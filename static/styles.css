@@ -127,6 +127,19 @@ body::after {
 .topnav {
   display: flex;
   gap: 10px;
+  position: fixed;
+  top: 22px;
+  right: 24px;
+  z-index: 120;
+  max-width: min(68vw, 980px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent 12%);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
 }
 
 .slot-toolbar {
@@ -193,12 +206,13 @@ body::after {
 
 .navlink,
 .ghost-link {
+  width: auto;
   padding: 10px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--muted);
   text-decoration: none;
-  background: color-mix(in srgb, var(--panel) 88%, transparent 12%);
+  background: color-mix(in srgb, var(--panel-strong) 92%, transparent 8%);
   transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
@@ -691,6 +705,52 @@ button.compact {
   box-shadow: 0 10px 26px rgba(60, 43, 32, 0.07);
 }
 
+.bubble-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble-think {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 78%, transparent 22%);
+}
+
+.bubble-think-toggle {
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+  user-select: none;
+}
+
+.bubble-think-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.bubble-think-toggle::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.16s ease;
+}
+
+.bubble-think[open] .bubble-think-toggle::before {
+  transform: rotate(90deg);
+}
+
+.bubble-think-content {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-strong) 82%, transparent 18%);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .chat-greeting-scroll {
   max-height: 108px;
   overflow-y: auto;
@@ -826,27 +886,87 @@ button.compact {
 }
 
 .config-shell.compact {
-  max-width: 1120px;
+  max-width: 980px;
   margin: 0 auto;
-  grid-template-columns: repeat(2, minmax(320px, 520px));
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
   justify-content: center;
-  align-items: stretch;
-  gap: 18px;
+  align-items: start;
+  gap: 14px;
 }
 
 .config-shell.compact > .config-panel:not(.full-span) {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  min-height: 0;
 }
 
 .config-shell.compact > .config-panel:not(.full-span) .section-head {
-  min-height: 86px;
+  min-height: 68px;
 }
 
 .config-shell.compact > .config-panel:not(.full-span) .button-row:last-child {
   margin-top: auto;
-  padding-top: 14px;
+  padding-top: 10px;
+}
+
+.config-shell.compact .config-panel {
+  padding: 15px;
+  border-radius: 22px;
+}
+
+.config-shell.compact .section-head {
+  margin-bottom: 8px;
+}
+
+.config-shell.compact label {
+  margin: 10px 0 5px;
+  font-size: 13px;
+}
+
+.config-shell.compact input,
+.config-shell.compact textarea,
+.config-shell.compact select {
+  padding: 9px 11px;
+  border-radius: 14px;
+}
+
+.config-shell.compact input,
+.config-shell.compact select {
+  min-height: 40px;
+}
+
+.config-shell.compact textarea {
+  min-height: 88px;
+}
+
+.config-shell.compact .button-row,
+.config-shell.compact .action-group,
+.config-shell.compact .inline-field,
+.config-shell.compact .grid-two {
+  gap: 10px;
+}
+
+.config-shell.compact .stats-row {
+  gap: 10px;
+}
+
+.config-shell.compact .stat-box {
+  padding: 12px 14px;
+}
+
+.config-shell.compact .memory-card,
+.config-shell.compact .worldbook-card,
+.config-shell.compact .card-block,
+.config-shell.compact .sub-block {
+  padding: 12px;
+  border-radius: 16px;
+}
+
+.config-shell.compact .card-builder,
+.config-shell.compact .card-grid,
+.config-shell.compact .card-column,
+.config-shell.compact .card-persona-grid {
+  gap: 14px;
 }
 
 .stats-row {
@@ -983,6 +1103,23 @@ button.compact {
 
 .topnav-chat {
   align-items: center;
+}
+
+@media (max-width: 1100px) {
+  .topnav {
+    top: 16px;
+    right: 16px;
+    left: auto;
+    max-width: calc(100vw - 32px);
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .navlink,
+  .ghost-link {
+    padding: 9px 12px;
+    font-size: 14px;
+  }
 }
 
 .chat-layout {

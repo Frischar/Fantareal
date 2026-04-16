@@ -54,6 +54,7 @@ UPLOAD_DIR = STATIC_DIR / "uploads"
 SPRITES_DIR = STATIC_DIR / "sprites"
 CARDS_DIR = BASE_DIR / "cards"
 RESOURCE_CARDS_DIR = RESOURCE_DIR / "cards"
+ROLE_CARD_EXTENSIONS = {".json", ".txt"}
 SLOT_META_PATH = DATA_DIR / "save_slots.json"
 EXPORT_DIR = BASE_DIR / "exports"
 LEGACY_PERSONA_PATH = DATA_DIR / "persona.json"
@@ -380,27 +381,114 @@ def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
     return items
 
 
-def sanitize_worldbook(raw: Any) -> dict[str, str]:
-    if isinstance(raw, dict):
-        source = raw
-    elif isinstance(raw, list):
-        source = {}
-        for item in raw:
-            if not isinstance(item, dict):
-                continue
-            trigger = str(item.get("trigger", "")).strip()
-            content = str(item.get("content", "")).strip()
-            if trigger and content:
-                source[trigger] = content
-    else:
-        return {}
+DEFAULT_WORLDBOOK_SETTINGS = {
+    "enabled": True,
+    "max_hits": 3,
+    "default_case_sensitive": False,
+    "default_whole_word": False,
+    "default_match_mode": "any",
+    "default_secondary_mode": "all",
+}
 
+
+def default_worldbook_store() -> dict[str, Any]:
+    return {"settings": dict(DEFAULT_WORLDBOOK_SETTINGS), "entries": []}
+
+
+def sanitize_worldbook_settings(raw: Any) -> dict[str, Any]:
+    settings = dict(DEFAULT_WORLDBOOK_SETTINGS)
+    if not isinstance(raw, dict):
+        return settings
+
+    settings["enabled"] = bool(raw.get("enabled", settings["enabled"]))
+    try:
+        settings["max_hits"] = max(1, min(20, int(raw.get("max_hits", settings["max_hits"]))))
+    except (TypeError, ValueError):
+        settings["max_hits"] = DEFAULT_WORLDBOOK_SETTINGS["max_hits"]
+
+    settings["default_case_sensitive"] = bool(raw.get("default_case_sensitive", settings["default_case_sensitive"]))
+    settings["default_whole_word"] = bool(raw.get("default_whole_word", settings["default_whole_word"]))
+
+    default_match_mode = str(raw.get("default_match_mode", settings["default_match_mode"])).strip().lower()
+    settings["default_match_mode"] = default_match_mode if default_match_mode in {"any", "all"} else "any"
+
+    default_secondary_mode = str(raw.get("default_secondary_mode", settings["default_secondary_mode"])).strip().lower()
+    settings["default_secondary_mode"] = default_secondary_mode if default_secondary_mode in {"any", "all"} else "all"
+    return settings
+
+
+def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+
+    trigger = str(raw.get("trigger", "")).strip()
+    content = str(raw.get("content", "")).strip()
+    if not trigger or not content:
+        return None
+
+    title = str(raw.get("title", "")).strip() or f"词条 {index}"
+    secondary_trigger = str(raw.get("secondary_trigger", "")).strip()
+    comment = str(raw.get("comment", "")).strip()
+    entry_id = str(raw.get("id", "")).strip() or f"worldbook-{index}"
+
+    match_mode = str(raw.get("match_mode", settings["default_match_mode"])).strip().lower()
+    if match_mode not in {"any", "all"}:
+        match_mode = settings["default_match_mode"]
+
+    secondary_mode = str(raw.get("secondary_mode", settings["default_secondary_mode"])).strip().lower()
+    if secondary_mode not in {"any", "all"}:
+        secondary_mode = settings["default_secondary_mode"]
+
+    try:
+        priority = int(raw.get("priority", 100))
+    except (TypeError, ValueError):
+        priority = 100
+
+    return {
+        "id": entry_id,
+        "title": title[:80],
+        "trigger": trigger,
+        "secondary_trigger": secondary_trigger,
+        "content": content,
+        "enabled": bool(raw.get("enabled", True)),
+        "priority": max(0, min(9999, priority)),
+        "case_sensitive": bool(raw.get("case_sensitive", settings["default_case_sensitive"])),
+        "whole_word": bool(raw.get("whole_word", settings["default_whole_word"])),
+        "match_mode": match_mode,
+        "secondary_mode": secondary_mode,
+        "comment": comment[:240],
+    }
+
+
+def sanitize_worldbook_store(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict) and ("settings" in raw or "entries" in raw):
+        settings = sanitize_worldbook_settings(raw.get("settings", {}))
+        raw_entries = raw.get("entries", [])
+    elif isinstance(raw, dict):
+        settings = sanitize_worldbook_settings({})
+        raw_entries = [{"trigger": key, "content": value} for key, value in raw.items()]
+    elif isinstance(raw, list):
+        settings = sanitize_worldbook_settings({})
+        raw_entries = raw
+    else:
+        return default_worldbook_store()
+
+    entries: list[dict[str, Any]] = []
+    if isinstance(raw_entries, list):
+        for index, item in enumerate(raw_entries, start=1):
+            cleaned = sanitize_worldbook_entry(item, index=index, settings=settings)
+            if cleaned:
+                entries.append(cleaned)
+
+    return {"settings": settings, "entries": entries}
+
+
+def sanitize_worldbook(raw: Any) -> dict[str, str]:
+    store = sanitize_worldbook_store(raw)
     cleaned: dict[str, str] = {}
-    for key, value in source.items():
-        trigger = str(key).strip()
-        content = str(value).strip()
-        if trigger and content:
-            cleaned[trigger] = content
+    for item in store["entries"]:
+        if item.get("enabled", True):
+            cleaned[str(item["trigger"]).strip()] = str(item["content"]).strip()
     return cleaned
 
 
@@ -628,6 +716,18 @@ def is_garbled_placeholder_message(content: str) -> bool:
     return set(text) <= {"?", "？"}
 
 
+def normalize_legacy_message_content(role: str, content: str) -> str:
+    text = str(content or "")
+    if role != "assistant":
+        return text
+
+    stripped = text.lstrip()
+    if stripped.startswith("??????") or stripped.startswith("？？？？？？"):
+        remainder = stripped.lstrip("?？").lstrip(":：").lstrip()
+        return f"出错了：{remainder}" if remainder else "出错了。"
+    return text
+
+
 def sanitize_conversation(raw: Any) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         return []
@@ -642,7 +742,7 @@ def sanitize_conversation(raw: Any) -> list[dict[str, Any]]:
             continue
 
         role = str(item.get("role", "")).strip()
-        content = str(item.get("content", ""))
+        content = normalize_legacy_message_content(role, str(item.get("content", "")))
         created_at = str(item.get("created_at", "")).strip()
 
         if role not in {"user", "assistant", "system"}:
@@ -812,7 +912,19 @@ def get_memories(slot_id: str | None = None) -> list[dict[str, Any]]:
 
 
 def get_worldbook(slot_id: str | None = None) -> dict[str, str]:
-    return sanitize_worldbook(read_json(worldbook_path(slot_id), {}))
+    return sanitize_worldbook(get_worldbook_store(slot_id))
+
+
+def get_worldbook_store(slot_id: str | None = None) -> dict[str, Any]:
+    return sanitize_worldbook_store(read_json(worldbook_path(slot_id), {}))
+
+
+def get_worldbook_entries(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return get_worldbook_store(slot_id)["entries"]
+
+
+def get_worldbook_settings(slot_id: str | None = None) -> dict[str, Any]:
+    return get_worldbook_store(slot_id)["settings"]
 
 
 def save_memories(items: list[dict[str, Any]], slot_id: str | None = None) -> list[dict[str, Any]]:
@@ -829,10 +941,32 @@ def save_worldbook(entries: dict[str, str], slot_id: str | None = None) -> dict[
     sanitized = sanitize_worldbook(entries)
     persist_json(
         worldbook_path(slot_id),
+        {"settings": get_worldbook_settings(slot_id), "entries": [{"trigger": key, "content": value} for key, value in sanitized.items()]},
+        detail="世界书保存失败，请检查磁盘空间或文件权限。",
+    )
+    return sanitized
+
+
+def save_worldbook_store(store: dict[str, Any], slot_id: str | None = None) -> dict[str, Any]:
+    sanitized = sanitize_worldbook_store(store)
+    persist_json(
+        worldbook_path(slot_id),
         sanitized,
         detail="世界书保存失败，请检查磁盘空间或文件权限。",
     )
     return sanitized
+
+
+def save_worldbook_entries(entries: list[dict[str, Any]], slot_id: str | None = None) -> list[dict[str, Any]]:
+    store = get_worldbook_store(slot_id)
+    store["entries"] = entries
+    return save_worldbook_store(store, slot_id)["entries"]
+
+
+def save_worldbook_settings(settings: dict[str, Any], slot_id: str | None = None) -> dict[str, Any]:
+    store = get_worldbook_store(slot_id)
+    store["settings"] = settings
+    return save_worldbook_store(store, slot_id)["settings"]
 
 
 def get_current_card(slot_id: str | None = None) -> dict[str, Any]:
@@ -846,7 +980,11 @@ def get_current_card(slot_id: str | None = None) -> dict[str, Any]:
 
 def list_role_card_files() -> list[dict[str, str]]:
     cards: list[dict[str, str]] = []
-    for path in sorted(CARDS_DIR.glob("*.json")):
+    for path in sorted(CARDS_DIR.iterdir(), key=lambda item: item.name.lower()):
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in ROLE_CARD_EXTENSIONS:
+            continue
         cards.append({"filename": path.name, "path": str(path)})
     return cards
 
@@ -914,7 +1052,7 @@ def extract_role_card_payload(data: Any) -> dict[str, Any]:
 def parse_role_card_json(text: str) -> dict[str, Any]:
     raw = text.strip()
     if not raw:
-        raise HTTPException(status_code=400, detail="??? JSON ?????")
+        raise HTTPException(status_code=400, detail="角色卡 JSON 不能为空。")
 
     try:
         data = json.loads(raw)
@@ -923,10 +1061,10 @@ def parse_role_card_json(text: str) -> dict[str, Any]:
         try:
             data = json.loads(repaired)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail=f"??? JSON ?????{exc}") from exc
+            raise HTTPException(status_code=400, detail=f"角色卡 JSON 解析失败：{exc}") from exc
 
     if not isinstance(data, dict):
-        raise HTTPException(status_code=400, detail="??? JSON ????????")
+        raise HTTPException(status_code=400, detail="角色卡 JSON 顶层必须是对象。")
     return normalize_role_card(extract_role_card_payload(data))
 
 def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
@@ -970,10 +1108,12 @@ def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
     personas = card.get("personas", {})
     if isinstance(personas, dict):
         persona_lines = []
+        persona_names = []
         for key, value in personas.items():
             if not isinstance(value, dict):
                 continue
             name = str(value.get("name", "")).strip() or f"Persona {key}"
+            persona_names.append(name)
             desc = str(value.get("description", "")).strip()
             personality_text = str(value.get("personality", "")).strip()
             scenario_text = str(value.get("scenario", "")).strip()
@@ -981,14 +1121,28 @@ def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
             if details:
                 persona_lines.append(f"{name}: {'; '.join(details)}")
         if persona_lines:
-            sections.append(
-                "Multi-Character Cast Rules:\n"
-                "This role card contains multiple active characters.\n"
-                "When the scene fits, any of them may appear and speak in the same conversation.\n"
-                "Keep each character's name exactly as listed.\n"
-                "Do not merge different characters into one voice.\n"
-                "Write each speaker in separate paragraphs."
-            )
+            if len(persona_names) >= 3:
+                ordered_names = ", ".join(persona_names)
+                sections.append(
+                    "Multi-Character Cast Rules:\n"
+                    "This role card contains multiple active characters.\n"
+                    f"Every assistant turn must include all of these characters speaking: {ordered_names}.\n"
+                    "Do not omit any of them.\n"
+                    "Do not merge different characters into one voice.\n"
+                    "Write each speaker in a separate paragraph.\n"
+                    "Use the exact format `Name: dialogue` for every paragraph.\n"
+                    "Keep the speaking order stable across turns unless the user clearly asks for a different order.\n"
+                    "Do not say that only one or two characters are present unless the user explicitly removes the others from the scene."
+                )
+            else:
+                sections.append(
+                    "Multi-Character Cast Rules:\n"
+                    "This role card contains multiple active characters.\n"
+                    "When the scene fits, any of them may appear and speak in the same conversation.\n"
+                    "Keep each character's name exactly as listed.\n"
+                    "Do not merge different characters into one voice.\n"
+                    "Write each speaker in separate paragraphs."
+                )
             sections.append("Character Cast:\n" + "\n".join(persona_lines))
 
     return {
@@ -1081,17 +1235,17 @@ def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str
     persist_json(
         persona_path(target_slot),
         persona,
-        detail="???????????? persona.json?",
+        detail="写入角色设定失败，请检查 persona.json 权限。",
     )
     persist_json(
         memories_path(target_slot),
         [],
-        detail="????????????????",
+        detail="清空记忆库失败，请检查文件权限。",
     )
     persist_json(
         worldbook_path(target_slot),
         {},
-        detail="????????????????",
+        detail="清空世界书失败，请检查文件权限。",
     )
 
     current_card = {
@@ -1101,7 +1255,7 @@ def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str
     persist_json(
         current_card_path(target_slot),
         current_card,
-        detail="????????????????????",
+        detail="写入当前角色卡失败，请检查文件权限。",
     )
 
     return {
@@ -1260,6 +1414,7 @@ async def request_json(
     request_timeout: int,
 ) -> dict[str, Any]:
     last_error: Exception | None = None
+    last_error_detail = ""
 
     for attempt in range(1, REQUEST_RETRY_ATTEMPTS + 1):
         try:
@@ -1277,8 +1432,24 @@ async def request_json(
                     REQUEST_RETRY_ATTEMPTS,
                     url,
                 )
+        except httpx.HTTPStatusError as exc:
+            last_error = exc
+            response_text = exc.response.text.strip() if exc.response is not None else ""
+            last_error_detail = response_text[:500]
+            logger.warning(
+                "Upstream request failed on attempt %s/%s for %s: %s | body=%s",
+                attempt,
+                REQUEST_RETRY_ATTEMPTS,
+                url,
+                exc,
+                last_error_detail or "<empty>",
+            )
+            status_code = exc.response.status_code if exc.response is not None else 0
+            if 400 <= status_code < 500 and status_code not in {408, 409, 429}:
+                break
         except httpx.HTTPError as exc:
             last_error = exc
+            last_error_detail = ""
             logger.warning(
                 "Upstream request failed on attempt %s/%s for %s: %s",
                 attempt,
@@ -1293,7 +1464,42 @@ async def request_json(
     if isinstance(last_error, ValueError):
         raise HTTPException(status_code=502, detail="模型返回的不是合法 JSON") from last_error
 
-    raise HTTPException(status_code=502, detail=f"模型请求失败: {last_error}") from last_error
+    detail = f"模型请求失败: {last_error}"
+    if last_error_detail:
+        detail = f"{detail} | upstream={last_error_detail}"
+    raise HTTPException(status_code=502, detail=detail) from last_error
+
+
+async def request_minimal_model_reply() -> dict[str, Any]:
+    llm_config = get_runtime_chat_config()
+    url = build_api_url(llm_config["base_url"], "chat/completions")
+    payload = {
+        "model": llm_config["model"],
+        "messages": [
+            {
+                "role": "user",
+                "content": "Please reply with one short sentence: connection test successful.",
+            }
+        ],
+    }
+    data = await request_json(
+        url=url,
+        api_key=llm_config["api_key"],
+        payload=payload,
+        request_timeout=int(llm_config["request_timeout"]),
+    )
+
+    try:
+        raw_reply = str(data["choices"][0]["message"]["content"]).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(status_code=502, detail="模型返回格式不正确") from exc
+
+    sprite_tag, cleaned_reply = extract_sprite_tag(raw_reply)
+    return {
+        "reply": cleaned_reply or raw_reply,
+        "sprite_tag": sprite_tag,
+        "worldbook_enforced": False,
+    }
 
 
 async def fetch_embeddings(texts: list[str], runtime_overrides: dict[str, Any] | None = None) -> list[list[float]]:
@@ -1406,36 +1612,88 @@ def split_trigger_aliases(trigger: Any) -> list[str]:
     return aliases or ([text.strip()] if text.strip() else [])
 
 
-def match_worldbook_entries(query: str) -> list[dict[str, str]]:
+def keyword_matches_query(query_text: str, keyword: str, *, case_sensitive: bool, whole_word: bool) -> bool:
+    query = unicodedata.normalize("NFKC", str(query_text or ""))
+    target = unicodedata.normalize("NFKC", str(keyword or "")).strip()
+    if not query or not target:
+        return False
+
+    if not case_sensitive:
+        query = query.lower()
+        target = target.lower()
+
+    if not whole_word:
+        return target in query
+
+    if re.search(r"[\u4e00-\u9fff]", target):
+        return target in query
+
+    return bool(re.search(rf"(?<![0-9A-Za-z_]){re.escape(target)}(?![0-9A-Za-z_])", query))
+
+
+def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
     text = str(query or "").strip()
     if not text:
         return []
 
-    normalized_query = normalize_match_text(text)
-    hits: list[dict[str, str]] = []
-    for trigger, content in get_worldbook().items():
-        aliases = split_trigger_aliases(trigger)
-        matched_aliases: list[str] = []
-        for alias in aliases:
-            normalized_alias = normalize_match_text(alias)
-            if normalized_alias and normalized_alias in normalized_query:
-                matched_aliases.append(alias)
+    settings = get_worldbook_settings()
+    if not settings.get("enabled", True):
+        return []
 
-        if matched_aliases:
-            hits.append(
-                {
-                    "trigger": trigger,
-                    "content": content,
-                    "matched": " / ".join(matched_aliases),
-                }
-            )
+    hits: list[dict[str, Any]] = []
+    for item in get_worldbook_entries():
+        if not item.get("enabled", True):
+            continue
+
+        primary_aliases = split_trigger_aliases(item.get("trigger", ""))
+        if not primary_aliases:
+            continue
+
+        case_sensitive = bool(item.get("case_sensitive", settings["default_case_sensitive"]))
+        whole_word = bool(item.get("whole_word", settings["default_whole_word"]))
+        primary_matches = [
+            alias for alias in primary_aliases if keyword_matches_query(text, alias, case_sensitive=case_sensitive, whole_word=whole_word)
+        ]
+
+        primary_mode = str(item.get("match_mode", settings["default_match_mode"])).strip().lower()
+        primary_ok = bool(primary_matches) if primary_mode != "all" else len(primary_matches) == len(primary_aliases)
+        if not primary_ok:
+            continue
+
+        secondary_aliases = split_trigger_aliases(item.get("secondary_trigger", ""))
+        secondary_matches: list[str] = []
+        if secondary_aliases:
+            secondary_matches = [
+                alias for alias in secondary_aliases if keyword_matches_query(text, alias, case_sensitive=case_sensitive, whole_word=whole_word)
+            ]
+            secondary_mode = str(item.get("secondary_mode", settings["default_secondary_mode"])).strip().lower()
+            secondary_ok = bool(secondary_matches) if secondary_mode != "all" else len(secondary_matches) == len(secondary_aliases)
+            if not secondary_ok:
+                continue
+
+        hits.append(
+            {
+                "id": str(item.get("id", "")).strip(),
+                "title": str(item.get("title", "")).strip(),
+                "trigger": str(item.get("trigger", "")).strip(),
+                "secondary_trigger": str(item.get("secondary_trigger", "")).strip(),
+                "content": str(item.get("content", "")).strip(),
+                "matched": " / ".join(primary_matches + secondary_matches),
+                "comment": str(item.get("comment", "")).strip(),
+                "priority": int(item.get("priority", 100) or 100),
+            }
+        )
+
+    hits.sort(key=lambda item: (-int(item.get("priority", 100) or 100), item.get("title", "")))
+    max_hits = max(1, int(settings.get("max_hits", DEFAULT_WORLDBOOK_SETTINGS["max_hits"])))
+    hits = hits[:max_hits]
 
     if hits:
         logger.info("世界书命中：%s", ", ".join(item["matched"] for item in hits))
     return hits
 
 
-def build_worldbook_prompt(matches: list[dict[str, str]]) -> str:
+def build_worldbook_prompt(matches: list[dict[str, Any]]) -> str:
     if not matches:
         return ""
 
@@ -1447,10 +1705,16 @@ def build_worldbook_prompt(matches: list[dict[str, str]]) -> str:
     ]
     for index, item in enumerate(matches, start=1):
         matched = item.get("matched", "")
-        lines = [f"{index}. 触发词：{item['trigger']}"]
+        title = str(item.get("title", "")).strip()
+        lines = [f"{index}. 词条：{title or item['trigger']}"]
+        lines.append(f"触发词：{item['trigger']}")
         if matched:
             lines.append(f"本轮命中：{matched}")
+        if item.get("secondary_trigger"):
+            lines.append(f"辅助触发：{item['secondary_trigger']}")
         lines.append(f"设定：{item['content']}")
+        if item.get("comment"):
+            lines.append(f"备注：{item['comment']}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
@@ -1526,6 +1790,20 @@ def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
     )
 
 
+def normalize_sprite_tag(tag: str) -> str:
+    text = str(tag or "").strip()
+    if not text:
+        return ""
+
+    replacements = {
+        "骞抽潤": "平静",
+        "賽抽潤": "平静",
+        "賽抽润": "平静",
+        "赛抽润": "平静",
+    }
+    return replacements.get(text, text)
+
+
 def extract_sprite_tag(reply_text: str) -> tuple[str, str]:
     text = str(reply_text or "").strip()
     if not text:
@@ -1535,22 +1813,80 @@ def extract_sprite_tag(reply_text: str) -> tuple[str, str]:
     if not match:
         return "", text
 
-    tag = match.group(1).strip()
+    tag = normalize_sprite_tag(match.group(1).strip())
     cleaned = text[match.end() :].lstrip()
     return tag, cleaned
 
 
-def extract_stream_visible_reply(raw_text: str) -> tuple[str, str]:
+def extract_reply_parts(raw_text: str) -> dict[str, Any]:
     text = str(raw_text or "")
     if not text:
-        return "", ""
+        return {"sprite_tag": "", "visible": "", "think": "", "thinking": False}
 
     stripped = text.lstrip()
     if stripped.startswith("[") and "]" not in stripped[:48]:
-        return "", ""
+        return {"sprite_tag": "", "visible": "", "think": "", "thinking": False}
 
-    tag, cleaned = extract_sprite_tag(text)
-    return tag, cleaned or text
+    sprite_tag, cleaned = extract_sprite_tag(text)
+    source = cleaned or text
+
+    think_parts: list[str] = []
+    visible_parts: list[str] = []
+    cursor = 0
+    thinking = False
+    open_tag_pattern = re.compile(r"<think\b[^>]*>", flags=re.IGNORECASE)
+
+    while True:
+        match = open_tag_pattern.search(source, cursor)
+        if not match:
+            if cursor < len(source):
+                visible_parts.append(source[cursor:])
+            break
+
+        start = match.start()
+        open_end = match.end()
+        if start > cursor:
+            visible_parts.append(source[cursor:start])
+
+        close_match = re.search(r"</think>", source[open_end:], flags=re.IGNORECASE)
+        if not close_match:
+            trailing = source[open_end:].strip()
+            if trailing:
+                think_parts.append(trailing)
+            thinking = True
+            cursor = len(source)
+            break
+
+        close_index = open_end + close_match.start()
+        inner = source[open_end:close_index].strip()
+        if inner:
+            think_parts.append(inner)
+        cursor = close_index + len(close_match.group(0))
+
+    visible = "".join(visible_parts)
+    visible = re.sub(r"\n{3,}", "\n\n", visible).strip()
+    think = "\n\n".join(part for part in think_parts if part).strip()
+    return {
+        "sprite_tag": sprite_tag,
+        "visible": visible,
+        "think": think,
+        "thinking": thinking,
+    }
+
+
+def compose_full_reply(think_text: str, visible_text: str) -> str:
+    think = str(think_text or "").strip()
+    visible = str(visible_text or "").strip()
+    if think and visible:
+        return f"<think>\n{think}\n</think>\n\n{visible}"
+    if think:
+        return f"<think>\n{think}\n</think>"
+    return visible
+
+
+def extract_stream_visible_reply(raw_text: str) -> tuple[str, str]:
+    reply_parts = extract_reply_parts(raw_text)
+    return str(reply_parts["sprite_tag"]), str(reply_parts["visible"])
 
 
 async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -1654,29 +1990,33 @@ def build_messages(
     memories = get_memories()
     llm_config = get_runtime_chat_config(runtime_overrides)
     messages: list[dict[str, str]] = []
+    system_sections: list[str] = []
 
     system_prompt = persona.get("system_prompt", "").strip()
     if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
+        system_sections.append(system_prompt)
 
     memory_recap_prompt = build_memory_recap_prompt(memories)
     if memory_recap_prompt:
-        messages.append({"role": "system", "content": memory_recap_prompt})
+        system_sections.append(memory_recap_prompt)
 
     worldbook_prompt = build_worldbook_prompt(worldbook_matches or [])
     if worldbook_prompt:
-        messages.append({"role": "system", "content": worldbook_prompt})
+        system_sections.append(worldbook_prompt)
     worldbook_answer_guard = build_worldbook_answer_guard(user_message, worldbook_matches or [])
     if worldbook_answer_guard:
-        messages.append({"role": "system", "content": worldbook_answer_guard})
+        system_sections.append(worldbook_answer_guard)
 
     retrieval_prompt = build_retrieval_prompt(retrieved_items or [])
     if retrieval_prompt:
-        messages.append({"role": "system", "content": retrieval_prompt})
+        system_sections.append(retrieval_prompt)
 
     sprite_prompt = build_sprite_prompt(llm_config)
     if sprite_prompt:
-        messages.append({"role": "system", "content": sprite_prompt})
+        system_sections.append(sprite_prompt)
+
+    if system_sections:
+        messages.append({"role": "system", "content": "\n\n".join(section for section in system_sections if section)})
 
     history_limit = max(1, int(llm_config["history_limit"]))
     for item in history[-history_limit:]:
@@ -1720,8 +2060,9 @@ async def request_model_reply(
     except (KeyError, IndexError, TypeError) as exc:
         raise HTTPException(status_code=502, detail="模型返回格式不正确") from exc
 
-    sprite_tag, cleaned_reply = extract_sprite_tag(raw_reply)
-    reply_source = cleaned_reply or raw_reply
+    reply_parts = extract_reply_parts(raw_reply)
+    sprite_tag = str(reply_parts["sprite_tag"])
+    reply_source = str(reply_parts["visible"] or raw_reply)
     final_reply = enforce_worldbook_fact_in_reply(
         user_message,
         reply_source,
@@ -1732,6 +2073,8 @@ async def request_model_reply(
         sprite_tag = "平静"
     return {
         "reply": final_reply,
+        "full_reply": compose_full_reply(str(reply_parts["think"]), final_reply),
+        "think": str(reply_parts["think"]),
         "sprite_tag": sprite_tag,
         "worldbook_enforced": worldbook_enforced,
     }
@@ -1775,7 +2118,9 @@ async def stream_model_reply(
 
     accumulated_raw = ""
     accumulated_visible = ""
+    accumulated_think = ""
     sprite_tag = ""
+    was_thinking = False
 
     async with httpx.AsyncClient(timeout=float(llm_config["request_timeout"])) as client:
         async with client.stream("POST", url, headers=build_headers(llm_config["api_key"]), json=payload) as response:
@@ -1802,9 +2147,23 @@ async def stream_model_reply(
                     continue
 
                 accumulated_raw += chunk
-                parsed_tag, visible_text = extract_stream_visible_reply(accumulated_raw)
+                reply_parts = extract_reply_parts(accumulated_raw)
+                parsed_tag = str(reply_parts["sprite_tag"])
+                visible_text = str(reply_parts["visible"])
+                think_text = str(reply_parts["think"])
+                is_thinking = bool(reply_parts["thinking"])
                 if parsed_tag and not sprite_tag:
                     sprite_tag = parsed_tag
+                if is_thinking and not was_thinking:
+                    yield {"type": "think_start"}
+                if len(think_text) > len(accumulated_think):
+                    think_delta = think_text[len(accumulated_think) :]
+                    accumulated_think = think_text
+                    if think_delta:
+                        yield {"type": "think_chunk", "delta": think_delta}
+                if was_thinking and not is_thinking:
+                    yield {"type": "think_end"}
+                was_thinking = is_thinking
                 if len(visible_text) > len(accumulated_visible):
                     delta_text = visible_text[len(accumulated_visible) :]
                     accumulated_visible = visible_text
@@ -1817,8 +2176,10 @@ async def stream_model_reply(
             accumulated_visible or accumulated_raw,
             worldbook_matches or [],
         ),
-        "sprite_tag": sprite_tag or ("骞抽潤" if llm_config.get("sprite_enabled", True) else ""),
+        "sprite_tag": sprite_tag or ("平静" if llm_config.get("sprite_enabled", True) else ""),
     }
+    reply_result["full_reply"] = compose_full_reply(accumulated_think, str(reply_result["reply"]))
+    reply_result["think"] = accumulated_think
     reply_result["worldbook_enforced"] = reply_result["reply"] != (accumulated_visible or accumulated_raw)
     yield {"type": "done", **reply_result}
 
@@ -1883,6 +2244,15 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
         raise ValueError("chat model is not configured")
 
     url = build_api_url(llm_config["base_url"], "chat/completions")
+    transcript = build_conversation_transcript(history)
+    schema_hint = (
+        '{\n'
+        '  "title": "不超过20字的短标题",\n'
+        '  "content": "一条精炼完整的长期记忆短句",\n'
+        '  "tags": ["tag1", "tag2"],\n'
+        '  "notes": "可为空字符串"\n'
+        '}'
+    )
     payload = {
         "model": llm_config["model"],
         "temperature": 0.2,
@@ -1891,14 +2261,24 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
                 "role": "system",
                 "content": (
                     "You are a dialogue memory formatter. "
-                    "Convert the following completed conversation into strict JSON with only title, content, tags, notes. "
-                    "title should be short, content should be one polished short sentence for long-term memory, "
-                    "tags must be an array of strings, notes may be empty."
+                    "Return one strict JSON object only. "
+                    "Do not output markdown fences, explanation, roleplay, XML, or any extra text. "
+                    "The JSON object must contain exactly these keys: title, content, tags, notes. "
+                    "title must be a short title within 20 Chinese characters or 40 ASCII chars. "
+                    "content must be one polished complete sentence for long-term memory. "
+                    "tags must be an array of short strings. "
+                    "notes may be an empty string. "
+                    "Output must start with { and end with }."
                 ),
             },
             {
                 "role": "user",
-                "content": build_conversation_transcript(history),
+                "content": (
+                    "请把这段完整对话整理成长期记忆。\n"
+                    "只返回 JSON 对象，不要返回任何解释。\n"
+                    f"格式示例：\n{schema_hint}\n\n"
+                    f"对话内容：\n{transcript}"
+                ),
             },
         ],
     }
@@ -1914,14 +2294,70 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
     except (KeyError, IndexError, TypeError) as exc:
         raise ValueError("invalid summary payload") from exc
 
+    def parse_summary_json(candidate: str) -> dict[str, Any]:
+        cleaned = str(candidate or "").strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+            cleaned = re.sub(r"\s*```$", "", cleaned)
+
+        try:
+            parsed = json.loads(cleaned)
+        except ValueError:
+            start = cleaned.find("{")
+            end = cleaned.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                raise ValueError("summary is not json") from None
+            parsed = json.loads(cleaned[start : end + 1])
+
+        if not isinstance(parsed, dict):
+            raise ValueError("summary json must be an object")
+
+        required_keys = {"title", "content", "tags", "notes"}
+        if not required_keys.issubset(parsed.keys()):
+            raise ValueError("summary json missing required keys")
+        return parsed
+
     try:
-        return json.loads(text)
+        summary = parse_summary_json(text)
+        logger.info("Automatic memory summary parsed as strict JSON on first pass.")
+        return summary
     except ValueError:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1 or end <= start:
-            raise ValueError("summary is not json")
-        return json.loads(text[start : end + 1])
+        logger.warning("Automatic memory summary was not strict JSON, trying one repair pass.")
+        repair_payload = {
+            "model": llm_config["model"],
+            "temperature": 0.0,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Convert the provided text into one strict JSON object only. "
+                        "Do not output markdown, explanation, or extra text. "
+                        "The object must contain exactly these keys: title, content, tags, notes."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "把下面这段内容修正成严格 JSON。\n"
+                        f"格式示例：\n{schema_hint}\n\n"
+                        f"原始内容：\n{text}"
+                    ),
+                },
+            ],
+        }
+        repair_data = await request_json(
+            url=url,
+            api_key=llm_config["api_key"],
+            payload=repair_payload,
+            request_timeout=int(llm_config["request_timeout"]),
+        )
+        try:
+            repaired_text = str(repair_data["choices"][0]["message"]["content"]).strip()
+        except (KeyError, IndexError, TypeError) as exc:
+            raise ValueError("invalid summary repair payload") from exc
+        summary = parse_summary_json(repaired_text)
+        logger.info("Automatic memory summary repaired into strict JSON successfully.")
+        return summary
 
 
 def sanitize_memory_summary(payload: dict[str, Any], *, fallback: dict[str, Any]) -> dict[str, Any]:
@@ -2036,12 +2472,32 @@ class MemoryListPayload(BaseModel):
 
 
 class WorldbookEntryPayload(BaseModel):
+    id: str = ""
+    title: str = ""
     trigger: str = ""
+    secondary_trigger: str = ""
     content: str = ""
+    enabled: bool = True
+    priority: int = 100
+    case_sensitive: bool = False
+    whole_word: bool = False
+    match_mode: str = "any"
+    secondary_mode: str = "all"
+    comment: str = ""
+
+
+class WorldbookSettingsPayload(BaseModel):
+    enabled: bool = True
+    max_hits: int = 3
+    default_case_sensitive: bool = False
+    default_whole_word: bool = False
+    default_match_mode: str = "any"
+    default_secondary_mode: str = "all"
 
 
 class WorldbookPayload(BaseModel):
     items: list[WorldbookEntryPayload] = Field(default_factory=list)
+    settings: WorldbookSettingsPayload | None = None
 
 
 class SaveSlotSelectPayload(BaseModel):
@@ -2155,6 +2611,38 @@ async def memory_config_page(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/config/worldbook", response_class=HTMLResponse)
+async def worldbook_config_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "worldbook_config.html",
+        {
+            "settings": get_settings(active_slot),
+            "worldbook_settings": get_worldbook_settings(active_slot),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/config/worldbook/entries", response_class=HTMLResponse)
+async def worldbook_manager_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "worldbook_manager.html",
+        {
+            "settings": get_settings(active_slot),
+            "worldbook_settings": get_worldbook_settings(active_slot),
+            "worldbook_entries": get_worldbook_entries(active_slot),
+            "worldbook_count": len(get_worldbook_entries(active_slot)),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
 @app.get("/config/sprite", response_class=HTMLResponse)
 async def sprite_config_page(request: Request) -> HTMLResponse:
     active_slot = get_active_slot_id()
@@ -2256,8 +2744,8 @@ async def api_get_memories() -> list[dict[str, Any]]:
 
 @app.get("/api/worldbook")
 async def api_get_worldbook() -> dict[str, Any]:
-    items = [{"trigger": trigger, "content": content} for trigger, content in get_worldbook().items()]
-    return {"items": items}
+    store = get_worldbook_store()
+    return {"items": store["entries"], "settings": store["settings"]}
 
 
 @app.get("/api/sprites")
@@ -2302,7 +2790,9 @@ async def api_load_card(payload: RoleCardLoadPayload) -> dict[str, Any]:
     filename = Path(payload.filename).name
     target = CARDS_DIR / filename
     if not target.exists():
-        raise HTTPException(status_code=404, detail="????????????")
+        raise HTTPException(status_code=404, detail="未找到对应的角色卡文件。")
+    if target.suffix.lower() not in ROLE_CARD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="角色卡文件格式不受支持，请使用 .json 或 .txt。")
 
     raw_text = read_role_card_text(target)
     card = parse_role_card_json(raw_text)
@@ -2318,7 +2808,7 @@ async def api_export_current_card() -> FileResponse:
     if not isinstance(card, dict) or not any(
         str(value).strip() for value in card.values() if not isinstance(value, (dict, list))
     ):
-        raise HTTPException(status_code=404, detail="?????????????")
+        raise HTTPException(status_code=404, detail="当前角色卡不存在或尚未加载。")
 
     source_name = Path(str(current_card.get("source_name", "")).strip() or "role_card_export.json").name
     if not source_name.lower().endswith(".json"):
@@ -2327,7 +2817,7 @@ async def api_export_current_card() -> FileResponse:
     persist_json(
         export_path,
         normalize_role_card(card),
-        detail="?????????????????????",
+        detail="导出当前角色卡失败，请检查文件权限。",
     )
     return FileResponse(
         path=export_path,
@@ -2343,15 +2833,61 @@ async def api_save_memories(payload: MemoryListPayload) -> dict[str, Any]:
 
 @app.post("/api/worldbook")
 async def api_save_worldbook(payload: WorldbookPayload) -> dict[str, Any]:
-    worldbook = save_worldbook(
-        {
-            item.trigger.strip(): item.content.strip()
-            for item in payload.items
-            if item.trigger.strip() and item.content.strip()
-        }
-    )
-    items = [{"trigger": trigger, "content": content} for trigger, content in worldbook.items()]
-    return {"ok": True, "items": items}
+    existing_store = get_worldbook_store()
+    existing_entries = existing_store["entries"]
+    merged_items: list[dict[str, Any]] = []
+    for index, item in enumerate(payload.items, start=1):
+        row = item.model_dump()
+        trigger = str(row.get("trigger", "")).strip()
+        content = str(row.get("content", "")).strip()
+        if not trigger or not content:
+            continue
+        previous = next((entry for entry in existing_entries if str(entry.get("trigger", "")).strip() == trigger), {})
+        merged_items.append(
+            {
+                "id": row.get("id") or previous.get("id", f"worldbook-{index}"),
+                "title": row.get("title") or previous.get("title", f"词条 {index}"),
+                "trigger": trigger,
+                "secondary_trigger": row.get("secondary_trigger") or previous.get("secondary_trigger", ""),
+                "content": content,
+                "enabled": row.get("enabled", previous.get("enabled", True)),
+                "priority": row.get("priority", previous.get("priority", 100)),
+                "case_sensitive": row.get("case_sensitive", previous.get("case_sensitive", existing_store["settings"]["default_case_sensitive"])),
+                "whole_word": row.get("whole_word", previous.get("whole_word", existing_store["settings"]["default_whole_word"])),
+                "match_mode": row.get("match_mode") or previous.get("match_mode", existing_store["settings"]["default_match_mode"]),
+                "secondary_mode": row.get("secondary_mode") or previous.get("secondary_mode", existing_store["settings"]["default_secondary_mode"]),
+                "comment": row.get("comment") or previous.get("comment", ""),
+            }
+        )
+
+    store_to_save = {
+        "settings": payload.settings.model_dump() if payload.settings is not None else existing_store["settings"],
+        "entries": merged_items,
+    }
+    saved_store = save_worldbook_store(store_to_save)
+    return {"ok": True, "items": saved_store["entries"], "settings": saved_store["settings"]}
+
+
+@app.get("/api/worldbook/settings")
+async def api_get_worldbook_settings() -> dict[str, Any]:
+    return {"settings": get_worldbook_settings()}
+
+
+@app.post("/api/worldbook/settings")
+async def api_save_worldbook_settings(payload: WorldbookSettingsPayload) -> dict[str, Any]:
+    settings = save_worldbook_settings(payload.model_dump())
+    return {"ok": True, "settings": settings}
+
+
+@app.get("/api/worldbook/entries")
+async def api_get_worldbook_entries() -> dict[str, Any]:
+    return {"items": get_worldbook_entries(), "settings": get_worldbook_settings()}
+
+
+@app.post("/api/worldbook/entries")
+async def api_save_worldbook_entries(payload: WorldbookPayload) -> dict[str, Any]:
+    items = save_worldbook_entries([item.model_dump() for item in payload.items])
+    return {"ok": True, "items": items, "settings": get_worldbook_settings()}
 
 
 @app.post("/api/sprites")
@@ -2462,7 +2998,7 @@ async def api_test_connection() -> dict[str, Any]:
     if not (llm_config["base_url"] and llm_config["model"]):
         raise HTTPException(status_code=400, detail="请先填写聊天模型的 API URL 和模型名。")
 
-    reply = await request_model_reply("请用一句简短的话回复：聊天模型连接测试成功。", [])
+    reply = await request_minimal_model_reply()
     return {"ok": True, "reply": reply.get("reply", ""), "sprite_tag": reply.get("sprite_tag", "")}
 
 
@@ -2488,7 +3024,7 @@ async def api_get_history() -> list[dict[str, Any]]:
 async def api_chat(payload: ChatRequest) -> dict[str, Any]:
     message = payload.message.strip()
     if not message:
-        raise HTTPException(status_code=400, detail="???????")
+        raise HTTPException(status_code=400, detail="消息不能为空。")
 
     runtime_overrides = payload.runtime_config or {}
     reply_result, retrieved_items, worldbook_matches = await generate_reply(message, runtime_overrides)
@@ -2574,9 +3110,10 @@ async def api_chat_stream(payload: ChatRequest) -> StreamingResponse:
             return
 
         reply_text = str((final_reply_result or {}).get("reply", "")).strip()
+        stored_reply_text = str((final_reply_result or {}).get("full_reply", "")).strip() or reply_text
         entries = [("user", message)]
-        if reply_text:
-            entries.append(("assistant", reply_text))
+        if stored_reply_text:
+            entries.append(("assistant", stored_reply_text))
         append_messages(entries)
 
     return StreamingResponse(

@@ -1,30 +1,39 @@
 # Xuqi LLM Chat
 
-一个基于 `FastAPI + WebUI` 的本地 AI 伴侣聊天项目，支持多存档、角色卡、世界书、记忆库、立绘切换和桌面启动器。
+一个本地运行的 AI 伴侣聊天项目，基于 `FastAPI + WebUI` 构建，支持多存档、角色卡、世界书、记忆库、差分立绘和桌面启动器。
 
-项目定位偏向：
-
-- 本地运行
-- 可自定义扩展
-- 适合做角色陪伴、设定互动和聊天原型
-
-使用AI coding编程制作 为测试产物
+这个仓库是适合公开发布的干净版本，不包含个人 API Key、聊天记录、测试角色卡或本地缓存数据。
 
 Made by `Frischar`.
 
-## 功能概览
+使用`AI coding`制作
 
-- 欢迎页、聊天页、配置页分离
+## 更新日志v1.1
+
+- 补充了世界书相关页面入口：
+  - `/config/worldbook`
+  - `/config/worldbook/entries`
+- 补充了角色卡模板说明，默认只保留：
+  - `cards/template_role_card.json`
+- 补充了双击启动脚本的 Python 检测说明：
+  - 会检查是否安装 Python
+  - 会检查版本是否至少为 `3.10`
+  - 未安装时会给出下载提示
+- 补充了“未配置嵌入模型 / 重排序模型时仍可正常聊天”的说明。
+
+## 项目特点
+
+- 本地 WebUI，开箱即用
 - 多存档隔离
 - 角色卡导入、编辑、导出
-- 世界书关键词触发
+- 世界书设置页与词条管理页
 - 可编辑记忆库
-- 立绘管理与情绪切换
+- 差分立绘与表情标签切换
 - 背景图、主题、透明度等界面设置
 - OpenAI 兼容聊天接口
-- 预留嵌入模型与重排序模型接入
+- 可接入嵌入模型与重排序模型
 - 流式输出
-- 单文件桌面启动器封包
+- 可封包为桌面启动器
 
 ## 页面入口
 
@@ -40,50 +49,33 @@ Made by `Frischar`.
   记忆库配置页
 - `/config/sprite`
   立绘管理页
+- `/config/worldbook`
+  世界书设置页
+- `/config/worldbook/entries`
+  世界书词条管理页
 
-## 目录结构
+## 快速启动
 
-```text
-.
-|-- app.py
-|-- launcher.py
-|-- requirements.txt
-|-- README.md
-|-- 启动webui.bat
-|-- 封包器.bat
-|-- data/
-|   |-- settings.json
-|   |-- persona.json
-|   |-- save_slots.json
-|   `-- slots/
-|-- cards/
-|-- templates/
-|   |-- welcome.html
-|   |-- index.html
-|   |-- config.html
-|   |-- card_config.html
-|   |-- memory_config.html
-|   `-- sprite_config.html
-`-- static/
-    |-- styles.css
-    |-- uploads/
-    `-- sprites/
-```
+### 方式一：双击启动
 
-## 本地启动
-
-### 方式一：直接双击
-
-双击：
+直接双击：
 
 `启动webui.bat`
 
-它会自动创建虚拟环境、安装依赖并启动本地 WebUI。
+脚本会自动：
 
-### 方式二：命令行运行
+- 检测是否已安装 Python
+- 检测 Python 版本是否至少为 `3.10`
+- 首次运行时创建 `.venv`
+- 安装依赖
+- 启动本地 WebUI
+
+如果没有安装 Python，脚本会给出提示，并打开官方下载页面。
+
+### 方式二：命令行启动
 
 ```powershell
-cd "G:\xuqi_llm聊天"
+cd "G:\xuqi_llm聊天_github"
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -94,61 +86,28 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 `http://127.0.0.1:8000`
 
-## 启动器与封包
-
-项目支持封包为单文件启动器。
-
-重新封包可运行：
-
-`封包器.bat`
-
-封包后的启动器行为：
-
-- 单个 `exe` 启动
-- 自动拉起本地服务
-- 自动打开独立应用窗口
-- 关闭窗口后程序退出
-
-运行数据会优先生成在 `exe` 同目录，例如：
-
-- `data/`
-- `cards/`
-- `static/`
-- `exports/`
-- `browser_profile/`
-
-如果当前目录没有写权限，才会回退到系统本地用户目录。
-
-## 配置说明
+## 使用说明
 
 ### 聊天模型
+
+在 `Config` 页填写：
 
 - `API URL`
 - `API Key`
 - `Model`
 
-### 嵌入模型
+只要接口兼容 OpenAI Chat Completions 风格，就可以直接接入。
 
-- `Embedding API URL`
-- `Embedding API Key`
-- `Embedding Model`
-- `Embedding Fields`
+### 嵌入模型与重排序
 
-### 重排序模型
+可选接入：
 
-- `Rerank Enabled`
-- `Rerank API URL`
-- `Rerank API Key`
-- `Rerank Model`
+- 嵌入模型
+- 重排序模型
 
-### 界面设置
+未配置时，主聊天功能仍可正常运行，只是不会启用检索增强链路。
 
-- 浅色 / 暗色主题
-- 背景图
-- 背景遮罩
-- UI 透明度
-
-## 存档机制
+### 存档机制
 
 默认提供 3 个存档槽位：
 
@@ -164,6 +123,7 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 - 世界书
 - 当前角色卡
 - 立绘目录
+- 部分本地运行时配置
 
 立绘默认按槽位读取：
 
@@ -171,11 +131,79 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 - `/static/sprites/slot_2`
 - `/static/sprites/slot_3`
 
+### 角色卡
+
+支持：
+
+- 从 `cards/` 目录加载角色卡
+- 在页面内编辑角色卡
+- 导出当前角色卡
+
+仓库默认只保留一张模板角色卡：
+
+- [cards/template_role_card.json](./cards/template_role_card.json)
+
+## 封包与启动器
+
+项目支持封包为单文件桌面启动器。
+
+可使用：
+
+`封包器.bat`
+
+封包后的启动器行为：
+
+- 单个 `exe` 启动
+- 自动拉起本地服务
+- 自动打开独立窗口
+- 关闭窗口后程序退出
+
+运行数据会优先生成在 `exe` 同目录，例如：
+
+- `data/`
+- `cards/`
+- `static/`
+- `exports/`
+- `browser_profile/`
+
+如果当前目录没有写权限，才会回退到系统用户目录。
+
+## 目录结构
+
+```text
+.
+|-- app.py
+|-- launcher.py
+|-- requirements.txt
+|-- README.md
+|-- 启动webui.bat
+|-- 封包器.bat
+|-- app_icon.ico
+|-- cards/
+|   `-- template_role_card.json
+|-- data/
+|   |-- persona.json
+|   |-- settings.json
+|   |-- save_slots.json
+|   `-- slots/
+|-- templates/
+|   |-- welcome.html
+|   |-- index.html
+|   |-- config.html
+|   |-- card_config.html
+|   |-- memory_config.html
+|   |-- sprite_config.html
+|   |-- worldbook_config.html
+|   `-- worldbook_manager.html
+`-- static/
+    |-- styles.css
+    |-- uploads/
+    `-- sprites/
+```
+
 ## 开发入口
 
 - 后端主入口：`app.py`
 - 桌面启动器入口：`launcher.py`
 - 页面模板：`templates/`
 - 样式文件：`static/styles.css`
-
-

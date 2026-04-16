@@ -1,13 +1,47 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 
 cd /d "%~dp0"
 
+set "PYTHON_CMD="
+
+where py >nul 2>nul
+if not errorlevel 1 set "PYTHON_CMD=py"
+
+if not defined PYTHON_CMD (
+    where python >nul 2>nul
+    if not errorlevel 1 set "PYTHON_CMD=python"
+)
+
+if not defined PYTHON_CMD (
+    echo [Error] Python was not found on this computer.
+    echo.
+    echo Please install Python 3.10 or newer first.
+    echo Download: https://www.python.org/downloads/windows/
+    echo Make sure to enable "Add python.exe to PATH" during setup.
+    echo.
+    start "" "https://www.python.org/downloads/windows/"
+    pause
+    exit /b 1
+)
+
+%PYTHON_CMD% -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)"
+if errorlevel 1 (
+    echo [Error] Python version is too old.
+    echo.
+    echo Please install Python 3.10 or newer.
+    echo Download: https://www.python.org/downloads/windows/
+    echo.
+    start "" "https://www.python.org/downloads/windows/"
+    pause
+    exit /b 1
+)
+
 if not exist ".venv\Scripts\python.exe" (
     echo [First run] Creating virtual environment...
-    python -m venv .venv
+    %PYTHON_CMD% -m venv .venv
     if errorlevel 1 (
-        echo Failed to create virtual environment. Please make sure Python is installed.
+        echo Failed to create the virtual environment.
         pause
         exit /b 1
     )

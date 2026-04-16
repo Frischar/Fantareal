@@ -13,10 +13,14 @@
         <a class="brand" href="/">Xuqi LLM Chat</a>
       </div>
       <nav class="topnav topnav-chat">
-        <a class="ghost-link" href="/">Welcome</a>
-        <a class="ghost-link" href="/config/card">Card</a>
-        <a class="ghost-link" href="/config/sprite">Sprite</a>
-        <a class="ghost-link" href="/config/memory">Memory</a>
+        <a class="navlink" href="/">Welcome</a>
+        <a class="navlink active" href="/chat">Chat</a>
+        <a class="navlink" href="/config">Config</a>
+        <a class="navlink" href="/config/card">Card</a>
+        <a class="navlink" href="/config/sprite">Sprite</a>
+        <a class="navlink" href="/config/memory">Memory</a>
+        <a class="navlink" href="/config/worldbook">WB Set</a>
+        <a class="navlink" href="/config/worldbook/entries">WB List</a>
       </nav>
     </div>
 
@@ -267,6 +271,8 @@
             <a class="ghost-link button-link" href="/config/card">Card Editor</a>
             <a class="ghost-link button-link" href="/config/sprite">Sprite Manager</a>
             <a class="ghost-link button-link" href="/config/memory">Memory Manager</a>
+            <a class="ghost-link button-link" href="/config/worldbook">Worldbook Settings</a>
+            <a class="ghost-link button-link" href="/config/worldbook/entries">Worldbook Entries</a>
           </div>
         </section>
       </div>
@@ -511,6 +517,145 @@
         spritePlaceholderEl.textContent = `没有找到对应立绘，请在 ${runtimeState.sprite_base_path || {{ settings.sprite_base_path | tojson }}} 里放入同名 PNG。`;
       });
 
+      function parseThoughtSections(content) {
+        const text = String(content || "");
+        if (!text) {
+          return { visible: "", think: "" };
+        }
+
+        const thinkParts = [];
+        const visibleParts = [];
+        const openTagPattern = /<think\b[^>]*>/gi;
+        let cursor = 0;
+        let match;
+
+        while ((match = openTagPattern.exec(text)) !== null) {
+          const start = match.index;
+          const openEnd = openTagPattern.lastIndex;
+
+          if (start > cursor) {
+            visibleParts.push(text.slice(cursor, start));
+          }
+
+          const closeIndex = text.toLowerCase().indexOf("</think>", openEnd);
+          if (closeIndex === -1) {
+            const trailingThink = text.slice(openEnd).trim();
+            if (trailingThink) {
+              thinkParts.push(trailingThink);
+            }
+            cursor = text.length;
+            break;
+          }
+
+          const inner = text.slice(openEnd, closeIndex).trim();
+          if (inner) {
+            thinkParts.push(inner);
+          }
+          cursor = closeIndex + "</think>".length;
+          openTagPattern.lastIndex = cursor;
+        }
+
+        if (cursor < text.length) {
+          visibleParts.push(text.slice(cursor));
+        }
+
+        return {
+          visible: visibleParts.join("").replace(/\n{3,}/g, "\n\n").trim(),
+          think: thinkParts.join("\n\n").trim(),
+        };
+      }
+
+      function ensureBubbleNodes(bubble) {
+        if (!bubble._bodyNode) {
+          bubble.replaceChildren();
+          const body = document.createElement("div");
+          body.className = "bubble-body";
+          bubble.appendChild(body);
+          bubble._bodyNode = body;
+        }
+        return {
+          body: bubble._bodyNode,
+          thinkDetails: bubble._thinkDetails || null,
+          thinkSummary: bubble._thinkSummary || null,
+          thinkContent: bubble._thinkContent || null,
+        };
+      }
+
+      function ensureThinkNodes(bubble) {
+        if (bubble._thinkDetails && bubble._thinkSummary && bubble._thinkContent) {
+          return {
+            details: bubble._thinkDetails,
+            summary: bubble._thinkSummary,
+            content: bubble._thinkContent,
+          };
+        }
+
+        const details = document.createElement("details");
+        details.className = "bubble-think";
+
+        const summary = document.createElement("summary");
+        summary.className = "bubble-think-toggle";
+
+        const content = document.createElement("div");
+        content.className = "bubble-think-content";
+
+        details.appendChild(summary);
+        details.appendChild(content);
+        bubble.insertBefore(details, bubble.firstChild || null);
+
+        bubble._thinkDetails = details;
+        bubble._thinkSummary = summary;
+        bubble._thinkContent = content;
+        return { details, summary, content };
+      }
+
+      function removeThinkNodes(bubble) {
+        if (bubble._thinkDetails) {
+          bubble._thinkDetails.remove();
+        }
+        bubble._thinkDetails = null;
+        bubble._thinkSummary = null;
+        bubble._thinkContent = null;
+      }
+
+      function renderBubbleContent(bubble, content) {
+        if (!bubble) return;
+        const state = typeof content === "object" && content !== null
+          ? {
+              visible: String(content.visible || ""),
+              think: String(content.think || ""),
+              thinking: Boolean(content.thinking),
+            }
+          : (() => {
+              const parts = parseThoughtSections(content);
+              return { visible: parts.visible, think: parts.think, thinking: false };
+            })();
+
+        const nodes = ensureBubbleNodes(bubble);
+
+        if (state.think) {
+          const thinkNodes = ensureThinkNodes(bubble);
+          thinkNodes.details.open = state.thinking;
+          thinkNodes.summary.textContent = state.thinking ? "思考中..." : "查看思考链";
+          if (thinkNodes.content.textContent !== state.think) {
+            thinkNodes.content.textContent = state.think;
+          }
+        } else {
+          removeThinkNodes(bubble);
+        }
+
+        const nextBodyText = state.visible || (state.think && state.thinking ? "" : "");
+        if (nodes.body.textContent !== nextBodyText) {
+          nodes.body.textContent = nextBodyText;
+        }
+      }
+
+      function hydrateExistingMessages() {
+        messagesEl.querySelectorAll(".bubble").forEach((bubble) => {
+          renderBubbleContent(bubble, bubble.textContent || "");
+        });
+      }
+
       function createMessage(role, content, createdAt = new Date().toLocaleString()) {
         const wrapper = document.createElement("div");
         wrapper.className = `message ${role}`;
@@ -518,7 +663,7 @@
         bubbleWrap.className = "bubble-wrap";
         const bubble = document.createElement("div");
         bubble.className = "bubble";
-        bubble.textContent = content;
+        renderBubbleContent(bubble, content);
         const meta = document.createElement("div");
         meta.className = "message-meta";
         meta.textContent = createdAt;
@@ -527,7 +672,19 @@
         wrapper.appendChild(bubbleWrap);
         messagesEl.appendChild(wrapper);
         messagesEl.scrollTop = messagesEl.scrollHeight;
-        return { wrapper, bubble, meta };
+        return {
+          wrapper,
+          bubble,
+          meta,
+          framePending: false,
+          pendingVisibleChars: [],
+          typewriterActive: false,
+          state: {
+            visible: "",
+            think: "",
+            thinking: false,
+          },
+        };
       }
 
       function addMessage(role, content, createdAt = new Date().toLocaleString()) {
@@ -536,11 +693,69 @@
 
       function updateMessage(entry, content, createdAt = "") {
         if (!entry) return;
-        entry.bubble.textContent = content;
+        renderBubbleContent(entry.bubble, content);
         if (createdAt) {
           entry.meta.textContent = createdAt;
         }
         messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function scheduleBubbleRender(entry) {
+        if (!entry || entry.framePending) return;
+        entry.framePending = true;
+        requestAnimationFrame(() => {
+          entry.framePending = false;
+          renderBubbleContent(entry.bubble, entry.state);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        });
+      }
+
+      function scheduleTypewriterTick(entry) {
+        if (!entry || entry.typewriterActive) return;
+        entry.typewriterActive = true;
+
+        const tick = () => {
+          if (!entry.pendingVisibleChars.length) {
+            entry.typewriterActive = false;
+            return;
+          }
+          entry.state.visible += entry.pendingVisibleChars.shift();
+          scheduleBubbleRender(entry);
+          requestAnimationFrame(tick);
+        };
+
+        requestAnimationFrame(tick);
+      }
+
+      function appendVisibleDelta(entry, delta) {
+        if (!entry) return;
+        const chars = Array.from(String(delta || ""));
+        if (!chars.length) return;
+        entry.pendingVisibleChars.push(...chars);
+        scheduleTypewriterTick(entry);
+      }
+
+      function ensureFinalVisible(entry, fullText) {
+        if (!entry) return;
+        const target = String(fullText || "");
+        const buffered = entry.state.visible + entry.pendingVisibleChars.join("");
+        if (target === buffered) {
+          scheduleTypewriterTick(entry);
+          return;
+        }
+        if (target.startsWith(buffered)) {
+          entry.pendingVisibleChars.push(...Array.from(target.slice(buffered.length)));
+          scheduleTypewriterTick(entry);
+          return;
+        }
+        if (target.startsWith(entry.state.visible)) {
+          entry.pendingVisibleChars = Array.from(target.slice(entry.state.visible.length));
+          scheduleTypewriterTick(entry);
+          return;
+        }
+        entry.pendingVisibleChars = [];
+        entry.state.visible = target;
+        scheduleBubbleRender(entry);
       }
 
       function renderRetrievedItems(items) {
@@ -615,7 +830,7 @@
         });
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
-          throw new Error(data.detail || "璇锋眰澶辫触");
+          throw new Error(data.detail || "请求失败");
         }
         if (!response.body) {
           throw new Error("Streaming is not supported in this browser.");
@@ -638,6 +853,9 @@
               if (jsonText) {
                 const event = JSON.parse(jsonText);
                 if (event.type === "meta" && handlers.onMeta) handlers.onMeta(event);
+                if (event.type === "think_start" && handlers.onThinkStart) handlers.onThinkStart(event);
+                if (event.type === "think_chunk" && handlers.onThinkChunk) handlers.onThinkChunk(event);
+                if (event.type === "think_end" && handlers.onThinkEnd) handlers.onThinkEnd(event);
                 if (event.type === "chunk" && handlers.onChunk) handlers.onChunk(event);
                 if (event.type === "done" && handlers.onDone) handlers.onDone(event);
                 if (event.type === "error" && handlers.onError) handlers.onError(event);
@@ -775,7 +993,7 @@
         if (!text) return;
         addMessage("user", text);
         inputEl.value = "";
-        setStatus("?????...");
+        setStatus("正在回复...");
         const assistantEntry = createMessage("assistant", "");
         let finalReply = "";
         try {
@@ -788,31 +1006,54 @@
               renderWorldbookHits(data.worldbook_hits || []);
               renderWorldbookDebug(data.worldbook_debug || {});
             },
+            onThinkStart() {
+              assistantEntry.state.thinking = true;
+              scheduleBubbleRender(assistantEntry);
+            },
+            onThinkChunk(data) {
+              assistantEntry.state.think += data.delta || "";
+              assistantEntry.state.thinking = true;
+              scheduleBubbleRender(assistantEntry);
+            },
+            onThinkEnd() {
+              assistantEntry.state.thinking = false;
+              scheduleBubbleRender(assistantEntry);
+            },
             onChunk(data) {
               finalReply += data.delta || "";
-              updateMessage(assistantEntry, finalReply);
+              appendVisibleDelta(assistantEntry, data.delta || "");
             },
             onDone(data) {
               finalReply = typeof data.reply === "string" ? data.reply : finalReply;
-              if (finalReply.trim()) {
-                updateMessage(assistantEntry, finalReply);
+              ensureFinalVisible(assistantEntry, finalReply);
+              if (typeof data.think === "string") {
+                assistantEntry.state.think = data.think;
+              }
+              assistantEntry.state.thinking = false;
+              if (
+                assistantEntry.state.visible.trim()
+                || assistantEntry.pendingVisibleChars.length
+                || assistantEntry.state.think.trim()
+              ) {
+                renderBubbleContent(assistantEntry.bubble, assistantEntry.state);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
               } else {
                 assistantEntry.wrapper.remove();
               }
               updateSprite(data.sprite_tag || "");
             },
             onError(data) {
-              throw new Error(data.detail || "Streaming failed");
+              throw new Error(data.detail || "流式请求失败");
             },
           });
-          setStatus("???");
+          setStatus("就绪");
         } catch (error) {
           assistantEntry.wrapper.remove();
-          addMessage("assistant", `??????${error.message}`);
+          addMessage("assistant", `出错了：${error.message}`);
           renderRetrievedItems([]);
           renderWorldbookHits([]);
           renderWorldbookDebug({});
-          setStatus("??????");
+          setStatus("回复失败");
         }
       });
 
@@ -894,6 +1135,7 @@
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
       syncDrawerFromState();
+      hydrateExistingMessages();
       loadWorldbook().catch(() => {
         worldbookEntries = [];
         renderWorldbookEditor();
