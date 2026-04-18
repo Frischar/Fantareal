@@ -425,6 +425,22 @@
       const ACTIVE_SLOT = {{ active_slot | tojson }};
       const STORAGE_KEY = `xuqi.runtime.sidebar.v1.${ACTIVE_SLOT}`;
       const DEFAULT_SLOT_SPRITE_BASE_PATH = {{ settings.sprite_base_path | tojson }};
+      const SERVER_VISUAL_KEYS = [
+        "theme",
+        "ui_opacity",
+        "background_image_url",
+        "background_overlay",
+        "sprite_enabled",
+        "sprite_base_path",
+      ];
+      const SERVER_VISUAL_INPUT_IDS = new Set([
+        "drawer-theme",
+        "drawer-ui-opacity",
+        "drawer-background-url",
+        "drawer-background-overlay",
+        "drawer-sprite-enabled",
+        "drawer-sprite-base-path",
+      ]);
       const initialState = {
         llm_base_url: {{ settings.llm_base_url | tojson }},
         llm_api_key: {{ settings.llm_api_key | tojson }},
@@ -451,9 +467,11 @@
         sprite_base_path: DEFAULT_SLOT_SPRITE_BASE_PATH
       };
 
+      let serverState = { ...initialState };
       let runtimeState = loadRuntimeState();
       let worldbookEntries = [];
       const streamingEntries = new Set();
+      let visualSettingsSaveTimer = null;
 
       async function selectSlot(slotId) {
         await postJson("/api/slots/select", { slot_id: slotId });
@@ -475,10 +493,25 @@
         window.location.reload();
       }
 
+      function stripServerVisualState(state) {
+        const stripped = { ...(state || {}) };
+        SERVER_VISUAL_KEYS.forEach((key) => {
+          delete stripped[key];
+        });
+        return stripped;
+      }
+
+      function pickServerVisualState(state) {
+        return SERVER_VISUAL_KEYS.reduce((acc, key) => {
+          acc[key] = state[key];
+          return acc;
+        }, {});
+      }
+
       function loadRuntimeState() {
         try {
           const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-          const merged = { ...initialState, ...saved };
+          const merged = { ...initialState, ...stripServerVisualState(saved) };
           if (!merged.sprite_base_path || merged.sprite_base_path === "/static/sprites") {
             merged.sprite_base_path = DEFAULT_SLOT_SPRITE_BASE_PATH;
           }
@@ -489,7 +522,37 @@
       }
 
       function persistRuntimeState() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(runtimeState));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stripServerVisualState(runtimeState)));
+      }
+
+      async function saveVisualSettingsToServer(statusText = "") {
+        const payload = {
+          ...serverState,
+          ...pickServerVisualState(runtimeState),
+        };
+        const data = await postJson("/api/settings", payload);
+        serverState = { ...data.settings };
+        runtimeState = {
+          ...runtimeState,
+          ...pickServerVisualState(serverState),
+        };
+        persistRuntimeState();
+        applyTheme(runtimeState.theme);
+        applyUiOpacity(runtimeState.ui_opacity);
+        applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+        syncDrawerFromState();
+        if (statusText) {
+          setStatus(statusText);
+        }
+      }
+
+      function scheduleVisualSettingsSave() {
+        window.clearTimeout(visualSettingsSaveTimer);
+        visualSettingsSaveTimer = window.setTimeout(() => {
+          saveVisualSettingsToServer().catch((error) => {
+            setStatus(`界面设置保存失败：${error.message}`);
+          });
+        }, 250);
       }
 
       function setStatus(text) {
@@ -532,7 +595,7 @@
         document.getElementById("drawer-background-overlay-value").textContent = Number(runtimeState.background_overlay || 0.42).toFixed(2);
       }
 
-      function syncStateFromDrawer() {
+      function syncStateFromDrawer(event) {
         runtimeState = {
           ...runtimeState,
           llm_base_url: drawerInput("drawer-llm-base-url").value.trim(),
@@ -564,6 +627,10 @@
         applyTheme(runtimeState.theme);
         applyUiOpacity(runtimeState.ui_opacity);
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+
+        if (SERVER_VISUAL_INPUT_IDS.has(event?.target?.id || "")) {
+          scheduleVisualSettingsSave();
+        }
       }
 
       function openDrawer() {
@@ -1106,6 +1173,7 @@
         drawerInput("drawer-background-url").value = runtimeState.background_image_url;
         persistRuntimeState();
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+        await saveVisualSettingsToServer("背景图已上传并保存到聊天界面");
         setStatus("背景图已上传到本地 static/uploads");
       }
 
@@ -1296,6 +1364,7 @@
       applyTheme(runtimeState.theme);
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+      persistRuntimeState();
       syncDrawerFromState();
       hydrateExistingMessages();
       loadWorldbook().catch(() => {
