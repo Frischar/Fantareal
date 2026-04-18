@@ -1514,7 +1514,14 @@ async def fetch_available_models(
         if model_id and model_id not in models:
             models.append(model_id)
 
+    normalized_base = str(base_url or "").strip().lower().rstrip("/")
+    if "api.deepseek.com" in normalized_base:
+        for model_id in ["deepseek-chat", "deepseek-reasoner"]:
+            if model_id not in models:
+                models.append(model_id)
+
     return models
+
 
 
 async def request_minimal_model_reply() -> dict[str, Any]:
@@ -3090,8 +3097,9 @@ async def api_upload_background(file: UploadFile = File(...)) -> dict[str, Any]:
 @app.post("/api/models")
 async def api_get_models() -> dict[str, Any]:
     llm_config = get_runtime_chat_config()
+    base_url = str(llm_config["base_url"] or "").strip()
     models = await fetch_available_models(
-        base_url=str(llm_config["base_url"] or "").strip(),
+        base_url=base_url,
         api_key=str(llm_config["api_key"] or "").strip(),
         request_timeout=int(llm_config["request_timeout"]),
     )
@@ -3103,6 +3111,7 @@ async def api_get_models() -> dict[str, Any]:
         "items": models,
         "current_model": current_model,
         "preferred_model": preferred,
+        "provider_hint": "deepseek" if "api.deepseek.com" in base_url.lower() else "",
     }
 
 

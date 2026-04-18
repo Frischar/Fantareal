@@ -69,14 +69,29 @@
           </div>
         </div>
 
+        <div class="grid-two">
+          <div>
+            <label for="memory-search">搜索记忆</label>
+            <input id="memory-search" type="text" placeholder="按标题、正文、标签、备注搜索" />
+          </div>
+          <div class="button-row offset-top">
+            <button id="collapse-all-memories" type="button" class="secondary">全部折叠</button>
+            <button id="expand-all-memories" type="button" class="secondary">全部展开</button>
+          </div>
+        </div>
+
         <div id="memory-list" class="memory-list">
           {% for item in memories %}
-          <article class="memory-card">
+          <article class="memory-card" data-collapsed="false">
             <div class="memory-card-head">
-              <strong>记忆 {{ loop.index }}</strong>
-              <button type="button" class="secondary compact remove-memory">删除</button>
+              <strong>{{ item.title or ("记忆 " ~ loop.index) }}</strong>
+              <div class="button-row">
+                <button type="button" class="secondary compact toggle-memory">折叠</button>
+                <button type="button" class="secondary compact remove-memory">删除</button>
+              </div>
             </div>
 
+            <div class="memory-card-body">
             <label>标题</label>
             <input class="memory-title" value="{{ item.title }}" placeholder="例如：和用户的关系进展" />
 
@@ -90,6 +105,7 @@
             <textarea class="memory-notes" rows="3" placeholder="补充说明，可选">{{ item.notes }}</textarea>
 
             <input class="memory-id" type="hidden" value="{{ item.id }}" />
+            </div>
           </article>
           {% endfor %}
         </div>
@@ -105,12 +121,16 @@
     </div>
 
     <template id="memory-card-template">
-      <article class="memory-card">
+      <article class="memory-card" data-collapsed="false">
         <div class="memory-card-head">
           <strong>新记忆</strong>
-          <button type="button" class="secondary compact remove-memory">删除</button>
+          <div class="button-row">
+            <button type="button" class="secondary compact toggle-memory">折叠</button>
+            <button type="button" class="secondary compact remove-memory">删除</button>
+          </div>
         </div>
 
+        <div class="memory-card-body">
         <label>标题</label>
         <input class="memory-title" placeholder="例如：主角色的固定偏好" />
 
@@ -124,6 +144,7 @@
         <textarea class="memory-notes" rows="3" placeholder="补充说明，可选"></textarea>
 
         <input class="memory-id" type="hidden" />
+        </div>
       </article>
     </template>
 
@@ -188,6 +209,39 @@
         bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
       }
 
+      function normalizeSearchText(value) {
+        return String(value || "").trim().toLowerCase();
+      }
+
+      function getMemorySearchText(card) {
+        return [
+          card.querySelector(".memory-title")?.value || "",
+          card.querySelector(".memory-content")?.value || "",
+          card.querySelector(".memory-tags")?.value || "",
+          card.querySelector(".memory-notes")?.value || "",
+        ].join("\n").toLowerCase();
+      }
+
+      function setMemoryCollapsed(card, collapsed) {
+        const body = card.querySelector(".memory-card-body");
+        const toggleBtn = card.querySelector(".toggle-memory");
+        card.dataset.collapsed = collapsed ? "true" : "false";
+        if (body) body.style.display = collapsed ? "none" : "";
+        if (toggleBtn) toggleBtn.textContent = collapsed ? "展开" : "折叠";
+      }
+
+      function applyMemorySearch() {
+        const keyword = normalizeSearchText(document.getElementById("memory-search")?.value || "");
+        const cards = [...memoryListEl.querySelectorAll(".memory-card")];
+        let visibleCount = 0;
+        for (const card of cards) {
+          const matched = !keyword || getMemorySearchText(card).includes(keyword);
+          card.style.display = matched ? "" : "none";
+          if (matched) visibleCount += 1;
+        }
+        setStatus(keyword ? `搜索完成：找到 ${visibleCount} 条匹配记忆。` : "已清除搜索筛选。");
+      }
+
       function updateMemoryCount() {
         memoryCountEl.textContent = String(memoryListEl.querySelectorAll(".memory-card").length);
       }
@@ -196,7 +250,29 @@
         card.querySelector(".remove-memory").addEventListener("click", () => {
           card.remove();
           updateMemoryCount();
+          applyMemorySearch();
           setStatus("已删除一条记忆，记得保存。");
+        });
+
+        const toggleBtn = card.querySelector(".toggle-memory");
+        if (toggleBtn) {
+          toggleBtn.addEventListener("click", () => {
+            const collapsed = card.dataset.collapsed === "true";
+            setMemoryCollapsed(card, !collapsed);
+          });
+        }
+      }
+
+      function initExistingMemoryCards() {
+        [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => {
+          attachRemoveHandler(card);
+          if (!card.dataset.collapsed) {
+            card.dataset.collapsed = "false";
+          }
+          const collapsed = card.dataset.collapsed === "true";
+          setMemoryCollapsed(card, collapsed);
+          const title = card.querySelector(".memory-title")?.value?.trim() || card.querySelector(".memory-card-head strong")?.textContent || "新记忆";
+          card.querySelector(".memory-card-head strong").textContent = title;
         });
       }
 
@@ -244,6 +320,7 @@
           memoryListEl.appendChild(createMemoryCard(item));
         }
         updateMemoryCount();
+        applyMemorySearch();
         setStatus("记忆库已重新读取。");
       }
 
@@ -255,12 +332,14 @@
           memoryListEl.appendChild(createMemoryCard(item));
         }
         updateMemoryCount();
+        applyMemorySearch();
         setStatus("记忆库已保存，并会在每次聊天时作为前情提要生效。");
       }
 
       document.getElementById("add-memory").addEventListener("click", () => {
         memoryListEl.prepend(createMemoryCard());
         updateMemoryCount();
+        applyMemorySearch();
         setStatus("已新增一条空白记忆。");
       });
 
@@ -278,6 +357,27 @@
         } catch (error) {
           setStatus(`读取失败：${error.message}`);
         }
+      });
+
+      memoryListEl.addEventListener("input", (event) => {
+        const card = event.target.closest(".memory-card");
+        if (!card) return;
+        card.querySelector(".memory-card-head strong").textContent = card.querySelector(".memory-title").value.trim() || "新记忆";
+        applyMemorySearch();
+      });
+
+      document.getElementById("memory-search").addEventListener("input", () => {
+        applyMemorySearch();
+      });
+
+      document.getElementById("collapse-all-memories").addEventListener("click", () => {
+        [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, true));
+        setStatus("已折叠当前列表中的全部记忆。");
+      });
+
+      document.getElementById("expand-all-memories").addEventListener("click", () => {
+        [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, false));
+        setStatus("已展开当前列表中的全部记忆。");
       });
 
       document.getElementById("slot-select").addEventListener("change", async (event) => {
@@ -309,7 +409,9 @@
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
+      initExistingMemoryCards();
       updateMemoryCount();
+      applyMemorySearch();
     </script>
   </body>
 </html>
