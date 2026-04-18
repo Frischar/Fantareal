@@ -209,6 +209,17 @@ def default_role_card() -> dict[str, Any]:
     }
 
 
+
+def default_user_profile() -> dict[str, Any]:
+    return {
+        "display_name": "我",
+        "nickname": "",
+        "profile_text": "",
+        "notes": "",
+        "avatar_url": "",
+    }
+
+
 def load_env_file() -> None:
     env_path = BASE_DIR / ".env"
     if not env_path.exists():
@@ -606,6 +617,53 @@ def current_card_path(slot_id: str | None = None) -> Path:
     return get_slot_dir(slot_id) / "current_role_card.json"
 
 
+def user_profile_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "user_profile.json"
+
+
+def avatar_upload_url(filename: str) -> str:
+    safe_name = Path(str(filename or "")).name
+    return f"/static/uploads/{safe_name}" if safe_name else ""
+
+
+def remove_upload_variants(prefix: str) -> None:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    for path in UPLOAD_DIR.glob(f"{prefix}.*"):
+        if path.is_file():
+            path.unlink(missing_ok=True)
+
+
+def save_image_upload_for_slot(
+    *,
+    file: UploadFile,
+    prefix: str,
+    empty_detail: str,
+    too_large_detail: str,
+    invalid_type_detail: str,
+    save_failed_detail: str,
+) -> str:
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in ALLOWED_IMAGE_SUFFIXES:
+        raise HTTPException(status_code=400, detail=invalid_type_detail)
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail=invalid_type_detail)
+    content = file.file.read(MAX_UPLOAD_SIZE_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail=empty_detail)
+    if len(content) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail=too_large_detail)
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    remove_upload_variants(prefix)
+    target = UPLOAD_DIR / f"{prefix}{suffix}"
+    try:
+        target.write_bytes(content)
+    except OSError as exc:
+        logger.exception("Avatar write failed: %s", target)
+        raise HTTPException(status_code=500, detail=save_failed_detail) from exc
+    return avatar_upload_url(target.name)
+
+
 def reset_slot_data(slot_id: str) -> dict[str, Any]:
     target = sanitize_slot_id(slot_id, get_active_slot_id())
     persist_json(persona_path(target), DEFAULT_PERSONA, detail="存档重置失败：无法重置人设。")
@@ -614,6 +672,9 @@ def reset_slot_data(slot_id: str) -> dict[str, Any]:
     persist_json(memories_path(target), [], detail="存档重置失败：无法清空记忆库。")
     persist_json(worldbook_path(target), {}, detail="存档重置失败：无法清空世界书。")
     persist_json(current_card_path(target), {}, detail="存档重置失败：无法清空角色卡记录。")
+    persist_json(user_profile_path(target), default_user_profile(), detail="存档重置失败：无法重置用户资料。")
+    remove_upload_variants(f"user_avatar_{target}")
+    remove_upload_variants(f"role_avatar_{target}")
     return slot_summary(target)
 
 
@@ -880,6 +941,8 @@ def ensure_data_files() -> None:
             write_json(worldbook_path(slot_id), {})
         if not current_card_path(slot_id).exists():
             write_json(current_card_path(slot_id), {})
+        if not user_profile_path(slot_id).exists():
+            write_json(user_profile_path(slot_id), default_user_profile())
     migrate_legacy_root_to_primary_slot()
 
 
@@ -905,6 +968,49 @@ def get_conversation(slot_id: str | None = None) -> list[dict[str, Any]]:
 def get_settings(slot_id: str | None = None) -> dict[str, Any]:
     target = sanitize_slot_id(slot_id, get_active_slot_id())
     return sanitize_settings(read_json(settings_path(target), {}), slot_id=target)
+
+
+def sanitize_user_profile(payload: Any, *, slot_id: str | None = None) -> dict[str, Any]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    base = default_user_profile()
+    if isinstance(payload, dict):
+        base["display_name"] = str(payload.get("display_name", base["display_name"])).strip()[:24] or "我"
+        base["nickname"] = str(payload.get("nickname", "")).strip()[:40]
+        base["profile_text"] = str(payload.get("profile_text", "")).strip()[:4000]
+        base["notes"] = str(payload.get("notes", "")).strip()[:1000]
+        avatar_url = str(payload.get("avatar_url", "")).strip()
+        if avatar_url.startswith("/static/uploads/"):
+            base["avatar_url"] = avatar_url
+    avatar_prefix = f"user_avatar_{target}"
+    role_prefix = f"role_avatar_{target}"
+    for path in sorted(UPLOAD_DIR.glob(f"{avatar_prefix}.*")):
+        if path.is_file() and path.suffix.lower() in ALLOWED_IMAGE_SUFFIXES:
+            base["avatar_url"] = avatar_upload_url(path.name)
+            break
+    base["role_avatar_url"] = ""
+    for path in sorted(UPLOAD_DIR.glob(f"{role_prefix}.*")):
+        if path.is_file() and path.suffix.lower() in ALLOWED_IMAGE_SUFFIXES:
+            base["role_avatar_url"] = avatar_upload_url(path.name)
+            break
+    return base
+
+
+def get_user_profile(slot_id: str | None = None) -> dict[str, Any]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    return sanitize_user_profile(read_json(user_profile_path(target), {}), slot_id=target)
+
+
+def save_user_profile(payload: dict[str, Any], slot_id: str | None = None) -> dict[str, Any]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    existing = get_user_profile(target)
+    merged = {**existing, **payload}
+    sanitized = sanitize_user_profile(merged, slot_id=target)
+    persist_json(user_profile_path(target), sanitized, detail="用户资料保存失败，请检查磁盘空间或文件权限。")
+    return sanitized
+
+
+def get_role_avatar_url(slot_id: str | None = None) -> str:
+    return str(get_user_profile(slot_id).get("role_avatar_url", "")).strip()
 
 
 def get_memories(slot_id: str | None = None) -> list[dict[str, Any]]:
@@ -1514,14 +1620,7 @@ async def fetch_available_models(
         if model_id and model_id not in models:
             models.append(model_id)
 
-    normalized_base = str(base_url or "").strip().lower().rstrip("/")
-    if "api.deepseek.com" in normalized_base:
-        for model_id in ["deepseek-chat", "deepseek-reasoner"]:
-            if model_id not in models:
-                models.append(model_id)
-
     return models
-
 
 
 async def request_minimal_model_reply() -> dict[str, Any]:
@@ -1844,14 +1943,6 @@ def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
     )
 
 
-def build_thinking_prompt() -> str:
-    return (
-        "If the model supports visible reasoning, start each reply with a short reasoning block wrapped in "
-        "<thinking>...</thinking> or <think>...</think>, then output the final visible answer. "
-        "Keep the reasoning concise, but always close the tag properly."
-    )
-
-
 def normalize_sprite_tag(tag: str) -> str:
     text = str(tag or "").strip()
     if not text:
@@ -1889,13 +1980,14 @@ def extract_reply_parts(raw_text: str) -> dict[str, Any]:
     if stripped.startswith("[") and "]" not in stripped[:48]:
         return {"sprite_tag": "", "visible": "", "think": "", "thinking": False}
 
-    source = text
+    sprite_tag, cleaned = extract_sprite_tag(text)
+    source = cleaned or text
 
     think_parts: list[str] = []
     visible_parts: list[str] = []
     cursor = 0
     thinking = False
-    open_tag_pattern = re.compile(r"<(think|thinking)\b[^>]*>", flags=re.IGNORECASE)
+    open_tag_pattern = re.compile(r"<think\b[^>]*>", flags=re.IGNORECASE)
 
     while True:
         match = open_tag_pattern.search(source, cursor)
@@ -1909,12 +2001,7 @@ def extract_reply_parts(raw_text: str) -> dict[str, Any]:
         if start > cursor:
             visible_parts.append(source[cursor:start])
 
-        tag_name = str(match.group(1) or "think").lower()
-        close_match = re.search(
-            rf"</{re.escape(tag_name)}>",
-            source[open_end:],
-            flags=re.IGNORECASE,
-        )
+        close_match = re.search(r"</think>", source[open_end:], flags=re.IGNORECASE)
         if not close_match:
             trailing = source[open_end:].strip()
             if trailing:
@@ -1931,7 +2018,6 @@ def extract_reply_parts(raw_text: str) -> dict[str, Any]:
 
     visible = "".join(visible_parts)
     visible = re.sub(r"\n{3,}", "\n\n", visible).strip()
-    sprite_tag, visible = extract_sprite_tag(visible)
     think = "\n\n".join(part for part in think_parts if part).strip()
     return {
         "sprite_tag": sprite_tag,
@@ -2077,10 +2163,6 @@ def build_messages(
     retrieval_prompt = build_retrieval_prompt(retrieved_items or [])
     if retrieval_prompt:
         system_sections.append(retrieval_prompt)
-
-    thinking_prompt = build_thinking_prompt()
-    if thinking_prompt:
-        system_sections.append(thinking_prompt)
 
     sprite_prompt = build_sprite_prompt(llm_config)
     if sprite_prompt:
@@ -2590,6 +2672,13 @@ class MemoryListPayload(BaseModel):
     items: list[MemoryItemPayload] = Field(default_factory=list)
 
 
+class UserProfilePayload(BaseModel):
+    display_name: str = "我"
+    nickname: str = ""
+    profile_text: str = ""
+    notes: str = ""
+
+
 class WorldbookEntryPayload(BaseModel):
     id: str = ""
     title: str = ""
@@ -2652,6 +2741,8 @@ def build_chat_template_context() -> dict[str, Any]:
         "persona": get_persona(active_slot),
         "history": get_conversation(active_slot),
         "settings": get_settings(active_slot),
+        "user_profile": get_user_profile(active_slot),
+        "role_avatar_url": get_role_avatar_url(active_slot),
         "active_slot": active_slot,
         "slot_registry": get_slot_registry(),
     }
@@ -2690,6 +2781,21 @@ async def config_page(request: Request) -> HTMLResponse:
             "settings": get_settings(active_slot),
             "memory_count": len(get_memories(active_slot)),
             "current_card": get_current_card(active_slot),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/config/user", response_class=HTMLResponse)
+async def user_config_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "user_config.html",
+        {
+            "settings": get_settings(active_slot),
+            "user_profile": get_user_profile(active_slot),
             "active_slot": active_slot,
             "slot_registry": get_slot_registry(),
         },
@@ -2773,10 +2879,53 @@ async def sprite_config_page(request: Request) -> HTMLResponse:
             "sprites": list_sprite_assets(active_slot),
             "sprite_count": len(list_sprite_assets(active_slot)),
             "sprite_base_path": default_sprite_base_path_for_slot(active_slot),
+            "role_avatar_url": get_role_avatar_url(active_slot),
             "active_slot": active_slot,
             "slot_registry": get_slot_registry(),
         },
     )
+
+
+@app.get("/api/user-profile")
+async def api_get_user_profile() -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    return {"active_slot": active_slot, "profile": get_user_profile(active_slot)}
+
+
+@app.post("/api/user-profile")
+async def api_save_user_profile(payload: UserProfilePayload) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    profile = save_user_profile(payload.model_dump(), active_slot)
+    return {"ok": True, "active_slot": active_slot, "profile": profile}
+
+
+@app.post("/api/user-avatar")
+async def api_upload_user_avatar(file: UploadFile = File(...)) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    url = save_image_upload_for_slot(
+        file=file,
+        prefix=f"user_avatar_{active_slot}",
+        empty_detail="上传的用户头像不能为空。",
+        too_large_detail="用户头像不能大于 10 MB。",
+        invalid_type_detail="用户头像只支持 png / jpg / jpeg / webp / gif。",
+        save_failed_detail="用户头像保存失败，请检查磁盘空间或文件权限。",
+    )
+    profile = save_user_profile({"avatar_url": url}, active_slot)
+    return {"ok": True, "active_slot": active_slot, "profile": profile}
+
+
+@app.post("/api/role-avatar")
+async def api_upload_role_avatar(file: UploadFile = File(...)) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    url = save_image_upload_for_slot(
+        file=file,
+        prefix=f"role_avatar_{active_slot}",
+        empty_detail="上传的角色头像不能为空。",
+        too_large_detail="角色头像不能大于 10 MB。",
+        invalid_type_detail="角色头像只支持 png / jpg / jpeg / webp / gif。",
+        save_failed_detail="角色头像保存失败，请检查磁盘空间或文件权限。",
+    )
+    return {"ok": True, "active_slot": active_slot, "role_avatar_url": url, "profile": get_user_profile(active_slot)}
 
 
 @app.get("/api/persona")
@@ -3114,9 +3263,8 @@ async def api_upload_background(file: UploadFile = File(...)) -> dict[str, Any]:
 @app.post("/api/models")
 async def api_get_models() -> dict[str, Any]:
     llm_config = get_runtime_chat_config()
-    base_url = str(llm_config["base_url"] or "").strip()
     models = await fetch_available_models(
-        base_url=base_url,
+        base_url=str(llm_config["base_url"] or "").strip(),
         api_key=str(llm_config["api_key"] or "").strip(),
         request_timeout=int(llm_config["request_timeout"]),
     )
@@ -3128,7 +3276,6 @@ async def api_get_models() -> dict[str, Any]:
         "items": models,
         "current_model": current_model,
         "preferred_model": preferred,
-        "provider_hint": "deepseek" if "api.deepseek.com" in base_url.lower() else "",
     }
 
 
@@ -3282,9 +3429,7 @@ async def api_reset() -> dict[str, Any]:
 async def api_export_history() -> FileResponse:
     slot_id = get_active_slot_id()
     history = get_conversation(slot_id)
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H_%M")
-    export_filename = f"{slot_id}_chat_history_export-{timestamp}.json"
-    export_path = EXPORT_DIR / export_filename
+    export_path = EXPORT_DIR / f"{slot_id}_chat_history_export.json"
     persist_json(
         export_path,
         history,
@@ -3292,6 +3437,6 @@ async def api_export_history() -> FileResponse:
     )
     return FileResponse(
         path=export_path,
-        filename=export_filename,
+        filename=f"{slot_id}_chat_history_export.json",
         media_type="application/json",
     )

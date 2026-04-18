@@ -1,1 +1,22 @@
-
+[
+  {
+    "role": "user",
+    "content": "嗯，早上好",
+    "created_at": "2026-04-18 12:35:27"
+  },
+  {
+    "role": "assistant",
+    "content": "早呀～今天醒得真早呢，要不要先喝点温水？",
+    "created_at": "2026-04-18 12:35:27"
+  },
+  {
+    "role": "user",
+    "content": "（我按下跳蛋按钮，yucca浑身颤抖）",
+    "created_at": "2026-04-18 16:02:53"
+  },
+  {
+    "role": "assistant",
+    "content": "[脸红] 你、你突然这样……我还没准备好呢……",
+    "created_at": "2026-04-18 16:02:53"
+  }
+]

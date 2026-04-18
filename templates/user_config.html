@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User - Xuqi LLM Chat</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="topbar-stack">
+      <div class="topbar">
+        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <nav class="topnav">
+          <a class="navlink" href="/">Welcome</a>
+          <a class="navlink" href="/chat">Chat</a>
+          <a class="navlink" href="/config">Config</a>
+          <a class="navlink active" href="/config/user">User</a>
+          <a class="navlink" href="/config/card">Card</a>
+          <a class="navlink" href="/config/sprite">Sprite</a>
+          <a class="navlink" href="/config/memory">Memory</a>
+          <a class="navlink" href="/config/worldbook">WB Set</a>
+          <a class="navlink" href="/config/worldbook/entries">WB List</a>
+        </nav>
+      </div>
+      <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Save</span>
+          <div class="slot-meta">
+            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
+            <p class="slot-hint">这里维护当前存档专属的用户资料和用户头像。</p>
+          </div>
+        </div>
+        <div class="slot-toolbar-right">
+          <select id="slot-select" class="slot-select">
+            {% for slot in slot_registry.slots %}
+            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
+            {% endfor %}
+          </select>
+          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
+          <button id="reset-slot" type="button" class="secondary compact">重置</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-shell compact">
+      <section class="panel config-panel full-span">
+        <div class="section-head">
+          <p class="eyebrow">User</p>
+          <h2>用户资料</h2>
+          <p class="muted">你可以在这里设置用户显示名、昵称、用户设定文本和头像。聊天页右侧会优先使用这里上传的头像。</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-box">
+            <span class="stat-label">显示名</span>
+            <strong id="profile-display-name">{{ user_profile.display_name or "我" }}</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">当前头像</span>
+            <strong id="profile-avatar-status">{{ "已上传" if user_profile.avatar_url else "未设置" }}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel config-panel">
+        <div class="section-head">
+          <p class="eyebrow">Profile</p>
+          <h2>基础信息</h2>
+        </div>
+
+        <label for="display-name">显示名</label>
+        <input id="display-name" value="{{ user_profile.display_name }}" placeholder="例如：我 / 苏打" />
+
+        <label for="nickname">昵称 / 备注称呼</label>
+        <input id="nickname" value="{{ user_profile.nickname }}" placeholder="例如：哥哥 / 老公 / 主人" />
+
+        <label for="profile-text">用户设定文本</label>
+        <textarea id="profile-text" rows="8" placeholder="这里填写用户长期设定，后续可用于聊天页展示或扩展注入。">{{ user_profile.profile_text }}</textarea>
+
+        <label for="profile-notes">备注</label>
+        <textarea id="profile-notes" rows="4" placeholder="补充说明，可选。">{{ user_profile.notes }}</textarea>
+
+        <div class="button-row">
+          <button id="save-user-profile" type="button">保存用户资料</button>
+          <button id="reload-user-profile" type="button" class="secondary">重新读取</button>
+        </div>
+      </section>
+
+      <section class="panel config-panel">
+        <div class="section-head">
+          <p class="eyebrow">Avatar</p>
+          <h2>用户头像</h2>
+        </div>
+
+        <div class="sprite-frame" style="max-width: 220px;">
+          {% if user_profile.avatar_url %}
+          <img id="user-avatar-preview" class="sprite-image" src="{{ user_profile.avatar_url }}" alt="用户头像" />
+          {% else %}
+          <div id="user-avatar-preview" class="sprite-placeholder">当前未设置用户头像</div>
+          {% endif %}
+        </div>
+
+        <label for="user-avatar-file">上传头像</label>
+        <input id="user-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+
+        <div class="button-row">
+          <button id="upload-user-avatar" type="button">上传头像</button>
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span">
+        <div class="section-head">
+          <p class="eyebrow">Status</p>
+          <h2>当前状态</h2>
+          <p id="status-text" class="muted status-line">就绪</p>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const rootEl = document.documentElement;
+      const bodyEl = document.body;
+      const statusEl = document.getElementById("status-text");
+      const ACTIVE_SLOT = {{ active_slot | tojson }};
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function applyTheme(theme) {
+        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+      }
+
+      function applyUiOpacity(value) {
+        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const palette = theme === "dark"
+          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
+          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
+        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
+        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
+        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
+      }
+
+      function applyBackground(url, overlay) {
+        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
+        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
+        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "请求失败");
+        }
+        return response.json();
+      }
+
+      async function selectSlot(slotId) {
+        await postJson("/api/slots/select", { slot_id: slotId });
+        window.location.reload();
+      }
+
+      async function renameSlot(slotId) {
+        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
+        const nextName = window.prompt("给这个存档起个名字：", currentName);
+        if (nextName === null) return;
+        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
+        window.location.reload();
+      }
+
+      async function resetSlot(slotId) {
+        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。用户资料也会一起重置。要继续吗？");
+        if (!confirmed) return;
+        await postJson("/api/slots/reset", { slot_id: slotId });
+        window.location.reload();
+      }
+
+      function profilePayload() {
+        return {
+          display_name: document.getElementById("display-name").value.trim() || "我",
+          nickname: document.getElementById("nickname").value.trim(),
+          profile_text: document.getElementById("profile-text").value.trim(),
+          notes: document.getElementById("profile-notes").value.trim(),
+        };
+      }
+
+      function applyProfile(profile) {
+        document.getElementById("display-name").value = profile.display_name || "我";
+        document.getElementById("nickname").value = profile.nickname || "";
+        document.getElementById("profile-text").value = profile.profile_text || "";
+        document.getElementById("profile-notes").value = profile.notes || "";
+        document.getElementById("profile-display-name").textContent = profile.display_name || "我";
+        document.getElementById("profile-avatar-status").textContent = profile.avatar_url ? "已上传" : "未设置";
+
+        const preview = document.getElementById("user-avatar-preview");
+        if (profile.avatar_url) {
+          preview.outerHTML = `<img id="user-avatar-preview" class="sprite-image" src="${profile.avatar_url}" alt="用户头像" />`;
+        } else {
+          preview.outerHTML = `<div id="user-avatar-preview" class="sprite-placeholder">当前未设置用户头像</div>`;
+        }
+      }
+
+      document.getElementById("save-user-profile").addEventListener("click", async () => {
+        try {
+          const data = await postJson("/api/user-profile", profilePayload());
+          applyProfile(data.profile || {});
+          setStatus("用户资料已保存。");
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("reload-user-profile").addEventListener("click", async () => {
+        try {
+          const data = await fetch("/api/user-profile").then((response) => response.json());
+          applyProfile(data.profile || {});
+          setStatus("用户资料已重新读取。");
+        } catch (error) {
+          setStatus(`读取失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("upload-user-avatar").addEventListener("click", async () => {
+        const input = document.getElementById("user-avatar-file");
+        const file = input.files?.[0];
+        if (!file) {
+          setStatus("请先选择一张头像图片。");
+          return;
+        }
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch("/api/user-avatar", { method: "POST", body: formData });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "上传失败");
+          }
+          const data = await response.json();
+          applyProfile(data.profile || {});
+          input.value = "";
+          setStatus("用户头像已上传。");
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("slot-select").addEventListener("change", async (event) => {
+        try {
+          setStatus("正在切换存档...");
+          await selectSlot(event.target.value);
+        } catch (error) {
+          setStatus(`切换存档失败：${error.message}`);
+          event.target.value = ACTIVE_SLOT;
+        }
+      });
+
+      document.getElementById("rename-slot").addEventListener("click", async () => {
+        try {
+          await renameSlot(document.getElementById("slot-select").value);
+        } catch (error) {
+          setStatus(`重命名失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("reset-slot").addEventListener("click", async () => {
+        try {
+          await resetSlot(document.getElementById("slot-select").value);
+        } catch (error) {
+          setStatus(`重置失败：${error.message}`);
+        }
+      });
+
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+    </script>
+  </body>
+</html>

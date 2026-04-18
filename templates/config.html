@@ -67,7 +67,8 @@
           <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink active" href="/config">Config</a>
-          <a class="navlink" href="/config/card">Card</a>
+                    <a class="navlink" href="/config/user">User</a>
+<a class="navlink" href="/config/card">Card</a>
           <a class="navlink" href="/config/sprite">Sprite</a>
           <a class="navlink" href="/config/memory">Memory</a>
           <a class="navlink" href="/config/worldbook">WB Set</a>
@@ -612,9 +613,20 @@
 
       document.getElementById("save-settings").addEventListener("click", async () => {
         try {
-          await saveSettings("聊天模型配置已保存");
+          await saveSettings("聊天模型配置已保存，正在测试连接...");
         } catch (error) {
           setStatus(`保存失败：${error.message}`);
+          showResultModal("聊天模型保存失败", String(error.message || error));
+          return;
+        }
+
+        try {
+          const data = await postJson("/api/test-connection", {});
+          setStatus(`聊天模型连接成功：${data.reply}`);
+          showResultModal("聊天模型保存并测试成功", `模型响应：\n${data.reply}`);
+        } catch (error) {
+          setStatus(`连接失败：${error.message}`);
+          showResultModal("聊天模型连接失败", String(error.message || error));
         }
       });
 

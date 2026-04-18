@@ -5,6 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Xuqi LLM Chat</title>
     <link rel="stylesheet" href="/static/styles.css" />
+
+    <style>
+      .message {
+        align-items: flex-start;
+      }
+      .message .bubble-wrap {
+        display: flex;
+        flex-direction: column;
+        max-width: min(78%, 920px);
+      }
+      .message.user .bubble-wrap {
+        align-items: flex-end;
+      }
+      .message.assistant .bubble-wrap,
+      .message.system .bubble-wrap {
+        align-items: flex-start;
+      }
+      .message-avatar {
+        width: 58px;
+        height: 58px;
+        min-width: 58px;
+        border-radius: 0.85rem;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        align-self: flex-start;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid var(--border);
+        background: var(--panel-strong);
+      }
+      .message-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .message-avatar .avatar-text {
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .message.user .message-avatar {
+        order: 2;
+        margin-left: 0.65rem;
+      }
+      .message.assistant .message-avatar,
+      .message.system .message-avatar {
+        order: 0;
+        margin-right: 0.65rem;
+      }
+      @media (max-width: 768px) {
+        .message-avatar {
+          width: 38px;
+          height: 38px;
+          min-width: 38px;
+        }
+      }
+    </style>
   </head>
   <body>
     <div class="topbar topbar-chat">
@@ -16,6 +74,7 @@
         <a class="navlink" href="/">Welcome</a>
         <a class="navlink active" href="/chat">Chat</a>
         <a class="navlink" href="/config">Config</a>
+        <a class="navlink" href="/config/user">User</a>
         <a class="navlink" href="/config/card">Card</a>
         <a class="navlink" href="/config/sprite">Sprite</a>
         <a class="navlink" href="/config/memory">Memory</a>
@@ -94,10 +153,27 @@
           <div id="messages" class="messages">
             {% for item in history %}
             <div class="message {{ item.role }}">
+              {% if item.role == "user" %}
               <div class="bubble-wrap">
                 <div class="bubble">{{ item.content }}</div>
                 <div class="message-meta">{{ item.created_at or "" }}</div>
               </div>
+              <div class="message-avatar user-avatar" aria-hidden="true">
+                {% if user_profile.avatar_url %}
+                <img src="{{ user_profile.avatar_url }}" alt="{{ user_profile.display_name or "我" }}" />
+                {% else %}
+                <span class="avatar-text">{{ (user_profile.display_name or "我")[:1] }}</span>
+                {% endif %}
+              </div>
+              {% else %}
+              <div class="message-avatar assistant-avatar" aria-hidden="true">
+                <img src="{{ role_avatar_url or (settings.sprite_base_path ~ '/avatar.png') }}" alt="{{ persona.name or "AI" }}" onerror="this.remove(); this.parentElement.innerHTML='<span class=&quot;avatar-text&quot;>{{ (persona.name or "AI")[:1] }}</span>';" />
+              </div>
+              <div class="bubble-wrap">
+                <div class="bubble">{{ item.content }}</div>
+                <div class="message-meta">{{ item.created_at or "" }}</div>
+              </div>
+              {% endif %}
             </div>
             {% endfor %}
           </div>
@@ -268,6 +344,7 @@
             <h3>更多页面</h3>
           </div>
           <div class="button-row">
+            <a class="ghost-link button-link" href="/config/user">User Settings</a>
             <a class="ghost-link button-link" href="/config/card">Card Editor</a>
             <a class="ghost-link button-link" href="/config/sprite">Sprite Manager</a>
             <a class="ghost-link button-link" href="/config/memory">Memory Manager</a>
@@ -300,6 +377,50 @@
       const spritePlaceholderEl = document.getElementById("sprite-placeholder");
       const spriteTagLabelEl = document.getElementById("sprite-tag-label");
       const worldbookListEl = document.getElementById("worldbook-list");
+      const userAvatarUrl = {{ user_profile.avatar_url | tojson }};
+      const userAvatarLabel = {{ ((user_profile.display_name or "我")[:1]) | tojson }};
+      const assistantAvatarLabel = {{ ((persona.name or "AI")[:1]) | tojson }};
+
+      function getAssistantAvatarUrl() {
+        const basePath = (runtimeState?.sprite_base_path || DEFAULT_SLOT_SPRITE_BASE_PATH || "").trim();
+        return basePath ? `${basePath}/avatar.png` : "";
+      }
+
+      function buildAvatar(role) {
+        const avatar = document.createElement("div");
+        avatar.className = `message-avatar ${role === "user" ? "user-avatar" : "assistant-avatar"}`;
+        avatar.setAttribute("aria-hidden", "true");
+
+        if (role === "user") {
+          if (userAvatarUrl) {
+            const img = document.createElement("img");
+            img.alt = userAvatarLabel;
+            img.src = userAvatarUrl;
+            avatar.appendChild(img);
+          } else {
+            const label = document.createElement("span");
+            label.className = "avatar-text";
+            label.textContent = userAvatarLabel;
+            avatar.appendChild(label);
+          }
+          return avatar;
+        }
+
+        const img = document.createElement("img");
+        img.alt = assistantAvatarLabel;
+        img.src = getAssistantAvatarUrl();
+        img.addEventListener("error", () => {
+          img.remove();
+        });
+
+        const label = document.createElement("span");
+        label.className = "avatar-text";
+        label.textContent = assistantAvatarLabel;
+
+        avatar.appendChild(img);
+        avatar.appendChild(label);
+        return avatar;
+      }
 
       const ACTIVE_SLOT = {{ active_slot | tojson }};
       const STORAGE_KEY = `xuqi.runtime.sidebar.v1.${ACTIVE_SLOT}`;
@@ -526,21 +647,19 @@
 
         const thinkParts = [];
         const visibleParts = [];
-        const openTagPattern = /<(think|thinking)\b[^>]*>/gi;
+        const openTagPattern = /<think\b[^>]*>/gi;
         let cursor = 0;
         let match;
 
         while ((match = openTagPattern.exec(text)) !== null) {
           const start = match.index;
           const openEnd = openTagPattern.lastIndex;
-          const tagName = (match[1] || "think").toLowerCase();
-          const closeTag = `</${tagName}>`;
 
           if (start > cursor) {
             visibleParts.push(text.slice(cursor, start));
           }
 
-          const closeIndex = text.toLowerCase().indexOf(closeTag, openEnd);
+          const closeIndex = text.toLowerCase().indexOf("</think>", openEnd);
           if (closeIndex === -1) {
             const trailingThink = text.slice(openEnd).trim();
             if (trailingThink) {
@@ -554,7 +673,7 @@
           if (inner) {
             thinkParts.push(inner);
           }
-          cursor = closeIndex + closeTag.length;
+          cursor = closeIndex + "</think>".length;
           openTagPattern.lastIndex = cursor;
         }
 

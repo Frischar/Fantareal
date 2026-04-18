@@ -14,7 +14,8 @@
           <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
-          <a class="navlink" href="/config/card">Card</a>
+                    <a class="navlink" href="/config/user">User</a>
+<a class="navlink" href="/config/card">Card</a>
           <a class="navlink active" href="/config/sprite">Sprite</a>
           <a class="navlink" href="/config/memory">Memory</a>
           <a class="navlink" href="/config/worldbook">WB Set</a>
@@ -92,6 +93,34 @@
         </div>
       </section>
 
+
+      <section class="panel config-panel full-span">
+        <div class="section-head">
+          <p class="eyebrow">Role Avatar</p>
+          <h2>角色头像</h2>
+          <p class="muted">这里单独管理聊天页左侧的角色头像，不占用现有表情标签上传。上传后会优先作为聊天头像显示。</p>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <div class="sprite-frame" style="max-width: 220px;">
+              {% if role_avatar_url %}
+              <img id="role-avatar-preview" class="sprite-image" src="{{ role_avatar_url }}" alt="角色头像" />
+              {% else %}
+              <div id="role-avatar-preview" class="sprite-placeholder">当前未设置角色头像</div>
+              {% endif %}
+            </div>
+          </div>
+          <div>
+            <label for="role-avatar-file">上传角色头像</label>
+            <input id="role-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <div class="button-row offset-top">
+              <button id="upload-role-avatar" type="button">上传角色头像</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Library</p>
@@ -147,6 +176,7 @@
       const bodyEl = document.body;
       const statusEl = document.getElementById("status-text");
       const spriteGridEl = document.getElementById("sprite-grid");
+      const roleAvatarFileEl = document.getElementById("role-avatar-file");
       const spriteCountEl = document.getElementById("sprite-count");
       const spriteBasePathEl = document.getElementById("sprite-base-path");
       const templateEl = document.getElementById("sprite-card-template");
@@ -367,6 +397,39 @@
           await loadSprites();
         } catch (error) {
           setStatus(`刷新失败：${error.message}`);
+        }
+      });
+
+
+      document.getElementById("upload-role-avatar").addEventListener("click", async () => {
+        const file = roleAvatarFileEl?.files?.[0];
+        if (!file) {
+          setStatus("请先选择一张角色头像图片。");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("/api/role-avatar", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.detail || "上传角色头像失败");
+          }
+
+          const previewEl = document.getElementById("role-avatar-preview");
+          if (previewEl.tagName === "IMG") {
+            previewEl.src = data.url;
+          } else {
+            previewEl.outerHTML = `<img id="role-avatar-preview" class="sprite-image" src="${data.url}" alt="角色头像" />`;
+          }
+          setStatus("角色头像已上传。");
+        } catch (error) {
+          setStatus(`角色头像上传失败：${error.message}`);
         }
       });
 

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Worldbook Entries - Xuqi LLM Chat</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="topbar-stack">
+      <div class="topbar">
+        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <nav class="topnav">
+          <a class="navlink" href="/">Welcome</a>
+          <a class="navlink" href="/chat">Chat</a>
+          <a class="navlink" href="/config">Config</a>
+          <a class="navlink" href="/config/card">Card</a>
+          <a class="navlink" href="/config/sprite">Sprite</a>
+          <a class="navlink" href="/config/memory">Memory</a>
+          <a class="navlink" href="/config/worldbook">WB Set</a>
+          <a class="navlink active" href="/config/worldbook/entries">WB List</a>
+        </nav>
+      </div>
+      <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Save</span>
+          <div class="slot-meta">
+            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
+            <p class="slot-hint">这里维护当前存档专属的世界书词条。每条都可以单独设置优先级、辅助触发词和匹配方式。</p>
+          </div>
+        </div>
+        <div class="slot-toolbar-right">
+          <select id="slot-select" class="slot-select">
+            {% for slot in slot_registry.slots %}
+            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
+            {% endfor %}
+          </select>
+          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
+          <button id="reset-slot" type="button" class="secondary compact">重置</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-shell compact">
+      <section class="panel config-panel full-span">
+        <div class="section-head">
+          <p class="eyebrow">Worldbook</p>
+          <h2>世界书词条管理</h2>
+          <p class="muted">你可以给每条世界书单独设置标题、主触发词、辅助触发词、优先级和匹配模式。主触发词支持用逗号分隔多个别名。</p>
+        </div>
+        <div class="stats-row">
+          <div class="stat-box">
+            <span class="stat-label">当前条数</span>
+            <strong id="worldbook-count">{{ worldbook_count }}</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">快速入口</span>
+            <strong><a class="ghost-link" href="/config/worldbook">打开触发设置</a></strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span">
+        <div class="memory-actions">
+          <div class="button-row">
+            <button id="add-worldbook-entry" type="button">新增词条</button>
+            <button id="save-worldbook-entries" type="button" class="secondary">保存全部词条</button>
+            <button id="reload-worldbook-entries" type="button" class="secondary">重新读取</button>
+          </div>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="worldbook-search">搜索词条</label>
+            <input id="worldbook-search" type="text" placeholder="按标题、触发词、设定文本、备注搜索" />
+          </div>
+          <div class="button-row offset-top">
+            <button id="collapse-all-worldbook" type="button" class="secondary">全部折叠</button>
+            <button id="expand-all-worldbook" type="button" class="secondary">全部展开</button>
+          </div>
+        </div>
+
+        <div id="worldbook-entry-list" class="memory-list">
+          {% for item in worldbook_entries %}
+          <article class="memory-card worldbook-entry-card" data-collapsed="false">
+            <div class="memory-card-head">
+              <strong>{{ item.title or ("词条 " ~ loop.index) }}</strong>
+              <div class="button-row">
+                <button type="button" class="secondary compact toggle-worldbook-entry">折叠</button>
+                <button type="button" class="secondary compact remove-worldbook-entry">删除</button>
+              </div>
+            </div>
+
+            <div class="worldbook-entry-body">
+            <div class="grid-two">
+              <div>
+                <label>标题</label>
+                <input class="wb-title" value="{{ item.title }}" placeholder="例如：身份·我是妻子" />
+              </div>
+              <div>
+                <label>优先级</label>
+                <input class="wb-priority" type="number" min="0" max="9999" step="1" value="{{ item.priority }}" />
+              </div>
+            </div>
+
+            <label>主触发词</label>
+            <input class="wb-trigger" value="{{ item.trigger }}" placeholder="多个别名可用逗号分隔" />
+
+            <label>辅助触发词</label>
+            <input class="wb-secondary-trigger" value="{{ item.secondary_trigger }}" placeholder="可留空；例如：婚后, 妻子" />
+
+            <div class="grid-two">
+              <div>
+                <label>主触发逻辑</label>
+                <select class="wb-match-mode">
+                  <option value="any" {% if item.match_mode == 'any' %}selected{% endif %}>任意命中</option>
+                  <option value="all" {% if item.match_mode == 'all' %}selected{% endif %}>全部命中</option>
+                </select>
+              </div>
+              <div>
+                <label>辅助触发逻辑</label>
+                <select class="wb-secondary-mode">
+                  <option value="any" {% if item.secondary_mode == 'any' %}selected{% endif %}>任意命中</option>
+                  <option value="all" {% if item.secondary_mode == 'all' %}selected{% endif %}>全部命中</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-two">
+              <label class="checkbox-row">
+                <input class="wb-enabled" type="checkbox" {% if item.enabled %}checked{% endif %} />
+                <span>启用词条</span>
+              </label>
+              <label class="checkbox-row">
+                <input class="wb-case-sensitive" type="checkbox" {% if item.case_sensitive %}checked{% endif %} />
+                <span>区分大小写</span>
+              </label>
+            </div>
+
+            <label class="checkbox-row">
+              <input class="wb-whole-word" type="checkbox" {% if item.whole_word %}checked{% endif %} />
+              <span>完整词匹配</span>
+            </label>
+
+            <label>设定文本</label>
+            <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。">{{ item.content }}</textarea>
+
+            <label>备注</label>
+            <textarea class="wb-comment" rows="2" placeholder="这条词条的用途说明，可选。">{{ item.comment }}</textarea>
+
+            <input class="wb-id" type="hidden" value="{{ item.id }}" />
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <footer class="status-footer">
+      <span id="status-text">就绪</span>
+    </footer>
+
+    <template id="worldbook-entry-template">
+      <article class="memory-card worldbook-entry-card" data-collapsed="false">
+        <div class="memory-card-head">
+          <strong>新词条</strong>
+          <div class="button-row">
+            <button type="button" class="secondary compact toggle-worldbook-entry">折叠</button>
+            <button type="button" class="secondary compact remove-worldbook-entry">删除</button>
+          </div>
+        </div>
+
+        <div class="worldbook-entry-body">
+        <div class="grid-two">
+          <div>
+            <label>标题</label>
+            <input class="wb-title" placeholder="例如：身份·我是妻子" />
+          </div>
+          <div>
+            <label>优先级</label>
+            <input class="wb-priority" type="number" min="0" max="9999" step="1" value="100" />
+          </div>
+        </div>
+
+        <label>主触发词</label>
+        <input class="wb-trigger" placeholder="多个别名可用逗号分隔" />
+
+        <label>辅助触发词</label>
+        <input class="wb-secondary-trigger" placeholder="可留空；例如：婚后, 妻子" />
+
+        <div class="grid-two">
+          <div>
+            <label>主触发逻辑</label>
+            <select class="wb-match-mode">
+              <option value="any" selected>任意命中</option>
+              <option value="all">全部命中</option>
+            </select>
+          </div>
+          <div>
+            <label>辅助触发逻辑</label>
+            <select class="wb-secondary-mode">
+              <option value="any">任意命中</option>
+              <option value="all" selected>全部命中</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-two">
+          <label class="checkbox-row">
+            <input class="wb-enabled" type="checkbox" checked />
+            <span>启用词条</span>
+          </label>
+          <label class="checkbox-row">
+            <input class="wb-case-sensitive" type="checkbox" />
+            <span>区分大小写</span>
+          </label>
+        </div>
+
+        <label class="checkbox-row">
+          <input class="wb-whole-word" type="checkbox" />
+          <span>完整词匹配</span>
+        </label>
+
+        <label>设定文本</label>
+        <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。"></textarea>
+
+        <label>备注</label>
+        <textarea class="wb-comment" rows="2" placeholder="这条词条的用途说明，可选。"></textarea>
+
+        <input class="wb-id" type="hidden" />
+        </div>
+      </article>
+    </template>
+
+    <script>
+      const rootEl = document.documentElement;
+      const bodyEl = document.body;
+      const statusEl = document.getElementById("status-text");
+      const worldbookListEl = document.getElementById("worldbook-entry-list");
+      const worldbookCountEl = document.getElementById("worldbook-count");
+      const templateEl = document.getElementById("worldbook-entry-template");
+      const ACTIVE_SLOT = {{ active_slot | tojson }};
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function applyTheme(theme) {
+        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+      }
+
+      function applyUiOpacity(value) {
+        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const palette = theme === "dark"
+          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
+          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
+        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
+        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
+        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
+      }
+
+      function applyBackground(url, overlay) {
+        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
+        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
+        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "请求失败");
+        }
+        return response.json();
+      }
+
+      async function selectSlot(slotId) {
+        await postJson("/api/slots/select", { slot_id: slotId });
+        window.location.reload();
+      }
+
+      async function renameSlot(slotId) {
+        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
+        const nextName = window.prompt("给这个存档起个名字：", currentName);
+        if (nextName === null) return;
+        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
+        window.location.reload();
+      }
+
+      async function resetSlot(slotId) {
+        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。要继续吗？");
+        if (!confirmed) return;
+        await postJson("/api/slots/reset", { slot_id: slotId });
+        window.location.reload();
+      }
+
+      function normalizeSearchText(value) {
+        return String(value || "").trim().toLowerCase();
+      }
+
+      function getCardSearchText(card) {
+        return [
+          card.querySelector(".wb-title")?.value || "",
+          card.querySelector(".wb-trigger")?.value || "",
+          card.querySelector(".wb-secondary-trigger")?.value || "",
+          card.querySelector(".wb-content")?.value || "",
+          card.querySelector(".wb-comment")?.value || "",
+        ].join("\n").toLowerCase();
+      }
+
+      function setEntryCollapsed(card, collapsed) {
+        const body = card.querySelector(".worldbook-entry-body");
+        const toggleBtn = card.querySelector(".toggle-worldbook-entry");
+        card.dataset.collapsed = collapsed ? "true" : "false";
+        if (body) {
+          body.style.display = collapsed ? "none" : "";
+        }
+        if (toggleBtn) {
+          toggleBtn.textContent = collapsed ? "展开" : "折叠";
+        }
+      }
+
+      function applyWorldbookSearch() {
+        const keyword = normalizeSearchText(document.getElementById("worldbook-search")?.value || "");
+        const cards = [...worldbookListEl.querySelectorAll(".worldbook-entry-card")];
+        let visibleCount = 0;
+        for (const card of cards) {
+          const matched = !keyword || getCardSearchText(card).includes(keyword);
+          card.style.display = matched ? "" : "none";
+          if (matched) visibleCount += 1;
+        }
+        setStatus(keyword ? `搜索完成：找到 ${visibleCount} 条匹配词条。` : "已清除搜索筛选。");
+      }
+
+      function updateCount() {
+        worldbookCountEl.textContent = String(worldbookListEl.querySelectorAll(".worldbook-entry-card").length);
+      }
+
+      function attachRemoveHandler(card) {
+        card.querySelector(".remove-worldbook-entry").addEventListener("click", () => {
+          card.remove();
+          updateCount();
+          applyWorldbookSearch();
+          setStatus("已删除一条世界书词条，记得保存。");
+        });
+
+        const toggleBtn = card.querySelector(".toggle-worldbook-entry");
+        if (toggleBtn) {
+          toggleBtn.addEventListener("click", () => {
+            const collapsed = card.dataset.collapsed === "true";
+            setEntryCollapsed(card, !collapsed);
+          });
+        }
+      }
+
+      function createEntryCard(item = {}) {
+        const fragment = templateEl.content.cloneNode(true);
+        const card = fragment.querySelector(".worldbook-entry-card");
+        card.querySelector(".wb-id").value = item.id || "";
+        card.querySelector(".wb-title").value = item.title || "";
+        card.querySelector(".wb-trigger").value = item.trigger || "";
+        card.querySelector(".wb-secondary-trigger").value = item.secondary_trigger || "";
+        card.querySelector(".wb-content").value = item.content || "";
+        card.querySelector(".wb-comment").value = item.comment || "";
+        card.querySelector(".wb-enabled").checked = item.enabled !== false;
+        card.querySelector(".wb-priority").value = item.priority ?? 100;
+        card.querySelector(".wb-case-sensitive").checked = Boolean(item.case_sensitive);
+        card.querySelector(".wb-whole-word").checked = Boolean(item.whole_word);
+        card.querySelector(".wb-match-mode").value = item.match_mode || "any";
+        card.querySelector(".wb-secondary-mode").value = item.secondary_mode || "all";
+        card.querySelector(".memory-card-head strong").textContent = item.title || "新词条";
+        attachRemoveHandler(card);
+        return card;
+      }
+
+      function collectEntries() {
+        return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].map((card, index) => ({
+          id: card.querySelector(".wb-id").value.trim() || `worldbook-manual-${Date.now()}-${index}`,
+          title: card.querySelector(".wb-title").value.trim(),
+          trigger: card.querySelector(".wb-trigger").value.trim(),
+          secondary_trigger: card.querySelector(".wb-secondary-trigger").value.trim(),
+          content: card.querySelector(".wb-content").value.trim(),
+          comment: card.querySelector(".wb-comment").value.trim(),
+          enabled: card.querySelector(".wb-enabled").checked,
+          priority: Number(card.querySelector(".wb-priority").value || 100),
+          case_sensitive: card.querySelector(".wb-case-sensitive").checked,
+          whole_word: card.querySelector(".wb-whole-word").checked,
+          match_mode: card.querySelector(".wb-match-mode").value,
+          secondary_mode: card.querySelector(".wb-secondary-mode").value,
+        }));
+      }
+
+      async function reloadEntries() {
+        const data = await fetch("/api/worldbook/entries").then((response) => response.json());
+        worldbookListEl.innerHTML = "";
+        for (const item of data.items || []) {
+          worldbookListEl.appendChild(createEntryCard(item));
+        }
+        updateCount();
+        applyWorldbookSearch();
+        setStatus("世界书词条已重新读取。");
+      }
+
+      async function saveEntries() {
+        const data = await postJson("/api/worldbook/entries", { items: collectEntries() });
+        worldbookListEl.innerHTML = "";
+        for (const item of data.items || []) {
+          worldbookListEl.appendChild(createEntryCard(item));
+        }
+        updateCount();
+        applyWorldbookSearch();
+        setStatus("世界书词条已保存。");
+      }
+
+      worldbookListEl.addEventListener("input", (event) => {
+        const card = event.target.closest(".worldbook-entry-card");
+        if (!card) return;
+        card.querySelector(".memory-card-head strong").textContent = card.querySelector(".wb-title").value.trim() || "新词条";
+        applyWorldbookSearch();
+      });
+
+      document.querySelectorAll(".worldbook-entry-card").forEach((card) => attachRemoveHandler(card));
+
+      document.getElementById("add-worldbook-entry").addEventListener("click", () => {
+        const card = createEntryCard();
+        worldbookListEl.prepend(card);
+        updateCount();
+        applyWorldbookSearch();
+        setStatus("已新增一条空白世界书词条。");
+      });
+
+      document.getElementById("save-worldbook-entries").addEventListener("click", async () => {
+        try {
+          await saveEntries();
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("reload-worldbook-entries").addEventListener("click", async () => {
+        try {
+          await reloadEntries();
+        } catch (error) {
+          setStatus(`读取失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("worldbook-search").addEventListener("input", () => {
+        applyWorldbookSearch();
+      });
+
+      document.getElementById("collapse-all-worldbook").addEventListener("click", () => {
+        [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => setEntryCollapsed(card, true));
+        setStatus("已折叠当前列表中的全部词条。");
+      });
+
+      document.getElementById("expand-all-worldbook").addEventListener("click", () => {
+        [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => setEntryCollapsed(card, false));
+        setStatus("已展开当前列表中的全部词条。");
+      });
+
+      document.getElementById("slot-select").addEventListener("change", async (event) => {
+        try {
+          setStatus("正在切换存档...");
+          await selectSlot(event.target.value);
+        } catch (error) {
+          setStatus(`切换存档失败：${error.message}`);
+          event.target.value = ACTIVE_SLOT;
+        }
+      });
+
+      document.getElementById("rename-slot").addEventListener("click", async () => {
+        try {
+          await renameSlot(document.getElementById("slot-select").value);
+        } catch (error) {
+          setStatus(`重命名失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("reset-slot").addEventListener("click", async () => {
+        try {
+          await resetSlot(document.getElementById("slot-select").value);
+        } catch (error) {
+          setStatus(`重置失败：${error.message}`);
+        }
+      });
+
+      updateCount();
+      applyWorldbookSearch();
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+    </script>
+  </body>
+</html>

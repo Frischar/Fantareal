@@ -1,12 +1,1 @@
-{
-    "settings":  {
-                     "enabled":  true,
-                     "max_hits":  3,
-                     "default_case_sensitive":  false,
-                     "default_match_mode":  "any",
-                     "default_whole_word":  false
-                 },
-    "entries":  [
-
-                ]
-}
+{}
