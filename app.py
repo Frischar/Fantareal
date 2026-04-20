@@ -79,12 +79,15 @@ PRESET_FILENAME = "preset.json"
 
 ALLOWED_EMBEDDING_FIELDS = ("title", "content", "tags", "notes")
 ALLOWED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+ALLOWED_AUDIO_SUFFIXES = {".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac", ".webm"}
 ALLOWED_BACKGROUND_SCHEMES = {"http", "https"}
 MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
+MAX_WORKSHOP_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024
 REQUEST_RETRY_ATTEMPTS = 5
 REQUEST_RETRY_BASE_DELAY_SECONDS = 1.0
 DEFAULT_SPRITE_BASE_PATH = "/static/sprites"
 DEFAULT_SLOT_IDS = ("slot_1", "slot_2", "slot_3")
+WORKSHOP_STAGE_LIMITS = {"aMax": 2, "bMax": 5}
 
 logger = logging.getLogger("xuqi_llm_chat")
 if not logging.getLogger().handlers:
@@ -190,6 +193,27 @@ def default_role_card() -> dict[str, Any]:
         "scenario": "",
         "creator_notes": "",
         "tags": [],
+        "creativeWorkshop": {
+            "enabled": True,
+            "items": [
+                {
+                    "id": "workshop_stage_a",
+                    "name": "A阶段动作",
+                    "enabled": True,
+                    "triggerStage": "A",
+                    "actionType": "music",
+                    "popupTitle": "",
+                    "musicPreset": "off",
+                    "musicUrl": "",
+                    "autoplay": True,
+                    "loop": True,
+                    "volume": 0.85,
+                    "imageUrl": "",
+                    "imageAlt": "",
+                    "note": "",
+                }
+            ],
+        },
         "plotStages": {
             "A": {"description": "", "rules": ""},
             "B": {"description": "", "rules": ""},
@@ -230,6 +254,259 @@ def default_user_profile() -> dict[str, Any]:
         "notes": "",
         "avatar_url": "",
     }
+
+
+def default_creative_workshop() -> dict[str, Any]:
+    return json.loads(json.dumps(default_role_card()["creativeWorkshop"], ensure_ascii=False))
+
+
+def normalize_workshop_stage(value: Any) -> str:
+    stage = str(value or "A").strip().upper()
+    return stage if stage in {"A", "B", "C"} else "A"
+
+
+def normalize_workshop_action_type(value: Any) -> str:
+    action_type = str(value or "music").strip().lower()
+    return "image" if action_type == "image" else "music"
+
+
+def sanitize_creative_workshop_item(raw: Any, *, index: int) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    return {
+        "id": str(raw.get("id", "")).strip() or f"workshop-item-{index}",
+        "name": str(raw.get("name", "")).strip()[:64] or f"触发器 {index}",
+        "enabled": parse_bool(raw.get("enabled"), True),
+        "triggerStage": normalize_workshop_stage(raw.get("triggerStage")),
+        "actionType": normalize_workshop_action_type(raw.get("actionType")),
+        "popupTitle": str(raw.get("popupTitle", "")).strip()[:80],
+        "musicPreset": str(raw.get("musicPreset", "off")).strip() or "off",
+        "musicUrl": str(raw.get("musicUrl", "")).strip(),
+        "autoplay": parse_bool(raw.get("autoplay"), True),
+        "loop": parse_bool(raw.get("loop"), True),
+        "volume": clamp_float(raw.get("volume"), 0.0, 1.0, 0.85),
+        "imageUrl": str(raw.get("imageUrl", "")).strip(),
+        "imageAlt": str(raw.get("imageAlt", "")).strip()[:120],
+        "note": str(raw.get("note", "")).strip()[:2000],
+    }
+
+
+def sanitize_creative_workshop(raw: Any) -> dict[str, Any]:
+    base = default_creative_workshop()
+    if not isinstance(raw, dict):
+        return base
+
+    items: list[dict[str, Any]] = []
+    raw_items = raw.get("items", [])
+    if isinstance(raw_items, list):
+        for index, item in enumerate(raw_items, start=1):
+            cleaned = sanitize_creative_workshop_item(item, index=index)
+            if cleaned:
+                items.append(cleaned)
+
+    stage_items: dict[str, dict[str, Any]] = {}
+    extras: list[dict[str, Any]] = []
+    for item in items:
+        stage = normalize_workshop_stage(item.get("triggerStage"))
+        item["triggerStage"] = stage
+        if stage in {"A", "B", "C"} and stage not in stage_items:
+            stage_items[stage] = item
+        else:
+            extras.append(item)
+
+    normalized_items = []
+    template_item = default_creative_workshop()["items"][0]
+    for stage in ("A", "B", "C"):
+        existing = stage_items.get(stage)
+        if existing:
+            normalized_items.append(existing)
+            continue
+        normalized_items.append(
+            {
+                **template_item,
+                "id": f"workshop_stage_{stage.lower()}",
+                "name": f"{stage}阶段动作",
+                "enabled": False,
+                "triggerStage": stage,
+            }
+        )
+
+    base["enabled"] = parse_bool(raw.get("enabled"), True)
+    base["items"] = normalized_items + extras
+    return base
+
+
+def workshop_effective_fields(item: dict[str, Any]) -> dict[str, Any]:
+    action_type = normalize_workshop_action_type(item.get("actionType"))
+    payload: dict[str, Any] = {
+        "id": str(item.get("id", "")).strip(),
+        "enabled": bool(item.get("enabled", False)),
+        "triggerStage": normalize_workshop_stage(item.get("triggerStage")),
+        "actionType": action_type,
+        "note": str(item.get("note", "")).strip(),
+    }
+    if action_type == "image":
+        payload.update(
+            {
+                "popupTitle": str(item.get("popupTitle", "")).strip(),
+                "imageUrl": str(item.get("imageUrl", "")).strip(),
+                "imageAlt": str(item.get("imageAlt", "")).strip(),
+            }
+        )
+    else:
+        payload.update(
+            {
+                "musicPreset": str(item.get("musicPreset", "off")).strip() or "off",
+                "musicUrl": str(item.get("musicUrl", "")).strip(),
+                "autoplay": parse_bool(item.get("autoplay"), True),
+                "loop": parse_bool(item.get("loop"), True),
+                "volume": clamp_float(item.get("volume"), 0.0, 1.0, 0.85),
+            }
+        )
+    return payload
+def default_workshop_state() -> dict[str, Any]:
+    return {"temp": 0, "last_signature": "", "pending_temp": -1}
+
+
+def sanitize_workshop_state(raw: Any) -> dict[str, Any]:
+    base = default_workshop_state()
+    if not isinstance(raw, dict):
+        return base
+    base["temp"] = clamp_int(raw.get("temp"), 0, 9999, 0)
+    base["last_signature"] = str(raw.get("last_signature", "")).strip()
+    base["pending_temp"] = clamp_int(raw.get("pending_temp"), -1, 9999, -1)
+    return base
+
+
+def get_workshop_state(slot_id: str | None = None) -> dict[str, Any]:
+    return sanitize_workshop_state(read_json(workshop_state_path(slot_id), default_workshop_state()))
+
+
+def save_workshop_state(payload: dict[str, Any], slot_id: str | None = None) -> dict[str, Any]:
+    sanitized = sanitize_workshop_state(payload)
+    persist_json(
+        workshop_state_path(slot_id),
+        sanitized,
+        detail="创意工坊状态保存失败，请检查磁盘空间或文件权限。",
+    )
+    return sanitized
+
+
+def reset_workshop_state(slot_id: str | None = None) -> dict[str, Any]:
+    return save_workshop_state(default_workshop_state(), slot_id)
+
+
+def get_workshop_stage(temp: Any) -> str:
+    count = clamp_int(temp, 0, 9999, 0)
+    if count <= WORKSHOP_STAGE_LIMITS["aMax"]:
+        return "A"
+    if count <= WORKSHOP_STAGE_LIMITS["bMax"]:
+        return "B"
+    return "C"
+
+
+def workshop_signature(slot: dict[str, Any] | None, workshop: dict[str, Any], stage: str) -> str:
+    payload = {
+        "slot": str((slot or {}).get("source_name", "")),
+        "enabled": bool(workshop.get("enabled", False)),
+        "stage": stage,
+        "items": [
+            {
+                **workshop_effective_fields(item),
+            }
+            for item in workshop.get("items", [])
+            if isinstance(item, dict)
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+
+def resolve_workshop_music_url(item: dict[str, Any]) -> str:
+    return str(item.get("musicUrl", "")).strip()
+
+
+def resolve_workshop_image_url(item: dict[str, Any]) -> str:
+    return str(item.get("imageUrl", "")).strip()
+
+
+def evaluate_creative_workshop(*, slot_id: str | None = None, reason: str = "sync") -> dict[str, Any]:
+    target_slot = sanitize_slot_id(slot_id, get_active_slot_id())
+    current_card = get_current_card(target_slot)
+    workshop = sanitize_creative_workshop(current_card.get("raw", {}).get("creativeWorkshop", {}))
+    state = get_workshop_state(target_slot)
+    stage = get_workshop_stage(state.get("temp", 0))
+
+    result: dict[str, Any] = {
+        "stage": stage,
+        "stage_label": f"{stage}阶段",
+        "temp": state.get("temp", 0),
+        "reason": reason,
+        "triggered": False,
+        "action": None,
+        "workshop": workshop,
+        "current_card_name": str(current_card.get("source_name", "")).strip(),
+    }
+
+    if reason != "chat_round_start":
+        return result
+
+    pending_temp = clamp_int(state.get("pending_temp"), -1, 9999, -1)
+    current_temp = int(state.get("temp", 0) or 0)
+    if pending_temp != current_temp:
+        return result
+
+    signature = workshop_signature(current_card, workshop, stage)
+    previous = str(state.get("last_signature", "")).strip()
+    state["last_signature"] = signature
+    state["pending_temp"] = -1
+    save_workshop_state(state, target_slot)
+
+    if previous == signature or not workshop.get("enabled", False):
+        return result
+
+    match = next((item for item in workshop.get("items", []) if isinstance(item, dict) and item.get("enabled", True) and normalize_workshop_stage(item.get("triggerStage")) == stage), None)
+    if not match:
+        return result
+
+    action_type = normalize_workshop_action_type(match.get("actionType"))
+    action = {
+        "id": match.get("id", ""),
+        "name": match.get("name", ""),
+        "stage": stage,
+        "stage_label": result["stage_label"],
+        "reason": reason,
+        "action_type": action_type,
+        "note": str(match.get("note", "")).strip(),
+    }
+
+    if action_type == "image":
+        action.update(
+            {
+                "popup_title": str(match.get("popupTitle", "")).strip() or str(match.get("name", "")).strip() or "创意工坊弹窗",
+                "image_url": resolve_workshop_image_url(match),
+                "image_alt": str(match.get("imageAlt", "")).strip() or str(match.get("name", "")).strip() or "创意工坊图片",
+            }
+        )
+    else:
+        action.update(
+            {
+                "music_preset": str(match.get("musicPreset", "off")).strip() or "off",
+                "music_url": resolve_workshop_music_url(match),
+                "autoplay": bool(match.get("autoplay", True)),
+                "loop": bool(match.get("loop", True)),
+                "volume": clamp_float(match.get("volume"), 0.0, 1.0, 0.85),
+            }
+        )
+
+    if action_type == "image" and not action["image_url"]:
+        return result
+    if action_type == "music" and not action["music_url"] and action["music_preset"] == "off":
+        return result
+
+    result["triggered"] = True
+    result["action"] = action
+    return result
+
 
 def default_preset_store() -> dict[str, Any]:
     return default_preset_store_data()
@@ -647,6 +924,7 @@ def get_slot_name(slot_id: str | None = None) -> str:
 def slot_summary(slot_id: str | None = None) -> dict[str, Any]:
     target = sanitize_slot_id(slot_id, get_active_slot_id())
     current_card = get_current_card(target)
+    workshop_state = get_workshop_state(target)
     return {
         "id": target,
         "name": get_slot_name(target),
@@ -655,6 +933,8 @@ def slot_summary(slot_id: str | None = None) -> dict[str, Any]:
         "worldbook_count": len(get_worldbook(target)),
         "conversation_count": len(get_conversation(target)),
         "current_card_name": current_card.get("source_name", ""),
+        "workshop_temp": workshop_state.get("temp", 0),
+        "workshop_stage": get_workshop_stage(workshop_state.get("temp", 0)),
     }
 
 
@@ -684,6 +964,10 @@ def worldbook_path(slot_id: str | None = None) -> Path:
 
 def current_card_path(slot_id: str | None = None) -> Path:
     return get_slot_dir(slot_id) / "current_role_card.json"
+
+
+def workshop_state_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "creative_workshop_state.json"
 
 
 def user_profile_path(slot_id: str | None = None) -> Path:
@@ -733,6 +1017,61 @@ def save_image_upload_for_slot(
     return avatar_upload_url(target.name)
 
 
+def workshop_asset_dir(kind: str) -> Path:
+    normalized = "image" if str(kind or "").strip().lower() == "image" else "music"
+    return UPLOAD_DIR / "workshop" / normalized
+
+
+def workshop_asset_url(kind: str, filename: str) -> str:
+    normalized = "image" if str(kind or "").strip().lower() == "image" else "music"
+    safe_name = Path(str(filename or "")).name
+    return f"/static/uploads/workshop/{normalized}/{safe_name}" if safe_name else ""
+
+
+async def save_workshop_asset_upload(*, kind: str, file: UploadFile) -> dict[str, Any]:
+    normalized_kind = "image" if str(kind or "").strip().lower() == "image" else "music"
+    suffix = Path(file.filename or "").suffix.lower()
+    allowed_suffixes = ALLOWED_IMAGE_SUFFIXES if normalized_kind == "image" else ALLOWED_AUDIO_SUFFIXES
+    if suffix not in allowed_suffixes:
+        if normalized_kind == "image":
+            raise HTTPException(status_code=400, detail="创意工坊图片只支持 png / jpg / jpeg / webp / gif。")
+        raise HTTPException(status_code=400, detail="创意工坊音乐只支持 mp3 / wav / ogg / m4a / aac / flac / webm。")
+
+    content_type = str(file.content_type or "").strip().lower()
+    if normalized_kind == "image":
+        if content_type and content_type != "application/octet-stream" and not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="选择的文件不是图片。")
+    else:
+        if content_type and content_type != "application/octet-stream" and not (
+            content_type.startswith("audio/") or content_type.startswith("video/")
+        ):
+            raise HTTPException(status_code=400, detail="选择的文件不是音频。")
+
+    content = await file.read(MAX_WORKSHOP_UPLOAD_SIZE_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="上传文件不能为空。")
+    if len(content) > MAX_WORKSHOP_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="文件不能大于 25 MB。")
+
+    normalized_stem = sanitize_sprite_filename_tag(Path(file.filename or "").stem) or f"workshop_{normalized_kind}"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    directory = workshop_asset_dir(normalized_kind)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / f"{timestamp}_{normalized_stem}{suffix}"
+    try:
+        target.write_bytes(content)
+    except OSError as exc:
+        logger.exception("Workshop asset write failed: %s", target)
+        raise HTTPException(status_code=500, detail="工坊资源保存失败，请检查磁盘空间或文件权限。") from exc
+
+    return {
+        "ok": True,
+        "kind": normalized_kind,
+        "filename": target.name,
+        "url": workshop_asset_url(normalized_kind, target.name),
+    }
+
+
 def reset_slot_data(slot_id: str) -> dict[str, Any]:
     target = sanitize_slot_id(slot_id, get_active_slot_id())
     persist_json(persona_path(target), DEFAULT_PERSONA, detail="存档重置失败：无法重置人设。")
@@ -741,6 +1080,7 @@ def reset_slot_data(slot_id: str) -> dict[str, Any]:
     persist_json(memories_path(target), [], detail="存档重置失败：无法清空记忆库。")
     persist_json(worldbook_path(target), {}, detail="存档重置失败：无法清空世界书。")
     persist_json(current_card_path(target), {}, detail="存档重置失败：无法清空角色卡记录。")
+    reset_workshop_state(target)
     persist_json(user_profile_path(target), default_user_profile(), detail="存档重置失败：无法重置用户资料。")
     persist_json(preset_path(target), default_preset_store(), detail="存档重置失败：无法重置预设。")
     remove_upload_variants(f"user_avatar_{target}")
@@ -765,6 +1105,8 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
         card[key] = str(raw.get(key, "")).strip()
 
     card["tags"] = sanitize_tags(raw.get("tags", []))
+
+    card["creativeWorkshop"] = sanitize_creative_workshop(raw.get("creativeWorkshop", {}))
 
     plot_stages = raw.get("plotStages", {})
     if isinstance(plot_stages, dict):
@@ -1011,6 +1353,8 @@ def ensure_data_files() -> None:
             write_json(worldbook_path(slot_id), {})
         if not current_card_path(slot_id).exists():
             write_json(current_card_path(slot_id), {})
+        if not workshop_state_path(slot_id).exists():
+            write_json(workshop_state_path(slot_id), default_workshop_state())
         if not user_profile_path(slot_id).exists():
             write_json(user_profile_path(slot_id), default_user_profile())
         if not preset_path(slot_id).exists():
@@ -1220,7 +1564,7 @@ def extract_role_card_payload(data: Any) -> dict[str, Any]:
         return {}
 
     merged = dict(candidate)
-    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "plotStages", "personas"]:
+    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "creativeWorkshop", "plotStages", "personas"]:
         if not merged.get(key) and data.get(key):
             merged[key] = data.get(key)
 
@@ -1425,7 +1769,6 @@ def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str
         {},
         detail="清空世界书失败，请检查文件权限。",
     )
-
     current_card = {
         "source_name": source_name,
         "raw": normalized_card,
@@ -1435,10 +1778,48 @@ def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str
         current_card,
         detail="写入当前角色卡失败，请检查文件权限。",
     )
+    reset_workshop_state(target_slot)
 
     return {
         "persona": persona,
         "card": current_card,
+    }
+
+
+def save_workshop_card(workshop: dict[str, Any], *, slot_id: str | None = None) -> dict[str, Any]:
+    target_slot = sanitize_slot_id(slot_id, get_active_slot_id())
+    current_card = get_current_card(target_slot)
+    current_raw = current_card.get("raw", {})
+    if not isinstance(current_raw, dict):
+        current_raw = {}
+
+    updated_raw = json.loads(json.dumps(current_raw, ensure_ascii=False))
+    updated_raw["creativeWorkshop"] = sanitize_creative_workshop(workshop)
+    normalized_card = normalize_role_card(updated_raw)
+    source_name = str(current_card.get("source_name", "")).strip()
+    if not source_name:
+        source_name = "role_card.json"
+    source_path = CARDS_DIR / Path(source_name).name
+
+    persist_json(
+        source_path,
+        normalized_card,
+        detail="工坊配置保存失败，无法写入角色卡文件。",
+    )
+    current_card_payload = {
+        "source_name": source_path.name,
+        "raw": normalized_card,
+    }
+    persist_json(
+        current_card_path(target_slot),
+        current_card_payload,
+        detail="工坊配置保存失败，无法更新当前角色卡记录。",
+    )
+    return {
+        "current_card": current_card_payload,
+        "card": normalized_card,
+        "workshop": sanitize_creative_workshop(updated_raw["creativeWorkshop"]),
+        "workshop_state": get_workshop_state(target_slot),
     }
 
 
@@ -2203,6 +2584,34 @@ def build_memory_recap_prompt(memories: list[dict[str, Any]]) -> str:
     return "\n\n".join(blocks)
 
 
+def build_user_profile_prompt(user_profile: dict[str, Any]) -> str:
+    if not isinstance(user_profile, dict):
+        return ""
+
+    display_name = str(user_profile.get("display_name", "")).strip()
+    nickname = str(user_profile.get("nickname", "")).strip()
+    profile_text = str(user_profile.get("profile_text", "")).strip()
+    notes = str(user_profile.get("notes", "")).strip()
+
+    if display_name in {"", "我"} and not any([nickname, profile_text, notes]):
+        return ""
+
+    blocks = [
+        "以下是当前存档绑定的用户资料。",
+        "请把它们视为当前对话对象的稳定背景信息，用于称呼和理解用户。",
+        "不要把这些资料误说成你自己的设定，也不要无故改写这些信息。",
+    ]
+    if display_name:
+        blocks.append(f"用户显示名：{display_name}")
+    if nickname:
+        blocks.append(f"偏好称呼：{nickname}")
+    if profile_text:
+        blocks.append(f"用户设定：{profile_text}")
+    if notes:
+        blocks.append(f"补充备注：{notes}")
+    return "\n".join(blocks)
+
+
 def build_messages(
     user_message: str,
     retrieved_items: list[dict[str, Any]] | None = None,
@@ -2213,6 +2622,7 @@ def build_messages(
     persona = get_persona()
     history = get_conversation()
     memories = get_memories()
+    user_profile = get_user_profile()
     llm_config = get_runtime_chat_config(runtime_overrides)
     messages: list[dict[str, str]] = []
     system_sections: list[str] = []
@@ -2228,6 +2638,10 @@ def build_messages(
     memory_recap_prompt = build_memory_recap_prompt(memories)
     if memory_recap_prompt:
         system_sections.append(memory_recap_prompt)
+
+    user_profile_prompt = build_user_profile_prompt(user_profile)
+    if user_profile_prompt:
+        system_sections.append(user_profile_prompt)
 
     worldbook_prompt = build_worldbook_prompt(worldbook_matches or [])
     if worldbook_prompt:
@@ -2848,6 +3262,15 @@ class RoleCardLoadPayload(BaseModel):
     filename: str
 
 
+class WorkshopEvaluatePayload(BaseModel):
+    reason: str = "sync"
+    advance_temp: bool = False
+
+
+class WorkshopSavePayload(BaseModel):
+    creativeWorkshop: dict[str, Any]
+
+
 def build_chat_template_context() -> dict[str, Any]:
     active_slot = get_active_slot_id()
     preset_store = get_preset_store(active_slot)
@@ -2951,6 +3374,7 @@ async def user_config_page(request: Request) -> HTMLResponse:
 async def card_config_page(request: Request) -> HTMLResponse:
     active_slot = get_active_slot_id()
     current_card = get_current_card(active_slot)
+    workshop_state = get_workshop_state(active_slot)
     card_template = normalize_role_card(
         current_card.get("normalized") or current_card.get("raw", {})
     )
@@ -2964,6 +3388,31 @@ async def card_config_page(request: Request) -> HTMLResponse:
             "card_template": card_template,
             "stage_items": list(card_template.get("plotStages", {}).items()),
             "persona_items": list(card_template.get("personas", {}).items()),
+            "workshop_state": workshop_state,
+            "workshop_stage": get_workshop_stage(workshop_state.get("temp", 0)),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/config/workshop", response_class=HTMLResponse)
+async def workshop_config_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    current_card = get_current_card(active_slot)
+    workshop_state = get_workshop_state(active_slot)
+    card_template = normalize_role_card(
+        current_card.get("normalized") or current_card.get("raw", {})
+    )
+    return templates.TemplateResponse(
+        request,
+        "workshop_config.html",
+        {
+            "settings": get_settings(active_slot),
+            "current_card": current_card,
+            "card_template": card_template,
+            "workshop_state": workshop_state,
+            "workshop_stage": get_workshop_stage(workshop_state.get("temp", 0)),
             "active_slot": active_slot,
             "slot_registry": get_slot_registry(),
         },
@@ -3373,14 +3822,17 @@ async def api_get_sprites() -> dict[str, Any]:
 
 @app.get("/api/cards")
 async def api_get_cards() -> dict[str, Any]:
+    active_slot = get_active_slot_id()
     return {
         "items": list_role_card_files(),
-        "current_card": get_current_card(),
+        "current_card": get_current_card(active_slot),
+        "workshop_state": get_workshop_state(active_slot),
     }
 
 
 @app.post("/api/cards/import")
 async def api_import_card(payload: RoleCardPayload) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
     card = parse_role_card_json(payload.raw_json)
     filename = Path(payload.filename.strip() or f"{card.get('name', 'role_card')}.json").name
     if not filename.lower().endswith(".json"):
@@ -3394,12 +3846,14 @@ async def api_import_card(payload: RoleCardPayload) -> dict[str, Any]:
 
     result: dict[str, Any] = {"ok": True, "filename": filename, "card": card}
     if payload.apply_now:
-        result.update(apply_role_card(card, source_name=filename))
+        result.update(apply_role_card(card, source_name=filename, slot_id=active_slot))
+        result["workshop"] = evaluate_creative_workshop(slot_id=active_slot, reason="load")
     return result
 
 
 @app.post("/api/cards/load")
 async def api_load_card(payload: RoleCardLoadPayload) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
     filename = Path(payload.filename).name
     target = CARDS_DIR / filename
     if not target.exists():
@@ -3409,7 +3863,8 @@ async def api_load_card(payload: RoleCardLoadPayload) -> dict[str, Any]:
 
     raw_text = read_role_card_text(target)
     card = parse_role_card_json(raw_text)
-    result = apply_role_card(card, source_name=filename)
+    result = apply_role_card(card, source_name=filename, slot_id=active_slot)
+    result["workshop"] = evaluate_creative_workshop(slot_id=active_slot, reason="load")
     result.update({"ok": True, "filename": filename, "card": card})
     return result
 
@@ -3437,6 +3892,52 @@ async def api_export_current_card() -> FileResponse:
         filename=source_name,
         media_type="application/json",
     )
+
+
+@app.get("/api/workshop/status")
+async def api_get_workshop_status() -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    current_card = get_current_card(active_slot)
+    workshop = sanitize_creative_workshop(current_card.get("raw", {}).get("creativeWorkshop", {}))
+    state = get_workshop_state(active_slot)
+    stage = get_workshop_stage(state.get("temp", 0))
+    return {
+        "ok": True,
+        "active_slot": active_slot,
+        "current_card": current_card,
+        "workshop": workshop,
+        "state": state,
+        "stage": stage,
+        "stage_label": f"{stage}阶段",
+        "signature": workshop_signature(current_card, workshop, stage),
+    }
+
+
+@app.post("/api/workshop/save")
+async def api_save_workshop(payload: WorkshopSavePayload) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    result = save_workshop_card(payload.creativeWorkshop, slot_id=active_slot)
+    return {
+        "ok": True,
+        "active_slot": active_slot,
+        "current_card": result["current_card"],
+        "card": result["card"],
+        "workshop": result["workshop"],
+        "state": result["workshop_state"],
+    }
+
+
+@app.post("/api/workshop/evaluate")
+async def api_evaluate_workshop(payload: WorkshopEvaluatePayload) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    if payload.advance_temp:
+        state = get_workshop_state(active_slot)
+        state["temp"] = max(0, int(state.get("temp", 0) or 0) + 1)
+        state["pending_temp"] = state["temp"]
+        save_workshop_state(state, active_slot)
+    workshop = evaluate_creative_workshop(slot_id=active_slot, reason=payload.reason)
+    return {"ok": True, "active_slot": active_slot, "workshop": workshop, "state": get_workshop_state(active_slot)}
+
 
 @app.post("/api/memories")
 async def api_save_memories(payload: MemoryListPayload) -> dict[str, Any]:
@@ -3605,6 +4106,14 @@ async def api_upload_background(file: UploadFile = File(...)) -> dict[str, Any]:
     return {"ok": True, "url": f"/static/uploads/{filename}"}
 
 
+@app.post("/api/workshop/upload")
+async def api_upload_workshop_asset(
+    kind: str = Form("image"),
+    file: UploadFile = File(...),
+) -> dict[str, Any]:
+    return await save_workshop_asset_upload(kind=kind, file=file)
+
+
 @app.post("/api/models")
 async def api_get_models() -> dict[str, Any]:
     llm_config = get_runtime_chat_config()
@@ -3763,10 +4272,21 @@ async def api_chat_stream(payload: ChatRequest) -> StreamingResponse:
 @app.post("/api/conversation/end")
 async def api_end_conversation() -> dict[str, Any]:
     memory = await archive_current_conversation()
-    return {"ok": True, "memory_item": memory}
+    active_slot = get_active_slot_id()
+    state = get_workshop_state(active_slot)
+    state["temp"] = max(0, int(state.get("temp", 0) or 0) + 1)
+    state["pending_temp"] = state["temp"]
+    save_workshop_state(state, active_slot)
+    return {
+        "ok": True,
+        "memory_item": memory,
+        "workshop_state": get_workshop_state(active_slot),
+        "workshop_stage": get_workshop_stage(state.get("temp", 0)),
+    }
 
 @app.post("/api/reset")
 async def api_reset() -> dict[str, Any]:
+    reset_workshop_state()
     persist_json(
         conversation_path(),
         [],

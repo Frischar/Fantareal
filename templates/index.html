@@ -318,6 +318,7 @@
         <a class="navlink" href="/config/preset">Preset</a>
         <a class="navlink" href="/config/user">User</a>
         <a class="navlink" href="/config/card">Card</a>
+        <a class="navlink" href="/config/workshop">Workshop</a>
         <a class="navlink" href="/config/sprite">Sprite</a>
         <a class="navlink" href="/config/memory">Memory</a>
         <a class="navlink" href="/config/worldbook">WB Set</a>
@@ -455,6 +456,28 @@
         </main>
       </div>
     </div>
+
+    <div id="workshop-modal" class="workshop-modal hidden" aria-hidden="true">
+      <div class="workshop-modal-backdrop"></div>
+      <div class="panel workshop-modal-card">
+        <div class="drawer-head">
+          <div>
+            <p class="eyebrow">创意工坊</p>
+            <h2 id="workshop-modal-title">图片弹窗</h2>
+          </div>
+          <button id="workshop-modal-close" class="secondary compact" type="button">关闭</button>
+        </div>
+        <div class="workshop-modal-stage" id="workshop-modal-stage">触发阶段：A 阶段</div>
+        <div class="workshop-modal-body">
+          <img id="workshop-modal-image" class="workshop-modal-image" loading="lazy" decoding="async" alt="创意工坊图片" />
+          <p id="workshop-modal-text" class="workshop-modal-text">这里会显示图片说明。</p>
+        </div>
+        <div class="workshop-modal-actions">
+          <button id="workshop-modal-confirm" class="secondary compact" type="button">我知道了</button>
+        </div>
+      </div>
+    </div>
+    <audio id="workshop-audio-player" preload="auto"></audio>
 
     <div id="drawer-overlay" class="drawer-overlay" hidden></div>
     <aside id="config-drawer" class="config-drawer" aria-hidden="true">
@@ -677,6 +700,21 @@
       const presetDebugBodyEl = document.getElementById("preset-debug-body");
       const togglePresetDebugBtn = document.getElementById("toggle-preset-debug");
       let presetDebugCollapsed = true;
+      const workshopModalEl = document.getElementById("workshop-modal");
+      const workshopModalTitleEl = document.getElementById("workshop-modal-title");
+      const workshopModalStageEl = document.getElementById("workshop-modal-stage");
+      const workshopModalImageEl = document.getElementById("workshop-modal-image");
+      const workshopModalTextEl = document.getElementById("workshop-modal-text");
+      const workshopModalCloseEl = document.getElementById("workshop-modal-close");
+      const workshopModalConfirmEl = document.getElementById("workshop-modal-confirm");
+      const workshopAudioEl = document.getElementById("workshop-audio-player");
+      const WORKSHOP_MUSIC_PRESETS = [
+        { id: "off", label: "关闭", url: "" },
+        { id: "coffee", label: "咖啡馆氛围", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
+        { id: "night", label: "夜晚钢琴", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
+        { id: "rain", label: "雨声氛围", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
+      ];
+      let workshopStatusCache = null;
       const drawerEl = document.getElementById("config-drawer");
       const drawerOverlayEl = document.getElementById("drawer-overlay");
       const spriteImageEl = document.getElementById("sprite-image");
@@ -1536,6 +1574,93 @@
         }
       }
 
+      function getWorkshopStageLabel(stage) {
+        const mapping = {
+          A: "A 阶段",
+          B: "B 阶段",
+          C: "C 阶段",
+        };
+        return mapping[stage] || stage || "A 阶段";
+      }
+
+      function resolveWorkshopMusicUrl(action) {
+        const customUrl = String(action?.music_url || "").trim();
+        if (customUrl) return customUrl;
+        const preset = WORKSHOP_MUSIC_PRESETS.find((entry) => entry.id === action?.music_preset);
+        return preset?.url || "";
+      }
+
+      function hideWorkshopImagePopup() {
+        if (workshopModalEl) {
+          workshopModalEl.classList.add("hidden");
+          workshopModalEl.setAttribute("aria-hidden", "true");
+        }
+        if (workshopAudioEl) {
+          workshopAudioEl.pause();
+          workshopAudioEl.removeAttribute("src");
+          workshopAudioEl.load();
+        }
+        if (workshopModalImageEl) {
+          workshopModalImageEl.src = "";
+          workshopModalImageEl.hidden = true;
+        }
+      }
+
+      function showWorkshopImagePopup(action) {
+        if (!workshopModalEl || !workshopModalTitleEl || !workshopModalStageEl || !workshopModalTextEl || !workshopModalImageEl) return;
+        workshopModalTitleEl.textContent = String(action?.popup_title || action?.name || "创意工坊弹窗").trim();
+        workshopModalStageEl.textContent = `触发阶段：${action?.stage_label || getWorkshopStageLabel(action?.stage)}`;
+        workshopModalTextEl.textContent = String(action?.note || "这里会显示图片说明。").trim() || "这里会显示图片说明。";
+        const imageUrl = String(action?.image_url || "").trim();
+        workshopModalImageEl.src = imageUrl;
+        workshopModalImageEl.alt = String(action?.image_alt || action?.name || "创意工坊图片").trim();
+        workshopModalImageEl.hidden = !imageUrl;
+        workshopModalEl.classList.remove("hidden");
+        workshopModalEl.setAttribute("aria-hidden", "false");
+      }
+
+      function playWorkshopMusic(action) {
+        if (!workshopAudioEl) return;
+        const nextUrl = resolveWorkshopMusicUrl(action);
+        if (!nextUrl) return;
+        workshopAudioEl.loop = action?.loop !== false;
+        workshopAudioEl.volume = Math.min(Math.max(Number(action?.volume ?? 0.85) || 0.85, 0), 1);
+        if (workshopAudioEl.src !== nextUrl) {
+          workshopAudioEl.src = nextUrl;
+          workshopAudioEl.load();
+        }
+        workshopAudioEl.currentTime = 0;
+        if (action?.autoplay !== false) {
+          workshopAudioEl.play().catch(() => {
+            setStatus("创意工坊音乐播放失败，请点击页面后重试。");
+          });
+        }
+      }
+
+      function handleWorkshopOutcome(workshop) {
+        workshopStatusCache = workshop || null;
+        hideWorkshopImagePopup();
+        if (!workshop?.triggered || !workshop?.action) {
+          return "";
+        }
+        const action = workshop.action;
+        if (action.action_type === "image") {
+          showWorkshopImagePopup(action);
+        } else {
+          playWorkshopMusic(action);
+        }
+        return `创意工坊已触发：${action.name || action.stage_label || getWorkshopStageLabel(action.stage)}`;
+      }
+
+      async function triggerWorkshopEvaluation(reason = "load") {
+        const response = await postJson("/api/workshop/evaluate", {
+          reason,
+          advance_temp: false,
+        });
+        handleWorkshopOutcome(response.workshop);
+        return response;
+      }
+
       async function postJson(url, payload) {
         const response = await fetch(url, {
           method: "POST",
@@ -1724,6 +1849,14 @@
         streamingEntries.add(assistantEntry);
         let finalReply = "";
         try {
+          try {
+            const workshopResult = await triggerWorkshopEvaluation("chat_round_start");
+            if (workshopResult?.workshop) {
+              handleWorkshopOutcome(workshopResult.workshop);
+            }
+          } catch (workshopError) {
+            console.warn("Workshop evaluation skipped:", workshopError);
+          }
           await streamChat({
             message: text,
             runtime_config: buildChatRuntimeConfig(),
@@ -1794,9 +1927,12 @@
           messagesEl.innerHTML = "";
           renderRetrievedItems([]);
           renderWorldbookHits([]);
-          setStatus(`已写入长期记忆：${data.memory_item?.title || "完成"}`);
+          setStatus(
+            "已写入长期记忆：" + (data.memory_item?.title || "完成")
+            + "；当前工坊阶段：" + (data.workshop_stage || "未知")
+          );
         } catch (error) {
-          setStatus(`结束失败：${error.message}`);
+          setStatus("结束失败：" + error.message);
         }
       });
 
@@ -1852,6 +1988,14 @@
           }
         });
       }
+
+      workshopModalCloseEl?.addEventListener("click", hideWorkshopImagePopup);
+      workshopModalConfirmEl?.addEventListener("click", hideWorkshopImagePopup);
+      workshopModalEl?.addEventListener("click", (event) => {
+        if (event.target === workshopModalEl || event.target.classList.contains("workshop-modal-backdrop")) {
+          hideWorkshopImagePopup();
+        }
+      });
 
       document.getElementById("slot-select").addEventListener("change", async (event) => {
         try {

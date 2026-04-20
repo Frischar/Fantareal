@@ -58,6 +58,11 @@
   box-sizing: border-box;
 }
 
+.hidden,
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   min-height: 100%;
@@ -494,7 +499,38 @@ button.secondary {
   color: var(--text);
 }
 
+a.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 16px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--muted) 38%, transparent 62%);
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+}
+
+a.secondary:visited {
+  color: var(--text);
+}
+
+button.secondary:hover,
+a.secondary:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--muted) 46%, transparent 54%);
+}
+
 button.compact {
+  width: auto;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+a.compact {
   width: auto;
   margin-top: 0;
   white-space: nowrap;
@@ -893,6 +929,78 @@ button.compact {
   white-space: pre-wrap;
 }
 
+.workshop-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 230;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.workshop-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 10, 16, 0.56);
+  backdrop-filter: blur(8px);
+}
+
+.workshop-modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(82vh, 760px);
+  overflow: auto;
+}
+
+.workshop-modal-stage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-strong) 90%, transparent 10%);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 14px;
+}
+
+.workshop-modal-body {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.workshop-modal-image {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-strong) 92%, transparent 8%);
+}
+
+.workshop-modal-text {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--input-bg) 96%, transparent 4%);
+  color: var(--text);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.workshop-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 1080px) {
   .config-shell,
   .config-shell.wide {
@@ -926,6 +1034,7 @@ button.compact {
   }
 
   button.compact,
+  a.compact,
   .composer-actions button,
   .button-row button,
   .action-group button,
@@ -1157,6 +1266,106 @@ button.compact {
 .card-builder textarea {
   resize: vertical;
   min-height: 96px;
+}
+
+.workshop-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.workshop-info-grid {
+  margin-bottom: 12px;
+}
+
+.workshop-search-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workshop-runtime-panel {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px dashed var(--line);
+  background: color-mix(in srgb, var(--panel-strong) 90%, transparent 10%);
+}
+
+.workshop-runtime-panel p {
+  margin: 0;
+}
+
+#workshop-rule-list {
+  display: grid;
+  gap: 12px;
+}
+
+.workshop-rule-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.workshop-rule-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.workshop-rule-summary-copy {
+  min-width: 0;
+}
+
+.workshop-rule-summary-title {
+  display: block;
+  font-weight: 700;
+}
+
+.workshop-rule-summary-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.workshop-rule-body {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.workshop-rule-shell[data-collapsed="true"] .workshop-rule-body {
+  display: none;
+}
+
+.workshop-rule-shell.is-collapsed {
+  opacity: 0.98;
+}
+
+.workshop-action-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 88%, transparent 12%);
+}
+
+.workshop-image-preview-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.workshop-rule-image-preview {
+  max-width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--line);
 }
 
 @media (max-width: 1080px) {
