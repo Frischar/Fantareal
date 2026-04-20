@@ -9,9 +9,8 @@
   <body>
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
         <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
@@ -24,26 +23,15 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-      <div class="slot-toolbar">
+            <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
+          <span class="slot-badge">Memory</span>
           <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">这里维护的是当前存档独有的长期记忆条目。</p>
+            <strong>当前为全局记忆库</strong>
+            <p class="slot-hint">这里维护的是全局长期记忆条目，可以自由导入和导出。</p>
           </div>
         </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">
-            {% for slot in slot_registry.slots %}
-            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-            {% endfor %}
-          </select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
       </div>
-    </div>
-
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
@@ -69,6 +57,9 @@
             <button id="add-memory" type="button">新增记忆</button>
             <button id="save-memories" type="button" class="secondary">保存全部记忆</button>
             <button id="reload-memories" type="button" class="secondary">重新读取</button>
+            <button id="import-memories" type="button" class="secondary">导入记忆</button>
+            <button id="export-memories" type="button" class="secondary">导出记忆</button>
+            <input id="import-memories-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
           </div>
         </div>
 
@@ -158,32 +149,11 @@
       const memoryListEl = document.getElementById("memory-list");
       const memoryCountEl = document.getElementById("memory-count");
       const templateEl = document.getElementById("memory-card-template");
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
 
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
-
-      async function selectSlot(slotId) {
-        await postJson("/api/slots/select", { slot_id: slotId });
-        window.location.reload();
-      }
-
-      async function renameSlot(slotId) {
-        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
-        const nextName = window.prompt("给这个存档起个名字：", currentName);
-        if (nextName === null) return;
-        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
-        window.location.reload();
-      }
-
-      async function resetSlot(slotId) {
-        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。要继续吗？");
-        if (!confirmed) return;
-        await postJson("/api/slots/reset", { slot_id: slotId });
-        window.location.reload();
-      }
 
       function setStatus(text) {
         statusEl.textContent = text;
@@ -316,6 +286,25 @@
         return response.json();
       }
 
+      async function downloadJson(url, fallbackName) {
+        const response = await fetch(url);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "下载失败");
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const disposition = response.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename=\"?([^\";]+)\"?/);
+        anchor.href = objectUrl;
+        anchor.download = match ? decodeURIComponent(match[1]) : fallbackName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
+      }
+
       async function loadMemories() {
         const items = await fetch("/api/memories").then((response) => response.json());
         memoryListEl.innerHTML = "";
@@ -337,6 +326,19 @@
         updateMemoryCount();
         applyMemorySearch();
         setStatus("记忆库已保存，并会在每次聊天时作为前情提要生效。");
+      }
+
+      async function importMemoriesFile(file) {
+        if (!file) return;
+        const rawJson = await file.text();
+        const data = await postJson("/api/memories/import", { raw_json: rawJson });
+        memoryListEl.innerHTML = "";
+        for (const item of data.items || []) {
+          memoryListEl.appendChild(createMemoryCard(item));
+        }
+        updateMemoryCount();
+        applyMemorySearch();
+        setStatus(`记忆导入完成：${data.items?.length || 0} 条。`);
       }
 
       document.getElementById("add-memory").addEventListener("click", () => {
@@ -362,6 +364,31 @@
         }
       });
 
+      document.getElementById("import-memories").addEventListener("click", () => {
+        document.getElementById("import-memories-file").click();
+      });
+
+      document.getElementById("import-memories-file").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          await importMemoriesFile(file);
+        } catch (error) {
+          setStatus(`导入失败：${error.message}`);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("export-memories").addEventListener("click", async () => {
+        try {
+          await downloadJson("/api/memories/export", "memories.json");
+          setStatus("记忆已导出。");
+        } catch (error) {
+          setStatus(`导出失败：${error.message}`);
+        }
+      });
+
       memoryListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".memory-card");
         if (!card) return;
@@ -381,32 +408,6 @@
       document.getElementById("expand-all-memories").addEventListener("click", () => {
         [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, false));
         setStatus("已展开当前列表中的全部记忆。");
-      });
-
-      document.getElementById("slot-select").addEventListener("change", async (event) => {
-        try {
-          setStatus("正在切换存档...");
-          await selectSlot(event.target.value);
-        } catch (error) {
-          setStatus(`切换存档失败：${error.message}`);
-          event.target.value = ACTIVE_SLOT;
-        }
-      });
-
-      document.getElementById("rename-slot").addEventListener("click", async () => {
-        try {
-          await renameSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重命名失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("reset-slot").addEventListener("click", async () => {
-        try {
-          await resetSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重置失败：${error.message}`);
-        }
       });
 
       applyTheme(currentTheme);

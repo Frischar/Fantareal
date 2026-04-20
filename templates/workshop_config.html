@@ -9,9 +9,8 @@
   <body>
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
         <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
@@ -24,32 +23,21 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-      <div class="slot-toolbar">
+            <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
+          <span class="slot-badge">Workshop</span>
           <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">这个页面只编辑当前角色卡的创意工坊规则，不会影响其它存档。</p>
+            <strong>当前编辑的是角色卡工坊规则</strong>
+            <p class="slot-hint">这里只编辑当前角色卡的创意工坊规则；工坊进度现在跟随全局记忆运行。</p>
           </div>
         </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">
-            {% for slot in slot_registry.slots %}
-            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-            {% endfor %}
-          </select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
       </div>
-    </div>
-
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Workshop</p>
           <h2>创意工坊</h2>
-          <p class="muted">当前编辑角色卡：<strong>{{ current_card.source_name or "未命名角色卡" }}</strong>。保存后会直接写回当前角色卡文件。</p>
+          <p class="muted">当前编辑角色卡：<strong>{{ current_card.source_name or "未命名角色卡" }}</strong>。保存后会直接写回角色卡文件，当前全局运行状态会读取这张卡的最新工坊规则。</p>
         </div>
 
         <div class="button-row" style="margin-bottom: 12px;">
@@ -63,11 +51,11 @@
         <div class="grid-two workshop-info-grid">
           <div class="workshop-search-block">
             <label for="workshop-rule-search">搜索规则</label>
-            <input id="workshop-rule-search" type="text" placeholder="按标题、备注或链接搜索" />
+            <input id="workshop-rule-search" type="text" placeholder="按标题、备注、Temp 或链接搜索" />
           </div>
           <div class="workshop-runtime-panel">
             <label class="checkbox-row"><input id="workshop-enabled" type="checkbox" /> 启用创意工坊</label>
-            <p class="muted compact" id="workshop-runtime-info">当前 temp = {{ workshop_state.temp or 0 }}，阶段 = {{ workshop_stage }}。</p>
+            <p class="muted compact" id="workshop-runtime-info">当前 temp = {{ workshop_state.temp or 0 }}，阶段 = {{ workshop_stage }}阶段。</p>
           </div>
         </div>
 
@@ -84,12 +72,12 @@
     </div>
 
     <script>
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
       const initialWorkshop = {{ card_template.creativeWorkshop | tojson }};
+      const initialWorkshopTemp = Number({{ workshop_state.temp or 0 }}) || 0;
       const currentCardName = {{ current_card.source_name | tojson }};
       const rootEl = document.documentElement;
       const bodyEl = document.body;
@@ -103,8 +91,8 @@
       const MUSIC_PRESETS = [
         { id: "off", label: "关闭", url: "" },
         { id: "coffee", label: "咖啡馆氛围", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
-        { id: "night", label: "夜色钢琴", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
-        { id: "rain", label: "雨声氛围", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
+        { id: "night", label: "夜晚钢琴", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
+        { id: "rain", label: "雨声音氛围", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
       ];
 
       function setStatus(text) {
@@ -165,6 +153,17 @@
         return ["A", "B", "C"].includes(stage) ? stage : "A";
       }
 
+      function normalizeWorkshopTriggerMode(value) {
+        const mode = String(value || "stage").trim().toLowerCase();
+        return mode === "temp" ? "temp" : "stage";
+      }
+
+      function normalizeWorkshopTempValue(value, fallback = 0) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(Math.max(Math.round(parsed), 0), 9999);
+      }
+
       function normalizeWorkshopActionType(value) {
         const actionType = String(value || "music").trim().toLowerCase();
         return actionType === "image" ? "image" : "music";
@@ -172,11 +171,22 @@
 
       function getWorkshopStageLabel(stage) {
         const mapping = { A: "A 阶段", B: "B 阶段", C: "C 阶段" };
-        return mapping[stage] || "A 阶段";
+        return mapping[normalizeWorkshopStage(stage)] || "A 阶段";
       }
 
       function getWorkshopActionLabel(actionType) {
-        return actionType === "image" ? "弹出图片" : "播放音乐";
+        return normalizeWorkshopActionType(actionType) === "image" ? "弹出图片" : "播放音乐";
+      }
+
+      function getWorkshopTriggerLabel(item) {
+        const triggerMode = normalizeWorkshopTriggerMode(item?.triggerMode);
+        if (triggerMode === "temp") {
+          let min = normalizeWorkshopTempValue(item?.triggerTempMin, initialWorkshopTemp);
+          let max = normalizeWorkshopTempValue(item?.triggerTempMax, min);
+          if (max < min) [min, max] = [max, min];
+          return min === max ? `Temp ${min}` : `Temp ${min}-${max}`;
+        }
+        return getWorkshopStageLabel(item?.triggerStage);
       }
 
       function stripFileExtension(filename) {
@@ -203,9 +213,12 @@
       function createDefaultWorkshopItem(stage = "A") {
         return {
           id: `workshop_stage_${String(stage).toLowerCase()}`,
-          name: `${stage} 阶段规则`,
+          name: `${stage}阶段规则`,
           enabled: stage === "A",
-          triggerStage: stage,
+          triggerMode: "stage",
+          triggerStage: normalizeWorkshopStage(stage),
+          triggerTempMin: initialWorkshopTemp,
+          triggerTempMax: initialWorkshopTemp,
           actionType: "music",
           popupTitle: "",
           musicPreset: "off",
@@ -230,11 +243,18 @@
         const rawItems = Array.isArray(workshop.items) ? workshop.items : [];
         rawItems.forEach((item, index) => {
           if (!item || typeof item !== "object") return;
+          const triggerMode = normalizeWorkshopTriggerMode(item.triggerMode);
+          let triggerTempMin = normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp);
+          let triggerTempMax = normalizeWorkshopTempValue(item.triggerTempMax, triggerTempMin);
+          if (triggerTempMax < triggerTempMin) [triggerTempMin, triggerTempMax] = [triggerTempMax, triggerTempMin];
           items.push({
             id: String(item.id || "").trim() || `workshop-item-${index + 1}`,
             name: String(item.name || "").trim() || `规则 ${index + 1}`,
             enabled: item.enabled !== false,
+            triggerMode,
             triggerStage: normalizeWorkshopStage(item.triggerStage),
+            triggerTempMin,
+            triggerTempMax,
             actionType: normalizeWorkshopActionType(item.actionType),
             popupTitle: String(item.popupTitle || "").trim(),
             musicPreset: String(item.musicPreset || "off").trim() || "off",
@@ -251,7 +271,7 @@
         const stageMap = new Map();
         const extraItems = [];
         items.forEach((item) => {
-          if (["A", "B", "C"].includes(item.triggerStage) && !stageMap.has(item.triggerStage)) {
+          if (item.triggerMode === "stage" && ["A", "B", "C"].includes(item.triggerStage) && !stageMap.has(item.triggerStage)) {
             stageMap.set(item.triggerStage, item);
           } else {
             extraItems.push(item);
@@ -266,9 +286,12 @@
       function getWorkshopSearchText(card) {
         return [
           card.querySelector(".workshop-rule-name")?.value || "",
-          card.querySelector(".workshop-rule-popup-title")?.value || "",
+          card.querySelector(".workshop-rule-trigger-mode")?.value || "",
           card.querySelector(".workshop-rule-trigger")?.value || "",
+          card.querySelector(".workshop-rule-trigger-temp-min")?.value || "",
+          card.querySelector(".workshop-rule-trigger-temp-max")?.value || "",
           card.querySelector(".workshop-rule-action")?.value || "",
+          card.querySelector(".workshop-rule-popup-title")?.value || "",
           card.querySelector(".workshop-rule-note")?.value || "",
           card.querySelector(".workshop-rule-url")?.value || "",
           card.querySelector(".workshop-rule-image-url")?.value || "",
@@ -293,10 +316,18 @@
         });
       }
 
+      function setWorkshopTriggerPanelState(panel, active) {
+        if (!panel) return;
+        panel.hidden = !active;
+        panel.querySelectorAll("input, select").forEach((field) => {
+          field.disabled = !active;
+        });
+      }
+
       function buildMusicFields(item, index) {
         const presetOptions = MUSIC_PRESETS.map((preset) => {
           const selected = preset.id === (item.musicPreset || "off") ? "selected" : "";
-          return `<option value="${preset.id}" ${selected}>${preset.label}</option>`;
+          return `<option value="${preset.id}" ${selected}>${escapeHtml(preset.label)}</option>`;
         }).join("");
         return `
           <div class="workshop-action-panel" data-action-type="music">
@@ -324,12 +355,72 @@
             <label>图片地址</label>
             <input class="workshop-rule-image-url" data-workshop-rule-image-url="${index}" value="${escapeAttr(item.imageUrl || "")}" placeholder="远程图片地址或 data URL" />
             <label>图片说明</label>
-            <input class="workshop-rule-image-alt" data-workshop-rule-image-alt="${index}" value="${escapeAttr(item.imageAlt || "")}" placeholder="图片弹窗里显示的说明文字" />
+            <input class="workshop-rule-image-alt" data-workshop-rule-image-alt="${index}" value="${escapeAttr(item.imageAlt || "")}" placeholder="弹窗里的说明文字" />
             <div class="workshop-image-preview-wrap">
-              <img class="workshop-rule-image-preview" loading="lazy" decoding="async" src="${escapeAttr(item.imageUrl || "")}" alt="${escapeAttr(item.imageAlt || item.name || "工坊图片")}" ${item.imageUrl ? "" : "hidden"} />
+              <img class="workshop-rule-image-preview" loading="lazy" decoding="async" src="${escapeAttr(item.imageUrl || "")}" alt="${escapeAttr(item.imageAlt || item.name || "创意工坊图片")}" ${item.imageUrl ? "" : "hidden"} />
             </div>
           </div>
         `;
+      }
+
+      function buildTriggerFields(item, index, isCoreStage) {
+        const triggerMode = normalizeWorkshopTriggerMode(item.triggerMode);
+        const tempMin = normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp);
+        const tempMax = normalizeWorkshopTempValue(item.triggerTempMax, tempMin);
+        return `
+          <div class="grid-two">
+            <div>
+              <label>触发方式</label>
+              <select class="workshop-rule-trigger-mode" data-workshop-rule-trigger-mode="${index}" ${isCoreStage ? "disabled" : ""}>
+                <option value="stage" ${triggerMode === "stage" ? "selected" : ""}>阶段触发</option>
+                <option value="temp" ${triggerMode === "temp" ? "selected" : ""}>自定义 Temp</option>
+              </select>
+            </div>
+            <div class="workshop-trigger-panel" data-trigger-mode="stage">
+              <label>触发阶段</label>
+              <select class="workshop-rule-trigger" data-workshop-rule-trigger="${index}" ${isCoreStage ? "disabled" : ""}>
+                <option value="A" ${item.triggerStage === "A" ? "selected" : ""}>A 阶段</option>
+                <option value="B" ${item.triggerStage === "B" ? "selected" : ""}>B 阶段</option>
+                <option value="C" ${item.triggerStage === "C" ? "selected" : ""}>C 阶段</option>
+              </select>
+            </div>
+          </div>
+          <div class="workshop-trigger-panel" data-trigger-mode="temp">
+            <div class="grid-two">
+              <div>
+                <label>Temp 起点</label>
+                <input class="workshop-rule-trigger-temp-min" data-workshop-rule-trigger-temp-min="${index}" type="number" min="0" max="9999" step="1" value="${escapeAttr(tempMin)}" />
+              </div>
+              <div>
+                <label>Temp 终点</label>
+                <input class="workshop-rule-trigger-temp-max" data-workshop-rule-trigger-temp-max="${index}" type="number" min="0" max="9999" step="1" value="${escapeAttr(tempMax)}" />
+              </div>
+            </div>
+            <p class="muted compact">起点和终点相同表示只在单个 temp 触发。</p>
+          </div>
+        `;
+      }
+
+      function updateWorkshopRuleTriggerUI(card) {
+        if (!card) return;
+        const triggerMode = normalizeWorkshopTriggerMode(card.querySelector(".workshop-rule-trigger-mode")?.value);
+        const stagePanel = card.querySelector(".workshop-trigger-panel[data-trigger-mode='stage']");
+        const tempPanel = card.querySelector(".workshop-trigger-panel[data-trigger-mode='temp']");
+        const summaryTrigger = card.querySelector(".workshop-rule-trigger-label");
+
+        setWorkshopTriggerPanelState(stagePanel, triggerMode === "stage");
+        setWorkshopTriggerPanelState(tempPanel, triggerMode === "temp");
+
+        if (summaryTrigger) {
+          if (triggerMode === "temp") {
+            let min = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-min")?.value, initialWorkshopTemp);
+            let max = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-max")?.value, min);
+            if (max < min) [min, max] = [max, min];
+            summaryTrigger.textContent = min === max ? `Temp ${min}` : `Temp ${min}-${max}`;
+          } else {
+            summaryTrigger.textContent = getWorkshopStageLabel(card.querySelector(".workshop-rule-trigger")?.value);
+          }
+        }
       }
 
       function updateWorkshopRuleActionUI(card) {
@@ -345,9 +436,9 @@
         }
         if (summarySnippet) {
           const snippet = actionType === "image"
-            ? (card.querySelector(".workshop-rule-image-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击编辑这条工坊规则")
-            : (card.querySelector(".workshop-rule-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击编辑这条工坊规则");
-          summarySnippet.textContent = String(snippet).replace(/\s+/g, " ").trim().slice(0, 56) || "点击编辑这条工坊规则";
+            ? (card.querySelector(".workshop-rule-image-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条创意工坊规则")
+            : (card.querySelector(".workshop-rule-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条创意工坊规则");
+          summarySnippet.textContent = String(snippet).replace(/\s+/g, " ").trim().slice(0, 56) || "点击展开编辑这条创意工坊规则";
         }
 
         setWorkshopPanelState(musicBlock, actionType === "music");
@@ -357,7 +448,7 @@
         const imageUrl = card.querySelector(".workshop-rule-image-url")?.value || "";
         if (preview) {
           preview.src = imageUrl;
-          preview.alt = card.querySelector(".workshop-rule-image-alt")?.value || card.querySelector(".workshop-rule-name")?.value || "工坊图片";
+          preview.alt = card.querySelector(".workshop-rule-image-alt")?.value || card.querySelector(".workshop-rule-name")?.value || "创意工坊图片";
           preview.hidden = !imageUrl;
         }
       }
@@ -390,7 +481,7 @@
           row.innerHTML = `
             <button class="secondary compact workshop-asset-pick" data-workshop-pick-kind="${config.kind}" type="button">${config.buttonLabel}</button>
             <input class="workshop-rule-file" data-workshop-file-kind="${config.kind}" type="file" accept="${config.accept}" hidden />
-            <span class="muted compact">上传后会自动填入地址</span>
+            <span class="muted compact">上传后会自动回填地址</span>
           `;
           targetInput.insertAdjacentElement("afterend", row);
         });
@@ -412,7 +503,7 @@
             }
             const altInput = card.querySelector(".workshop-rule-image-alt");
             if (altInput && !String(altInput.value || "").trim()) {
-              altInput.value = stripFileExtension(file.name) || "工坊图片";
+              altInput.value = stripFileExtension(file.name) || "创意工坊图片";
               altInput.dispatchEvent(new Event("input", { bubbles: true }));
             }
           } else {
@@ -428,7 +519,7 @@
             }
           }
 
-          setStatus(`${kind === "image" ? "图片" : "音乐"}已上传并应用。`);
+          setStatus(`${kind === "image" ? "图片" : "音乐"}已上传并回填地址。`);
         } catch (error) {
           setStatus(`上传失败：${error.message}`);
         } finally {
@@ -441,10 +532,10 @@
         node.className = "card-block workshop-rule-card";
         node.dataset.workshopIndex = String(index);
         const summaryTitle = item.name || `规则 ${index + 1}`;
-        const isCoreStage = String(item.id || "").startsWith("workshop_stage_") && ["A", "B", "C"].includes(item.triggerStage);
+        const isCoreStage = String(item.id || "").startsWith("workshop_stage_") && item.triggerMode === "stage" && ["A", "B", "C"].includes(item.triggerStage);
         const summarySource = item.actionType === "image"
-          ? (item.imageUrl || item.note || "点击编辑这条工坊规则")
-          : (item.musicUrl || item.musicPreset || item.note || "点击编辑这条工坊规则");
+          ? (item.imageUrl || item.note || "点击展开编辑这条创意工坊规则")
+          : (item.musicUrl || item.musicPreset || item.note || "点击展开编辑这条创意工坊规则");
         const summarySnippet = String(summarySource).replace(/\s+/g, " ").trim().slice(0, 56);
 
         node.innerHTML = `
@@ -453,8 +544,9 @@
               <div class="workshop-rule-summary-copy">
                 <strong class="workshop-rule-summary-title">${escapeHtml(summaryTitle)}</strong>
                 <span class="workshop-rule-summary-meta">
+                  <span class="workshop-rule-trigger-label">${escapeHtml(getWorkshopTriggerLabel(item))}</span>
                   <span class="workshop-rule-action-label">${escapeHtml(getWorkshopActionLabel(item.actionType))}</span>
-                  <span class="workshop-rule-summary-text">${escapeHtml(summarySnippet || "点击编辑这条工坊规则")}</span>
+                  <span class="workshop-rule-summary-text">${escapeHtml(summarySnippet || "点击展开编辑这条创意工坊规则")}</span>
                 </span>
               </div>
               <div class="button-row">
@@ -467,22 +559,13 @@
               <label>标题</label>
               <input class="workshop-rule-name" data-workshop-rule-name="${index}" value="${escapeAttr(item.name || "")}" />
               <label class="checkbox-row"><input class="workshop-rule-enabled" data-workshop-rule-enabled="${index}" type="checkbox" ${item.enabled !== false ? "checked" : ""} /> 启用规则</label>
-              <div class="grid-two">
-                <div>
-                  <label>触发阶段</label>
-                  <select class="workshop-rule-trigger" data-workshop-rule-trigger="${index}" ${isCoreStage ? "disabled" : ""}>
-                    <option value="A" ${item.triggerStage === "A" ? "selected" : ""}>A 阶段</option>
-                    <option value="B" ${item.triggerStage === "B" ? "selected" : ""}>B 阶段</option>
-                    <option value="C" ${item.triggerStage === "C" ? "selected" : ""}>C 阶段</option>
-                  </select>
-                </div>
-                <div>
-                  <label>动作类型</label>
-                  <select class="workshop-rule-action" data-workshop-rule-action="${index}">
-                    <option value="music" ${normalizeWorkshopActionType(item.actionType) === "music" ? "selected" : ""}>播放音乐</option>
-                    <option value="image" ${normalizeWorkshopActionType(item.actionType) === "image" ? "selected" : ""}>弹出图片</option>
-                  </select>
-                </div>
+              ${buildTriggerFields(item, index, isCoreStage)}
+              <div>
+                <label>动作类型</label>
+                <select class="workshop-rule-action" data-workshop-rule-action="${index}">
+                  <option value="music" ${normalizeWorkshopActionType(item.actionType) === "music" ? "selected" : ""}>播放音乐</option>
+                  <option value="image" ${normalizeWorkshopActionType(item.actionType) === "image" ? "selected" : ""}>弹出图片</option>
+                </select>
               </div>
               ${buildMusicFields(item, index)}
               ${buildImageFields(item, index)}
@@ -495,21 +578,20 @@
         const shell = node.querySelector(".workshop-rule-shell");
         setWorkshopRuleCollapsed(shell, false);
         injectWorkshopAssetPickers(node);
+        updateWorkshopRuleTriggerUI(node);
         updateWorkshopRuleActionUI(node);
         return node;
       }
 
       function renderWorkshopRules(workshop = currentWorkshop) {
         const collapsedStateById = new Map();
-        if (workshopRuleListEl) {
-          workshopRuleListEl.querySelectorAll(".workshop-rule-card").forEach((card) => {
-            const itemId = String(card.querySelector(".workshop-rule-id")?.value || "").trim();
-            const shell = card.querySelector(".workshop-rule-shell");
-            if (itemId && shell) {
-              collapsedStateById.set(itemId, shell.dataset.collapsed === "true");
-            }
-          });
-        }
+        workshopRuleListEl?.querySelectorAll(".workshop-rule-card").forEach((card) => {
+          const itemId = String(card.querySelector(".workshop-rule-id")?.value || "").trim();
+          const shell = card.querySelector(".workshop-rule-shell");
+          if (itemId && shell) {
+            collapsedStateById.set(itemId, shell.dataset.collapsed === "true");
+          }
+        });
 
         currentWorkshop = normalizeCreativeWorkshop(workshop || initialWorkshop);
         if (workshopEnabledEl) workshopEnabledEl.checked = Boolean(currentWorkshop.enabled);
@@ -537,6 +619,9 @@
           id: `workshop-item-${Date.now().toString(36)}`,
           name: `规则 ${nextIndex}`,
           enabled: true,
+          triggerMode: "temp",
+          triggerTempMin: initialWorkshopTemp,
+          triggerTempMax: initialWorkshopTemp,
         });
 
         const item = currentWorkshop.items[currentWorkshop.items.length - 1];
@@ -544,12 +629,11 @@
         workshopRuleListEl?.appendChild(block);
         if (workshopSearchEl) workshopSearchEl.value = "";
         applyWorkshopRuleSearch();
-
         const lastCard = workshopRuleListEl?.querySelector(".workshop-rule-card:last-of-type");
         if (lastCard && typeof lastCard.scrollIntoView === "function") {
           lastCard.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-        setStatus("已新增工坊规则。");
+        setStatus("已新增创意工坊规则。");
       }
 
       function applyWorkshopRuleSearch() {
@@ -562,7 +646,7 @@
           if (matched) visibleCount += 1;
         });
         if (keyword) {
-          setStatus(`搜索完成：匹配到 ${visibleCount} 条规则。`);
+          setStatus(`创意工坊搜索完成：找到 ${visibleCount} 条匹配规则。`);
         }
       }
 
@@ -579,11 +663,18 @@
         };
 
         workshopRuleListEl?.querySelectorAll(".workshop-rule-card").forEach((card, index) => {
+          let triggerTempMin = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-min")?.value || initialWorkshopTemp, initialWorkshopTemp);
+          let triggerTempMax = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-max")?.value || initialWorkshopTemp, triggerTempMin);
+          if (triggerTempMax < triggerTempMin) [triggerTempMin, triggerTempMax] = [triggerTempMax, triggerTempMin];
+
           creativeWorkshop.items.push({
             id: String(card.querySelector(".workshop-rule-id")?.value || "").trim() || `workshop-item-${Date.now()}-${index}`,
             name: String(card.querySelector(".workshop-rule-name")?.value || "").trim() || `规则 ${index + 1}`,
             enabled: card.querySelector(".workshop-rule-enabled")?.checked !== false,
+            triggerMode: normalizeWorkshopTriggerMode(card.querySelector(".workshop-rule-trigger-mode")?.value || "stage"),
             triggerStage: normalizeWorkshopStage(card.querySelector(".workshop-rule-trigger")?.value || "A"),
+            triggerTempMin,
+            triggerTempMax,
             actionType: normalizeWorkshopActionType(card.querySelector(".workshop-rule-action")?.value),
             popupTitle: String(card.querySelector(".workshop-rule-popup-title")?.value || "").trim(),
             musicPreset: String(card.querySelector(".workshop-rule-preset")?.value || "off").trim() || "off",
@@ -618,34 +709,12 @@
         const data = await postJson("/api/workshop/save", payload);
         currentWorkshop = normalizeCreativeWorkshop(data.workshop || payload.creativeWorkshop);
         renderWorkshopRules(currentWorkshop);
-        setStatus(`工坊已保存：${currentCardName || "当前角色卡"}`);
+        setStatus(`创意工坊已保存：${currentCardName || "当前角色卡"}`);
         await refreshWorkshopStatus().catch(() => {});
       }
 
-      async function selectSlot(slotId) {
-        await postJson("/api/slots/select", { slot_id: slotId });
-        window.location.reload();
-      }
-
-      async function renameSlot(slotId) {
-        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
-        const nextName = window.prompt("重命名这个存档：", currentName);
-        if (nextName === null) return;
-        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
-        window.location.reload();
-      }
-
-      async function resetSlot(slotId) {
-        const confirmed = window.confirm("重置这个存档会清空立绘、人设、记忆、世界书和聊天记录。要继续吗？");
-        if (!confirmed) return;
-        await postJson("/api/slots/reset", { slot_id: slotId });
-        window.location.reload();
-      }
-
       workshopEnabledEl?.addEventListener("change", () => {
-        if (currentWorkshop) {
-          currentWorkshop.enabled = workshopEnabledEl.checked;
-        }
+        if (currentWorkshop) currentWorkshop.enabled = workshopEnabledEl.checked;
       });
 
       workshopSearchEl?.addEventListener("input", applyWorkshopRuleSearch);
@@ -656,12 +725,12 @@
 
       document.getElementById("collapse-workshop-rules")?.addEventListener("click", () => {
         setAllWorkshopRulesCollapsed(true);
-        setStatus("已全部折叠工坊规则。");
+        setStatus("已折叠全部创意工坊规则。");
       });
 
       document.getElementById("expand-workshop-rules")?.addEventListener("click", () => {
         setAllWorkshopRulesCollapsed(false);
-        setStatus("已全部展开工坊规则。");
+        setStatus("已展开全部创意工坊规则。");
       });
 
       document.getElementById("save-workshop")?.addEventListener("click", async () => {
@@ -675,6 +744,9 @@
       workshopRuleListEl?.addEventListener("input", (event) => {
         const card = event.target.closest(".workshop-rule-card");
         if (!card) return;
+        if (event.target.matches(".workshop-rule-trigger-mode, .workshop-rule-trigger, .workshop-rule-trigger-temp-min, .workshop-rule-trigger-temp-max")) {
+          updateWorkshopRuleTriggerUI(card);
+        }
         if (event.target.matches(".workshop-rule-name")) {
           const title = card.querySelector(".workshop-rule-summary-title");
           if (title) title.textContent = String(event.target.value || "").trim() || "未命名规则";
@@ -686,10 +758,10 @@
       workshopRuleListEl?.addEventListener("change", (event) => {
         const card = event.target.closest(".workshop-rule-card");
         if (!card) return;
-        if (event.target.matches(".workshop-rule-action")) {
-          updateWorkshopRuleActionUI(card);
+        if (event.target.matches(".workshop-rule-trigger-mode, .workshop-rule-trigger, .workshop-rule-trigger-temp-min, .workshop-rule-trigger-temp-max")) {
+          updateWorkshopRuleTriggerUI(card);
         }
-        if (event.target.matches(".workshop-rule-image-url")) {
+        if (event.target.matches(".workshop-rule-action, .workshop-rule-image-url")) {
           updateWorkshopRuleActionUI(card);
         }
         if (event.target.matches(".workshop-rule-file")) {
@@ -723,7 +795,7 @@
             return;
           }
           card.remove();
-          setStatus("工坊规则已删除。");
+          setStatus("创意工坊规则已删除。");
           applyWorkshopRuleSearch();
           return;
         }
@@ -745,32 +817,6 @@
           if (!shell) return;
           const collapsed = shell.dataset.collapsed === "true";
           setWorkshopRuleCollapsed(shell, !collapsed);
-        }
-      });
-
-      document.getElementById("slot-select")?.addEventListener("change", async (event) => {
-        try {
-          setStatus("正在切换存档...");
-          await selectSlot(event.target.value);
-        } catch (error) {
-          setStatus(`切换存档失败：${error.message}`);
-          event.target.value = ACTIVE_SLOT;
-        }
-      });
-
-      document.getElementById("rename-slot")?.addEventListener("click", async () => {
-        try {
-          await renameSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重命名失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("reset-slot")?.addEventListener("click", async () => {
-        try {
-          await resetSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重置失败：${error.message}`);
         }
       });
 

@@ -12,6 +12,7 @@ tmp_index_script*.js
 data/**/*.json
 data/**/*.jsonc
 data/.slot_migration_done
+data/.global_runtime_migration_done
 cards/*.json
 cards/*.txt
 !cards/template_multi_role_card.json

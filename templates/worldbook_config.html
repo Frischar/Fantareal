@@ -9,9 +9,8 @@
   <body>
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
         <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
@@ -24,32 +23,22 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-      <div class="slot-toolbar">
+            <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
+          <span class="slot-badge">Worldbook</span>
           <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">这里配置的是当前存档专属的世界书触发规则。</p>
+            <strong>当前为全局世界书设置</strong>
+            <p class="slot-hint">这里配置的是全局世界书触发规则，不再跟存档绑定。</p>
           </div>
         </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">
-            {% for slot in slot_registry.slots %}
-            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-            {% endfor %}
-          </select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
       </div>
-    </div>
-
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Worldbook</p>
           <h2>世界书触发设置</h2>
           <p class="muted">这里控制世界书是否启用、每轮最多命中多少条，以及词条默认采用怎样的匹配方式。词条内容本身请去 <code>Worldbook Entries</code> 页面维护。</p>
+          <p class="muted helper-text">“每轮最多注入条数”指的是单次回复里最多往 prompt 里塞多少条命中的世界书，不是总词条数。命中的词条会按优先级从高到低截断。</p>
         </div>
         <div class="stats-row">
           <div class="stat-box">
@@ -78,6 +67,7 @@
           <div>
             <label for="wb-max-hits">每轮最多命中条数</label>
             <input id="wb-max-hits" type="number" min="1" max="20" step="1" value="{{ worldbook_settings.max_hits }}" />
+            <p class="muted helper-text">数字越小，注入越克制；数字越大，模型拿到的世界书上下文越多。</p>
           </div>
           <div>
             <label for="wb-default-match-mode">主触发词默认逻辑</label>
@@ -85,6 +75,7 @@
               <option value="any" {% if worldbook_settings.default_match_mode == 'any' %}selected{% endif %}>任意命中</option>
               <option value="all" {% if worldbook_settings.default_match_mode == 'all' %}selected{% endif %}>全部命中</option>
             </select>
+            <p class="muted helper-text">“任意命中”表示多个别名里命中一个就算；“全部命中”表示填写的词都要同时出现。</p>
           </div>
         </div>
 
@@ -127,7 +118,6 @@
       const rootEl = document.documentElement;
       const bodyEl = document.body;
       const statusEl = document.getElementById("status-text");
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
@@ -173,26 +163,6 @@
         return response.json();
       }
 
-      async function selectSlot(slotId) {
-        await postJson("/api/slots/select", { slot_id: slotId });
-        window.location.reload();
-      }
-
-      async function renameSlot(slotId) {
-        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
-        const nextName = window.prompt("给这个存档起个名字：", currentName);
-        if (nextName === null) return;
-        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
-        window.location.reload();
-      }
-
-      async function resetSlot(slotId) {
-        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。要继续吗？");
-        if (!confirmed) return;
-        await postJson("/api/slots/reset", { slot_id: slotId });
-        window.location.reload();
-      }
-
       function readSettingsForm() {
         return {
           enabled: document.getElementById("wb-enabled").checked,
@@ -228,32 +198,6 @@
         fillSettingsForm(data.settings || {});
         setStatus("世界书设置已保存。");
       }
-
-      document.getElementById("slot-select").addEventListener("change", async (event) => {
-        try {
-          setStatus("正在切换存档...");
-          await selectSlot(event.target.value);
-        } catch (error) {
-          setStatus(`切换存档失败：${error.message}`);
-          event.target.value = ACTIVE_SLOT;
-        }
-      });
-
-      document.getElementById("rename-slot").addEventListener("click", async () => {
-        try {
-          await renameSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重命名失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("reset-slot").addEventListener("click", async () => {
-        try {
-          await resetSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重置失败：${error.message}`);
-        }
-      });
 
       document.getElementById("save-worldbook-settings").addEventListener("click", async () => {
         try {

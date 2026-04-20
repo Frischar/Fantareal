@@ -9,9 +9,8 @@
   <body>
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
         <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
@@ -24,26 +23,15 @@
           <a class="navlink active" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-      <div class="slot-toolbar">
+            <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
+          <span class="slot-badge">Worldbook</span>
           <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">这里维护当前存档专属的世界书词条。每条都可以单独设置优先级、辅助触发词和匹配方式。</p>
+            <strong>当前为全局世界书</strong>
+            <p class="slot-hint">这里维护全局世界书词条，每条都可以独立编辑并自由导入导出。</p>
           </div>
         </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">
-            {% for slot in slot_registry.slots %}
-            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-            {% endfor %}
-          </select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
       </div>
-    </div>
-
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
@@ -69,6 +57,9 @@
             <button id="add-worldbook-entry" type="button">新增词条</button>
             <button id="save-worldbook-entries" type="button" class="secondary">保存全部词条</button>
             <button id="reload-worldbook-entries" type="button" class="secondary">重新读取</button>
+            <button id="import-worldbook" type="button" class="secondary">导入世界书</button>
+            <button id="export-worldbook" type="button" class="secondary">导出世界书</button>
+            <input id="import-worldbook-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
           </div>
         </div>
 
@@ -82,6 +73,7 @@
             <button id="expand-all-worldbook" type="button" class="secondary">全部展开</button>
           </div>
         </div>
+        <p class="muted helper-text">优先级数值越大越先注入；命中后会按优先级从高到低截取到“每轮最多注入条数”。主触发词或辅助触发词选“全部命中”时，填写的多个别名需要同时出现。</p>
 
         <div id="worldbook-entry-list" class="memory-list">
           {% for item in worldbook_entries %}
@@ -242,7 +234,6 @@
       const worldbookListEl = document.getElementById("worldbook-entry-list");
       const worldbookCountEl = document.getElementById("worldbook-count");
       const templateEl = document.getElementById("worldbook-entry-template");
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
@@ -288,24 +279,23 @@
         return response.json();
       }
 
-      async function selectSlot(slotId) {
-        await postJson("/api/slots/select", { slot_id: slotId });
-        window.location.reload();
-      }
-
-      async function renameSlot(slotId) {
-        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
-        const nextName = window.prompt("给这个存档起个名字：", currentName);
-        if (nextName === null) return;
-        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
-        window.location.reload();
-      }
-
-      async function resetSlot(slotId) {
-        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。要继续吗？");
-        if (!confirmed) return;
-        await postJson("/api/slots/reset", { slot_id: slotId });
-        window.location.reload();
+      async function downloadJson(url, fallbackName) {
+        const response = await fetch(url);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "下载失败");
+        }
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        const disposition = response.headers.get("Content-Disposition") || "";
+        const match = disposition.match(/filename=\"?([^\";]+)\"?/);
+        anchor.href = objectUrl;
+        anchor.download = match ? decodeURIComponent(match[1]) : fallbackName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
       }
 
       function normalizeSearchText(value) {
@@ -426,6 +416,19 @@
         setStatus("世界书词条已保存。");
       }
 
+      async function importWorldbookFile(file) {
+        if (!file) return;
+        const rawJson = await file.text();
+        const data = await postJson("/api/worldbook/import", { raw_json: rawJson });
+        worldbookListEl.innerHTML = "";
+        for (const item of data.items || []) {
+          worldbookListEl.appendChild(createEntryCard(item));
+        }
+        updateCount();
+        applyWorldbookSearch();
+        setStatus(`世界书导入完成：${data.items?.length || 0} 条。`);
+      }
+
       worldbookListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
@@ -459,6 +462,31 @@
         }
       });
 
+      document.getElementById("import-worldbook").addEventListener("click", () => {
+        document.getElementById("import-worldbook-file").click();
+      });
+
+      document.getElementById("import-worldbook-file").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          await importWorldbookFile(file);
+        } catch (error) {
+          setStatus(`导入失败：${error.message}`);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("export-worldbook").addEventListener("click", async () => {
+        try {
+          await downloadJson("/api/worldbook/export", "worldbook.json");
+          setStatus("世界书已导出。");
+        } catch (error) {
+          setStatus(`导出失败：${error.message}`);
+        }
+      });
+
       document.getElementById("worldbook-search").addEventListener("input", () => {
         applyWorldbookSearch();
       });
@@ -471,32 +499,6 @@
       document.getElementById("expand-all-worldbook").addEventListener("click", () => {
         [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => setEntryCollapsed(card, false));
         setStatus("已展开当前列表中的全部词条。");
-      });
-
-      document.getElementById("slot-select").addEventListener("change", async (event) => {
-        try {
-          setStatus("正在切换存档...");
-          await selectSlot(event.target.value);
-        } catch (error) {
-          setStatus(`切换存档失败：${error.message}`);
-          event.target.value = ACTIVE_SLOT;
-        }
-      });
-
-      document.getElementById("rename-slot").addEventListener("click", async () => {
-        try {
-          await renameSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重命名失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("reset-slot").addEventListener("click", async () => {
-        try {
-          await resetSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重置失败：${error.message}`);
-        }
       });
 
       updateCount();

@@ -25,9 +25,8 @@
   <body>
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
         <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink active" href="/config/preset">Preset</a>
@@ -40,27 +39,21 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-      <div class="slot-toolbar">
+            <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
+          <span class="slot-badge">Preset</span>
           <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">这里维护当前存档专属的多套写作预设，不会污染角色卡本体。</p>
+            <strong>当前为全局预设库</strong>
+            <p class="slot-hint">这里维护的是全局预设，不再跟存档绑定，可以自由导入和导出。</p>
           </div>
         </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">{% for slot in slot_registry.slots %}<option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>{% endfor %}</select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
       </div>
-    </div>
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Preset</p>
           <h2>多预设管理</h2>
-          <p class="muted">一个存档内可保存多套写作预设；聊天时只会使用当前激活的那一份。</p>
+          <p class="muted">全局预设库内可保存多套写作预设；聊天时只会使用当前激活的那一份。</p>
         </div>
         <div class="stats-row">
           <div class="stat-box"><span class="stat-label">当前激活</span><strong id="active-preset-label">{{ active_preset.name }}</strong></div>
@@ -122,7 +115,6 @@
       const activePresetLabelEl = document.getElementById("active-preset-label");
       const presetEnabledLabelEl = document.getElementById("preset-enabled-label");
       const templateEl = document.getElementById("preset-card-template");
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
@@ -132,12 +124,20 @@
       const MODULE_MUTEX = { short_paragraph: ["long_paragraph"], long_paragraph: ["short_paragraph"], second_person: ["third_person"], third_person: ["second_person"] };
       function setStatus(text){ statusEl.textContent = text; }
       function applyTheme(theme){ rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light"); }
-      function applyUiOpacity(opacity){ const normalized = Math.min(Math.max(Number(opacity || 0.84), 0.2), 1); rootEl.style.setProperty("--panel-opacity", normalized.toFixed(2)); rootEl.style.setProperty("--input-opacity", Math.min(normalized + 0.04, 1).toFixed(2)); }
+      function applyUiOpacity(value){
+        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const palette = theme === "dark"
+          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
+          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
+        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
+        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
+        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
+      }
       function applyBackground(url, overlay){ const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85); bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay)); bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none"); }
       async function postJson(url,payload){ const response = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if(!response.ok){ const data = await response.json().catch(()=>({})); throw new Error(data.detail || "请求失败"); } return response.json(); }
-      async function selectSlot(slotId){ await postJson('/api/slots/select',{slot_id:slotId}); window.location.reload(); }
-      async function renameSlot(slotId){ const currentName = document.getElementById('slot-select').selectedOptions[0]?.textContent || slotId; const nextName = window.prompt('给这个存档起个名字：', currentName); if(nextName===null) return; await postJson('/api/slots/rename',{slot_id:slotId,name:nextName}); window.location.reload(); }
-      async function resetSlot(slotId){ const confirmed = window.confirm('重置后，这个存档里的立绘、人设、记忆、世界书、聊天记录和预设都会清空。要继续吗？'); if(!confirmed) return; await postJson('/api/slots/reset',{slot_id:slotId}); window.location.reload(); }
       function getPresetById(id){ return (presetStore.presets || []).find(item => item.id === id) || presetStore.presets?.[0] || null; }
       function setCardCollapsed(card, collapsed){ card.dataset.collapsed = collapsed ? 'true' : 'false'; const body = card.querySelector('.memory-card-body'); const toggle = card.querySelector('.toggle-preset-card'); if(body) body.hidden = collapsed; if(toggle) toggle.textContent = collapsed ? '展开' : '折叠'; }
       function attachPresetCardHandlers(card){ card.querySelector('.remove-preset-card')?.addEventListener('click',()=>{ card.remove(); applySearch(); }); card.querySelector('.toggle-preset-card')?.addEventListener('click',()=>{ setCardCollapsed(card, card.dataset.collapsed !== 'true'); }); }
@@ -171,9 +171,6 @@
       document.getElementById('preset-search').addEventListener('input', applySearch);
       document.getElementById('collapse-all-blocks').addEventListener('click', ()=>{ presetListEl.querySelectorAll('.preset-card').forEach((card)=>setCardCollapsed(card,true)); setStatus('已折叠全部规则块。'); });
       document.getElementById('expand-all-blocks').addEventListener('click', ()=>{ presetListEl.querySelectorAll('.preset-card').forEach((card)=>setCardCollapsed(card,false)); setStatus('已展开全部规则块。'); });
-      document.getElementById('slot-select').addEventListener('change', async(event)=>{ try{ setStatus('正在切换存档。'); await selectSlot(event.target.value); } catch(error){ setStatus(`切换存档失败：${error.message}`); event.target.value = ACTIVE_SLOT; } });
-      document.getElementById('rename-slot').addEventListener('click', async()=>{ try{ await renameSlot(document.getElementById('slot-select').value); } catch(error){ setStatus(`重命名失败：${error.message}`); } });
-      document.getElementById('reset-slot').addEventListener('click', async()=>{ try{ await resetSlot(document.getElementById('slot-select').value); } catch(error){ setStatus(`重置失败：${error.message}`); } });
       applyTheme(currentTheme); applyUiOpacity(currentOpacity); applyBackground(currentBackground, currentOverlay); renderPresetList(); applyPreset(getPresetById(editingPresetId));
     </script>
   </body>

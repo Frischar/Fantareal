@@ -283,6 +283,48 @@
       #preset-debug-body[hidden] {
         display: none !important;
       }
+      .prompt-package-tools {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 0.85rem;
+      }
+      .prompt-package-summary {
+        font-size: 0.82rem;
+      }
+      .prompt-layer-list {
+        display: grid;
+        gap: 0.7rem;
+        margin-bottom: 0.85rem;
+      }
+      .prompt-layer-card {
+        border: 1px solid var(--border);
+        border-radius: 0.85rem;
+        background: var(--input-bg);
+        padding: 0.75rem 0.85rem;
+      }
+      .prompt-layer-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.4rem;
+        flex-wrap: wrap;
+      }
+      .prompt-layer-title {
+        font-size: 0.9rem;
+      }
+      .prompt-layer-meta {
+        font-size: 0.76rem;
+        color: var(--muted);
+      }
+      .prompt-layer-snippet {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.8rem;
+        line-height: 1.45;
+        color: var(--muted);
+      }
       @media (max-width: 768px) {
         .preset-toolbar {
           flex-direction: column;
@@ -309,10 +351,9 @@
     <div class="topbar topbar-chat">
       <div class="topbar-left">
         <button id="open-drawer" class="menu-button" type="button">Config</button>
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
       </div>
       <nav class="topnav topnav-chat">
-        <a class="navlink" href="/">Welcome</a>
         <a class="navlink active" href="/chat">Chat</a>
         <a class="navlink" href="/config">Config</a>
         <a class="navlink" href="/config/preset">Preset</a>
@@ -326,25 +367,15 @@
       </nav>
     </div>
 
-    <div class="slot-toolbar">
-      <div class="slot-toolbar-left">
-        <span class="slot-badge">Save</span>
-        <div class="slot-meta">
-          <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-          <p class="slot-hint">每个存档都会独立保存立绘、记忆、人设、世界书和聊天记录。</p>
+          <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Global</span>
+          <div class="slot-meta">
+            <strong>当前为全局对话</strong>
+            <p class="slot-hint">聊天会持续读取当前全局记忆、世界书、预设和环境设置；角色卡可以随时热插拔。</p>
+          </div>
         </div>
       </div>
-      <div class="slot-toolbar-right">
-        <select id="slot-select" class="slot-select">
-          {% for slot in slot_registry.slots %}
-          <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-          {% endfor %}
-        </select>
-        <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-        <button id="reset-slot" type="button" class="secondary compact">重置</button>
-      </div>
-    </div>
-
     <div class="chat-shell">
       <div class="chat-layout">
         <aside class="sprite-stage panel">
@@ -521,13 +552,35 @@
         </section>
         <section class="drawer-section">
           <div class="section-head">
+            <p class="eyebrow">Prompt</p>
+            <h3>本轮打包预览</h3>
+            <p class="muted">可以直接看到系统提示、人设、记忆、世界书、最近聊天和这一轮输入是怎样一起发给模型的。</p>
+          </div>
+          <div class="prompt-package-tools">
+            <button id="preview-prompt-package" type="button" class="secondary compact">预览当前轮 Prompt</button>
+          </div>
+          <div id="prompt-package-panel" class="drawer-debug-panel" hidden>
+            <div class="drawer-debug-head">
+              <div class="drawer-debug-meta">
+                <span class="drawer-debug-title">Prompt Package</span>
+                <span id="prompt-package-summary" class="prompt-package-summary muted">尚未生成</span>
+              </div>
+            </div>
+            <div class="drawer-debug-body">
+              <div id="prompt-package-layers" class="prompt-layer-list"></div>
+              <pre id="prompt-package-preview" class="debug-code-block"></pre>
+            </div>
+          </div>
+        </section>
+        <section class="drawer-section">
+          <div class="section-head">
             <p class="eyebrow">LLM</p>
             <h3>聊天模型</h3>
           </div>
           <label for="drawer-llm-base-url">API URL</label>
           <input id="drawer-llm-base-url" placeholder="例如 https://api.deepseek.com/v1" />
           <label for="drawer-llm-api-key">API Key</label>
-          <input id="drawer-llm-api-key" type="password" placeholder="保存到当前存档的服务端配置" />
+          <input id="drawer-llm-api-key" type="password" placeholder="保存到当前全局配置的服务端参数" />
           <label for="drawer-llm-model">模型名</label>
           <input id="drawer-llm-model" placeholder="例如 deepseek-chat" />
           <div class="grid-two">
@@ -636,7 +689,7 @@
           </label>
           <label for="drawer-sprite-base-path">立绘目录</label>
           <input id="drawer-sprite-base-path" placeholder="{{ settings.sprite_base_path }}" />
-          <p class="muted">默认会按当前存档读取，例如 `{{ settings.sprite_base_path }}/害羞.png`。</p>
+          <p class="muted">默认会按当前全局立绘目录读取，例如 `{{ settings.sprite_base_path }}/害羞.png`。</p>
         </section>
 
         <section class="drawer-section">
@@ -699,6 +752,11 @@
       const presetDebugPromptEl = document.getElementById("preset-debug-prompt");
       const presetDebugBodyEl = document.getElementById("preset-debug-body");
       const togglePresetDebugBtn = document.getElementById("toggle-preset-debug");
+      const previewPromptPackageBtn = document.getElementById("preview-prompt-package");
+      const promptPackagePanelEl = document.getElementById("prompt-package-panel");
+      const promptPackageSummaryEl = document.getElementById("prompt-package-summary");
+      const promptPackageLayersEl = document.getElementById("prompt-package-layers");
+      const promptPackagePreviewEl = document.getElementById("prompt-package-preview");
       let presetDebugCollapsed = true;
       const workshopModalEl = document.getElementById("workshop-modal");
       const workshopModalTitleEl = document.getElementById("workshop-modal-title");
@@ -765,8 +823,6 @@
         avatar.appendChild(label);
         return avatar;
       }
-
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
       const DEFAULT_SLOT_SPRITE_BASE_PATH = {{ settings.sprite_base_path | tojson }};
       const DRAWER_SERVER_INPUT_IDS = new Set([
         "drawer-llm-base-url",
@@ -823,26 +879,6 @@
       let worldbookEntries = [];
       const streamingEntries = new Set();
       let drawerSettingsSaveTimer = null;
-
-      async function selectSlot(slotId) {
-        await postJson("/api/slots/select", { slot_id: slotId });
-        window.location.reload();
-      }
-
-      async function renameSlot(slotId) {
-        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
-        const nextName = window.prompt("给这个存档起个名字：", currentName);
-        if (nextName === null) return;
-        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
-        window.location.reload();
-      }
-
-      async function resetSlot(slotId) {
-        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。要继续吗？");
-        if (!confirmed) return;
-        await postJson("/api/slots/reset", { slot_id: slotId });
-        window.location.reload();
-      }
 
       function normalizeRuntimeState(state) {
         const normalized = { ...(state || {}) };
@@ -1483,6 +1519,111 @@
         setPresetDebugCollapsed(true);
       }
 
+      function formatPromptLayerMeta(meta) {
+        if (!meta || typeof meta !== "object") {
+          return "";
+        }
+        const labels = {
+          character_name: "角色",
+          stored_memory_count: "记忆库",
+          recalled_memory_count: "召回",
+          hit_count: "命中",
+          turn_count: "历史",
+          char_count: "字数",
+          sprite_enabled: "立绘约束",
+          section_count: "段数",
+        };
+        return Object.entries(meta)
+          .filter(([, value]) => value !== "" && value !== null && value !== undefined)
+          .map(([key, value]) => `${labels[key] || key}: ${value === true ? "开" : value === false ? "关" : value}`)
+          .join(" · ");
+      }
+
+      function renderPromptPackage(pkg) {
+        const layers = Array.isArray(pkg?.layers) ? pkg.layers : [];
+        const previewText = typeof pkg?.preview_text === "string" ? pkg.preview_text.trim() : "";
+        if (!layers.length && !previewText) {
+          promptPackagePanelEl.hidden = true;
+          promptPackageLayersEl.innerHTML = "";
+          promptPackagePreviewEl.textContent = "";
+          return;
+        }
+
+        const summaryBits = [];
+        if (typeof pkg?.system_section_count === "number") {
+          summaryBits.push(`system ${pkg.system_section_count} 段`);
+        }
+        if (typeof pkg?.recent_history_turns === "number") {
+          summaryBits.push(`历史 ${pkg.recent_history_turns} 条`);
+        }
+        if (typeof pkg?.message_count === "number") {
+          summaryBits.push(`messages ${pkg.message_count} 条`);
+        }
+        promptPackageSummaryEl.textContent = summaryBits.join(" · ") || `共 ${layers.length} 层`;
+
+        promptPackageLayersEl.innerHTML = "";
+        layers.forEach((layer, index) => {
+          const card = document.createElement("div");
+          card.className = "prompt-layer-card";
+
+          const head = document.createElement("div");
+          head.className = "prompt-layer-head";
+
+          const title = document.createElement("strong");
+          title.className = "prompt-layer-title";
+          title.textContent = `${index + 1}. ${layer.title || "未命名层"}`;
+
+          const meta = document.createElement("span");
+          meta.className = "prompt-layer-meta";
+          meta.textContent = formatPromptLayerMeta(layer.meta);
+
+          const snippet = document.createElement("p");
+          snippet.className = "prompt-layer-snippet";
+          const content = typeof layer.content === "string" ? layer.content.trim() : "";
+          snippet.textContent = content.length > 220 ? `${content.slice(0, 220).trimEnd()}...` : content;
+
+          head.appendChild(title);
+          if (meta.textContent) {
+            head.appendChild(meta);
+          }
+          card.appendChild(head);
+          if (snippet.textContent) {
+            card.appendChild(snippet);
+          }
+          promptPackageLayersEl.appendChild(card);
+        });
+
+        promptPackagePreviewEl.textContent = previewText || layers
+          .map((layer, index) => `[${index + 1}. ${layer.title || "未命名层"}]\n${String(layer.content || "").trim()}`)
+          .join("\n\n");
+        promptPackagePanelEl.hidden = false;
+      }
+
+      async function previewPromptPackage() {
+        const text = inputEl.value.trim();
+        if (!text) {
+          inputEl.focus();
+          setStatus("先输入一条消息，再预览本轮 Prompt。");
+          return;
+        }
+        setStatus("正在生成本轮 Prompt 预览...");
+        try {
+          const data = await postJson("/api/chat/prompt-preview", {
+            message: text,
+            runtime_config: buildChatRuntimeConfig(),
+          });
+          renderRetrievedItems(data.retrieved_items || []);
+          renderWorldbookHits(data.worldbook_hits || []);
+          renderWorldbookDebug(data.worldbook_debug || {});
+          renderPresetDebug(data.preset_debug || {}, presetStoreCache);
+          renderPromptPackage(data.prompt_package || {});
+          openDrawer();
+          setStatus("已生成本轮 Prompt 预览");
+        } catch (error) {
+          setStatus(`Prompt 预览失败：${error.message}`);
+        }
+      }
+
       function renderPresetMenu(store) {
         if (!presetMenuEl) return;
         presetMenuEl.innerHTML = "";
@@ -1866,6 +2007,7 @@
               renderWorldbookHits(data.worldbook_hits || []);
               renderWorldbookDebug(data.worldbook_debug || {});
               renderPresetDebug(data.preset_debug || {}, presetStoreCache);
+              renderPromptPackage(data.prompt_package || {});
             },
             onThinkStart() {
               assistantEntry.state.thinking = true;
@@ -1989,37 +2131,17 @@
         });
       }
 
+      previewPromptPackageBtn?.addEventListener("click", () => {
+        previewPromptPackage().catch((error) => {
+          setStatus(`Prompt 预览失败：${error.message}`);
+        });
+      });
+
       workshopModalCloseEl?.addEventListener("click", hideWorkshopImagePopup);
       workshopModalConfirmEl?.addEventListener("click", hideWorkshopImagePopup);
       workshopModalEl?.addEventListener("click", (event) => {
         if (event.target === workshopModalEl || event.target.classList.contains("workshop-modal-backdrop")) {
           hideWorkshopImagePopup();
-        }
-      });
-
-      document.getElementById("slot-select").addEventListener("change", async (event) => {
-        try {
-          setStatus("正在切换存档...");
-          await selectSlot(event.target.value);
-        } catch (error) {
-          setStatus(`切换存档失败：${error.message}`);
-          event.target.value = ACTIVE_SLOT;
-        }
-      });
-
-      document.getElementById("rename-slot").addEventListener("click", async () => {
-        try {
-          await renameSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重命名失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("reset-slot").addEventListener("click", async () => {
-        try {
-          await resetSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重置失败：${error.message}`);
         }
       });
 

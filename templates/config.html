@@ -62,9 +62,8 @@
   <body>
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
         <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink active" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
@@ -77,26 +76,15 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-      <div class="slot-toolbar">
+            <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
+          <span class="slot-badge">Global</span>
           <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">模型设置、立绘、记忆、人设和世界书都会跟随当前存档。</p>
+            <strong>当前为全局配置</strong>
+            <p class="slot-hint">模型设置、记忆、世界书、预设、聊天记录和环境状态现在都按全局工作区保存；角色卡仍然单独加载。</p>
           </div>
         </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">
-            {% for slot in slot_registry.slots %}
-            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-            {% endfor %}
-          </select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
       </div>
-    </div>
-
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
@@ -106,13 +94,16 @@
         </div>
         <div class="stats-row">
           <div class="stat-box">
-            <span class="stat-label">当前角色卡</span>
+            <span class="stat-label">当前已加载角色卡</span>
             <strong>{{ current_card.source_name or '未命名角色卡' }}</strong>
           </div>
           <div class="stat-box">
             <span class="stat-label">记忆条数</span>
             <strong id="memory-count">{{ memory_count }}</strong>
           </div>
+        </div>
+        <div class="button-row">
+          <button id="export-current-bundle" type="button" class="secondary">导出当前人设存档 ZIP</button>
         </div>
       </section>
 
@@ -323,7 +314,6 @@
       const rootEl = document.documentElement;
       const bodyEl = document.body;
       const statusEl = document.getElementById("status-text");
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
       const themeSelectEl = document.getElementById("theme-select");
       const uiOpacityEl = document.getElementById("ui-opacity");
       const uiOpacityValueEl = document.getElementById("ui-opacity-value");
@@ -376,26 +366,6 @@
       };
 
       const saveTimers = { settings: null };
-
-      async function selectSlot(slotId) {
-        await postJson("/api/slots/select", { slot_id: slotId });
-        window.location.reload();
-      }
-
-      async function renameSlot(slotId) {
-        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
-        const nextName = window.prompt("给这个存档起个名字：", currentName);
-        if (nextName === null) return;
-        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
-        window.location.reload();
-      }
-
-      async function resetSlot(slotId) {
-        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。要继续吗？");
-        if (!confirmed) return;
-        await postJson("/api/slots/reset", { slot_id: slotId });
-        window.location.reload();
-      }
 
       function setStatus(text) {
         statusEl.textContent = text;
@@ -770,35 +740,14 @@
         applyBackground(backgroundUrlEl.value, backgroundOverlayEl.value);
       });
 
-      document.getElementById("slot-select").addEventListener("change", async (event) => {
-        try {
-          setStatus("正在切换存档...");
-          await selectSlot(event.target.value);
-        } catch (error) {
-          setStatus(`切换存档失败：${error.message}`);
-          event.target.value = ACTIVE_SLOT;
-        }
-      });
-
-      document.getElementById("rename-slot").addEventListener("click", async () => {
-        try {
-          await renameSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重命名失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("reset-slot").addEventListener("click", async () => {
-        try {
-          await resetSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重置失败：${error.message}`);
-        }
-      });
-
       document.getElementById("apply-preset").addEventListener("click", () => {
         applyPresetSelection(document.getElementById("preset-provider").value);
         scheduleSave(saveSettings, "已填入预设，正在保存...", 250);
+      });
+
+      document.getElementById("export-current-bundle").addEventListener("click", () => {
+        setStatus("正在打包当前人设卡、记忆、世界书和预设...");
+        window.location.href = "/api/export/current-bundle";
       });
 
       document.getElementById("preset-provider").addEventListener("change", () => {

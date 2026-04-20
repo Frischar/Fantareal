@@ -9,9 +9,8 @@
   <body>
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
         <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
@@ -24,26 +23,15 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-      <div class="slot-toolbar">
+            <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
+          <span class="slot-badge">Card</span>
           <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">这个页面编辑的是当前存档专属的人设与角色卡状态；记忆和世界书会继续按存档独立保留，不会因重新加载角色卡而被清空。</p>
+            <strong>当前编辑的是角色卡</strong>
+            <p class="slot-hint">切换角色卡只会更换人设与工坊规则，不会清空当前记忆、世界书、预设和聊天记录。</p>
           </div>
         </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">
-            {% for slot in slot_registry.slots %}
-            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-            {% endfor %}
-          </select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
       </div>
-    </div>
-
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
@@ -209,33 +197,13 @@
       const workshopRuleListEl = document.getElementById("workshop-rule-list");
       const workshopRuntimeInfoEl = document.getElementById("workshop-runtime-info");
       const workshopSearchEl = document.getElementById("workshop-rule-search");
-      const ACTIVE_SLOT = {{ active_slot | tojson }};
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
       const initialWorkshop = {{ card_template.creativeWorkshop | tojson }};
+      const initialWorkshopTemp = Number({{ workshop_state.temp or 0 }}) || 0;
       let currentWorkshop = null;
-
-      async function selectSlot(slotId) {
-        await postJson("/api/slots/select", { slot_id: slotId });
-        window.location.reload();
-      }
-
-      async function renameSlot(slotId) {
-        const currentName = document.getElementById("slot-select").selectedOptions[0]?.textContent || slotId;
-        const nextName = window.prompt("给这个存档起个名字：", currentName);
-        if (nextName === null) return;
-        await postJson("/api/slots/rename", { slot_id: slotId, name: nextName });
-        window.location.reload();
-      }
-
-      async function resetSlot(slotId) {
-        const confirmed = window.confirm("重置后，这个存档里的立绘、人设、记忆、世界书和聊天记录都会清空。要继续吗？");
-        if (!confirmed) return;
-        await postJson("/api/slots/reset", { slot_id: slotId });
-        window.location.reload();
-      }
 
       function setStatus(text) {
         statusEl.textContent = text;
@@ -286,6 +254,17 @@
       function normalizeWorkshopStage(value) {
         const stage = String(value || "A").trim().toUpperCase();
         return ["A", "B", "C"].includes(stage) ? stage : "A";
+      }
+
+      function normalizeWorkshopTriggerMode(value) {
+        const mode = String(value || "stage").trim().toLowerCase();
+        return mode === "temp" ? "temp" : "stage";
+      }
+
+      function normalizeWorkshopTempValue(value, fallback = 0) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(Math.max(Math.round(parsed), 0), 9999);
       }
 
       function normalizeWorkshopActionType(value) {
@@ -339,7 +318,10 @@
           id: `workshop_stage_${String(stage).toLowerCase()}`,
           name: `${stage}阶段动作`,
           enabled: stage === "A",
+          triggerMode: "stage",
           triggerStage: stage,
+          triggerTempMin: initialWorkshopTemp,
+          triggerTempMax: initialWorkshopTemp,
           actionType: "music",
           popupTitle: "",
           musicPreset: "off",
@@ -367,7 +349,10 @@
             id: String(item.id || "").trim() || `workshop-item-${index + 1}`,
             name: String(item.name || "").trim() || `触发器 ${index + 1}`,
             enabled: item.enabled !== false,
+            triggerMode: normalizeWorkshopTriggerMode(item.triggerMode),
             triggerStage: normalizeWorkshopStage(item.triggerStage),
+            triggerTempMin: normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp),
+            triggerTempMax: normalizeWorkshopTempValue(item.triggerTempMax, normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp)),
             actionType: normalizeWorkshopActionType(item.actionType),
             popupTitle: String(item.popupTitle || "").trim(),
             musicPreset: String(item.musicPreset || "off").trim() || "off",
@@ -383,7 +368,7 @@
         const stageMap = new Map();
         const extraItems = [];
         items.forEach((item) => {
-          if (["A", "B", "C"].includes(item.triggerStage) && !stageMap.has(item.triggerStage)) {
+          if (item.triggerMode === "stage" && ["A", "B", "C"].includes(item.triggerStage) && !stageMap.has(item.triggerStage)) {
             stageMap.set(item.triggerStage, item);
           } else {
             extraItems.push(item);
@@ -824,7 +809,10 @@
               id: itemId,
               name: String(card.querySelector(".workshop-rule-name")?.value || "").trim() || `触发器 ${index + 1}`,
               enabled: card.querySelector(".workshop-rule-enabled")?.checked !== false,
+              triggerMode: normalizeWorkshopTriggerMode(card.querySelector(".workshop-rule-trigger-mode")?.value || "stage"),
               triggerStage: normalizeWorkshopStage(card.querySelector(".workshop-rule-trigger")?.value || "A"),
+              triggerTempMin: normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-min")?.value || initialWorkshopTemp, initialWorkshopTemp),
+              triggerTempMax: normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-max")?.value || initialWorkshopTemp, initialWorkshopTemp),
               actionType: normalizeWorkshopActionType(card.querySelector(".workshop-rule-action")?.value),
               popupTitle: String(card.querySelector(".workshop-rule-popup-title")?.value || "").trim(),
               musicPreset: String(card.querySelector(".workshop-rule-preset")?.value || "off").trim() || "off",
@@ -925,9 +913,11 @@
         fillCardForm(savedCard);
         document.getElementById("card-filename").value = data.filename || filename;
         await refreshCardList(data.filename || filename);
+        applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
-          ? `角色卡已保存并加载：${data.filename}。创意工坊已进入 ${data.workshop.stage_label}。`
-          : `角色卡已保存并加载：${data.filename}。当前存档的记忆与世界书已保留。`);
+          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 创意工坊已进入 ${data.workshop.stage_label}。`
+          : `角色卡已保存并加载：${data.filename}。${slotSummary}`);
       }
 
       async function loadCard() {
@@ -940,9 +930,11 @@
         document.getElementById("card-filename").value = data.filename || filename;
         fillCardForm(loadedCard);
         await refreshCardList(data.filename || filename);
+        applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
-          ? `角色卡已加载：${data.filename}。创意工坊已进入 ${data.workshop.stage_label}。`
-          : `角色卡已加载：${data.filename}。当前存档的记忆与世界书已保留。`);
+          ? `角色卡已加载：${data.filename}。${slotSummary} 创意工坊已进入 ${data.workshop.stage_label}。`
+          : `角色卡已加载：${data.filename}。${slotSummary}`);
       }
 
       async function importLocalCardFile(file) {
@@ -965,9 +957,11 @@
         fillCardForm(importedCard);
         document.getElementById("card-filename").value = data.filename || file.name || "imported_role_card.json";
         await refreshCardList(data.filename || file.name || "");
+        applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
-          ? `本地角色卡已导入：${data.filename || file.name}。创意工坊已进入 ${data.workshop.stage_label}。`
-          : `本地角色卡已导入：${data.filename || file.name}。当前存档的记忆与世界书已保留。`);
+          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 创意工坊已进入 ${data.workshop.stage_label}。`
+          : `本地角色卡已导入：${data.filename || file.name}。${slotSummary}`);
         return data;
       }
 
@@ -1153,32 +1147,6 @@
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden) {
           refreshCardList().catch(() => {});
-        }
-      });
-
-      document.getElementById("slot-select").addEventListener("change", async (event) => {
-        try {
-          setStatus("正在切换存档...");
-          await selectSlot(event.target.value);
-        } catch (error) {
-          setStatus(`切换存档失败：${error.message}`);
-          event.target.value = ACTIVE_SLOT;
-        }
-      });
-
-      document.getElementById("rename-slot").addEventListener("click", async () => {
-        try {
-          await renameSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重命名失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("reset-slot").addEventListener("click", async () => {
-        try {
-          await resetSlot(document.getElementById("slot-select").value);
-        } catch (error) {
-          setStatus(`重置失败：${error.message}`);
         }
       });
 
