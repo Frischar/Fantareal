@@ -2,6 +2,7 @@ import re
 import unicodedata
 from typing import Any
 
+
 DEFAULT_WORLDBOOK_SETTINGS = {
     "enabled": True,
     "debug_enabled": False,
@@ -10,6 +11,11 @@ DEFAULT_WORLDBOOK_SETTINGS = {
     "default_whole_word": False,
     "default_match_mode": "any",
     "default_secondary_mode": "all",
+    "default_entry_type": "keyword",       # keyword / constant
+    "default_group_operator": "and",       # and / or
+    "default_chance": 100,                   # 0 ~ 100
+    "default_sticky_turns": 0,               # >= 0
+    "default_cooldown_turns": 0,             # >= 0
 }
 
 
@@ -17,26 +23,100 @@ def default_worldbook_store() -> dict[str, Any]:
     return {"settings": dict(DEFAULT_WORLDBOOK_SETTINGS), "entries": []}
 
 
+def _clamp_int(value: Any, minimum: int, maximum: int, default: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return min(max(number, minimum), maximum)
+
+
+def _normalize_yes_no_bool(value: Any, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return True
+        if text in {"0", "false", "no", "off"}:
+            return False
+    return bool(value)
+
+
+def _normalize_match_mode(value: Any, default: str) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"any", "all"} else default
+
+
+def _normalize_entry_type(value: Any, default: str = "keyword") -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"keyword", "constant"} else default
+
+
+def _normalize_group_operator(value: Any, default: str = "and") -> str:
+    text = str(value or "").strip().lower()
+    if text in {"and", "all"}:
+        return "and"
+    if text in {"or", "any"}:
+        return "or"
+    return default
+
+
 def sanitize_worldbook_settings(raw: Any) -> dict[str, Any]:
     settings = dict(DEFAULT_WORLDBOOK_SETTINGS)
     if not isinstance(raw, dict):
         return settings
 
-    settings["enabled"] = bool(raw.get("enabled", settings["enabled"]))
-    settings["debug_enabled"] = bool(raw.get("debug_enabled", settings["debug_enabled"]))
-    try:
-        settings["max_hits"] = max(1, min(20, int(raw.get("max_hits", settings["max_hits"]))))
-    except (TypeError, ValueError):
-        settings["max_hits"] = DEFAULT_WORLDBOOK_SETTINGS["max_hits"]
+    settings["enabled"] = _normalize_yes_no_bool(raw.get("enabled"), settings["enabled"])
+    settings["debug_enabled"] = _normalize_yes_no_bool(raw.get("debug_enabled"), settings["debug_enabled"])
+    settings["max_hits"] = _clamp_int(raw.get("max_hits"), 1, 20, DEFAULT_WORLDBOOK_SETTINGS["max_hits"])
 
-    settings["default_case_sensitive"] = bool(raw.get("default_case_sensitive", settings["default_case_sensitive"]))
-    settings["default_whole_word"] = bool(raw.get("default_whole_word", settings["default_whole_word"]))
+    settings["default_case_sensitive"] = _normalize_yes_no_bool(
+        raw.get("default_case_sensitive"),
+        settings["default_case_sensitive"],
+    )
+    settings["default_whole_word"] = _normalize_yes_no_bool(
+        raw.get("default_whole_word"),
+        settings["default_whole_word"],
+    )
 
-    default_match_mode = str(raw.get("default_match_mode", settings["default_match_mode"])).strip().lower()
-    settings["default_match_mode"] = default_match_mode if default_match_mode in {"any", "all"} else "any"
+    settings["default_match_mode"] = _normalize_match_mode(
+        raw.get("default_match_mode"),
+        settings["default_match_mode"],
+    )
+    settings["default_secondary_mode"] = _normalize_match_mode(
+        raw.get("default_secondary_mode"),
+        settings["default_secondary_mode"],
+    )
 
-    default_secondary_mode = str(raw.get("default_secondary_mode", settings["default_secondary_mode"])).strip().lower()
-    settings["default_secondary_mode"] = default_secondary_mode if default_secondary_mode in {"any", "all"} else "all"
+    settings["default_entry_type"] = _normalize_entry_type(
+        raw.get("default_entry_type"),
+        settings["default_entry_type"],
+    )
+    settings["default_group_operator"] = _normalize_group_operator(
+        raw.get("default_group_operator"),
+        settings["default_group_operator"],
+    )
+    settings["default_chance"] = _clamp_int(
+        raw.get("default_chance"),
+        0,
+        100,
+        DEFAULT_WORLDBOOK_SETTINGS["default_chance"],
+    )
+    settings["default_sticky_turns"] = _clamp_int(
+        raw.get("default_sticky_turns"),
+        0,
+        999,
+        DEFAULT_WORLDBOOK_SETTINGS["default_sticky_turns"],
+    )
+    settings["default_cooldown_turns"] = _clamp_int(
+        raw.get("default_cooldown_turns"),
+        0,
+        999,
+        DEFAULT_WORLDBOOK_SETTINGS["default_cooldown_turns"],
+    )
     return settings
 
 
@@ -44,41 +124,92 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
     if not isinstance(raw, dict):
         return None
 
-    trigger = str(raw.get("trigger", "")).strip()
     content = str(raw.get("content", "")).strip()
-    if not trigger or not content:
+    if not content:
+        return None
+
+    entry_type = _normalize_entry_type(
+        raw.get("entry_type"),
+        str(settings.get("default_entry_type", "keyword")),
+    )
+
+    trigger = str(raw.get("trigger", "")).strip()
+    secondary_trigger = str(raw.get("secondary_trigger", "")).strip()
+
+    if entry_type == "keyword" and not trigger:
         return None
 
     title = str(raw.get("title", "")).strip() or f"词条 {index}"
-    secondary_trigger = str(raw.get("secondary_trigger", "")).strip()
     comment = str(raw.get("comment", "")).strip()
     entry_id = str(raw.get("id", "")).strip() or f"worldbook-{index}"
 
-    match_mode = str(raw.get("match_mode", settings["default_match_mode"])).strip().lower()
-    if match_mode not in {"any", "all"}:
-        match_mode = settings["default_match_mode"]
+    match_mode = _normalize_match_mode(
+        raw.get("match_mode"),
+        str(settings.get("default_match_mode", "any")),
+    )
+    secondary_mode = _normalize_match_mode(
+        raw.get("secondary_mode"),
+        str(settings.get("default_secondary_mode", "all")),
+    )
 
-    secondary_mode = str(raw.get("secondary_mode", settings["default_secondary_mode"])).strip().lower()
-    if secondary_mode not in {"any", "all"}:
-        secondary_mode = settings["default_secondary_mode"]
+    group_operator = _normalize_group_operator(
+        raw.get("group_operator"),
+        str(settings.get("default_group_operator", "and")),
+    )
 
-    try:
-        priority = int(raw.get("priority", 100))
-    except (TypeError, ValueError):
-        priority = 100
+    group = str(raw.get("group", raw.get("group_name", ""))).strip()
+
+    chance = _clamp_int(
+        raw.get("chance"),
+        0,
+        100,
+        int(settings.get("default_chance", 100)),
+    )
+    sticky_turns = _clamp_int(
+        raw.get("sticky_turns"),
+        0,
+        999,
+        int(settings.get("default_sticky_turns", 0)),
+    )
+    cooldown_turns = _clamp_int(
+        raw.get("cooldown_turns"),
+        0,
+        999,
+        int(settings.get("default_cooldown_turns", 0)),
+    )
+
+    raw_order = raw.get("order", raw.get("priority", 100))
+    order = _clamp_int(raw_order, 0, 999999, 100)
+
+    enabled = _normalize_yes_no_bool(raw.get("enabled"), True)
+    case_sensitive = _normalize_yes_no_bool(
+        raw.get("case_sensitive"),
+        bool(settings.get("default_case_sensitive", False)),
+    )
+    whole_word = _normalize_yes_no_bool(
+        raw.get("whole_word"),
+        bool(settings.get("default_whole_word", False)),
+    )
 
     return {
         "id": entry_id,
         "title": title[:80],
         "trigger": trigger,
         "secondary_trigger": secondary_trigger,
-        "content": content,
-        "enabled": bool(raw.get("enabled", True)),
-        "priority": max(0, min(9999, priority)),
-        "case_sensitive": bool(raw.get("case_sensitive", settings["default_case_sensitive"])),
-        "whole_word": bool(raw.get("whole_word", settings["default_whole_word"])),
+        "entry_type": entry_type,
+        "group_operator": group_operator,
         "match_mode": match_mode,
         "secondary_mode": secondary_mode,
+        "content": content,
+        "group": group[:80],
+        "chance": chance,
+        "sticky_turns": sticky_turns,
+        "cooldown_turns": cooldown_turns,
+        "order": order,
+        "priority": order,
+        "enabled": enabled,
+        "case_sensitive": case_sensitive,
+        "whole_word": whole_word,
         "comment": comment[:240],
     }
 
@@ -110,8 +241,10 @@ def sanitize_worldbook(raw: Any) -> dict[str, str]:
     store = sanitize_worldbook_store(raw)
     cleaned: dict[str, str] = {}
     for item in store["entries"]:
-        if item.get("enabled", True):
-            cleaned[str(item["trigger"]).strip()] = str(item["content"]).strip()
+        trigger = str(item.get("trigger", "")).strip()
+        content = str(item.get("content", "")).strip()
+        if item.get("enabled", True) and trigger and content:
+            cleaned[trigger] = content
     return cleaned
 
 

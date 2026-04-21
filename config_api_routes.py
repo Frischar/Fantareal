@@ -8,10 +8,21 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
+from memory_merge_logic import (
+    get_memory_outline,
+    get_merged_memories,
+    merge_memories_to_outline,
+    save_memory_outline,
+    save_merged_memories,
+)
+
 from app_models import (
     DynamicWorldbookPreviewPayload,
     JsonImportPayload,
     MemoryListPayload,
+    MemoryMergePayload,
+    MemoryOutlineListPayload,
+    MergedMemoryListPayload,
     PersonaPayload,
     PresetActionPayload,
     PresetCreatePayload,
@@ -361,6 +372,68 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         active_slot = ctx.get_active_slot_id()
         memories = ctx.save_memories([item.model_dump() for item in payload.items], active_slot)
         return {"ok": True, "items": memories}
+
+
+    @app.get("/api/memories/merged")
+    async def api_get_merged_memories() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {"ok": True, "items": get_merged_memories(ctx, active_slot), "active_slot": active_slot}
+
+    @app.post("/api/memories/merged")
+    async def api_save_merged_memories(payload: MergedMemoryListPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        items = save_merged_memories(ctx, [item.model_dump() for item in payload.items], active_slot)
+        return {"ok": True, "items": items, "active_slot": active_slot}
+
+    @app.get("/api/memories/merged/export")
+    async def api_export_merged_memories() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        filename = "merged_memories.json"
+        target = ctx.EXPORT_DIR / filename
+        ctx.persist_json(
+            target,
+            {"items": get_merged_memories(ctx, active_slot)},
+            detail="Merged memory export failed. Please check disk space or file permissions.",
+        )
+        return FileResponse(path=target, filename=filename, media_type="application/json")
+
+    @app.get("/api/memories/outline")
+    async def api_get_memory_outline() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {"ok": True, "items": get_memory_outline(ctx, active_slot), "active_slot": active_slot}
+
+    @app.post("/api/memories/outline")
+    async def api_save_memory_outline(payload: MemoryOutlineListPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        items = save_memory_outline(ctx, [item.model_dump() for item in payload.items], active_slot)
+        return {"ok": True, "items": items, "active_slot": active_slot}
+
+    @app.get("/api/memories/outline/export")
+    async def api_export_memory_outline() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        filename = "memory_outline.json"
+        target = ctx.EXPORT_DIR / filename
+        ctx.persist_json(
+            target,
+            {"items": get_memory_outline(ctx, active_slot)},
+            detail="Memory outline export failed. Please check disk space or file permissions.",
+        )
+        return FileResponse(path=target, filename=filename, media_type="application/json")
+
+    @app.post("/api/memories/merge")
+    async def api_merge_memories(payload: MemoryMergePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return await merge_memories_to_outline(
+            ctx,
+            payload.memory_ids,
+            merged_title=payload.merged_title,
+            outline_title=payload.outline_title,
+            delete_sources=payload.delete_sources,
+            slot_id=active_slot,
+            runtime_overrides=payload.runtime_config,
+        )
 
     @app.get("/api/worldbook")
     async def api_get_worldbook() -> dict[str, Any]:

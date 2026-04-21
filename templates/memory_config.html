@@ -5,6 +5,201 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memory - Xuqi LLM Chat</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    <style>
+      .memory-merge-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .memory-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .memory-side-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .merge-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .merge-toolbar .field-block {
+        display: grid;
+        gap: 6px;
+      }
+
+      .merge-toolbar .field-block label {
+        margin: 0;
+      }
+
+      .selection-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-top: 12px;
+      }
+
+      .selection-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel-strong) 88%, transparent 12%);
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .memory-card.selectable {
+        position: relative;
+      }
+
+      .memory-card-head-main {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .memory-select {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+      }
+
+      .memory-card-head strong {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .memory-panel-titlebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .memory-summary-card,
+      .outline-card {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: color-mix(in srgb, var(--panel-strong) 92%, transparent 8%);
+        padding: 14px;
+      }
+
+      .memory-summary-card h3,
+      .outline-card h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+      }
+
+      .summary-meta,
+      .outline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .summary-badge,
+      .outline-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 84%, transparent 16%);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .summary-content,
+      .outline-content {
+        white-space: pre-wrap;
+        line-height: 1.75;
+        color: var(--text);
+      }
+
+      .summary-note,
+      .outline-note {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed var(--line);
+        white-space: pre-wrap;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .empty-tip {
+        padding: 18px;
+        border: 1px dashed var(--line);
+        border-radius: 18px;
+        color: var(--muted);
+        background: color-mix(in srgb, var(--panel) 80%, transparent 20%);
+      }
+
+      .list-divider {
+        height: 1px;
+        background: var(--line);
+        margin: 6px 0 0;
+      }
+
+      .outline-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .outline-block {
+        display: grid;
+        gap: 8px;
+      }
+
+      .outline-block strong {
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .outline-list-items {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text);
+        line-height: 1.7;
+      }
+
+      .sticky-side {
+        position: sticky;
+        top: 20px;
+      }
+
+      .button-row.compact-wrap {
+        flex-wrap: wrap;
+      }
+
+      .status-line.strong {
+        color: var(--text);
+      }
+
+      @media (max-width: 1100px) {
+        .memory-merge-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .sticky-side {
+          position: static;
+        }
+      }
+    </style>
   </head>
   <body>
     <div class="topbar-stack">
@@ -14,8 +209,8 @@
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
-                    <a class="navlink" href="/config/user">User</a>
-<a class="navlink" href="/config/card">Card</a>
+          <a class="navlink" href="/config/user">User</a>
+          <a class="navlink" href="/config/card">Card</a>
           <a class="navlink" href="/config/workshop">Workshop</a>
           <a class="navlink" href="/config/sprite">Sprite</a>
           <a class="navlink active" href="/config/memory">Memory</a>
@@ -23,49 +218,85 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-            <div class="slot-toolbar">
+
+      <div class="slot-toolbar">
         <div class="slot-toolbar-left">
           <span class="slot-badge">Memory</span>
           <div class="slot-meta">
             <strong>当前为全局记忆库</strong>
-            <p class="slot-hint">这里维护的是全局长期记忆条目，可以自由导入和导出。</p>
+            <p class="slot-hint">原记忆保持原逻辑；新增支持多选合并、生成合并记忆，并写入独立大纲表。</p>
           </div>
         </div>
       </div>
+    </div>
+
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Memory</p>
           <h2>记忆库管理</h2>
-          <p class="muted">这里的每一条记忆都会在每次聊天时作为固定前情提要投喂给模型。你可以手动新增、修改、删除，然后点击保存立即生效。</p>
+          <p class="muted">
+            原记忆仍会按原方式参与聊天。你可以勾选多条原记忆，批量总结为一条“合并后的记忆”，同时生成一条“大纲表项”，并从原记忆区删除这些源记忆。
+          </p>
         </div>
         <div class="stats-row">
           <div class="stat-box">
-            <span class="stat-label">当前条数</span>
+            <span class="stat-label">原记忆</span>
             <strong id="memory-count">{{ memory_count }}</strong>
           </div>
           <div class="stat-box">
-            <span class="stat-label">生效方式</span>
-            <strong>每轮聊天固定前情提要</strong>
+            <span class="stat-label">合并记忆</span>
+            <strong id="merged-count">0</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">大纲表</span>
+            <strong id="outline-count">0</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">当前选中</span>
+            <strong id="selected-count">0</strong>
           </div>
         </div>
       </section>
 
       <section class="panel config-panel full-span">
         <div class="memory-actions">
-          <div class="button-row">
+          <div class="button-row compact-wrap">
             <button id="add-memory" type="button">新增记忆</button>
             <button id="save-memories" type="button" class="secondary">保存全部记忆</button>
-            <button id="reload-memories" type="button" class="secondary">重新读取</button>
+            <button id="reload-all" type="button" class="secondary">重新读取全部</button>
             <button id="import-memories" type="button" class="secondary">导入记忆</button>
             <button id="export-memories" type="button" class="secondary">导出记忆</button>
             <input id="import-memories-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
           </div>
         </div>
 
+        <div class="merge-toolbar">
+          <div class="field-block">
+            <label for="merged-title-input">合并记忆标题（可空，交给模型自动拟定）</label>
+            <input id="merged-title-input" type="text" placeholder="例如：林翩翩阶段总结" />
+          </div>
+          <div class="field-block">
+            <label for="outline-title-input">大纲表标题（可空，交给模型自动拟定）</label>
+            <input id="outline-title-input" type="text" placeholder="例如：林翩翩线阶段大纲" />
+          </div>
+        </div>
+
+        <div class="selection-row">
+          <label class="selection-chip">
+            <input id="delete-sources-toggle" type="checkbox" checked />
+            <span>合并成功后删除原记忆</span>
+          </label>
+          <button id="merge-selected" type="button">把选中记忆合并到大纲表</button>
+          <button id="select-all-visible" type="button" class="secondary">选中当前可见项</button>
+          <button id="clear-selection" type="button" class="secondary">清空勾选</button>
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span">
         <div class="grid-two">
           <div>
-            <label for="memory-search">搜索记忆</label>
+            <label for="memory-search">搜索原记忆</label>
             <input id="memory-search" type="text" placeholder="按标题、正文、标签、备注搜索" />
           </div>
           <div class="button-row offset-top">
@@ -73,51 +304,94 @@
             <button id="expand-all-memories" type="button" class="secondary">全部展开</button>
           </div>
         </div>
+      </section>
 
-        <div id="memory-list" class="memory-list">
-          {% for item in memories %}
-          <article class="memory-card" data-collapsed="false">
-            <div class="memory-card-head">
-              <strong>{{ item.title or ("记忆 " ~ loop.index) }}</strong>
-              <div class="button-row">
-                <button type="button" class="secondary compact toggle-memory">折叠</button>
-                <button type="button" class="secondary compact remove-memory">删除</button>
+      <div class="memory-merge-grid full-span">
+        <div class="memory-stack">
+          <section class="panel config-panel">
+            <div class="memory-panel-titlebar">
+              <div class="section-head">
+                <p class="eyebrow">Original Memories</p>
+                <h2>原记忆区</h2>
+                <p class="muted">这里保留原始长期记忆。可多选后进行批量合并。</p>
               </div>
             </div>
+            <div id="memory-list" class="memory-list">
+              {% for item in memories %}
+              <article class="memory-card selectable" data-collapsed="false">
+                <div class="memory-card-head">
+                  <div class="memory-card-head-main">
+                    <input class="memory-select" type="checkbox" />
+                    <strong>{{ item.title or ("记忆 " ~ loop.index) }}</strong>
+                  </div>
+                  <div class="button-row">
+                    <button type="button" class="secondary compact toggle-memory">折叠</button>
+                    <button type="button" class="secondary compact remove-memory">删除</button>
+                  </div>
+                </div>
 
-            <div class="memory-card-body">
-            <label>标题</label>
-            <input class="memory-title" value="{{ item.title }}" placeholder="例如：和用户的关系进展" />
+                <div class="memory-card-body">
+                  <label>标题</label>
+                  <input class="memory-title" value="{{ item.title }}" placeholder="例如：和用户的关系进展" />
 
-            <label>正文</label>
-            <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要">{{ item.content }}</textarea>
+                  <label>正文</label>
+                  <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要">{{ item.content }}</textarea>
 
-            <label>标签</label>
-            <input class="memory-tags" value="{{ item.tags | join(', ') }}" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
+                  <label>标签</label>
+                  <input class="memory-tags" value="{{ item.tags | join(', ') }}" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
 
-            <label>备注</label>
-            <textarea class="memory-notes" rows="3" placeholder="补充说明，可选">{{ item.notes }}</textarea>
+                  <label>备注</label>
+                  <textarea class="memory-notes" rows="3" placeholder="补充说明，可选">{{ item.notes }}</textarea>
 
-            <input class="memory-id" type="hidden" value="{{ item.id }}" />
+                  <input class="memory-id" type="hidden" value="{{ item.id }}" />
+                </div>
+              </article>
+              {% endfor %}
             </div>
-          </article>
-          {% endfor %}
+          </section>
         </div>
-      </section>
+
+        <div class="memory-side-stack sticky-side">
+          <section class="panel config-panel">
+            <div class="memory-panel-titlebar">
+              <div class="section-head">
+                <p class="eyebrow">Merged Memories</p>
+                <h2>合并后的记忆</h2>
+                <p class="muted">这里单独展示合并结果，不影响原记忆格式。</p>
+              </div>
+            </div>
+            <div id="merged-list" class="memory-list"></div>
+          </section>
+
+          <section class="panel config-panel">
+            <div class="memory-panel-titlebar">
+              <div class="section-head">
+                <p class="eyebrow">Outline</p>
+                <h2>大纲表</h2>
+                <p class="muted">每次合并都会生成一条新的大纲摘要。</p>
+              </div>
+            </div>
+            <div id="outline-list" class="outline-list"></div>
+          </section>
+        </div>
+      </div>
 
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Status</p>
           <h2>当前状态</h2>
-          <p id="status-text" class="muted status-line">就绪</p>
+          <p id="status-text" class="muted status-line strong">就绪</p>
         </div>
       </section>
     </div>
 
     <template id="memory-card-template">
-      <article class="memory-card" data-collapsed="false">
+      <article class="memory-card selectable" data-collapsed="false">
         <div class="memory-card-head">
-          <strong>新记忆</strong>
+          <div class="memory-card-head-main">
+            <input class="memory-select" type="checkbox" />
+            <strong>新记忆</strong>
+          </div>
           <div class="button-row">
             <button type="button" class="secondary compact toggle-memory">折叠</button>
             <button type="button" class="secondary compact remove-memory">删除</button>
@@ -125,19 +399,19 @@
         </div>
 
         <div class="memory-card-body">
-        <label>标题</label>
-        <input class="memory-title" placeholder="例如：主角色的固定偏好" />
+          <label>标题</label>
+          <input class="memory-title" placeholder="例如：主角色的固定偏好" />
 
-        <label>正文</label>
-        <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要"></textarea>
+          <label>正文</label>
+          <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要"></textarea>
 
-        <label>标签</label>
-        <input class="memory-tags" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
+          <label>标签</label>
+          <input class="memory-tags" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
 
-        <label>备注</label>
-        <textarea class="memory-notes" rows="3" placeholder="补充说明，可选"></textarea>
+          <label>备注</label>
+          <textarea class="memory-notes" rows="3" placeholder="补充说明，可选"></textarea>
 
-        <input class="memory-id" type="hidden" />
+          <input class="memory-id" type="hidden" />
         </div>
       </article>
     </template>
@@ -147,7 +421,12 @@
       const bodyEl = document.body;
       const statusEl = document.getElementById("status-text");
       const memoryListEl = document.getElementById("memory-list");
+      const mergedListEl = document.getElementById("merged-list");
+      const outlineListEl = document.getElementById("outline-list");
       const memoryCountEl = document.getElementById("memory-count");
+      const mergedCountEl = document.getElementById("merged-count");
+      const outlineCountEl = document.getElementById("outline-count");
+      const selectedCountEl = document.getElementById("selected-count");
       const templateEl = document.getElementById("memory-card-template");
 
       const currentTheme = {{ settings.theme | tojson }};
@@ -156,7 +435,7 @@
       const currentOverlay = {{ settings.background_overlay | tojson }};
 
       function setStatus(text) {
-        statusEl.textContent = text;
+        statusEl.textContent = text || "就绪";
       }
 
       function applyTheme(theme) {
@@ -203,6 +482,13 @@
         if (toggleBtn) toggleBtn.textContent = collapsed ? "展开" : "折叠";
       }
 
+      function updateSelectionCount() {
+        const count = [...memoryListEl.querySelectorAll(".memory-select:checked")]
+          .filter((checkbox) => checkbox.closest(".memory-card")?.style.display !== "none")
+          .length;
+        selectedCountEl.textContent = String(count);
+      }
+
       function applyMemorySearch() {
         const keyword = normalizeSearchText(document.getElementById("memory-search")?.value || "");
         const cards = [...memoryListEl.querySelectorAll(".memory-card")];
@@ -212,11 +498,22 @@
           card.style.display = matched ? "" : "none";
           if (matched) visibleCount += 1;
         }
-        setStatus(keyword ? `搜索完成：找到 ${visibleCount} 条匹配记忆。` : "已清除搜索筛选。");
+        updateSelectionCount();
+        setStatus(keyword ? `搜索完成：找到 ${visibleCount} 条匹配原记忆。` : "已清除搜索筛选。");
       }
 
       function updateMemoryCount() {
         memoryCountEl.textContent = String(memoryListEl.querySelectorAll(".memory-card").length);
+        updateSelectionCount();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
       }
 
       function attachRemoveHandler(card) {
@@ -224,7 +521,7 @@
           card.remove();
           updateMemoryCount();
           applyMemorySearch();
-          setStatus("已删除一条记忆，记得保存。");
+          setStatus("已删除一条原记忆，记得保存。");
         });
 
         const toggleBtn = card.querySelector(".toggle-memory");
@@ -232,6 +529,13 @@
           toggleBtn.addEventListener("click", () => {
             const collapsed = card.dataset.collapsed === "true";
             setMemoryCollapsed(card, !collapsed);
+          });
+        }
+
+        const checkbox = card.querySelector(".memory-select");
+        if (checkbox) {
+          checkbox.addEventListener("change", () => {
+            updateSelectionCount();
           });
         }
       }
@@ -267,10 +571,29 @@
           const id = card.querySelector(".memory-id").value.trim() || `memory-manual-${Date.now()}-${index}`;
           const title = card.querySelector(".memory-title").value.trim();
           const content = card.querySelector(".memory-content").value.trim();
-          const tags = card.querySelector(".memory-tags").value.split(",").map((item) => item.trim()).filter(Boolean);
+          const tags = card.querySelector(".memory-tags").value
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
           const notes = card.querySelector(".memory-notes").value.trim();
           return { id, title, content, tags, notes };
         });
+      }
+
+      function getSelectedMemoryIds() {
+        return [...memoryListEl.querySelectorAll(".memory-card")]
+          .filter((card) => card.querySelector(".memory-select")?.checked)
+          .map((card) => card.querySelector(".memory-id")?.value?.trim())
+          .filter(Boolean);
+      }
+
+      async function getJson(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "读取失败");
+        }
+        return response.json();
       }
 
       async function postJson(url, payload) {
@@ -305,15 +628,115 @@
         URL.revokeObjectURL(objectUrl);
       }
 
+      function renderMergedList(items = []) {
+        mergedListEl.innerHTML = "";
+        mergedCountEl.textContent = String(items.length);
+
+        if (!items.length) {
+          mergedListEl.innerHTML = '<div class="empty-tip">还没有合并后的记忆。先在左侧勾选两条以上原记忆，再执行合并。</div>';
+          return;
+        }
+
+        for (const item of items) {
+          const tags = Array.isArray(item.tags) ? item.tags : [];
+          const sourceIds = Array.isArray(item.source_memory_ids) ? item.source_memory_ids : [];
+          const article = document.createElement("article");
+          article.className = "memory-summary-card";
+          article.innerHTML = `
+            <h3>${escapeHtml(item.title || "未命名合并记忆")}</h3>
+            <div class="summary-meta">
+              <span class="summary-badge">来源 ${sourceIds.length} 条</span>
+              <span class="summary-badge">${escapeHtml(item.created_at || "")}</span>
+              ${tags.map((tag) => `<span class="summary-badge">${escapeHtml(tag)}</span>`).join("")}
+            </div>
+            <div class="summary-content">${escapeHtml(item.content || "")}</div>
+            ${item.notes ? `<div class="summary-note">${escapeHtml(item.notes)}</div>` : ""}
+          `;
+          mergedListEl.appendChild(article);
+        }
+      }
+
+      function renderOutlineList(items = []) {
+        outlineListEl.innerHTML = "";
+        outlineCountEl.textContent = String(items.length);
+
+        if (!items.length) {
+          outlineListEl.innerHTML = '<div class="empty-tip">还没有大纲表项。合并记忆后会自动出现在这里。</div>';
+          return;
+        }
+
+        for (const item of items) {
+          const events = Array.isArray(item.key_events) ? item.key_events : [];
+          const article = document.createElement("article");
+          article.className = "outline-card";
+          article.innerHTML = `
+            <h3>${escapeHtml(item.title || "未命名大纲")}</h3>
+            <div class="outline-meta">
+              <span class="outline-badge">${escapeHtml(item.updated_at || "")}</span>
+              <span class="outline-badge">来源 ${Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0} 条</span>
+            </div>
+            <div class="outline-list">
+              <div class="outline-block">
+                <strong>摘要</strong>
+                <div class="outline-content">${escapeHtml(item.summary || "")}</div>
+              </div>
+              ${item.characters ? `
+              <div class="outline-block">
+                <strong>涉及角色</strong>
+                <div class="outline-content">${escapeHtml(item.characters)}</div>
+              </div>` : ""}
+              ${item.relationship_progress ? `
+              <div class="outline-block">
+                <strong>关系推进</strong>
+                <div class="outline-content">${escapeHtml(item.relationship_progress)}</div>
+              </div>` : ""}
+              ${events.length ? `
+              <div class="outline-block">
+                <strong>关键事件</strong>
+                <ul class="outline-list-items">
+                  ${events.map((event) => `<li>${escapeHtml(event)}</li>`).join("")}
+                </ul>
+              </div>` : ""}
+              ${item.conflicts ? `
+              <div class="outline-block">
+                <strong>矛盾点</strong>
+                <div class="outline-content">${escapeHtml(item.conflicts)}</div>
+              </div>` : ""}
+              ${item.next_hooks ? `
+              <div class="outline-block">
+                <strong>后续钩子</strong>
+                <div class="outline-content">${escapeHtml(item.next_hooks)}</div>
+              </div>` : ""}
+              ${item.notes ? `<div class="outline-note">${escapeHtml(item.notes)}</div>` : ""}
+            </div>
+          `;
+          outlineListEl.appendChild(article);
+        }
+      }
+
       async function loadMemories() {
-        const items = await fetch("/api/memories").then((response) => response.json());
+        const items = await getJson("/api/memories");
         memoryListEl.innerHTML = "";
         for (const item of items) {
           memoryListEl.appendChild(createMemoryCard(item));
         }
         updateMemoryCount();
         applyMemorySearch();
-        setStatus("记忆库已重新读取。");
+      }
+
+      async function loadMergedMemories() {
+        const data = await getJson("/api/memories/merged");
+        renderMergedList(data.items || []);
+      }
+
+      async function loadOutlineItems() {
+        const data = await getJson("/api/memories/outline");
+        renderOutlineList(data.items || []);
+      }
+
+      async function loadAllPanels() {
+        await Promise.all([loadMemories(), loadMergedMemories(), loadOutlineItems()]);
+        setStatus("原记忆、合并记忆和大纲表已重新读取。");
       }
 
       async function saveMemories() {
@@ -325,7 +748,7 @@
         }
         updateMemoryCount();
         applyMemorySearch();
-        setStatus("记忆库已保存，并会在每次聊天时作为前情提要生效。");
+        setStatus("原记忆已保存，并会继续按原方式参与聊天。");
       }
 
       async function importMemoriesFile(file) {
@@ -338,14 +761,44 @@
         }
         updateMemoryCount();
         applyMemorySearch();
-        setStatus(`记忆导入完成：${data.items?.length || 0} 条。`);
+        setStatus(`原记忆导入完成：${data.items?.length || 0} 条。`);
+      }
+
+      async function mergeSelectedMemories() {
+        const memoryIds = getSelectedMemoryIds();
+        if (memoryIds.length < 2) {
+          throw new Error("请至少勾选两条原记忆再执行合并。");
+        }
+
+        const mergedTitle = document.getElementById("merged-title-input").value.trim();
+        const outlineTitle = document.getElementById("outline-title-input").value.trim();
+        const deleteSources = document.getElementById("delete-sources-toggle").checked;
+
+        const data = await postJson("/api/memories/merge", {
+          memory_ids: memoryIds,
+          merged_title: mergedTitle,
+          outline_title: outlineTitle,
+          delete_sources: deleteSources
+        });
+
+        memoryListEl.innerHTML = "";
+        for (const item of data.remaining_items || []) {
+          memoryListEl.appendChild(createMemoryCard(item));
+        }
+        renderMergedList(data.merged_items || []);
+        renderOutlineList(data.outline_items || []);
+        updateMemoryCount();
+        applyMemorySearch();
+        document.getElementById("merged-title-input").value = "";
+        document.getElementById("outline-title-input").value = "";
+        setStatus(`合并完成：已处理 ${data.selected_count || memoryIds.length} 条原记忆，模式：${data.mode === "model" ? "模型总结" : "本地回退" }。`);
       }
 
       document.getElementById("add-memory").addEventListener("click", () => {
         memoryListEl.prepend(createMemoryCard());
         updateMemoryCount();
         applyMemorySearch();
-        setStatus("已新增一条空白记忆。");
+        setStatus("已新增一条空白原记忆。");
       });
 
       document.getElementById("save-memories").addEventListener("click", async () => {
@@ -356,9 +809,9 @@
         }
       });
 
-      document.getElementById("reload-memories").addEventListener("click", async () => {
+      document.getElementById("reload-all").addEventListener("click", async () => {
         try {
-          await loadMemories();
+          await loadAllPanels();
         } catch (error) {
           setStatus(`读取失败：${error.message}`);
         }
@@ -383,16 +836,44 @@
       document.getElementById("export-memories").addEventListener("click", async () => {
         try {
           await downloadJson("/api/memories/export", "memories.json");
-          setStatus("记忆已导出。");
+          setStatus("原记忆已导出。");
         } catch (error) {
           setStatus(`导出失败：${error.message}`);
         }
       });
 
+      document.getElementById("merge-selected").addEventListener("click", async () => {
+        try {
+          await mergeSelectedMemories();
+        } catch (error) {
+          setStatus(`合并失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("select-all-visible").addEventListener("click", () => {
+        [...memoryListEl.querySelectorAll(".memory-card")]
+          .filter((card) => card.style.display !== "none")
+          .forEach((card) => {
+            const checkbox = card.querySelector(".memory-select");
+            if (checkbox) checkbox.checked = true;
+          });
+        updateSelectionCount();
+        setStatus("已勾选当前可见的原记忆。");
+      });
+
+      document.getElementById("clear-selection").addEventListener("click", () => {
+        [...memoryListEl.querySelectorAll(".memory-select")].forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+        updateSelectionCount();
+        setStatus("已清空勾选。");
+      });
+
       memoryListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".memory-card");
         if (!card) return;
-        card.querySelector(".memory-card-head strong").textContent = card.querySelector(".memory-title").value.trim() || "新记忆";
+        card.querySelector(".memory-card-head strong").textContent =
+          card.querySelector(".memory-title").value.trim() || "新记忆";
         applyMemorySearch();
       });
 
@@ -402,12 +883,12 @@
 
       document.getElementById("collapse-all-memories").addEventListener("click", () => {
         [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, true));
-        setStatus("已折叠当前列表中的全部记忆。");
+        setStatus("已折叠当前列表中的全部原记忆。");
       });
 
       document.getElementById("expand-all-memories").addEventListener("click", () => {
         [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, false));
-        setStatus("已展开当前列表中的全部记忆。");
+        setStatus("已展开当前列表中的全部原记忆。");
       });
 
       applyTheme(currentTheme);
@@ -416,6 +897,10 @@
       initExistingMemoryCards();
       updateMemoryCount();
       applyMemorySearch();
+
+      Promise.allSettled([loadMergedMemories(), loadOutlineItems()]).then(() => {
+        setStatus("页面已就绪。可以直接勾选原记忆并执行批量合并。");
+      });
     </script>
   </body>
 </html>

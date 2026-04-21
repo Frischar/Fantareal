@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import sys
@@ -105,6 +106,7 @@ LEGACY_CURRENT_CARD_PATH = DATA_DIR / "current_role_card.json"
 GLOBAL_PRESET_PATH = DATA_DIR / "preset.json"
 GLOBAL_WORKSHOP_STATE_PATH = DATA_DIR / "creative_workshop_state.json"
 GLOBAL_USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
+GLOBAL_WORLDBOOK_RUNTIME_STATE_PATH = DATA_DIR / "worldbook_runtime_state.json"
 SLOT_MIGRATION_MARKER_PATH = DATA_DIR / ".slot_migration_done"
 GLOBAL_RUNTIME_MIGRATION_MARKER_PATH = DATA_DIR / ".global_runtime_migration_done"
 PRESET_FILENAME = "preset.json"
@@ -926,6 +928,7 @@ def reset_slot_data(slot_id: str) -> dict[str, Any]:
     persist_json(settings_path(), sanitize_settings(DEFAULT_SETTINGS), detail="Workspace reset failed: could not reset settings.")
     persist_json(memories_path(), [], detail="Workspace reset failed: could not clear memories.")
     persist_json(worldbook_path(), {}, detail="Workspace reset failed: could not clear worldbook.")
+    persist_json(worldbook_runtime_state_path(), default_worldbook_runtime_state(), detail="Workspace reset failed: could not reset worldbook runtime state.")
     reset_workshop_state()
     persist_json(user_profile_path(), default_user_profile(), detail="Workspace reset failed: could not reset user profile.")
     persist_json(preset_path(), default_preset_store(), detail="Workspace reset failed: could not reset presets.")
@@ -1382,6 +1385,8 @@ def ensure_data_files() -> None:
         write_json(workshop_state_path(), default_workshop_state())
     if not user_profile_path().exists():
         write_json(user_profile_path(), default_user_profile())
+    if not worldbook_runtime_state_path().exists():
+        write_json(worldbook_runtime_state_path(), default_worldbook_runtime_state())
     if not preset_path().exists():
         write_json(preset_path(), default_preset_store())
     migrate_slot_runtime_to_global_files()
@@ -2248,6 +2253,210 @@ async def rerank_documents(
     return reranked or documents
 
 
+
+def default_worldbook_runtime_state() -> dict[str, Any]:
+    return {"turn_index": 0, "entries": {}}
+
+
+def worldbook_runtime_state_path(slot_id: str | None = None) -> Path:
+    return GLOBAL_WORLDBOOK_RUNTIME_STATE_PATH
+
+
+def sanitize_worldbook_runtime_state(raw: Any) -> dict[str, Any]:
+    state = default_worldbook_runtime_state()
+    if not isinstance(raw, dict):
+        return state
+
+    state["turn_index"] = clamp_int(raw.get("turn_index"), 0, 10_000_000, 0)
+    raw_entries = raw.get("entries", {})
+    if not isinstance(raw_entries, dict):
+        return state
+
+    cleaned_entries: dict[str, dict[str, Any]] = {}
+    for raw_entry_id, value in raw_entries.items():
+        if not isinstance(value, dict):
+            continue
+        entry_id = str(raw_entry_id or "").strip()
+        if not entry_id:
+            continue
+        cleaned_entries[entry_id] = {
+            "active_until_turn": clamp_int(value.get("active_until_turn"), 0, 10_000_000, 0),
+            "cooldown_until_turn": clamp_int(value.get("cooldown_until_turn"), 0, 10_000_000, 0),
+            "last_trigger_turn": clamp_int(value.get("last_trigger_turn"), 0, 10_000_000, 0),
+            "last_roll": clamp_int(value.get("last_roll"), 0, 100, 0),
+            "last_result": str(value.get("last_result", "")).strip()[:32],
+            "last_reason": str(value.get("last_reason", "")).strip()[:64],
+            "matched_text": str(value.get("matched_text", "")).strip()[:240],
+        }
+    state["entries"] = cleaned_entries
+    return state
+
+
+def get_worldbook_runtime_state(slot_id: str | None = None) -> dict[str, Any]:
+    return sanitize_worldbook_runtime_state(read_json(worldbook_runtime_state_path(slot_id), default_worldbook_runtime_state()))
+
+
+def save_worldbook_runtime_state(payload: dict[str, Any], slot_id: str | None = None) -> dict[str, Any]:
+    sanitized = sanitize_worldbook_runtime_state(payload)
+    persist_json(
+        worldbook_runtime_state_path(slot_id),
+        sanitized,
+        detail="Worldbook runtime state save failed. Please check disk space or file permissions.",
+    )
+    return sanitized
+
+
+def _worldbook_direct_question(user_message: str) -> bool:
+    text = str(user_message or "").strip().lower()
+    if not text:
+        return False
+
+    markers = (
+        "what", "who", "why", "how", "tell me", "explain", "?", "？",
+        "什么", "是谁", "为啥", "为什么", "怎么", "如何", "解释", "告诉我", "说说", "介绍",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _worldbook_entry_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
+    order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    source_rank_map = {"constant": 0, "sticky": 1, "keyword": 2}
+    source_rank = source_rank_map.get(str(item.get("source", "keyword")), 2)
+    title = str(item.get("title", "")).strip()
+    return (order, source_rank, title)
+
+
+def _build_worldbook_runtime_debug_entries(
+    current_turn: int,
+    entries: list[dict[str, Any]],
+    runtime_entries: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in sorted(entries, key=_worldbook_entry_sort_key):
+        entry_id = str(item.get("id", "")).strip()
+        runtime = runtime_entries.get(entry_id, {})
+        active_until_turn = clamp_int(runtime.get("active_until_turn"), 0, 10_000_000, 0)
+        cooldown_until_turn = clamp_int(runtime.get("cooldown_until_turn"), 0, 10_000_000, 0)
+        sticky_remaining = max(0, active_until_turn - current_turn)
+        cooldown_remaining = max(0, cooldown_until_turn - max(current_turn, active_until_turn))
+        rows.append(
+            {
+                "id": entry_id,
+                "title": str(item.get("title", "")).strip(),
+                "entry_type": str(item.get("entry_type", "keyword")).strip() or "keyword",
+                "group": str(item.get("group", "")).strip(),
+                "order": clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100),
+                "chance": clamp_int(item.get("chance", 100), 0, 100, 100),
+                "sticky_turns": clamp_int(item.get("sticky_turns", 0), 0, 999, 0),
+                "cooldown_turns": clamp_int(item.get("cooldown_turns", 0), 0, 999, 0),
+                "active_until_turn": active_until_turn,
+                "cooldown_until_turn": cooldown_until_turn,
+                "sticky_remaining": sticky_remaining,
+                "cooldown_remaining": cooldown_remaining,
+                "last_result": str(runtime.get("last_result", "")).strip(),
+                "last_reason": str(runtime.get("last_reason", "")).strip(),
+                "last_roll": clamp_int(runtime.get("last_roll"), 0, 100, 0),
+                "matched_text": str(runtime.get("matched_text", "")).strip(),
+            }
+        )
+    return rows
+
+
+def _worldbook_alias_match_result(
+    text: str,
+    aliases: list[str],
+    *,
+    mode: str,
+    case_sensitive: bool,
+    whole_word: bool,
+) -> tuple[bool, list[str]]:
+    if not aliases:
+        return False, []
+
+    matches = [
+        alias for alias in aliases if keyword_matches_query(text, alias, case_sensitive=case_sensitive, whole_word=whole_word)
+    ]
+    normalized_mode = str(mode or "any").strip().lower()
+    ok = len(matches) == len(aliases) if normalized_mode == "all" else bool(matches)
+    return ok, matches
+
+
+def _evaluate_worldbook_keyword_entry(
+    text: str,
+    item: dict[str, Any],
+    settings: dict[str, Any],
+) -> tuple[bool, list[str], list[str], str]:
+    case_sensitive = bool(item.get("case_sensitive", settings["default_case_sensitive"]))
+    whole_word = bool(item.get("whole_word", settings["default_whole_word"]))
+
+    primary_aliases = split_trigger_aliases(item.get("trigger", ""))
+    secondary_aliases = split_trigger_aliases(item.get("secondary_trigger", ""))
+
+    primary_mode = str(item.get("match_mode", settings.get("default_match_mode", "any"))).strip().lower()
+    secondary_mode = str(item.get("secondary_mode", settings.get("default_secondary_mode", "all"))).strip().lower()
+    group_operator = str(item.get("group_operator", settings.get("default_group_operator", "and"))).strip().lower()
+    if group_operator not in {"and", "or"}:
+        group_operator = "and"
+
+    primary_ok = False
+    primary_matches: list[str] = []
+    if primary_aliases:
+        primary_ok, primary_matches = _worldbook_alias_match_result(
+            text,
+            primary_aliases,
+            mode=primary_mode,
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+        )
+
+    secondary_ok = False
+    secondary_matches: list[str] = []
+    if secondary_aliases:
+        secondary_ok, secondary_matches = _worldbook_alias_match_result(
+            text,
+            secondary_aliases,
+            mode=secondary_mode,
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+        )
+
+    if not secondary_aliases:
+        final_ok = primary_ok
+    elif group_operator == "or":
+        final_ok = primary_ok or secondary_ok
+    else:
+        final_ok = primary_ok and secondary_ok
+
+    matched_text = " / ".join(primary_matches + secondary_matches)
+    return final_ok, primary_matches, secondary_matches, matched_text
+
+
+def _worldbook_match_payload(
+    *,
+    item: dict[str, Any],
+    source: str,
+    matched_text: str = "",
+) -> dict[str, Any]:
+    order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    return {
+        "id": str(item.get("id", "")).strip(),
+        "title": str(item.get("title", "")).strip(),
+        "trigger": str(item.get("trigger", "")).strip(),
+        "secondary_trigger": str(item.get("secondary_trigger", "")).strip(),
+        "content": str(item.get("content", "")).strip(),
+        "matched": matched_text,
+        "comment": str(item.get("comment", "")).strip(),
+        "priority": order,
+        "order": order,
+        "source": source,
+        "group": str(item.get("group", "")).strip(),
+        "entry_type": str(item.get("entry_type", "keyword")).strip() or "keyword",
+        "chance": clamp_int(item.get("chance", 100), 0, 100, 100),
+        "sticky_turns": clamp_int(item.get("sticky_turns", 0), 0, 999, 0),
+        "cooldown_turns": clamp_int(item.get("cooldown_turns", 0), 0, 999, 0),
+    }
+
+
 def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
     text = str(query or "").strip()
     if not text:
@@ -2257,56 +2466,99 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
     if not settings.get("enabled", True):
         return []
 
+    runtime_state = get_worldbook_runtime_state()
+    current_turn = clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0) + 1
+    runtime_state["turn_index"] = current_turn
+
+    runtime_entries = runtime_state.get("entries", {}) if isinstance(runtime_state.get("entries"), dict) else {}
+    clean_runtime_entries: dict[str, dict[str, Any]] = {}
     hits: list[dict[str, Any]] = []
+
     for item in get_worldbook_entries():
         if not item.get("enabled", True):
             continue
 
-        primary_aliases = split_trigger_aliases(item.get("trigger", ""))
-        if not primary_aliases:
+        entry_id = str(item.get("id", "")).strip()
+        if not entry_id:
             continue
 
-        case_sensitive = bool(item.get("case_sensitive", settings["default_case_sensitive"]))
-        whole_word = bool(item.get("whole_word", settings["default_whole_word"]))
-        primary_matches = [
-            alias for alias in primary_aliases if keyword_matches_query(text, alias, case_sensitive=case_sensitive, whole_word=whole_word)
-        ]
+        entry_type = str(item.get("entry_type", settings.get("default_entry_type", "keyword"))).strip().lower()
+        if entry_type not in {"keyword", "constant"}:
+            entry_type = "keyword"
 
-        primary_mode = str(item.get("match_mode", settings["default_match_mode"])).strip().lower()
-        primary_ok = bool(primary_matches) if primary_mode != "all" else len(primary_matches) == len(primary_aliases)
-        if not primary_ok:
+        runtime = runtime_entries.get(entry_id, {}) if isinstance(runtime_entries.get(entry_id), dict) else {}
+        state_row = {
+            "active_until_turn": clamp_int(runtime.get("active_until_turn"), 0, 10_000_000, 0),
+            "cooldown_until_turn": clamp_int(runtime.get("cooldown_until_turn"), 0, 10_000_000, 0),
+            "last_trigger_turn": clamp_int(runtime.get("last_trigger_turn"), 0, 10_000_000, 0),
+            "last_roll": clamp_int(runtime.get("last_roll"), 0, 100, 0),
+            "last_result": str(runtime.get("last_result", "")).strip()[:32],
+            "last_reason": str(runtime.get("last_reason", "")).strip()[:64],
+            "matched_text": str(runtime.get("matched_text", "")).strip()[:240],
+        }
+
+        sticky_turns = clamp_int(item.get("sticky_turns", settings.get("default_sticky_turns", 0)), 0, 999, 0)
+        cooldown_turns = clamp_int(item.get("cooldown_turns", settings.get("default_cooldown_turns", 0)), 0, 999, 0)
+
+        if entry_type == "constant":
+            state_row["last_result"] = "constant"
+            state_row["last_reason"] = "always_on"
+            clean_runtime_entries[entry_id] = state_row
+            hits.append(_worldbook_match_payload(item=item, source="constant", matched_text="常驻"))
             continue
 
-        secondary_aliases = split_trigger_aliases(item.get("secondary_trigger", ""))
-        secondary_matches: list[str] = []
-        if secondary_aliases:
-            secondary_matches = [
-                alias for alias in secondary_aliases if keyword_matches_query(text, alias, case_sensitive=case_sensitive, whole_word=whole_word)
-            ]
-            secondary_mode = str(item.get("secondary_mode", settings["default_secondary_mode"])).strip().lower()
-            secondary_ok = bool(secondary_matches) if secondary_mode != "all" else len(secondary_matches) == len(secondary_aliases)
-            if not secondary_ok:
-                continue
+        if state_row["active_until_turn"] >= current_turn and state_row["last_trigger_turn"] < current_turn:
+            matched_text = state_row["matched_text"] or str(item.get("trigger", "")).strip()
+            state_row["last_result"] = "sticky"
+            state_row["last_reason"] = "active"
+            clean_runtime_entries[entry_id] = state_row
+            hits.append(_worldbook_match_payload(item=item, source="sticky", matched_text=matched_text))
+            continue
 
-        hits.append(
-            {
-                "id": str(item.get("id", "")).strip(),
-                "title": str(item.get("title", "")).strip(),
-                "trigger": str(item.get("trigger", "")).strip(),
-                "secondary_trigger": str(item.get("secondary_trigger", "")).strip(),
-                "content": str(item.get("content", "")).strip(),
-                "matched": " / ".join(primary_matches + secondary_matches),
-                "comment": str(item.get("comment", "")).strip(),
-                "priority": int(item.get("priority", 100) or 100),
-            }
-        )
+        if state_row["cooldown_until_turn"] >= current_turn:
+            state_row["last_result"] = "cooldown"
+            state_row["last_reason"] = "cooldown"
+            clean_runtime_entries[entry_id] = state_row
+            continue
 
-    hits.sort(key=lambda item: (-int(item.get("priority", 100) or 100), item.get("title", "")))
+        matched, primary_matches, secondary_matches, matched_text = _evaluate_worldbook_keyword_entry(text, item, settings)
+        if not matched:
+            state_row["last_result"] = "not_matched"
+            state_row["last_reason"] = "keyword"
+            state_row["matched_text"] = matched_text[:240]
+            clean_runtime_entries[entry_id] = state_row
+            continue
+
+        chance = clamp_int(item.get("chance", settings.get("default_chance", 100)), 0, 100, 100)
+        roll = random.randint(1, 100)
+        state_row["last_roll"] = roll
+        state_row["matched_text"] = matched_text[:240]
+        if chance < 100 and roll > chance:
+            state_row["last_result"] = "chance_failed"
+            state_row["last_reason"] = "chance"
+            clean_runtime_entries[entry_id] = state_row
+            continue
+
+        active_until_turn = current_turn + sticky_turns
+        cooldown_until_turn = active_until_turn + cooldown_turns
+        state_row["active_until_turn"] = active_until_turn
+        state_row["cooldown_until_turn"] = cooldown_until_turn
+        state_row["last_trigger_turn"] = current_turn
+        state_row["last_result"] = "triggered"
+        state_row["last_reason"] = "keyword"
+        clean_runtime_entries[entry_id] = state_row
+
+        hits.append(_worldbook_match_payload(item=item, source="keyword", matched_text=matched_text))
+
+    runtime_state["entries"] = clean_runtime_entries
+    save_worldbook_runtime_state(runtime_state)
+
+    hits.sort(key=_worldbook_entry_sort_key)
     max_hits = max(1, int(settings.get("max_hits", DEFAULT_WORLDBOOK_SETTINGS["max_hits"])))
     hits = hits[:max_hits]
 
     if hits:
-        logger.info("涓栫晫涔﹀懡涓細%s", ", ".join(item["matched"] for item in hits))
+        logger.info("Worldbook hits: %s", ", ".join(item.get("title") or item.get("matched") or item.get("trigger", "") for item in hits))
     return hits
 
 
@@ -2324,7 +2576,14 @@ def build_worldbook_prompt(matches: list[dict[str, Any]]) -> str:
         matched = item.get("matched", "")
         title = str(item.get("title", "")).strip()
         lines = [f"{index}. Title: {title or item['trigger']}"]
-        lines.append(f"Trigger: {item['trigger']}")
+        source = str(item.get("source", "keyword")).strip()
+        if source:
+            lines.append(f"Source: {source}")
+        group = str(item.get("group", "")).strip()
+        if group:
+            lines.append(f"Group: {group}")
+        if item.get("trigger"):
+            lines.append(f"Trigger: {item['trigger']}")
         if matched:
             lines.append(f"Matched: {matched}")
         if item.get("secondary_trigger"):
@@ -2332,31 +2591,27 @@ def build_worldbook_prompt(matches: list[dict[str, Any]]) -> str:
         lines.append(f"Content: {item['content']}")
         if item.get("comment"):
             lines.append(f"Comment: {item['comment']}")
-        blocks.append("\n".join(lines))
-    return "\n\n".join(blocks)
+        blocks.append("\\n".join(lines))
+    return "\\n\\n".join(blocks)
 
 
-def build_worldbook_answer_guard(user_message: str, matches: list[dict[str, str]]) -> str:
+def build_worldbook_answer_guard(user_message: str, matches: list[dict[str, Any]]) -> str:
     if not matches:
         return ""
 
     text = str(user_message or "").strip()
-    if not text:
-        return ""
-
-    direct_question_markers = ("what", "who", "why", "how", "tell me", "explain", "?")
-    if not any(marker in text for marker in direct_question_markers):
+    if not text or not _worldbook_direct_question(text):
         return ""
 
     primary_match = matches[0]
-    subject = primary_match.get("matched") or primary_match.get("trigger") or "this item"
-    fact = primary_match.get("content", "").strip()
+    subject = primary_match.get("matched") or primary_match.get("title") or primary_match.get("trigger") or "this item"
+    fact = str(primary_match.get("content", "")).strip()
     if not fact:
         return ""
 
     return (
-        f"The user is directly asking about \"{subject}\".\n"
-        f"Your first sentence must state the core fact directly, for example: {fact}\n"
+        f"The user is directly asking about \\\"{subject}\\\".\\n"
+        f"Your first sentence must state the core fact directly, for example: {fact}\\n"
         "Answer directly first, then continue in character without dodging or pretending not to know."
     )
 
@@ -2364,21 +2619,17 @@ def build_worldbook_answer_guard(user_message: str, matches: list[dict[str, str]
 def enforce_worldbook_fact_in_reply(
     user_message: str,
     reply_text: str,
-    matches: list[dict[str, str]],
+    matches: list[dict[str, Any]],
 ) -> str:
     if not matches:
         return reply_text
 
     text = str(reply_text or "").strip()
-    if not text:
-        return text
-
-    direct_question_markers = ("what", "who", "why", "how", "tell me", "explain", "?")
-    if not any(marker in str(user_message or "") for marker in direct_question_markers):
+    if not text or not _worldbook_direct_question(user_message):
         return text
 
     primary_match = matches[0]
-    subject = str(primary_match.get("matched") or primary_match.get("trigger") or "").strip()
+    subject = str(primary_match.get("matched") or primary_match.get("title") or primary_match.get("trigger") or "").strip()
     fact = str(primary_match.get("content") or "").strip()
     if not subject or not fact:
         return text
@@ -2392,7 +2643,7 @@ def enforce_worldbook_fact_in_reply(
         return text
 
     logger.info("Worldbook direct-answer guard applied before reply.")
-    return f"{fact}\n\n{text}"
+    return f"{fact}\\n\\n{text}"
 
 
 def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
@@ -2833,12 +3084,23 @@ def build_worldbook_debug_payload(
 ) -> dict[str, Any]:
     if not get_worldbook_settings().get("debug_enabled", False):
         return {}
+
+    runtime_state = get_worldbook_runtime_state()
+    all_entries = get_worldbook_entries()
+    runtime_entries = runtime_state.get("entries", {}) if isinstance(runtime_state.get("entries"), dict) else {}
+
     return {
+        "turn_index": clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
         "hit_count": len(worldbook_matches),
         "prompt": build_worldbook_prompt(worldbook_matches),
         "guard": build_worldbook_answer_guard(user_message, worldbook_matches),
         "enforced": bool((reply_result or {}).get("worldbook_enforced")),
         "matched": worldbook_matches,
+        "entry_states": _build_worldbook_runtime_debug_entries(
+            clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
+            all_entries,
+            runtime_entries,
+        ),
     }
 
 

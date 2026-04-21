@@ -14,8 +14,8 @@
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
-                    <a class="navlink" href="/config/user">User</a>
-<a class="navlink" href="/config/card">Card</a>
+          <a class="navlink" href="/config/user">User</a>
+          <a class="navlink" href="/config/card">Card</a>
           <a class="navlink" href="/config/workshop">Workshop</a>
           <a class="navlink" href="/config/sprite">Sprite</a>
           <a class="navlink" href="/config/memory">Memory</a>
@@ -23,21 +23,23 @@
           <a class="navlink active" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-            <div class="slot-toolbar">
+      <div class="slot-toolbar">
         <div class="slot-toolbar-left">
           <span class="slot-badge">Worldbook</span>
           <div class="slot-meta">
             <strong>当前为全局世界书</strong>
-            <p class="slot-hint">这里维护全局世界书词条，每条都可以独立编辑并自由导入导出。</p>
+            <p class="slot-hint">这里维护全局世界书词条。当前这版字段已扩展为更接近酒馆世界书的配置结构。</p>
           </div>
         </div>
       </div>
+    </div>
+
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Worldbook</p>
           <h2>世界书词条管理</h2>
-          <p class="muted">你可以给每条世界书单独设置标题、主触发词、辅助触发词、优先级和匹配模式。主触发词支持用逗号分隔多个别名。</p>
+          <p class="muted">支持标题、主关键词、副关键词、常驻/关键词触发、主副组关系、组别、概率、黏性、冷却、顺序等字段。</p>
         </div>
         <div class="stats-row">
           <div class="stat-box">
@@ -66,14 +68,18 @@
         <div class="grid-two">
           <div>
             <label for="worldbook-search">搜索词条</label>
-            <input id="worldbook-search" type="text" placeholder="按标题、触发词、设定文本、备注搜索" />
+            <input id="worldbook-search" type="text" placeholder="按标题、组别、关键词、内容、备注搜索" />
           </div>
           <div class="button-row offset-top">
             <button id="collapse-all-worldbook" type="button" class="secondary">全部折叠</button>
             <button id="expand-all-worldbook" type="button" class="secondary">全部展开</button>
           </div>
         </div>
-        <p class="muted helper-text">优先级数值越大越先注入；命中后会按优先级从高到低截取到“每轮最多注入条数”。主触发词或辅助触发词选“全部命中”时，填写的多个别名需要同时出现。</p>
+
+        <p class="muted helper-text">
+          说明：顺序数值越小越先处理。当前这版文件会把“顺序”同时写入兼容字段 <code>priority</code>，便于和旧后端共存。
+          “常驻”表示该条不依赖关键词；“关键词触发”表示仍依赖主关键词命中。主副组关系中的“与所有/与任意”是主组与副组之间的关系，不是组内别名关系。
+        </p>
 
         <div id="worldbook-entry-list" class="memory-list">
           {% for item in worldbook_entries %}
@@ -87,63 +93,107 @@
             </div>
 
             <div class="worldbook-entry-body">
-            <div class="grid-two">
-              <div>
-                <label>标题</label>
-                <input class="wb-title" value="{{ item.title }}" placeholder="例如：身份·我是妻子" />
+              <div class="grid-two">
+                <div>
+                  <label>标题</label>
+                  <input class="wb-title" value="{{ item.title }}" placeholder="例如：身份·我是妻子" />
+                </div>
+                <div>
+                  <label>组别</label>
+                  <input class="wb-group" value="{{ item.group or '' }}" placeholder="例如：身份关系 / 地点 / 规则" />
+                </div>
               </div>
-              <div>
-                <label>优先级</label>
-                <input class="wb-priority" type="number" min="0" max="9999" step="1" value="{{ item.priority }}" />
+
+              <div class="grid-two">
+                <div>
+                  <label>主关键词</label>
+                  <input class="wb-trigger" value="{{ item.trigger }}" placeholder="多个别名可用逗号分隔" />
+                </div>
+                <div>
+                  <label>副关键词</label>
+                  <input class="wb-secondary-trigger" value="{{ item.secondary_trigger }}" placeholder="可留空；例如：婚后, 成亲" />
+                </div>
               </div>
-            </div>
 
-            <label>主触发词</label>
-            <input class="wb-trigger" value="{{ item.trigger }}" placeholder="多个别名可用逗号分隔" />
-
-            <label>辅助触发词</label>
-            <input class="wb-secondary-trigger" value="{{ item.secondary_trigger }}" placeholder="可留空；例如：婚后, 妻子" />
-
-            <div class="grid-two">
-              <div>
-                <label>主触发逻辑</label>
-                <select class="wb-match-mode">
-                  <option value="any" {% if item.match_mode == 'any' %}selected{% endif %}>任意命中</option>
-                  <option value="all" {% if item.match_mode == 'all' %}selected{% endif %}>全部命中</option>
-                </select>
+              <div class="grid-two">
+                <div>
+                  <label>触发类型</label>
+                  <select class="wb-entry-type">
+                    <option value="keyword" {% if (item.entry_type or 'keyword') == 'keyword' %}selected{% endif %}>关键词触发</option>
+                    <option value="constant" {% if item.entry_type == 'constant' %}selected{% endif %}>常驻</option>
+                  </select>
+                </div>
+                <div>
+                  <label>主副组关系</label>
+                  <select class="wb-group-operator">
+                    <option value="and" {% if (item.group_operator or 'and') == 'and' %}selected{% endif %}>与所有（主副都要触发）</option>
+                    <option value="or" {% if item.group_operator == 'or' %}selected{% endif %}>与任意（主副任意一个即可）</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label>辅助触发逻辑</label>
-                <select class="wb-secondary-mode">
-                  <option value="any" {% if item.secondary_mode == 'any' %}selected{% endif %}>任意命中</option>
-                  <option value="all" {% if item.secondary_mode == 'all' %}selected{% endif %}>全部命中</option>
-                </select>
-              </div>
-            </div>
 
-            <div class="grid-two">
+              <div class="grid-two">
+                <div>
+                  <label>主关键词组逻辑</label>
+                  <select class="wb-match-mode">
+                    <option value="any" {% if (item.match_mode or 'any') == 'any' %}selected{% endif %}>任意命中</option>
+                    <option value="all" {% if item.match_mode == 'all' %}selected{% endif %}>全部命中</option>
+                  </select>
+                </div>
+                <div>
+                  <label>副关键词组逻辑</label>
+                  <select class="wb-secondary-mode">
+                    <option value="any" {% if item.secondary_mode == 'any' %}selected{% endif %}>任意命中</option>
+                    <option value="all" {% if (item.secondary_mode or 'all') == 'all' %}selected{% endif %}>全部命中</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid-two">
+                <div>
+                  <label>触发概率（0-100）</label>
+                  <input class="wb-chance" type="number" min="0" max="100" step="1" value="{{ item.chance if item.chance is not none else 100 }}" />
+                </div>
+                <div>
+                  <label>顺序</label>
+                  <input class="wb-order" type="number" min="0" max="999999" step="1" value="{{ item.order if item.order is not none else item.priority if item.priority is not none else 100 }}" />
+                </div>
+              </div>
+
+              <div class="grid-two">
+                <div>
+                  <label>黏性（额外跟随几轮）</label>
+                  <input class="wb-sticky-turns" type="number" min="0" max="999" step="1" value="{{ item.sticky_turns if item.sticky_turns is not none else 0 }}" />
+                </div>
+                <div>
+                  <label>冷却（结束后冷却几轮）</label>
+                  <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="{{ item.cooldown_turns if item.cooldown_turns is not none else 0 }}" />
+                </div>
+              </div>
+
+              <div class="grid-two">
+                <label class="checkbox-row">
+                  <input class="wb-enabled" type="checkbox" {% if item.enabled %}checked{% endif %} />
+                  <span>启用词条</span>
+                </label>
+                <label class="checkbox-row">
+                  <input class="wb-case-sensitive" type="checkbox" {% if item.case_sensitive %}checked{% endif %} />
+                  <span>区分大小写</span>
+                </label>
+              </div>
+
               <label class="checkbox-row">
-                <input class="wb-enabled" type="checkbox" {% if item.enabled %}checked{% endif %} />
-                <span>启用词条</span>
+                <input class="wb-whole-word" type="checkbox" {% if item.whole_word %}checked{% endif %} />
+                <span>完整词匹配</span>
               </label>
-              <label class="checkbox-row">
-                <input class="wb-case-sensitive" type="checkbox" {% if item.case_sensitive %}checked{% endif %} />
-                <span>区分大小写</span>
-              </label>
-            </div>
 
-            <label class="checkbox-row">
-              <input class="wb-whole-word" type="checkbox" {% if item.whole_word %}checked{% endif %} />
-              <span>完整词匹配</span>
-            </label>
+              <label>内容</label>
+              <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。">{{ item.content }}</textarea>
 
-            <label>设定文本</label>
-            <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。">{{ item.content }}</textarea>
+              <label>备注</label>
+              <textarea class="wb-comment" rows="2" placeholder="可写用途说明。">{{ item.comment }}</textarea>
 
-            <label>备注</label>
-            <textarea class="wb-comment" rows="2" placeholder="这条词条的用途说明，可选。">{{ item.comment }}</textarea>
-
-            <input class="wb-id" type="hidden" value="{{ item.id }}" />
+              <input class="wb-id" type="hidden" value="{{ item.id }}" />
             </div>
           </article>
           {% endfor %}
@@ -166,63 +216,107 @@
         </div>
 
         <div class="worldbook-entry-body">
-        <div class="grid-two">
-          <div>
-            <label>标题</label>
-            <input class="wb-title" placeholder="例如：身份·我是妻子" />
+          <div class="grid-two">
+            <div>
+              <label>标题</label>
+              <input class="wb-title" placeholder="例如：身份·我是妻子" />
+            </div>
+            <div>
+              <label>组别</label>
+              <input class="wb-group" placeholder="例如：身份关系 / 地点 / 规则" />
+            </div>
           </div>
-          <div>
-            <label>优先级</label>
-            <input class="wb-priority" type="number" min="0" max="9999" step="1" value="100" />
+
+          <div class="grid-two">
+            <div>
+              <label>主关键词</label>
+              <input class="wb-trigger" placeholder="多个别名可用逗号分隔" />
+            </div>
+            <div>
+              <label>副关键词</label>
+              <input class="wb-secondary-trigger" placeholder="可留空；例如：婚后, 成亲" />
+            </div>
           </div>
-        </div>
 
-        <label>主触发词</label>
-        <input class="wb-trigger" placeholder="多个别名可用逗号分隔" />
-
-        <label>辅助触发词</label>
-        <input class="wb-secondary-trigger" placeholder="可留空；例如：婚后, 妻子" />
-
-        <div class="grid-two">
-          <div>
-            <label>主触发逻辑</label>
-            <select class="wb-match-mode">
-              <option value="any" selected>任意命中</option>
-              <option value="all">全部命中</option>
-            </select>
+          <div class="grid-two">
+            <div>
+              <label>触发类型</label>
+              <select class="wb-entry-type">
+                <option value="keyword" selected>关键词触发</option>
+                <option value="constant">常驻</option>
+              </select>
+            </div>
+            <div>
+              <label>主副组关系</label>
+              <select class="wb-group-operator">
+                <option value="and" selected>与所有（主副都要触发）</option>
+                <option value="or">与任意（主副任意一个即可）</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label>辅助触发逻辑</label>
-            <select class="wb-secondary-mode">
-              <option value="any">任意命中</option>
-              <option value="all" selected>全部命中</option>
-            </select>
-          </div>
-        </div>
 
-        <div class="grid-two">
+          <div class="grid-two">
+            <div>
+              <label>主关键词组逻辑</label>
+              <select class="wb-match-mode">
+                <option value="any" selected>任意命中</option>
+                <option value="all">全部命中</option>
+              </select>
+            </div>
+            <div>
+              <label>副关键词组逻辑</label>
+              <select class="wb-secondary-mode">
+                <option value="any">任意命中</option>
+                <option value="all" selected>全部命中</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <div>
+              <label>触发概率（0-100）</label>
+              <input class="wb-chance" type="number" min="0" max="100" step="1" value="100" />
+            </div>
+            <div>
+              <label>顺序</label>
+              <input class="wb-order" type="number" min="0" max="999999" step="1" value="100" />
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <div>
+              <label>黏性（额外跟随几轮）</label>
+              <input class="wb-sticky-turns" type="number" min="0" max="999" step="1" value="0" />
+            </div>
+            <div>
+              <label>冷却（结束后冷却几轮）</label>
+              <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="0" />
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <label class="checkbox-row">
+              <input class="wb-enabled" type="checkbox" checked />
+              <span>启用词条</span>
+            </label>
+            <label class="checkbox-row">
+              <input class="wb-case-sensitive" type="checkbox" />
+              <span>区分大小写</span>
+            </label>
+          </div>
+
           <label class="checkbox-row">
-            <input class="wb-enabled" type="checkbox" checked />
-            <span>启用词条</span>
+            <input class="wb-whole-word" type="checkbox" />
+            <span>完整词匹配</span>
           </label>
-          <label class="checkbox-row">
-            <input class="wb-case-sensitive" type="checkbox" />
-            <span>区分大小写</span>
-          </label>
-        </div>
 
-        <label class="checkbox-row">
-          <input class="wb-whole-word" type="checkbox" />
-          <span>完整词匹配</span>
-        </label>
+          <label>内容</label>
+          <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。"></textarea>
 
-        <label>设定文本</label>
-        <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。"></textarea>
+          <label>备注</label>
+          <textarea class="wb-comment" rows="2" placeholder="可写用途说明。"></textarea>
 
-        <label>备注</label>
-        <textarea class="wb-comment" rows="2" placeholder="这条词条的用途说明，可选。"></textarea>
-
-        <input class="wb-id" type="hidden" />
+          <input class="wb-id" type="hidden" />
         </div>
       </article>
     </template>
@@ -305,8 +399,10 @@
       function getCardSearchText(card) {
         return [
           card.querySelector(".wb-title")?.value || "",
+          card.querySelector(".wb-group")?.value || "",
           card.querySelector(".wb-trigger")?.value || "",
           card.querySelector(".wb-secondary-trigger")?.value || "",
+          card.querySelector(".wb-entry-type")?.value || "",
           card.querySelector(".wb-content")?.value || "",
           card.querySelector(".wb-comment")?.value || "",
         ].join("\n").toLowerCase();
@@ -340,6 +436,12 @@
         worldbookCountEl.textContent = String(worldbookListEl.querySelectorAll(".worldbook-entry-card").length);
       }
 
+      function updateCardTitle(card) {
+        const title = card.querySelector(".wb-title")?.value?.trim() || "新词条";
+        const group = card.querySelector(".wb-group")?.value?.trim();
+        card.querySelector(".memory-card-head strong").textContent = group ? `${title} ｜ ${group}` : title;
+      }
+
       function attachRemoveHandler(card) {
         card.querySelector(".remove-worldbook-entry").addEventListener("click", () => {
           card.remove();
@@ -362,36 +464,52 @@
         const card = fragment.querySelector(".worldbook-entry-card");
         card.querySelector(".wb-id").value = item.id || "";
         card.querySelector(".wb-title").value = item.title || "";
+        card.querySelector(".wb-group").value = item.group || "";
         card.querySelector(".wb-trigger").value = item.trigger || "";
         card.querySelector(".wb-secondary-trigger").value = item.secondary_trigger || "";
         card.querySelector(".wb-content").value = item.content || "";
         card.querySelector(".wb-comment").value = item.comment || "";
-        card.querySelector(".wb-enabled").checked = item.enabled !== false;
-        card.querySelector(".wb-priority").value = item.priority ?? 100;
-        card.querySelector(".wb-case-sensitive").checked = Boolean(item.case_sensitive);
-        card.querySelector(".wb-whole-word").checked = Boolean(item.whole_word);
+        card.querySelector(".wb-entry-type").value = item.entry_type || "keyword";
+        card.querySelector(".wb-group-operator").value = item.group_operator || "and";
         card.querySelector(".wb-match-mode").value = item.match_mode || "any";
         card.querySelector(".wb-secondary-mode").value = item.secondary_mode || "all";
-        card.querySelector(".memory-card-head strong").textContent = item.title || "新词条";
+        card.querySelector(".wb-chance").value = item.chance ?? 100;
+        card.querySelector(".wb-sticky-turns").value = item.sticky_turns ?? 0;
+        card.querySelector(".wb-cooldown-turns").value = item.cooldown_turns ?? 0;
+        card.querySelector(".wb-order").value = item.order ?? item.priority ?? 100;
+        card.querySelector(".wb-enabled").checked = item.enabled !== false;
+        card.querySelector(".wb-case-sensitive").checked = Boolean(item.case_sensitive);
+        card.querySelector(".wb-whole-word").checked = Boolean(item.whole_word);
         attachRemoveHandler(card);
+        updateCardTitle(card);
         return card;
       }
 
       function collectEntries() {
-        return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].map((card, index) => ({
-          id: card.querySelector(".wb-id").value.trim() || `worldbook-manual-${Date.now()}-${index}`,
-          title: card.querySelector(".wb-title").value.trim(),
-          trigger: card.querySelector(".wb-trigger").value.trim(),
-          secondary_trigger: card.querySelector(".wb-secondary-trigger").value.trim(),
-          content: card.querySelector(".wb-content").value.trim(),
-          comment: card.querySelector(".wb-comment").value.trim(),
-          enabled: card.querySelector(".wb-enabled").checked,
-          priority: Number(card.querySelector(".wb-priority").value || 100),
-          case_sensitive: card.querySelector(".wb-case-sensitive").checked,
-          whole_word: card.querySelector(".wb-whole-word").checked,
-          match_mode: card.querySelector(".wb-match-mode").value,
-          secondary_mode: card.querySelector(".wb-secondary-mode").value,
-        }));
+        return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].map((card, index) => {
+          const order = Number(card.querySelector(".wb-order").value || 100);
+          return {
+            id: card.querySelector(".wb-id").value.trim() || `worldbook-manual-${Date.now()}-${index}`,
+            title: card.querySelector(".wb-title").value.trim(),
+            group: card.querySelector(".wb-group").value.trim(),
+            trigger: card.querySelector(".wb-trigger").value.trim(),
+            secondary_trigger: card.querySelector(".wb-secondary-trigger").value.trim(),
+            entry_type: card.querySelector(".wb-entry-type").value,
+            group_operator: card.querySelector(".wb-group-operator").value,
+            match_mode: card.querySelector(".wb-match-mode").value,
+            secondary_mode: card.querySelector(".wb-secondary-mode").value,
+            chance: Number(card.querySelector(".wb-chance").value || 100),
+            sticky_turns: Number(card.querySelector(".wb-sticky-turns").value || 0),
+            cooldown_turns: Number(card.querySelector(".wb-cooldown-turns").value || 0),
+            order,
+            priority: order,
+            content: card.querySelector(".wb-content").value.trim(),
+            comment: card.querySelector(".wb-comment").value.trim(),
+            enabled: card.querySelector(".wb-enabled").checked,
+            case_sensitive: card.querySelector(".wb-case-sensitive").checked,
+            whole_word: card.querySelector(".wb-whole-word").checked,
+          };
+        });
       }
 
       async function reloadEntries() {
@@ -432,11 +550,14 @@
       worldbookListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
-        card.querySelector(".memory-card-head strong").textContent = card.querySelector(".wb-title").value.trim() || "新词条";
+        updateCardTitle(card);
         applyWorldbookSearch();
       });
 
-      document.querySelectorAll(".worldbook-entry-card").forEach((card) => attachRemoveHandler(card));
+      document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
+        attachRemoveHandler(card);
+        updateCardTitle(card);
+      });
 
       document.getElementById("add-worldbook-entry").addEventListener("click", () => {
         const card = createEntryCard();

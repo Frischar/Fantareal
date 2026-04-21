@@ -55,6 +55,47 @@ class MemoryListPayload(BaseModel):
     items: list[MemoryItemPayload] = Field(default_factory=list)
 
 
+class MergedMemoryItemPayload(BaseModel):
+    id: str = ""
+    title: str = ""
+    content: str = ""
+    tags: list[str] = Field(default_factory=list)
+    notes: str = ""
+    source_memory_ids: list[str] = Field(default_factory=list)
+    created_at: str = ""
+
+
+class MergedMemoryListPayload(BaseModel):
+    items: list[MergedMemoryItemPayload] = Field(default_factory=list)
+
+
+class MemoryOutlineItemPayload(BaseModel):
+    id: str = ""
+    title: str = ""
+    summary: str = ""
+    characters: str = ""
+    relationship_progress: str = ""
+    key_events: list[str] = Field(default_factory=list)
+    conflicts: str = ""
+    next_hooks: str = ""
+    notes: str = ""
+    source_memory_ids: list[str] = Field(default_factory=list)
+    merged_memory_id: str = ""
+    updated_at: str = ""
+
+
+class MemoryOutlineListPayload(BaseModel):
+    items: list[MemoryOutlineItemPayload] = Field(default_factory=list)
+
+
+class MemoryMergePayload(BaseModel):
+    memory_ids: list[str] = Field(default_factory=list)
+    merged_title: str = ""
+    outline_title: str = ""
+    delete_sources: bool = True
+    runtime_config: dict[str, Any] | None = None
+
+
 class UserProfilePayload(BaseModel):
     display_name: str = ""
     nickname: str = ""

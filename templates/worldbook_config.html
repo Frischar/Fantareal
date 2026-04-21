@@ -14,8 +14,8 @@
           <a class="navlink" href="/chat">Chat</a>
           <a class="navlink" href="/config">Config</a>
           <a class="navlink" href="/config/preset">Preset</a>
-                    <a class="navlink" href="/config/user">User</a>
-<a class="navlink" href="/config/card">Card</a>
+          <a class="navlink" href="/config/user">User</a>
+          <a class="navlink" href="/config/card">Card</a>
           <a class="navlink" href="/config/workshop">Workshop</a>
           <a class="navlink" href="/config/sprite">Sprite</a>
           <a class="navlink" href="/config/memory">Memory</a>
@@ -23,22 +23,24 @@
           <a class="navlink" href="/config/worldbook/entries">WB List</a>
         </nav>
       </div>
-            <div class="slot-toolbar">
+      <div class="slot-toolbar">
         <div class="slot-toolbar-left">
           <span class="slot-badge">Worldbook</span>
           <div class="slot-meta">
             <strong>当前为全局世界书设置</strong>
-            <p class="slot-hint">这里配置的是全局世界书触发规则，不再跟存档绑定。</p>
+            <p class="slot-hint">这里配置的是全局世界书默认触发规则与默认字段，不再跟存档绑定。</p>
           </div>
         </div>
       </div>
+    </div>
+
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
           <p class="eyebrow">Worldbook</p>
           <h2>世界书触发设置</h2>
-          <p class="muted">这里控制世界书是否启用、每轮最多命中多少条，以及词条默认采用怎样的匹配方式。词条内容本身请去 <code>Worldbook Entries</code> 页面维护。</p>
-          <p class="muted helper-text">“每轮最多注入条数”指的是单次回复里最多往 prompt 里塞多少条命中的世界书，不是总词条数。命中的词条会按优先级从高到低截断。</p>
+          <p class="muted">这里控制世界书是否启用、每轮最多注入多少条，以及新词条默认采用怎样的触发方式。词条内容本身请去 <code>Worldbook Entries</code> 页面维护。</p>
+          <p class="muted helper-text">“每轮最多注入条数”指的是单次回复里最多往 prompt 里塞多少条命中的世界书，不是总词条数。命中的词条会按顺序处理后，再按命中上限截断。</p>
         </div>
         <div class="stats-row">
           <div class="stat-box">
@@ -70,26 +72,66 @@
             <p class="muted helper-text">数字越小，注入越克制；数字越大，模型拿到的世界书上下文越多。</p>
           </div>
           <div>
-            <label for="wb-default-match-mode">主触发词默认逻辑</label>
+            <label for="wb-default-entry-type">新词条默认触发类型</label>
+            <select id="wb-default-entry-type">
+              <option value="keyword" {% if (worldbook_settings.default_entry_type or 'keyword') == 'keyword' %}selected{% endif %}>关键词触发</option>
+              <option value="constant" {% if worldbook_settings.default_entry_type == 'constant' %}selected{% endif %}>常驻</option>
+            </select>
+            <p class="muted helper-text">常驻词条默认不依赖关键词；关键词触发词条仍依赖主关键词。</p>
+          </div>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="wb-default-match-mode">主关键词组默认逻辑</label>
             <select id="wb-default-match-mode">
               <option value="any" {% if worldbook_settings.default_match_mode == 'any' %}selected{% endif %}>任意命中</option>
               <option value="all" {% if worldbook_settings.default_match_mode == 'all' %}selected{% endif %}>全部命中</option>
             </select>
             <p class="muted helper-text">“任意命中”表示多个别名里命中一个就算；“全部命中”表示填写的词都要同时出现。</p>
           </div>
-        </div>
-
-        <div class="grid-two">
           <div>
-            <label for="wb-default-secondary-mode">辅助触发词默认逻辑</label>
+            <label for="wb-default-secondary-mode">副关键词组默认逻辑</label>
             <select id="wb-default-secondary-mode">
               <option value="any" {% if worldbook_settings.default_secondary_mode == 'any' %}selected{% endif %}>任意命中</option>
               <option value="all" {% if worldbook_settings.default_secondary_mode == 'all' %}selected{% endif %}>全部命中</option>
             </select>
+            <p class="muted helper-text">这是副关键词组内部多个别名之间的默认关系。</p>
+          </div>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="wb-default-group-operator">主副组默认关系</label>
+            <select id="wb-default-group-operator">
+              <option value="and" {% if (worldbook_settings.default_group_operator or 'and') == 'and' %}selected{% endif %}>与所有（主副都要触发）</option>
+              <option value="or" {% if worldbook_settings.default_group_operator == 'or' %}selected{% endif %}>与任意（主副任意一个即可）</option>
+            </select>
+            <p class="muted helper-text">这是主关键词组与副关键词组之间的默认关系，不是组内别名关系。</p>
           </div>
           <div class="button-row offset-top">
             <a class="ghost-link button-link" href="/config/worldbook/entries">打开词条管理页</a>
           </div>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="wb-default-chance">默认触发概率（0-100）</label>
+            <input id="wb-default-chance" type="number" min="0" max="100" step="1" value="{{ worldbook_settings.default_chance if worldbook_settings.default_chance is not none else 100 }}" />
+            <p class="muted helper-text">只影响新建词条的默认值，不会强行覆盖已有词条。</p>
+          </div>
+          <div>
+            <label for="wb-default-sticky-turns">默认黏性（额外跟随几轮）</label>
+            <input id="wb-default-sticky-turns" type="number" min="0" max="999" step="1" value="{{ worldbook_settings.default_sticky_turns if worldbook_settings.default_sticky_turns is not none else 0 }}" />
+          </div>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="wb-default-cooldown-turns">默认冷却（结束后冷却几轮）</label>
+            <input id="wb-default-cooldown-turns" type="number" min="0" max="999" step="1" value="{{ worldbook_settings.default_cooldown_turns if worldbook_settings.default_cooldown_turns is not none else 0 }}" />
+          </div>
+          <div></div>
         </div>
 
         <div class="grid-two">
@@ -172,6 +214,11 @@
           default_whole_word: document.getElementById("wb-default-whole-word").checked,
           default_match_mode: document.getElementById("wb-default-match-mode").value,
           default_secondary_mode: document.getElementById("wb-default-secondary-mode").value,
+          default_entry_type: document.getElementById("wb-default-entry-type").value,
+          default_group_operator: document.getElementById("wb-default-group-operator").value,
+          default_chance: Number(document.getElementById("wb-default-chance").value || 100),
+          default_sticky_turns: Number(document.getElementById("wb-default-sticky-turns").value || 0),
+          default_cooldown_turns: Number(document.getElementById("wb-default-cooldown-turns").value || 0),
         };
       }
 
@@ -183,6 +230,11 @@
         document.getElementById("wb-default-whole-word").checked = Boolean(settings.default_whole_word);
         document.getElementById("wb-default-match-mode").value = settings.default_match_mode || "any";
         document.getElementById("wb-default-secondary-mode").value = settings.default_secondary_mode || "all";
+        document.getElementById("wb-default-entry-type").value = settings.default_entry_type || "keyword";
+        document.getElementById("wb-default-group-operator").value = settings.default_group_operator || "and";
+        document.getElementById("wb-default-chance").value = settings.default_chance ?? 100;
+        document.getElementById("wb-default-sticky-turns").value = settings.default_sticky_turns ?? 0;
+        document.getElementById("wb-default-cooldown-turns").value = settings.default_cooldown_turns ?? 0;
         document.getElementById("enabled-label").textContent = settings.enabled ? "启用" : "停用";
         document.getElementById("max-hits-label").textContent = String(settings.max_hits ?? 3);
       }
