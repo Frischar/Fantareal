@@ -490,7 +490,7 @@
             <div class="retrieval-items" id="worldbook-items"></div>
           </div>
 
-          <div class="retrieval-bar worldbook-debug-panel" id="worldbook-debug-panel">
+          <div class="retrieval-bar worldbook-debug-panel" id="worldbook-debug-panel" {% if not worldbook_settings.debug_enabled %}hidden{% endif %}>
             <button id="worldbook-debug-toggle" class="worldbook-debug-toggle" type="button" aria-expanded="false">
               <div class="worldbook-debug-toggle-main">
                 <div class="retrieval-title">Worldbook Debug</div>
@@ -802,6 +802,7 @@
       const worldbookDebugStatusEl = document.getElementById("worldbook-debug-status");
       const worldbookDebugCountEl = document.getElementById("worldbook-debug-count");
       const worldbookDebugPromptEl = document.getElementById("worldbook-debug-prompt");
+      const worldbookDebugEnabled = {{ worldbook_settings.debug_enabled | tojson }};
       const presetNameEl = document.getElementById("chat-preset-name");
       const presetModulesEl = document.getElementById("chat-preset-modules");
       const drawerPresetNameEl = document.getElementById("drawer-preset-name");
@@ -1478,6 +1479,17 @@
       }
 
       function renderWorldbookDebug(debug) {
+        if (!worldbookDebugEnabled) {
+          if (worldbookDebugPanelEl) {
+            worldbookDebugPanelEl.hidden = true;
+          }
+          return;
+        }
+
+        if (worldbookDebugPanelEl) {
+          worldbookDebugPanelEl.hidden = false;
+        }
+
         const hits = Array.isArray(debug?.matched) ? debug.matched : [];
         const prompt = typeof debug?.prompt === "string" ? debug.prompt.trim() : "";
         const enforced = !!debug?.enforced;
