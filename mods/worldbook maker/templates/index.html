@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>世界书生成器</title>
+    <link rel="stylesheet" href="{{ static_stylesheet_url or '/static/styles.css' }}" />
+  </head>
+  <body>
+    <div id="appBackgroundLayer" class="app-background" aria-hidden="true"></div>
+    <div class="app-background-overlay" aria-hidden="true"></div>
+    <div class="page-shell">
+      <main class="layout">
+        <section class="panel editor-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Project</p>
+              <h2>原始素材与生成策略</h2>
+            </div>
+          </div>
+
+          <label for="projectName">项目名</label>
+          <input id="projectName" type="text" value="{{ initial_workspace.project_name }}" placeholder="例如：雾港调查篇 / 校园恋爱设定" />
+
+          <div class="chip-group" id="starterSnippets">
+            {% for item in starter_snippets %}
+            <button class="chip-button" type="button" data-snippet="{{ item.content }}">{{ item.label }}</button>
+            {% endfor %}
+          </div>
+
+          <label for="sourceInput">原始素材</label>
+          <textarea
+            id="sourceInput"
+            class="source-input"
+            placeholder="粘贴剧情设定、世界观笔记、角色关系、地点资料、规则说明、术语表、阶段大纲……"
+          >{{ initial_workspace.source_text }}</textarea>
+
+          <div class="mini-grid">
+            <div>
+              <label for="sourceMode">素材类型</label>
+              <select id="sourceMode">
+                {% for item in source_mode_options %}
+                <option value="{{ item.value }}" {% if initial_settings.generation.source_mode == item.value %}selected{% endif %}>{{ item.label }}</option>
+                {% endfor %}
+              </select>
+              <p class="field-tip" id="sourceModeHint"></p>
+            </div>
+            <div>
+              <label for="focusMode">处理重点</label>
+              <select id="focusMode">
+                {% for item in focus_mode_options %}
+                <option value="{{ item.value }}" {% if initial_settings.generation.focus_mode == item.value %}selected{% endif %}>{{ item.label }}</option>
+                {% endfor %}
+              </select>
+              <p class="field-tip" id="focusModeHint"></p>
+            </div>
+          </div>
+
+          <div class="mini-grid">
+            <div>
+              <label for="targetEntryCount">目标条数</label>
+              <input id="targetEntryCount" type="number" min="1" max="60" value="{{ initial_settings.generation.target_entry_count }}" />
+            </div>
+            <div>
+              <label for="extraRequirements">额外要求</label>
+              <textarea id="extraRequirements" rows="3" class="compact-textarea" placeholder="例如：更重视地点词条；避免剧透；保留阵营敌对关系。">{{ initial_settings.generation.extra_requirements }}</textarea>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button id="generateButton" class="primary-button" type="button">生成世界书</button>
+            <button id="previewButton" class="ghost-button" type="button">重新预览 JSON</button>
+            <button id="saveWorkspaceButton" class="ghost-button" type="button">保存草稿</button>
+            <button id="clearWorkspaceButton" class="ghost-button danger-button" type="button">清空当前项目</button>
+          </div>
+
+          <div class="editor-divider" aria-hidden="true"></div>
+
+          <section class="editor-inline-shell">
+            <div class="section-head studio-section-head">
+              <div>
+                <p class="eyebrow">Studio</p>
+                <h2>词条工作台</h2>
+              </div>
+              <p class="muted" id="previewHint">左边挑词条，右边精修内容。所有修改都会即时同步回 JSON。</p>
+            </div>
+
+            <div class="studio-toolbar">
+              <div class="studio-search">
+                <label for="entrySearch">搜索词条</label>
+                <input id="entrySearch" type="text" placeholder="按标题、触发词、备注搜索" />
+              </div>
+              <div class="button-row studio-action-row">
+                <button id="addEntryButton" class="ghost-button" type="button">新增词条</button>
+                <button id="duplicateEntryButton" class="ghost-button" type="button">复制词条</button>
+                <button id="deleteEntryButton" class="ghost-button danger-button" type="button">删除词条</button>
+              </div>
+            </div>
+
+            <div class="studio-grid studio-workbench">
+              <aside class="entry-browser entry-browser-panel">
+                <div class="entry-browser-meta">
+                  <div class="entry-meta-card">
+                    <span>总词条</span>
+                    <strong id="browserEntryCount">0</strong>
+                  </div>
+                  <div class="entry-meta-card">
+                    <span>启用中</span>
+                    <strong id="browserEnabledCount">0</strong>
+                  </div>
+                  <div class="entry-meta-card">
+                    <span>当前选择</span>
+                    <strong id="browserSelectedTitle">未选择</strong>
+                  </div>
+                </div>
+                <div id="entryList" class="entry-list"></div>
+                <div id="entryEmpty" class="empty-state compact-empty">还没有词条，可以先生成，或者手工新增。</div>
+              </aside>
+
+              <section class="entry-editor entry-editor-panel">
+                <div id="editorEmpty" class="empty-state">选择一个词条后，就能在这里精修标题、触发词、正文和备注。</div>
+                <div id="editorForm" hidden>
+                  <div class="entry-editor-head">
+                    <div>
+                      <p class="eyebrow">Editing</p>
+                      <h3 id="entryEditorHeading">未选择词条</h3>
+                      <p id="entryEditorSubheading" class="muted">在这里维护词条结构、触发方式和正文内容。</p>
+                    </div>
+                    <div class="entry-pill-group">
+                      <span class="pill" id="entryStatusPill">未选择</span>
+                      <span class="pill" id="entryPriorityPill">优先级 -</span>
+                      <span class="pill" id="entryRulePill">匹配 -</span>
+                    </div>
+                  </div>
+
+                  <div class="entry-form-grid">
+                    <div class="editor-card">
+                      <h3>基础信息</h3>
+                      <div class="mini-grid">
+                        <div>
+                          <label for="entryTitle">标题</label>
+                          <input id="entryTitle" type="text" />
+                        </div>
+                        <div>
+                          <label for="entryId">ID</label>
+                          <input id="entryId" type="text" />
+                        </div>
+                      </div>
+
+                      <div class="mini-grid">
+                        <div>
+                          <label for="entryPriority">优先级</label>
+                          <input id="entryPriority" type="number" min="0" max="9999" />
+                        </div>
+                        <div>
+                          <label for="entryEnabled">启用状态</label>
+                          <select id="entryEnabled">
+                            <option value="true">启用</option>
+                            <option value="false">停用</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="editor-card">
+                      <h3>触发规则</h3>
+                      <div class="mini-grid">
+                        <div>
+                          <label for="entryTrigger">主触发词</label>
+                          <input id="entryTrigger" type="text" />
+                        </div>
+                        <div>
+                          <label for="entrySecondaryTrigger">辅助触发词</label>
+                          <input id="entrySecondaryTrigger" type="text" />
+                        </div>
+                      </div>
+
+                      <div class="mini-grid">
+                        <div>
+                          <label for="entryMatchMode">主触发匹配</label>
+                          <select id="entryMatchMode">
+                            <option value="any">任意命中</option>
+                            <option value="all">全部命中</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label for="entrySecondaryMode">辅助触发匹配</label>
+                          <select id="entrySecondaryMode">
+                            <option value="all">全部命中</option>
+                            <option value="any">任意命中</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="mini-grid">
+                        <div>
+                          <label for="entryCaseSensitive">区分大小写</label>
+                          <select id="entryCaseSensitive">
+                            <option value="false">否</option>
+                            <option value="true">是</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label for="entryWholeWord">完整词匹配</label>
+                          <select id="entryWholeWord">
+                            <option value="false">否</option>
+                            <option value="true">是</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="editor-card editor-card-wide">
+                    <h3>正文内容</h3>
+                    <label for="entryContent">正文</label>
+                    <textarea id="entryContent" class="editor-textarea" rows="12"></textarea>
+                  </div>
+
+                  <div class="editor-card editor-card-wide">
+                    <h3>备注与维护说明</h3>
+                    <label for="entryComment">备注</label>
+                    <textarea id="entryComment" class="compact-textarea" rows="5"></textarea>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+          </section>
+        </section>
+
+        <aside class="sidebar">
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">API</p>
+                <h2>模型服务</h2>
+              </div>
+            </div>
+
+            <label for="baseUrl">API URL</label>
+            <input id="baseUrl" type="text" value="{{ initial_settings.base_url }}" placeholder="例如 https://api.openai.com/v1" />
+
+            <label for="apiKey">API Key</label>
+            <input id="apiKey" type="password" value="{{ initial_settings.api_key }}" placeholder="没有就留空" />
+
+            <label for="model">模型名</label>
+            <input id="model" type="text" value="{{ initial_settings.model }}" placeholder="例如 gpt-4.1-mini" />
+
+            <div class="mini-grid">
+              <div>
+                <label for="temperature">Temperature</label>
+                <input id="temperature" type="number" min="0" max="2" step="0.05" value="{{ initial_settings.temperature }}" />
+              </div>
+              <div>
+                <label for="requestTimeout">超时秒数</label>
+                <input id="requestTimeout" type="number" min="10" max="600" step="1" value="{{ initial_settings.request_timeout }}" />
+              </div>
+            </div>
+
+            <label for="systemPrompt">系统 Prompt</label>
+            <textarea id="systemPrompt" rows="12">{{ initial_settings.system_prompt }}</textarea>
+
+            <div class="button-row">
+              <button id="saveSettingsButton" class="ghost-button" type="button">保存配置</button>
+              <button id="detectServiceButton" class="ghost-button" type="button">检测服务</button>
+              <button id="resetPromptButton" class="ghost-button" type="button">恢复默认 Prompt</button>
+            </div>
+          </section>
+
+        </aside>
+
+        <section class="panel output-panel full-span">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Output</p>
+              <h2>JSON 输出与导入导出</h2>
+            </div>
+          </div>
+          <textarea id="rawOutput" class="output-input" placeholder="生成后的世界书 JSON 会出现在这里，也可以直接手工修改。">{{ initial_workspace.raw_output }}</textarea>
+          <input id="importFileInput" type="file" accept=".json,application/json" hidden />
+          <div class="button-row">
+            <button id="formatOutputButton" class="ghost-button" type="button">格式化 JSON</button>
+            <button id="copyOutputButton" class="ghost-button" type="button">复制 JSON</button>
+            <button id="exportWorldbookButton" class="ghost-button" type="button">导出世界书</button>
+            <button id="exportDraftButton" class="ghost-button" type="button">导出草稿</button>
+            <button id="importJsonButton" class="ghost-button" type="button">导入 JSON / 草稿</button>
+          </div>
+        </section>
+
+        <section class="panel quality-panel full-span">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Check</p>
+              <h2>词条检查与整理</h2>
+            </div>
+          </div>
+          <div class="quality-summary" id="qualitySummary"></div>
+          <div class="button-row compact-row">
+            <button id="sortByPriorityButton" class="ghost-button" type="button">按优先级排序</button>
+            <button id="sortByTitleButton" class="ghost-button" type="button">按标题排序</button>
+            <button id="cleanEntriesButton" class="ghost-button danger-button" type="button">清理空词条</button>
+          </div>
+          <div id="qualityEmpty" class="empty-state compact-empty">当前还没有可检查的词条。</div>
+          <div id="qualityList" class="quality-list"></div>
+        </section>
+
+        <section class="panel appearance-panel full-span">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Appearance</p>
+              <h2>界面背景设置</h2>
+            </div>
+            <p class="muted">背景图片选择已经挪到最底部，透明度和覆盖度都可以直接调。</p>
+          </div>
+
+          <div class="appearance-grid">
+            <div>
+              <label for="accentColor">强调色</label>
+              <input id="accentColor" type="color" value="{{ initial_settings.appearance.accent_color }}" />
+            </div>
+            <div>
+              <div class="range-head">
+                <label for="panelOpacity">面板透明度</label>
+                <span id="panelOpacityValue" class="range-value"></span>
+              </div>
+              <input id="panelOpacity" type="range" min="0.5" max="0.98" step="0.01" value="{{ initial_settings.appearance.panel_opacity }}" />
+            </div>
+          </div>
+
+          <div class="appearance-grid">
+            <div>
+              <div class="range-head">
+                <label for="backgroundOverlay">背景覆盖度</label>
+                <span id="backgroundOverlayValue" class="range-value"></span>
+              </div>
+              <input id="backgroundOverlay" type="range" min="0" max="0.92" step="0.01" value="{{ initial_settings.appearance.background_overlay }}" />
+            </div>
+            <div>
+              <div class="range-head">
+                <label for="blurStrength">背景模糊</label>
+                <span id="blurStrengthValue" class="range-value"></span>
+              </div>
+              <input id="blurStrength" type="range" min="0" max="40" step="1" value="{{ initial_settings.appearance.blur_strength }}" />
+            </div>
+          </div>
+
+          <label for="backgroundImageUrl">背景图片 URL / Data URL</label>
+          <input id="backgroundImageUrl" type="text" value="{{ initial_settings.appearance.background_image }}" placeholder="可粘贴图片链接，或用下方按钮上传本地图片" />
+
+          <div class="background-preview-card">
+            <div id="backgroundPreview" class="background-preview">
+              <span id="backgroundPreviewHint">当前还没有背景图</span>
+            </div>
+            <p id="backgroundPreviewMeta" class="field-tip">上传本地图片后会立即预览，点击“保存界面样式”后下次打开也会保留。</p>
+          </div>
+
+          <input id="backgroundImageFile" type="file" accept="image/*" hidden />
+          <div class="chip-group" id="appearancePresetGroup">
+            <button class="chip-button" type="button" data-preset="mint">薄荷夜色</button>
+            <button class="chip-button" type="button" data-preset="amber">暖金书房</button>
+            <button class="chip-button" type="button" data-preset="ocean">深海雾蓝</button>
+          </div>
+          <div class="button-row">
+            <label id="uploadBackgroundButton" class="ghost-button file-trigger" for="backgroundImageFile" tabindex="0">上传本地背景</label>
+            <button id="clearBackgroundButton" class="ghost-button danger-button" type="button">清空背景</button>
+            <button id="resetAppearanceButton" class="ghost-button" type="button">恢复默认样式</button>
+            <button id="saveAppearanceButton" class="ghost-button" type="button">保存界面样式</button>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <div class="status-bar" id="statusText">就绪</div>
+
+    <script>
+      const API_BASE_PATH = {{ api_base_path | default('', true) | tojson }};
+      const INITIAL_WORKSPACE = {{ initial_workspace | tojson }};
+      const INITIAL_SETTINGS = {{ initial_settings | tojson }};
+      const SOURCE_MODE_OPTIONS = {{ source_mode_options | tojson }};
+      const FOCUS_MODE_OPTIONS = {{ focus_mode_options | tojson }};
+      const DEFAULT_SYSTEM_PROMPT = {{ default_system_prompt | tojson }};
+
+      const sourceInput = document.getElementById("sourceInput");
+      const rawOutput = document.getElementById("rawOutput");
+      const projectNameInput = document.getElementById("projectName");
+      const entryList = document.getElementById("entryList");
+      const entryEmpty = document.getElementById("entryEmpty");
+      const editorEmpty = document.getElementById("editorEmpty");
+      const editorForm = document.getElementById("editorForm");
+      const previewHint = document.getElementById("previewHint");
+      const statusText = document.getElementById("statusText");
+      const browserEntryCount = document.getElementById("browserEntryCount");
+      const browserEnabledCount = document.getElementById("browserEnabledCount");
+      const browserSelectedTitle = document.getElementById("browserSelectedTitle");
+      const entryEditorHeading = document.getElementById("entryEditorHeading");
+      const entryEditorSubheading = document.getElementById("entryEditorSubheading");
+      const entryStatusPill = document.getElementById("entryStatusPill");
+      const entryPriorityPill = document.getElementById("entryPriorityPill");
+      const entryRulePill = document.getElementById("entryRulePill");
+      const panelOpacityValue = document.getElementById("panelOpacityValue");
+      const backgroundOverlayValue = document.getElementById("backgroundOverlayValue");
+      const blurStrengthValue = document.getElementById("blurStrengthValue");
+
+      const qualitySummary = document.getElementById("qualitySummary");
+      const qualityList = document.getElementById("qualityList");
+      const qualityEmpty = document.getElementById("qualityEmpty");
+
+      const sourceModeHint = document.getElementById("sourceModeHint");
+      const focusModeHint = document.getElementById("focusModeHint");
+
+      const entryEditorFields = {
+        title: document.getElementById("entryTitle"),
+        id: document.getElementById("entryId"),
+        trigger: document.getElementById("entryTrigger"),
+        secondary_trigger: document.getElementById("entrySecondaryTrigger"),
+        priority: document.getElementById("entryPriority"),
+        enabled: document.getElementById("entryEnabled"),
+        match_mode: document.getElementById("entryMatchMode"),
+        secondary_mode: document.getElementById("entrySecondaryMode"),
+        case_sensitive: document.getElementById("entryCaseSensitive"),
+        whole_word: document.getElementById("entryWholeWord"),
+        content: document.getElementById("entryContent"),
+        comment: document.getElementById("entryComment"),
+      };
+
+      const APPEARANCE_PRESETS = {
+        mint: { accent_color: "#5ec2a8", panel_opacity: 0.88, background_overlay: 0.46, blur_strength: 18 },
+        amber: { accent_color: "#efaa63", panel_opacity: 0.9, background_overlay: 0.52, blur_strength: 12 },
+        ocean: { accent_color: "#64b8ff", panel_opacity: 0.84, background_overlay: 0.4, blur_strength: 24 },
+      };
+
+      let workspaceStore = structuredClone(INITIAL_WORKSPACE.store || { settings: {}, entries: [] });
+      let selectedEntryId = workspaceStore.entries?.[0]?.id || null;
+      let lastGeneratedAt = INITIAL_WORKSPACE.generated_at || "";
+
+      function setStatus(text) {
+        statusText.textContent = text;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function generateEntryId() {
+        return `worldbook-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      }
+
+      function createEmptyEntry() {
+        return {
+          id: generateEntryId(),
+          title: "新词条",
+          trigger: "",
+          secondary_trigger: "",
+          content: "",
+          enabled: true,
+          priority: 100,
+          case_sensitive: false,
+          whole_word: false,
+          match_mode: "any",
+          secondary_mode: "all",
+          comment: "",
+        };
+      }
+
+      function updateSummary(summary, generatedValue = "") {
+        lastGeneratedAt = generatedValue || lastGeneratedAt || "";
+        renderStudioMeta();
+      }
+
+      function getOptionHint(options, value) {
+        return options.find((item) => item.value === value)?.hint || "";
+      }
+
+      function updateModeHints() {
+        sourceModeHint.textContent = getOptionHint(SOURCE_MODE_OPTIONS, document.getElementById("sourceMode").value);
+        focusModeHint.textContent = getOptionHint(FOCUS_MODE_OPTIONS, document.getElementById("focusMode").value);
+      }
+
+      function collectSettings() {
+        return {
+          base_url: document.getElementById("baseUrl").value.trim(),
+          api_key: document.getElementById("apiKey").value.trim(),
+          model: document.getElementById("model").value.trim(),
+          temperature: Number(document.getElementById("temperature").value || 0.35),
+          request_timeout: Number(document.getElementById("requestTimeout").value || 120),
+          system_prompt: document.getElementById("systemPrompt").value.trim(),
+          generation: {
+            source_mode: document.getElementById("sourceMode").value,
+            focus_mode: document.getElementById("focusMode").value,
+            target_entry_count: Number(document.getElementById("targetEntryCount").value || 8),
+            extra_requirements: document.getElementById("extraRequirements").value.trim(),
+          },
+          appearance: {
+            background_image: document.getElementById("backgroundImageUrl").value.trim(),
+            background_overlay: Number(document.getElementById("backgroundOverlay").value || 0.46),
+            panel_opacity: Number(document.getElementById("panelOpacity").value || 0.88),
+            blur_strength: Number(document.getElementById("blurStrength").value || 18),
+            accent_color: document.getElementById("accentColor").value || "#5ec2a8",
+          },
+        };
+      }
+
+      function collectWorkspacePayload() {
+        return {
+          project_name: projectNameInput.value.trim(),
+          source_text: sourceInput.value,
+          raw_output: rawOutput.value,
+        };
+      }
+
+      function buildApiUrl(path) {
+        return `${API_BASE_PATH}${path}`;
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(buildApiUrl(url), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.detail || "请求失败");
+        }
+        return data;
+      }
+
+      function applyAppearance(appearance) {
+        const root = document.documentElement;
+        const panelOpacity = Number(appearance.panel_opacity ?? 0.88);
+        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+        const panelStrongAlpha = clamp(panelOpacity + 0.06, 0.56, 0.98);
+        const inputAlpha = clamp(panelOpacity - 0.12, 0.22, 0.92);
+        const inputStrongAlpha = clamp(panelOpacity - 0.04, 0.28, 0.96);
+        const surfaceSoftAlpha = clamp(panelOpacity * 0.075, 0.025, 0.12);
+        const surfaceCardAlpha = clamp(panelOpacity * 0.08, 0.03, 0.13);
+        const surfaceListAlpha = clamp(panelOpacity * 0.065, 0.025, 0.11);
+        const surfaceQualityAlpha = clamp(panelOpacity * 0.05, 0.015, 0.08);
+        root.style.setProperty("--accent", appearance.accent_color || "#5ec2a8");
+        root.style.setProperty("--panel-alpha", String(panelOpacity));
+        root.style.setProperty("--panel-strong-alpha", String(panelStrongAlpha));
+        root.style.setProperty("--input-alpha", String(inputAlpha));
+        root.style.setProperty("--input-strong-alpha", String(inputStrongAlpha));
+        root.style.setProperty("--surface-soft-alpha", String(surfaceSoftAlpha));
+        root.style.setProperty("--surface-card-alpha", String(surfaceCardAlpha));
+        root.style.setProperty("--surface-list-alpha", String(surfaceListAlpha));
+        root.style.setProperty("--surface-quality-alpha", String(surfaceQualityAlpha));
+        root.style.setProperty("--overlay-opacity", String(appearance.background_overlay ?? 0.46));
+        root.style.setProperty("--blur-strength", `${appearance.blur_strength ?? 18}px`);
+        updateAppearanceRangeValues(appearance);
+        updateBackgroundPreview(appearance.background_image || "");
+      }
+
+      function updateAppearanceRangeValues(appearance) {
+        panelOpacityValue.textContent = `${Math.round((appearance.panel_opacity ?? 0.88) * 100)}%`;
+        backgroundOverlayValue.textContent = `${Math.round((appearance.background_overlay ?? 0.46) * 100)}%`;
+        blurStrengthValue.textContent = `${appearance.blur_strength ?? 18}px`;
+      }
+
+      function updateBackgroundPreview(backgroundImage) {
+        const root = document.documentElement;
+        const preview = document.getElementById("backgroundPreview");
+        const previewHint = document.getElementById("backgroundPreviewHint");
+        const previewMeta = document.getElementById("backgroundPreviewMeta");
+        const bgLayer = document.getElementById("appBackgroundLayer");
+        const image = String(backgroundImage || "").trim();
+        if (image) {
+          const cssImage = `url("${image.replace(/"/g, '\\"')}")`;
+          root.style.setProperty("--custom-bg-sharp-image", cssImage);
+          root.style.setProperty("--custom-bg-image", cssImage);
+          bgLayer.style.backgroundImage = cssImage;
+          preview.style.backgroundImage = cssImage;
+          preview.classList.add("has-image");
+          previewHint.textContent = "";
+          previewMeta.textContent = image.startsWith("data:")
+            ? "本地背景图已载入预览，记得点“保存界面样式”长期保留。"
+            : "背景图链接已载入预览，记得点“保存界面样式”长期保留。";
+          document.body.classList.add("has-custom-bg");
+        } else {
+          root.style.setProperty("--custom-bg-sharp-image", "none");
+          root.style.setProperty("--custom-bg-image", "none");
+          bgLayer.style.backgroundImage = "none";
+          preview.style.backgroundImage = "none";
+          preview.classList.remove("has-image");
+          previewHint.textContent = "当前还没有背景图";
+          previewMeta.textContent = "上传本地图片后会立即预览，点击“保存界面样式”后下次打开也会保留。";
+          document.body.classList.remove("has-custom-bg");
+        }
+      }
+
+      function normalizeStoreForOutput(store) {
+        const safeStore = store && typeof store === "object" ? store : {};
+        const settings = safeStore.settings && typeof safeStore.settings === "object" ? safeStore.settings : {};
+        const entries = Array.isArray(safeStore.entries) ? safeStore.entries : [];
+        return {
+          settings: {
+            enabled: Boolean(settings.enabled ?? true),
+            debug_enabled: Boolean(settings.debug_enabled ?? false),
+            max_hits: Number(settings.max_hits ?? 3),
+            default_case_sensitive: Boolean(settings.default_case_sensitive ?? false),
+            default_whole_word: Boolean(settings.default_whole_word ?? false),
+            default_match_mode: String(settings.default_match_mode || "any"),
+            default_secondary_mode: String(settings.default_secondary_mode || "all"),
+          },
+          entries: entries.map((entry) => ({
+            id: String(entry?.id || ""),
+            title: String(entry?.title || ""),
+            trigger: String(entry?.trigger || ""),
+            secondary_trigger: String(entry?.secondary_trigger || ""),
+            content: String(entry?.content || ""),
+            enabled: entry?.enabled !== false,
+            priority: Number(entry?.priority ?? 100),
+            case_sensitive: Boolean(entry?.case_sensitive ?? false),
+            whole_word: Boolean(entry?.whole_word ?? false),
+            match_mode: String(entry?.match_mode || "any"),
+            secondary_mode: String(entry?.secondary_mode || "all"),
+            comment: String(entry?.comment || ""),
+          })),
+        };
+      }
+
+      function serializeStore(store) {
+        return JSON.stringify(normalizeStoreForOutput(store), null, 2);
+      }
+
+      function syncRawOutputFromStore() {
+        rawOutput.value = serializeStore(workspaceStore);
+      }
+
+      function getSelectedEntry() {
+        return (workspaceStore.entries || []).find((item) => item.id === selectedEntryId) || null;
+      }
+
+      function renderStudioMeta() {
+        const entries = Array.isArray(workspaceStore.entries) ? workspaceStore.entries : [];
+        const enabled = entries.filter((item) => item.enabled !== false).length;
+        const selected = getSelectedEntry();
+        browserEntryCount.textContent = String(entries.length);
+        browserEnabledCount.textContent = String(enabled);
+        browserSelectedTitle.textContent = selected?.title?.trim() || "未选择";
+      }
+
+      function updateEntryEditorSummary(entry) {
+        if (!entry) {
+          entryEditorHeading.textContent = "未选择词条";
+          entryEditorSubheading.textContent = "在这里维护词条结构、触发方式和正文内容。";
+          entryStatusPill.textContent = "未选择";
+          entryStatusPill.className = "pill";
+          entryPriorityPill.textContent = "优先级 -";
+          entryRulePill.textContent = "匹配 -";
+          return;
+        }
+        entryEditorHeading.textContent = entry.title?.trim() || "未命名词条";
+        entryEditorSubheading.textContent = entry.trigger?.trim()
+          ? `主触发词：${entry.trigger}`
+          : "还没有填写主触发词，建议先补触发词再继续细修。";
+        entryStatusPill.textContent = entry.enabled === false ? "当前停用" : "当前启用";
+        entryStatusPill.className = `pill ${entry.enabled === false ? "is-idle" : "is-ok"}`;
+        entryPriorityPill.textContent = `优先级 ${entry.priority ?? 100}`;
+        entryRulePill.textContent = `${entry.match_mode || "any"} / ${entry.secondary_mode || "all"}`;
+      }
+
+      function renderEntryList() {
+        const query = document.getElementById("entrySearch").value.trim().toLowerCase();
+        const entries = Array.isArray(workspaceStore.entries) ? workspaceStore.entries : [];
+        const filtered = entries.filter((item) => {
+          if (!query) return true;
+          return [item.title, item.trigger, item.comment, item.secondary_trigger]
+            .join(" ")
+            .toLowerCase()
+            .includes(query);
+        });
+
+        entryList.innerHTML = "";
+        entryEmpty.hidden = filtered.length > 0;
+
+        filtered.forEach((item) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `entry-list-item ${item.id === selectedEntryId ? "is-active" : ""}`;
+          const enabledLabel = item.enabled === false ? "停用" : "启用";
+          const triggerPreview = item.trigger?.trim() || "未填写主触发词";
+          const commentPreview = item.comment?.trim() || item.content?.trim() || "还没有补充说明";
+          button.innerHTML = `
+            <div class="entry-list-topline">
+              <strong>${escapeHtml(item.title || "未命名词条")}</strong>
+              <span class="entry-state-badge ${item.enabled === false ? "is-offline" : "is-online"}">${enabledLabel}</span>
+            </div>
+            <span class="entry-trigger-line">${escapeHtml(triggerPreview)}</span>
+            <small>${escapeHtml(commentPreview)}</small>
+            <div class="entry-list-foot">
+              <span>优先级 ${escapeHtml(item.priority ?? 100)}</span>
+              <span>${escapeHtml(item.match_mode || "any")} / ${escapeHtml(item.secondary_mode || "all")}</span>
+            </div>
+          `;
+          button.addEventListener("click", () => {
+            selectedEntryId = item.id;
+            renderEntryList();
+            renderEntryEditor();
+          });
+          entryList.appendChild(button);
+        });
+      }
+
+      function renderPreview(store, summary) {
+        workspaceStore = structuredClone(store || { settings: {}, entries: [] });
+        if (!selectedEntryId || !workspaceStore.entries.some((item) => item.id === selectedEntryId)) {
+          selectedEntryId = workspaceStore.entries?.[0]?.id || null;
+        }
+        syncRawOutputFromStore();
+        renderStudioMeta();
+        renderEntryList();
+        renderEntryEditor();
+        renderQualityBoard();
+        updateSummary(summary || {
+          entry_count: workspaceStore.entries.length,
+          enabled_count: workspaceStore.entries.filter((item) => item.enabled !== false).length,
+        }, lastGeneratedAt);
+      }
+
+      function renderEntryEditor() {
+        const entry = getSelectedEntry();
+        const hasEntry = Boolean(entry);
+        editorEmpty.hidden = hasEntry;
+        editorForm.hidden = !hasEntry;
+        if (!entry) {
+          updateEntryEditorSummary(null);
+          renderStudioMeta();
+          return;
+        }
+
+        entryEditorFields.title.value = entry.title || "";
+        entryEditorFields.id.value = entry.id || "";
+        entryEditorFields.trigger.value = entry.trigger || "";
+        entryEditorFields.secondary_trigger.value = entry.secondary_trigger || "";
+        entryEditorFields.priority.value = Number(entry.priority ?? 100);
+        entryEditorFields.enabled.value = String(entry.enabled !== false);
+        entryEditorFields.match_mode.value = entry.match_mode || "any";
+        entryEditorFields.secondary_mode.value = entry.secondary_mode || "all";
+        entryEditorFields.case_sensitive.value = String(Boolean(entry.case_sensitive));
+        entryEditorFields.whole_word.value = String(Boolean(entry.whole_word));
+        entryEditorFields.content.value = entry.content || "";
+        entryEditorFields.comment.value = entry.comment || "";
+        updateEntryEditorSummary(entry);
+        renderStudioMeta();
+      }
+
+      function syncSelectedEntryFromEditor() {
+        const entry = getSelectedEntry();
+        if (!entry) return;
+        entry.title = entryEditorFields.title.value.trim() || "未命名词条";
+        entry.id = entryEditorFields.id.value.trim() || generateEntryId();
+        entry.trigger = entryEditorFields.trigger.value.trim();
+        entry.secondary_trigger = entryEditorFields.secondary_trigger.value.trim();
+        entry.priority = Number(entryEditorFields.priority.value || 100);
+        entry.enabled = entryEditorFields.enabled.value === "true";
+        entry.match_mode = entryEditorFields.match_mode.value;
+        entry.secondary_mode = entryEditorFields.secondary_mode.value;
+        entry.case_sensitive = entryEditorFields.case_sensitive.value === "true";
+        entry.whole_word = entryEditorFields.whole_word.value === "true";
+        entry.content = entryEditorFields.content.value.trim();
+        entry.comment = entryEditorFields.comment.value.trim();
+
+        selectedEntryId = entry.id;
+        syncRawOutputFromStore();
+        renderStudioMeta();
+        updateEntryEditorSummary(entry);
+        renderEntryList();
+        renderQualityBoard();
+      }
+
+      function buildQualityIssues() {
+        const entries = Array.isArray(workspaceStore.entries) ? workspaceStore.entries : [];
+        const titleMap = new Map();
+        const triggerMap = new Map();
+        const issues = [];
+
+        entries.forEach((entry) => {
+          const titleKey = (entry.title || "").trim().toLowerCase();
+          const triggerKey = (entry.trigger || "").trim().toLowerCase();
+          if (titleKey) titleMap.set(titleKey, (titleMap.get(titleKey) || 0) + 1);
+          if (triggerKey) triggerMap.set(triggerKey, (triggerMap.get(triggerKey) || 0) + 1);
+        });
+
+        entries.forEach((entry) => {
+          if (!entry.trigger?.trim()) {
+            issues.push({ id: entry.id, level: "warning", text: `「${entry.title || "未命名词条"}」缺少主触发词。` });
+          }
+          if (!entry.content?.trim()) {
+            issues.push({ id: entry.id, level: "warning", text: `「${entry.title || "未命名词条"}」缺少正文。` });
+          }
+          if ((entry.trigger || "").length > 48) {
+            issues.push({ id: entry.id, level: "note", text: `「${entry.title || "未命名词条"}」的主触发词偏长，后续命中率可能下降。` });
+          }
+          if ((titleMap.get((entry.title || "").trim().toLowerCase()) || 0) > 1 && entry.title?.trim()) {
+            issues.push({ id: entry.id, level: "note", text: `标题「${entry.title}」出现重复，建议确认是否需要合并。` });
+          }
+          if ((triggerMap.get((entry.trigger || "").trim().toLowerCase()) || 0) > 1 && entry.trigger?.trim()) {
+            issues.push({ id: entry.id, level: "note", text: `主触发词「${entry.trigger}」出现重复，建议确认是否冲突。` });
+          }
+        });
+        return issues;
+      }
+
+      function renderQualityBoard() {
+        const entries = Array.isArray(workspaceStore.entries) ? workspaceStore.entries : [];
+        const issues = buildQualityIssues();
+        const enabled = entries.filter((item) => item.enabled !== false).length;
+        const emptyTrigger = entries.filter((item) => !item.trigger?.trim()).length;
+        const emptyContent = entries.filter((item) => !item.content?.trim()).length;
+
+        qualitySummary.innerHTML = `
+          <span class="pill">总词条 ${entries.length}</span>
+          <span class="pill">启用 ${enabled}</span>
+          <span class="pill ${emptyTrigger ? "is-fail" : "is-ok"}">缺触发词 ${emptyTrigger}</span>
+          <span class="pill ${emptyContent ? "is-fail" : "is-ok"}">缺正文 ${emptyContent}</span>
+          <span class="pill ${issues.length ? "is-idle" : "is-ok"}">检查项 ${issues.length}</span>
+        `;
+
+        qualityList.innerHTML = "";
+        qualityEmpty.hidden = entries.length > 0;
+        if (!entries.length) return;
+
+        if (!issues.length) {
+          const okCard = document.createElement("div");
+          okCard.className = "quality-item is-ok";
+          okCard.textContent = "当前词条结构看起来比较健康，已经适合继续精修或直接导出。";
+          qualityList.appendChild(okCard);
+          return;
+        }
+
+        issues.forEach((issue) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `quality-item is-${issue.level}`;
+          button.textContent = issue.text;
+          button.addEventListener("click", () => {
+            selectedEntryId = issue.id;
+            renderEntryList();
+            renderEntryEditor();
+          });
+          qualityList.appendChild(button);
+        });
+      }
+
+      async function saveSettings(customMessage = "配置已保存。") {
+        const data = await postJson("/api/settings", collectSettings());
+        applyAppearance(data.settings.appearance);
+        setStatus(customMessage);
+        return data.settings;
+      }
+
+      async function detectService() {
+        setStatus("正在检测服务...");
+        const data = await postJson("/api/detect-service", collectSettings());
+        if (!document.getElementById("model").value.trim() && data.service.selected_model) {
+          document.getElementById("model").value = data.service.selected_model;
+        }
+        const service = data.service || {};
+        const modelLabel = service.selected_model || "未检测到模型";
+        const modelEndpoint = service.models_endpoint_ok ? "/models 可用" : "/models 不可用";
+        const chatEndpoint = service.chat_endpoint_ok ? "chat 可用" : "chat 未验证";
+        const warningText = service.warnings?.length ? `，提示：${service.warnings.join(" / ")}` : "";
+        setStatus(`服务检测完成：${modelLabel}，${modelEndpoint}，${chatEndpoint}${warningText}`);
+      }
+
+      async function previewCurrent() {
+        const data = await postJson("/api/workspace/preview", { raw_output: rawOutput.value });
+        renderPreview(data.store, data.summary);
+        previewHint.textContent = `当前共 ${data.summary.entry_count} 条词条，可继续在下方工作台精修。`;
+        setStatus("预览已刷新。");
+        return data;
+      }
+
+      async function saveWorkspace() {
+        const data = await postJson("/api/workspace/save", collectWorkspacePayload());
+        lastGeneratedAt = data.workspace.generated_at || lastGeneratedAt || "";
+        if (data.workspace.store) {
+          renderPreview(data.workspace.store, data.summary);
+        }
+        if (data.warnings?.length) {
+          setStatus(data.warnings.join(" "));
+        } else {
+          setStatus("草稿已保存。");
+        }
+      }
+
+      async function generateWorldbook() {
+        setStatus("???????...");
+        const data = await postJson("/api/generate", {
+          ...collectSettings(),
+          ...collectWorkspacePayload(),
+          store: workspaceStore,
+        });
+        rawOutput.value = data.output_json || "";
+        lastGeneratedAt = data.workspace.generated_at || "??";
+        renderPreview(data.store, data.summary);
+        const appendedCount = Number(data.merge_summary?.appended_count ?? data.summary.entry_count ?? 0);
+        const skippedCount = Number(data.merge_summary?.skipped_duplicates ?? 0);
+        previewHint.textContent = skippedCount > 0
+          ? `???? ${appendedCount} ???? ${skippedCount} ????????? ${data.summary.entry_count} ??`
+          : `???? ${appendedCount} ??????? ${data.summary.entry_count} ??`;
+        setStatus("?????");
+      }
+
+      async function formatOutput() {
+        const data = await previewCurrent();
+        rawOutput.value = serializeStore(data.store);
+        workspaceStore = structuredClone(data.store);
+        renderEntryList();
+        renderEntryEditor();
+        setStatus("JSON 已格式化。");
+      }
+
+      async function copyOutput() {
+        if (!rawOutput.value.trim()) {
+          setStatus("当前没有可复制的输出。");
+          return;
+        }
+        await navigator.clipboard.writeText(rawOutput.value);
+        setStatus("JSON 已复制。");
+      }
+
+      function downloadFile(filename, content) {
+        const blob = new Blob([content], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function exportWorldbook() {
+        const projectName = projectNameInput.value.trim() || "世界书";
+        const content = rawOutput.value.trim() || serializeStore(workspaceStore);
+        downloadFile(`${projectName}-worldbook.json`, content);
+        setStatus("世界书已导出。");
+      }
+
+      function exportDraft() {
+        const projectName = projectNameInput.value.trim() || "世界书项目";
+        const payload = {
+          project_name: projectNameInput.value.trim(),
+          source_text: sourceInput.value,
+          raw_output: rawOutput.value,
+          generated_at: lastGeneratedAt || "",
+          store: workspaceStore,
+        };
+        downloadFile(`${projectName}-draft.json`, JSON.stringify(payload, null, 2));
+        setStatus("草稿已导出。");
+      }
+
+      async function importJsonFile(file) {
+        const text = await file.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (error) {
+          setStatus("导入失败：文件不是合法 JSON。");
+          return;
+        }
+
+        if (parsed && (parsed.source_text !== undefined || parsed.raw_output !== undefined || parsed.store !== undefined)) {
+          projectNameInput.value = parsed.project_name || "";
+          sourceInput.value = parsed.source_text || "";
+          if (parsed.raw_output) {
+            rawOutput.value = typeof parsed.raw_output === "string" ? parsed.raw_output : serializeStore(parsed.raw_output);
+          } else if (parsed.store) {
+            rawOutput.value = serializeStore(parsed.store);
+          } else {
+            rawOutput.value = "";
+          }
+          lastGeneratedAt = parsed.generated_at || "";
+          await previewCurrent().catch(() => {
+            setStatus("草稿已导入，但当前 JSON 还需要手工整理。");
+          });
+          return;
+        }
+
+        rawOutput.value = serializeStore(parsed);
+        await previewCurrent();
+        setStatus("世界书 JSON 已导入。");
+      }
+
+      function clearWorkspace() {
+        if (!window.confirm("确定清空当前项目吗？")) return;
+        projectNameInput.value = "";
+        sourceInput.value = "";
+        rawOutput.value = "";
+        lastGeneratedAt = "";
+        workspaceStore = { settings: {}, entries: [] };
+        selectedEntryId = null;
+        renderEntryList();
+        renderEntryEditor();
+        updateSummary({ entry_count: 0, enabled_count: 0 });
+        previewHint.textContent = "先生成，再选词条精修。所有修改都会同步回 JSON。";
+        setStatus("当前项目已清空。");
+      }
+
+      function appendSnippet(snippet) {
+        const current = sourceInput.value.trim();
+        sourceInput.value = current ? `${current}\n\n${snippet}` : snippet;
+        sourceInput.focus();
+        setStatus("已插入模板片段。");
+      }
+
+      function addEntry() {
+        const entry = createEmptyEntry();
+        workspaceStore.entries = Array.isArray(workspaceStore.entries) ? workspaceStore.entries : [];
+        workspaceStore.entries.unshift(entry);
+        selectedEntryId = entry.id;
+        syncRawOutputFromStore();
+        renderEntryList();
+        renderEntryEditor();
+        renderQualityBoard();
+        setStatus("已新增空白词条。");
+      }
+
+      function duplicateEntry() {
+        const current = getSelectedEntry();
+        if (!current) {
+          setStatus("请先选择一个词条。");
+          return;
+        }
+        const clone = structuredClone(current);
+        clone.id = generateEntryId();
+        clone.title = `${clone.title || "词条"} 副本`;
+        workspaceStore.entries.unshift(clone);
+        selectedEntryId = clone.id;
+        syncRawOutputFromStore();
+        renderEntryList();
+        renderEntryEditor();
+        renderQualityBoard();
+        setStatus("词条已复制。");
+      }
+
+      function deleteEntry() {
+        const current = getSelectedEntry();
+        if (!current) {
+          setStatus("请先选择一个词条。");
+          return;
+        }
+        if (!window.confirm(`确定删除词条「${current.title || "未命名词条"}」吗？`)) return;
+        workspaceStore.entries = workspaceStore.entries.filter((item) => item.id !== current.id);
+        selectedEntryId = workspaceStore.entries?.[0]?.id || null;
+        syncRawOutputFromStore();
+        renderEntryList();
+        renderEntryEditor();
+        renderQualityBoard();
+        updateSummary({
+          entry_count: workspaceStore.entries.length,
+          enabled_count: workspaceStore.entries.filter((item) => item.enabled !== false).length,
+        }, lastGeneratedAt);
+        setStatus("词条已删除。");
+      }
+
+      function sortEntriesByPriority() {
+        workspaceStore.entries.sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0));
+        syncRawOutputFromStore();
+        renderEntryList();
+        renderEntryEditor();
+        renderQualityBoard();
+        setStatus("已按优先级排序。");
+      }
+
+      function sortEntriesByTitle() {
+        workspaceStore.entries.sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "zh-Hans-CN"));
+        syncRawOutputFromStore();
+        renderEntryList();
+        renderEntryEditor();
+        renderQualityBoard();
+        setStatus("已按标题排序。");
+      }
+
+      function cleanEmptyEntries() {
+        const before = workspaceStore.entries.length;
+        workspaceStore.entries = workspaceStore.entries.filter((item) => item.trigger?.trim() || item.content?.trim() || item.title?.trim());
+        const removed = before - workspaceStore.entries.length;
+        if (!removed) {
+          setStatus("没有需要清理的空词条。");
+          return;
+        }
+        selectedEntryId = workspaceStore.entries?.[0]?.id || null;
+        syncRawOutputFromStore();
+        renderEntryList();
+        renderEntryEditor();
+        renderQualityBoard();
+        updateSummary({
+          entry_count: workspaceStore.entries.length,
+          enabled_count: workspaceStore.entries.filter((item) => item.enabled !== false).length,
+        }, lastGeneratedAt);
+        setStatus(`已清理 ${removed} 个空词条。`);
+      }
+
+      function handleBackgroundUpload(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          document.getElementById("backgroundImageUrl").value = String(reader.result || "");
+          applyAppearance(collectSettings().appearance);
+          setStatus("背景图片已载入，记得保存界面样式。");
+        };
+        reader.onerror = () => {
+          setStatus("背景图片读取失败，请换一张图片再试。");
+        };
+        reader.readAsDataURL(file);
+      }
+
+      document.querySelectorAll("#starterSnippets .chip-button").forEach((button) => {
+        button.addEventListener("click", () => appendSnippet(button.dataset.snippet || ""));
+      });
+
+      document.getElementById("sourceMode").addEventListener("change", updateModeHints);
+      document.getElementById("focusMode").addEventListener("change", updateModeHints);
+
+      document.getElementById("saveSettingsButton").addEventListener("click", async () => {
+        try {
+          await saveSettings("配置已保存。");
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("saveAppearanceButton").addEventListener("click", async () => {
+        try {
+          await saveSettings("界面样式已保存。");
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("detectServiceButton").addEventListener("click", async () => {
+        try {
+          await detectService();
+        } catch (error) {
+          setStatus(`检测失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("resetPromptButton").addEventListener("click", () => {
+        document.getElementById("systemPrompt").value = DEFAULT_SYSTEM_PROMPT;
+        setStatus("已恢复默认 Prompt。");
+      });
+
+      document.getElementById("generateButton").addEventListener("click", async () => {
+        try {
+          await generateWorldbook();
+        } catch (error) {
+          setStatus(`生成失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("previewButton").addEventListener("click", async () => {
+        try {
+          await previewCurrent();
+        } catch (error) {
+          setStatus(`预览失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("saveWorkspaceButton").addEventListener("click", async () => {
+        try {
+          await saveWorkspace();
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("formatOutputButton").addEventListener("click", async () => {
+        try {
+          await formatOutput();
+        } catch (error) {
+          setStatus(`格式化失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("copyOutputButton").addEventListener("click", async () => {
+        try {
+          await copyOutput();
+        } catch (error) {
+          setStatus(`复制失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("exportWorldbookButton").addEventListener("click", exportWorldbook);
+      document.getElementById("exportDraftButton").addEventListener("click", exportDraft);
+      document.getElementById("clearWorkspaceButton").addEventListener("click", clearWorkspace);
+      document.getElementById("entrySearch").addEventListener("input", renderEntryList);
+      document.getElementById("addEntryButton").addEventListener("click", addEntry);
+      document.getElementById("duplicateEntryButton").addEventListener("click", duplicateEntry);
+      document.getElementById("deleteEntryButton").addEventListener("click", deleteEntry);
+
+      Object.values(entryEditorFields).forEach((element) => {
+        element.addEventListener("input", syncSelectedEntryFromEditor);
+        element.addEventListener("change", syncSelectedEntryFromEditor);
+      });
+
+      document.getElementById("importJsonButton").addEventListener("click", () => {
+        document.getElementById("importFileInput").click();
+      });
+
+      document.getElementById("importFileInput").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          await importJsonFile(file);
+        } catch (error) {
+          setStatus(`导入失败：${error.message}`);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("uploadBackgroundButton").addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          document.getElementById("backgroundImageFile").click();
+        }
+      });
+
+      document.getElementById("backgroundImageFile").addEventListener("change", (event) => {
+        handleBackgroundUpload(event.target.files?.[0]);
+        event.target.value = "";
+      });
+
+      document.getElementById("clearBackgroundButton").addEventListener("click", () => {
+        document.getElementById("backgroundImageUrl").value = "";
+        applyAppearance(collectSettings().appearance);
+        setStatus("背景已清空，记得保存界面样式。");
+      });
+
+      document.getElementById("resetAppearanceButton").addEventListener("click", () => {
+        const defaults = {
+          accent_color: "#5ec2a8",
+          panel_opacity: 0.88,
+          background_overlay: 0.46,
+          blur_strength: 18,
+          background_image: "",
+        };
+        document.getElementById("accentColor").value = defaults.accent_color;
+        document.getElementById("panelOpacity").value = defaults.panel_opacity;
+        document.getElementById("backgroundOverlay").value = defaults.background_overlay;
+        document.getElementById("blurStrength").value = defaults.blur_strength;
+        document.getElementById("backgroundImageUrl").value = defaults.background_image;
+        applyAppearance(defaults);
+        setStatus("已恢复默认界面样式。");
+      });
+
+      document.querySelectorAll("#appearancePresetGroup .chip-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          const preset = APPEARANCE_PRESETS[button.dataset.preset];
+          if (!preset) return;
+          document.getElementById("accentColor").value = preset.accent_color;
+          document.getElementById("panelOpacity").value = preset.panel_opacity;
+          document.getElementById("backgroundOverlay").value = preset.background_overlay;
+          document.getElementById("blurStrength").value = preset.blur_strength;
+          applyAppearance({ ...collectSettings().appearance, ...preset });
+          setStatus("已套用界面预设，记得保存界面样式。");
+        });
+      });
+
+      ["accentColor", "panelOpacity", "backgroundOverlay", "blurStrength", "backgroundImageUrl"].forEach((id) => {
+        document.getElementById(id).addEventListener("input", () => applyAppearance(collectSettings().appearance));
+      });
+
+      document.getElementById("sortByPriorityButton").addEventListener("click", sortEntriesByPriority);
+      document.getElementById("sortByTitleButton").addEventListener("click", sortEntriesByTitle);
+      document.getElementById("cleanEntriesButton").addEventListener("click", cleanEmptyEntries);
+
+      updateModeHints();
+      applyAppearance(INITIAL_SETTINGS.appearance || {});
+      renderPreview(workspaceStore, {
+        entry_count: workspaceStore.entries?.length || 0,
+        enabled_count: (workspaceStore.entries || []).filter((item) => item.enabled !== false).length,
+      });
+    </script>
+  </body>
+</html>

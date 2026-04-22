@@ -1,0 +1,92 @@
+{% set current_path = request.url.path %}
+{% set mod_state = namespace(has_worldbook_maker=false) %}
+{% for mod in registered_mods or [] %}
+  {% if mod.slug == 'worldbook-maker' %}
+    {% set mod_state.has_worldbook_maker = true %}
+  {% endif %}
+{% endfor %}
+{% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' or current_path == '/config/sprite' %}
+{% set persona_active = current_path == '/config/card' or current_path == '/config/preset' or current_path == '/config/memory' %}
+{% set worldbook_active = current_path.startswith('/config/worldbook') or current_path.startswith('/mods/worldbook-maker') %}
+
+<nav class="topnav topnav-grouped" aria-label="Primary navigation">
+  <details class="nav-group{% if current_path == '/chat' %} active-group{% endif %}">
+    <summary class="nav-group-summary">聊天</summary>
+    <div class="nav-group-panel">
+      <div class="nav-group-links">
+        <a class="navlink{% if current_path == '/chat' %} active{% endif %}" href="/chat">Chat</a>
+      </div>
+    </div>
+  </details>
+
+  <details class="nav-group{% if settings_active %} active-group{% endif %}">
+    <summary class="nav-group-summary">设置</summary>
+    <div class="nav-group-panel">
+      <div class="nav-group-links">
+        <a class="navlink{% if current_path == '/config' %} active{% endif %}" href="/config">Config</a>
+        <a class="navlink{% if current_path == '/config/workshop' %} active{% endif %}" href="/config/workshop">Workshop</a>
+        <a class="navlink{% if current_path == '/config/user' %} active{% endif %}" href="/config/user">User</a>
+        <a class="navlink{% if current_path == '/config/sprite' %} active{% endif %}" href="/config/sprite">Sprite</a>
+      </div>
+    </div>
+  </details>
+
+  <details class="nav-group{% if persona_active %} active-group{% endif %}">
+    <summary class="nav-group-summary">人设</summary>
+    <div class="nav-group-panel">
+      <div class="nav-group-links">
+        <a class="navlink{% if current_path == '/config/card' %} active{% endif %}" href="/config/card">Card</a>
+        <a class="navlink{% if current_path == '/config/preset' %} active{% endif %}" href="/config/preset">Preset</a>
+        <a class="navlink{% if current_path == '/config/memory' %} active{% endif %}" href="/config/memory">Memory</a>
+      </div>
+    </div>
+  </details>
+
+  <details class="nav-group{% if worldbook_active %} active-group{% endif %}">
+    <summary class="nav-group-summary">世界书</summary>
+    <div class="nav-group-panel">
+      <div class="nav-group-links">
+        <a class="navlink{% if current_path == '/config/worldbook' %} active{% endif %}" href="/config/worldbook">WB Set</a>
+        <a class="navlink{% if current_path == '/config/worldbook/entries' %} active{% endif %}" href="/config/worldbook/entries">WB List</a>
+        {% if mod_state.has_worldbook_maker %}
+        <a class="navlink{% if current_path.startswith('/mods/worldbook-maker') %} active{% endif %}" href="/mods/worldbook-maker">WB Maker</a>
+        {% endif %}
+      </div>
+    </div>
+  </details>
+</nav>
+<script>
+  (() => {
+    const nav = document.currentScript?.previousElementSibling;
+    if (!nav || !nav.classList.contains("topnav-grouped")) return;
+    const groups = [...nav.querySelectorAll(".nav-group")];
+
+    function closeAll(exceptGroup = null) {
+      groups.forEach((group) => {
+        if (group !== exceptGroup) {
+          group.removeAttribute("open");
+        }
+      });
+    }
+
+    groups.forEach((group) => {
+      group.addEventListener("toggle", () => {
+        if (group.hasAttribute("open")) {
+          closeAll(group);
+        }
+      });
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!nav.contains(event.target)) {
+        closeAll();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeAll();
+      }
+    });
+  })();
+</script>

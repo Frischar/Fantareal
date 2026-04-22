@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ mod.label }} - Xuqi LLM Chat</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <style>
+      .mod-host-page {
+        padding: 0 16px 20px;
+      }
+
+      .mod-host-shell {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        width: min(100%, 1680px);
+        margin: 0 auto;
+      }
+
+      .mod-intro-panel {
+        padding: 16px 18px;
+      }
+
+      .mod-intro-panel .section-head {
+        margin-bottom: 0;
+      }
+
+      .mod-frame-panel {
+        padding: 10px;
+      }
+
+      .mod-frame {
+        width: 100%;
+        min-height: calc(100vh - 150px);
+        border: 0;
+        border-radius: 22px;
+        background: transparent;
+      }
+
+      .mod-frame-hint {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 0.7rem;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      @media (max-width: 980px) {
+        .mod-host-page {
+          padding: 0 12px 18px;
+        }
+
+        .mod-frame {
+          min-height: calc(100vh - 190px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar-stack">
+      <div class="topbar">
+        <a class="brand" href="/chat">Xuqi LLM Chat</a>
+        {% include "_grouped_nav.html" %}
+      </div>
+      <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Mods</span>
+          <div class="slot-meta">
+            <strong>{{ mod.label }}</strong>
+            <p class="slot-hint">当前页面承载的是 `mods` 目录下的附属工具，并且把更多可视空间留给模块本体。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mod-host-page">
+      <div class="mod-host-shell">
+        <section class="panel config-panel full-span mod-intro-panel">
+          <div class="section-head">
+            <p class="eyebrow">Mods</p>
+            <h2>{{ mod.label }}</h2>
+            <p class="muted">这个页面承载的是 `{{ mod.name }}` 模块，内容来自仓库里的 `mods` 目录。</p>
+          </div>
+        </section>
+
+        <section class="panel config-panel full-span mod-frame-panel">
+          <iframe
+            class="mod-frame"
+            src="{{ mod.mount_path }}/"
+            title="{{ mod.label }}"
+            loading="lazy"
+            referrerpolicy="same-origin"
+          ></iframe>
+          <div class="mod-frame-hint">
+            <span>模块仍然运行在 Xuqi_LLM 内部，只是宿主页把更多空间让给了模块本体。</span>
+            <a class="ghost-link button-link" href="{{ mod.mount_path }}/" target="_blank" rel="noopener noreferrer">新窗口打开模块</a>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

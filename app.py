@@ -19,6 +19,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from chat_api_routes import register_chat_api_routes
 from config_api_routes import register_config_api_routes
+from mod_api_routes import register_mod_api_routes
+from mods_runtime import mount_discovered_mods
 from page_routes import register_page_routes
 from preset_rules import (
     PRESET_MODULE_RULES,
@@ -93,6 +95,7 @@ TEMPLATES_DIR = RESOURCE_DIR / "templates"
 UPLOAD_DIR = STATIC_DIR / "uploads"
 SPRITES_DIR = STATIC_DIR / "sprites"
 CARDS_DIR = BASE_DIR / "cards"
+MODS_DIR = BASE_DIR / "mods"
 RESOURCE_CARDS_DIR = RESOURCE_DIR / "cards"
 ROLE_CARD_EXTENSIONS = {".json", ".txt"}
 SLOT_META_PATH = DATA_DIR / "save_slots.json"
@@ -3593,6 +3596,8 @@ bootstrap_runtime_layout()
 app = FastAPI(title="Xuqi LLM Chat")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+registered_mods = mount_discovered_mods(app, MODS_DIR)
+templates.env.globals["registered_mods"] = [mod.to_dict() for mod in registered_mods]
 
 
 
@@ -3625,6 +3630,9 @@ route_ctx = SimpleNamespace(
     get_conversation=get_conversation,
     get_current_card=get_current_card,
     get_memories=get_memories,
+    get_mod=lambda slug: next(
+        (mod.to_dict() for mod in registered_mods if mod.slug == slug), None
+    ),
     get_persona=get_persona,
     get_preset_store=get_preset_store,
     get_role_avatar_url=get_role_avatar_url,
@@ -3642,6 +3650,7 @@ route_ctx = SimpleNamespace(
     get_worldbook_entries=get_worldbook_entries,
     get_worldbook_settings=get_worldbook_settings,
     get_worldbook_store=get_worldbook_store,
+    list_mods=lambda: [mod.to_dict() for mod in registered_mods],
     list_role_card_files=list_role_card_files,
     list_sprite_assets=list_sprite_assets,
     logger=logger,
@@ -3689,3 +3698,4 @@ route_ctx.slot_runtime_service = SlotRuntimeService(route_ctx)
 register_page_routes(app, templates=templates, ctx=route_ctx)
 register_config_api_routes(app, ctx=route_ctx)
 register_chat_api_routes(app, ctx=route_ctx)
+register_mod_api_routes(app, ctx=route_ctx)
