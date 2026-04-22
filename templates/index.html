@@ -344,6 +344,71 @@
           max-width: 100%;
         }
       }
+
+      .worldbook-debug-panel {
+        padding: 0.9rem 1rem;
+      }
+      .worldbook-debug-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+      .worldbook-debug-toggle-main {
+        min-width: 0;
+        flex: 1;
+      }
+      .worldbook-debug-toggle .debug-status-row {
+        margin-top: 0.45rem;
+      }
+      .worldbook-debug-arrow {
+        flex: 0 0 auto;
+        width: 2rem;
+        height: 2rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--input-bg);
+        font-size: 0.9rem;
+        line-height: 1;
+        transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+      }
+      .worldbook-debug-toggle:hover .worldbook-debug-arrow {
+        border-color: var(--accent, var(--border));
+        background: var(--panel);
+      }
+      .worldbook-debug-panel.expanded .worldbook-debug-arrow {
+        transform: rotate(180deg);
+      }
+      .worldbook-debug-body {
+        margin-top: 0.75rem;
+      }
+      .worldbook-debug-body[hidden] {
+        display: none !important;
+      }
+      .worldbook-debug-body .debug-code-block {
+        margin: 0;
+        max-height: 16rem;
+        overflow: auto;
+      }
+      @media (max-width: 768px) {
+        .worldbook-debug-toggle {
+          gap: 0.75rem;
+        }
+        .worldbook-debug-arrow {
+          width: 1.8rem;
+          height: 1.8rem;
+        }
+      }
     </style>
 
   </head>
@@ -436,13 +501,20 @@
             <div class="retrieval-items" id="worldbook-items"></div>
           </div>
 
-          <div class="retrieval-bar worldbook-debug-panel" id="worldbook-debug-panel" hidden>
-            <div class="retrieval-title">Worldbook Debug</div>
-            <div class="debug-status-row">
-              <span id="worldbook-debug-status" class="debug-status-chip">No Hit</span>
-              <span id="worldbook-debug-count" class="muted">0 items</span>
+          <div class="retrieval-bar worldbook-debug-panel" id="worldbook-debug-panel">
+            <button id="worldbook-debug-toggle" class="worldbook-debug-toggle" type="button" aria-expanded="false">
+              <div class="worldbook-debug-toggle-main">
+                <div class="retrieval-title">Worldbook Debug</div>
+                <div class="debug-status-row">
+                  <span id="worldbook-debug-status" class="debug-status-chip">No Hit</span>
+                  <span id="worldbook-debug-count" class="muted">暂无命中</span>
+                </div>
+              </div>
+              <span id="worldbook-debug-arrow" class="worldbook-debug-arrow" aria-hidden="true">▾</span>
+            </button>
+            <div id="worldbook-debug-body" class="worldbook-debug-body" hidden>
+              <pre id="worldbook-debug-prompt" class="debug-code-block">点击上方箭头展开后，可查看本轮 Worldbook 调试文本。</pre>
             </div>
-            <pre id="worldbook-debug-prompt" class="debug-code-block"></pre>
           </div>
 
           <div id="messages" class="messages">
@@ -735,6 +807,9 @@
       const worldbookBarEl = document.getElementById("worldbook-bar");
       const worldbookItemsEl = document.getElementById("worldbook-items");
       const worldbookDebugPanelEl = document.getElementById("worldbook-debug-panel");
+      const worldbookDebugToggleEl = document.getElementById("worldbook-debug-toggle");
+      const worldbookDebugArrowEl = document.getElementById("worldbook-debug-arrow");
+      const worldbookDebugBodyEl = document.getElementById("worldbook-debug-body");
       const worldbookDebugStatusEl = document.getElementById("worldbook-debug-status");
       const worldbookDebugCountEl = document.getElementById("worldbook-debug-count");
       const worldbookDebugPromptEl = document.getElementById("worldbook-debug-prompt");
@@ -874,6 +949,7 @@
         sprite_base_path: DEFAULT_SLOT_SPRITE_BASE_PATH
       };
 
+      let worldbookDebugCollapsed = true;
       let serverState = normalizeRuntimeState(initialState);
       let runtimeState = { ...serverState };
       let worldbookEntries = [];
@@ -1395,21 +1471,44 @@
         worldbookBarEl.hidden = false;
       }
 
+      function setWorldbookDebugCollapsed(collapsed) {
+        worldbookDebugCollapsed = !!collapsed;
+        if (worldbookDebugBodyEl) {
+          worldbookDebugBodyEl.hidden = worldbookDebugCollapsed;
+        }
+        if (worldbookDebugToggleEl) {
+          worldbookDebugToggleEl.setAttribute("aria-expanded", String(!worldbookDebugCollapsed));
+          worldbookDebugToggleEl.title = worldbookDebugCollapsed ? "展开 Worldbook Debug" : "收起 Worldbook Debug";
+        }
+        if (worldbookDebugArrowEl) {
+          worldbookDebugArrowEl.textContent = worldbookDebugCollapsed ? "▾" : "▴";
+        }
+        if (worldbookDebugPanelEl) {
+          worldbookDebugPanelEl.classList.toggle("expanded", !worldbookDebugCollapsed);
+        }
+      }
+
       function renderWorldbookDebug(debug) {
         const hits = Array.isArray(debug?.matched) ? debug.matched : [];
         const prompt = typeof debug?.prompt === "string" ? debug.prompt.trim() : "";
         const enforced = !!debug?.enforced;
-        if (!hits.length && !prompt) {
-          worldbookDebugPanelEl.hidden = true;
-          worldbookDebugPromptEl.textContent = "";
+        const hasDebug = !!hits.length || !!prompt;
+
+        if (!hasDebug) {
+          worldbookDebugStatusEl.textContent = "No Hit";
           worldbookDebugStatusEl.classList.remove("active");
+          worldbookDebugCountEl.textContent = "暂无命中";
+          worldbookDebugPromptEl.textContent = "当前轮没有可展示的 Worldbook 调试文本。点击上方箭头后，这里会显示命中详情和拼接进 Prompt 的内容。";
+          setWorldbookDebugCollapsed(true);
           return;
         }
+
         worldbookDebugStatusEl.textContent = enforced ? "Hit + Boost" : "Hit";
         worldbookDebugStatusEl.classList.add("active");
         worldbookDebugCountEl.textContent = `${hits.length} items`;
-        worldbookDebugPromptEl.textContent = prompt || hits.map((item) => item.trigger).join("\n");
-        worldbookDebugPanelEl.hidden = false;
+        worldbookDebugPromptEl.textContent = prompt || hits.map((item) => item.trigger).join("
+");
+        setWorldbookDebugCollapsed(worldbookDebugCollapsed);
       }
 
 
@@ -1690,6 +1789,15 @@
       if (togglePresetDebugBtn) {
         togglePresetDebugBtn.addEventListener("click", () => {
           setPresetDebugCollapsed(!presetDebugCollapsed);
+        });
+      }
+
+      if (worldbookDebugToggleEl) {
+        worldbookDebugToggleEl.addEventListener("click", () => {
+          if (worldbookDebugPanelEl.hidden) {
+            return;
+          }
+          setWorldbookDebugCollapsed(!worldbookDebugCollapsed);
         });
       }
 
@@ -2149,6 +2257,7 @@
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
       syncDrawerFromState();
+      setWorldbookDebugCollapsed(true);
       hydrateExistingMessages();
       loadPresetStoreForChat().catch(() => {
         presetDebugPanelEl.hidden = true;
