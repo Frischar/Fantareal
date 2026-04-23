@@ -104,6 +104,59 @@ def parse_json_import_payload(raw_json: str, *, label: str) -> Any:
             raise HTTPException(status_code=400, detail=f"{label} JSON parse failed: {exc}") from exc
 
 
+def _worldbook_field_present(row: dict[str, Any], key: str) -> bool:
+    if key not in row:
+        return False
+    value = row.get(key)
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def _apply_worldbook_import_options(
+    entries: list[Any],
+    *,
+    missing_injection_policy: str,
+    force_in_chat_depth: int,
+    force_injection_order: int | None,
+) -> list[Any]:
+    policy = str(missing_injection_policy or "follow_defaults").strip().lower()
+    if policy not in {"follow_defaults", "force_before_char_defs", "force_after_char_defs", "force_in_chat"}:
+        policy = "follow_defaults"
+
+    normalized_depth = max(0, min(int(force_in_chat_depth or 0), 3))
+    processed: list[Any] = []
+    for item in entries:
+        if not isinstance(item, dict):
+            processed.append(item)
+            continue
+
+        row = dict(item)
+        if policy != "follow_defaults":
+            if not _worldbook_field_present(row, "insertion_position"):
+                if policy == "force_before_char_defs":
+                    row["insertion_position"] = "before_char_defs"
+                elif policy == "force_after_char_defs":
+                    row["insertion_position"] = "after_char_defs"
+                elif policy == "force_in_chat":
+                    row["insertion_position"] = "in_chat"
+
+            effective_position = str(row.get("insertion_position", "") or "").strip().lower()
+            if effective_position == "in_chat" and not _worldbook_field_present(row, "injection_depth"):
+                row["injection_depth"] = normalized_depth
+
+            if not _worldbook_field_present(row, "injection_role"):
+                row["injection_role"] = "system"
+
+            if force_injection_order is not None and not _worldbook_field_present(row, "injection_order"):
+                row["injection_order"] = force_injection_order
+
+        processed.append(row)
+    return processed
+
+
 def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
     def build_bundle_label() -> tuple[str, dict[str, Any], dict[str, Any]]:
         current_card = ctx.get_current_card()
@@ -466,7 +519,32 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 "settings": raw_store.get("settings", {}),
                 "entries": raw_store.get("items", []),
             }
-        saved_store = ctx.save_worldbook_store(raw_store, active_slot)
+
+        current_store = ctx.get_worldbook_store(active_slot)
+        current_settings = current_store.get("settings", {})
+
+        if isinstance(raw_store, dict):
+            import_settings = raw_store.get("settings", {})
+            import_entries = raw_store.get("entries", [])
+        elif isinstance(raw_store, list):
+            import_settings = {}
+            import_entries = raw_store
+        else:
+            import_settings = {}
+            import_entries = []
+
+        effective_entries = _apply_worldbook_import_options(
+            import_entries if isinstance(import_entries, list) else [],
+            missing_injection_policy=payload.missing_injection_policy,
+            force_in_chat_depth=payload.force_in_chat_depth,
+            force_injection_order=payload.force_injection_order,
+        )
+
+        store_to_save = {
+            "settings": import_settings if payload.apply_settings else current_settings,
+            "entries": effective_entries,
+        }
+        saved_store = ctx.save_worldbook_store(store_to_save, active_slot)
         return {"ok": True, "items": saved_store["entries"], "settings": saved_store["settings"]}
 
     @app.post("/api/worldbook")
@@ -476,40 +554,52 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         existing_entries = existing_store["entries"]
         merged_items: list[dict[str, Any]] = []
         for index, item in enumerate(payload.items, start=1):
-            row = item.model_dump()
-            trigger = str(row.get("trigger", "")).strip()
-            content = str(row.get("content", "")).strip()
-            if not trigger or not content:
-                continue
+            row = item.model_dump(exclude_unset=True)
+            trigger = str(row.get("trigger", "") or "").strip()
+            content = str(row.get("content", "") or "").strip()
             previous = next((entry for entry in existing_entries if str(entry.get("trigger", "")).strip() == trigger), {})
-            merged_items.append(
-                {
-                    "id": row.get("id") or previous.get("id", f"worldbook-{index}"),
-                    "title": row.get("title") or previous.get("title", f"词条 {index}"),
-                    "trigger": trigger,
-                    "secondary_trigger": row.get("secondary_trigger") or previous.get("secondary_trigger", ""),
-                    "content": content,
-                    "enabled": row.get("enabled", previous.get("enabled", True)),
-                    "priority": row.get("priority", previous.get("priority", 100)),
-                    "case_sensitive": row.get(
-                        "case_sensitive",
-                        previous.get("case_sensitive", existing_store["settings"]["default_case_sensitive"]),
-                    ),
-                    "whole_word": row.get(
-                        "whole_word",
-                        previous.get("whole_word", existing_store["settings"]["default_whole_word"]),
-                    ),
-                    "match_mode": row.get("match_mode") or previous.get(
-                        "match_mode",
-                        existing_store["settings"]["default_match_mode"],
-                    ),
-                    "secondary_mode": row.get("secondary_mode") or previous.get(
-                        "secondary_mode",
-                        existing_store["settings"]["default_secondary_mode"],
-                    ),
-                    "comment": row.get("comment") or previous.get("comment", ""),
-                }
-            )
+            effective_trigger = trigger or str(previous.get("trigger", "")).strip()
+            effective_content = content or str(previous.get("content", "")).strip()
+            if not effective_trigger or not effective_content:
+                continue
+
+            merged = dict(previous)
+            if row.get("id"):
+                merged["id"] = row.get("id")
+            else:
+                merged.setdefault("id", f"worldbook-{index}")
+            merged["title"] = str(row.get("title", "") or merged.get("title", f"词条 {index}")).strip() or f"词条 {index}"
+            merged["trigger"] = effective_trigger
+            merged["secondary_trigger"] = str(
+                row.get("secondary_trigger", merged.get("secondary_trigger", ""))
+            ).strip()
+            merged["content"] = effective_content
+            for key in [
+                "enabled",
+                "priority",
+                "case_sensitive",
+                "whole_word",
+                "match_mode",
+                "secondary_mode",
+                "comment",
+                "group",
+                "entry_type",
+                "group_operator",
+                "chance",
+                "sticky_turns",
+                "cooldown_turns",
+                "order",
+                "insertion_position",
+                "injection_depth",
+                "injection_role",
+                "injection_order",
+                "recursive_enabled",
+                "prevent_further_recursion",
+            ]:
+                if key in row:
+                    merged[key] = row[key]
+            merged_items.append(merged)
+
         store_to_save = {
             "settings": payload.settings.model_dump() if payload.settings is not None else existing_store["settings"],
             "entries": merged_items,

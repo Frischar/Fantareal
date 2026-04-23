@@ -1,0 +1,41 @@
+{
+  "settings": {
+    "enabled": true,
+    "debug_enabled": true,
+    "max_hits": 4,
+    "default_case_sensitive": false,
+    "default_whole_word": false,
+    "default_match_mode": "any",
+    "default_secondary_mode": "all"
+  },
+  "entries": [
+    {
+      "id": "old-import-001",
+      "title": "旧版导入测试·听雨咖啡",
+      "trigger": "旧版咖啡馆",
+      "secondary_trigger": "旧版店里",
+      "content": "【OLD_IMPORT_CAFE】这是旧版 worldbook 词条，用来测试“缺失注入字段时怎么补”。",
+      "enabled": true,
+      "priority": 120,
+      "case_sensitive": false,
+      "whole_word": false,
+      "match_mode": "any",
+      "secondary_mode": "all",
+      "comment": "旧版词条，没有 insertion_position / injection_depth / injection_order / recursive 字段"
+    },
+    {
+      "id": "old-import-002",
+      "title": "旧版导入测试·雪音",
+      "trigger": "旧版雪音",
+      "secondary_trigger": "旧版伦敦",
+      "content": "【OLD_IMPORT_YUCCA】这是第二条旧版词条，用来测试旧包在不同导入策略下的落点。",
+      "enabled": true,
+      "priority": 80,
+      "case_sensitive": false,
+      "whole_word": false,
+      "match_mode": "any",
+      "secondary_mode": "all",
+      "comment": "同样缺失新字段"
+    }
+  ]
+}

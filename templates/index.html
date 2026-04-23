@@ -400,6 +400,141 @@
         max-height: 16rem;
         overflow: auto;
       }
+      .worldbook-debug-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+      }
+      .worldbook-debug-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.3rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--input-bg);
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .worldbook-debug-chip.active {
+        border-color: var(--accent, var(--border));
+      }
+      .worldbook-debug-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 0.85rem;
+      }
+      .worldbook-debug-filters[hidden] {
+        display: none !important;
+      }
+      .worldbook-debug-filters .secondary.compact.active {
+        border-color: var(--accent, var(--border));
+        background: var(--panel);
+      }
+      .worldbook-debug-groups {
+        display: grid;
+        gap: 0.85rem;
+      }
+      .worldbook-debug-group {
+        border: 1px solid var(--border);
+        border-radius: 0.9rem;
+        background: var(--panel);
+        padding: 0.8rem 0.9rem;
+      }
+      .worldbook-debug-group-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.7rem;
+        flex-wrap: wrap;
+      }
+      .worldbook-debug-group-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+      }
+      .worldbook-debug-group-meta {
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+      .worldbook-debug-empty {
+        border: 1px dashed var(--border);
+        border-radius: 0.85rem;
+        padding: 0.85rem 0.95rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+        background: var(--panel);
+      }
+      .worldbook-debug-item-list {
+        display: grid;
+        gap: 0.65rem;
+      }
+      .worldbook-debug-item {
+        border: 1px solid var(--border);
+        border-radius: 0.8rem;
+        background: var(--input-bg);
+        padding: 0.75rem 0.85rem;
+      }
+      .worldbook-debug-item-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.5rem;
+      }
+      .worldbook-debug-item-title {
+        font-weight: 700;
+        font-size: 0.88rem;
+      }
+      .worldbook-debug-tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+      .worldbook-debug-tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.22rem 0.58rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        font-size: 0.75rem;
+      }
+      .worldbook-debug-tag.selected {
+        border-color: var(--accent, var(--border));
+      }
+      .worldbook-debug-tag.dropped {
+        color: var(--muted);
+      }
+      .worldbook-debug-item-meta {
+        display: grid;
+        gap: 0.28rem;
+        margin-bottom: 0.55rem;
+        font-size: 0.79rem;
+      }
+      .worldbook-debug-label {
+        color: var(--muted);
+      }
+      .worldbook-debug-item-preview {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+      .worldbook-debug-raw-wrap {
+        margin-top: 0.85rem;
+      }
+      .worldbook-debug-raw-wrap summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
       @media (max-width: 768px) {
         .worldbook-debug-toggle {
           gap: 0.75rem;
@@ -502,7 +637,21 @@
               <span id="worldbook-debug-arrow" class="worldbook-debug-arrow" aria-hidden="true">▾</span>
             </button>
             <div id="worldbook-debug-body" class="worldbook-debug-body" hidden>
-              <pre id="worldbook-debug-prompt" class="debug-code-block">点击上方箭头展开后，可查看本轮 Worldbook 调试文本。</pre>
+              <div id="worldbook-debug-summary" class="worldbook-debug-summary"></div>
+
+              <div id="worldbook-debug-filters" class="worldbook-debug-filters" hidden>
+                <button type="button" class="secondary compact active" data-debug-filter="all">全部</button>
+                <button type="button" class="secondary compact" data-debug-filter="selected">只看已注入</button>
+                <button type="button" class="secondary compact" data-debug-filter="dropped">只看未注入</button>
+                <button type="button" class="secondary compact" data-debug-filter="recursive">只看递归链</button>
+              </div>
+
+              <div id="worldbook-debug-groups" class="worldbook-debug-groups"></div>
+
+              <details class="worldbook-debug-raw-wrap">
+                <summary>查看原始调试文本</summary>
+                <pre id="worldbook-debug-prompt" class="debug-code-block">点击上方箭头展开后，可查看本轮 Worldbook 调试文本。</pre>
+              </details>
             </div>
           </div>
 
@@ -802,6 +951,9 @@
       const worldbookDebugStatusEl = document.getElementById("worldbook-debug-status");
       const worldbookDebugCountEl = document.getElementById("worldbook-debug-count");
       const worldbookDebugPromptEl = document.getElementById("worldbook-debug-prompt");
+      const worldbookDebugSummaryEl = document.getElementById("worldbook-debug-summary");
+      const worldbookDebugGroupsEl = document.getElementById("worldbook-debug-groups");
+      const worldbookDebugFiltersEl = document.getElementById("worldbook-debug-filters");
       const worldbookDebugEnabled = {{ worldbook_settings.debug_enabled | tojson }};
       const presetNameEl = document.getElementById("chat-preset-name");
       const presetModulesEl = document.getElementById("chat-preset-modules");
@@ -940,6 +1092,8 @@
       };
 
       let worldbookDebugCollapsed = true;
+      let worldbookDebugFilter = "all";
+      let lastWorldbookDebugPayload = null;
       let serverState = normalizeRuntimeState(initialState);
       let runtimeState = { ...serverState };
       let worldbookEntries = [];
@@ -1478,6 +1632,298 @@
         }
       }
 
+      function normalizeWorldbookDebug(debug) {
+        const rawItems = Array.isArray(debug?.items) ? debug.items : [];
+        const rawAll = Array.isArray(debug?.matched_all) ? debug.matched_all : [];
+        const rawMatched = Array.isArray(debug?.matched) ? debug.matched : [];
+        const rawSelected = Array.isArray(debug?.selected) ? debug.selected : [];
+        const rawDropped = Array.isArray(debug?.dropped) ? debug.dropped : [];
+        const sourceItems = rawItems.length ? rawItems : (rawAll.length ? rawAll : (rawMatched.length ? rawMatched : []));
+
+        const selectedIds = new Set(rawSelected.map((item) => String(item?.id || "").trim()).filter(Boolean));
+        const droppedIds = new Set(rawDropped.map((item) => String(item?.id || "").trim()).filter(Boolean));
+
+        const items = sourceItems.map((item, index) => {
+          const entryId = String(item?.id || "").trim();
+          const insertionPosition = String(item?.insertion_position || item?.insertionPosition || "after_char_defs").trim() || "after_char_defs";
+          const injectionDepth = Number.isFinite(Number(item?.injection_depth)) ? Number(item.injection_depth) : (Number.isFinite(Number(item?.injectionDepth)) ? Number(item.injectionDepth) : 0);
+          const selectedFlag = item?.selected_for_prompt !== undefined ? item.selected_for_prompt : item?.selectedForPrompt;
+          const selectedForPrompt = entryId
+            ? selectedIds.has(entryId) || (!droppedIds.has(entryId) && selectedFlag !== false)
+            : selectedFlag !== false;
+          const droppedReason = String(item?.dropped_reason || item?.droppedReason || "").trim();
+          const matchedDepth = Number.isFinite(Number(item?.matched_depth)) ? Number(item.matched_depth) : (Number.isFinite(Number(item?.matchedDepth)) ? Number(item.matchedDepth) : 0);
+
+          let bucketKey = insertionPosition;
+          let bucketLabel = "世界书（未分类）";
+          if (insertionPosition === "before_char_defs") {
+            bucketKey = "before_char_defs";
+            bucketLabel = "世界书（角色定义前）";
+          } else if (insertionPosition === "after_char_defs") {
+            bucketKey = "after_char_defs";
+            bucketLabel = "世界书（角色定义后）";
+          } else if (insertionPosition === "in_chat") {
+            bucketKey = `in_chat_${injectionDepth}`;
+            bucketLabel = `世界书（聊天深度 ${injectionDepth}）`;
+          }
+
+          return {
+            index,
+            id: entryId,
+            title: String(item?.title || item?.trigger || `未命名词条 ${index + 1}`).trim(),
+            trigger: String(item?.trigger || "").trim(),
+            matched: String(item?.matched || item?.trigger || "").trim(),
+            contentPreview: String(item?.content_preview || item?.content || "").trim(),
+            insertionPosition,
+            injectionDepth,
+            injectionOrder: Number.isFinite(Number(item?.injection_order)) ? Number(item.injection_order) : (Number.isFinite(Number(item?.injectionOrder)) ? Number(item.injectionOrder) : null),
+            injectionRole: String(item?.injection_role || item?.injectionRole || "").trim(),
+            matchedDepth,
+            matchedFrom: String(item?.matched_from || item?.matchedFrom || "").trim(),
+            selectedForPrompt,
+            droppedReason,
+            source: String(item?.source || "").trim(),
+            group: String(item?.group || "").trim(),
+            bucketKey,
+            bucketLabel,
+          };
+        });
+
+        return {
+          items,
+          prompt: typeof debug?.prompt === "string" ? debug.prompt.trim() : "",
+          enforced: !!debug?.enforced,
+          recursiveEnabled: debug?.recursive_enabled !== undefined ? !!debug.recursive_enabled : !!debug?.recursiveEnabled,
+          recursionMaxDepth: Number.isFinite(Number(debug?.recursion_max_depth)) ? Number(debug.recursion_max_depth) : (Number.isFinite(Number(debug?.recursionMaxDepth)) ? Number(debug.recursionMaxDepth) : null),
+        };
+      }
+
+      function getWorldbookDebugVisibleItems(items) {
+        if (worldbookDebugFilter === "selected") {
+          return items.filter((item) => item.selectedForPrompt);
+        }
+        if (worldbookDebugFilter === "dropped") {
+          return items.filter((item) => !item.selectedForPrompt);
+        }
+        if (worldbookDebugFilter === "recursive") {
+          return items.filter((item) => item.matchedDepth > 0 || item.matchedFrom);
+        }
+        return items;
+      }
+
+      function refreshWorldbookDebugFilterButtons() {
+        if (!worldbookDebugFiltersEl) return;
+        worldbookDebugFiltersEl.querySelectorAll("[data-debug-filter]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.debugFilter === worldbookDebugFilter);
+        });
+      }
+
+      function makeWorldbookDebugChip(text, isActive = false) {
+        const chip = document.createElement("span");
+        chip.className = "worldbook-debug-chip";
+        if (isActive) {
+          chip.classList.add("active");
+        }
+        chip.textContent = text;
+        return chip;
+      }
+
+      function makeWorldbookDebugTag(text, extraClass = "") {
+        const tag = document.createElement("span");
+        tag.className = `worldbook-debug-tag${extraClass ? ` ${extraClass}` : ""}`;
+        tag.textContent = text;
+        return tag;
+      }
+
+      function formatWorldbookPositionLabel(item) {
+        if (item.insertionPosition === "before_char_defs") {
+          return "角色定义前";
+        }
+        if (item.insertionPosition === "after_char_defs") {
+          return "角色定义后";
+        }
+        if (item.insertionPosition === "in_chat") {
+          return `聊天深度 ${item.injectionDepth}`;
+        }
+        return "未分类";
+      }
+
+      function formatWorldbookStateText(item) {
+        if (item.selectedForPrompt) {
+          return "已注入到当前轮 Prompt";
+        }
+        if (item.droppedReason === "max_hits") {
+          return "命中但未注入：被 max_hits 截断";
+        }
+        if (item.droppedReason) {
+          return `命中但未注入：${item.droppedReason}`;
+        }
+        return "命中但未注入";
+      }
+
+      function renderWorldbookDebugSummary(debugState) {
+        if (!worldbookDebugSummaryEl) return;
+
+        const allItems = Array.isArray(debugState?.items) ? debugState.items : [];
+        const selectedCount = allItems.filter((item) => item.selectedForPrompt).length;
+        const droppedCount = allItems.length - selectedCount;
+        const recursiveCount = allItems.filter((item) => item.matchedDepth > 0 || item.matchedFrom).length;
+
+        worldbookDebugSummaryEl.innerHTML = "";
+        worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`命中 ${allItems.length}`));
+        worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`已注入 ${selectedCount}`, selectedCount > 0));
+        worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`未注入 ${droppedCount}`));
+        worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`递归 ${debugState?.recursiveEnabled ? "开" : "关"}`, !!debugState?.recursiveEnabled));
+        if (debugState?.recursionMaxDepth !== null && debugState?.recursionMaxDepth !== undefined) {
+          worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`最大层级 ${debugState.recursionMaxDepth}`));
+        }
+        if (recursiveCount > 0) {
+          worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`递归命中 ${recursiveCount}`));
+        }
+      }
+
+      function renderWorldbookDebugGroups(debugState) {
+        if (!worldbookDebugGroupsEl) return;
+
+        const visibleItems = getWorldbookDebugVisibleItems(Array.isArray(debugState?.items) ? debugState.items : []);
+        const groupOrder = [
+          "before_char_defs",
+          "after_char_defs",
+          "in_chat_0",
+          "in_chat_1",
+          "in_chat_2",
+          "in_chat_3",
+          "unknown",
+        ];
+        const grouped = new Map();
+        visibleItems.forEach((item) => {
+          if (!grouped.has(item.bucketKey)) {
+            grouped.set(item.bucketKey, []);
+          }
+          grouped.get(item.bucketKey).push(item);
+        });
+
+        worldbookDebugGroupsEl.innerHTML = "";
+
+        if (!visibleItems.length) {
+          const empty = document.createElement("div");
+          empty.className = "worldbook-debug-empty";
+          empty.textContent = worldbookDebugFilter === "recursive"
+            ? "当前轮没有递归链可展示。你可以切回“全部”查看完整 Worldbook Debug。"
+            : "当前过滤条件下没有 Worldbook 条目可展示。你可以切回“全部”查看完整 Worldbook Debug。";
+          worldbookDebugGroupsEl.appendChild(empty);
+          return;
+        }
+
+        groupOrder.forEach((groupKey) => {
+          const entries = grouped.get(groupKey);
+          if (!entries || !entries.length) return;
+
+          const group = document.createElement("section");
+          group.className = "worldbook-debug-group";
+
+          const head = document.createElement("div");
+          head.className = "worldbook-debug-group-head";
+
+          const title = document.createElement("strong");
+          title.className = "worldbook-debug-group-title";
+          title.textContent = entries[0].bucketLabel;
+
+          const meta = document.createElement("span");
+          meta.className = "worldbook-debug-group-meta";
+          meta.textContent = `${entries.length} 条`;
+
+          head.appendChild(title);
+          head.appendChild(meta);
+          group.appendChild(head);
+
+          const list = document.createElement("div");
+          list.className = "worldbook-debug-item-list";
+
+          entries.forEach((item) => {
+            const card = document.createElement("article");
+            card.className = "worldbook-debug-item";
+
+            const cardHead = document.createElement("div");
+            cardHead.className = "worldbook-debug-item-head";
+
+            const titleWrap = document.createElement("div");
+            const cardTitle = document.createElement("div");
+            cardTitle.className = "worldbook-debug-item-title";
+            cardTitle.textContent = item.title;
+            titleWrap.appendChild(cardTitle);
+
+            const tagRow = document.createElement("div");
+            tagRow.className = "worldbook-debug-tag-row";
+            tagRow.appendChild(makeWorldbookDebugTag(item.selectedForPrompt ? "已注入" : "未注入", item.selectedForPrompt ? "selected" : "dropped"));
+            tagRow.appendChild(makeWorldbookDebugTag(formatWorldbookPositionLabel(item)));
+            if (item.matchedDepth > 0 || item.matchedFrom) {
+              tagRow.appendChild(makeWorldbookDebugTag(`递归层级 ${item.matchedDepth}`));
+            } else {
+              tagRow.appendChild(makeWorldbookDebugTag("直接命中"));
+            }
+
+            cardHead.appendChild(titleWrap);
+            cardHead.appendChild(tagRow);
+            card.appendChild(cardHead);
+
+            const metaBlock = document.createElement("div");
+            metaBlock.className = "worldbook-debug-item-meta";
+
+            const lines = [
+              ["Trigger", item.trigger || "—"],
+              ["Matched", item.matched || "—"],
+            ];
+
+            if (item.matchedFrom) {
+              lines.push(["来源", item.matchedFrom]);
+            }
+            if (item.injectionOrder !== null) {
+              lines.push(["注入顺序", String(item.injectionOrder)]);
+            }
+            if (item.injectionRole) {
+              lines.push(["角色", item.injectionRole]);
+            }
+            if (item.group) {
+              lines.push(["组别", item.group]);
+            }
+            if (item.source) {
+              lines.push(["来源类型", item.source]);
+            }
+            lines.push(["状态", formatWorldbookStateText(item)]);
+
+            lines.forEach(([labelText, valueText]) => {
+              const line = document.createElement("div");
+              const label = document.createElement("span");
+              label.className = "worldbook-debug-label";
+              label.textContent = `${labelText}: `;
+              const value = document.createElement("span");
+              value.textContent = valueText;
+              line.appendChild(label);
+              line.appendChild(value);
+              metaBlock.appendChild(line);
+            });
+
+            card.appendChild(metaBlock);
+
+            if (item.contentPreview) {
+              const preview = document.createElement("p");
+              preview.className = "worldbook-debug-item-preview";
+              const trimmed = item.contentPreview.length > 220
+                ? `${item.contentPreview.slice(0, 220).trimEnd()}...`
+                : item.contentPreview;
+              preview.textContent = trimmed;
+              card.appendChild(preview);
+            }
+
+            list.appendChild(card);
+          });
+
+          group.appendChild(list);
+          worldbookDebugGroupsEl.appendChild(group);
+        });
+      }
+
       function renderWorldbookDebug(debug) {
         if (!worldbookDebugEnabled) {
           if (worldbookDebugPanelEl) {
@@ -1490,24 +1936,38 @@
           worldbookDebugPanelEl.hidden = false;
         }
 
-        const hits = Array.isArray(debug?.matched) ? debug.matched : [];
-        const prompt = typeof debug?.prompt === "string" ? debug.prompt.trim() : "";
-        const enforced = !!debug?.enforced;
-        const hasDebug = !!hits.length || !!prompt;
+        const normalized = normalizeWorldbookDebug(debug || {});
+        lastWorldbookDebugPayload = normalized;
+
+        const allItems = normalized.items;
+        const hasDebug = allItems.length > 0 || !!normalized.prompt;
 
         if (!hasDebug) {
           worldbookDebugStatusEl.textContent = "No Hit";
           worldbookDebugStatusEl.classList.remove("active");
           worldbookDebugCountEl.textContent = "暂无命中";
           worldbookDebugPromptEl.textContent = "当前轮没有可展示的 Worldbook 调试文本。点击上方箭头后，这里会显示命中详情和拼接进 Prompt 的内容。";
+          if (worldbookDebugSummaryEl) worldbookDebugSummaryEl.innerHTML = "";
+          if (worldbookDebugGroupsEl) worldbookDebugGroupsEl.innerHTML = '<div class="worldbook-debug-empty">当前轮没有可展示的 Worldbook 调试信息。</div>';
+          if (worldbookDebugFiltersEl) worldbookDebugFiltersEl.hidden = true;
           setWorldbookDebugCollapsed(true);
           return;
         }
 
-        worldbookDebugStatusEl.textContent = enforced ? "Hit + Boost" : "Hit";
+        worldbookDebugStatusEl.textContent = normalized.enforced ? "Hit + Boost" : "Hit";
         worldbookDebugStatusEl.classList.add("active");
-        worldbookDebugCountEl.textContent = `${hits.length} items`;
-        worldbookDebugPromptEl.textContent = prompt || hits.map((item) => item.trigger).join("\n");
+        worldbookDebugCountEl.textContent = `${allItems.length} items`;
+
+        renderWorldbookDebugSummary(normalized);
+        renderWorldbookDebugGroups(normalized);
+
+        if (worldbookDebugFiltersEl) {
+          worldbookDebugFiltersEl.hidden = false;
+          refreshWorldbookDebugFilterButtons();
+        }
+
+        const rawPrompt = normalized.prompt || allItems.map((item) => item.trigger || item.title).join("\n");
+        worldbookDebugPromptEl.textContent = rawPrompt;
         setWorldbookDebugCollapsed(worldbookDebugCollapsed);
       }
 
@@ -1799,6 +2259,21 @@
           }
           setWorldbookDebugCollapsed(!worldbookDebugCollapsed);
         });
+      }
+
+      if (worldbookDebugFiltersEl) {
+        worldbookDebugFiltersEl.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-debug-filter]");
+          if (!button) {
+            return;
+          }
+          worldbookDebugFilter = button.dataset.debugFilter || "all";
+          refreshWorldbookDebugFilterButtons();
+          if (lastWorldbookDebugPayload) {
+            renderWorldbookDebug(lastWorldbookDebugPayload);
+          }
+        });
+        refreshWorldbookDebugFilterButtons();
       }
 
       async function loadPresetStoreForChat() {

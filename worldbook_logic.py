@@ -11,11 +11,21 @@ DEFAULT_WORLDBOOK_SETTINGS = {
     "default_whole_word": False,
     "default_match_mode": "any",
     "default_secondary_mode": "all",
-    "default_entry_type": "keyword",       # keyword / constant
-    "default_group_operator": "and",       # and / or
+    "default_entry_type": "keyword",         # keyword / constant
+    "default_group_operator": "and",         # and / or
     "default_chance": 100,                   # 0 ~ 100
     "default_sticky_turns": 0,               # >= 0
     "default_cooldown_turns": 0,             # >= 0
+
+    # 节点版世界书注入默认值
+    "default_insertion_position": "after_char_defs",  # before_char_defs / after_char_defs / in_chat
+    "default_injection_depth": 0,                     # 仅 in_chat 时使用
+    "default_injection_role": "system",               # 当前节点只真正支持 system
+    "default_injection_order": 100,                   # 同位置内的二次排序
+
+    # 递归 V1
+    "recursive_scan_enabled": False,
+    "recursion_max_depth": 2,
 }
 
 
@@ -62,6 +72,30 @@ def _normalize_group_operator(value: Any, default: str = "and") -> str:
     if text in {"or", "any"}:
         return "or"
     return default
+
+
+def _normalize_insertion_position(value: Any, default: str = "after_char_defs") -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"before_char_defs", "after_char_defs", "in_chat"} else default
+
+
+def _normalize_injection_role(value: Any, default: str = "system") -> str:
+    text = str(value or "").strip().lower()
+    if text in {"system", "user", "assistant"}:
+        return text
+    return default
+
+
+def _normalize_injection_depth(value: Any, default: int = 0) -> int:
+    return _clamp_int(value, 0, 3, default)
+
+
+def _normalize_injection_order(value: Any, default: int = 100) -> int:
+    return _clamp_int(value, 0, 999999, default)
+
+
+def _normalize_recursion_depth(value: Any, default: int = 2) -> int:
+    return _clamp_int(value, 0, 5, default)
 
 
 def sanitize_worldbook_settings(raw: Any) -> dict[str, Any]:
@@ -116,6 +150,30 @@ def sanitize_worldbook_settings(raw: Any) -> dict[str, Any]:
         0,
         999,
         DEFAULT_WORLDBOOK_SETTINGS["default_cooldown_turns"],
+    )
+    settings["default_insertion_position"] = _normalize_insertion_position(
+        raw.get("default_insertion_position"),
+        settings["default_insertion_position"],
+    )
+    settings["default_injection_depth"] = _normalize_injection_depth(
+        raw.get("default_injection_depth"),
+        settings["default_injection_depth"],
+    )
+    settings["default_injection_role"] = _normalize_injection_role(
+        raw.get("default_injection_role"),
+        settings["default_injection_role"],
+    )
+    settings["default_injection_order"] = _normalize_injection_order(
+        raw.get("default_injection_order"),
+        settings["default_injection_order"],
+    )
+    settings["recursive_scan_enabled"] = _normalize_yes_no_bool(
+        raw.get("recursive_scan_enabled"),
+        settings["recursive_scan_enabled"],
+    )
+    settings["recursion_max_depth"] = _normalize_recursion_depth(
+        raw.get("recursion_max_depth"),
+        settings["recursion_max_depth"],
     )
     return settings
 
@@ -181,6 +239,26 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
     raw_order = raw.get("order", raw.get("priority", 100))
     order = _clamp_int(raw_order, 0, 999999, 100)
 
+    insertion_position = _normalize_insertion_position(
+        raw.get("insertion_position"),
+        str(settings.get("default_insertion_position", "after_char_defs")),
+    )
+    injection_depth = _normalize_injection_depth(
+        raw.get("injection_depth"),
+        int(settings.get("default_injection_depth", 0)),
+    )
+    injection_role = _normalize_injection_role(
+        raw.get("injection_role"),
+        str(settings.get("default_injection_role", "system")),
+    )
+    injection_order = _normalize_injection_order(
+        raw.get("injection_order", raw_order),
+        int(settings.get("default_injection_order", 100)),
+    )
+
+    recursive_enabled = _normalize_yes_no_bool(raw.get("recursive_enabled"), True)
+    prevent_further_recursion = _normalize_yes_no_bool(raw.get("prevent_further_recursion"), False)
+
     enabled = _normalize_yes_no_bool(raw.get("enabled"), True)
     case_sensitive = _normalize_yes_no_bool(
         raw.get("case_sensitive"),
@@ -207,6 +285,12 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
         "cooldown_turns": cooldown_turns,
         "order": order,
         "priority": order,
+        "insertion_position": insertion_position,
+        "injection_depth": injection_depth,
+        "injection_role": injection_role,
+        "injection_order": injection_order,
+        "recursive_enabled": recursive_enabled,
+        "prevent_further_recursion": prevent_further_recursion,
         "enabled": enabled,
         "case_sensitive": case_sensitive,
         "whole_word": whole_word,

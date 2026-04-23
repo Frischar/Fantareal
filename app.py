@@ -61,6 +61,19 @@ from worldbook_logic import (
     split_trigger_aliases,
 )
 
+from prompt_builder import (
+    build_conversation_transcript,
+    build_memory_recap_prompt,
+    build_messages,
+    build_prompt_package,
+    build_retrieval_prompt,
+    build_sprite_prompt,
+    build_user_profile_prompt,
+    build_worldbook_answer_guard,
+    build_worldbook_prompt,
+    configure_prompt_builder,
+)
+
 
 def get_runtime_base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -133,6 +146,8 @@ WORKSHOP_STAGE_LIMITS = {"aMax": 2, "bMax": 5}
 logger = logging.getLogger("xuqi_llm_chat")
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO)
+
+_LAST_WORLDBOOK_DEBUG_SNAPSHOT: dict[str, Any] = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
 
 
 def bootstrap_runtime_layout() -> None:
@@ -2321,14 +2336,84 @@ def _worldbook_direct_question(user_message: str) -> bool:
     return any(marker in text for marker in markers)
 
 
-def _worldbook_entry_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
+
+
+def _normalize_worldbook_insertion_position(value: Any, default: str = "after_char_defs") -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"before_char_defs", "after_char_defs", "in_chat"} else default
+
+
+def _normalize_worldbook_injection_role(value: Any, default: str = "system") -> str:
+    text = str(value or "").strip().lower()
+    if text in {"system", "user", "assistant"}:
+        return text
+    return default
+
+
+def _normalize_worldbook_injection_depth(value: Any, default: int = 0) -> int:
+    return clamp_int(value, 0, 3, default)
+
+
+def _normalize_worldbook_injection_order(value: Any, default: int = 100) -> int:
+    return clamp_int(value, 0, 999999, default)
+
+
+def _worldbook_position_priority(item: dict[str, Any]) -> int:
+    position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
+    if position == "in_chat":
+        return 0
+    if position == "after_char_defs":
+        return 1
+    return 2
+
+
+def _worldbook_global_selection_sort_key(item: dict[str, Any]) -> tuple[int, int, int, str]:
     order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
     source_rank_map = {"constant": 0, "sticky": 1, "keyword": 2}
     source_rank = source_rank_map.get(str(item.get("source", "keyword")), 2)
-    title = str(item.get("title", "")).strip()
-    return (order, source_rank, title)
+    title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
+    return (_worldbook_position_priority(item), order, source_rank, title)
 
 
+def _worldbook_bucket_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
+    injection_order = _normalize_worldbook_injection_order(
+        item.get("injection_order", item.get("order", item.get("priority", 100))),
+        100,
+    )
+    order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
+    return (injection_order, order, title)
+
+
+def bucket_worldbook_matches(matches: list[dict[str, Any]] | None) -> dict[str, Any]:
+    buckets: dict[str, Any] = {
+        "before_char_defs": [],
+        "after_char_defs": [],
+        "in_chat": {},
+    }
+    for item in matches or []:
+        position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
+        if position == "in_chat":
+            depth = _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0)
+            buckets["in_chat"].setdefault(depth, []).append(item)
+        elif position == "before_char_defs":
+            buckets["before_char_defs"].append(item)
+        else:
+            buckets["after_char_defs"].append(item)
+
+    buckets["before_char_defs"].sort(key=_worldbook_bucket_sort_key)
+    buckets["after_char_defs"].sort(key=_worldbook_bucket_sort_key)
+    for depth, items in list(buckets["in_chat"].items()):
+        items.sort(key=_worldbook_bucket_sort_key)
+        buckets["in_chat"][depth] = items
+    return buckets
+def _worldbook_entry_sort_key(item: dict[str, Any]) -> tuple[int, int, int, str]:
+    position_rank = _worldbook_position_priority(item)
+    order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    source_rank_map = {"constant": 0, "sticky": 1, "keyword": 2}
+    source_rank = source_rank_map.get(str(item.get("source", "keyword")), 2)
+    title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
+    return (position_rank, order, source_rank, title)
 def _build_worldbook_runtime_debug_entries(
     current_turn: int,
     entries: list[dict[str, Any]],
@@ -2349,6 +2434,15 @@ def _build_worldbook_runtime_debug_entries(
                 "entry_type": str(item.get("entry_type", "keyword")).strip() or "keyword",
                 "group": str(item.get("group", "")).strip(),
                 "order": clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100),
+                "insertion_position": _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs"),
+                "injection_depth": _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0),
+                "injection_role": _normalize_worldbook_injection_role(item.get("injection_role", "system"), "system"),
+                "injection_order": _normalize_worldbook_injection_order(
+                    item.get("injection_order", item.get("order", item.get("priority", 100))),
+                    100,
+                ),
+                "recursive_enabled": bool(item.get("recursive_enabled", True)),
+                "prevent_further_recursion": bool(item.get("prevent_further_recursion", False)),
                 "chance": clamp_int(item.get("chance", 100), 0, 100, 100),
                 "sticky_turns": clamp_int(item.get("sticky_turns", 0), 0, 999, 0),
                 "cooldown_turns": clamp_int(item.get("cooldown_turns", 0), 0, 999, 0),
@@ -2439,8 +2533,17 @@ def _worldbook_match_payload(
     item: dict[str, Any],
     source: str,
     matched_text: str = "",
+    matched_depth: int = 0,
+    matched_from: str = "",
 ) -> dict[str, Any]:
     order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    insertion_position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
+    injection_depth = _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0)
+    injection_role = _normalize_worldbook_injection_role(item.get("injection_role", "system"), "system")
+    injection_order = _normalize_worldbook_injection_order(
+        item.get("injection_order", order),
+        order,
+    )
     return {
         "id": str(item.get("id", "")).strip(),
         "title": str(item.get("title", "")).strip(),
@@ -2457,16 +2560,64 @@ def _worldbook_match_payload(
         "chance": clamp_int(item.get("chance", 100), 0, 100, 100),
         "sticky_turns": clamp_int(item.get("sticky_turns", 0), 0, 999, 0),
         "cooldown_turns": clamp_int(item.get("cooldown_turns", 0), 0, 999, 0),
+        "insertion_position": insertion_position,
+        "injection_depth": injection_depth,
+        "injection_role": injection_role,
+        "injection_order": injection_order,
+        "recursive_enabled": bool(item.get("recursive_enabled", True)),
+        "prevent_further_recursion": bool(item.get("prevent_further_recursion", False)),
+        "matched_depth": clamp_int(matched_depth, 0, 5, 0),
+        "matched_from": str(matched_from or "").strip(),
+        "selected_for_prompt": False,
+        "dropped_reason": "",
+    }
+
+def _worldbook_recursive_seed_text(item: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for value in [
+        item.get("title", ""),
+        item.get("trigger", ""),
+        item.get("secondary_trigger", ""),
+    ]:
+        text = str(value or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def _worldbook_runtime_state_row(runtime: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "active_until_turn": clamp_int(runtime.get("active_until_turn"), 0, 10_000_000, 0),
+        "cooldown_until_turn": clamp_int(runtime.get("cooldown_until_turn"), 0, 10_000_000, 0),
+        "last_trigger_turn": clamp_int(runtime.get("last_trigger_turn"), 0, 10_000_000, 0),
+        "last_roll": clamp_int(runtime.get("last_roll"), 0, 100, 0),
+        "last_result": str(runtime.get("last_result", "")).strip()[:32],
+        "last_reason": str(runtime.get("last_reason", "")).strip()[:64],
+        "matched_text": str(runtime.get("matched_text", "")).strip()[:240],
     }
 
 
+def _worldbook_debug_display_sort_key(item: dict[str, Any]) -> tuple[int, int, int, int, str]:
+    return (
+        clamp_int(item.get("matched_depth", 0), 0, 99, 0),
+        _worldbook_position_priority(item),
+        _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0),
+        _normalize_worldbook_injection_order(item.get("injection_order", item.get("order", 100)), 100),
+        str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip(),
+    )
+
+
 def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
+    global _LAST_WORLDBOOK_DEBUG_SNAPSHOT
+
     text = str(query or "").strip()
     if not text:
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
         return []
 
     settings = get_worldbook_settings()
     if not settings.get("enabled", True):
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": text, "all_matches": [], "selected_ids": [], "dropped_ids": []}
         return []
 
     runtime_state = get_worldbook_runtime_state()
@@ -2476,6 +2627,11 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
     runtime_entries = runtime_state.get("entries", {}) if isinstance(runtime_state.get("entries"), dict) else {}
     clean_runtime_entries: dict[str, dict[str, Any]] = {}
     hits: list[dict[str, Any]] = []
+    hits_by_id: dict[str, dict[str, Any]] = {}
+    keyword_candidates: list[dict[str, Any]] = []
+    seed_queue: list[dict[str, Any]] = [{"text": text, "depth": 0, "from": ""}]
+    recursion_enabled = bool(settings.get("recursive_scan_enabled", False))
+    recursion_max_depth = clamp_int(settings.get("recursion_max_depth", 2), 0, 5, 2)
 
     for item in get_worldbook_entries():
         if not item.get("enabled", True):
@@ -2490,24 +2646,26 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             entry_type = "keyword"
 
         runtime = runtime_entries.get(entry_id, {}) if isinstance(runtime_entries.get(entry_id), dict) else {}
-        state_row = {
-            "active_until_turn": clamp_int(runtime.get("active_until_turn"), 0, 10_000_000, 0),
-            "cooldown_until_turn": clamp_int(runtime.get("cooldown_until_turn"), 0, 10_000_000, 0),
-            "last_trigger_turn": clamp_int(runtime.get("last_trigger_turn"), 0, 10_000_000, 0),
-            "last_roll": clamp_int(runtime.get("last_roll"), 0, 100, 0),
-            "last_result": str(runtime.get("last_result", "")).strip()[:32],
-            "last_reason": str(runtime.get("last_reason", "")).strip()[:64],
-            "matched_text": str(runtime.get("matched_text", "")).strip()[:240],
-        }
-
+        state_row = _worldbook_runtime_state_row(runtime)
         sticky_turns = clamp_int(item.get("sticky_turns", settings.get("default_sticky_turns", 0)), 0, 999, 0)
         cooldown_turns = clamp_int(item.get("cooldown_turns", settings.get("default_cooldown_turns", 0)), 0, 999, 0)
+
+        candidate = {
+            "item": item,
+            "entry_id": entry_id,
+            "entry_type": entry_type,
+            "state_row": state_row,
+            "sticky_turns": sticky_turns,
+            "cooldown_turns": cooldown_turns,
+        }
 
         if entry_type == "constant":
             state_row["last_result"] = "constant"
             state_row["last_reason"] = "always_on"
             clean_runtime_entries[entry_id] = state_row
-            hits.append(_worldbook_match_payload(item=item, source="constant", matched_text="常驻"))
+            hit = _worldbook_match_payload(item=item, source="constant", matched_text="常驻", matched_depth=0, matched_from="")
+            hits.append(hit)
+            hits_by_id[entry_id] = hit
             continue
 
         if state_row["active_until_turn"] >= current_turn and state_row["last_trigger_turn"] < current_turn:
@@ -2515,7 +2673,9 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             state_row["last_result"] = "sticky"
             state_row["last_reason"] = "active"
             clean_runtime_entries[entry_id] = state_row
-            hits.append(_worldbook_match_payload(item=item, source="sticky", matched_text=matched_text))
+            hit = _worldbook_match_payload(item=item, source="sticky", matched_text=matched_text, matched_depth=0, matched_from="")
+            hits.append(hit)
+            hits_by_id[entry_id] = hit
             continue
 
         if state_row["cooldown_until_turn"] >= current_turn:
@@ -2524,99 +2684,135 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             clean_runtime_entries[entry_id] = state_row
             continue
 
-        matched, primary_matches, secondary_matches, matched_text = _evaluate_worldbook_keyword_entry(text, item, settings)
-        if not matched:
-            state_row["last_result"] = "not_matched"
-            state_row["last_reason"] = "keyword"
-            state_row["matched_text"] = matched_text[:240]
+        keyword_candidates.append(candidate)
+
+    depth = 0
+    while seed_queue:
+        next_queue: list[dict[str, Any]] = []
+        newly_matched_this_depth: list[dict[str, Any]] = []
+
+        for seed in seed_queue:
+            seed_text = str(seed.get("text", "")).strip()
+            if not seed_text:
+                continue
+            seed_depth = clamp_int(seed.get("depth", depth), 0, 5, depth)
+            seed_from = str(seed.get("from", "")).strip()
+
+            for candidate in keyword_candidates:
+                entry_id = candidate["entry_id"]
+                if entry_id in hits_by_id:
+                    continue
+
+                item = candidate["item"]
+                if seed_depth > 0 and not bool(item.get("recursive_enabled", True)):
+                    continue
+
+                state_row = candidate["state_row"]
+                matched, _primary_matches, _secondary_matches, matched_text = _evaluate_worldbook_keyword_entry(seed_text, item, settings)
+                if not matched:
+                    continue
+
+                chance = clamp_int(item.get("chance", settings.get("default_chance", 100)), 0, 100, 100)
+                roll = random.randint(1, 100)
+                state_row["last_roll"] = roll
+                state_row["matched_text"] = matched_text[:240]
+                if chance < 100 and roll > chance:
+                    state_row["last_result"] = "chance_failed"
+                    state_row["last_reason"] = "chance"
+                    clean_runtime_entries[entry_id] = state_row
+                    hits_by_id[entry_id] = {"id": entry_id, "_chance_failed": True}
+                    continue
+
+                active_until_turn = current_turn + candidate["sticky_turns"]
+                cooldown_until_turn = active_until_turn + candidate["cooldown_turns"]
+                state_row["active_until_turn"] = active_until_turn
+                state_row["cooldown_until_turn"] = cooldown_until_turn
+                state_row["last_trigger_turn"] = current_turn
+                state_row["last_result"] = "triggered"
+                state_row["last_reason"] = "recursive" if seed_depth > 0 else "keyword"
+                clean_runtime_entries[entry_id] = state_row
+
+                hit = _worldbook_match_payload(
+                    item=item,
+                    source="keyword",
+                    matched_text=matched_text,
+                    matched_depth=seed_depth,
+                    matched_from=seed_from,
+                )
+                hits.append(hit)
+                hits_by_id[entry_id] = hit
+                newly_matched_this_depth.append(hit)
+
+        if not recursion_enabled or depth >= recursion_max_depth:
+            break
+
+        if not newly_matched_this_depth:
+            break
+
+        for hit in newly_matched_this_depth:
+            if not bool(hit.get("recursive_enabled", True)):
+                continue
+            if bool(hit.get("prevent_further_recursion", False)):
+                continue
+            seed_text = _worldbook_recursive_seed_text(hit)
+            if not seed_text:
+                continue
+            next_queue.append(
+                {
+                    "text": seed_text,
+                    "depth": clamp_int(hit.get("matched_depth", depth), 0, 5, depth) + 1,
+                    "from": str(hit.get("title", "")).strip() or str(hit.get("trigger", "")).strip(),
+                }
+            )
+
+        depth += 1
+        seed_queue = next_queue
+
+    for candidate in keyword_candidates:
+        entry_id = candidate["entry_id"]
+        if entry_id in clean_runtime_entries:
+            continue
+        state_row = candidate["state_row"]
+        if state_row.get("last_result") == "chance_failed":
             clean_runtime_entries[entry_id] = state_row
             continue
-
-        chance = clamp_int(item.get("chance", settings.get("default_chance", 100)), 0, 100, 100)
-        roll = random.randint(1, 100)
-        state_row["last_roll"] = roll
-        state_row["matched_text"] = matched_text[:240]
-        if chance < 100 and roll > chance:
-            state_row["last_result"] = "chance_failed"
-            state_row["last_reason"] = "chance"
-            clean_runtime_entries[entry_id] = state_row
+        if entry_id in hits_by_id:
             continue
-
-        active_until_turn = current_turn + sticky_turns
-        cooldown_until_turn = active_until_turn + cooldown_turns
-        state_row["active_until_turn"] = active_until_turn
-        state_row["cooldown_until_turn"] = cooldown_until_turn
-        state_row["last_trigger_turn"] = current_turn
-        state_row["last_result"] = "triggered"
+        state_row["last_result"] = "not_matched"
         state_row["last_reason"] = "keyword"
         clean_runtime_entries[entry_id] = state_row
-
-        hits.append(_worldbook_match_payload(item=item, source="keyword", matched_text=matched_text))
 
     runtime_state["entries"] = clean_runtime_entries
     save_worldbook_runtime_state(runtime_state)
 
-    hits.sort(key=_worldbook_entry_sort_key)
+    full_hits = [item for item in hits if not item.get("_chance_failed")]
+    full_hits.sort(key=_worldbook_global_selection_sort_key)
     max_hits = max(1, int(settings.get("max_hits", DEFAULT_WORLDBOOK_SETTINGS["max_hits"])))
-    hits = hits[:max_hits]
+    selected_hits = full_hits[:max_hits]
+    selected_ids = {str(item.get("id", "")).strip() for item in selected_hits if str(item.get("id", "")).strip()}
 
-    if hits:
-        logger.info("Worldbook hits: %s", ", ".join(item.get("title") or item.get("matched") or item.get("trigger", "") for item in hits))
-    return hits
+    all_matches_sorted: list[dict[str, Any]] = []
+    dropped_ids: list[str] = []
+    for item in sorted(full_hits, key=_worldbook_debug_display_sort_key):
+        row = dict(item)
+        entry_id = str(row.get("id", "")).strip()
+        selected_for_prompt = entry_id in selected_ids
+        row["selected_for_prompt"] = selected_for_prompt
+        row["dropped_reason"] = "" if selected_for_prompt else "max_hits"
+        all_matches_sorted.append(row)
+        if not selected_for_prompt and entry_id:
+            dropped_ids.append(entry_id)
 
+    _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {
+        "query": text,
+        "all_matches": all_matches_sorted,
+        "selected_ids": list(selected_ids),
+        "dropped_ids": dropped_ids,
+    }
 
-def build_worldbook_prompt(matches: list[dict[str, Any]]) -> str:
-    if not matches:
-        return ""
-
-    blocks = [
-        "The following are the worldbook notes matched in this turn.",
-        "These are high-priority factual backdrops for the current conversation.",
-        "If the user is asking about any of these items directly, answer from these notes first.",
-        "Do not mention that you saw the worldbook notes in your answer.",
-    ]
-    for index, item in enumerate(matches, start=1):
-        matched = item.get("matched", "")
-        title = str(item.get("title", "")).strip()
-        lines = [f"{index}. Title: {title or item['trigger']}"]
-        source = str(item.get("source", "keyword")).strip()
-        if source:
-            lines.append(f"Source: {source}")
-        group = str(item.get("group", "")).strip()
-        if group:
-            lines.append(f"Group: {group}")
-        if item.get("trigger"):
-            lines.append(f"Trigger: {item['trigger']}")
-        if matched:
-            lines.append(f"Matched: {matched}")
-        if item.get("secondary_trigger"):
-            lines.append(f"Secondary trigger: {item['secondary_trigger']}")
-        lines.append(f"Content: {item['content']}")
-        if item.get("comment"):
-            lines.append(f"Comment: {item['comment']}")
-        blocks.append("\\n".join(lines))
-    return "\\n\\n".join(blocks)
-
-
-def build_worldbook_answer_guard(user_message: str, matches: list[dict[str, Any]]) -> str:
-    if not matches:
-        return ""
-
-    text = str(user_message or "").strip()
-    if not text or not _worldbook_direct_question(text):
-        return ""
-
-    primary_match = matches[0]
-    subject = primary_match.get("matched") or primary_match.get("title") or primary_match.get("trigger") or "this item"
-    fact = str(primary_match.get("content", "")).strip()
-    if not fact:
-        return ""
-
-    return (
-        f"The user is directly asking about \\\"{subject}\\\".\\n"
-        f"Your first sentence must state the core fact directly, for example: {fact}\\n"
-        "Answer directly first, then continue in character without dodging or pretending not to know."
-    )
+    if selected_hits:
+        logger.info("Worldbook hits: %s", ", ".join(item.get("title") or item.get("matched") or item.get("trigger", "") for item in selected_hits))
+    return selected_hits
 
 
 def enforce_worldbook_fact_in_reply(
@@ -2647,18 +2843,6 @@ def enforce_worldbook_fact_in_reply(
 
     logger.info("Worldbook direct-answer guard applied before reply.")
     return f"{fact}\\n\\n{text}"
-
-
-def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
-    if not llm_config.get("sprite_enabled", True):
-        return ""
-
-    return (
-        "Always start every reply with a single sprite tag on the first line in the format [expression:tag].\n"
-        "Do not omit the tag. Do not place anything before it.\n"
-        "Keep the tag short and simple, such as happy, calm, angry, sad, or surprised.\n"
-        "After the tag, write the normal reply. Do not explain the rule.\n"
-    )
 
 
 def normalize_sprite_tag(tag: str) -> str:
@@ -2815,217 +2999,6 @@ async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None
     ]
 
 
-def build_retrieval_prompt(retrieved_items: list[dict[str, Any]]) -> str:
-    if not retrieved_items:
-        return ""
-
-    blocks = [
-        "The following are the most relevant long-term memories for the current message.",
-        "Use them as supporting context, but do not hallucinate details that are not present.",
-    ]
-    for index, item in enumerate(retrieved_items, start=1):
-        title = str(item.get("title", "")).strip() or f"Memory {index}"
-        blocks.append(f"{index}. {title}\n{item.get('text', '')}")
-    return "\n\n".join(blocks)
-
-
-def build_memory_recap_prompt(memories: list[dict[str, Any]]) -> str:
-    if not memories:
-        return ""
-
-    blocks = [
-        "The following are long-term memories that should stay consistent over time.",
-        "Treat them as durable background facts unless the user explicitly asks to revise them.",
-    ]
-    for index, item in enumerate(memories, start=1):
-        title = str(item.get("title", "")).strip() or f"Memory {index}"
-        content = str(item.get("content", "")).strip()
-        tags = ", ".join(sanitize_tags(item.get("tags", [])))
-        notes = str(item.get("notes", "")).strip()
-        lines = [f"{index}. {title}"]
-        if content:
-            lines.append(f"Content: {content}")
-        if tags:
-            lines.append(f"Tags: {tags}")
-        if notes:
-            lines.append(f"Notes: {notes}")
-        blocks.append("\n".join(lines))
-    return "\n\n".join(blocks)
-
-
-def build_user_profile_prompt(user_profile: dict[str, Any]) -> str:
-    if not isinstance(user_profile, dict):
-        return ""
-
-    display_name = str(user_profile.get("display_name", "")).strip()
-    nickname = str(user_profile.get("nickname", "")).strip()
-    profile_text = str(user_profile.get("profile_text", "")).strip()
-    notes = str(user_profile.get("notes", "")).strip()
-
-    if display_name == "" and not any([nickname, profile_text, notes]):
-        return ""
-
-    blocks = [
-        "The following are the user profile details bound to the current slot.",
-        "Treat them as stable background information for addressing and understanding the user.",
-        "Do not rewrite these details as if they were your own persona settings.",
-    ]
-    if display_name:
-        blocks.append(f"Display name: {display_name}")
-    if nickname:
-        blocks.append(f"Nickname: {nickname}")
-    if profile_text:
-        blocks.append(f"Profile text: {profile_text}")
-    if notes:
-        blocks.append(f"Notes: {notes}")
-    return "\n".join(blocks)
-
-
-def build_prompt_package(
-    user_message: str,
-    retrieved_items: list[dict[str, Any]] | None = None,
-    *,
-    runtime_overrides: dict[str, Any] | None = None,
-    worldbook_matches: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    persona = get_persona()
-    history = get_conversation()
-    memories = get_memories()
-    user_profile = get_user_profile()
-    llm_config = get_runtime_chat_config(runtime_overrides)
-
-    matched_worldbook_entries = worldbook_matches or []
-    recalled_memories = retrieved_items or []
-
-    preset_prompt = build_preset_prompt()
-    system_prompt = str(persona.get("system_prompt", "")).strip()
-    memory_recap_prompt = build_memory_recap_prompt(memories)
-    user_profile_prompt = build_user_profile_prompt(user_profile)
-    worldbook_prompt = build_worldbook_prompt(matched_worldbook_entries)
-    worldbook_answer_guard = build_worldbook_answer_guard(user_message, matched_worldbook_entries)
-    retrieval_prompt = build_retrieval_prompt(recalled_memories)
-    sprite_prompt = build_sprite_prompt(llm_config)
-
-    history_limit = max(1, int(llm_config["history_limit"]))
-    recent_history = history[-history_limit:]
-    recent_history_text = build_conversation_transcript(recent_history)
-
-    actual_system_sections = [
-        prompt
-        for prompt in [
-            preset_prompt,
-            system_prompt,
-            memory_recap_prompt,
-            user_profile_prompt,
-            worldbook_prompt,
-            worldbook_answer_guard,
-            retrieval_prompt,
-            sprite_prompt,
-        ]
-        if str(prompt or "").strip()
-    ]
-
-    messages: list[dict[str, str]] = []
-    if actual_system_sections:
-        messages.append({"role": "system", "content": "\n\n".join(actual_system_sections)})
-
-    for item in recent_history:
-        role = str(item.get("role", "assistant")).strip() or "assistant"
-        content = str(item.get("content", "")).strip()
-        if content:
-            messages.append({"role": role, "content": content})
-
-    clean_user_message = str(user_message or "").strip()
-    messages.append({"role": "user", "content": clean_user_message})
-
-    layers: list[dict[str, Any]] = []
-
-    def append_layer(layer_id: str, title: str, sections: list[str], **meta: Any) -> None:
-        content = "\n\n".join(part for part in sections if str(part or "").strip()).strip()
-        if not content:
-            return
-        layer: dict[str, Any] = {
-            "id": layer_id,
-            "title": title,
-            "content": content,
-        }
-        if meta:
-            layer["meta"] = meta
-        layers.append(layer)
-
-    append_layer(
-        "system_main",
-        "系统提示词 / 主提示",
-        [preset_prompt],
-        section_count=1 if preset_prompt else 0,
-    )
-    append_layer(
-        "role_card",
-        "角色卡固定设定",
-        [system_prompt],
-        character_name=str(persona.get("name", "")).strip(),
-    )
-    append_layer(
-        "memory_context",
-        "记忆 / 摘要 / 长期信息",
-        [memory_recap_prompt, retrieval_prompt, user_profile_prompt],
-        stored_memory_count=len(memories),
-        recalled_memory_count=len(recalled_memories),
-    )
-    append_layer(
-        "worldbook_context",
-        "世界书（按需触发）",
-        [worldbook_prompt, worldbook_answer_guard],
-        hit_count=len(matched_worldbook_entries),
-    )
-    append_layer(
-        "output_rules",
-        "输出格式约束",
-        [sprite_prompt],
-        sprite_enabled=bool(llm_config.get("sprite_enabled", True)),
-    )
-    append_layer(
-        "recent_history",
-        "最近聊天记录",
-        [recent_history_text],
-        turn_count=len(recent_history),
-    )
-    append_layer(
-        "user_input",
-        "本轮新输入",
-        [clean_user_message],
-        char_count=len(clean_user_message),
-    )
-
-    preview_blocks: list[str] = []
-    for index, layer in enumerate(layers, start=1):
-        preview_blocks.append(f"[{index}. {layer['title']}]\n{layer['content']}")
-
-    return {
-        "layers": layers,
-        "messages": messages,
-        "preview_text": "\n\n".join(preview_blocks).strip(),
-        "message_count": len(messages),
-        "system_section_count": len(actual_system_sections),
-        "recent_history_turns": len(recent_history),
-    }
-
-
-def build_messages(
-    user_message: str,
-    retrieved_items: list[dict[str, Any]] | None = None,
-    *,
-    runtime_overrides: dict[str, Any] | None = None,
-    worldbook_matches: list[dict[str, str]] | None = None,
-) -> list[dict[str, str]]:
-    return build_prompt_package(
-        user_message,
-        retrieved_items,
-        runtime_overrides=runtime_overrides,
-        worldbook_matches=worldbook_matches,
-    )["messages"]
-
-
 async def request_model_reply(
     user_message: str,
     retrieved_items: list[dict[str, Any]],
@@ -3092,21 +3065,53 @@ def build_worldbook_debug_payload(
     all_entries = get_worldbook_entries()
     runtime_entries = runtime_state.get("entries", {}) if isinstance(runtime_state.get("entries"), dict) else {}
 
+    snapshot_matches = _LAST_WORLDBOOK_DEBUG_SNAPSHOT.get("all_matches", [])
+    selected_snapshot = [item for item in snapshot_matches if item.get("selected_for_prompt")]
+    dropped_snapshot = [item for item in snapshot_matches if not item.get("selected_for_prompt")]
+
+    buckets = bucket_worldbook_matches(selected_snapshot or worldbook_matches)
+
+    prompt_blocks: list[str] = []
+    before_prompt = build_worldbook_prompt(
+        buckets["before_char_defs"],
+        heading="[before_char_defs] The following worldbook notes must be considered before the character definition.",
+    )
+    after_prompt = build_worldbook_prompt(
+        buckets["after_char_defs"],
+        heading="[after_char_defs] The following worldbook notes refine or extend the character definition for this turn.",
+    )
+    if before_prompt:
+        prompt_blocks.append(before_prompt)
+    if after_prompt:
+        prompt_blocks.append(after_prompt)
+    for depth in sorted(buckets.get("in_chat", {})):
+        bucket_prompt = build_worldbook_prompt(
+            buckets["in_chat"][depth],
+            heading=f"[in_chat depth={depth}] The following are in-chat worldbook notes at depth {depth}.",
+        )
+        if bucket_prompt:
+            prompt_blocks.append(bucket_prompt)
+
     return {
         "turn_index": clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
-        "hit_count": len(worldbook_matches),
-        "prompt": build_worldbook_prompt(worldbook_matches),
+        "hit_count": len(selected_snapshot or worldbook_matches),
+        "matched_count": len(snapshot_matches) if snapshot_matches else len(worldbook_matches),
+        "selected_count": len(selected_snapshot or worldbook_matches),
+        "dropped_count": len(dropped_snapshot),
+        "prompt": "\n\n".join(prompt_blocks).strip(),
         "guard": build_worldbook_answer_guard(user_message, worldbook_matches),
         "enforced": bool((reply_result or {}).get("worldbook_enforced")),
-        "matched": worldbook_matches,
+        "matched": selected_snapshot or worldbook_matches,
+        "matched_all": snapshot_matches or worldbook_matches,
+        "selected": selected_snapshot or worldbook_matches,
+        "dropped": dropped_snapshot,
+        "buckets": buckets,
         "entry_states": _build_worldbook_runtime_debug_entries(
             clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
             all_entries,
             runtime_entries,
         ),
     }
-
-
 async def stream_model_reply(
     user_message: str,
     retrieved_items: list[dict[str, Any]],
@@ -3276,18 +3281,6 @@ async def generate_reply(
         prompt_package=prompt_package,
     )
     return reply, retrieved, worldbook_matches, prompt_package
-
-
-def build_conversation_transcript(history: list[dict[str, Any]]) -> str:
-    lines: list[str] = []
-    for item in history:
-        role = item.get("role", "")
-        content = str(item.get("content", "")).strip()
-        if role not in {"user", "assistant"} or not content:
-            continue
-        speaker = "User" if role == "user" else "AI"
-        lines.append(f"{speaker}: {content}")
-    return "\n".join(lines)
 
 
 def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str, Any]:
@@ -3588,6 +3581,19 @@ async def archive_current_conversation() -> dict[str, Any]:
     )
     return memory
 
+
+configure_prompt_builder(
+    sanitize_tags=sanitize_tags,
+    get_persona=get_persona,
+    get_conversation=get_conversation,
+    get_memories=get_memories,
+    get_user_profile=get_user_profile,
+    get_runtime_chat_config=get_runtime_chat_config,
+    bucket_worldbook_matches=bucket_worldbook_matches,
+    normalize_worldbook_injection_role=_normalize_worldbook_injection_role,
+    build_preset_prompt=build_preset_prompt,
+)
+
 load_env_file()
 ensure_data_files()
 
@@ -3669,6 +3675,7 @@ route_ctx = SimpleNamespace(
     retrieve_memories=retrieve_memories,
     memories_path=memories_path,
     sanitize_creative_workshop=sanitize_creative_workshop,
+    sanitize_worldbook_store=sanitize_worldbook_store,
     sanitize_preset_store=sanitize_preset_store,
     sanitize_settings=sanitize_settings,
     sanitize_slot_id=sanitize_slot_id,

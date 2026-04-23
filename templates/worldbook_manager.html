@@ -33,7 +33,7 @@
         <div class="section-head">
           <p class="eyebrow">Worldbook</p>
           <h2>世界书词条管理</h2>
-          <p class="muted">支持标题、主关键词、副关键词、常驻/关键词触发、主副组关系、组别、概率、黏性、冷却、顺序等字段。</p>
+          <p class="muted">支持标题、主关键词、副关键词、常驻/关键词触发、主副组关系、组别、概率、黏性、冷却、顺序，以及角色定义前/后与聊天内注入等字段。</p>
         </div>
         <div class="stats-row">
           <div class="stat-box">
@@ -59,6 +59,97 @@
           </div>
         </div>
 
+        <div class="panel config-panel full-span">
+          <div class="section-head">
+            <p class="eyebrow">Import</p>
+            <h2>导入增强</h2>
+            <p class="muted">兼容旧版 worldbook。已有注入字段的词条保留原值；缺失注入字段时，按这里的策略补齐。</p>
+          </div>
+          <div class="grid-two">
+            <label class="checkbox-row">
+              <input id="import-apply-settings" type="checkbox" checked />
+              <span>导入时同时应用包内 settings</span>
+            </label>
+            <div>
+              <label for="import-missing-injection-policy">缺失注入字段时</label>
+              <select id="import-missing-injection-policy">
+                <option value="follow_defaults" selected>跟随当前默认设置</option>
+                <option value="force_before_char_defs">统一补到角色定义前</option>
+                <option value="force_after_char_defs">统一补到角色定义后</option>
+                <option value="force_in_chat">统一补到聊天内注入</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <div>
+              <label for="import-force-in-chat-depth">强制聊天深度</label>
+              <input id="import-force-in-chat-depth" type="number" min="0" max="3" step="1" value="0" />
+              <p class="muted helper-text">仅在“统一补到聊天内注入”时生效。</p>
+            </div>
+            <div>
+              <label for="import-force-injection-order">缺失注入顺序时补为</label>
+              <input id="import-force-injection-order" type="number" min="0" max="999999" step="1" placeholder="留空则不强制" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel config-panel full-span">
+          <div class="section-head">
+            <p class="eyebrow">Batch</p>
+            <h2>批量编辑（V1）</h2>
+            <p class="muted">先勾选词条，再批量修改位置、深度、注入顺序、递归开关与启用状态。</p>
+          </div>
+
+          <div class="button-row">
+            <button id="select-all-visible-worldbook" type="button" class="secondary">全选当前结果</button>
+            <button id="clear-selected-worldbook" type="button" class="secondary">清空选择</button>
+            <span class="muted helper-text">已选中 <strong id="selected-worldbook-count">0</strong> 条</span>
+          </div>
+
+          <div class="grid-two">
+            <div>
+              <label for="bulk-insertion-position">批量插入位置</label>
+              <select id="bulk-insertion-position">
+                <option value="before_char_defs">角色定义前</option>
+                <option value="after_char_defs" selected>角色定义后</option>
+                <option value="in_chat">聊天内注入</option>
+              </select>
+            </div>
+            <div>
+              <label for="bulk-injection-depth">批量聊天深度</label>
+              <input id="bulk-injection-depth" type="number" min="0" max="3" step="1" value="0" />
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <div>
+              <label for="bulk-injection-order">批量注入顺序</label>
+              <input id="bulk-injection-order" type="number" min="0" max="999999" step="1" value="100" />
+            </div>
+            <div class="button-row offset-top">
+              <button id="apply-bulk-injection" type="button" class="secondary">应用注入设置到选中词条</button>
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <label class="checkbox-row">
+              <input id="bulk-recursive-enabled" type="checkbox" checked />
+              <span>批量允许递归参与</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="bulk-prevent-further-recursion" type="checkbox" />
+              <span>批量阻止继续递归</span>
+            </label>
+          </div>
+
+          <div class="button-row">
+            <button id="apply-bulk-recursion" type="button" class="secondary">应用递归设置到选中词条</button>
+            <button id="bulk-enable-selected" type="button" class="secondary">启用选中词条</button>
+            <button id="bulk-disable-selected" type="button" class="secondary">禁用选中词条</button>
+          </div>
+        </div>
+
         <div class="grid-two">
           <div>
             <label for="worldbook-search">搜索词条</label>
@@ -79,6 +170,10 @@
           {% for item in worldbook_entries %}
           <article class="memory-card worldbook-entry-card" data-collapsed="false">
             <div class="memory-card-head">
+              <label class="checkbox-row">
+                <input class="wb-selected" type="checkbox" />
+                <span>选中</span>
+              </label>
               <strong>{{ item.title or ("词条 " ~ loop.index) }}</strong>
               <div class="button-row">
                 <button type="button" class="secondary compact toggle-worldbook-entry">折叠</button>
@@ -166,6 +261,45 @@
               </div>
 
               <div class="grid-two">
+                <div>
+                  <label>插入位置</label>
+                  <select class="wb-insertion-position">
+                    <option value="before_char_defs" {% if item.insertion_position == 'before_char_defs' %}selected{% endif %}>角色定义前</option>
+                    <option value="after_char_defs" {% if (item.insertion_position or 'after_char_defs') == 'after_char_defs' %}selected{% endif %}>角色定义后</option>
+                    <option value="in_chat" {% if item.insertion_position == 'in_chat' %}selected{% endif %}>聊天内注入</option>
+                  </select>
+                </div>
+                <div>
+                  <label>注入顺序</label>
+                  <input class="wb-injection-order" type="number" min="0" max="999999" step="1" value="{{ item.injection_order if item.injection_order is not none else item.order if item.order is not none else item.priority if item.priority is not none else 100 }}" />
+                </div>
+              </div>
+
+              <div class="grid-two">
+                <div>
+                  <label>聊天深度（仅聊天内注入生效）</label>
+                  <input class="wb-injection-depth" type="number" min="0" max="3" step="1" value="{{ item.injection_depth if item.injection_depth is not none else 0 }}" />
+                </div>
+                <div>
+                  <label>注入角色</label>
+                  <select class="wb-injection-role">
+                    <option value="system" {% if (item.injection_role or 'system') == 'system' %}selected{% endif %}>system</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid-two">
+                <label class="checkbox-row">
+                  <input class="wb-recursive-enabled" type="checkbox" {% if item.recursive_enabled is not defined or item.recursive_enabled %}checked{% endif %} />
+                  <span>允许递归参与</span>
+                </label>
+                <label class="checkbox-row">
+                  <input class="wb-prevent-further-recursion" type="checkbox" {% if item.prevent_further_recursion %}checked{% endif %} />
+                  <span>命中后阻止继续递归</span>
+                </label>
+              </div>
+
+              <div class="grid-two">
                 <label class="checkbox-row">
                   <input class="wb-enabled" type="checkbox" {% if item.enabled %}checked{% endif %} />
                   <span>启用词条</span>
@@ -205,6 +339,10 @@
     <template id="worldbook-entry-template">
       <article class="memory-card worldbook-entry-card" data-collapsed="false">
         <div class="memory-card-head">
+          <label class="checkbox-row">
+            <input class="wb-selected" type="checkbox" />
+            <span>选中</span>
+          </label>
           <strong>新词条</strong>
           <div class="button-row">
             <button type="button" class="secondary compact toggle-worldbook-entry">折叠</button>
@@ -292,6 +430,45 @@
           </div>
 
           <div class="grid-two">
+            <div>
+              <label>插入位置</label>
+              <select class="wb-insertion-position">
+                <option value="before_char_defs">角色定义前</option>
+                <option value="after_char_defs" selected>角色定义后</option>
+                <option value="in_chat">聊天内注入</option>
+              </select>
+            </div>
+            <div>
+              <label>注入顺序</label>
+              <input class="wb-injection-order" type="number" min="0" max="999999" step="1" value="100" />
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <div>
+              <label>聊天深度（仅聊天内注入生效）</label>
+              <input class="wb-injection-depth" type="number" min="0" max="3" step="1" value="0" />
+            </div>
+            <div>
+              <label>注入角色</label>
+              <select class="wb-injection-role">
+                <option value="system" selected>system</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <label class="checkbox-row">
+              <input class="wb-recursive-enabled" type="checkbox" checked />
+              <span>允许递归参与</span>
+            </label>
+            <label class="checkbox-row">
+              <input class="wb-prevent-further-recursion" type="checkbox" />
+              <span>命中后阻止继续递归</span>
+            </label>
+          </div>
+
+          <div class="grid-two">
             <label class="checkbox-row">
               <input class="wb-enabled" type="checkbox" checked />
               <span>启用词条</span>
@@ -329,6 +506,12 @@
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
+      const selectedWorldbookCountEl = document.getElementById("selected-worldbook-count");
+      const importMissingInjectionPolicyEl = document.getElementById("import-missing-injection-policy");
+      const importForceInChatDepthEl = document.getElementById("import-force-in-chat-depth");
+      const importForceInjectionOrderEl = document.getElementById("import-force-injection-order");
+      const bulkInsertionPositionEl = document.getElementById("bulk-insertion-position");
+      const bulkInjectionDepthEl = document.getElementById("bulk-injection-depth");
 
       function setStatus(text) {
         statusEl.textContent = text;
@@ -400,6 +583,8 @@
           card.querySelector(".wb-trigger")?.value || "",
           card.querySelector(".wb-secondary-trigger")?.value || "",
           card.querySelector(".wb-entry-type")?.value || "",
+          card.querySelector(".wb-insertion-position")?.value || "",
+          card.querySelector(".wb-injection-role")?.value || "",
           card.querySelector(".wb-content")?.value || "",
           card.querySelector(".wb-comment")?.value || "",
         ].join("\n").toLowerCase();
@@ -429,6 +614,48 @@
         setStatus(keyword ? `搜索完成：找到 ${visibleCount} 条匹配词条。` : "已清除搜索筛选。");
       }
 
+      function syncInjectionUi(card) {
+        if (!card) return;
+        const position = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
+        const depthInput = card.querySelector(".wb-injection-depth");
+        if (depthInput) {
+          const disabled = position !== "in_chat";
+          depthInput.disabled = disabled;
+          depthInput.title = disabled ? "仅在“聊天内注入”时生效" : "";
+        }
+      }
+
+      function syncImportEnhancementUi() {
+        const policy = importMissingInjectionPolicyEl?.value || "follow_defaults";
+        if (importForceInChatDepthEl) {
+          const disabled = policy !== "force_in_chat";
+          importForceInChatDepthEl.disabled = disabled;
+          importForceInChatDepthEl.title = disabled ? "仅在“统一补到聊天内注入”时生效" : "";
+        }
+      }
+
+      function syncBulkInjectionUi() {
+        const policy = bulkInsertionPositionEl?.value || "after_char_defs";
+        if (bulkInjectionDepthEl) {
+          const disabled = policy !== "in_chat";
+          bulkInjectionDepthEl.disabled = disabled;
+          bulkInjectionDepthEl.title = disabled ? "仅在“聊天内注入”时生效" : "";
+        }
+      }
+
+      function getSelectedCards() {
+        return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].filter((card) => {
+          const checkbox = card.querySelector(".wb-selected");
+          return Boolean(checkbox?.checked);
+        });
+      }
+
+      function updateSelectedCount() {
+        if (selectedWorldbookCountEl) {
+          selectedWorldbookCountEl.textContent = String(getSelectedCards().length);
+        }
+      }
+
       function updateCount() {
         worldbookCountEl.textContent = String(worldbookListEl.querySelectorAll(".worldbook-entry-card").length);
       }
@@ -443,6 +670,7 @@
         card.querySelector(".remove-worldbook-entry").addEventListener("click", () => {
           card.remove();
           updateCount();
+          updateSelectedCount();
           applyWorldbookSearch();
           setStatus("已删除一条世界书词条，记得保存。");
         });
@@ -474,10 +702,17 @@
         card.querySelector(".wb-sticky-turns").value = item.sticky_turns ?? 0;
         card.querySelector(".wb-cooldown-turns").value = item.cooldown_turns ?? 0;
         card.querySelector(".wb-order").value = item.order ?? item.priority ?? 100;
+        card.querySelector(".wb-insertion-position").value = item.insertion_position || "after_char_defs";
+        card.querySelector(".wb-injection-depth").value = item.injection_depth ?? 0;
+        card.querySelector(".wb-injection-role").value = item.injection_role || "system";
+        card.querySelector(".wb-injection-order").value = item.injection_order ?? item.order ?? item.priority ?? 100;
+        card.querySelector(".wb-recursive-enabled").checked = item.recursive_enabled !== false;
+        card.querySelector(".wb-prevent-further-recursion").checked = Boolean(item.prevent_further_recursion);
         card.querySelector(".wb-enabled").checked = item.enabled !== false;
         card.querySelector(".wb-case-sensitive").checked = Boolean(item.case_sensitive);
         card.querySelector(".wb-whole-word").checked = Boolean(item.whole_word);
         attachRemoveHandler(card);
+        syncInjectionUi(card);
         updateCardTitle(card);
         return card;
       }
@@ -500,6 +735,12 @@
             cooldown_turns: Number(card.querySelector(".wb-cooldown-turns").value || 0),
             order,
             priority: order,
+            insertion_position: card.querySelector(".wb-insertion-position").value,
+            injection_depth: Number(card.querySelector(".wb-injection-depth").value || 0),
+            injection_role: card.querySelector(".wb-injection-role").value,
+            injection_order: Number(card.querySelector(".wb-injection-order").value || order),
+            recursive_enabled: card.querySelector(".wb-recursive-enabled").checked,
+            prevent_further_recursion: card.querySelector(".wb-prevent-further-recursion").checked,
             content: card.querySelector(".wb-content").value.trim(),
             comment: card.querySelector(".wb-comment").value.trim(),
             enabled: card.querySelector(".wb-enabled").checked,
@@ -516,6 +757,7 @@
           worldbookListEl.appendChild(createEntryCard(item));
         }
         updateCount();
+        updateSelectedCount();
         applyWorldbookSearch();
         setStatus("世界书词条已重新读取。");
       }
@@ -527,6 +769,7 @@
           worldbookListEl.appendChild(createEntryCard(item));
         }
         updateCount();
+        updateSelectedCount();
         applyWorldbookSearch();
         setStatus("世界书词条已保存。");
       }
@@ -534,12 +777,20 @@
       async function importWorldbookFile(file) {
         if (!file) return;
         const rawJson = await file.text();
-        const data = await postJson("/api/worldbook/import", { raw_json: rawJson });
+        const forceOrderRaw = importForceInjectionOrderEl?.value?.trim() || "";
+        const data = await postJson("/api/worldbook/import", {
+          raw_json: rawJson,
+          apply_settings: document.getElementById("import-apply-settings")?.checked ?? true,
+          missing_injection_policy: importMissingInjectionPolicyEl?.value || "follow_defaults",
+          force_in_chat_depth: Number(importForceInChatDepthEl?.value || 0),
+          force_injection_order: forceOrderRaw ? Number(forceOrderRaw) : null,
+        });
         worldbookListEl.innerHTML = "";
         for (const item of data.items || []) {
           worldbookListEl.appendChild(createEntryCard(item));
         }
         updateCount();
+        updateSelectedCount();
         applyWorldbookSearch();
         setStatus(`世界书导入完成：${data.items?.length || 0} 条。`);
       }
@@ -547,12 +798,24 @@
       worldbookListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
+        if (event.target.classList.contains("wb-insertion-position")) {
+          syncInjectionUi(card);
+        }
         updateCardTitle(card);
         applyWorldbookSearch();
       });
 
+      worldbookListEl.addEventListener("change", (event) => {
+        const card = event.target.closest(".worldbook-entry-card");
+        if (!card) return;
+        if (event.target.classList.contains("wb-insertion-position")) {
+          syncInjectionUi(card);
+        }
+      });
+
       document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
         attachRemoveHandler(card);
+        syncInjectionUi(card);
         updateCardTitle(card);
       });
 
@@ -560,6 +823,7 @@
         const card = createEntryCard();
         worldbookListEl.prepend(card);
         updateCount();
+        updateSelectedCount();
         applyWorldbookSearch();
         setStatus("已新增一条空白世界书词条。");
       });
@@ -619,8 +883,109 @@
         setStatus("已展开当前列表中的全部词条。");
       });
 
+
+      worldbookListEl.addEventListener("change", (event) => {
+        const card = event.target.closest(".worldbook-entry-card");
+        if (!card) return;
+        if (event.target.classList.contains("wb-insertion-position")) {
+          syncInjectionUi(card);
+        }
+        if (event.target.classList.contains("wb-selected")) {
+          updateSelectedCount();
+        }
+      });
+
+      document.getElementById("select-all-visible-worldbook").addEventListener("click", () => {
+        [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => {
+          if (card.style.display === "none") return;
+          const checkbox = card.querySelector(".wb-selected");
+          if (checkbox) checkbox.checked = true;
+        });
+        updateSelectedCount();
+        setStatus("已选中当前筛选结果中的全部词条。");
+      });
+
+      document.getElementById("clear-selected-worldbook").addEventListener("click", () => {
+        [...worldbookListEl.querySelectorAll(".wb-selected")].forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+        updateSelectedCount();
+        setStatus("已清空当前选择。");
+      });
+
+      document.getElementById("apply-bulk-injection").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再应用批量注入设置。");
+          return;
+        }
+        const position = bulkInsertionPositionEl?.value || "after_char_defs";
+        const depth = Number(bulkInjectionDepthEl?.value || 0);
+        const injectionOrder = Number(document.getElementById("bulk-injection-order")?.value || 100);
+        cards.forEach((card) => {
+          const positionEl = card.querySelector(".wb-insertion-position");
+          const depthEl = card.querySelector(".wb-injection-depth");
+          const orderEl = card.querySelector(".wb-injection-order");
+          if (positionEl) positionEl.value = position;
+          if (depthEl) depthEl.value = depth;
+          if (orderEl) orderEl.value = injectionOrder;
+          syncInjectionUi(card);
+        });
+        applyWorldbookSearch();
+        setStatus(`已将 ${cards.length} 条词条的注入设置批量更新。`);
+      });
+
+      document.getElementById("apply-bulk-recursion").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再应用批量递归设置。");
+          return;
+        }
+        const recursiveEnabled = document.getElementById("bulk-recursive-enabled")?.checked ?? true;
+        const preventFurther = document.getElementById("bulk-prevent-further-recursion")?.checked ?? false;
+        cards.forEach((card) => {
+          const recursiveEl = card.querySelector(".wb-recursive-enabled");
+          const preventEl = card.querySelector(".wb-prevent-further-recursion");
+          if (recursiveEl) recursiveEl.checked = recursiveEnabled;
+          if (preventEl) preventEl.checked = preventFurther;
+        });
+        setStatus(`已将 ${cards.length} 条词条的递归设置批量更新。`);
+      });
+
+      document.getElementById("bulk-enable-selected").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再批量启用。");
+          return;
+        }
+        cards.forEach((card) => {
+          const enabledEl = card.querySelector(".wb-enabled");
+          if (enabledEl) enabledEl.checked = true;
+        });
+        setStatus(`已启用 ${cards.length} 条选中词条。`);
+      });
+
+      document.getElementById("bulk-disable-selected").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再批量停用。");
+          return;
+        }
+        cards.forEach((card) => {
+          const enabledEl = card.querySelector(".wb-enabled");
+          if (enabledEl) enabledEl.checked = false;
+        });
+        setStatus(`已停用 ${cards.length} 条选中词条。`);
+      });
+
+      importMissingInjectionPolicyEl?.addEventListener("change", syncImportEnhancementUi);
+      bulkInsertionPositionEl?.addEventListener("change", syncBulkInjectionUi);
+
       updateCount();
+      updateSelectedCount();
       applyWorldbookSearch();
+      syncImportEnhancementUi();
+      syncBulkInjectionUi();
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
