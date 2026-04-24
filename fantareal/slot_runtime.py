@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from app_models import (
+from .app_models import (
     DynamicWorldbookPreviewPayload,
     ScenarioBundle,
     SlotActivePreset,
@@ -20,8 +20,8 @@ from app_models import (
     SlotVariableStore,
     SlotWorldbookContext,
 )
-from worldbook_logic import keyword_matches_query, sanitize_worldbook_store, split_trigger_aliases
-from workshop_logic import get_workshop_stage, sanitize_creative_workshop, select_workshop_match
+from .worldbook_logic import keyword_matches_query, sanitize_worldbook_store, split_trigger_aliases
+from .workshop_logic import get_workshop_stage, sanitize_creative_workshop, select_workshop_match
 
 
 class SlotRuntimeService:

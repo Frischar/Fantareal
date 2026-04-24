@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from app_models import ChatRequest, SlotSummaryBufferPayload
+from .app_models import ChatRequest, SlotSummaryBufferPayload
 
 
 def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:

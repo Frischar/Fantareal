@@ -8,7 +8,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from memory_merge_logic import (
+from .memory_merge_logic import (
     get_memory_outline,
     get_merged_memories,
     merge_memories_to_outline,
@@ -16,7 +16,7 @@ from memory_merge_logic import (
     save_merged_memories,
 )
 
-from app_models import (
+from .app_models import (
     DynamicWorldbookPreviewPayload,
     JsonImportPayload,
     MemoryListPayload,
@@ -330,7 +330,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             cloned = json.loads(json.dumps(item, ensure_ascii=False))
             preset_id = str(cloned.get("id", "")).strip()
             if not preset_id or preset_id in existing_ids:
-                from preset_rules import generate_preset_id
+                from .preset_rules import generate_preset_id
 
                 cloned["id"] = generate_preset_id()
             existing_ids.add(cloned["id"])

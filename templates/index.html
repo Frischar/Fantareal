@@ -677,7 +677,7 @@
               </div>
               {% else %}
               <div class="message-avatar assistant-avatar" aria-hidden="true">
-                <img src="{{ role_avatar_url or (settings.sprite_base_path ~ '/avatar.png') }}" alt="{{ persona.name or "AI" }}" onerror="this.remove(); this.parentElement.innerHTML='<span class=&quot;avatar-text&quot;>{{ (persona.name or "AI")[:1] }}</span>';" />
+                <img src="{{ role_avatar_url or (settings.sprite_base_path ~ '/avatar.png') }}" alt="{{ persona.name or "AI" }}" onerror="this.outerHTML='<span class=&quot;avatar-text&quot;>{{ (persona.name or "AI")[:1] }}</span>';" />
               </div>
               <div class="bubble-wrap">
                 <div class="bubble">{{ item.content }}</div>
