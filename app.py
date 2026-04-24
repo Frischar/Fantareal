@@ -989,46 +989,70 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
         card[key] = str(raw.get(key, "")).strip()
 
     card["tags"] = sanitize_tags(raw.get("tags", []))
-
     card["creativeWorkshop"] = sanitize_creative_workshop(raw.get("creativeWorkshop", {}))
 
+    # 保留导入角色卡里的全部剧情阶段。
+    # 旧逻辑只按 default_role_card() 里的 A/B/C 三个 key 取值，
+    # 导入 D/E 或 Stage4 之类的自定义阶段时会被静默丢弃。
     plot_stages = raw.get("plotStages", {})
-    if isinstance(plot_stages, dict):
-        for key in card["plotStages"]:
-            value = plot_stages.get(key, {})
-            if isinstance(value, dict):
-                card["plotStages"][key]["description"] = str(value.get("description", "")).strip()
-                card["plotStages"][key]["rules"] = str(value.get("rules", "")).strip()
+    normalized_plot_stages: dict[str, dict[str, str]] = {}
+    if isinstance(plot_stages, dict) and plot_stages:
+        for source_key, value in plot_stages.items():
+            stage_key = str(source_key).strip()
+            if not stage_key or not isinstance(value, dict):
+                continue
+            normalized_plot_stages[stage_key] = {
+                "description": str(value.get("description", "")).strip(),
+                "rules": str(value.get("rules", "")).strip(),
+            }
 
+    if normalized_plot_stages:
+        card["plotStages"] = normalized_plot_stages
+
+    # 保留导入角色卡里的全部多人人设。
+    # 旧逻辑用 default_role_card() 的 1/2/3 三个槽位 zip，
+    # 导致第 4 个及之后的人设在导入/加载时被截断。
     personas = raw.get("personas", {})
-    if isinstance(personas, dict):
-        persona_items: list[tuple[str, Any]]
-        if any(str(key) in card["personas"] for key in personas):
-            persona_items = [(key, personas.get(key, {})) for key in card["personas"]]
-        else:
-            persona_items = list(personas.items())[: len(card["personas"])]
+    normalized_personas: dict[str, dict[str, str]] = {}
 
-        for slot, item in zip(card["personas"], persona_items):
-            source_key, value = item
-            if isinstance(value, dict):
-                source_name = str(source_key).strip()
-                raw_name = str(value.get("name", "")).strip()
-                display_name = raw_name or source_name
-                if not display_name or re.fullmatch(r"[A-Z]", display_name):
-                    extracted_name = extract_persona_name_from_fields(
-                        str(value.get("description", "")).strip(),
-                        str(value.get("scenario", "")).strip(),
-                        str(value.get("personality", "")).strip(),
-                    )
-                    if extracted_name:
-                        display_name = extracted_name
-                    elif source_name and source_name not in {"1", "2", "3"}:
-                        display_name = source_name
-                card["personas"][slot]["name"] = display_name
-                card["personas"][slot]["description"] = str(value.get("description", "")).strip()
-                card["personas"][slot]["personality"] = str(value.get("personality", "")).strip()
-                card["personas"][slot]["scenario"] = str(value.get("scenario", "")).strip()
-                card["personas"][slot]["creator_notes"] = str(value.get("creator_notes", "")).strip()
+    if isinstance(personas, dict):
+        persona_items: list[tuple[str, Any]] = list(personas.items())
+    elif isinstance(personas, list):
+        persona_items = [(str(index), item) for index, item in enumerate(personas, start=1)]
+    else:
+        persona_items = []
+
+    for source_key, value in persona_items:
+        if not isinstance(value, dict):
+            continue
+
+        persona_key = str(source_key).strip()
+        if not persona_key:
+            continue
+
+        raw_name = str(value.get("name", "")).strip()
+        display_name = raw_name or persona_key
+        if not display_name or re.fullmatch(r"[A-Z]", display_name):
+            extracted_name = extract_persona_name_from_fields(
+                str(value.get("description", "")).strip(),
+                str(value.get("scenario", "")).strip(),
+                str(value.get("personality", "")).strip(),
+            )
+            if extracted_name:
+                display_name = extracted_name
+            elif persona_key:
+                display_name = persona_key
+
+        normalized_personas[persona_key] = {
+            "name": display_name,
+            "description": str(value.get("description", "")).strip(),
+            "personality": str(value.get("personality", "")).strip(),
+            "scenario": str(value.get("scenario", "")).strip(),
+            "creator_notes": str(value.get("creator_notes", "")).strip(),
+        }
+
+    if normalized_personas:
+        card["personas"] = normalized_personas
 
     return card
 
