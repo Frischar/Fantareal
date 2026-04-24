@@ -10,18 +10,7 @@
     <div class="topbar-stack">
       <div class="topbar">
         <a class="brand" href="/chat">Xuqi LLM Chat</a>
-        <nav class="topnav">
-          <a class="navlink" href="/chat">Chat</a>
-          <a class="navlink" href="/config">Config</a>
-          <a class="navlink" href="/config/preset">Preset</a>
-          <a class="navlink" href="/config/user">User</a>
-          <a class="navlink" href="/config/card">Card</a>
-          <a class="navlink" href="/config/workshop">Workshop</a>
-          <a class="navlink" href="/config/sprite">Sprite</a>
-          <a class="navlink" href="/config/memory">Memory</a>
-          <a class="navlink active" href="/config/worldbook">WB Set</a>
-          <a class="navlink" href="/config/worldbook/entries">WB List</a>
-        </nav>
+        {% include "_grouped_nav.html" %}
       </div>
       <div class="slot-toolbar">
         <div class="slot-toolbar-left">
@@ -135,6 +124,51 @@
         </div>
 
         <div class="grid-two">
+          <div>
+            <label for="wb-default-insertion-position">新词条默认插入位置</label>
+            <select id="wb-default-insertion-position">
+              <option value="before_char_defs" {% if worldbook_settings.default_insertion_position == 'before_char_defs' %}selected{% endif %}>角色定义前</option>
+              <option value="after_char_defs" {% if (worldbook_settings.default_insertion_position or 'after_char_defs') == 'after_char_defs' %}selected{% endif %}>角色定义后</option>
+              <option value="in_chat" {% if worldbook_settings.default_insertion_position == 'in_chat' %}selected{% endif %}>聊天内注入</option>
+            </select>
+            <p class="muted helper-text">旧版世界书没有该字段时，会跟随这里的默认值。</p>
+          </div>
+          <div>
+            <label for="wb-default-injection-order">默认注入顺序</label>
+            <input id="wb-default-injection-order" type="number" min="0" max="999999" step="1" value="{{ worldbook_settings.default_injection_order if worldbook_settings.default_injection_order is not none else 100 }}" />
+            <p class="muted helper-text">用于同一层里的先后顺序。旧词条没有该字段时会继承原顺序。</p>
+          </div>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="wb-default-injection-depth">默认聊天深度</label>
+            <input id="wb-default-injection-depth" type="number" min="0" max="3" step="1" value="{{ worldbook_settings.default_injection_depth if worldbook_settings.default_injection_depth is not none else 0 }}" />
+            <p class="muted helper-text">仅在“聊天内注入”时生效；0 最靠近当前输入。</p>
+          </div>
+          <div>
+            <label for="wb-default-injection-role">默认注入角色</label>
+            <select id="wb-default-injection-role">
+              <option value="system" {% if (worldbook_settings.default_injection_role or 'system') == 'system' %}selected{% endif %}>system</option>
+            </select>
+            <p class="muted helper-text">当前节点版先只支持 system。</p>
+          </div>
+        </div>
+
+
+        <div class="grid-two">
+          <label class="checkbox-row">
+            <input id="wb-recursive-scan-enabled" type="checkbox" {% if worldbook_settings.recursive_scan_enabled %}checked{% endif %} />
+            <span>启用递归扫描（V1）</span>
+          </label>
+          <div>
+            <label for="wb-recursion-max-depth">递归最大层级</label>
+            <input id="wb-recursion-max-depth" type="number" min="0" max="5" step="1" value="{{ worldbook_settings.recursion_max_depth if worldbook_settings.recursion_max_depth is not none else 2 }}" />
+            <p class="muted helper-text">递归 V1 当前只使用 title / trigger / secondary_trigger 做递归语料；0 表示关闭递归扩展。</p>
+          </div>
+        </div>
+
+        <div class="grid-two">
           <label class="checkbox-row">
             <input id="wb-default-case-sensitive" type="checkbox" {% if worldbook_settings.default_case_sensitive %}checked{% endif %} />
             <span>默认区分大小写</span>
@@ -219,6 +253,12 @@
           default_chance: Number(document.getElementById("wb-default-chance").value || 100),
           default_sticky_turns: Number(document.getElementById("wb-default-sticky-turns").value || 0),
           default_cooldown_turns: Number(document.getElementById("wb-default-cooldown-turns").value || 0),
+          default_insertion_position: document.getElementById("wb-default-insertion-position").value,
+          default_injection_depth: Number(document.getElementById("wb-default-injection-depth").value || 0),
+          default_injection_role: document.getElementById("wb-default-injection-role").value,
+          default_injection_order: Number(document.getElementById("wb-default-injection-order").value || 100),
+          recursive_scan_enabled: document.getElementById("wb-recursive-scan-enabled").checked,
+          recursion_max_depth: Number(document.getElementById("wb-recursion-max-depth").value || 2),
         };
       }
 
@@ -235,6 +275,12 @@
         document.getElementById("wb-default-chance").value = settings.default_chance ?? 100;
         document.getElementById("wb-default-sticky-turns").value = settings.default_sticky_turns ?? 0;
         document.getElementById("wb-default-cooldown-turns").value = settings.default_cooldown_turns ?? 0;
+        document.getElementById("wb-default-insertion-position").value = settings.default_insertion_position || "after_char_defs";
+        document.getElementById("wb-default-injection-depth").value = settings.default_injection_depth ?? 0;
+        document.getElementById("wb-default-injection-role").value = settings.default_injection_role || "system";
+        document.getElementById("wb-default-injection-order").value = settings.default_injection_order ?? 100;
+        document.getElementById("wb-recursive-scan-enabled").checked = Boolean(settings.recursive_scan_enabled);
+        document.getElementById("wb-recursion-max-depth").value = settings.recursion_max_depth ?? 2;
         document.getElementById("enabled-label").textContent = settings.enabled ? "启用" : "停用";
         document.getElementById("max-hits-label").textContent = String(settings.max_hits ?? 3);
       }

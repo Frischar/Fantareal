@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>世界书生成器</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="{{ static_stylesheet_url or '/static/styles.css' }}" />
   </head>
   <body>
     <div id="appBackgroundLayer" class="app-background" aria-hidden="true"></div>
@@ -375,6 +375,7 @@
     <div class="status-bar" id="statusText">就绪</div>
 
     <script>
+      const API_BASE_PATH = {{ api_base_path | default('', true) | tojson }};
       const INITIAL_WORKSPACE = {{ initial_workspace | tojson }};
       const INITIAL_SETTINGS = {{ initial_settings | tojson }};
       const SOURCE_MODE_OPTIONS = {{ source_mode_options | tojson }};
@@ -514,8 +515,12 @@
         };
       }
 
+      function buildApiUrl(path) {
+        return `${API_BASE_PATH}${path}`;
+      }
+
       async function postJson(url, payload) {
-        const response = await fetch(url, {
+        const response = await fetch(buildApiUrl(url), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

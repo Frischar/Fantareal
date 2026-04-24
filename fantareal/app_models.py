@@ -129,6 +129,16 @@ class WorldbookEntryPayload(BaseModel):
     cooldown_turns: int = 0
     order: int = 100
 
+    # 节点版世界书注入控制
+    insertion_position: str = "after_char_defs"
+    injection_depth: int = 0
+    injection_role: str = "system"
+    injection_order: int = 100
+
+    # 递归 V1
+    recursive_enabled: bool = True
+    prevent_further_recursion: bool = False
+
 
 class WorldbookSettingsPayload(BaseModel):
     enabled: bool = True
@@ -145,6 +155,16 @@ class WorldbookSettingsPayload(BaseModel):
     default_chance: int = 100
     default_sticky_turns: int = 0
     default_cooldown_turns: int = 0
+
+    # 节点版世界书注入默认值
+    default_insertion_position: str = "after_char_defs"
+    default_injection_depth: int = 0
+    default_injection_role: str = "system"
+    default_injection_order: int = 100
+
+    # 递归 V1
+    recursive_scan_enabled: bool = False
+    recursion_max_depth: int = 2
 
 
 class WorldbookPayload(BaseModel):
@@ -215,6 +235,10 @@ class RoleCardLoadPayload(BaseModel):
 
 class JsonImportPayload(BaseModel):
     raw_json: str = ""
+    apply_settings: bool = True
+    missing_injection_policy: str = "follow_defaults"
+    force_in_chat_depth: int = 0
+    force_injection_order: int | None = None
 
 
 class WorkshopEvaluatePayload(BaseModel):

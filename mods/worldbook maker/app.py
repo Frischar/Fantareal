@@ -711,6 +711,8 @@ async def index(request: Request) -> HTMLResponse:
     ensure_data_files()
     settings = get_settings()
     workspace = get_workspace()
+    root_path = (request.scope.get("root_path") or "").rstrip("/")
+    stylesheet_url = f"{root_path}/static/styles.css" if root_path else "/static/styles.css"
     return templates.TemplateResponse(
         request,
         "index.html",
@@ -722,6 +724,8 @@ async def index(request: Request) -> HTMLResponse:
             "focus_mode_options": FOCUS_MODE_OPTIONS,
             "starter_snippets": STARTER_SNIPPETS,
             "default_system_prompt": DEFAULT_SYSTEM_PROMPT,
+            "api_base_path": root_path,
+            "static_stylesheet_url": stylesheet_url,
         },
     )
 

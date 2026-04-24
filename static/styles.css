@@ -156,6 +156,93 @@ body::after {
   display: none;
 }
 
+.topnav-grouped {
+  gap: 10px;
+  overflow: visible;
+  white-space: normal;
+  padding: 8px;
+}
+
+.nav-group {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.nav-group summary {
+  list-style: none;
+}
+
+.nav-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.nav-group-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 90%, transparent 10%);
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.nav-group-summary:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line) 70%);
+}
+
+.nav-group[open] .nav-group-summary,
+.nav-group.active-group .nav-group-summary {
+  color: white;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+.nav-group-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  min-width: 172px;
+  max-width: min(220px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent 6%);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.nav-group[open] .nav-group-panel {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+
+.nav-group-links {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.nav-group-links .navlink {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 42px;
+  text-align: center;
+}
+
 .slot-toolbar {
   display: flex;
   align-items: center;
@@ -1412,6 +1499,20 @@ a.compact {
   .ghost-link {
     padding: 9px 12px;
     font-size: 14px;
+  }
+
+  .topnav-grouped {
+    gap: 8px;
+    overflow: visible;
+  }
+
+  .nav-group-panel {
+    left: 50%;
+    min-width: 200px;
+  }
+
+  .nav-group-links {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -17,10 +17,12 @@ import httpx
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from chat_api_routes import register_chat_api_routes
-from config_api_routes import register_config_api_routes
-from page_routes import register_page_routes
-from preset_rules import (
+from .chat_api_routes import register_chat_api_routes
+from .config_api_routes import register_config_api_routes
+from .mod_api_routes import register_mod_api_routes
+from .mods_runtime import mount_discovered_mods
+from .page_routes import register_page_routes
+from .preset_rules import (
     PRESET_MODULE_RULES,
     activate_preset_in_store,
     build_preset_prompt_from_preset,
@@ -31,8 +33,8 @@ from preset_rules import (
     get_active_preset_from_store,
     sanitize_preset_store as sanitize_preset_store_data,
 )
-from slot_runtime import SlotRuntimeService
-from workshop_logic import (
+from .slot_runtime import SlotRuntimeService
+from .workshop_logic import (
     build_workshop_trigger_token,
     default_workshop_state,
     get_workshop_stage,
@@ -47,7 +49,7 @@ from workshop_logic import (
     workshop_effective_fields,
     workshop_rule_matches_trigger,
 )
-from worldbook_logic import (
+from .worldbook_logic import (
     DEFAULT_WORLDBOOK_SETTINGS,
     default_worldbook_store,
     keyword_matches_query,
@@ -58,6 +60,23 @@ from worldbook_logic import (
     sanitize_worldbook_store,
     split_trigger_aliases,
 )
+
+from .prompt_builder import (
+    build_conversation_transcript,
+    build_memory_recap_prompt,
+    build_messages,
+    build_prompt_package,
+    build_retrieval_prompt,
+    build_sprite_prompt,
+    build_user_profile_prompt,
+    build_worldbook_answer_guard,
+    build_worldbook_prompt,
+    configure_prompt_builder,
+)
+
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = PACKAGE_DIR.parent
 
 
 def get_runtime_base_dir() -> Path:
@@ -74,13 +93,13 @@ def get_runtime_base_dir() -> Path:
             if local_app_data:
                 return Path(local_app_data) / "XuqiLLMChat"
             return Path.home() / "AppData" / "Local" / "XuqiLLMChat"
-    return Path(__file__).resolve().parent
+    return PROJECT_ROOT
 
 
 def get_resource_dir() -> Path:
     if getattr(sys, "_MEIPASS", None):
         return Path(sys._MEIPASS)
-    return Path(__file__).resolve().parent
+    return PROJECT_ROOT
 
 
 BASE_DIR = get_runtime_base_dir()
@@ -93,6 +112,7 @@ TEMPLATES_DIR = RESOURCE_DIR / "templates"
 UPLOAD_DIR = STATIC_DIR / "uploads"
 SPRITES_DIR = STATIC_DIR / "sprites"
 CARDS_DIR = BASE_DIR / "cards"
+MODS_DIR = BASE_DIR / "mods"
 RESOURCE_CARDS_DIR = RESOURCE_DIR / "cards"
 ROLE_CARD_EXTENSIONS = {".json", ".txt"}
 SLOT_META_PATH = DATA_DIR / "save_slots.json"
@@ -130,6 +150,25 @@ WORKSHOP_STAGE_LIMITS = {"aMax": 2, "bMax": 5}
 logger = logging.getLogger("xuqi_llm_chat")
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO)
+
+_LAST_WORLDBOOK_DEBUG_SNAPSHOT: dict[str, Any] = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
+
+
+def _copy_worldbook_debug_snapshot(snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
+    source = snapshot if isinstance(snapshot, dict) else _LAST_WORLDBOOK_DEBUG_SNAPSHOT
+    all_matches = source.get("all_matches", [])
+    selected_ids = source.get("selected_ids", [])
+    dropped_ids = source.get("dropped_ids", [])
+    return {
+        "query": str(source.get("query", "") or ""),
+        "all_matches": [dict(item) for item in all_matches if isinstance(item, dict)],
+        "selected_ids": [str(item) for item in selected_ids] if isinstance(selected_ids, list) else [],
+        "dropped_ids": [str(item) for item in dropped_ids] if isinstance(dropped_ids, list) else [],
+    }
+
+
+def get_worldbook_debug_snapshot() -> dict[str, Any]:
+    return _copy_worldbook_debug_snapshot()
 
 
 def bootstrap_runtime_layout() -> None:
@@ -2318,14 +2357,84 @@ def _worldbook_direct_question(user_message: str) -> bool:
     return any(marker in text for marker in markers)
 
 
-def _worldbook_entry_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
+
+
+def _normalize_worldbook_insertion_position(value: Any, default: str = "after_char_defs") -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"before_char_defs", "after_char_defs", "in_chat"} else default
+
+
+def _normalize_worldbook_injection_role(value: Any, default: str = "system") -> str:
+    text = str(value or "").strip().lower()
+    if text in {"system", "user", "assistant"}:
+        return text
+    return default
+
+
+def _normalize_worldbook_injection_depth(value: Any, default: int = 0) -> int:
+    return clamp_int(value, 0, 3, default)
+
+
+def _normalize_worldbook_injection_order(value: Any, default: int = 100) -> int:
+    return clamp_int(value, 0, 999999, default)
+
+
+def _worldbook_position_priority(item: dict[str, Any]) -> int:
+    position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
+    if position == "in_chat":
+        return 0
+    if position == "after_char_defs":
+        return 1
+    return 2
+
+
+def _worldbook_global_selection_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
     order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
     source_rank_map = {"constant": 0, "sticky": 1, "keyword": 2}
     source_rank = source_rank_map.get(str(item.get("source", "keyword")), 2)
-    title = str(item.get("title", "")).strip()
+    title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
     return (order, source_rank, title)
 
 
+def _worldbook_bucket_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
+    injection_order = _normalize_worldbook_injection_order(
+        item.get("injection_order", item.get("order", item.get("priority", 100))),
+        100,
+    )
+    order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
+    return (injection_order, order, title)
+
+
+def bucket_worldbook_matches(matches: list[dict[str, Any]] | None) -> dict[str, Any]:
+    buckets: dict[str, Any] = {
+        "before_char_defs": [],
+        "after_char_defs": [],
+        "in_chat": {},
+    }
+    for item in matches or []:
+        position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
+        if position == "in_chat":
+            depth = _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0)
+            buckets["in_chat"].setdefault(depth, []).append(item)
+        elif position == "before_char_defs":
+            buckets["before_char_defs"].append(item)
+        else:
+            buckets["after_char_defs"].append(item)
+
+    buckets["before_char_defs"].sort(key=_worldbook_bucket_sort_key)
+    buckets["after_char_defs"].sort(key=_worldbook_bucket_sort_key)
+    for depth, items in list(buckets["in_chat"].items()):
+        items.sort(key=_worldbook_bucket_sort_key)
+        buckets["in_chat"][depth] = items
+    return buckets
+def _worldbook_entry_sort_key(item: dict[str, Any]) -> tuple[int, int, int, str]:
+    position_rank = _worldbook_position_priority(item)
+    order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    source_rank_map = {"constant": 0, "sticky": 1, "keyword": 2}
+    source_rank = source_rank_map.get(str(item.get("source", "keyword")), 2)
+    title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
+    return (position_rank, order, source_rank, title)
 def _build_worldbook_runtime_debug_entries(
     current_turn: int,
     entries: list[dict[str, Any]],
@@ -2346,6 +2455,15 @@ def _build_worldbook_runtime_debug_entries(
                 "entry_type": str(item.get("entry_type", "keyword")).strip() or "keyword",
                 "group": str(item.get("group", "")).strip(),
                 "order": clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100),
+                "insertion_position": _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs"),
+                "injection_depth": _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0),
+                "injection_role": _normalize_worldbook_injection_role(item.get("injection_role", "system"), "system"),
+                "injection_order": _normalize_worldbook_injection_order(
+                    item.get("injection_order", item.get("order", item.get("priority", 100))),
+                    100,
+                ),
+                "recursive_enabled": bool(item.get("recursive_enabled", True)),
+                "prevent_further_recursion": bool(item.get("prevent_further_recursion", False)),
                 "chance": clamp_int(item.get("chance", 100), 0, 100, 100),
                 "sticky_turns": clamp_int(item.get("sticky_turns", 0), 0, 999, 0),
                 "cooldown_turns": clamp_int(item.get("cooldown_turns", 0), 0, 999, 0),
@@ -2436,8 +2554,17 @@ def _worldbook_match_payload(
     item: dict[str, Any],
     source: str,
     matched_text: str = "",
+    matched_depth: int = 0,
+    matched_from: str = "",
 ) -> dict[str, Any]:
     order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
+    insertion_position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
+    injection_depth = _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0)
+    injection_role = _normalize_worldbook_injection_role(item.get("injection_role", "system"), "system")
+    injection_order = _normalize_worldbook_injection_order(
+        item.get("injection_order", order),
+        order,
+    )
     return {
         "id": str(item.get("id", "")).strip(),
         "title": str(item.get("title", "")).strip(),
@@ -2454,16 +2581,64 @@ def _worldbook_match_payload(
         "chance": clamp_int(item.get("chance", 100), 0, 100, 100),
         "sticky_turns": clamp_int(item.get("sticky_turns", 0), 0, 999, 0),
         "cooldown_turns": clamp_int(item.get("cooldown_turns", 0), 0, 999, 0),
+        "insertion_position": insertion_position,
+        "injection_depth": injection_depth,
+        "injection_role": injection_role,
+        "injection_order": injection_order,
+        "recursive_enabled": bool(item.get("recursive_enabled", True)),
+        "prevent_further_recursion": bool(item.get("prevent_further_recursion", False)),
+        "matched_depth": clamp_int(matched_depth, 0, 5, 0),
+        "matched_from": str(matched_from or "").strip(),
+        "selected_for_prompt": False,
+        "dropped_reason": "",
+    }
+
+def _worldbook_recursive_seed_text(item: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for value in [
+        item.get("title", ""),
+        item.get("trigger", ""),
+        item.get("secondary_trigger", ""),
+    ]:
+        text = str(value or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def _worldbook_runtime_state_row(runtime: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "active_until_turn": clamp_int(runtime.get("active_until_turn"), 0, 10_000_000, 0),
+        "cooldown_until_turn": clamp_int(runtime.get("cooldown_until_turn"), 0, 10_000_000, 0),
+        "last_trigger_turn": clamp_int(runtime.get("last_trigger_turn"), 0, 10_000_000, 0),
+        "last_roll": clamp_int(runtime.get("last_roll"), 0, 100, 0),
+        "last_result": str(runtime.get("last_result", "")).strip()[:32],
+        "last_reason": str(runtime.get("last_reason", "")).strip()[:64],
+        "matched_text": str(runtime.get("matched_text", "")).strip()[:240],
     }
 
 
+def _worldbook_debug_display_sort_key(item: dict[str, Any]) -> tuple[int, int, int, int, str]:
+    return (
+        clamp_int(item.get("matched_depth", 0), 0, 99, 0),
+        _worldbook_position_priority(item),
+        _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0),
+        _normalize_worldbook_injection_order(item.get("injection_order", item.get("order", 100)), 100),
+        str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip(),
+    )
+
+
 def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
+    global _LAST_WORLDBOOK_DEBUG_SNAPSHOT
+
     text = str(query or "").strip()
     if not text:
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
         return []
 
     settings = get_worldbook_settings()
     if not settings.get("enabled", True):
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": text, "all_matches": [], "selected_ids": [], "dropped_ids": []}
         return []
 
     runtime_state = get_worldbook_runtime_state()
@@ -2473,6 +2648,11 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
     runtime_entries = runtime_state.get("entries", {}) if isinstance(runtime_state.get("entries"), dict) else {}
     clean_runtime_entries: dict[str, dict[str, Any]] = {}
     hits: list[dict[str, Any]] = []
+    hits_by_id: dict[str, dict[str, Any]] = {}
+    keyword_candidates: list[dict[str, Any]] = []
+    seed_queue: list[dict[str, Any]] = [{"text": text, "depth": 0, "from": ""}]
+    recursion_enabled = bool(settings.get("recursive_scan_enabled", False))
+    recursion_max_depth = clamp_int(settings.get("recursion_max_depth", 2), 0, 5, 2)
 
     for item in get_worldbook_entries():
         if not item.get("enabled", True):
@@ -2487,24 +2667,26 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             entry_type = "keyword"
 
         runtime = runtime_entries.get(entry_id, {}) if isinstance(runtime_entries.get(entry_id), dict) else {}
-        state_row = {
-            "active_until_turn": clamp_int(runtime.get("active_until_turn"), 0, 10_000_000, 0),
-            "cooldown_until_turn": clamp_int(runtime.get("cooldown_until_turn"), 0, 10_000_000, 0),
-            "last_trigger_turn": clamp_int(runtime.get("last_trigger_turn"), 0, 10_000_000, 0),
-            "last_roll": clamp_int(runtime.get("last_roll"), 0, 100, 0),
-            "last_result": str(runtime.get("last_result", "")).strip()[:32],
-            "last_reason": str(runtime.get("last_reason", "")).strip()[:64],
-            "matched_text": str(runtime.get("matched_text", "")).strip()[:240],
-        }
-
+        state_row = _worldbook_runtime_state_row(runtime)
         sticky_turns = clamp_int(item.get("sticky_turns", settings.get("default_sticky_turns", 0)), 0, 999, 0)
         cooldown_turns = clamp_int(item.get("cooldown_turns", settings.get("default_cooldown_turns", 0)), 0, 999, 0)
+
+        candidate = {
+            "item": item,
+            "entry_id": entry_id,
+            "entry_type": entry_type,
+            "state_row": state_row,
+            "sticky_turns": sticky_turns,
+            "cooldown_turns": cooldown_turns,
+        }
 
         if entry_type == "constant":
             state_row["last_result"] = "constant"
             state_row["last_reason"] = "always_on"
             clean_runtime_entries[entry_id] = state_row
-            hits.append(_worldbook_match_payload(item=item, source="constant", matched_text="常驻"))
+            hit = _worldbook_match_payload(item=item, source="constant", matched_text="常驻", matched_depth=0, matched_from="")
+            hits.append(hit)
+            hits_by_id[entry_id] = hit
             continue
 
         if state_row["active_until_turn"] >= current_turn and state_row["last_trigger_turn"] < current_turn:
@@ -2512,7 +2694,9 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             state_row["last_result"] = "sticky"
             state_row["last_reason"] = "active"
             clean_runtime_entries[entry_id] = state_row
-            hits.append(_worldbook_match_payload(item=item, source="sticky", matched_text=matched_text))
+            hit = _worldbook_match_payload(item=item, source="sticky", matched_text=matched_text, matched_depth=0, matched_from="")
+            hits.append(hit)
+            hits_by_id[entry_id] = hit
             continue
 
         if state_row["cooldown_until_turn"] >= current_turn:
@@ -2521,99 +2705,135 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             clean_runtime_entries[entry_id] = state_row
             continue
 
-        matched, primary_matches, secondary_matches, matched_text = _evaluate_worldbook_keyword_entry(text, item, settings)
-        if not matched:
-            state_row["last_result"] = "not_matched"
-            state_row["last_reason"] = "keyword"
-            state_row["matched_text"] = matched_text[:240]
+        keyword_candidates.append(candidate)
+
+    depth = 0
+    while seed_queue:
+        next_queue: list[dict[str, Any]] = []
+        newly_matched_this_depth: list[dict[str, Any]] = []
+
+        for seed in seed_queue:
+            seed_text = str(seed.get("text", "")).strip()
+            if not seed_text:
+                continue
+            seed_depth = clamp_int(seed.get("depth", depth), 0, 5, depth)
+            seed_from = str(seed.get("from", "")).strip()
+
+            for candidate in keyword_candidates:
+                entry_id = candidate["entry_id"]
+                if entry_id in hits_by_id:
+                    continue
+
+                item = candidate["item"]
+                if seed_depth > 0 and not bool(item.get("recursive_enabled", True)):
+                    continue
+
+                state_row = candidate["state_row"]
+                matched, _primary_matches, _secondary_matches, matched_text = _evaluate_worldbook_keyword_entry(seed_text, item, settings)
+                if not matched:
+                    continue
+
+                chance = clamp_int(item.get("chance", settings.get("default_chance", 100)), 0, 100, 100)
+                roll = random.randint(1, 100)
+                state_row["last_roll"] = roll
+                state_row["matched_text"] = matched_text[:240]
+                if chance < 100 and roll > chance:
+                    state_row["last_result"] = "chance_failed"
+                    state_row["last_reason"] = "chance"
+                    clean_runtime_entries[entry_id] = state_row
+                    hits_by_id[entry_id] = {"id": entry_id, "_chance_failed": True}
+                    continue
+
+                active_until_turn = current_turn + candidate["sticky_turns"]
+                cooldown_until_turn = active_until_turn + candidate["cooldown_turns"]
+                state_row["active_until_turn"] = active_until_turn
+                state_row["cooldown_until_turn"] = cooldown_until_turn
+                state_row["last_trigger_turn"] = current_turn
+                state_row["last_result"] = "triggered"
+                state_row["last_reason"] = "recursive" if seed_depth > 0 else "keyword"
+                clean_runtime_entries[entry_id] = state_row
+
+                hit = _worldbook_match_payload(
+                    item=item,
+                    source="keyword",
+                    matched_text=matched_text,
+                    matched_depth=seed_depth,
+                    matched_from=seed_from,
+                )
+                hits.append(hit)
+                hits_by_id[entry_id] = hit
+                newly_matched_this_depth.append(hit)
+
+        if not recursion_enabled or depth >= recursion_max_depth:
+            break
+
+        if not newly_matched_this_depth:
+            break
+
+        for hit in newly_matched_this_depth:
+            if not bool(hit.get("recursive_enabled", True)):
+                continue
+            if bool(hit.get("prevent_further_recursion", False)):
+                continue
+            seed_text = _worldbook_recursive_seed_text(hit)
+            if not seed_text:
+                continue
+            next_queue.append(
+                {
+                    "text": seed_text,
+                    "depth": clamp_int(hit.get("matched_depth", depth), 0, 5, depth) + 1,
+                    "from": str(hit.get("title", "")).strip() or str(hit.get("trigger", "")).strip(),
+                }
+            )
+
+        depth += 1
+        seed_queue = next_queue
+
+    for candidate in keyword_candidates:
+        entry_id = candidate["entry_id"]
+        if entry_id in clean_runtime_entries:
+            continue
+        state_row = candidate["state_row"]
+        if state_row.get("last_result") == "chance_failed":
             clean_runtime_entries[entry_id] = state_row
             continue
-
-        chance = clamp_int(item.get("chance", settings.get("default_chance", 100)), 0, 100, 100)
-        roll = random.randint(1, 100)
-        state_row["last_roll"] = roll
-        state_row["matched_text"] = matched_text[:240]
-        if chance < 100 and roll > chance:
-            state_row["last_result"] = "chance_failed"
-            state_row["last_reason"] = "chance"
-            clean_runtime_entries[entry_id] = state_row
+        if entry_id in hits_by_id:
             continue
-
-        active_until_turn = current_turn + sticky_turns
-        cooldown_until_turn = active_until_turn + cooldown_turns
-        state_row["active_until_turn"] = active_until_turn
-        state_row["cooldown_until_turn"] = cooldown_until_turn
-        state_row["last_trigger_turn"] = current_turn
-        state_row["last_result"] = "triggered"
+        state_row["last_result"] = "not_matched"
         state_row["last_reason"] = "keyword"
         clean_runtime_entries[entry_id] = state_row
-
-        hits.append(_worldbook_match_payload(item=item, source="keyword", matched_text=matched_text))
 
     runtime_state["entries"] = clean_runtime_entries
     save_worldbook_runtime_state(runtime_state)
 
-    hits.sort(key=_worldbook_entry_sort_key)
+    full_hits = [item for item in hits if not item.get("_chance_failed")]
+    full_hits.sort(key=_worldbook_global_selection_sort_key)
     max_hits = max(1, int(settings.get("max_hits", DEFAULT_WORLDBOOK_SETTINGS["max_hits"])))
-    hits = hits[:max_hits]
+    selected_hits = full_hits[:max_hits]
+    selected_ids = {str(item.get("id", "")).strip() for item in selected_hits if str(item.get("id", "")).strip()}
 
-    if hits:
-        logger.info("Worldbook hits: %s", ", ".join(item.get("title") or item.get("matched") or item.get("trigger", "") for item in hits))
-    return hits
+    all_matches_sorted: list[dict[str, Any]] = []
+    dropped_ids: list[str] = []
+    for item in sorted(full_hits, key=_worldbook_debug_display_sort_key):
+        row = dict(item)
+        entry_id = str(row.get("id", "")).strip()
+        selected_for_prompt = entry_id in selected_ids
+        row["selected_for_prompt"] = selected_for_prompt
+        row["dropped_reason"] = "" if selected_for_prompt else "max_hits"
+        all_matches_sorted.append(row)
+        if not selected_for_prompt and entry_id:
+            dropped_ids.append(entry_id)
 
+    _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {
+        "query": text,
+        "all_matches": all_matches_sorted,
+        "selected_ids": list(selected_ids),
+        "dropped_ids": dropped_ids,
+    }
 
-def build_worldbook_prompt(matches: list[dict[str, Any]]) -> str:
-    if not matches:
-        return ""
-
-    blocks = [
-        "The following are the worldbook notes matched in this turn.",
-        "These are high-priority factual backdrops for the current conversation.",
-        "If the user is asking about any of these items directly, answer from these notes first.",
-        "Do not mention that you saw the worldbook notes in your answer.",
-    ]
-    for index, item in enumerate(matches, start=1):
-        matched = item.get("matched", "")
-        title = str(item.get("title", "")).strip()
-        lines = [f"{index}. Title: {title or item['trigger']}"]
-        source = str(item.get("source", "keyword")).strip()
-        if source:
-            lines.append(f"Source: {source}")
-        group = str(item.get("group", "")).strip()
-        if group:
-            lines.append(f"Group: {group}")
-        if item.get("trigger"):
-            lines.append(f"Trigger: {item['trigger']}")
-        if matched:
-            lines.append(f"Matched: {matched}")
-        if item.get("secondary_trigger"):
-            lines.append(f"Secondary trigger: {item['secondary_trigger']}")
-        lines.append(f"Content: {item['content']}")
-        if item.get("comment"):
-            lines.append(f"Comment: {item['comment']}")
-        blocks.append("\\n".join(lines))
-    return "\\n\\n".join(blocks)
-
-
-def build_worldbook_answer_guard(user_message: str, matches: list[dict[str, Any]]) -> str:
-    if not matches:
-        return ""
-
-    text = str(user_message or "").strip()
-    if not text or not _worldbook_direct_question(text):
-        return ""
-
-    primary_match = matches[0]
-    subject = primary_match.get("matched") or primary_match.get("title") or primary_match.get("trigger") or "this item"
-    fact = str(primary_match.get("content", "")).strip()
-    if not fact:
-        return ""
-
-    return (
-        f"The user is directly asking about \\\"{subject}\\\".\\n"
-        f"Your first sentence must state the core fact directly, for example: {fact}\\n"
-        "Answer directly first, then continue in character without dodging or pretending not to know."
-    )
+    if selected_hits:
+        logger.info("Worldbook hits: %s", ", ".join(item.get("title") or item.get("matched") or item.get("trigger", "") for item in selected_hits))
+    return selected_hits
 
 
 def enforce_worldbook_fact_in_reply(
@@ -2644,18 +2864,6 @@ def enforce_worldbook_fact_in_reply(
 
     logger.info("Worldbook direct-answer guard applied before reply.")
     return f"{fact}\\n\\n{text}"
-
-
-def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
-    if not llm_config.get("sprite_enabled", True):
-        return ""
-
-    return (
-        "Always start every reply with a single sprite tag on the first line in the format [expression:tag].\n"
-        "Do not omit the tag. Do not place anything before it.\n"
-        "Keep the tag short and simple, such as happy, calm, angry, sad, or surprised.\n"
-        "After the tag, write the normal reply. Do not explain the rule.\n"
-    )
 
 
 def normalize_sprite_tag(tag: str) -> str:
@@ -2812,217 +3020,6 @@ async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None
     ]
 
 
-def build_retrieval_prompt(retrieved_items: list[dict[str, Any]]) -> str:
-    if not retrieved_items:
-        return ""
-
-    blocks = [
-        "The following are the most relevant long-term memories for the current message.",
-        "Use them as supporting context, but do not hallucinate details that are not present.",
-    ]
-    for index, item in enumerate(retrieved_items, start=1):
-        title = str(item.get("title", "")).strip() or f"Memory {index}"
-        blocks.append(f"{index}. {title}\n{item.get('text', '')}")
-    return "\n\n".join(blocks)
-
-
-def build_memory_recap_prompt(memories: list[dict[str, Any]]) -> str:
-    if not memories:
-        return ""
-
-    blocks = [
-        "The following are long-term memories that should stay consistent over time.",
-        "Treat them as durable background facts unless the user explicitly asks to revise them.",
-    ]
-    for index, item in enumerate(memories, start=1):
-        title = str(item.get("title", "")).strip() or f"Memory {index}"
-        content = str(item.get("content", "")).strip()
-        tags = ", ".join(sanitize_tags(item.get("tags", [])))
-        notes = str(item.get("notes", "")).strip()
-        lines = [f"{index}. {title}"]
-        if content:
-            lines.append(f"Content: {content}")
-        if tags:
-            lines.append(f"Tags: {tags}")
-        if notes:
-            lines.append(f"Notes: {notes}")
-        blocks.append("\n".join(lines))
-    return "\n\n".join(blocks)
-
-
-def build_user_profile_prompt(user_profile: dict[str, Any]) -> str:
-    if not isinstance(user_profile, dict):
-        return ""
-
-    display_name = str(user_profile.get("display_name", "")).strip()
-    nickname = str(user_profile.get("nickname", "")).strip()
-    profile_text = str(user_profile.get("profile_text", "")).strip()
-    notes = str(user_profile.get("notes", "")).strip()
-
-    if display_name == "" and not any([nickname, profile_text, notes]):
-        return ""
-
-    blocks = [
-        "The following are the user profile details bound to the current slot.",
-        "Treat them as stable background information for addressing and understanding the user.",
-        "Do not rewrite these details as if they were your own persona settings.",
-    ]
-    if display_name:
-        blocks.append(f"Display name: {display_name}")
-    if nickname:
-        blocks.append(f"Nickname: {nickname}")
-    if profile_text:
-        blocks.append(f"Profile text: {profile_text}")
-    if notes:
-        blocks.append(f"Notes: {notes}")
-    return "\n".join(blocks)
-
-
-def build_prompt_package(
-    user_message: str,
-    retrieved_items: list[dict[str, Any]] | None = None,
-    *,
-    runtime_overrides: dict[str, Any] | None = None,
-    worldbook_matches: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    persona = get_persona()
-    history = get_conversation()
-    memories = get_memories()
-    user_profile = get_user_profile()
-    llm_config = get_runtime_chat_config(runtime_overrides)
-
-    matched_worldbook_entries = worldbook_matches or []
-    recalled_memories = retrieved_items or []
-
-    preset_prompt = build_preset_prompt()
-    system_prompt = str(persona.get("system_prompt", "")).strip()
-    memory_recap_prompt = build_memory_recap_prompt(memories)
-    user_profile_prompt = build_user_profile_prompt(user_profile)
-    worldbook_prompt = build_worldbook_prompt(matched_worldbook_entries)
-    worldbook_answer_guard = build_worldbook_answer_guard(user_message, matched_worldbook_entries)
-    retrieval_prompt = build_retrieval_prompt(recalled_memories)
-    sprite_prompt = build_sprite_prompt(llm_config)
-
-    history_limit = max(1, int(llm_config["history_limit"]))
-    recent_history = history[-history_limit:]
-    recent_history_text = build_conversation_transcript(recent_history)
-
-    actual_system_sections = [
-        prompt
-        for prompt in [
-            preset_prompt,
-            system_prompt,
-            memory_recap_prompt,
-            user_profile_prompt,
-            worldbook_prompt,
-            worldbook_answer_guard,
-            retrieval_prompt,
-            sprite_prompt,
-        ]
-        if str(prompt or "").strip()
-    ]
-
-    messages: list[dict[str, str]] = []
-    if actual_system_sections:
-        messages.append({"role": "system", "content": "\n\n".join(actual_system_sections)})
-
-    for item in recent_history:
-        role = str(item.get("role", "assistant")).strip() or "assistant"
-        content = str(item.get("content", "")).strip()
-        if content:
-            messages.append({"role": role, "content": content})
-
-    clean_user_message = str(user_message or "").strip()
-    messages.append({"role": "user", "content": clean_user_message})
-
-    layers: list[dict[str, Any]] = []
-
-    def append_layer(layer_id: str, title: str, sections: list[str], **meta: Any) -> None:
-        content = "\n\n".join(part for part in sections if str(part or "").strip()).strip()
-        if not content:
-            return
-        layer: dict[str, Any] = {
-            "id": layer_id,
-            "title": title,
-            "content": content,
-        }
-        if meta:
-            layer["meta"] = meta
-        layers.append(layer)
-
-    append_layer(
-        "system_main",
-        "系统提示词 / 主提示",
-        [preset_prompt],
-        section_count=1 if preset_prompt else 0,
-    )
-    append_layer(
-        "role_card",
-        "角色卡固定设定",
-        [system_prompt],
-        character_name=str(persona.get("name", "")).strip(),
-    )
-    append_layer(
-        "memory_context",
-        "记忆 / 摘要 / 长期信息",
-        [memory_recap_prompt, retrieval_prompt, user_profile_prompt],
-        stored_memory_count=len(memories),
-        recalled_memory_count=len(recalled_memories),
-    )
-    append_layer(
-        "worldbook_context",
-        "世界书（按需触发）",
-        [worldbook_prompt, worldbook_answer_guard],
-        hit_count=len(matched_worldbook_entries),
-    )
-    append_layer(
-        "output_rules",
-        "输出格式约束",
-        [sprite_prompt],
-        sprite_enabled=bool(llm_config.get("sprite_enabled", True)),
-    )
-    append_layer(
-        "recent_history",
-        "最近聊天记录",
-        [recent_history_text],
-        turn_count=len(recent_history),
-    )
-    append_layer(
-        "user_input",
-        "本轮新输入",
-        [clean_user_message],
-        char_count=len(clean_user_message),
-    )
-
-    preview_blocks: list[str] = []
-    for index, layer in enumerate(layers, start=1):
-        preview_blocks.append(f"[{index}. {layer['title']}]\n{layer['content']}")
-
-    return {
-        "layers": layers,
-        "messages": messages,
-        "preview_text": "\n\n".join(preview_blocks).strip(),
-        "message_count": len(messages),
-        "system_section_count": len(actual_system_sections),
-        "recent_history_turns": len(recent_history),
-    }
-
-
-def build_messages(
-    user_message: str,
-    retrieved_items: list[dict[str, Any]] | None = None,
-    *,
-    runtime_overrides: dict[str, Any] | None = None,
-    worldbook_matches: list[dict[str, str]] | None = None,
-) -> list[dict[str, str]]:
-    return build_prompt_package(
-        user_message,
-        retrieved_items,
-        runtime_overrides=runtime_overrides,
-        worldbook_matches=worldbook_matches,
-    )["messages"]
-
-
 async def request_model_reply(
     user_message: str,
     retrieved_items: list[dict[str, Any]],
@@ -3081,6 +3078,7 @@ def build_worldbook_debug_payload(
     worldbook_matches: list[dict[str, str]],
     *,
     reply_result: dict[str, Any] | None = None,
+    debug_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not get_worldbook_settings().get("debug_enabled", False):
         return {}
@@ -3089,21 +3087,54 @@ def build_worldbook_debug_payload(
     all_entries = get_worldbook_entries()
     runtime_entries = runtime_state.get("entries", {}) if isinstance(runtime_state.get("entries"), dict) else {}
 
+    snapshot = _copy_worldbook_debug_snapshot(debug_snapshot)
+    snapshot_matches = snapshot.get("all_matches", [])
+    selected_snapshot = [item for item in snapshot_matches if item.get("selected_for_prompt")]
+    dropped_snapshot = [item for item in snapshot_matches if not item.get("selected_for_prompt")]
+
+    buckets = bucket_worldbook_matches(selected_snapshot or worldbook_matches)
+
+    prompt_blocks: list[str] = []
+    before_prompt = build_worldbook_prompt(
+        buckets["before_char_defs"],
+        heading="[before_char_defs] The following worldbook notes must be considered before the character definition.",
+    )
+    after_prompt = build_worldbook_prompt(
+        buckets["after_char_defs"],
+        heading="[after_char_defs] The following worldbook notes refine or extend the character definition for this turn.",
+    )
+    if before_prompt:
+        prompt_blocks.append(before_prompt)
+    if after_prompt:
+        prompt_blocks.append(after_prompt)
+    for depth in sorted(buckets.get("in_chat", {})):
+        bucket_prompt = build_worldbook_prompt(
+            buckets["in_chat"][depth],
+            heading=f"[in_chat depth={depth}] The following are in-chat worldbook notes at depth {depth}.",
+        )
+        if bucket_prompt:
+            prompt_blocks.append(bucket_prompt)
+
     return {
         "turn_index": clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
-        "hit_count": len(worldbook_matches),
-        "prompt": build_worldbook_prompt(worldbook_matches),
+        "hit_count": len(selected_snapshot or worldbook_matches),
+        "matched_count": len(snapshot_matches) if snapshot_matches else len(worldbook_matches),
+        "selected_count": len(selected_snapshot or worldbook_matches),
+        "dropped_count": len(dropped_snapshot),
+        "prompt": "\n\n".join(prompt_blocks).strip(),
         "guard": build_worldbook_answer_guard(user_message, worldbook_matches),
         "enforced": bool((reply_result or {}).get("worldbook_enforced")),
-        "matched": worldbook_matches,
+        "matched": selected_snapshot or worldbook_matches,
+        "matched_all": snapshot_matches or worldbook_matches,
+        "selected": selected_snapshot or worldbook_matches,
+        "dropped": dropped_snapshot,
+        "buckets": buckets,
         "entry_states": _build_worldbook_runtime_debug_entries(
             clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
             all_entries,
             runtime_entries,
         ),
     }
-
-
 async def stream_model_reply(
     user_message: str,
     retrieved_items: list[dict[str, Any]],
@@ -3246,10 +3277,11 @@ async def stream_model_reply(
 async def generate_reply(
     user_message: str,
     runtime_overrides: dict[str, Any] | None = None,
-) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]], dict[str, Any], dict[str, Any]]:
     llm_config = get_runtime_chat_config(runtime_overrides)
     retrieved = await retrieve_memories(user_message, runtime_overrides)
     worldbook_matches = match_worldbook_entries(user_message)
+    worldbook_debug_snapshot = get_worldbook_debug_snapshot()
     prompt_package = build_prompt_package(
         user_message,
         retrieved,
@@ -3263,7 +3295,7 @@ async def generate_reply(
                 status_code=400,
                 detail="Please configure the chat model API URL and model name first, or enable demo mode.",
             )
-        return {"reply": "", "sprite_tag": ""}, retrieved, worldbook_matches, prompt_package
+        return {"reply": "", "sprite_tag": ""}, retrieved, worldbook_matches, prompt_package, worldbook_debug_snapshot
 
     reply = await request_model_reply(
         user_message,
@@ -3272,19 +3304,7 @@ async def generate_reply(
         worldbook_matches=worldbook_matches,
         prompt_package=prompt_package,
     )
-    return reply, retrieved, worldbook_matches, prompt_package
-
-
-def build_conversation_transcript(history: list[dict[str, Any]]) -> str:
-    lines: list[str] = []
-    for item in history:
-        role = item.get("role", "")
-        content = str(item.get("content", "")).strip()
-        if role not in {"user", "assistant"} or not content:
-            continue
-        speaker = "User" if role == "user" else "AI"
-        lines.append(f"{speaker}: {content}")
-    return "\n".join(lines)
+    return reply, retrieved, worldbook_matches, prompt_package, worldbook_debug_snapshot
 
 
 def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str, Any]:
@@ -3299,8 +3319,8 @@ def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str
         (str(item.get("content", "")).strip() for item in reversed(history) if item.get("role") == "user"),
         "",
     )
-    title_source = last_user or transcript or "Conversation Memory"
-    title = compact_text(title_source, 32) or "Conversation Memory"
+    title_source = last_user or transcript or "对话记忆"
+    title = compact_text(title_source, 32) or "对话记忆"
 
     highlighted_turns: list[str] = []
     for item in history[-8:]:
@@ -3308,20 +3328,20 @@ def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str
         content = compact_text(item.get("content", ""), 110)
         if role not in {"user", "assistant"} or not content:
             continue
-        speaker = "User" if role == "user" else "AI"
-        highlighted_turns.append(f"{speaker}: {content}")
+        speaker = "用户" if role == "user" else "AI"
+        highlighted_turns.append(f"{speaker}：{content}")
 
     recent_exchange = " | ".join(highlighted_turns)
     compact = recent_exchange or compact_text(transcript, 420)
     notes_parts = []
     if last_user:
-        notes_parts.append(f"Latest user request: {compact_text(last_user, 140)}")
+        notes_parts.append(f"用户最后一次请求：{compact_text(last_user, 140)}")
     if highlighted_turns:
-        notes_parts.append(f"Recent key turns: {recent_exchange}")
+        notes_parts.append(f"最近关键轮次：{recent_exchange}")
     return {
         "title": title,
-        "content": compact or "A detailed long-term memory summary was created for this conversation.",
-        "tags": ["auto-memory", "summary"],
+        "content": compact or "系统已为本轮对话生成一条长期记忆摘要。",
+        "tags": ["自动记忆", "对话总结"],
         "notes": "\n".join(notes_parts).strip(),
     }
 
@@ -3334,59 +3354,13 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
     url = build_api_url(llm_config["base_url"], "chat/completions")
     transcript = build_conversation_transcript(history)
     schema_hint = (
-        '{\n'
-        '  "title": "short topic title",\n'
-        '  "content": "a detailed long-term memory summary that covers the important events, decisions, outcomes, and unresolved threads",\n'
-        '  "tags": ["tag1", "tag2", "tag3"],\n'
-        '  "notes": "optional extra specifics such as names, promises, locations, numbers, and unresolved items"\n'
-        '}'
+        "{\n"
+        "  \"title\": \"简短中文标题\",\n"
+        "  \"content\": \"一段较详细的中文长期记忆总结，覆盖重要事件、决定、结果、情绪变化和未解决事项\",\n"
+        "  \"tags\": [\"标签1\", \"标签2\", \"标签3\"],\n"
+        "  \"notes\": \"可选补充细节，例如人名、地名、约定、数字、时间点和待办事项\"\n"
+        "}"
     )
-    payload = {
-        "model": llm_config["model"],
-        "temperature": 0.2,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a dialogue memory formatter for long-term chat memory. "
-                    "Return one strict JSON object only. "
-                    "Do not output markdown fences, explanation, roleplay, XML, or any extra text. "
-                    "The JSON object must contain exactly these keys: title, content, tags, notes. "
-                    "Capture concrete events instead of vague themes. "
-                    "If multiple important events happened, include all of them. "
-                    "Prefer specifics: requests, decisions, promises, outcomes, emotional turning points, changes of state, and unresolved follow-ups. "
-                    "title must be a short topic title within 32 Chinese characters or 64 ASCII chars. "
-                    "content must be a detailed but compact memory summary, usually 2 to 5 sentences. "
-                    "content should normally be at least 120 Chinese characters or 220 ASCII chars when enough detail exists. "
-                    "tags must be an array of 2 to 6 short strings. "
-                    "notes may be empty, but should include extra specifics when useful. "
-                    "Output must start with { and end with }."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "Summarize the full conversation below into one long-term memory entry.\n"
-                    "Do not omit important incidents just to keep it short.\n"
-                    "Focus on what actually happened, what changed, what was decided, what was promised, and what still matters later.\n"
-                    "Return JSON only.\n"
-                    f"Format example:\n{schema_hint}\n\n"
-                    f"Conversation:\n{transcript}"
-                ),
-            },
-        ],
-    }
-    data = await request_json(
-        url=url,
-        api_key=llm_config["api_key"],
-        payload=payload,
-        request_timeout=int(llm_config["request_timeout"]),
-    )
-
-    try:
-        text = str(data["choices"][0]["message"]["content"]).strip()
-    except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError("invalid summary payload") from exc
 
     def parse_summary_json(candidate: str) -> dict[str, Any]:
         cleaned = str(candidate or "").strip()
@@ -3411,10 +3385,81 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
             raise ValueError("summary json missing required keys")
         return parsed
 
+    def is_mostly_english_summary(payload: dict[str, Any]) -> bool:
+        tags = payload.get("tags", [])
+        if isinstance(tags, list):
+            tags_text = " ".join(str(item) for item in tags)
+        else:
+            tags_text = str(tags or "")
+
+        combined = " ".join(
+            [
+                str(payload.get("title", "") or ""),
+                str(payload.get("content", "") or ""),
+                str(payload.get("notes", "") or ""),
+                tags_text,
+            ]
+        ).strip()
+
+        if not combined:
+            return False
+
+        english_count = len(re.findall(r"[A-Za-z]", combined))
+        chinese_count = len(re.findall(r"[\u4e00-\u9fff]", combined))
+        return english_count >= max(40, chinese_count * 2) and chinese_count < 40
+
+    payload = {
+        "model": llm_config["model"],
+        "temperature": 0.2,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "你是用于长期记忆归档的对话总结器。"
+                    "你必须只返回一个严格 JSON 对象。"
+                    "不要输出 markdown 代码块、解释、旁白、角色扮演内容、XML 或任何额外文本。"
+                    "JSON 对象必须且只能包含这四个键：title、content、tags、notes。"
+                    "总结时要记录具体事件，不要只写空泛主题。"
+                    "如果发生了多个重要事件，要一并写入。"
+                    "优先保留具体信息：请求、决定、承诺、结果、情绪转折、状态变化、后续待处理事项。"
+                    "title 必须是简短中文标题，长度不超过 32 个汉字或 64 个 ASCII 字符。"
+                    "content 必须是较详细但紧凑的中文总结，通常 2 到 5 句。"
+                    "在信息足够时，content 通常不少于 120 个汉字或 220 个 ASCII 字符。"
+                    "tags 必须是 2 到 6 个短标签，优先使用简体中文；专有名词可保留原文。"
+                    "notes 可以为空，但在有帮助时应补充人名、地点、时间、数字、约定和未解决事项。"
+                    "除专有名词、产品名、缩写外，title、content、notes 必须使用简体中文。"
+                    "如果原对话以中文为主，禁止输出整段英文总结。"
+                    "输出必须以 { 开始，并以 } 结束。"
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "请把下面完整对话总结为一条长期记忆。\n"
+                    "不要为了简短而省略重要事件。\n"
+                    "重点总结：实际发生了什么、有什么变化、做了什么决定、承诺了什么、后续还有什么重要事项。\n"
+                    "只返回 JSON。\n"
+                    f"格式示例：\n{schema_hint}\n\n"
+                    f"对话内容：\n{transcript}"
+                ),
+            },
+        ],
+    }
+    data = await request_json(
+        url=url,
+        api_key=llm_config["api_key"],
+        payload=payload,
+        request_timeout=int(llm_config["request_timeout"]),
+    )
+
+    try:
+        text = str(data["choices"][0]["message"]["content"]).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError("invalid summary payload") from exc
+
     try:
         summary = parse_summary_json(text)
         logger.info("Automatic memory summary parsed as strict JSON on first pass.")
-        return summary
     except ValueError:
         logger.warning("Automatic memory summary was not strict JSON, trying one repair pass.")
         repair_payload = {
@@ -3424,17 +3469,19 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
                 {
                     "role": "system",
                     "content": (
-                        "Convert the provided text into one strict JSON object only. "
-                        "Do not output markdown, explanation, or extra text. "
-                        "The object must contain exactly these keys: title, content, tags, notes."
+                        "请把提供的内容修复为一个严格 JSON 对象。"
+                        "不要输出 markdown、解释或额外文本。"
+                        "对象必须且只能包含这四个键：title、content、tags、notes。"
+                        "除专有名词外，title、content、notes 必须使用简体中文。"
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        "Repair the following content into strict JSON.\n"
-                        f"Format example:\n{schema_hint}\n\n"
-                        f"Original content:\n{text}"
+                        "请将下面内容修复为严格 JSON。\n"
+                        "如果原文已经是 JSON，请只修正格式，不要扩写。\n"
+                        f"格式示例：\n{schema_hint}\n\n"
+                        f"原始内容：\n{text}"
                     ),
                 },
             ],
@@ -3451,13 +3498,60 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
             raise ValueError("invalid summary repair payload") from exc
         summary = parse_summary_json(repaired_text)
         logger.info("Automatic memory summary repaired into strict JSON successfully.")
-        return summary
 
+    if is_mostly_english_summary(summary):
+        logger.warning("Automatic memory summary is mostly English, trying one Chinese rewrite pass.")
+        rewrite_payload = {
+            "model": llm_config["model"],
+            "temperature": 0.0,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "你是 JSON 语言修正器。"
+                        "请在不改变原意的前提下，把输入中的长期记忆内容改写为简体中文。"
+                        "只返回一个严格 JSON 对象。"
+                        "不要输出 markdown、解释或额外文本。"
+                        "对象必须且只能包含这四个键：title、content、tags、notes。"
+                        "除专有名词、产品名、缩写外，title、content、notes 必须使用简体中文。"
+                        "tags 优先使用简体中文，专有名词可保留原文。"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "请把下面 JSON 中的长期记忆内容改写为简体中文，并保持原意。\n"
+                        "不要丢失事件、决定、承诺、结果、情绪变化和未解决事项。\n"
+                        "只返回 JSON。\n\n"
+                        f"原始 JSON：\n{json.dumps(summary, ensure_ascii=False, indent=2)}"
+                    ),
+                },
+            ],
+        }
+
+        try:
+            rewrite_data = await request_json(
+                url=url,
+                api_key=llm_config["api_key"],
+                payload=rewrite_payload,
+                request_timeout=int(llm_config["request_timeout"]),
+            )
+            rewrite_text = str(rewrite_data["choices"][0]["message"]["content"]).strip()
+            rewritten_summary = parse_summary_json(rewrite_text)
+            if not is_mostly_english_summary(rewritten_summary):
+                summary = rewritten_summary
+                logger.info("Automatic memory summary rewritten into Chinese successfully.")
+            else:
+                logger.warning("Chinese rewrite pass still looks mostly English, keeping previous summary.")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Chinese rewrite pass failed, keeping previous summary: %s", exc)
+
+    return summary
 
 def sanitize_memory_summary(payload: dict[str, Any], *, fallback: dict[str, Any]) -> dict[str, Any]:
     title = str(payload.get("title", "")).strip() or fallback["title"]
     content = str(payload.get("content", "")).strip() or fallback["content"]
-    tags = sanitize_tags(payload.get("tags", fallback["tags"])) or ["auto-memory", "summary"]
+    tags = sanitize_tags(payload.get("tags", fallback["tags"])) or ["自动记忆", "对话总结"]
     notes = str(payload.get("notes", "")).strip() or str(fallback.get("notes", "")).strip()
 
     normalized_content = re.sub(r"\s+", " ", content).strip()
@@ -3511,6 +3605,19 @@ async def archive_current_conversation() -> dict[str, Any]:
     )
     return memory
 
+
+configure_prompt_builder(
+    sanitize_tags=sanitize_tags,
+    get_persona=get_persona,
+    get_conversation=get_conversation,
+    get_memories=get_memories,
+    get_user_profile=get_user_profile,
+    get_runtime_chat_config=get_runtime_chat_config,
+    bucket_worldbook_matches=bucket_worldbook_matches,
+    normalize_worldbook_injection_role=_normalize_worldbook_injection_role,
+    build_preset_prompt=build_preset_prompt,
+)
+
 load_env_file()
 ensure_data_files()
 
@@ -3519,6 +3626,8 @@ bootstrap_runtime_layout()
 app = FastAPI(title="Xuqi LLM Chat")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+registered_mods = mount_discovered_mods(app, MODS_DIR)
+templates.env.globals["registered_mods"] = [mod.to_dict() for mod in registered_mods]
 
 
 
@@ -3551,6 +3660,9 @@ route_ctx = SimpleNamespace(
     get_conversation=get_conversation,
     get_current_card=get_current_card,
     get_memories=get_memories,
+    get_mod=lambda slug: next(
+        (mod.to_dict() for mod in registered_mods if mod.slug == slug), None
+    ),
     get_persona=get_persona,
     get_preset_store=get_preset_store,
     get_role_avatar_url=get_role_avatar_url,
@@ -3566,8 +3678,10 @@ route_ctx = SimpleNamespace(
     get_workshop_stage_label=get_workshop_stage_label,
     get_workshop_state=get_workshop_state,
     get_worldbook_entries=get_worldbook_entries,
+    get_worldbook_debug_snapshot=get_worldbook_debug_snapshot,
     get_worldbook_settings=get_worldbook_settings,
     get_worldbook_store=get_worldbook_store,
+    list_mods=lambda: [mod.to_dict() for mod in registered_mods],
     list_role_card_files=list_role_card_files,
     list_sprite_assets=list_sprite_assets,
     logger=logger,
@@ -3586,6 +3700,7 @@ route_ctx = SimpleNamespace(
     retrieve_memories=retrieve_memories,
     memories_path=memories_path,
     sanitize_creative_workshop=sanitize_creative_workshop,
+    sanitize_worldbook_store=sanitize_worldbook_store,
     sanitize_preset_store=sanitize_preset_store,
     sanitize_settings=sanitize_settings,
     sanitize_slot_id=sanitize_slot_id,
@@ -3615,3 +3730,4 @@ route_ctx.slot_runtime_service = SlotRuntimeService(route_ctx)
 register_page_routes(app, templates=templates, ctx=route_ctx)
 register_config_api_routes(app, ctx=route_ctx)
 register_chat_api_routes(app, ctx=route_ctx)
+register_mod_api_routes(app, ctx=route_ctx)
