@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Xuqi LLM Chat</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=chat-layout-transparent-v4" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=ttsvoice-chip-v1" data-mod-hook="{{ mod.slug }}" />
@@ -77,9 +77,9 @@
         gap: 1rem;
         padding: 0.95rem 1rem;
         border-radius: 1rem;
-        border: 1px solid var(--border);
-        background: var(--panel-strong);
-        box-shadow: var(--shadow-soft);
+        border: 1px solid color-mix(in srgb, var(--line) 38%, transparent 62%);
+        background: color-mix(in srgb, var(--panel-strong) 18%, transparent 82%);
+        box-shadow: none;
         margin-bottom: 1rem;
       }
       .preset-toolbar-left {
@@ -561,28 +561,22 @@
       {% include "_grouped_nav.html" %}
       </div>
 
-          <div class="slot-toolbar">
-        <div class="slot-toolbar-left">
-          <span class="slot-badge">Global</span>
-          <div class="slot-meta">
-            <strong>当前为全局对话</strong>
-            <p class="slot-hint">聊天会持续读取当前全局记忆、世界书、预设和环境设置；角色卡可以随时热插拔。</p>
-          </div>
-        </div>
-      </div>
     <div class="chat-shell">
-      <div class="chat-layout">
-        <aside class="sprite-stage panel">
-          <div class="section-head">
-            <p class="eyebrow">Sprite</p>
-            <h2>差分立绘</h2>
-            <p id="sprite-tag-label" class="muted">当前表情：未命中</p>
-          </div>
-          <div class="sprite-frame">
-            <img id="sprite-image" class="sprite-image" alt="当前立绘" hidden />
-            <div id="sprite-placeholder" class="sprite-placeholder">
-              这里会显示 `{{ settings.sprite_base_path }}/标签.png`
+      <div id="chat-layout" class="chat-layout worldbook-rail-collapsed">
+        <aside id="worldbook-hit-rail" class="worldbook-hit-rail panel" aria-label="Worldbook 命中">
+          <button id="toggle-worldbook-rail" class="worldbook-rail-toggle" type="button" aria-expanded="false" aria-controls="worldbook-rail-content" title="展开 Worldbook 命中">
+            <span id="worldbook-rail-arrow" class="worldbook-rail-arrow" aria-hidden="true">›</span>
+            <span id="worldbook-rail-count" class="worldbook-rail-count" aria-label="Worldbook 命中数量" hidden>0</span>
+          </button>
+          <div id="worldbook-rail-content" class="worldbook-rail-content">
+            <div class="section-head">
+              <p class="eyebrow">Worldbook</p>
+              <h2>命中</h2>
             </div>
+            <div class="worldbook-rail-list" id="worldbook-bar" hidden>
+              <div class="retrieval-items worldbook-rail-items" id="worldbook-items"></div>
+            </div>
+            <div id="worldbook-empty" class="worldbook-rail-empty">暂无命中</div>
           </div>
         </aside>
 
@@ -598,7 +592,6 @@
               <button id="open-drawer-secondary" type="button" class="secondary compact">打开侧栏</button>
             </div>
           </div>
-
 
           <div class="preset-toolbar">
             <div class="preset-toolbar-left">
@@ -623,11 +616,6 @@
           <div class="retrieval-bar" id="retrieval-bar" hidden>
             <div class="retrieval-title">记忆命中</div>
             <div class="retrieval-items" id="retrieval-items"></div>
-          </div>
-
-          <div class="retrieval-bar worldbook-bar" id="worldbook-bar" hidden>
-            <div class="retrieval-title">Worldbook Hits</div>
-            <div class="retrieval-items" id="worldbook-items"></div>
           </div>
 
           <div class="retrieval-bar worldbook-debug-panel" id="worldbook-debug-panel" {% if not worldbook_settings.debug_enabled %}hidden{% endif %}>
@@ -673,11 +661,15 @@
                 <img src="{{ user_profile.avatar_url }}" alt="{{ user_profile.display_name or "我" }}" />
                 {% else %}
                 <span class="avatar-text">{{ (user_profile.display_name or "我")[:1] }}</span>
-                {% endif %}
+              {% endif %}
               </div>
               {% else %}
               <div class="message-avatar assistant-avatar" aria-hidden="true">
-                <img src="{{ role_avatar_url or (settings.sprite_base_path ~ '/avatar.png') }}" alt="{{ persona.name or "AI" }}" onerror="this.outerHTML='<span class=&quot;avatar-text&quot;>{{ (persona.name or "AI")[:1] }}</span>';" />
+                {% if role_avatar_url %}
+                <img src="{{ role_avatar_url }}" alt="{{ persona.name or "AI" }}" onerror="this.outerHTML='<span class=&quot;avatar-text&quot;>{{ (persona.name or "AI")[:1] }}</span>';" />
+                {% else %}
+                <span class="avatar-text">{{ (persona.name or "AI")[:1] }}</span>
+                {% endif %}
               </div>
               <div class="bubble-wrap">
                 <div class="bubble">{{ item.content }}</div>
@@ -895,20 +887,6 @@
 
         <section class="drawer-section">
           <div class="section-head">
-            <p class="eyebrow">Sprite</p>
-            <h3>表情驱动立绘</h3>
-          </div>
-          <label class="checkbox-row">
-            <input id="drawer-sprite-enabled" type="checkbox" />
-            <span>强制模型输出 `[表情:标签]`</span>
-          </label>
-          <label for="drawer-sprite-base-path">立绘目录</label>
-          <input id="drawer-sprite-base-path" placeholder="{{ settings.sprite_base_path }}" />
-          <p class="muted">默认会按当前全局立绘目录读取，例如 `{{ settings.sprite_base_path }}/害羞.png`。</p>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
             <p class="eyebrow">Worldbook</p>
             <h3>世界书</h3>
             <p class="muted">命中触发词后会把对应设定文本临时拼进本轮 Prompt。</p>
@@ -928,7 +906,6 @@
           <div class="button-row">
             <a class="ghost-link button-link" href="/config/user">User Settings</a>
             <a class="ghost-link button-link" href="/config/card">Card Editor</a>
-            <a class="ghost-link button-link" href="/config/sprite">Sprite Manager</a>
             <a class="ghost-link button-link" href="/config/memory">Memory Manager</a>
             <a class="ghost-link button-link" href="/config/worldbook">Worldbook Settings</a>
             <a class="ghost-link button-link" href="/config/worldbook/entries">Worldbook Entries</a>
@@ -945,10 +922,16 @@
       const inputEl = document.getElementById("message-input");
       const statusEl = document.getElementById("status-text");
       const themePillEl = document.getElementById("theme-pill");
+      const chatLayoutEl = document.getElementById("chat-layout");
+      const worldbookRailEl = document.getElementById("worldbook-hit-rail");
+      const worldbookRailToggleEl = document.getElementById("toggle-worldbook-rail");
+      const worldbookRailArrowEl = document.getElementById("worldbook-rail-arrow");
+      const worldbookRailCountEl = document.getElementById("worldbook-rail-count");
       const retrievalBarEl = document.getElementById("retrieval-bar");
       const retrievalItemsEl = document.getElementById("retrieval-items");
       const worldbookBarEl = document.getElementById("worldbook-bar");
       const worldbookItemsEl = document.getElementById("worldbook-items");
+      const worldbookEmptyEl = document.getElementById("worldbook-empty");
       const worldbookDebugPanelEl = document.getElementById("worldbook-debug-panel");
       const worldbookDebugToggleEl = document.getElementById("worldbook-debug-toggle");
       const worldbookDebugArrowEl = document.getElementById("worldbook-debug-arrow");
@@ -997,18 +980,11 @@
       let workshopStatusCache = null;
       const drawerEl = document.getElementById("config-drawer");
       const drawerOverlayEl = document.getElementById("drawer-overlay");
-      const spriteImageEl = document.getElementById("sprite-image");
-      const spritePlaceholderEl = document.getElementById("sprite-placeholder");
-      const spriteTagLabelEl = document.getElementById("sprite-tag-label");
       const worldbookListEl = document.getElementById("worldbook-list");
       const userAvatarUrl = {{ user_profile.avatar_url | tojson }};
       const userAvatarLabel = {{ ((user_profile.display_name or "我")[:1]) | tojson }};
+      const assistantAvatarUrl = {{ role_avatar_url | tojson }};
       const assistantAvatarLabel = {{ ((persona.name or "AI")[:1]) | tojson }};
-
-      function getAssistantAvatarUrl() {
-        const basePath = (runtimeState?.sprite_base_path || DEFAULT_SLOT_SPRITE_BASE_PATH || "").trim();
-        return basePath ? `${basePath}/avatar.png` : "";
-      }
 
       function buildAvatar(role) {
         const avatar = document.createElement("div");
@@ -1030,22 +1006,22 @@
           return avatar;
         }
 
-        const img = document.createElement("img");
-        img.alt = assistantAvatarLabel;
-        img.src = getAssistantAvatarUrl();
-        img.addEventListener("error", () => {
-          img.remove();
-        });
-
         const label = document.createElement("span");
         label.className = "avatar-text";
         label.textContent = assistantAvatarLabel;
 
-        avatar.appendChild(img);
+        if (assistantAvatarUrl) {
+          const img = document.createElement("img");
+          img.alt = assistantAvatarLabel;
+          img.src = assistantAvatarUrl;
+          img.addEventListener("error", () => {
+            img.remove();
+          });
+          avatar.appendChild(img);
+        }
         avatar.appendChild(label);
         return avatar;
       }
-      const DEFAULT_SLOT_SPRITE_BASE_PATH = {{ settings.sprite_base_path | tojson }};
       const DRAWER_SERVER_INPUT_IDS = new Set([
         "drawer-llm-base-url",
         "drawer-llm-api-key",
@@ -1067,8 +1043,6 @@
         "drawer-ui-opacity",
         "drawer-background-url",
         "drawer-background-overlay",
-        "drawer-sprite-enabled",
-        "drawer-sprite-base-path",
       ]);
       const initialState = {
         llm_base_url: {{ settings.llm_base_url | tojson }},
@@ -1091,9 +1065,7 @@
         theme: {{ settings.theme | tojson }},
         ui_opacity: {{ settings.ui_opacity | tojson }},
         background_image_url: {{ settings.background_image_url | tojson }},
-        background_overlay: {{ settings.background_overlay | tojson }},
-        sprite_enabled: {{ settings.sprite_enabled | tojson }},
-        sprite_base_path: DEFAULT_SLOT_SPRITE_BASE_PATH
+        background_overlay: {{ settings.background_overlay | tojson }}
       };
 
       let worldbookDebugCollapsed = true;
@@ -1108,9 +1080,6 @@
       function normalizeRuntimeState(state) {
         const normalized = { ...(state || {}) };
         normalized.embedding_fields = Array.isArray(normalized.embedding_fields) ? normalized.embedding_fields : [];
-        if (!normalized.sprite_base_path || normalized.sprite_base_path === "/static/sprites") {
-          normalized.sprite_base_path = DEFAULT_SLOT_SPRITE_BASE_PATH;
-        }
         return normalized;
       }
 
@@ -1176,8 +1145,6 @@
         drawerInput("drawer-ui-opacity").value = runtimeState.ui_opacity ?? 0.84;
         drawerInput("drawer-background-url").value = runtimeState.background_image_url || "";
         drawerInput("drawer-background-overlay").value = runtimeState.background_overlay ?? 0.42;
-        drawerInput("drawer-sprite-enabled").checked = runtimeState.sprite_enabled !== false;
-        drawerInput("drawer-sprite-base-path").value = runtimeState.sprite_base_path || {{ settings.sprite_base_path | tojson }};
 
         document.querySelectorAll(".drawer-embedding-field").forEach((el) => {
           el.checked = (runtimeState.embedding_fields || []).includes(el.value);
@@ -1211,8 +1178,6 @@
           ui_opacity: Number(drawerInput("drawer-ui-opacity").value || 0.84),
           background_image_url: drawerInput("drawer-background-url").value.trim(),
           background_overlay: Number(drawerInput("drawer-background-overlay").value || 0.42),
-          sprite_enabled: drawerInput("drawer-sprite-enabled").checked,
-          sprite_base_path: drawerInput("drawer-sprite-base-path").value.trim() || {{ settings.sprite_base_path | tojson }},
         };
 
         applyTheme(runtimeState.theme);
@@ -1273,31 +1238,6 @@
           bodyEl.style.setProperty("--background-image", "none");
         }
       }
-
-      function spriteUrlFor(tag) {
-        const cleanBase = (runtimeState.sprite_base_path || {{ settings.sprite_base_path | tojson }}).replace(/\/+$/, "");
-        return `${cleanBase}/${encodeURIComponent(tag)}.png`;
-      }
-
-      function updateSprite(tag) {
-        if (!tag || runtimeState.sprite_enabled === false) {
-          spriteImageEl.hidden = true;
-          spritePlaceholderEl.hidden = false;
-          spriteTagLabelEl.textContent = "当前表情：未命中";
-          return;
-        }
-
-        spriteTagLabelEl.textContent = `当前表情：${tag}`;
-        spriteImageEl.src = spriteUrlFor(tag);
-        spriteImageEl.hidden = false;
-        spritePlaceholderEl.hidden = true;
-      }
-
-      spriteImageEl.addEventListener("error", () => {
-        spriteImageEl.hidden = true;
-        spritePlaceholderEl.hidden = false;
-        spritePlaceholderEl.textContent = `没有找到对应立绘，请在 ${runtimeState.sprite_base_path || {{ settings.sprite_base_path | tojson }}} 里放入同名 PNG。`;
-      });
 
       function parseThoughtSections(content) {
         const text = String(content || "");
@@ -1774,10 +1714,34 @@
         retrievalBarEl.hidden = false;
       }
 
+      function setWorldbookRailExpanded(expanded) {
+        const shouldExpand = !!expanded;
+        chatLayoutEl?.classList.toggle("worldbook-rail-collapsed", !shouldExpand);
+        worldbookRailEl?.classList.toggle("expanded", shouldExpand);
+        worldbookRailToggleEl?.setAttribute("aria-expanded", String(shouldExpand));
+        if (worldbookRailArrowEl) {
+          worldbookRailArrowEl.textContent = shouldExpand ? "‹" : "›";
+        }
+        if (worldbookRailToggleEl) {
+          worldbookRailToggleEl.title = shouldExpand ? "收起 Worldbook 命中" : "展开 Worldbook 命中";
+        }
+      }
+
+      worldbookRailToggleEl?.addEventListener("click", () => {
+        setWorldbookRailExpanded(!worldbookRailEl?.classList.contains("expanded"));
+      });
+      setWorldbookRailExpanded(false);
+
       function renderWorldbookHits(items) {
+        const hitCount = Array.isArray(items) ? items.length : 0;
+        if (worldbookRailCountEl) {
+          worldbookRailCountEl.textContent = String(hitCount);
+          worldbookRailCountEl.hidden = hitCount <= 0;
+        }
         if (!Array.isArray(items) || items.length === 0) {
           worldbookItemsEl.innerHTML = "";
           worldbookBarEl.hidden = true;
+          if (worldbookEmptyEl) worldbookEmptyEl.hidden = false;
           return;
         }
         worldbookItemsEl.innerHTML = "";
@@ -1788,6 +1752,7 @@
           worldbookItemsEl.appendChild(chip);
         }
         worldbookBarEl.hidden = false;
+        if (worldbookEmptyEl) worldbookEmptyEl.hidden = true;
       }
 
       function setWorldbookDebugCollapsed(collapsed) {
@@ -2264,7 +2229,6 @@
           hit_count: "命中",
           turn_count: "历史",
           char_count: "字数",
-          sprite_enabled: "立绘约束",
           section_count: "段数",
         };
         return Object.entries(meta)
@@ -2725,8 +2689,7 @@
           rerank_api_key: runtimeState.rerank_api_key,
           rerank_model: runtimeState.rerank_model,
           rerank_top_n: runtimeState.rerank_top_n,
-          sprite_enabled: runtimeState.sprite_enabled,
-          sprite_base_path: runtimeState.sprite_base_path,
+          sprite_enabled: false,
         };
       }
 
@@ -2801,7 +2764,6 @@
               } else {
                 assistantEntry.wrapper.remove();
               }
-              updateSprite(data.sprite_tag || "");
               streamingEntries.delete(assistantEntry);
             },
             onError(data) {

@@ -8,7 +8,7 @@
     {% set mod_state.has_tts_studio = true %}
   {% endif %}
 {% endfor %}
-{% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' or current_path == '/config/sprite' %}
+{% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' %}
 {% set persona_active = current_path == '/config/card' or current_path == '/config/preset' or current_path == '/config/memory' %}
 {% set worldbook_active = current_path.startswith('/config/worldbook') or current_path.startswith('/mods/worldbook-maker') %}
 {% set tts_active = current_path.startswith('/mods/tts-studio') %}
@@ -41,7 +41,6 @@
         <a class="navlink{% if current_path == '/config' %} active{% endif %}" href="/config">Config</a>
         <a class="navlink{% if current_path == '/config/workshop' %} active{% endif %}" href="/config/workshop">Workshop</a>
         <a class="navlink{% if current_path == '/config/user' %} active{% endif %}" href="/config/user">User</a>
-        <a class="navlink{% if current_path == '/config/sprite' %} active{% endif %}" href="/config/sprite">Sprite</a>
       </div>
     </div>
   </details>

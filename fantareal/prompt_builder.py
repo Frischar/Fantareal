@@ -182,7 +182,7 @@ def build_user_profile_prompt(user_profile: dict[str, Any]) -> str:
 
 
 def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
-    if not llm_config.get("sprite_enabled", True):
+    if not llm_config.get("sprite_enabled", False):
         return ""
 
     return (
@@ -380,7 +380,7 @@ def build_prompt_package(
         "output_rules",
         "输出格式约束",
         [sprite_prompt],
-        sprite_enabled=bool(llm_config.get("sprite_enabled", True)),
+        sprite_enabled=bool(llm_config.get("sprite_enabled", False)),
     )
     append_layer(
         "recent_history",

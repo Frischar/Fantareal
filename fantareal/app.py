@@ -213,7 +213,7 @@ DEFAULT_SETTINGS = {
     "rerank_api_key": "",
     "rerank_model": "",
     "rerank_top_n": 3,
-    "sprite_enabled": True,
+    "sprite_enabled": False,
     "sprite_base_path": DEFAULT_SPRITE_BASE_PATH,
 }
 
@@ -649,7 +649,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
             strict=strict,
         ),
         "background_overlay": clamp_float(settings.get("background_overlay"), 0.0, 0.85, 0.42),
-        "sprite_enabled": parse_bool(settings.get("sprite_enabled"), True),
+        "sprite_enabled": parse_bool(settings.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
         "embedding_base_url": str(settings.get("embedding_base_url", "")).strip(),
         "embedding_api_key": str(settings.get("embedding_api_key", "")).strip(),
@@ -1963,7 +1963,7 @@ def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
         "rerank_api_key": str(source.get("rerank_api_key", "")).strip(),
         "rerank_model": str(source.get("rerank_model", "")).strip(),
         "rerank_top_n": clamp_int(source.get("rerank_top_n"), 1, 12, 3),
-        "sprite_enabled": parse_bool(source.get("sprite_enabled"), True),
+        "sprite_enabled": parse_bool(source.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
     }
 
@@ -1997,7 +1997,7 @@ def get_runtime_chat_config(runtime_overrides: dict[str, Any] | None = None) -> 
         "history_limit": overrides.get("history_limit") if runtime_overrides else settings.get("history_limit", 20),
         "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
         "demo_mode": overrides.get("demo_mode") if runtime_overrides else settings.get("demo_mode", False),
-        "sprite_enabled": overrides.get("sprite_enabled") if runtime_overrides else settings.get("sprite_enabled", True),
+        "sprite_enabled": False,
         "sprite_base_path": overrides.get("sprite_base_path") if runtime_overrides else settings.get("sprite_base_path", DEFAULT_SPRITE_BASE_PATH),
     }
 
@@ -3077,7 +3077,7 @@ async def request_model_reply(
         worldbook_matches or [],
     )
     worldbook_enforced = final_reply != reply_source
-    if not sprite_tag and llm_config.get("sprite_enabled", True):
+    if not sprite_tag and llm_config.get("sprite_enabled", False):
         sprite_tag = "calm"
     return {
         "reply": final_reply,
@@ -3281,7 +3281,7 @@ async def stream_model_reply(
             accumulated_visible or accumulated_raw,
             worldbook_matches or [],
         ),
-        "sprite_tag": sprite_tag or ("骞抽潤" if llm_config.get("sprite_enabled", True) else ""),
+        "sprite_tag": sprite_tag or ("骞抽潤" if llm_config.get("sprite_enabled", False) else ""),
     }
     reply_result["full_reply"] = compose_full_reply(accumulated_think, str(reply_result["reply"]))
     reply_result["think"] = accumulated_think
