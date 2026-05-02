@@ -344,12 +344,13 @@ body::after {
 .chat-shell {
   height: calc(100vh - 92px);
   overflow: hidden;
+  padding: 14px 18px 18px;
 }
 
 .config-shell {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 20px;
 }
 
 .welcome-hero {
@@ -446,10 +447,11 @@ body::after {
 }
 
 .config-shell.wide {
-  max-width: 1180px;
+  width: min(1760px, calc(100vw - 32px));
+  max-width: min(1760px, calc(100vw - 32px));
   margin: 0 auto;
-  grid-template-columns: repeat(2, minmax(320px, 540px));
-  justify-content: center;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  justify-content: stretch;
   align-items: start;
   gap: 18px;
 }
@@ -485,6 +487,11 @@ body::after {
 .chat-area.standalone {
   height: 100%;
   max-height: calc(100vh - 116px);
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 0;
 }
 
 .chat-header {
@@ -494,6 +501,12 @@ body::after {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.chat-area.standalone .chat-header {
+  padding: 14px 14px 8px;
+  border-bottom: 0;
+  background: transparent;
 }
 
 .chat-header #chat-subtitle {
@@ -640,6 +653,14 @@ a.compact {
   padding: 10px 22px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel-strong) 86%, transparent 14%);
+}
+
+.chat-area.standalone .retrieval-bar {
+  margin: 0 14px 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 54%, transparent 46%);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel-strong) 28%, transparent 72%);
 }
 
 .retrieval-bar[hidden] {
@@ -819,6 +840,10 @@ a.compact {
   min-height: 0;
 }
 
+.chat-area.standalone .messages {
+  padding: 18px 14px 8px;
+}
+
 .message {
   display: flex;
 }
@@ -925,9 +950,14 @@ a.compact {
   border-top: 1px solid var(--line);
 }
 
+.chat-area.standalone .composer {
+  padding: 6px 14px 10px;
+  border-top: 0;
+}
+
 #message-input {
-  height: 120px;
-  max-height: 120px;
+  height: 86px;
+  max-height: 86px;
   overflow-y: scroll;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -940,7 +970,7 @@ a.compact {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .composer-actions button {
@@ -1090,7 +1120,10 @@ a.compact {
 
 @media (max-width: 1080px) {
   .config-shell,
-  .config-shell.wide {
+  .config-shell.wide,
+  .config-shell.compact {
+    width: 100%;
+    max-width: 100%;
     grid-template-columns: 1fr;
   }
 }
@@ -1135,12 +1168,13 @@ a.compact {
 }
 
 .config-shell.compact {
-  max-width: 980px;
+  width: min(1760px, calc(100vw - 32px));
+  max-width: min(1760px, calc(100vw - 32px));
   margin: 0 auto;
-  grid-template-columns: repeat(2, minmax(280px, 1fr));
-  justify-content: center;
+  grid-template-columns: repeat(2, minmax(360px, 1fr));
+  justify-content: stretch;
   align-items: start;
-  gap: 14px;
+  gap: 18px;
 }
 
 .config-shell.compact > .config-panel:not(.full-span) {
@@ -1462,6 +1496,11 @@ a.compact {
   .stats-row {
     grid-template-columns: 1fr;
   }
+
+  .config-shell.compact {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 .topbar-chat {
@@ -1518,9 +1557,165 @@ a.compact {
 
 .chat-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  position: relative;
   height: 100%;
+}
+
+.chat-layout.worldbook-rail-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.worldbook-hit-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 8;
+  width: min(260px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--panel) 74%, transparent 26%);
+  box-shadow: none;
+  backdrop-filter: none;
+  transition: width 0.18s ease, background 0.18s ease, border-color 0.18s ease, padding 0.18s ease;
+}
+
+.worldbook-hit-rail:not(.expanded) {
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  bottom: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  backdrop-filter: none;
+  overflow: visible;
+}
+
+.worldbook-rail-toggle {
+  width: 30px !important;
+  height: 30px;
+  min-width: 30px !important;
+  max-width: 30px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  position: relative;
+  background: color-mix(in srgb, var(--accent) 88%, transparent 12%);
+  color: white;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+}
+
+.worldbook-hit-rail:not(.expanded) .worldbook-rail-toggle {
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+.worldbook-rail-toggle:hover {
+  transform: translateX(1px);
+}
+
+.worldbook-hit-rail.expanded .worldbook-rail-toggle {
+  align-self: flex-end;
+}
+
+.worldbook-rail-arrow {
+  font-size: 22px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.worldbook-rail-count {
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-dark);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1px solid color-mix(in srgb, var(--panel-strong) 82%, transparent 18%);
+}
+
+.worldbook-rail-count[hidden] {
+  display: none !important;
+}
+
+.worldbook-rail-content {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.worldbook-hit-rail:not(.expanded) .worldbook-rail-content {
+  display: none !important;
+}
+
+.worldbook-hit-rail .section-head {
+  gap: 4px;
+}
+
+.worldbook-hit-rail h2 {
+  font-size: 20px;
+}
+
+.worldbook-rail-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.worldbook-rail-list[hidden],
+.worldbook-rail-empty[hidden] {
+  display: none !important;
+}
+
+.worldbook-rail-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.worldbook-rail-items .retrieval-chip {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worldbook-rail-empty {
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  background: color-mix(in srgb, var(--panel-strong) 78%, transparent 22%);
 }
 
 .sprite-stage {
@@ -1730,8 +1925,13 @@ a.compact {
     grid-template-columns: 1fr;
   }
 
-  .chat-layout {
+  .chat-layout,
+  .chat-layout.worldbook-rail-collapsed {
     grid-template-columns: 1fr;
+  }
+
+  .worldbook-hit-rail:not(.expanded) {
+    width: 36px;
   }
 
   .sprite-stage {

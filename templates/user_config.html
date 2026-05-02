@@ -4,9 +4,319 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>User - Xuqi LLM Chat</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=config-wide-v2-ui-unify-v1" />
+  
+    <style id="ui-unify-v1">
+      body.modern-setting-page {
+        --ui-card-radius: 24px;
+        --ui-sub-radius: 18px;
+        --ui-gap: 18px;
+      }
+
+      body.modern-setting-page .config-shell.compact {
+        width: min(1480px, calc(100% - 32px));
+        max-width: none;
+        gap: var(--ui-gap);
+      }
+
+      body.modern-setting-page .panel.config-panel {
+        position: relative;
+        overflow: hidden;
+        border-radius: var(--ui-card-radius);
+        border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+        background:
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--panel-strong) 72%, transparent),
+            color-mix(in srgb, var(--panel) 92%, transparent));
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
+      }
+
+      body.modern-setting-page .panel.config-panel.full-span:first-of-type {
+        border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+        background:
+          radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 12%, transparent), transparent 38%),
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--panel-strong) 82%, transparent),
+            color-mix(in srgb, var(--panel) 92%, transparent));
+      }
+
+      body.modern-setting-page .section-head {
+        gap: 0.35rem;
+      }
+
+      body.modern-setting-page .section-head h2,
+      body.modern-setting-page .section-head h3 {
+        margin-top: 0.08rem;
+        letter-spacing: -0.02em;
+      }
+
+      body.modern-setting-page .eyebrow {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.26rem 0.64rem;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+        background: color-mix(in srgb, var(--accent) 10%, transparent);
+      }
+
+      body.modern-setting-page .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      body.modern-setting-page .stat-box {
+        min-height: 76px;
+        padding: 14px 16px;
+        border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+        border-radius: var(--ui-sub-radius);
+        background:
+          linear-gradient(180deg,
+            color-mix(in srgb, var(--input-bg) 78%, transparent),
+            color-mix(in srgb, var(--panel) 86%, transparent));
+        box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
+      }
+
+      body.modern-setting-page .stat-label {
+        display: block;
+        margin-bottom: 0.36rem;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+
+      body.modern-setting-page .stat-box strong {
+        font-size: 1.05rem;
+        line-height: 1.35;
+      }
+
+      body.modern-setting-page label:not(.checkbox-row):not(.check-chip) {
+        font-weight: 850;
+        color: color-mix(in srgb, var(--text) 82%, var(--muted));
+      }
+
+      body.modern-setting-page input,
+      body.modern-setting-page select,
+      body.modern-setting-page textarea {
+        border-radius: 15px;
+        border-color: color-mix(in srgb, var(--border) 84%, transparent);
+        background: color-mix(in srgb, var(--input-bg) 92%, transparent);
+      }
+
+      body.modern-setting-page textarea {
+        line-height: 1.7;
+      }
+
+      body.modern-setting-page .button-row {
+        gap: 10px;
+      }
+
+      body.modern-setting-page button,
+      body.modern-setting-page .button-link,
+      body.modern-setting-page .ghost-link,
+      body.modern-setting-page .secondary,
+      body.modern-setting-page .compact {
+        border-radius: 999px;
+      }
+
+      body.modern-setting-page .secondary,
+      body.modern-setting-page .ghost-link,
+      body.modern-setting-page .button-link {
+        border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+        background: color-mix(in srgb, var(--input-bg) 70%, transparent);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+      }
+
+      body.modern-setting-page button:not(.secondary):not(.compact):not(.ghost-link):not(.button-link),
+      body.modern-setting-page #save-settings,
+      body.modern-setting-page #save-all,
+      body.modern-setting-page #save-user-profile,
+      body.modern-setting-page #save-worldbook-settings,
+      body.modern-setting-page #save-workshop,
+      body.modern-setting-page #save-card {
+        box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 18%, transparent);
+      }
+
+      body.modern-setting-page .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 0.72rem;
+        min-height: 46px;
+        padding: 10px 12px;
+        border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+        border-radius: 16px;
+        background: color-mix(in srgb, var(--input-bg) 64%, transparent);
+        color: var(--text);
+        font-weight: 760;
+      }
+
+      body.modern-setting-page .checkbox-row input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        position: relative;
+        flex: 0 0 auto;
+        width: 46px;
+        height: 26px;
+        margin: 0;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+        background: color-mix(in srgb, var(--panel-strong) 76%, transparent);
+        cursor: pointer;
+        transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      body.modern-setting-page .checkbox-row input[type="checkbox"]::before {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--muted) 82%, white);
+        box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
+        transition: transform 0.18s ease, background 0.18s ease;
+      }
+
+      body.modern-setting-page .checkbox-row input[type="checkbox"]:checked {
+        border-color: color-mix(in srgb, var(--accent) 68%, var(--border));
+        background: color-mix(in srgb, var(--accent) 38%, var(--panel-strong));
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+      }
+
+      body.modern-setting-page .checkbox-row input[type="checkbox"]:checked::before {
+        transform: translateX(20px);
+        background: white;
+      }
+
+      body.modern-setting-page .field-chip-row {
+        gap: 0.55rem;
+      }
+
+      body.modern-setting-page .check-chip {
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+        background: color-mix(in srgb, var(--input-bg) 62%, transparent);
+      }
+
+      body.modern-setting-page .helper-text,
+      body.modern-setting-page .field-note,
+      body.modern-setting-page .muted.compact {
+        color: color-mix(in srgb, var(--muted) 88%, var(--text));
+      }
+
+      body.modern-setting-page .status-line {
+        display: block;
+        min-height: 46px;
+        padding: 12px 14px;
+        border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+        border-radius: 16px;
+        background: color-mix(in srgb, var(--input-bg) 72%, transparent);
+      }
+
+      body.modern-setting-page .inline-field,
+      body.modern-setting-page .model-combo-row {
+        align-items: stretch;
+      }
+
+      body.modern-setting-page .preview-card,
+      body.modern-setting-page .card-block,
+      body.modern-setting-page .sub-block,
+      body.modern-setting-page .workshop-runtime-panel,
+      body.modern-setting-page .workshop-search-block,
+      body.modern-setting-page .workshop-rule-shell {
+        border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+        border-radius: var(--ui-sub-radius);
+        background: color-mix(in srgb, var(--input-bg) 58%, transparent);
+        box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+      }
+
+      body.modern-setting-page .card-block,
+      body.modern-setting-page .sub-block,
+      body.modern-setting-page .workshop-runtime-panel,
+      body.modern-setting-page .workshop-search-block {
+        padding: 16px;
+      }
+
+      body.modern-setting-page .persona-toolbar,
+      body.modern-setting-page .memory-card-head,
+      body.modern-setting-page .workshop-rule-summary {
+        border-radius: 16px;
+      }
+
+      body.modern-setting-page .workshop-rule-shell {
+        overflow: hidden;
+        margin-bottom: 12px;
+      }
+
+      body.modern-setting-page .workshop-rule-summary {
+        padding: 12px 14px;
+        background: linear-gradient(180deg,
+          color-mix(in srgb, var(--panel-strong) 68%, transparent),
+          color-mix(in srgb, var(--input-bg) 76%, transparent));
+      }
+
+      body.modern-setting-page .workshop-rule-body {
+        padding: 16px;
+        border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+      }
+
+      body.modern-setting-page .workshop-rule-summary-meta,
+      body.modern-setting-page .workshop-rule-summary-text {
+        color: var(--muted);
+      }
+
+      body.modern-setting-page .workshop-rule-trigger-label,
+      body.modern-setting-page .workshop-rule-action-label {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0.14rem 0.56rem;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+        background: color-mix(in srgb, var(--accent) 9%, transparent);
+      }
+
+      body.modern-setting-page .sprite-frame {
+        border-radius: 22px;
+        border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+        background: color-mix(in srgb, var(--input-bg) 62%, transparent);
+      }
+
+      body.modern-setting-page .topbar-stack {
+        gap: 12px;
+      }
+
+      body.modern-setting-page .slot-toolbar {
+        border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
+        background: color-mix(in srgb, var(--panel-strong) 72%, transparent);
+      }
+
+      body.modern-setting-page .slot-badge {
+        border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+      }
+
+      @media (max-width: 768px) {
+        body.modern-setting-page .config-shell.compact {
+          width: min(100% - 16px, 100%);
+        }
+        body.modern-setting-page .stats-row {
+          grid-template-columns: 1fr;
+        }
+        body.modern-setting-page .inline-field,
+        body.modern-setting-page .model-combo-row {
+          flex-direction: column;
+        }
+      }
+    </style>
+
   </head>
-  <body>
+  <body class="modern-setting-page">
     <div class="topbar-stack">
       <div class="topbar">
         <a class="brand" href="/chat">Xuqi LLM Chat</a>

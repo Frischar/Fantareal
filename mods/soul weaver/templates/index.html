@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>余声 - GAL 路线提纯</title>
+    <link rel="stylesheet" href="{{ api_base_path }}/static/soul-weaver.css" />
+  </head>
+  <body>
+    <div class="app-background-overlay" aria-hidden="true"></div>
+    <div class="page-shell">
+      <main class="layout">
+        <section class="panel editor-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">余声</p>
+              <h1>GAL 路线提纯流水线</h1>
+              <p class="muted">导入 0 到真结局的完整剧情，支持 `[角色]:对白`、`「角色」：对白`、`【角色】：对白`，逐步生成世界书、剧情提纯、记忆、预设和人设卡。</p>
+              <div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);font-size:0.82rem;color:#fbbf24;line-height:1.6;">
+                <strong>⚠ Token 消耗警告：</strong>一次完整流程（6步全部生成）消耗量极大，开发测试期间累计消耗超过千万 token。强烈建议使用 Token Plan，普通 API 额度可能无法支撑完整流程。
+              </div>
+            </div>
+            <span id="statusText" class="status-pill">就绪</span>
+          </div>
+
+          <div class="mini-grid">
+            <div>
+              <label for="projectName">项目名</label>
+              <input id="projectName" type="text" placeholder="例如：雪村线真结局提纯" />
+            </div>
+            <div>
+              <label for="characterName">目标角色名</label>
+              <input id="characterName" type="text" placeholder="从角色表选择，或手动输入" />
+            </div>
+          </div>
+
+          <label for="sourceText">完整 GAL 剧情</label>
+          <textarea
+            id="sourceText"
+            class="source-input"
+            placeholder="[角色A]:对白&#10;[主角]:对白&#10;[角色A]:对白&#10;&#10;建议粘贴从初遇到真结局的完整路线文本。"
+          ></textarea>
+
+          <div class="button-row">
+            <button id="parseScriptBtn" class="primary-button" type="button">1. 解析剧本 / 建角色表</button>
+            <button id="generateWorldbookBtn" class="ghost-button" type="button" disabled>2. 生成世界书</button>
+            <button id="generatePlotBtn" class="ghost-button" type="button" disabled>3. 剧情提纯</button>
+            <button id="generateMemoryBtn" class="ghost-button" type="button" disabled>4. 生成记忆</button>
+            <button id="generatePresetBtn" class="ghost-button" type="button" disabled>5. 生成预设</button>
+            <button id="generateRoleBtn" class="ghost-button" type="button" disabled>6. 生成人设卡</button>
+          </div>
+
+          <div class="flow-steps" aria-label="流水线步骤">
+            <button class="flow-step active" data-step="script" type="button">
+              <span>1</span><strong>剧本解析</strong><small>角色表 / 台词索引</small>
+            </button>
+            <button class="flow-step" data-step="worldbook" type="button">
+              <span>2</span><strong>世界书</strong><small>完整剧情提取</small>
+            </button>
+            <button class="flow-step" data-step="plot" type="button">
+              <span>3</span><strong>剧情提纯</strong><small>完整时间线</small>
+            </button>
+            <button class="flow-step" data-step="memory" type="button">
+              <span>4</span><strong>记忆</strong><small>第一人称长期记忆</small>
+            </button>
+            <button class="flow-step" data-step="preset" type="button">
+              <span>5</span><strong>预设</strong><small>只吃目标角色台词</small>
+            </button>
+            <button class="flow-step" data-step="rolecard" type="button">
+              <span>6</span><strong>人设卡</strong><small>真结局后衔接</small>
+            </button>
+          </div>
+
+          <div class="editor-divider" aria-hidden="true"></div>
+
+          <section class="character-panel">
+            <div class="section-head compact-head">
+              <div>
+                <p class="eyebrow">Character Table</p>
+                <h2>角色表</h2>
+              </div>
+              <p class="muted" id="characterHint">解析后点击角色即可提取该角色全部单独台词。</p>
+            </div>
+            <div id="characterTable" class="character-table">
+              <p class="empty-state">还没有解析剧本。</p>
+            </div>
+          </section>
+
+          <details class="compact-settings">
+            <summary>模型与导入配置</summary>
+            <div class="settings-grid">
+              <div>
+                <label for="baseUrl">API URL</label>
+                <input id="baseUrl" type="text" value="{{ initial_settings.base_url }}" />
+              </div>
+              <div>
+                <label for="model">模型名</label>
+                <input id="model" type="text" value="{{ initial_settings.model }}" />
+              </div>
+              <div>
+                <label for="apiKey">API Key</label>
+                <input id="apiKey" type="password" value="{{ initial_settings.api_key }}" autocomplete="off" />
+              </div>
+              <div>
+                <label for="mainBaseUrl">Fantareal 地址</label>
+                <input id="mainBaseUrl" type="text" value="" placeholder="留空时自动使用当前 Fantareal 地址" />
+              </div>
+              <div>
+                <label for="temperature">Temperature</label>
+                <input id="temperature" type="number" min="0" max="2" step="0.05" value="{{ initial_settings.temperature }}" />
+              </div>
+              <div>
+                <label for="maxTokens">Max Tokens（0 = 不传）</label>
+                <input id="maxTokens" type="number" min="0" step="1000" value="{{ initial_settings.max_tokens }}" />
+              </div>
+            </div>
+            <div class="button-row compact-row">
+              <button id="saveSettingsBtn" class="ghost-button" type="button">保存配置</button>
+              <button id="probeModelsBtn" class="ghost-button" type="button">检测模型</button>
+            </div>
+            <div id="modelList" class="model-list" hidden></div>
+          </details>
+        </section>
+
+        <section class="panel output-panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Workbench</p>
+              <h2>当前产物 / 手动确认</h2>
+              <p class="muted">每一步生成后都可以在这里修改，确认无误后再进入下一步。</p>
+            </div>
+            <div class="button-row output-actions">
+              <button id="importAllBtn" class="ghost-button" type="button" disabled>导入全部素材</button>
+              <button id="downloadBundleBtn" class="ghost-button" type="button" disabled>完整导出</button>
+            </div>
+          </div>
+
+          <div class="result-meta-grid">
+            <div class="meta-card"><span>剧本</span><strong id="scriptState">未解析</strong></div>
+            <div class="meta-card"><span>世界书</span><strong id="worldbookState">未生成</strong></div>
+            <div class="meta-card"><span>剧情</span><strong id="plotState">未提纯</strong></div>
+            <div class="meta-card"><span>记忆</span><strong id="memoryState">未生成</strong></div>
+            <div class="meta-card"><span>预设</span><strong id="presetState">未生成</strong></div>
+            <div class="meta-card"><span>人设卡</span><strong id="roleState">未生成</strong></div>
+          </div>
+
+          <div id="progressPanel" class="progress-panel" hidden>
+            <div class="progress-head">
+              <span id="progressText">等待 chunk 任务</span>
+              <strong id="progressCount">0 / 0</strong>
+            </div>
+            <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+          </div>
+
+          <div class="tab-bar" role="tablist">
+            <button class="tab active" data-tab="script" type="button">剧本索引</button>
+            <button class="tab" data-tab="lines" type="button">角色台词</button>
+            <button class="tab" data-tab="worldbook" type="button">世界书</button>
+            <button class="tab" data-tab="plot" type="button">剧情提纯</button>
+            <button class="tab" data-tab="memory" type="button">记忆</button>
+            <button class="tab" data-tab="preset" type="button">预设</button>
+            <button class="tab" data-tab="rolecard" type="button">人设卡</button>
+          </div>
+
+          <section id="tab-script" class="tab-content active">
+            <div class="result-toolbar">
+              <p class="muted">本地解析结果，不消耗模型。用于确认角色表和台词索引。</p>
+              <div class="button-row">
+                <button id="script-copyBtn" class="ghost-button" type="button" disabled>复制</button>
+                <button id="script-downloadBtn" class="ghost-button" type="button" disabled>下载</button>
+              </div>
+            </div>
+            <div id="script-warnings" class="warnings-box"></div>
+            <textarea id="script-output" class="json-editor" spellcheck="false" placeholder="剧本索引 JSON 会显示在这里。"></textarea>
+          </section>
+
+          <section id="tab-lines" class="tab-content">
+            <div class="result-toolbar">
+              <p class="muted">目标角色的全部单独台词。预设只使用这里的语料，避免旁白和其他角色污染文风。</p>
+              <div class="button-row">
+                <button id="lines-copyBtn" class="ghost-button" type="button" disabled>复制</button>
+                <button id="lines-downloadBtn" class="ghost-button" type="button" disabled>下载</button>
+              </div>
+            </div>
+            <textarea id="lines-output" class="json-editor text-editor" spellcheck="false" placeholder="选择目标角色后，这里会显示她/他的全部台词。"></textarea>
+          </section>
+
+          <section id="tab-worldbook" class="tab-content">
+            <div class="result-toolbar">
+              <p class="muted">世界书来自完整剧情，承载地点、人物、术语、共同事件和真结局后状态。</p>
+              <div class="button-row">
+                <label class="inline-check"><input id="wb-applySettings" type="checkbox" />导入时应用 settings</label>
+                <button id="wb-importBtn" class="ghost-button" type="button" disabled>导入</button>
+                <button id="wb-copyBtn" class="ghost-button" type="button" disabled>复制</button>
+                <button id="wb-downloadBtn" class="ghost-button" type="button" disabled>下载</button>
+              </div>
+            </div>
+            <div id="wb-warnings" class="warnings-box"></div>
+            <textarea id="wb-output" class="json-editor" spellcheck="false" placeholder="世界书 JSON 会显示在这里。"></textarea>
+          </section>
+
+          <section id="tab-plot" class="tab-content">
+            <div class="result-toolbar">
+              <p class="muted">完整路线剧情提纯。后续记忆和人设卡会优先使用这里的结果。</p>
+              <div class="button-row">
+                <button id="plot-copyBtn" class="ghost-button" type="button" disabled>复制</button>
+                <button id="plot-downloadBtn" class="ghost-button" type="button" disabled>下载</button>
+              </div>
+            </div>
+            <div id="plot-warnings" class="warnings-box"></div>
+            <textarea id="plot-output" class="json-editor" spellcheck="false" placeholder="剧情提纯 JSON 会显示在这里。"></textarea>
+          </section>
+
+          <section id="tab-memory" class="tab-content">
+            <div class="result-toolbar">
+              <p class="muted">记忆来自剧情提纯结果，目标是完整覆盖路线并转成角色第一人称长期记忆。</p>
+              <div class="button-row">
+                <button id="mem-importBtn" class="ghost-button" type="button" disabled>导入</button>
+                <button id="mem-copyBtn" class="ghost-button" type="button" disabled>复制</button>
+                <button id="mem-downloadBtn" class="ghost-button" type="button" disabled>下载</button>
+              </div>
+            </div>
+            <div id="mem-warnings" class="warnings-box"></div>
+            <textarea id="mem-output" class="json-editor" spellcheck="false" placeholder="记忆 JSON 会显示在这里。"></textarea>
+          </section>
+
+          <section id="tab-preset" class="tab-content">
+            <div class="result-toolbar">
+              <p class="muted">预设来自目标角色单独台词，输出完整 Fantareal preset store。</p>
+              <div class="button-row">
+                <button id="pre-importBtn" class="ghost-button" type="button" disabled>导入</button>
+                <button id="pre-copyBtn" class="ghost-button" type="button" disabled>复制</button>
+                <button id="pre-downloadBtn" class="ghost-button" type="button" disabled>下载</button>
+              </div>
+            </div>
+            <div id="pre-warnings" class="warnings-box"></div>
+            <textarea id="pre-output" class="json-editor" spellcheck="false" placeholder="预设 JSON 会显示在这里。"></textarea>
+          </section>
+
+          <section id="tab-rolecard" class="tab-content">
+            <div class="result-toolbar">
+              <p class="muted">人设卡综合剧情提纯、角色台词、记忆和世界书；description 最低要求 6000 字。</p>
+              <div class="button-row">
+                <button id="rc-importBtn" class="ghost-button" type="button" disabled>导入</button>
+                <button id="rc-copyBtn" class="ghost-button" type="button" disabled>复制</button>
+                <button id="rc-downloadBtn" class="ghost-button" type="button" disabled>下载</button>
+              </div>
+            </div>
+            <div id="rc-warnings" class="warnings-box"></div>
+            <textarea id="rc-output" class="json-editor" spellcheck="false" placeholder="人设卡 JSON 会显示在这里。"></textarea>
+          </section>
+        </section>
+
+        <section class="panel drafts-panel full-span">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Drafts</p>
+              <h2>草稿历史</h2>
+            </div>
+          </div>
+          <div id="draftsList" class="drafts-list">
+            <p class="empty-state">暂无草稿记录。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay" hidden>
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p id="loadingText">正在处理，请稍候...</p>
+      </div>
+    </div>
+
+    <div id="confirmDialog" class="confirm-dialog" hidden>
+      <div class="confirm-content">
+        <h3 id="confirmTitle">确认</h3>
+        <p id="confirmMessage">确定要继续吗？</p>
+        <div class="confirm-actions">
+          <button id="confirmYes" class="primary-button" type="button">确定</button>
+          <button id="confirmNo" class="ghost-button" type="button">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE_PATH = {{ api_base_path | default('', true) | tojson }};
+      const INITIAL_DRAFTS = {{ initial_drafts | tojson }};
+    </script>
+    <script src="{{ api_base_path }}/static/soul-weaver.js"></script>
+  </body>
+</html>

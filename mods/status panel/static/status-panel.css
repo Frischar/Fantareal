@@ -1,0 +1,9 @@
+/* Status Panel CSS entry · v1.7.4 css-trim-v5
+   稍大胆削减版 v5：把旧 legacy 里的结构样式搬入 base，再裁掉旧重复块。 */
+
+@import url("./status-panel-tokens.css?v=status-panel-v1-7-4-css-trim-v5");
+@import url("./status-panel-chat-base.css?v=status-panel-v1-7-4-css-trim-v5");
+@import url("./status-panel-admin-base.css?v=status-panel-v1-7-4-css-trim-v5");
+@import url("./status-panel-legacy.css?v=status-panel-v1-7-4-css-trim-v5");
+@import url("./status-panel-admin-current.css?v=status-panel-v1-7-4-css-trim-v5");
+@import url("./status-panel-chat-current.css?v=status-panel-v1-7-4-css-trim-v5");

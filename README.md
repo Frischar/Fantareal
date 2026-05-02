@@ -1,4 +1,4 @@
-# Xuqi LLM Chat
+# Fantareal
 
 <p align="center">
   <img src="./assets/preview.png" alt="Xuqi LLM Chat WebUI Preview" width="80%">
@@ -198,21 +198,26 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 ```text
 .
 |-- app.py
-|-- app_models.py
-|-- page_routes.py
-|-- config_api_routes.py
-|-- chat_api_routes.py
-|-- worldbook_logic.py
-|-- workshop_logic.py
-|-- slot_runtime.py
 |-- launcher.py
-|-- preset_rules.py
 |-- requirements.txt
 |-- README.md
 |-- LICENSE
 |-- 启动webui.bat
 |-- 封包器.bat
 |-- app_icon.ico
+|-- fantareal/
+|   |-- app.py
+|   |-- app_models.py
+|   |-- page_routes.py
+|   |-- config_api_routes.py
+|   |-- chat_api_routes.py
+|   |-- worldbook_logic.py
+|   |-- workshop_logic.py
+|   |-- slot_runtime.py
+|   |-- preset_rules.py
+|   |-- prompt_builder.py
+|   |-- mods_runtime.py
+|   `-- launcher.py
 |-- cards/
 |   `-- template_role_card.json
 |-- data/
@@ -235,13 +240,15 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 ## 开发入口
 
-- 应用启动与共享核心逻辑：`app.py`
-- 页面路由：`page_routes.py`
-- 配置相关 API：`config_api_routes.py`
-- 聊天相关 API：`chat_api_routes.py`
-- 数据模型：`app_models.py`
-- 世界书逻辑：`worldbook_logic.py`
-- 创意工坊逻辑：`workshop_logic.py`
+- 根目录 `app.py`：兼容 `uvicorn app:app` 的薄入口
+- 根目录 `launcher.py`：兼容封包器和桌面启动的薄入口
+- 应用启动与共享核心逻辑：`fantareal/app.py`
+- 页面路由：`fantareal/page_routes.py`
+- 配置相关 API：`fantareal/config_api_routes.py`
+- 聊天相关 API：`fantareal/chat_api_routes.py`
+- 数据模型：`fantareal/app_models.py`
+- 世界书逻辑：`fantareal/worldbook_logic.py`
+- 创意工坊逻辑：`fantareal/workshop_logic.py`
 - 页面模板：`templates/`
 - 样式文件：`static/styles.css`
 
