@@ -53,7 +53,6 @@ from .worldbook_logic import (
     DEFAULT_WORLDBOOK_SETTINGS,
     default_worldbook_store,
     keyword_matches_query,
-    normalize_match_text,
     sanitize_worldbook,
     sanitize_worldbook_entry,
     sanitize_worldbook_settings,
@@ -215,6 +214,8 @@ DEFAULT_SETTINGS = {
     "rerank_top_n": 3,
     "sprite_enabled": False,
     "sprite_base_path": DEFAULT_SPRITE_BASE_PATH,
+    "memory_summary_length": "medium",
+    "memory_summary_max_chars": 520,
 }
 
 
@@ -661,6 +662,8 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "rerank_api_key": str(settings.get("rerank_api_key", "")).strip(),
         "rerank_model": str(settings.get("rerank_model", "")).strip(),
         "rerank_top_n": clamp_int(settings.get("rerank_top_n"), 1, 12, 3),
+        "memory_summary_length": str(settings.get("memory_summary_length", "medium")).strip() if str(settings.get("memory_summary_length", "medium")).strip() in {"short", "medium", "long", "custom"} else "medium",
+        "memory_summary_max_chars": clamp_int(settings.get("memory_summary_max_chars"), 80, 2000, 520),
     }
 
 
@@ -2360,17 +2363,6 @@ def save_worldbook_runtime_state(payload: dict[str, Any], slot_id: str | None = 
     return sanitized
 
 
-def _worldbook_direct_question(user_message: str) -> bool:
-    text = str(user_message or "").strip().lower()
-    if not text:
-        return False
-
-    markers = (
-        "what", "who", "why", "how", "tell me", "explain", "?", "？",
-        "什么", "是谁", "为啥", "为什么", "怎么", "如何", "解释", "告诉我", "说说", "介绍",
-    )
-    return any(marker in text for marker in markers)
-
 
 
 
@@ -2872,29 +2864,7 @@ def enforce_worldbook_fact_in_reply(
     reply_text: str,
     matches: list[dict[str, Any]],
 ) -> str:
-    if not matches:
-        return reply_text
-
-    text = str(reply_text or "").strip()
-    if not text or not _worldbook_direct_question(user_message):
-        return text
-
-    primary_match = matches[0]
-    subject = str(primary_match.get("matched") or primary_match.get("title") or primary_match.get("trigger") or "").strip()
-    fact = str(primary_match.get("content") or "").strip()
-    if not subject or not fact:
-        return text
-
-    normalized_reply = normalize_match_text(text)
-    normalized_subject = normalize_match_text(subject)
-    normalized_fact = normalize_match_text(fact[:48])
-    if (normalized_subject and normalized_subject in normalized_reply) or (
-        normalized_fact and normalized_fact in normalized_reply
-    ):
-        return text
-
-    logger.info("Worldbook direct-answer guard applied before reply.")
-    return f"{fact}\\n\\n{text}"
+    return str(reply_text or "").strip()
 
 
 def normalize_sprite_tag(tag: str) -> str:
@@ -3214,12 +3184,8 @@ async def request_model_reply(
     think_text = combine_think_parts(reasoning_text, str(reply_parts["think"]))
     sprite_tag = str(reply_parts["sprite_tag"])
     reply_source = str(reply_parts["visible"] or raw_reply)
-    final_reply = enforce_worldbook_fact_in_reply(
-        user_message,
-        reply_source,
-        worldbook_matches or [],
-    )
-    worldbook_enforced = final_reply != reply_source
+    final_reply = reply_source
+    worldbook_enforced = False
     if not sprite_tag and llm_config.get("sprite_enabled", False):
         sprite_tag = "calm"
     return {
@@ -3438,17 +3404,14 @@ async def stream_model_reply(
             detail = f"{detail} | upstream={last_error_detail}"
         raise HTTPException(status_code=502, detail=detail) from last_error
 
+    reply_text = accumulated_visible or accumulated_raw
     reply_result: dict[str, Any] = {
-        "reply": enforce_worldbook_fact_in_reply(
-            user_message,
-            accumulated_visible or accumulated_raw,
-            worldbook_matches or [],
-        ),
+        "reply": reply_text,
         "sprite_tag": sprite_tag or ("calm" if llm_config.get("sprite_enabled", False) else ""),
     }
     reply_result["full_reply"] = compose_full_reply(accumulated_think, str(reply_result["reply"]))
     reply_result["think"] = accumulated_think
-    reply_result["worldbook_enforced"] = reply_result["reply"] != (accumulated_visible or accumulated_raw)
+    reply_result["worldbook_enforced"] = False
     yield {"type": "done", **reply_result}
 
 
@@ -3531,6 +3494,23 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
 
     url = build_api_url(llm_config["base_url"], "chat/completions")
     transcript = build_conversation_transcript(history)
+
+    memory_settings = get_settings()
+    memory_length = str(memory_settings.get("memory_summary_length", "medium")).strip()
+    if memory_length == "short":
+        sentence_hint = "content 必须是紧凑的中文总结，通常 1 到 2 句。"
+        min_length_hint = ""
+    elif memory_length == "long":
+        sentence_hint = "content 必须是较详细的中文总结，通常 5 到 10 句，覆盖重要事件、关系变化和未解决线索。"
+        min_length_hint = "在信息足够时，content 通常不少于 120 个汉字或 220 个 ASCII 字符。"
+    elif memory_length == "custom":
+        max_chars_hint = clamp_int(memory_settings.get("memory_summary_max_chars"), 80, 2000, 520)
+        sentence_hint = f"content 必须覆盖重要事件、关系变化和未解决线索。请根据对话信息量自行决定长度，内容尽量贴近目标字符数但不灌水（目标约 {max_chars_hint} 个字符）。"
+        min_length_hint = ""
+    else:
+        sentence_hint = "content 必须是较详细但紧凑的中文总结，通常 2 到 5 句。"
+        min_length_hint = "在信息足够时，content 通常不少于 120 个汉字或 220 个 ASCII 字符。"
+
     schema_hint = (
         "{\n"
         "  \"title\": \"简短中文标题\",\n"
@@ -3601,8 +3581,8 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
                     "如果发生了多个重要事件，要一并写入。"
                     "优先保留具体信息：请求、决定、承诺、结果、情绪转折、状态变化、后续待处理事项。"
                     "title 必须是简短中文标题，长度不超过 32 个汉字或 64 个 ASCII 字符。"
-                    "content 必须是较详细但紧凑的中文总结，通常 2 到 5 句。"
-                    "在信息足够时，content 通常不少于 120 个汉字或 220 个 ASCII 字符。"
+                    f"{sentence_hint}"
+                    f"{min_length_hint}"
                     "tags 必须是 2 到 6 个短标签，优先使用简体中文；专有名词可保留原文。"
                     "notes 可以为空，但在有帮助时应补充人名、地点、时间、数字、约定和未解决事项。"
                     "除专有名词、产品名、缩写外，title、content、notes 必须使用简体中文。"
@@ -3734,13 +3714,24 @@ def sanitize_memory_summary(payload: dict[str, Any], *, fallback: dict[str, Any]
 
     normalized_content = re.sub(r"\s+", " ", content).strip()
     fallback_content = str(fallback.get("content", "")).strip()
-    if len(normalized_content) < 80 and len(fallback_content) > len(normalized_content):
+    memory_length = str(get_settings().get("memory_summary_length", "medium")).strip()
+    min_content_len = 20 if memory_length == "short" else 80
+    if len(normalized_content) < min_content_len and len(fallback_content) > len(normalized_content):
         content = fallback_content
+    if memory_length == "short":
+        effective_max_chars = 200
+    elif memory_length == "long":
+        effective_max_chars = 800
+    elif memory_length == "custom":
+        effective_max_chars = clamp_int(get_settings().get("memory_summary_max_chars"), 80, 2000, 520)
+    else:
+        effective_max_chars = 520
+    max_chars = effective_max_chars
 
     return {
         "id": f"memory-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
         "title": title[:60],
-        "content": content[:520],
+        "content": content[:max_chars],
         "tags": tags[:8],
         "notes": notes[:800],
     }
@@ -3757,31 +3748,43 @@ async def summarize_conversation_to_memory(history: list[dict[str, Any]]) -> dic
     return sanitize_memory_summary(summary_payload, fallback=fallback)
 
 
+_ARCHIVE_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _get_archive_lock(slot_id: str) -> asyncio.Lock:
+    if slot_id not in _ARCHIVE_LOCKS:
+        _ARCHIVE_LOCKS[slot_id] = asyncio.Lock()
+    return _ARCHIVE_LOCKS[slot_id]
+
+
 async def archive_current_conversation() -> dict[str, Any]:
-    history = [item for item in get_conversation() if item.get("role") in {"user", "assistant"}]
-    if not history:
-        raise HTTPException(status_code=400, detail="There is no conversation to archive yet.")
+    slot_id = get_active_slot_id()
+    lock = _get_archive_lock(slot_id)
+    async with lock:
+        history = [item for item in get_conversation() if item.get("role") in {"user", "assistant"}]
+        if not history:
+            return {"_skipped": True}
 
-    memory = await summarize_conversation_to_memory(history)
-    memories = get_memories()
-    if memories:
-        last = memories[-1]
-        if last.get("title") == memory["title"] and last.get("content") == memory["content"]:
-            persist_json(
-                conversation_path(),
-                [],
-                detail="Conversation archive failed: could not clear the current chat history.",
-            )
-            return last
+        memory = await summarize_conversation_to_memory(history)
+        memories = get_memories()
+        if memories:
+            last = memories[-1]
+            if last.get("title") == memory["title"] and last.get("content") == memory["content"]:
+                persist_json(
+                    conversation_path(),
+                    [],
+                    detail="Conversation archive failed: could not clear the current chat history.",
+                )
+                return last
 
-    memories.append(memory)
-    save_memories(memories)
-    persist_json(
-        conversation_path(),
-        [],
-        detail="Conversation archive failed: could not clear the current chat history.",
-    )
-    return memory
+        memories.append(memory)
+        save_memories(memories)
+        persist_json(
+            conversation_path(),
+            [],
+            detail="Conversation archive failed: could not clear the current chat history.",
+        )
+        return memory
 
 
 configure_prompt_builder(

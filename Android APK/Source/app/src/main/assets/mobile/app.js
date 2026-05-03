@@ -1,5 +1,5 @@
 ﻿const APP_STATE_KEY = "xuqi-mobile-state-v4";
-const ROUTES = ["chat", "config", "preset", "card", "workshop", "memory", "worldbook"];
+const ROUTES = ["chat", "preview", "config"];
 const GLOBAL_RUNTIME_NAME = "全局运行数据";
 const MODEL_PRESETS = [
   { id: "custom", label: "自定义", url: "" },
@@ -53,6 +53,8 @@ const DEFAULT_SETTINGS = {
   rerankApiKey: "",
   rerankModel: "",
   rerankTopN: 3,
+  memorySummaryLength: "medium",
+  memorySummaryMaxChars: 520,
 };
 
 const SUMMARY_TRANSCRIPT_SOFT_LIMIT_CHARS = 12000;
@@ -1473,12 +1475,8 @@ function flushState() {
 
 const ROUTE_META = {
   chat: { title: "聊天", subtitle: "" },
-  config: { title: "配置", subtitle: "" },
-  preset: { title: "预设", subtitle: "" },
-  card: { title: "角色卡", subtitle: "" },
-  workshop: { title: "创意工坊", subtitle: "" },
-  memory: { title: "记忆库", subtitle: "" },
-  worldbook: { title: "世界书", subtitle: "" },
+  preview: { title: "预览", subtitle: "" },
+  config: { title: "设置", subtitle: "" },
 };
 
 function qs(id) {
@@ -1603,13 +1601,8 @@ function navigate(route) {
 function renderRoute(route) {
   renderGlobalChrome();
   if (route === "chat") renderChat();
+  if (route === "preview") renderPreview();
   if (route === "config") renderConfig();
-  if (route === "preset") renderPreset();
-  if (route === "card") renderCard();
-  if (route === "workshop") renderWorkshopSettings();
-  if (route === "memory") renderMemory();
-  if (route === "worldbook") renderWorldbook();
-  bindDynamicEditors();
 }
 
 function parseAssistantReply(raw) {
@@ -2653,7 +2646,7 @@ async function buildMemorySummaryPrompt(messages, slot) {
         "只能输出一个 JSON 对象，不要输出 markdown，不要输出解释，不要包裹代码块。",
         '字段必须且只能包含：title, content, tags, notes。',
         'content 必须覆盖重要事件、关系变化、做出的决定、已经产生的结果，以及还没解决的线索。',
-        "content 必须写得具体，通常为 2 到 5 句；对话材料足够时，不要只写一句空泛总结。",
+        (() => { const len = state.settings.memorySummaryLength || "medium"; if (len === "short") return "content 必须写得具体，通常 1 到 2 句；不要只写一句空泛总结。"; if (len === "long") return "content 必须写得具体，通常 5 到 10 句；必须覆盖重要事件、关系变化、做出的决定和未解决线索。"; if (len === "custom") { const mc = Math.min(Math.max(Number(state.settings.memorySummaryMaxChars) || 520, 80), 2000); return "content 必须覆盖重要事件、关系变化、做出的决定、已经产生的结果，以及还没解决的线索。请根据对话信息量自行决定长度，尽量贴近目标字符数但不灌水（目标约 " + mc + " 个字符）。"; } return "content 必须写得具体，通常为 2 到 5 句；对话材料足够时，不要只写一句空泛总结。"; })(),
         "title 要能让人一眼看出这段记忆在讲什么。",
         "tags 需要是短标签数组，不要塞成长句。",
         "如果上方包含已删除旧记忆，那些内容不能被重新写回长期记忆。",
@@ -2689,11 +2682,29 @@ function parseStrictSummaryJson(text) {
 
 function sanitizeMemorySummaryPayload(payload, fallback) {
   const nextTitle = String(payload?.title || "").trim() || fallback.title;
-  const nextContent = String(payload?.content || "").trim();
+  let nextContent = String(payload?.content || "").trim();
   const nextNotes = String(payload?.notes || "").trim() || fallback.notes;
   const nextTags = sanitizeTags(payload?.tags || fallback.tags || ["auto-memory", "summary"]);
   const sentenceCount = nextContent.split(/[。！？!?]+/).map((item) => item.trim()).filter(Boolean).length;
-  const useFallbackContent = !nextContent || nextContent.length < 36 || sentenceCount < 2;
+  const memLen = state.settings.memorySummaryLength || "medium";
+  const minSentenceCount = memLen === "short" ? 1 : 2;
+  const minContentLength = memLen === "short" ? 12 : 36;
+  const useFallbackContent = !nextContent || nextContent.length < minContentLength || sentenceCount < minSentenceCount;
+  if (!useFallbackContent) {
+    let maxChars;
+    if (memLen === "short") {
+      maxChars = 200;
+    } else if (memLen === "long") {
+      maxChars = 800;
+    } else if (memLen === "custom") {
+      maxChars = Math.min(Math.max(Number(state.settings.memorySummaryMaxChars) || 520, 80), 2000);
+    } else {
+      maxChars = 520;
+    }
+    if (nextContent.length > maxChars) {
+      nextContent = nextContent.slice(0, maxChars);
+    }
+  }
   return {
     title: nextTitle,
     content: useFallbackContent ? fallback.content : nextContent,
@@ -2740,7 +2751,17 @@ function dedupeMemory(memoryList, nextMemory) {
   return !findSimilarMemory(memoryList, nextMemory);
 }
 
+let isEndingConversation = false;
+
 async function endConversation() {
+  if (isEndingConversation) {
+    setStatus("正在归档对话，请稍后再试");
+    return;
+  }
+  isEndingConversation = true;
+  const button = qs("endConversationButton");
+  button.disabled = true;
+  try {
   const slot = getActiveSlot();
   if (!slot.messages.length) {
     setStatus("当前没有可归档的对话");
@@ -2791,6 +2812,10 @@ async function endConversation() {
   saveState();
   renderRoute(state.activeRoute);
   setStatus(`这段对话和已有记忆高度相似，已跳过重复写入：${memory.title || "已复用"}`);
+  } finally {
+    isEndingConversation = false;
+    button.disabled = false;
+  }
 }
 
 function downloadText(filename, content) {
@@ -3128,45 +3153,16 @@ function renderConfig() {
   qs("backgroundImageUrl").value = settings.backgroundImageUrl || "";
   qs("uiOpacityValue").textContent = Number(settings.uiOpacity || 0.88).toFixed(2);
   qs("backgroundOverlayValue").textContent = Number(settings.backgroundOverlay || 0.36).toFixed(2);
-  qs("embeddingBaseUrl").value = settings.embeddingBaseUrl || "";
-  qs("embeddingApiKey").value = settings.embeddingApiKey || "";
-  qs("embeddingModel").value = settings.embeddingModel || "";
-  qs("retrievalTopK").value = String(settings.retrievalTopK ?? 4);
-  qs("rerankEnabled").checked = Boolean(settings.rerankEnabled);
-  qs("rerankBaseUrl").value = settings.rerankBaseUrl || "";
-  qs("rerankApiKey").value = settings.rerankApiKey || "";
-  qs("rerankModel").value = settings.rerankModel || "";
-  qs("rerankTopN").value = String(settings.rerankTopN ?? 3);
-  document.querySelectorAll(".embedding-field").forEach((node) => {
-    node.checked = (settings.embeddingFields || []).includes(node.value);
-  });
-
   qs("personaName").value = persona.name || "";
   qs("personaGreeting").value = persona.greeting || "";
   qs("personaPrompt").value = persona.systemPrompt || "";
 
-  const userProfile = slot.userProfile || createDefaultUserProfile();
-  if (qs("userDisplayName")) qs("userDisplayName").value = userProfile.displayName || "";
-  if (qs("userNickname")) qs("userNickname").value = userProfile.nickname || "";
-  if (qs("userProfileText")) qs("userProfileText").value = userProfile.profileText || "";
-  if (qs("userNotes")) qs("userNotes").value = userProfile.notes || "";
-  if (qs("userAvatarUrl")) qs("userAvatarUrl").value = userProfile.avatarUrl || "";
-  if (qs("userRoleAvatarUrl")) qs("userRoleAvatarUrl").value = userProfile.roleAvatarUrl || "";
-  if (qs("userAvatarPreview")) {
-    const preview = qs("userAvatarPreview");
-    preview.hidden = !userProfile.avatarUrl;
-    if (userProfile.avatarUrl) preview.src = userProfile.avatarUrl;
-  }
-  if (qs("userRoleAvatarPreview")) {
-    const preview = qs("userRoleAvatarPreview");
-    preview.hidden = !userProfile.roleAvatarUrl;
-    if (userProfile.roleAvatarUrl) preview.src = userProfile.roleAvatarUrl;
-  }
-  const stage = getCurrentGameStage(slot);
-  if (qs("runtimeStageText")) {
-    const temp = Math.max(0, Number(slot.temp ?? 0) || 0);
-    qs("runtimeStageText").textContent = `当前 temp = ${temp}，阶段为 ${stage}。A: 0-${WORKSHOP_STAGE_LIMITS.aMax}，B: ${WORKSHOP_STAGE_LIMITS.aMax + 1}-${WORKSHOP_STAGE_LIMITS.bMax}，C: ${WORKSHOP_STAGE_LIMITS.bMax + 1}+。`;
-  }
+  const memLenSelect = qs("memorySummaryLength");
+  if (memLenSelect) memLenSelect.value = settings.memorySummaryLength || "medium";
+  const memMaxCharsInput = qs("memorySummaryMaxChars");
+  if (memMaxCharsInput) memMaxCharsInput.value = String(settings.memorySummaryMaxChars ?? 520);
+  const memMaxGroup = qs("memoryMaxCharsGroup");
+  if (memMaxGroup) memMaxGroup.style.display = (settings.memorySummaryLength || "medium") === "custom" ? "" : "none";
 
   const musicPresetSelect = qs("musicPresetSelect");
   musicPresetSelect.innerHTML = MUSIC_PRESETS.map((item) => {
@@ -3695,6 +3691,14 @@ async function mergeSelectedMemories() {
 }
 
 function renderMemory(activeOutlineId = "") {
+  // 记忆输出设置
+  const memLenSelect = qs("memorySummaryLength");
+  if (memLenSelect) memLenSelect.value = state.settings.memorySummaryLength || "medium";
+  const memMaxCharsInput = qs("memorySummaryMaxChars");
+  if (memMaxCharsInput) memMaxCharsInput.value = String(state.settings.memorySummaryMaxChars ?? 520);
+  const memMaxGroup = qs("memoryMaxCharsGroup");
+  if (memMaxGroup && memLenSelect) memMaxGroup.style.display = memLenSelect.value === "custom" ? "" : "none";
+
   const list = qs("memoryList");
   const slot = getActiveSlot();
   slot.memories = sanitizeMemoryList(slot.memories || []);
@@ -4590,16 +4594,6 @@ function saveSettingsFromForm() {
     backgroundImageUrl: qs("backgroundImageUrl").value.trim(),
     musicPreset: qs("musicPresetSelect").value,
     musicUrl: qs("musicUrlInput").value.trim(),
-    embeddingBaseUrl: qs("embeddingBaseUrl").value.trim(),
-    embeddingApiKey: qs("embeddingApiKey").value.trim(),
-    embeddingModel: qs("embeddingModel").value.trim(),
-    embeddingFields: [...document.querySelectorAll(".embedding-field:checked")].map((el) => el.value),
-    retrievalTopK: Number(qs("retrievalTopK").value || 4),
-    rerankEnabled: qs("rerankEnabled").checked,
-    rerankBaseUrl: qs("rerankBaseUrl").value.trim(),
-    rerankApiKey: qs("rerankApiKey").value.trim(),
-    rerankModel: qs("rerankModel").value.trim(),
-    rerankTopN: Number(qs("rerankTopN").value || 3),
   };
   qs("apiBaseUrl").value = state.settings.apiBaseUrl;
   qs("uiOpacityValue").textContent = state.settings.uiOpacity.toFixed(2);
@@ -4920,459 +4914,6 @@ function stopMusic() {
   player.currentTime = 0;
 }
 
-function bindDynamicEditors() {
-  qs("memoryList").querySelectorAll("[data-memory-title]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      const slot = getActiveSlot();
-      slot.memories[Number(event.target.dataset.memoryTitle)].title = event.target.value;
-      cleanupDeletedMemories(slot);
-      saveState();
-    });
-  });
-  qs("memoryList").querySelectorAll("[data-memory-selected]").forEach((input) => {
-    input.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-    input.addEventListener("change", updateMemoryStats);
-  });
-  qs("memoryList").querySelectorAll("[data-memory-content]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      const slot = getActiveSlot();
-      slot.memories[Number(event.target.dataset.memoryContent)].content = event.target.value;
-      cleanupDeletedMemories(slot);
-      saveState();
-    });
-  });
-  qs("memoryList").querySelectorAll("[data-memory-tags]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      const slot = getActiveSlot();
-      slot.memories[Number(event.target.dataset.memoryTags)].tags = sanitizeTags(event.target.value);
-      cleanupDeletedMemories(slot);
-      saveState();
-    });
-  });
-  qs("memoryList").querySelectorAll("[data-memory-notes]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      const slot = getActiveSlot();
-      slot.memories[Number(event.target.dataset.memoryNotes)].notes = event.target.value;
-      cleanupDeletedMemories(slot);
-      saveState();
-    });
-  });
-  qs("memoryList").querySelectorAll("[data-toggle-memory]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const card = event.currentTarget.closest("details");
-      if (!card) return;
-      const collapsed = card.dataset.collapsed === "true";
-      setMemoryCollapsed(card, !collapsed);
-    });
-  });
-
-  qs("memoryList").querySelectorAll("[data-remove-memory]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (!confirmDangerAction("确定删除这条记忆吗？删除后会立即影响后续聊天与总结。")) return;
-      const slot = getActiveSlot();
-      const removed = slot.memories.splice(Number(event.target.dataset.removeMemory), 1)[0];
-      recordDeletedMemory(slot, removed);
-      saveState();
-      renderMemory();
-      bindDynamicEditors();
-      setStatus("记忆已删除并立即生效。");
-    });
-  });
-
-  qs("worldbookList").querySelectorAll("[data-worldbook-title]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookTitle)].title = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-selected]").forEach((input) => {
-    input.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-    input.addEventListener("change", updateSelectedWorldbookCount);
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-group]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookGroup)].group = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-entry-type]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookEntryType)].entryType =
-        normalizeWorldbookEntryType(event.target.value, "keyword");
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-group-operator]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookGroupOperator)].groupOperator =
-        normalizeWorldbookGroupOperator(event.target.value, "and");
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-primary]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookPrimary)].primaryTriggers = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-secondary]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookSecondary)].secondaryTriggers = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-content]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookContent)].content = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-order]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      const entry = getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookOrder)];
-      entry.order = clampInteger(event.target.value, 0, 999999, 100);
-      entry.priority = entry.order;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-priority]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      const entry = getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookPriority)];
-      entry.order = clampInteger(event.target.value, 0, 999999, 100);
-      entry.priority = entry.order;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-mode]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookMode)].matchMode = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-secondary-mode]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookSecondaryMode)].secondaryMode = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-chance]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookChance)].chance =
-        clampInteger(event.target.value, 0, 100, 100);
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-sticky-turns]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookStickyTurns)].stickyTurns =
-        clampInteger(event.target.value, 0, 999, 0);
-      saveState();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-cooldown-turns]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookCooldownTurns)].cooldownTurns =
-        clampInteger(event.target.value, 0, 999, 0);
-      saveState();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-insertion-position]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookInsertionPosition)].insertionPosition =
-        normalizeWorldbookInsertionPosition(event.target.value, "after_char_defs");
-      syncWorldbookInjectionUi(event.target.closest(".worldbook-card") || qs("worldbookList"));
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-injection-depth]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookInjectionDepth)].injectionDepth =
-        clampInteger(event.target.value, 0, 3, 0);
-      saveState();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-injection-role]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookInjectionRole)].injectionRole =
-        normalizeWorldbookInjectionRole(event.target.value, "system");
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-injection-order]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookInjectionOrder)].injectionOrder =
-        clampInteger(event.target.value, 0, 999999, 100);
-      saveState();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-enabled]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookEnabled)].enabled = event.target.checked;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-case-sensitive]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookCaseSensitive)].caseSensitive = event.target.checked;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-wholeword]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookWholeword)].wholeWord = event.target.checked;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-recursive-enabled]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookRecursiveEnabled)].recursiveEnabled = event.target.checked;
-      saveState();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-prevent-recursion]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookPreventRecursion)].preventFurtherRecursion = event.target.checked;
-      saveState();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-worldbook-notes]").forEach((input) => {
-    input.addEventListener("input", (event) => {
-      getActiveSlot().worldbook.entries[Number(event.target.dataset.worldbookNotes)].notes = event.target.value;
-      saveState();
-      applyWorldbookSearch();
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-toggle-worldbook]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const card = event.currentTarget.closest("details");
-      if (!card) return;
-      const collapsed = card.dataset.collapsed === "true";
-      setWorldbookCollapsed(card, !collapsed);
-    });
-  });
-  qs("worldbookList").querySelectorAll("[data-remove-worldbook]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (!confirmDangerAction("确定删除这条世界书词条吗？")) return;
-      getActiveSlot().worldbook.entries.splice(Number(event.target.dataset.removeWorldbook), 1);
-      saveState();
-      renderWorldbook();
-      bindDynamicEditors();
-    });
-  });
-
-  const plotStageList = qs("plotStageList");
-  if (!plotStageList.dataset.bound) {
-    plotStageList.addEventListener("input", (event) => {
-      if (event.target.matches("textarea")) updateCardFromForm();
-    });
-    plotStageList.addEventListener("click", (event) => {
-      const removeButton = event.target.closest("[data-remove-stage]");
-      if (!removeButton) return;
-      const key = removeButton.dataset.removeStage;
-      if (!key) return;
-      if (!confirmDangerAction(`确定删除阶段 ${key} 吗？`)) return;
-      delete getCurrentCardStore().raw.plotStages[key];
-      state.persona = derivePersonaFromRoleCard(getCurrentCardStore().raw);
-      saveState();
-      renderCard();
-      bindDynamicEditors();
-    });
-    plotStageList.dataset.bound = "true";
-  }
-
-  const personaCardGrid = qs("personaCardGrid");
-  if (!personaCardGrid.dataset.bound) {
-    personaCardGrid.addEventListener("input", (event) => {
-      if (event.target.matches("input, textarea")) updateCardFromForm();
-    });
-    personaCardGrid.addEventListener("click", (event) => {
-      const removeButton = event.target.closest("[data-remove-persona]");
-      if (!removeButton) return;
-      const key = removeButton.dataset.removePersona;
-      if (!key) return;
-      if (!confirmDangerAction("确定删除这名角色吗？")) return;
-      delete getCurrentCardStore().raw.personas[key];
-      state.persona = derivePersonaFromRoleCard(getCurrentCardStore().raw);
-      saveState();
-      renderCard();
-      bindDynamicEditors();
-    });
-    personaCardGrid.dataset.bound = "true";
-  }
-
-  const presetBlockList = qs("presetBlockList");
-  if (presetBlockList && !presetBlockList.dataset.bound) {
-    presetBlockList.addEventListener("input", (event) => {
-      if (!event.target.matches("input, textarea")) return;
-      const nameInput = event.target.closest(".preset-block-card")?.querySelector(".preset-block-name");
-      const summary = event.target.closest(".preset-block-card")?.querySelector(".editor-summary strong");
-      if (summary && nameInput) {
-        summary.textContent = nameInput.value.trim() || "规则块";
-      }
-      syncPresetEditorToStore();
-    });
-    presetBlockList.addEventListener("click", (event) => {
-      const removeButton = event.target.closest("[data-remove-preset-block]");
-      if (removeButton) {
-        if (!confirmDangerAction("确定删除这条规则块吗？")) return;
-        const card = removeButton.closest(".preset-block-card");
-        if (card) card.remove();
-        syncPresetEditorToStore();
-        renderPresetLibrary();
-        applyPresetToForm(getEditingPreset());
-        setStatus("规则块已删除。");
-        return;
-      }
-      const toggleButton = event.target.closest("[data-toggle-preset-block]");
-      if (!toggleButton) return;
-      const card = toggleButton.closest(".preset-block-card");
-      if (!card) return;
-      const details = card.querySelector("details");
-      if (!details) return;
-      const collapsed = details.dataset.collapsed === "true";
-      setPresetBlockCollapsed(details, !collapsed);
-    });
-    presetBlockList.dataset.bound = "true";
-  }
-
-  const workshopRuleList = qs("workshopRuleList");
-  if (workshopRuleList && !workshopRuleList.dataset.bound) {
-    workshopRuleList.addEventListener("input", (event) => {
-      if (!event.target.matches("input, textarea, select")) return;
-      const card = event.target.closest(".workshop-rule-card");
-      const nameField = card?.querySelector(".workshop-rule-name");
-      const summary = card?.querySelector(".editor-summary strong");
-      if (event.target.matches(".workshop-rule-volume")) {
-        const valueBox = card?.querySelector(".inline-value");
-        if (valueBox) valueBox.textContent = `当前音量：${Number(event.target.value || 0.85).toFixed(2)}`;
-      }
-      if (summary && nameField) {
-        summary.textContent = nameField.value.trim() || "规则";
-      }
-      updateWorkshopRuleActionUI(card);
-      updateCardFromForm();
-      applyWorkshopRuleSearch();
-    });
-    workshopRuleList.addEventListener("change", (event) => {
-      if (!event.target.matches("input, select, textarea")) return;
-      const card = event.target.closest(".workshop-rule-card");
-      if (event.target.matches(".workshop-rule-action")) {
-        updateWorkshopRuleActionUI(card);
-        setStatus(event.target.value === "image" ? "已切换为图片动作，音乐配置已清空。" : "已切换为音乐动作，图片配置已清空。");
-      }
-      if (event.target.matches(".workshop-rule-music-file")) {
-        const file = event.target.files?.[0];
-        if (file && card) {
-          void fileToDataUrl(file)
-            .then((dataUrl) => {
-              const musicUrlField = card.querySelector(".workshop-rule-url");
-              const actionField = card.querySelector(".workshop-rule-action");
-              if (musicUrlField) {
-                musicUrlField.value = dataUrl;
-              }
-              if (actionField) {
-                actionField.value = "music";
-              }
-              if (musicUrlField || actionField) {
-                updateWorkshopRuleActionUI(card);
-                updateCardFromForm();
-                applyWorkshopRuleSearch();
-                setStatus("创意工坊音乐已导入。");
-              }
-            })
-            .catch(() => {
-              setStatus("创意工坊音乐读取失败");
-            })
-            .finally(() => {
-              event.target.value = "";
-            });
-          return;
-        }
-      }
-      if (event.target.matches(".workshop-rule-image-file")) {
-        const file = event.target.files?.[0];
-        if (file && card) {
-          void fileToDataUrl(file)
-            .then((dataUrl) => {
-              const imageUrlField = card.querySelector(".workshop-rule-image-url");
-              const actionField = card.querySelector(".workshop-rule-action");
-              if (imageUrlField) {
-                imageUrlField.value = dataUrl;
-              }
-              if (actionField) {
-                actionField.value = "image";
-              }
-              if (imageUrlField || actionField) {
-                updateWorkshopRuleActionUI(card);
-                updateCardFromForm();
-                applyWorkshopRuleSearch();
-                setStatus("创意工坊图片已导入。");
-              }
-            })
-            .catch(() => {
-              setStatus("创意工坊图片读取失败");
-            })
-            .finally(() => {
-              event.target.value = "";
-            });
-          return;
-        }
-      }
-      updateCardFromForm();
-      applyWorkshopRuleSearch();
-    });
-    workshopRuleList.addEventListener("click", (event) => {
-      const removeButton = event.target.closest("[data-remove-workshop-rule]");
-      if (removeButton) {
-        if (!confirmDangerAction("确定删除这条创意工坊规则吗？")) return;
-        const card = removeButton.closest(".workshop-rule-card");
-        if (card) card.remove();
-        updateCardFromForm();
-        renderWorkshopSettings();
-        bindDynamicEditors();
-        setStatus("创意工坊规则已删除。");
-        return;
-      }
-      const toggleButton = event.target.closest("[data-toggle-workshop-rule]");
-      if (!toggleButton) return;
-      const card = toggleButton.closest(".workshop-rule-card");
-      const details = card?.querySelector("details");
-      if (!details) return;
-      const collapsed = details.dataset.collapsed === "true";
-      setWorkshopRuleCollapsed(details, !collapsed);
-    });
-    workshopRuleList.dataset.bound = "true";
-  }
-}
 
 function bindGlobalEvents() {
   document.querySelectorAll("[data-nav]").forEach((button) => {
@@ -5446,81 +4987,12 @@ function bindGlobalEvents() {
     }
   });
 
-  if (qs("presetName")) qs("presetName").addEventListener("input", savePresetFromForm);
-  if (qs("presetEnabled")) qs("presetEnabled").addEventListener("change", savePresetFromForm);
-  if (qs("baseSystemPrompt")) qs("baseSystemPrompt").addEventListener("input", savePresetFromForm);
-  if (qs("presetBlockSearch")) qs("presetBlockSearch").addEventListener("input", applyPresetBlockSearch);
-  if (qs("addPresetBlockButton")) {
-    qs("addPresetBlockButton").addEventListener("click", () => {
-      syncPresetEditorToStore();
-      const slot = getActiveSlot();
-      const store = getEditingPresetStore();
-      const current = store.presets.find((item) => item.id === editingPresetId) || getActivePresetFromStore(store);
-      if (!current) return;
-      current.extra_prompts = [...(current.extra_prompts || []), {
-        id: `preset-block-${Date.now().toString(36)}`,
-        name: "新规则块",
-        enabled: true,
-        content: "",
-      }];
-      slot.presetStore = sanitizePresetStore(store);
-      saveState();
-      renderPresetLibrary();
-      applyPresetToForm(getEditingPreset());
-      setStatus("已新增规则块。");
-    });
-  }
-  if (qs("collapseAllPresetBlocks")) {
-    qs("collapseAllPresetBlocks").addEventListener("click", () => {
-      qs("presetBlockList").querySelectorAll(".preset-block-card details").forEach((card) => setPresetBlockCollapsed(card, true));
-      setStatus("已折叠全部规则块。");
-    });
-  }
-  if (qs("expandAllPresetBlocks")) {
-    qs("expandAllPresetBlocks").addEventListener("click", () => {
-      qs("presetBlockList").querySelectorAll(".preset-block-card details").forEach((card) => setPresetBlockCollapsed(card, false));
-      setStatus("已展开全部规则块。");
-    });
-  }
-  if (qs("createPresetButton")) qs("createPresetButton").addEventListener("click", createNewPreset);
-  if (qs("duplicatePresetButton")) qs("duplicatePresetButton").addEventListener("click", duplicateCurrentPreset);
-  if (qs("activatePresetButton")) qs("activatePresetButton").addEventListener("click", activateCurrentPreset);
-  if (qs("deletePresetButton")) qs("deletePresetButton").addEventListener("click", deleteCurrentPreset);
-  if (qs("exportPresetButton")) qs("exportPresetButton").addEventListener("click", exportCurrentPresetStore);
-  if (qs("importPresetButton")) qs("importPresetButton").addEventListener("click", () => qs("importPresetFile").click());
-  if (qs("importPresetFile")) {
-    qs("importPresetFile").addEventListener("change", async (event) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      try {
-        await importPresetStoreFromText(await file.text());
-        setStatus("预设已导入。");
-      } catch (error) {
-        setStatus(`预设导入失败：${error instanceof Error ? error.message : "未知错误"}`);
-      } finally {
-        event.target.value = "";
-      }
-    });
-  }
-
   qs("presetSelect").addEventListener("change", () => {
     const preset = MODEL_PRESETS.find((item) => item.id === qs("presetSelect").value);
     if (preset && preset.id !== "custom") {
       qs("apiBaseUrl").value = preset.url;
     }
     saveSettingsFromForm();
-  });
-
-  document.querySelectorAll(".preset-module").forEach((node) => {
-    node.addEventListener("change", () => {
-      if (node.checked) {
-        (PRESET_MODULE_MUTEX[node.dataset.key] || []).forEach((otherKey) => {
-          const other = document.querySelector(`.preset-module[data-key="${otherKey}"]`);
-          if (other) other.checked = false;
-        });
-      }
-      savePresetFromForm();
-    });
   });
 
   [
@@ -5537,54 +5009,33 @@ function bindGlobalEvents() {
     "backgroundImageUrl",
     "musicPresetSelect",
     "musicUrlInput",
-    "embeddingBaseUrl",
-    "embeddingApiKey",
-    "embeddingModel",
-    "retrievalTopK",
-    "rerankEnabled",
-    "rerankBaseUrl",
-    "rerankApiKey",
-    "rerankModel",
-    "rerankTopN",
   ].forEach((id) => {
     const node = qs(id);
     const eventName = node.tagName === "SELECT" ? "change" : "input";
     node.addEventListener(eventName, saveSettingsFromForm);
   });
 
-  [
-    "userDisplayName",
-    "userNickname",
-    "userProfileText",
-    "userNotes",
-    "userAvatarUrl",
-    "userRoleAvatarUrl",
-  ].forEach((id) => {
-    const node = qs(id);
-    if (!node) return;
-    node.addEventListener("input", saveUserProfileFromForm);
+  // 记忆输出设置（记忆库页面单独处理）
+  qs("memorySummaryLength").addEventListener("change", () => {
+    const group = qs("memoryMaxCharsGroup");
+    if (group) group.style.display = qs("memorySummaryLength").value === "custom" ? "" : "none";
+  });
+  qs("saveMemoryLengthSettings").addEventListener("click", () => {
+    const ml = qs("memorySummaryLength").value;
+    state.settings.memorySummaryLength = ml;
+    if (ml === "custom") {
+      state.settings.memorySummaryMaxChars = Number(qs("memorySummaryMaxChars").value || 520);
+    } else if (ml === "short") {
+      state.settings.memorySummaryMaxChars = 200;
+    } else if (ml === "long") {
+      state.settings.memorySummaryMaxChars = 800;
+    } else {
+      state.settings.memorySummaryMaxChars = 520;
+    }
+    saveState();
+    setStatus("记忆输出设置已保存。");
   });
 
-  if (qs("userAvatarFile")) {
-    qs("userAvatarFile").addEventListener("change", (event) => void importAvatarImage(event, "avatarUrl"));
-  }
-  if (qs("userRoleAvatarFile")) {
-    qs("userRoleAvatarFile").addEventListener("change", (event) => void importAvatarImage(event, "roleAvatarUrl"));
-  }
-  if (qs("userAvatarUploadButton") && qs("userAvatarFile")) {
-    qs("userAvatarUploadButton").addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      pickAvatarFromUi("avatarUrl");
-    });
-  }
-  if (qs("userRoleAvatarUploadButton") && qs("userRoleAvatarFile")) {
-    qs("userRoleAvatarUploadButton").addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      pickAvatarFromUi("roleAvatarUrl");
-    });
-  }
 
   qs("backgroundFileInput").addEventListener("change", (event) => void importBackgroundImage(event));
   qs("clearBackgroundButton").addEventListener("click", () => {
@@ -5596,88 +5047,6 @@ function bindGlobalEvents() {
 
   if (qs("saveRefreshConfigButton")) {
     qs("saveRefreshConfigButton").addEventListener("click", saveAndRefreshSettings);
-  }
-  const bindWorkshopNavButton = (id) => {
-    const node = qs(id);
-    if (!node) return;
-    node.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      navigate("workshop");
-    });
-  };
-  bindWorkshopNavButton("openWorkshopButton");
-  bindWorkshopNavButton("openWorkshopButtonCard");
-  bindWorkshopNavButton("openWorkshopButtonCard2");
-
-  [
-    "cardSourceName",
-    "cardName",
-    "cardTags",
-    "cardDescription",
-    "cardPersonality",
-    "cardScenario",
-    "cardFirstMes",
-    "cardMesExample",
-    "cardCreatorNotes",
-  ].forEach((id) => {
-    qs(id).addEventListener("input", updateCardFromForm);
-  });
-
-  qs("addPlotStageButton").addEventListener("click", () => {
-    const card = normalizeRoleCard(getCurrentCardStore().raw);
-    card.plotStages[getNextStageKey(card.plotStages)] = blankPlotStage();
-    getCurrentCardStore().raw = card;
-    state.persona = derivePersonaFromRoleCard(card);
-    saveState();
-    renderCard();
-    bindDynamicEditors();
-  });
-
-  qs("addPersonaButton").addEventListener("click", () => {
-    const card = normalizeRoleCard(getCurrentCardStore().raw);
-    card.personas[getNextNumericKey(card.personas)] = blankPersona();
-    getCurrentCardStore().raw = card;
-    state.persona = derivePersonaFromRoleCard(card);
-    saveState();
-    renderCard();
-    bindDynamicEditors();
-  });
-
-  qs("applySingleTemplateButton").addEventListener("click", () => {
-    applyCardTemplate(createSingleRoleTemplate, "single_role_template");
-  });
-  qs("applyMultiTemplateButton").addEventListener("click", () => {
-    applyCardTemplate(createMultiRoleTemplate, "multi_role_template");
-  });
-  qs("cardImportInput").addEventListener("change", (event) => void importRoleCard(event));
-  qs("exportCardButton").addEventListener("click", exportCurrentCard);
-  if (qs("workshopEnabled")) {
-    qs("workshopEnabled").addEventListener("change", updateCardFromForm);
-  }
-  if (qs("workshopRuleSearch")) {
-    qs("workshopRuleSearch").addEventListener("input", applyWorkshopRuleSearch);
-  }
-  if (qs("addWorkshopRuleButton")) {
-    qs("addWorkshopRuleButton").addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      addWorkshopRuleToCurrentCard();
-    });
-  }
-  if (qs("collapseAllWorkshopRules")) {
-    qs("collapseAllWorkshopRules").addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setAllWorkshopRulesCollapsed(true);
-    });
-  }
-  if (qs("expandAllWorkshopRules")) {
-    qs("expandAllWorkshopRules").addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      setAllWorkshopRulesCollapsed(false);
-    });
   }
 
   document.addEventListener("click", (event) => {
@@ -5697,222 +5066,17 @@ function bindGlobalEvents() {
     openFileInputPicker(input);
   });
 
-  [
-    "worldbookEnabled",
-    "worldbookDebugEnabled",
-    "worldbookMaxEntries",
-    "worldbookDefaultMatchMode",
-    "worldbookDefaultSecondaryMode",
-    "worldbookDefaultEntryType",
-    "worldbookDefaultGroupOperator",
-    "worldbookDefaultChance",
-    "worldbookDefaultStickyTurns",
-    "worldbookDefaultCooldownTurns",
-    "worldbookDefaultInsertionPosition",
-    "worldbookDefaultInjectionDepth",
-    "worldbookDefaultInjectionRole",
-    "worldbookDefaultInjectionOrder",
-    "worldbookRecursiveScanEnabled",
-    "worldbookRecursionMaxDepth",
-    "worldbookCaseSensitive",
-    "worldbookWholeWord",
-  ].forEach((id) => {
-    const node = qs(id);
-    if (!node) return;
-    node.addEventListener(node.matches('input[type="number"], input[type="text"]') ? "input" : "change", updateWorldbookSettingsFromForm);
-  });
-  qs("addWorldbookButton").addEventListener("click", () => {
-    const slot = getActiveSlot();
-    slot.worldbook = sanitizeWorldbookStore(slot.worldbook);
-    slot.worldbook.entries.unshift(createDefaultWorldbookEntry(slot.worldbook.settings));
-    saveState();
-    renderWorldbook();
-    bindDynamicEditors();
-  });
 
-  if (qs("worldbookSearch")) {
-    qs("worldbookSearch").addEventListener("input", applyWorldbookSearch);
-  }
-  if (qs("collapseAllWorldbook")) {
-    qs("collapseAllWorldbook").addEventListener("click", () => {
-      [...qs("worldbookList").querySelectorAll("details")].forEach((card) => setWorldbookCollapsed(card, true));
-      setStatus("已折叠当前页面中的全部世界书词条。");
-    });
-  }
-  if (qs("expandAllWorldbook")) {
-    qs("expandAllWorldbook").addEventListener("click", () => {
-      [...qs("worldbookList").querySelectorAll("details")].forEach((card) => setWorldbookCollapsed(card, false));
-      setStatus("已展开当前页面中的全部世界书词条。");
-    });
-  }
-  if (qs("selectAllVisibleWorldbook")) {
-    qs("selectAllVisibleWorldbook").addEventListener("click", () => {
-      qs("worldbookList").querySelectorAll(".worldbook-card").forEach((card) => {
-        if (card.style.display === "none") return;
-        const input = card.querySelector("[data-worldbook-selected]");
-        if (input) input.checked = true;
-      });
-      updateSelectedWorldbookCount();
-      setStatus("已选择当前可见的世界书词条。");
-    });
-  }
-  if (qs("clearSelectedWorldbook")) {
-    qs("clearSelectedWorldbook").addEventListener("click", () => {
-      qs("worldbookList").querySelectorAll("[data-worldbook-selected]").forEach((input) => {
-        input.checked = false;
-      });
-      updateSelectedWorldbookCount();
-      setStatus("已清空世界书选择。");
-    });
-  }
-  if (qs("bulkEnableSelected")) {
-    qs("bulkEnableSelected").addEventListener("click", () => {
-      const slot = getActiveSlot();
-      const indexes = getSelectedWorldbookIndexes();
-      indexes.forEach((index) => {
-        if (slot.worldbook.entries[index]) slot.worldbook.entries[index].enabled = true;
-      });
-      saveState();
-      renderWorldbook();
-      bindDynamicEditors();
-      setStatus(`已启用 ${indexes.length} 条世界书词条。`);
-    });
-  }
-  if (qs("bulkDisableSelected")) {
-    qs("bulkDisableSelected").addEventListener("click", () => {
-      const slot = getActiveSlot();
-      const indexes = getSelectedWorldbookIndexes();
-      indexes.forEach((index) => {
-        if (slot.worldbook.entries[index]) slot.worldbook.entries[index].enabled = false;
-      });
-      saveState();
-      renderWorldbook();
-      bindDynamicEditors();
-      setStatus(`已停用 ${indexes.length} 条世界书词条。`);
-    });
-  }
-  if (qs("applyBulkInjection")) {
-    qs("applyBulkInjection").addEventListener("click", () => {
-      const slot = getActiveSlot();
-      const indexes = getSelectedWorldbookIndexes();
-      const position = normalizeWorldbookInsertionPosition(qs("bulkInsertionPosition").value, "after_char_defs");
-      const depth = clampInteger(qs("bulkInjectionDepth").value, 0, 3, 0);
-      const order = clampInteger(qs("bulkInjectionOrder").value, 0, 999999, 100);
-      indexes.forEach((index) => {
-        const entry = slot.worldbook.entries[index];
-        if (!entry) return;
-        entry.insertionPosition = position;
-        entry.injectionDepth = depth;
-        entry.injectionOrder = order;
-      });
-      saveState();
-      renderWorldbook();
-      bindDynamicEditors();
-      setStatus(`已更新 ${indexes.length} 条词条的注入设置。`);
-    });
-  }
-  if (qs("applyBulkRecursion")) {
-    qs("applyBulkRecursion").addEventListener("click", () => {
-      const slot = getActiveSlot();
-      const indexes = getSelectedWorldbookIndexes();
-      const recursiveEnabled = qs("bulkRecursiveEnabled").checked;
-      const preventFurtherRecursion = qs("bulkPreventFurtherRecursion").checked;
-      indexes.forEach((index) => {
-        const entry = slot.worldbook.entries[index];
-        if (!entry) return;
-        entry.recursiveEnabled = recursiveEnabled;
-        entry.preventFurtherRecursion = preventFurtherRecursion;
-      });
-      saveState();
-      renderWorldbook();
-      bindDynamicEditors();
-      setStatus(`已更新 ${indexes.length} 条词条的递归设置。`);
-    });
-  }
-  if (qs("importWorldbookButton")) {
-    qs("importWorldbookButton").addEventListener("click", () => qs("importWorldbookFile").click());
-  }
-  if (qs("importWorldbookFile")) {
-    qs("importWorldbookFile").addEventListener("change", (event) => void importWorldbook(event));
-  }
-  if (qs("exportWorldbookButton")) {
-    qs("exportWorldbookButton").addEventListener("click", exportWorldbook);
-  }
-
-  qs("addMemoryButton").addEventListener("click", () => {
-    const slot = getActiveSlot();
-    slot.memories.unshift(sanitizeMemoryItem({
-      id: `memory-manual-${Date.now().toString(36)}`,
-      title: "新的记忆片段",
-      content: "",
-      tags: ["memory-fragment"],
-      notes: "",
-    }));
-    cleanupDeletedMemories(slot);
-    saveState();
-    renderMemory();
-    bindDynamicEditors();
-  });
-
-  if (qs("memorySearch")) {
-    qs("memorySearch").addEventListener("input", applyMemorySearch);
-  }
-  if (qs("collapseAllMemories")) {
-    qs("collapseAllMemories").addEventListener("click", () => {
-      [...qs("memoryList").querySelectorAll("details")].forEach((card) => setMemoryCollapsed(card, true));
-      setStatus("已折叠当前页面中的全部记忆。");
-    });
-  }
-  if (qs("expandAllMemories")) {
-    qs("expandAllMemories").addEventListener("click", () => {
-      [...qs("memoryList").querySelectorAll("details")].forEach((card) => setMemoryCollapsed(card, false));
-      setStatus("已展开当前页面中的全部记忆。");
-    });
-  }
-  if (qs("selectVisibleMemoriesButton")) {
-    qs("selectVisibleMemoriesButton").addEventListener("click", () => {
-      qs("memoryList").querySelectorAll(".memory-card").forEach((card) => {
-        if (card.style.display === "none") return;
-        const input = card.querySelector("[data-memory-selected]");
-        if (input) input.checked = true;
-      });
-      updateMemoryStats();
-      setStatus("已选择当前可见的记忆。");
-    });
-  }
-  if (qs("clearSelectedMemoriesButton")) {
-    qs("clearSelectedMemoriesButton").addEventListener("click", () => {
-      qs("memoryList").querySelectorAll("[data-memory-selected]").forEach((input) => {
-        input.checked = false;
-      });
-      updateMemoryStats();
-      setStatus("已清空记忆选择。");
-    });
-  }
-  if (qs("mergeSelectedMemoriesButton")) {
-    qs("mergeSelectedMemoriesButton").addEventListener("click", () => void mergeSelectedMemories());
-  }
-  if (qs("importMemoryButton")) {
-    qs("importMemoryButton").addEventListener("click", () => qs("importMemoryFile").click());
-  }
-  if (qs("importMemoryFile")) {
-    qs("importMemoryFile").addEventListener("change", (event) => void importMemories(event));
-  }
-  if (qs("exportMemoryButton")) {
-    qs("exportMemoryButton").addEventListener("click", exportMemories);
-  }
-  if (qs("exportMergedMemoryButton")) {
-    qs("exportMergedMemoryButton").addEventListener("click", exportMergedMemories);
-  }
-  if (qs("exportMemoryOutlineButton")) {
-    qs("exportMemoryOutlineButton").addEventListener("click", exportMemoryOutline);
-  }
 
   qs("exportStateButton").addEventListener("click", exportState);
   if (qs("exportBundleButton")) {
     qs("exportBundleButton").addEventListener("click", () => void exportCurrentBundle());
   }
   qs("importStateInput").addEventListener("change", (event) => void importState(event));
+
+  if (qs("pcBundleFileInput")) {
+    qs("pcBundleFileInput").addEventListener("change", (event) => void importPcBundle(event));
+  }
 
   qs("playMusicButton").addEventListener("click", playMusic);
   qs("pauseMusicButton").addEventListener("click", pauseMusic);
@@ -5923,6 +5087,174 @@ function bindGlobalEvents() {
   });
 }
 
+const BUNDLE_SETTINGS_WHITELIST = [
+  "apiBaseUrl", "apiKey", "model", "temperature", "timeoutSec",
+  "historyLimit", "maxTokens", "modelPreset", "musicPreset", "musicUrl",
+  "memorySummaryLength", "memorySummaryMaxChars",
+];
+
+const PC_SNAKE_TO_PE_CAMEL = {
+  llm_base_url: "apiBaseUrl",
+  llm_api_key: "apiKey",
+  llm_model: "model",
+  request_timeout: "timeoutSec",
+  history_limit: "historyLimit",
+  temperature: "temperature",
+  memory_summary_length: "memorySummaryLength",
+  memory_summary_max_chars: "memorySummaryMaxChars",
+};
+
+function categorizeBundlePayload(obj, fileName = "") {
+  if (!obj || typeof obj !== "object") return null;
+  const lower = String(fileName || "").toLowerCase();
+  if (lower.includes("人设卡") || lower.includes("role_card") || lower.includes("character")) return "card";
+  if (lower.includes("合并记忆") || lower.includes("merged")) return "mergedMemories";
+  if (lower.includes("记忆大纲") || lower.includes("outline")) return "memoryOutline";
+  if (lower.includes("记忆") || lower.includes("memory")) return "memories";
+  if (lower.includes("世界书") || lower.includes("worldbook")) return "worldbook";
+  if (lower.includes("预设") || lower.includes("preset")) return "preset";
+  if (obj.name && (obj.personality || obj.scenario || obj.first_mes || obj.mes_example)) return "card";
+  if (Array.isArray(obj.items) && obj.items.length && obj.items[0] && typeof obj.items[0] === "object") return "memories";
+  if (Array.isArray(obj) && obj.length && obj[0] && typeof obj[0] === "object" && ("content" in obj[0] || "title" in obj[0])) return "memories";
+  if (obj.entries || (obj.settings && obj.settings.defaultMatchMode !== undefined)) return "worldbook";
+  if (obj.presets && Array.isArray(obj.presets)) return "preset";
+  if (obj.active_preset_id !== undefined) return "preset";
+  if (obj.presetStore) return "preset";
+  if (obj.worldbook) return "worldbook";
+  if (obj.runtime || obj.state) return "bundle";
+  if (obj.persona || obj.presetStore || obj.memories || obj.settings) return "bundle";
+  return null;
+}
+
+function applyBundledCard(obj, fileName) {
+  const card = normalizeRoleCard(obj);
+  state.currentCard.raw = card;
+  state.currentCard.sourceName = fileName || "imported_role_card.json";
+  state.persona = derivePersonaFromRoleCard(card);
+}
+
+function applyBundledMemories(obj, slot) {
+  let items;
+  if (Array.isArray(obj)) items = obj;
+  else if (Array.isArray(obj.items)) items = obj.items;
+  else if (Array.isArray(obj.memories)) items = obj.memories;
+  else return false;
+  slot.memories = sanitizeMemoryList(items);
+  cleanupDeletedMemories(slot);
+  return true;
+}
+
+function applyBundledWorldbook(obj, slot) {
+  let wb;
+  if (obj.entries || obj.settings) wb = obj;
+  else if (obj.worldbook) wb = obj.worldbook;
+  else return false;
+  slot.worldbook = sanitizeWorldbookStore(wb);
+  return true;
+}
+
+function applyBundledPreset(obj, slot) {
+  let store;
+  if (obj.presets && Array.isArray(obj.presets)) store = obj;
+  else if (obj.presetStore) store = obj.presetStore;
+  else return false;
+  slot.presetStore = sanitizePresetStore(store);
+  return true;
+}
+
+function applyBundledMergedMemories(obj, slot) {
+  let items;
+  if (Array.isArray(obj.items)) items = obj.items;
+  else if (Array.isArray(obj)) items = obj;
+  else return false;
+  slot.mergedMemories = sanitizeMergedMemoryList(items);
+  return true;
+}
+
+function applyBundledMemoryOutline(obj, slot) {
+  let items;
+  if (Array.isArray(obj.items)) items = obj.items;
+  else if (Array.isArray(obj)) items = obj;
+  else return false;
+  slot.memoryOutline = sanitizeMemoryOutlineList(items);
+  return true;
+}
+
+function applyBundledSettings(obj) {
+  if (!obj || typeof obj !== "object") return false;
+  BUNDLE_SETTINGS_WHITELIST.forEach((key) => {
+    if (obj[key] !== undefined) { state.settings[key] = obj[key]; return; }
+    const pcKey = Object.keys(PC_SNAKE_TO_PE_CAMEL).find((k) => PC_SNAKE_TO_PE_CAMEL[k] === key);
+    if (pcKey && obj[pcKey] !== undefined) state.settings[key] = obj[pcKey];
+  });
+  return true;
+}
+
+function applyBundledPiece(obj, fileName, slot) {
+  const type = categorizeBundlePayload(obj, fileName);
+  switch (type) {
+    case "card": applyBundledCard(obj, fileName); return type;
+    case "memories": applyBundledMemories(obj, slot); return type;
+    case "worldbook": applyBundledWorldbook(obj, slot); return type;
+    case "preset": applyBundledPreset(obj, slot); return type;
+    case "mergedMemories": applyBundledMergedMemories(obj, slot); return type;
+    case "memoryOutline": applyBundledMemoryOutline(obj, slot); return type;
+    case "bundle": {
+      const data = obj.runtime ?? obj.state ?? obj;
+      const applied = [];
+      if (data.persona) { state.persona = data.persona; applied.push("persona"); }
+      if (data.currentCard?.raw) { state.currentCard.raw = normalizeRoleCard(data.currentCard.raw); state.persona = derivePersonaFromRoleCard(state.currentCard.raw); applied.push("card"); }
+      if (data.presetStore || data.activePreset) { slot.presetStore = sanitizePresetStore(data.presetStore ?? slot.presetStore); applied.push("preset"); }
+      if (data.worldbook) { applyBundledWorldbook(data.worldbook, slot); applied.push("worldbook"); }
+      if (Array.isArray(data.memories)) { applyBundledMemories(data.memories, slot); applied.push("memories"); }
+      if (Array.isArray(data.mergedMemories)) { slot.mergedMemories = sanitizeMergedMemoryList(data.mergedMemories); applied.push("mergedMemories"); }
+      if (Array.isArray(data.memoryOutline)) { slot.memoryOutline = sanitizeMemoryOutlineList(data.memoryOutline); applied.push("memoryOutline"); }
+      if (data.settings) { applyBundledSettings(data.settings); applied.push("settings"); }
+      return applied.length ? `bundle(${applied.join(",")})` : null;
+    }
+    default: return null;
+  }
+}
+
+async function importPcBundle(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const statusEl = qs("bundleImportStatus");
+  try {
+    if (statusEl) statusEl.textContent = "正在导入...";
+    const slot = getActiveSlot();
+    const applied = [];
+    const fileNameLower = String(file.name || "").toLowerCase();
+    if (fileNameLower.endsWith(".zip")) {
+      if (typeof JSZip === "undefined") throw new Error("JSZip 未加载，无法解压 ZIP 包");
+      const zip = await JSZip.loadAsync(file);
+      const jsonFiles = Object.keys(zip.files).filter((name) => name.endsWith(".json"));
+      if (!jsonFiles.length) throw new Error("ZIP 包中未找到 JSON 文件");
+      for (const name of jsonFiles) {
+        const text = await zip.files[name].async("string");
+        let obj;
+        try { obj = JSON.parse(text); } catch { continue; }
+        const type = applyBundledPiece(obj, name, slot);
+        if (type) applied.push(`${name}→${type}`);
+      }
+    } else {
+      const text = await file.text();
+      let obj;
+      try { obj = JSON.parse(text); } catch { throw new Error("无法解析 JSON 文件"); }
+      const type = applyBundledPiece(obj, file.name, slot);
+      if (type) applied.push(type);
+    }
+    saveState();
+    navigate("chat");
+    if (statusEl) statusEl.textContent = applied.length ? `导入成功：${applied.join("；")}` : "导入完成，未识别到可导入数据";
+    setTimeout(() => { if (statusEl) statusEl.textContent = ""; }, 6000);
+  } catch (error) {
+    if (statusEl) statusEl.textContent = "导入失败：" + (error instanceof Error ? error.message : "未知错误");
+  } finally {
+    event.target.value = "";
+  }
+}
+
 function renderAll() {
   syncCreativeWorkshopRuntime("sync");
   navigate(state.activeRoute);
@@ -5930,10 +5262,6 @@ function renderAll() {
 
 window.XuqiMobileApp = {
   navigate,
-  addWorkshopRule: addWorkshopRuleToCurrentCard,
-  collapseWorkshopRules: () => setAllWorkshopRulesCollapsed(true),
-  expandWorkshopRules: () => setAllWorkshopRulesCollapsed(false),
-  pickAvatar: (fieldName) => pickAvatarFromUi(fieldName),
   onNativeChatResult(payloadJson) {
     try {
       const payload = typeof payloadJson === "string" ? JSON.parse(payloadJson) : payloadJson;
@@ -5984,8 +5312,361 @@ window.XuqiMobileApp = {
   },
 };
 
+// ─── Preview page (read-only) ────────────────────────────────────────────
+
+function renderPreview() {
+  const slot = getActiveSlot();
+  renderPreviewPersona();
+  renderPreviewMemory(slot);
+  renderPreviewWorldbook(slot);
+  renderPreviewPreset(slot);
+  // Reset tabs to first
+  const tabs = document.querySelectorAll(".preview-tab");
+  const panels = document.querySelectorAll(".preview-panel");
+  tabs.forEach((t, i) => { t.classList.toggle("active", i === 0); });
+  panels.forEach((p, i) => { p.classList.toggle("active", i === 0); });
+}
+
+function bindPreviewTabs() {
+  document.querySelectorAll(".preview-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.previewTab;
+      document.querySelectorAll(".preview-tab").forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.querySelectorAll(".preview-panel").forEach((p) => p.classList.remove("active"));
+      const panel = document.querySelector(`[data-preview-panel="${target}"]`);
+      if (panel) panel.classList.add("active");
+    });
+  });
+}
+
+// ── Helpers ──
+
+function previewSection(heading, count, bodyHtml, emptyHtml = "") {
+  const countStr = count ? ` <span class="preview-count">${count}</span>` : "";
+  return (
+    `<div class="preview-section">` +
+    `<h3 class="preview-section-head">${escapeHtml(heading)}${countStr}</h3>` +
+    (bodyHtml || emptyHtml) +
+    `</div>`
+  );
+}
+
+function previewEmpty(text) {
+  return `<p class="preview-empty">${escapeHtml(text)}</p>`;
+}
+
+function previewField(label, value, fallback = "") {
+  const display = value != null && String(value).trim() ? String(value).trim() : fallback;
+  if (!display) return "";
+  return `<div class="preview-field"><span class="preview-field-label">${escapeHtml(label)}：</span><span class="preview-field-value">${escapeHtml(display)}</span></div>`;
+}
+
+function previewContentBlock(label, content, fallback = "") {
+  const display = content != null && String(content).trim() ? String(content).trim() : fallback;
+  if (!display) return "";
+  return (
+    `<div class="preview-content-block">` +
+    (label ? `<div class="preview-content-label">${escapeHtml(label)}</div>` : "") +
+    `<div class="preview-content-value"><pre>${escapeHtml(display)}</pre></div>` +
+    `</div>`
+  );
+}
+
+function previewTagList(tags) {
+  if (!Array.isArray(tags) || !tags.length) return "";
+  const items = tags.map((t) => `<span class="preview-tag">${escapeHtml(String(t).trim())}</span>`).join("");
+  return `<div class="preview-tags">${items}</div>`;
+}
+
+function previewInfoRow(entries) {
+  const parts = entries.filter((e) => e != null && String(e).trim());
+  if (!parts.length) return "";
+  return `<div class="preview-info-row">${parts.map((p) => `<span>${escapeHtml(String(p).trim())}</span>`).join("")}</div>`;
+}
+
+// ── Persona ──
+
+function renderPreviewPersona() {
+  const card = getCurrentCardStore();
+  const raw = card.raw || {};
+  const stages = raw.plotStages || {};
+  const personas = raw.personas || {};
+  const stageKeys = Object.keys(stages).sort((a, b) => {
+    const na = Number(a), nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+  const personaKeys = Object.keys(personas).sort((a, b) => {
+    const na = Number(a), nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+
+  let html = "";
+
+  // Core info
+  html += previewSection("角色信息", 0,
+    `<div class="preview-card">` +
+    previewField("角色名", raw.name) +
+    previewField("来源文件", card.sourceName) +
+    previewTagList(raw.tags || []) +
+    (raw.description ? previewContentBlock("角色背景", raw.description) : "") +
+    (raw.personality ? previewContentBlock("性格倾向", raw.personality) : "") +
+    (raw.scenario ? previewContentBlock("场景设定", raw.scenario) : "") +
+    (raw.first_mes ? previewContentBlock("开场白", raw.first_mes) : "") +
+    (raw.mes_example ? previewContentBlock("示例对话", raw.mes_example) : "") +
+    (raw.creator_notes ? previewContentBlock("补充说明", raw.creator_notes) : "") +
+    `</div>`
+  );
+
+  // Plot stages
+  if (stageKeys.length) {
+    let stageHtml = "";
+    stageKeys.forEach((key) => {
+      const stage = stages[key] || {};
+      stageHtml += `<div class="preview-card">`;
+      stageHtml += `<div class="preview-card-head"><strong>阶段 ${escapeHtml(String(key))}</strong></div>`;
+      if (stage.description) stageHtml += previewContentBlock("描述", stage.description);
+      if (stage.rules) stageHtml += previewContentBlock("规则", stage.rules);
+      stageHtml += `</div>`;
+    });
+    html += previewSection("剧情阶段", stageKeys.length, stageHtml);
+  }
+
+  // Multiple personas
+  if (personaKeys.length > 1) {
+    let personaHtml = "";
+    personaKeys.forEach((key) => {
+      const p = personas[key] || {};
+      personaHtml += `<div class="preview-card">`;
+      personaHtml += `<div class="preview-card-head"><strong>${escapeHtml(p.name || `角色 ${escapeHtml(String(key))}`)}</strong></div>`;
+      if (p.description) personaHtml += previewContentBlock("背景", p.description);
+      if (p.personality) personaHtml += previewContentBlock("性格", p.personality);
+      if (p.scenario) personaHtml += previewContentBlock("场景", p.scenario);
+      if (p.creator_notes) personaHtml += previewContentBlock("备注", p.creator_notes);
+      personaHtml += `</div>`;
+    });
+    html += previewSection("多人设", personaKeys.length, personaHtml);
+  }
+
+  const panel = document.getElementById("previewPersonaPanel");
+  if (panel) panel.innerHTML = html;
+}
+
+// ── Memory ──
+
+function renderPreviewMemory(slot) {
+  const memories = Array.isArray(slot.memories) ? slot.memories : [];
+  const merged = Array.isArray(slot.mergedMemories) ? slot.mergedMemories : [];
+  const outline = Array.isArray(slot.memoryOutline) ? slot.memoryOutline : [];
+
+  let html = "";
+
+  // Ordinary memories
+  let memHtml = "";
+  if (memories.length) {
+    memories.forEach((m) => {
+      memHtml += `<div class="preview-card">`;
+      memHtml += `<div class="preview-card-head"><strong>${escapeHtml(m.title || "无标题")}</strong></div>`;
+      if (m.content) memHtml += previewContentBlock("", m.content);
+      memHtml += previewTagList(m.tags);
+      if (m.notes) memHtml += previewField("备注", m.notes);
+      memHtml += `</div>`;
+    });
+  } else {
+    memHtml = previewEmpty("暂无记忆");
+  }
+  html += previewSection("普通记忆", memories.length, memHtml, memHtml);
+
+  // Merged memories
+  let mergedHtml = "";
+  if (merged.length) {
+    merged.forEach((m) => {
+      mergedHtml += `<div class="preview-card">`;
+      mergedHtml += `<div class="preview-card-head"><strong>${escapeHtml(m.title || "无标题")}</strong></div>`;
+      if (m.content) mergedHtml += previewContentBlock("", m.content);
+      mergedHtml += previewInfoRow([m.created_at ? "创建: " + m.created_at : "", m.source_memory_ids?.length ? "来源: " + m.source_memory_ids.length + " 条" : ""]);
+      mergedHtml += previewTagList(m.tags);
+      if (m.notes) mergedHtml += previewField("备注", m.notes);
+      mergedHtml += `</div>`;
+    });
+  } else {
+    mergedHtml = previewEmpty("暂无合并记忆");
+  }
+  html += previewSection("合并记忆", merged.length, mergedHtml, mergedHtml);
+
+  // Memory outline
+  let outlineHtml = "";
+  if (outline.length) {
+    outline.forEach((o) => {
+      outlineHtml += `<div class="preview-card">`;
+      outlineHtml += `<div class="preview-card-head"><strong>${escapeHtml(o.title || "无标题")}</strong></div>`;
+      if (o.summary) outlineHtml += previewContentBlock("摘要", o.summary);
+      if (o.characters) outlineHtml += previewField("角色", o.characters);
+      if (o.relationship_progress) outlineHtml += previewContentBlock("关系进展", o.relationship_progress);
+      if (o.key_events?.length) outlineHtml += previewField("关键事件", o.key_events.join(" / "));
+      if (o.conflicts) outlineHtml += previewContentBlock("冲突", o.conflicts);
+      if (o.next_hooks) outlineHtml += previewContentBlock("后续钩子", o.next_hooks);
+      if (o.notes) outlineHtml += previewField("备注", o.notes);
+      outlineHtml += previewInfoRow([o.updated_at ? "更新: " + o.updated_at : "", o.source_memory_ids?.length ? "来源: " + o.source_memory_ids.length + " 条" : ""]);
+      outlineHtml += `</div>`;
+    });
+  } else {
+    outlineHtml = previewEmpty("暂无记忆大纲");
+  }
+  html += previewSection("记忆大纲", outline.length, outlineHtml, outlineHtml);
+
+  const panel = document.getElementById("previewMemoryPanel");
+  if (panel) panel.innerHTML = html;
+}
+
+// ── Worldbook ──
+
+function renderPreviewWorldbook(slot) {
+  const wb = slot.worldbook || { settings: {}, entries: [] };
+  const settings = wb.settings || {};
+  const entries = Array.isArray(wb.entries) ? wb.entries : [];
+  const enabledEntries = entries.filter((e) => e.enabled);
+
+  const insertionLabels = { before_char_defs: "角色定义前", after_char_defs: "角色定义后", in_chat: "聊天中" };
+  const roleLabels = { system: "系统", user: "用户", assistant: "助手" };
+  const typeLabels = { keyword: "关键词", constant: "常驻" };
+  const modeLabels = { any: "任意匹配", all: "全部匹配" };
+  const groupLabels = { and: "全部", or: "任一" };
+  const posLabel = insertionLabels[settings.defaultInsertionPosition] || settings.defaultInsertionPosition || "";
+  const roleLabel = roleLabels[settings.defaultInjectionRole] || settings.defaultInjectionRole || "";
+
+  let html = "";
+
+  // Settings summary
+  html += previewSection("世界书设置", 0,
+    `<div class="preview-card">` +
+    previewField("状态", settings.enabled ? "已启用" : "已禁用") +
+    previewField("最大命中数", settings.maxEntries) +
+    previewField("大小写敏感", settings.caseSensitive ? "是" : "否") +
+    previewField("整词匹配", settings.wholeWord ? "是" : "否") +
+    previewField("默认匹配模式", modeLabels[settings.defaultMatchMode] || settings.defaultMatchMode) +
+    previewField("默认插入位置", posLabel) +
+    previewField("默认注入角色", roleLabel) +
+    previewField("递归扫描", settings.recursiveScanEnabled ? "启用" : "禁用") +
+    (settings.recursiveScanEnabled ? previewField("递归最大深度", settings.recursionMaxDepth) : "") +
+    `</div>`
+  );
+
+  // Entries
+  if (entries.length) {
+    let entryHtml = "";
+    entries.forEach((e) => {
+      const ePosLabel = insertionLabels[e.insertionPosition] || e.insertionPosition || "";
+      const eRoleLabel = roleLabels[e.injectionRole] || e.injectionRole || "";
+      entryHtml += `<div class="preview-card">`;
+      entryHtml += `<div class="preview-card-head">`;
+      entryHtml += `<strong>${escapeHtml(e.title || "未命名词条")}</strong>`;
+      if (!e.enabled) entryHtml += ` <span class="preview-pill-off">已禁用</span>`;
+      entryHtml += `</div>`;
+      entryHtml += previewInfoRow([
+        e.entryType ? typeLabels[e.entryType] || e.entryType : "",
+        e.matchMode ? modeLabels[e.matchMode] || e.matchMode : "",
+        e.chance !== 100 ? "概率: " + e.chance + "%" : "",
+        e.groupOperator && e.entryType === "keyword" ? groupLabels[e.groupOperator] || e.groupOperator : "",
+      ]);
+      if (e.primaryTriggers) entryHtml += previewField("主关键词", e.primaryTriggers);
+      if (e.secondaryTriggers) entryHtml += previewField("次级关键词", e.secondaryTriggers);
+      if (e.content) entryHtml += previewContentBlock("", e.content);
+      entryHtml += previewInfoRow([
+        ePosLabel,
+        e.injectionDepth ? "深度: " + e.injectionDepth : "",
+        eRoleLabel,
+        e.order ? "顺序: " + e.order : "",
+        e.stickyTurns ? "粘滞: " + e.stickyTurns + " 轮" : "",
+        e.cooldownTurns ? "冷却: " + e.cooldownTurns + " 轮" : "",
+        e.caseSensitive ? "大小写敏感" : "",
+        e.wholeWord ? "整词" : "",
+      ]);
+      if (e.notes) entryHtml += previewField("备注", e.notes);
+      entryHtml += `</div>`;
+    });
+    html += previewSection("词条列表", entries.length + " / 启用 " + enabledEntries.length, entryHtml);
+  } else {
+    html += previewSection("词条列表", 0, "", previewEmpty("暂无世界书词条"));
+  }
+
+  const panel = document.getElementById("previewWorldbookPanel");
+  if (panel) panel.innerHTML = html;
+}
+
+// ── Preset ──
+
+function renderPreviewPreset(slot) {
+  const raw = slot.presetStore;
+  const store = sanitizePresetStore(raw);
+  const presets = Array.isArray(store.presets) ? store.presets : [];
+  const activeId = store.active_preset_id;
+  const activePreset = presets.find((p) => p.id === activeId) || presets[0];
+
+  const moduleLabels = {};
+  Object.entries(PRESET_MODULE_RULES).forEach(([key, meta]) => { moduleLabels[key] = meta.label; });
+
+  let html = "";
+
+  if (!presets.length) {
+    html += previewEmpty("暂无预设数据");
+  } else {
+    // Active preset detail
+    if (activePreset) {
+      const enabledModules = Object.entries(activePreset.modules || {})
+        .filter(([, v]) => v)
+        .map(([k]) => moduleLabels[k] || k);
+      let detailHtml = "";
+      detailHtml += `<div class="preview-card">`;
+      detailHtml += previewField("名称", activePreset.name);
+      detailHtml += previewField("状态", activePreset.enabled ? "已启用" : "已禁用");
+      if (enabledModules.length) detailHtml += previewField("已启用模块", enabledModules.join(" / "));
+      if (activePreset.base_system_prompt) detailHtml += previewContentBlock("基础系统提示", activePreset.base_system_prompt);
+      if (activePreset.extra_prompts?.length) {
+        activePreset.extra_prompts.forEach((block) => {
+          detailHtml += `<div class="preview-card preview-sub-card">`;
+          detailHtml += `<div class="preview-card-head"><strong>${escapeHtml(block.name || "未命名规则块")}</strong>`;
+          if (!block.enabled) detailHtml += ` <span class="preview-pill-off">已禁用</span>`;
+          detailHtml += `</div>`;
+          if (block.content) detailHtml += previewContentBlock("", block.content);
+          detailHtml += `</div>`;
+        });
+      }
+      detailHtml += `</div>`;
+      html += previewSection("当前激活预设", 0, detailHtml);
+    }
+
+    // Preset list
+    if (presets.length > 1) {
+      let listHtml = "";
+      presets.forEach((p) => {
+        const isActive = p.id === activeId;
+        const enabledMods = Object.entries(p.modules || {})
+          .filter(([, v]) => v)
+          .map(([k]) => moduleLabels[k] || k);
+        listHtml += `<div class="preview-card">`;
+        listHtml += `<div class="preview-card-head">`;
+        listHtml += `<strong>${escapeHtml(p.name || "未命名预设")}</strong>`;
+        if (isActive) listHtml += ` <span class="preview-pill-on">当前激活</span>`;
+        if (!p.enabled) listHtml += ` <span class="preview-pill-off">已禁用</span>`;
+        listHtml += `</div>`;
+        if (enabledMods.length) listHtml += previewField("模块", enabledMods.join(" / "));
+        listHtml += previewField("规则块数量", p.extra_prompts?.length || 0);
+        listHtml += `</div>`;
+      });
+      html += previewSection("预设列表", presets.length, listHtml);
+    }
+  }
+
+  const panel = document.getElementById("previewPresetPanel");
+  if (panel) panel.innerHTML = html;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   bindGlobalEvents();
+  bindPreviewTabs();
   renderAll();
 });
 

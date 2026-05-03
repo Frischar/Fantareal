@@ -1115,6 +1115,7 @@
       };
 
       let worldbookDebugCollapsed = true;
+      let isEndingConversation = false;
       let worldbookDebugFilter = "all";
       let lastWorldbookDebugPayload = null;
       let serverState = normalizeRuntimeState(initialState);
@@ -2987,9 +2988,17 @@
       });
 
       document.getElementById("end-conversation").addEventListener("click", async () => {
+        if (isEndingConversation) return;
+        isEndingConversation = true;
+        const button = document.getElementById("end-conversation");
+        button.disabled = true;
         setStatus("正在整理当前对话...");
         try {
           const data = await postJson("/api/conversation/end", {});
+          if (data.skipped) {
+            setStatus("对话已在前一次请求中结束，无需重复操作");
+            return;
+          }
           messagesEl.innerHTML = "";
           renderRetrievedItems([]);
           renderWorldbookHits([]);
@@ -2999,6 +3008,9 @@
           );
         } catch (error) {
           setStatus("结束失败：" + error.message);
+        } finally {
+          isEndingConversation = false;
+          button.disabled = false;
         }
       });
 

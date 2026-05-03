@@ -177,6 +177,8 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
     async def api_end_conversation() -> dict[str, Any]:
         source_message_count = len(ctx.get_conversation(ctx.get_active_slot_id()))
         memory = await ctx.archive_current_conversation()
+        if memory.get("_skipped"):
+            return {"ok": True, "skipped": True}
         active_slot = ctx.get_active_slot_id()
         state = ctx.get_workshop_state(active_slot)
         state["temp"] = max(0, int(state.get("temp", 0) or 0) + 1)

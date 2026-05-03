@@ -124,9 +124,10 @@ def build_worldbook_answer_guard(user_message: str, matches: list[dict[str, Any]
         return ""
 
     return (
-        f'The user is directly asking about "{subject}".\n'
-        f"Your first sentence must state the core fact directly, for example: {fact}\n"
-        "Answer directly first, then continue in character without dodging or pretending not to know."
+        f'The user may be asking about "{subject}".\n'
+        "Use the matched notes as private reference.\n"
+        "Answer naturally in character.\n"
+        "Do not quote or dump the worldbook note verbatim unless the user explicitly asks for raw setting text."
     )
 
 

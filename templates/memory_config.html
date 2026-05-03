@@ -1098,6 +1098,32 @@
           </div>
 
         </div>
+
+        <div class="memory-tool-block">
+          <div class="memory-tool-head">
+            <div>
+              <h3>记忆输出设置</h3>
+              <p class="muted helper-text">控制"结束当前对话"时自动生成的记忆长度。</p>
+            </div>
+          </div>
+          <div class="memory-action-row" style="align-items:flex-end">
+            <div>
+              <label for="memory-summary-length">总结长度</label>
+              <select id="memory-summary-length">
+                <option value="short" {% if settings.memory_summary_length == "short" %}selected{% endif %}>简短 (1-2句)</option>
+                <option value="medium" {% if settings.memory_summary_length == "medium" %}selected{% endif %}>中等 (2-5句, 默认)</option>
+                <option value="long" {% if settings.memory_summary_length == "long" %}selected{% endif %}>详细 (5-10句)</option>
+                <option value="custom" {% if settings.memory_summary_length == "custom" %}selected{% endif %}>自定义</option>
+              </select>
+            </div>
+            <div id="memory-max-chars-block" style="display:{{ 'none' if settings.memory_summary_length != 'custom' else '' }}">
+              <label for="memory-summary-max-chars">自定义最大字符数 (80-2000)</label>
+              <input id="memory-summary-max-chars" type="number" min="80" max="2000" step="1" value="{{ settings.memory_summary_max_chars }}" />
+            </div>
+            <button id="save-memory-length-settings" type="button" class="secondary">保存设置</button>
+            <span id="memory-settings-status" class="status-line" style="margin-left:10px"></span>
+          </div>
+        </div>
       </section>
 
       <section class="panel config-panel full-span">
@@ -2009,6 +2035,45 @@
       Promise.allSettled([loadMergedMemories(), loadOutlineItems()]).then(() => {
         setMergeButtonLoading(false);
         setStatus("页面已就绪。");
+      });
+
+      // ── 记忆输出长度设置 ──
+      const memoryLengthSelect = document.getElementById("memory-summary-length");
+      const memoryMaxCharsBlock = document.getElementById("memory-max-chars-block");
+      const memoryMaxCharsInput = document.getElementById("memory-summary-max-chars");
+      const memorySettingsStatus = document.getElementById("memory-settings-status");
+
+      function updateMemoryMaxCharsBlock() {
+        if (memoryLengthSelect && memoryMaxCharsBlock) {
+          memoryMaxCharsBlock.style.display = memoryLengthSelect.value === "custom" ? "" : "none";
+        }
+      }
+      if (memoryLengthSelect) {
+        memoryLengthSelect.addEventListener("change", updateMemoryMaxCharsBlock);
+      }
+
+      document.getElementById("save-memory-length-settings").addEventListener("click", async () => {
+        try {
+          memorySettingsStatus.textContent = "正在保存...";
+          const current = await getJson("/api/settings");
+          const length = memoryLengthSelect.value;
+          const patch = { memory_summary_length: length };
+          // 只在 custom 模式保存用户填写的最大字符数，避免 hidden input 的脏值污染其他模式
+          if (length === "custom") {
+            patch.memory_summary_max_chars = Number(memoryMaxCharsInput.value || 520);
+          } else {
+            // 非 custom 时回写对应默认值，清理之前 custom 遗留的脏值
+            if (length === "short") patch.memory_summary_max_chars = 200;
+            else if (length === "long") patch.memory_summary_max_chars = 800;
+            else patch.memory_summary_max_chars = 520;
+          }
+          const merged = Object.assign({}, current.settings || {}, patch);
+          await postJson("/api/settings", merged);
+          memorySettingsStatus.textContent = "记忆输出设置已保存。";
+          setTimeout(() => { memorySettingsStatus.textContent = ""; }, 3000);
+        } catch (error) {
+          memorySettingsStatus.textContent = "保存失败：" + error.message;
+        }
       });
     </script>
   </body>

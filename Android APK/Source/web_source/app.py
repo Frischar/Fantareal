@@ -129,6 +129,8 @@ DEFAULT_SETTINGS = {
     "rerank_top_n": 3,
     "sprite_enabled": True,
     "sprite_base_path": DEFAULT_SPRITE_BASE_PATH,
+    "memory_summary_length": "medium",
+    "memory_summary_max_chars": 180,
 }
 
 
@@ -347,6 +349,8 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "rerank_api_key": str(settings.get("rerank_api_key", "")).strip(),
         "rerank_model": str(settings.get("rerank_model", "")).strip(),
         "rerank_top_n": clamp_int(settings.get("rerank_top_n"), 1, 12, 3),
+        "memory_summary_length": str(settings.get("memory_summary_length", "medium")).strip() if str(settings.get("memory_summary_length", "medium")).strip() in {"short", "medium", "long", "custom"} else "medium",
+        "memory_summary_max_chars": clamp_int(settings.get("memory_summary_max_chars"), 80, 2000, 180),
     }
 
 
@@ -2181,6 +2185,19 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
         summary_source_text = f"输入材料是长对话分段压缩稿。\n\n{summary_source_text}"
     else:
         summary_source_text = f"输入材料是完整对话原文。\n\n{summary_source_text}"
+
+    memory_settings = get_settings()
+    memory_length = str(memory_settings.get("memory_summary_length", "medium")).strip()
+    if memory_length == "short":
+        sentence_hint = "content must be 1 to 2 sentences, vivid but concise. "
+    elif memory_length == "long":
+        sentence_hint = "content must be 5 to 10 sentences, vivid and detailed. "
+    elif memory_length == "custom":
+        max_chars_hint = clamp_int(memory_settings.get("memory_summary_max_chars"), 80, 2000, 180)
+        sentence_hint = f"content must be vivid and detailed, covering key events and unresolved threads. Let length match the amount of material; try to approach roughly {max_chars_hint} characters without padding. "
+    else:
+        sentence_hint = "content should be 2 to 5 sentences, vivid but concise. "
+
     payload = {
         "model": llm_config["model"],
         "temperature": 0.35,
@@ -2194,7 +2211,7 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
                     "The JSON object must contain exactly these keys: title, content, tags, notes. "
                     "title must be short. "
                     "content must be a compact memory fragment in Chinese, written like a diary fragment or remembered scene excerpt. "
-                    "content should be 1 to 3 sentences, vivid but concise. "
+                    f"{sentence_hint}"
                     "Do not summarize like meeting minutes. "
                     "Do not bring back deleted or invalidated old memories. "
                     "tags must be an array of strings and include 'memory-fragment'. "
@@ -2252,10 +2269,21 @@ def sanitize_memory_summary(payload: dict[str, Any], *, fallback: dict[str, Any]
         tags.insert(0, "memory-fragment")
     notes = str(payload.get("notes", "")).strip() or str(fallback.get("notes", "")).strip()
 
+    memory_length = str(get_settings().get("memory_summary_length", "medium")).strip()
+    if memory_length == "short":
+        effective_max_chars = 120
+    elif memory_length == "long":
+        effective_max_chars = 500
+    elif memory_length == "custom":
+        effective_max_chars = clamp_int(get_settings().get("memory_summary_max_chars"), 80, 2000, 180)
+    else:
+        effective_max_chars = 180
+    max_chars = effective_max_chars
+
     return {
         "id": f"memory-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
         "title": title[:40],
-        "content": content[:180],
+        "content": content[:max_chars],
         "tags": tags[:8],
         "notes": notes[:240],
     }
@@ -2272,44 +2300,56 @@ async def summarize_conversation_to_memory(history: list[dict[str, Any]]) -> dic
     return sanitize_memory_summary(summary_payload, fallback=fallback)
 
 
+_ARCHIVE_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _get_archive_lock(slot_id: str) -> asyncio.Lock:
+    if slot_id not in _ARCHIVE_LOCKS:
+        _ARCHIVE_LOCKS[slot_id] = asyncio.Lock()
+    return _ARCHIVE_LOCKS[slot_id]
+
+
 async def archive_current_conversation() -> dict[str, Any]:
-    history = [item for item in get_conversation() if item.get("role") in {"user", "assistant"}]
-    if not history:
-        raise HTTPException(status_code=400, detail="当前没有可结束的对话。")
+    slot_id = get_active_slot_id()
+    lock = _get_archive_lock(slot_id)
+    async with lock:
+        history = [item for item in get_conversation() if item.get("role") in {"user", "assistant"}]
+        if not history:
+            return {"_skipped": True}
 
-    memory = await summarize_conversation_to_memory(history)
-    memories = get_memories()
-    deleted_memories = get_memory_tombstones()
-    blocked_tombstone = next((item for item in deleted_memories if is_similar_memory(memory, item)), None)
-    if blocked_tombstone:
+        memory = await summarize_conversation_to_memory(history)
+        memories = get_memories()
+        deleted_memories = get_memory_tombstones()
+        blocked_tombstone = next((item for item in deleted_memories if is_similar_memory(memory, item)), None)
+        if blocked_tombstone:
+            persist_json(
+                conversation_path(),
+                [],
+                detail="结束对话失败：无法清空当前聊天记录。",
+            )
+            return {
+                **memory,
+                "blocked": True,
+                "title": str(blocked_tombstone.get("title", "")).strip() or memory["title"],
+            }
+
+        existing_memory = find_similar_memory(memories, memory)
+        if existing_memory:
+            persist_json(
+                conversation_path(),
+                [],
+                detail="结束对话失败：无法清空当前聊天记录。",
+            )
+            return {**existing_memory, "deduplicated": True}
+
+        memories.append(memory)
+        save_memories(memories)
         persist_json(
             conversation_path(),
             [],
             detail="结束对话失败：无法清空当前聊天记录。",
         )
-        return {
-            **memory,
-            "blocked": True,
-            "title": str(blocked_tombstone.get("title", "")).strip() or memory["title"],
-        }
-
-    existing_memory = find_similar_memory(memories, memory)
-    if existing_memory:
-        persist_json(
-            conversation_path(),
-            [],
-            detail="结束对话失败：无法清空当前聊天记录。",
-        )
-        return {**existing_memory, "deduplicated": True}
-
-    memories.append(memory)
-    save_memories(memories)
-    persist_json(
-        conversation_path(),
-        [],
-        detail="结束对话失败：无法清空当前聊天记录。",
-    )
-    return memory
+        return memory
 
 load_env_file()
 ensure_data_files()
@@ -2356,6 +2396,8 @@ class SettingsPayload(BaseModel):
     rerank_api_key: str = ""
     rerank_model: str = ""
     rerank_top_n: int = 3
+    memory_summary_length: str = "medium"
+    memory_summary_max_chars: int = 180
 
 
 class MemoryItemPayload(BaseModel):
@@ -2541,7 +2583,7 @@ async def api_save_settings(payload: SettingsPayload) -> dict[str, Any]:
     active_slot = get_active_slot_id()
     settings = sanitize_settings(payload.model_dump(), strict=True, slot_id=active_slot)
     persist_json(
-        settings_path(),
+        settings_path(active_slot),
         settings,
         detail="设置保存失败，请检查磁盘空间或文件权限。",
     )
@@ -2924,6 +2966,8 @@ async def api_chat_stream(payload: ChatRequest) -> StreamingResponse:
 @app.post("/api/conversation/end")
 async def api_end_conversation() -> dict[str, Any]:
     memory = await archive_current_conversation()
+    if memory.get("_skipped"):
+        return {"ok": True, "skipped": True}
     return {
         "ok": True,
         "memory_item": memory,
