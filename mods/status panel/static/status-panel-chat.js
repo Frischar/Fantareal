@@ -568,14 +568,119 @@
     }
   }
 
+  let sidebarSafeLeftCache = { value: 8, width: 0, height: 0, time: 0 };
+
+  function isUsableSidebarRect(rect) {
+    if (!rect) return false;
+    const viewportWidth = Math.max(320, window.innerWidth || document.documentElement.clientWidth || 0);
+    const viewportHeight = Math.max(320, window.innerHeight || document.documentElement.clientHeight || 0);
+    const maxRailWidth = Math.min(520, viewportWidth * 0.58);
+    const minRailHeight = Math.min(220, Math.max(96, viewportHeight * 0.32));
+    return rect.left <= 6
+      && rect.right > 96
+      && rect.width >= 96
+      && rect.width <= maxRailWidth
+      && rect.height >= minRailHeight;
+  }
+
+  function getCandidateRect(node) {
+    if (!(node instanceof HTMLElement)) return null;
+    const style = window.getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden") return null;
+    const rect = node.getBoundingClientRect();
+    return rect;
+  }
+
+  function collectSidebarRightFrom(node) {
+    let best = 0;
+    let current = node;
+    let depth = 0;
+    while (current instanceof HTMLElement && current !== document.body && depth < 6) {
+      const rect = getCandidateRect(current);
+      if (isUsableSidebarRect(rect)) best = Math.max(best, rect.right);
+      current = current.parentElement;
+      depth += 1;
+    }
+    return best;
+  }
+
+  function getSidebarSafeLeft() {
+    const margin = 8;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const now = Date.now();
+    if (
+      sidebarSafeLeftCache.width === viewportWidth
+      && sidebarSafeLeftCache.height === viewportHeight
+      && now - sidebarSafeLeftCache.time < 260
+    ) {
+      return sidebarSafeLeftCache.value;
+    }
+
+    const selectors = [
+      ".app-sidebar",
+      ".global-sidebar",
+      ".left-sidebar",
+      ".sidebar",
+      ".sidebar-nav",
+      ".side-nav",
+      ".app-sidebar-shell > aside",
+      ".app-sidebar-shell .topbar-stack",
+      ".topbar-stack",
+      "#app-sidebar",
+      "#global-sidebar",
+      "#sidebar",
+      "[data-sidebar]",
+      "aside",
+      "nav",
+    ];
+    let railRight = 0;
+
+    selectors.forEach((selector) => {
+      document.querySelectorAll(selector).forEach((node) => {
+        if (!(node instanceof HTMLElement)) return;
+        if (node.id === PANEL_ID || node.closest(`#${PANEL_ID}`)) return;
+        railRight = Math.max(railRight, collectSidebarRightFrom(node));
+      });
+    });
+
+    // Fallback for the app's left-sidebar layout: if the page shell is active but
+    // the concrete sidebar class changed, reserve the known sidebar area anyway.
+    if (document.body.classList.contains("app-sidebar-shell") && viewportWidth >= 760) {
+      railRight = Math.max(railRight, Math.min(320, Math.round(viewportWidth * 0.22)));
+    }
+
+    // Last-resort DOM scan, throttled by the cache above. It catches renamed
+    // sidebar containers without touching the floating panel itself.
+    if (!railRight && viewportWidth >= 760) {
+      const all = Array.from(document.body.querySelectorAll("body > *, body > * *"));
+      for (const node of all) {
+        if (!(node instanceof HTMLElement)) continue;
+        if (node.id === PANEL_ID || node.closest(`#${PANEL_ID}`)) continue;
+        const rect = getCandidateRect(node);
+        if (isUsableSidebarRect(rect)) railRight = Math.max(railRight, rect.right);
+        if (railRight > 0) break;
+      }
+    }
+
+    // Keep the ball comfortably outside the sidebar. A wider gap avoids the case
+    // where the ball is technically outside the sidebar but still hard to grab.
+    const safeLeft = railRight ? Math.ceil(railRight + 28) : margin;
+    sidebarSafeLeftCache = { value: Math.max(margin, safeLeft), width: viewportWidth, height: viewportHeight, time: now };
+    return sidebarSafeLeftCache.value;
+  }
+
   function clampPosition(left, top, panel) {
     const margin = 8;
+    const minLeft = Math.max(margin, getSidebarSafeLeft());
     const rect = panel.getBoundingClientRect();
     const width = rect.width || 260;
     const height = rect.height || 48;
+    const maxLeft = Math.max(minLeft, window.innerWidth - width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - height - margin);
     return {
-      left: Math.max(margin, Math.min(left, window.innerWidth - width - margin)),
-      top: Math.max(margin, Math.min(top, window.innerHeight - height - margin)),
+      left: Math.max(minLeft, Math.min(left, maxLeft)),
+      top: Math.max(margin, Math.min(top, maxTop)),
     };
   }
 
@@ -588,6 +693,9 @@
     panel.style.right = "auto";
     panel.style.bottom = "auto";
     panel.style.transform = "none";
+    if (Math.abs(clamped.left - pos.left) > 0.5 || Math.abs(clamped.top - pos.top) > 0.5) {
+      setStoredPosition(clamped);
+    }
   }
 
   function attachDrag(panel, handle) {

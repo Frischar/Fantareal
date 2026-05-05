@@ -1718,3 +1718,176 @@ body.xsp-admin-page .xsp-source-result-line .xsp-source-index-chip {
   border-style: dashed;
   opacity: 0.92;
 }
+
+/* Status Panel Admin v1.7.5: always dark theme lock */
+body.xsp-admin-page {
+  color-scheme: dark;
+  color: #f8fafc !important;
+  background:
+    radial-gradient(circle at 22% 0%, rgba(50, 123, 165, 0.18), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(104, 216, 194, 0.10), transparent 30%),
+    linear-gradient(135deg, #08111d 0%, #0b1320 52%, #07101a 100%) !important;
+
+  --xsp-bg: rgba(17, 24, 35, 0.90);
+  --xsp-bg-strong: rgba(17, 24, 35, 0.96);
+  --xsp-text: #f8fafc;
+  --xsp-muted: #cbd5e1;
+  --xsp-border: rgba(148, 163, 184, 0.26);
+  --xsp-soft: rgba(148, 163, 184, 0.10);
+  --xsp-primary: #68d8c2;
+  --xsp-primary-soft: rgba(104, 216, 194, 0.14);
+  --xsp-danger: #f2a08f;
+  --xsp-ok: #8df0df;
+  --xsp-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+
+  --xsp-admin-panel: rgba(17, 24, 35, 0.92);
+  --xsp-admin-panel-soft: rgba(19, 28, 40, 0.82);
+  --xsp-admin-fill: rgba(148, 163, 184, 0.10);
+  --xsp-admin-fill-strong: rgba(31, 42, 58, 0.82);
+  --xsp-admin-text: #f8fafc;
+  --xsp-admin-muted: #cbd5e1;
+  --xsp-admin-faint: #94a3b8;
+  --xsp-admin-border: rgba(148, 163, 184, 0.26);
+  --xsp-admin-border-strong: rgba(148, 163, 184, 0.42);
+  --xsp-admin-accent: #68d8c2;
+  --xsp-admin-accent-strong: #8df0df;
+  --xsp-admin-accent-soft: rgba(104, 216, 194, 0.14);
+  --xsp-admin-warning: #f0b66f;
+  --xsp-admin-warning-soft: rgba(240, 182, 111, 0.14);
+  --xsp-admin-danger: #f2a08f;
+  --xsp-admin-danger-soft: rgba(242, 160, 143, 0.13);
+  --xsp-admin-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+}
+
+body.xsp-admin-page .xsp-admin-header,
+body.xsp-admin-page .xsp-settings-card,
+body.xsp-admin-page .xsp-edit-card,
+body.xsp-admin-page .xsp-preview-card,
+body.xsp-admin-page .xsp-empty-card,
+body.xsp-admin-page .xsp-admin-quickbar,
+body.xsp-admin-page .xsp-admin-tabs,
+body.xsp-admin-page .xsp-dashboard-stats article,
+body.xsp-admin-page .xsp-overview-card,
+body.xsp-admin-page .xsp-character-rail,
+body.xsp-admin-page .xsp-editor-main,
+body.xsp-admin-page .xsp-admin-pending-card,
+body.xsp-admin-page .xsp-scan-mode-card,
+body.xsp-admin-page .xsp-field-add-panel,
+body.xsp-admin-page .xsp-fields-list-panel,
+body.xsp-admin-page .xsp-format-guide-card {
+  border-color: var(--xsp-admin-border) !important;
+  background: var(--xsp-admin-panel) !important;
+  color: var(--xsp-admin-text) !important;
+  box-shadow: var(--xsp-admin-shadow) !important;
+}
+
+body.xsp-admin-page .xsp-admin-header p,
+body.xsp-admin-page .xsp-section-title p,
+body.xsp-admin-page .xsp-preview-card p,
+body.xsp-admin-page .xsp-muted,
+body.xsp-admin-page .xsp-save-chip,
+body.xsp-admin-page .xsp-dashboard-stats span,
+body.xsp-admin-page .xsp-overview-card-head span,
+body.xsp-admin-page .xsp-overview-card-head em,
+body.xsp-admin-page .xsp-admin-pending-card p,
+body.xsp-admin-page .xsp-admin-pending-card span,
+body.xsp-admin-page .xsp-character-nav-item span,
+body.xsp-admin-page .xsp-scan-mode-card span {
+  color: var(--xsp-admin-muted) !important;
+}
+
+body.xsp-admin-page h1,
+body.xsp-admin-page h2,
+body.xsp-admin-page h3,
+body.xsp-admin-page .xsp-dashboard-stats strong,
+body.xsp-admin-page .xsp-overview-card-head strong,
+body.xsp-admin-page .xsp-character-nav-item strong,
+body.xsp-admin-page .xsp-admin-pending-card strong,
+body.xsp-admin-page .xsp-editor-section h3,
+body.xsp-admin-page .xsp-scan-mode-card strong,
+body.xsp-admin-page .xsp-rail-head strong {
+  color: var(--xsp-admin-text) !important;
+}
+
+body.xsp-admin-page .xsp-kicker {
+  color: var(--xsp-admin-accent) !important;
+}
+
+body.xsp-admin-page input,
+body.xsp-admin-page textarea,
+body.xsp-admin-page select {
+  border-color: var(--xsp-admin-border) !important;
+  background: rgba(8, 13, 21, 0.42) !important;
+  color: var(--xsp-admin-text) !important;
+}
+
+body.xsp-admin-page input:focus,
+body.xsp-admin-page textarea:focus,
+body.xsp-admin-page select:focus {
+  border-color: color-mix(in srgb, var(--xsp-admin-accent) 55%, var(--xsp-admin-border)) !important;
+  box-shadow: 0 0 0 3px var(--xsp-admin-accent-soft) !important;
+}
+
+body.xsp-admin-page select option {
+  color: #f8fafc;
+  background: #111823;
+}
+
+body.xsp-admin-page .xsp-btn {
+  border-color: var(--xsp-admin-border) !important;
+  background: var(--xsp-admin-fill) !important;
+  color: var(--xsp-admin-text) !important;
+  box-shadow: none !important;
+}
+
+body.xsp-admin-page .xsp-btn-primary,
+body.xsp-admin-page button.xsp-btn-primary {
+  border-color: color-mix(in srgb, var(--xsp-admin-accent) 60%, transparent) !important;
+  background: var(--xsp-admin-accent) !important;
+  color: #06231f !important;
+}
+
+body.xsp-admin-page .xsp-btn-ghost {
+  background: transparent !important;
+  color: var(--xsp-admin-muted) !important;
+}
+
+body.xsp-admin-page .xsp-tab-button {
+  color: var(--xsp-admin-muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.xsp-admin-page .xsp-tab-button:hover {
+  color: var(--xsp-admin-text) !important;
+  background: var(--xsp-admin-fill) !important;
+}
+
+body.xsp-admin-page .xsp-tab-button.is-active {
+  color: var(--xsp-admin-accent-strong) !important;
+  border: 1px solid color-mix(in srgb, var(--xsp-admin-accent) 38%, transparent) !important;
+  background: var(--xsp-admin-accent-soft) !important;
+}
+
+body.xsp-admin-page .xsp-switch-line,
+body.xsp-admin-page .xsp-inline-setting,
+body.xsp-admin-page .xsp-overview-fields span,
+body.xsp-admin-page .xsp-character-nav-item,
+body.xsp-admin-page .xsp-editor-section,
+body.xsp-admin-page .xsp-clean-edit-card,
+body.xsp-admin-page .xsp-scan-diff-table,
+body.xsp-admin-page .xsp-settings-block,
+body.xsp-admin-page .xsp-advanced-settings-standalone {
+  border-color: var(--xsp-admin-border) !important;
+  background: var(--xsp-admin-fill) !important;
+  color: var(--xsp-admin-text) !important;
+}
+
+body.xsp-admin-page .xsp-overview-card-head em,
+body.xsp-admin-page .xsp-character-nav-item.is-active,
+body.xsp-admin-page .xsp-scan-mode-card.is-recommended,
+body.xsp-admin-page .xsp-source-chip:has(input:checked) {
+  border-color: color-mix(in srgb, var(--xsp-admin-accent) 38%, transparent) !important;
+  background: var(--xsp-admin-accent-soft) !important;
+}
+
