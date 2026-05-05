@@ -1,0 +1,1120 @@
+/* Split from static/styles.css · 04-user-workshop.css
+   Scope: 用户资料页、创意工坊页与共享控件
+   This v121 split preserves cascade order; clean-up comes later. */
+
+/* =========================================================
+   User Profile Workbench v0.8.5
+   UI-only polish for /config/user. Keeps existing API ids.
+   ========================================================= */
+body.modern-setting-page .user-workbench-shell {
+  align-items: start;
+}
+
+body.modern-setting-page .user-workbench-shell .config-panel {
+  min-width: 0;
+}
+
+body.modern-setting-page .user-avatar-card {
+  align-self: start;
+}
+
+body.modern-setting-page .user-avatar-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+body.modern-setting-page .user-avatar-frame {
+  max-width: none !important;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%),
+    color-mix(in srgb, var(--input-bg) 72%, transparent 28%);
+}
+
+body.modern-setting-page .user-avatar-image {
+  width: 100%;
+  height: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+body.modern-setting-page .user-avatar-controls {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+body.modern-setting-page .user-avatar-controls .helper-text {
+  margin: 0;
+}
+
+@media (max-width: 820px) {
+  body.modern-setting-page .user-avatar-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* =========================================================
+   User Profile Layout Trials v0.8.6
+   A: title + workbench + main/sidebar
+   B: title + left form + sticky right user panel
+   ========================================================= */
+body.modern-setting-page .user-hero-toolbar .slot-badge {
+  text-transform: uppercase;
+}
+
+body.modern-setting-page .user-workbench-shell.user-layout-a,
+body.modern-setting-page .user-workbench-shell.user-layout-b {
+  grid-template-columns: minmax(540px, 1.42fr) minmax(320px, 0.58fr) !important;
+  gap: 18px !important;
+}
+
+body.modern-setting-page .user-section-head {
+  min-height: 0 !important;
+  margin-bottom: 14px !important;
+}
+
+body.modern-setting-page .user-section-head h2 {
+  margin-bottom: 3px;
+}
+
+body.modern-setting-page .user-section-head .muted {
+  margin-top: 0;
+  line-height: 1.55;
+}
+
+body.modern-setting-page .user-profile-main-card {
+  min-height: 0;
+}
+
+body.modern-setting-page .user-profile-main-card textarea#profile-text {
+  min-height: 190px;
+}
+
+body.modern-setting-page .user-profile-main-card textarea#profile-notes {
+  min-height: 108px;
+}
+
+body.modern-setting-page .user-form-actions {
+  justify-content: flex-start;
+  padding-top: 14px !important;
+  margin-top: 4px !important;
+}
+
+body.modern-setting-page .user-form-actions button {
+  min-width: 220px;
+}
+
+body.modern-setting-page .user-avatar-stack,
+body.modern-setting-page .user-control-panel {
+  display: grid;
+  gap: 14px;
+}
+
+body.modern-setting-page .user-layout-a .user-avatar-frame,
+body.modern-setting-page .user-layout-b .user-avatar-frame {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 0 !important;
+  max-height: none;
+  overflow: hidden;
+}
+
+body.modern-setting-page .user-layout-a .user-avatar-image,
+body.modern-setting-page .user-layout-b .user-avatar-image {
+  width: 100%;
+  height: 100%;
+  max-height: none !important;
+  object-fit: cover;
+}
+
+body.modern-setting-page .user-side-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+body.modern-setting-page .user-summary-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 72%, transparent),
+      color-mix(in srgb, var(--panel) 82%, transparent));
+}
+
+body.modern-setting-page .user-summary-item span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 820;
+  letter-spacing: 0.03em;
+}
+
+body.modern-setting-page .user-summary-item strong {
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+body.modern-setting-page .user-avatar-controls {
+  display: grid;
+  gap: 10px;
+}
+
+body.modern-setting-page .user-avatar-controls button,
+body.modern-setting-page .user-panel-actions button {
+  width: 100%;
+}
+
+body.modern-setting-page .user-layout-a .user-layout-a-side {
+  align-self: start;
+}
+
+body.modern-setting-page .user-layout-a-toolbar .config-sticky-copy {
+  grid-template-columns: auto minmax(0, auto) minmax(260px, 1fr) !important;
+}
+
+body.modern-setting-page .user-layout-b {
+  margin-top: 0 !important;
+}
+
+body.modern-setting-page .user-control-panel {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+  padding: 16px !important;
+}
+
+body.modern-setting-page .user-control-panel .compact-head {
+  margin-bottom: 0 !important;
+}
+
+body.modern-setting-page .user-control-panel #status-text.task-status {
+  width: 100%;
+  max-width: none !important;
+  min-height: 38px !important;
+  justify-content: flex-start;
+}
+
+body.modern-setting-page .user-panel-block {
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+body.modern-setting-page .user-panel-avatar-block {
+  border-top: 0;
+  padding-top: 0;
+}
+
+body.modern-setting-page .user-panel-actions {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+}
+
+body.modern-setting-page .user-panel-actions button {
+  min-height: 42px !important;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page .user-workbench-shell.user-layout-a,
+  body.modern-setting-page .user-workbench-shell.user-layout-b {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.modern-setting-page .user-layout-b .user-control-panel {
+    position: relative;
+    top: auto;
+  }
+
+  body.modern-setting-page .user-layout-a-toolbar .config-sticky-copy {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  body.modern-setting-page .user-form-actions button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+
+
+/* =========================================================
+   Workshop Layout v0.8.8
+   - B-style: left rule editor + sticky right workshop panel
+   - follows User Panel structure
+   ========================================================= */
+body.modern-setting-page .workshop-hero-toolbar .slot-badge {
+  text-transform: uppercase;
+}
+
+body.modern-setting-page .workshop-workbench-shell.workshop-layout-b {
+  width: min(100% - 48px, 1320px) !important;
+  margin-top: 22px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 360px !important;
+  align-items: start !important;
+  gap: 20px !important;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-main-card {
+  min-width: 0;
+  padding: 26px 28px 30px !important;
+  min-height: 640px;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-section-head {
+  min-height: 0 !important;
+  margin-bottom: 16px !important;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-section-head h2 {
+  margin-bottom: 3px;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-section-head .muted {
+  margin-top: 0;
+  line-height: 1.55;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-control-panel {
+  position: sticky !important;
+  top: 20px !important;
+  align-self: start;
+  display: grid !important;
+  gap: 14px !important;
+  padding: 18px !important;
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border)) !important;
+  box-shadow: 0 18px 48px color-mix(in srgb, #000 14%, transparent) !important;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-control-panel .section-head h2::after {
+  content: "侧栏保存区";
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  vertical-align: middle;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-control-panel .compact-head {
+  margin-bottom: 0 !important;
+}
+
+body.modern-setting-page .workshop-layout-b .workshop-control-panel #status-text.task-status {
+  width: 100%;
+  max-width: none !important;
+  min-height: 38px !important;
+  justify-content: flex-start;
+}
+
+body.modern-setting-page .workshop-panel-block {
+  display: grid;
+  gap: 10px;
+  padding-top: 13px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+body.modern-setting-page .workshop-panel-block:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+body.modern-setting-page .workshop-side-summary {
+  grid-template-columns: 1fr;
+}
+
+body.modern-setting-page .workshop-summary-item {
+  display: grid;
+  gap: 4px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 72%, transparent),
+      color-mix(in srgb, var(--panel) 82%, transparent));
+}
+
+body.modern-setting-page .workshop-summary-item span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 820;
+  letter-spacing: 0.03em;
+}
+
+body.modern-setting-page .workshop-summary-item strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+body.modern-setting-page .workshop-runtime-panel-side .checkbox-row {
+  width: 100%;
+}
+
+body.modern-setting-page .workshop-runtime-panel-side #workshop-runtime-info {
+  margin: 0;
+  line-height: 1.55;
+}
+
+body.modern-setting-page .workshop-search-panel input {
+  width: 100%;
+}
+
+body.modern-setting-page .workshop-quick-actions button,
+body.modern-setting-page .workshop-panel-actions button,
+body.modern-setting-page .workshop-panel-actions .button-link {
+  width: 100%;
+  min-height: 42px !important;
+  justify-content: center;
+}
+
+body.modern-setting-page .workshop-quick-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+body.modern-setting-page .workshop-panel-actions {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+}
+
+body.modern-setting-page .workshop-panel-actions button:first-child {
+  min-height: 46px !important;
+  font-size: 0.98rem !important;
+}
+
+body.modern-setting-page .workshop-return-link {
+  text-align: center;
+  text-decoration: none;
+}
+
+body.modern-setting-page .workshop-rule-list-modern {
+  gap: 14px;
+}
+
+body.modern-setting-page .workshop-rule-list-modern .workshop-rule-shell {
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+body.modern-setting-page .workshop-rule-list-modern .workshop-rule-summary {
+  align-items: center;
+  min-height: 58px;
+}
+
+body.modern-setting-page .workshop-rule-list-modern .workshop-rule-summary-copy {
+  flex: 1 1 auto;
+}
+
+body.modern-setting-page .workshop-rule-list-modern .workshop-rule-body {
+  margin-top: 0;
+  padding: 16px;
+}
+
+body.modern-setting-page .workshop-rule-list-modern .toggle-workshop-rule,
+body.modern-setting-page .workshop-rule-list-modern [data-remove-workshop-rule] {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page .workshop-workbench-shell.workshop-layout-b {
+    width: min(100% - 24px, 100%) !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  body.modern-setting-page .workshop-layout-b .workshop-control-panel {
+    position: relative !important;
+    top: auto !important;
+  }
+}
+
+@media (max-width: 640px) {
+  body.modern-setting-page .workshop-quick-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   Config UI shared layout + WB-aligned components v0.9.0
+   Scope: /config, /config/user, /config/workshop
+   - No hover/press movement on buttons.
+   - Switches use the small WBmanager 36x20 track.
+   - Workshop collapse/delete actions use WBmanager-like round icons.
+   ========================================================= */
+body.modern-setting-page {
+  --ui-card-radius: 24px;
+  --ui-sub-radius: 18px;
+  --ui-gap: 18px;
+  --fr-toggle-w: 36px;
+  --fr-toggle-h: 20px;
+  --fr-toggle-dot: 14px;
+}
+
+body.modern-setting-page .config-shell.compact {
+  width: min(1480px, calc(100% - 32px));
+  max-width: none;
+  gap: var(--ui-gap);
+}
+
+body.modern-setting-page .panel.config-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ui-card-radius);
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 72%, transparent),
+      color-mix(in srgb, var(--panel) 92%, transparent));
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
+}
+
+body.modern-setting-page .panel.config-panel.full-span:first-of-type {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 12%, transparent), transparent 38%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 82%, transparent),
+      color-mix(in srgb, var(--panel) 92%, transparent));
+}
+
+body.modern-setting-page .section-head {
+  gap: 0.35rem;
+}
+
+body.modern-setting-page .section-head h2,
+body.modern-setting-page .section-head h3 {
+  margin-top: 0.08rem;
+  letter-spacing: -0.02em;
+}
+
+body.modern-setting-page .eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.26rem 0.64rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+body.modern-setting-page .stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+body.modern-setting-page .stat-box {
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--ui-sub-radius);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 78%, transparent),
+      color-mix(in srgb, var(--panel) 86%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
+}
+
+body.modern-setting-page .stat-label {
+  display: block;
+  margin-bottom: 0.36rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+body.modern-setting-page .stat-box strong {
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+body.modern-setting-page label:not(.checkbox-row):not(.check-chip) {
+  font-weight: 850;
+  color: color-mix(in srgb, var(--text) 82%, var(--muted));
+}
+
+body.modern-setting-page input,
+body.modern-setting-page select,
+body.modern-setting-page textarea {
+  border-radius: 15px;
+  border-color: color-mix(in srgb, var(--border) 84%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 92%, transparent);
+}
+
+body.modern-setting-page textarea {
+  line-height: 1.7;
+}
+
+body.modern-setting-page .button-row {
+  gap: 10px;
+}
+
+/* Buttons: keep feedback by color/shadow only; no hover lift, no press shrink. */
+body.modern-setting-page button,
+body.modern-setting-page .button-link,
+body.modern-setting-page .ghost-link,
+body.modern-setting-page .secondary,
+body.modern-setting-page .compact {
+  border-radius: 999px;
+  transform: none !important;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease !important;
+}
+
+body.modern-setting-page button:not(:disabled):hover,
+body.modern-setting-page button:not(:disabled):active,
+body.modern-setting-page .button-link:not(:disabled):hover,
+body.modern-setting-page .button-link:not(:disabled):active,
+body.modern-setting-page .ghost-link:not(:disabled):hover,
+body.modern-setting-page .ghost-link:not(:disabled):active,
+body.modern-setting-page .secondary:not(:disabled):hover,
+body.modern-setting-page .secondary:not(:disabled):active,
+body.modern-setting-page .compact:not(:disabled):hover,
+body.modern-setting-page .compact:not(:disabled):active {
+  transform: none !important;
+}
+
+body.modern-setting-page .secondary,
+body.modern-setting-page .ghost-link,
+body.modern-setting-page .button-link {
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 70%, transparent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+body.modern-setting-page button:not(.secondary):not(.compact):not(.ghost-link):not(.button-link),
+body.modern-setting-page #save-settings,
+body.modern-setting-page #save-all,
+body.modern-setting-page #save-user-profile,
+body.modern-setting-page #save-worldbook-settings,
+body.modern-setting-page #save-workshop,
+body.modern-setting-page #save-card {
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+body.modern-setting-page .helper-text,
+body.modern-setting-page .field-note,
+body.modern-setting-page .muted.compact {
+  color: color-mix(in srgb, var(--muted) 88%, var(--text));
+}
+
+body.modern-setting-page .status-line {
+  display: block;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--input-bg) 72%, transparent);
+}
+
+body.modern-setting-page .inline-field,
+body.modern-setting-page .model-combo-row {
+  align-items: stretch;
+}
+
+body.modern-setting-page .preview-card,
+body.modern-setting-page .card-block,
+body.modern-setting-page .sub-block,
+body.modern-setting-page .workshop-runtime-panel,
+body.modern-setting-page .workshop-search-block,
+body.modern-setting-page .workshop-rule-shell {
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--ui-sub-radius);
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+}
+
+body.modern-setting-page .card-block,
+body.modern-setting-page .sub-block,
+body.modern-setting-page .workshop-runtime-panel,
+body.modern-setting-page .workshop-search-block {
+  padding: 16px;
+}
+
+body.modern-setting-page .persona-toolbar,
+body.modern-setting-page .memory-card-head,
+body.modern-setting-page .workshop-rule-summary {
+  border-radius: 16px;
+}
+
+/* Small WBmanager-style horizontal switches. */
+body.modern-setting-page .checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent);
+  color: var(--text);
+  font-weight: 760;
+}
+
+body.modern-setting-page .checkbox-row input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: relative !important;
+  flex: 0 0 auto !important;
+  width: var(--fr-toggle-w) !important;
+  height: var(--fr-toggle-h) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent) !important;
+  background: rgba(148, 163, 184, 0.42) !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+body.modern-setting-page .checkbox-row input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: var(--fr-toggle-dot);
+  height: var(--fr-toggle-dot);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transition: transform 0.16s ease;
+}
+
+body.modern-setting-page .checkbox-row input[type="checkbox"]:checked {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent) !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent) !important;
+}
+
+body.modern-setting-page .checkbox-row input[type="checkbox"]:checked::before {
+  transform: translateX(16px);
+}
+
+body.modern-setting-page .checkbox-row input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent) !important;
+}
+
+/* Field chips: keep as clean pills, but remove movement. */
+body.modern-setting-page .field-chip-row {
+  gap: 8px;
+}
+
+body.modern-setting-page .check-chip {
+  position: relative;
+  min-height: 38px;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+body.modern-setting-page .check-chip input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+body.modern-setting-page .check-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 68%, transparent);
+  color: color-mix(in srgb, var(--text) 86%, var(--muted));
+  font-weight: 780;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 10%, transparent);
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+body.modern-setting-page .check-chip span::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 5px;
+  border: 1.5px solid color-mix(in srgb, var(--border) 92%, var(--muted));
+  background: color-mix(in srgb, var(--panel-strong) 78%, transparent);
+}
+
+body.modern-setting-page .check-chip:hover span {
+  transform: none !important;
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+body.modern-setting-page .check-chip input[type="checkbox"]:checked + span {
+  color: color-mix(in srgb, var(--text) 92%, var(--accent));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+}
+
+body.modern-setting-page .check-chip input[type="checkbox"]:checked + span::before {
+  content: "✓";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  border-color: transparent;
+  background: var(--accent);
+}
+
+body.modern-setting-page .check-chip input[type="checkbox"]:focus-visible + span {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+
+
+/* Global settings: small WBmanager-like toggles, without turning the whole row into a giant pill. */
+body.modern-setting-page .fr-setting-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.modern-setting-page .fr-setting-switch-row.offset-top {
+  margin-top: 31px;
+}
+
+body.modern-setting-page .fr-setting-switch-row:hover {
+  background: transparent;
+}
+
+body.modern-setting-page .fr-setting-switch-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.modern-setting-page .fr-setting-switch-row input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  position: relative !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 18px !important;
+  min-width: 34px !important;
+  min-height: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent) !important;
+  background: rgba(148, 163, 184, 0.42) !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  vertical-align: middle !important;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+body.modern-setting-page .fr-setting-switch-row input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+  top: 50%;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transform: translateY(-50%);
+  transition: transform 0.16s ease;
+}
+
+body.modern-setting-page .fr-setting-switch-row input[type="checkbox"]:checked {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent) !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent) !important;
+}
+
+body.modern-setting-page .fr-setting-switch-row input[type="checkbox"]:checked::before {
+  transform: translate(16px, -50%);
+}
+
+body.modern-setting-page .fr-setting-switch-row input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent) !important;
+}
+
+/* Workshop cards: WBmanager-like summary row and round action icons. */
+body.modern-setting-page .workshop-rule-shell {
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+body.modern-setting-page .workshop-rule-summary {
+  align-items: center;
+  padding: 12px 14px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 58%, transparent),
+      color-mix(in srgb, var(--panel) 86%, transparent));
+}
+
+body.modern-setting-page .workshop-rule-summary-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.modern-setting-page .workshop-rule-actions {
+  flex: 0 0 auto !important;
+  justify-content: flex-end;
+  gap: 7px !important;
+}
+
+body.modern-setting-page .workshop-rule-body {
+  padding: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+body.modern-setting-page .workshop-rule-summary-meta,
+body.modern-setting-page .workshop-rule-summary-text {
+  color: var(--muted);
+}
+
+body.modern-setting-page .workshop-rule-trigger-label,
+body.modern-setting-page .workshop-rule-action-label,
+body.modern-setting-page .workshop-trigger-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin-right: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  color: color-mix(in srgb, var(--accent) 80%, var(--text));
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  font-weight: 800;
+}
+
+body.modern-setting-page .toggle-workshop-rule.fr-collapse-button,
+body.modern-setting-page .toggle-workshop-rule,
+body.modern-setting-page .workshop-rule-actions [data-remove-workshop-rule].fr-danger-button {
+  min-width: 30px !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 0 !important;
+  line-height: 1;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent) !important;
+  background: color-mix(in srgb, var(--input-bg) 72%, transparent) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+body.modern-setting-page .toggle-workshop-rule::before {
+  content: "▾";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.94rem;
+  font-weight: 900;
+  line-height: 1;
+  transform: none !important;
+  transition: none !important;
+}
+
+body.modern-setting-page .workshop-rule-shell.is-collapsed .toggle-workshop-rule::before,
+body.modern-setting-page .workshop-rule-shell[data-collapsed="true"] .toggle-workshop-rule::before {
+  content: "▸";
+  transform: none !important;
+}
+
+body.modern-setting-page .workshop-rule-actions [data-remove-workshop-rule].fr-danger-button::before {
+  content: "×";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+body.modern-setting-page .toggle-workshop-rule:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 9%, var(--input-bg)) !important;
+}
+
+body.modern-setting-page .workshop-rule-actions [data-remove-workshop-rule].fr-danger-button {
+  color: color-mix(in srgb, #9d3d2f 78%, var(--text));
+  border-color: rgba(220, 84, 84, 0.45) !important;
+}
+
+body.modern-setting-page .workshop-rule-actions [data-remove-workshop-rule].fr-danger-button:hover {
+  border-color: rgba(220, 84, 84, 0.8) !important;
+  background: rgba(220, 84, 84, 0.12) !important;
+}
+
+body.modern-setting-page .danger-button:not([data-remove-workshop-rule]),
+body.modern-setting-page .fr-danger-button:not([data-remove-workshop-rule]) {
+  color: color-mix(in srgb, #9d3d2f 78%, var(--text));
+  border-color: color-mix(in srgb, #cf6b5d 30%, var(--border)) !important;
+  background: color-mix(in srgb, #fff2ef 52%, var(--input-bg)) !important;
+}
+
+body.modern-setting-page .preset-pill,
+body.modern-setting-page .fr-static-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--input-bg));
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .03em;
+}
+
+body.modern-setting-page .workshop-rule-shell .workshop-rule-body {
+  display: grid !important;
+}
+
+body.modern-setting-page .workshop-rule-shell[data-collapsed="true"] .workshop-rule-body,
+body.modern-setting-page .workshop-rule-shell.is-collapsed .workshop-rule-body {
+  display: none !important;
+}
+
+body.modern-setting-page .workshop-rule-card {
+  transition: border-color 0.12s ease, box-shadow 0.12s ease !important;
+}
+
+body.modern-setting-page .workshop-rule-card:hover {
+  transform: none !important;
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+}
+
+body.modern-setting-page .workshop-asset-row {
+  align-items: center;
+  padding: 8px 0 2px;
+}
+
+body.modern-setting-page .workshop-asset-pick::before {
+  content: "+";
+  margin-right: 5px;
+  font-weight: 900;
+}
+
+body.modern-setting-page .sprite-frame {
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 62%, transparent);
+}
+
+body.modern-setting-page .topbar-stack {
+  gap: 12px;
+}
+
+body.modern-setting-page .slot-toolbar {
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
+  background: color-mix(in srgb, var(--panel-strong) 72%, transparent);
+}
+
+body.modern-setting-page .slot-badge {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Native file button polish for user avatar and workshop local assets. */
+body.modern-setting-page input[type="file"] {
+  width: 100%;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 70%, transparent);
+}
+
+body.modern-setting-page input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  color: var(--text);
+  font-weight: 760;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+body.modern-setting-page input[type="file"]::file-selector-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-strong));
+}
+
+body.modern-setting-page input[type="range"] {
+  accent-color: var(--accent);
+}
+
+@media (max-width: 768px) {
+  body.modern-setting-page .config-shell.compact {
+    width: min(100% - 16px, 100%);
+  }
+  body.modern-setting-page .stats-row {
+    grid-template-columns: 1fr;
+  }
+  body.modern-setting-page .inline-field,
+  body.modern-setting-page .model-combo-row {
+    flex-direction: column;
+  }
+}
+

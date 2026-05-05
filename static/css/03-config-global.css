@@ -1,0 +1,646 @@
+/* Split from static/styles.css · 03-config-global.css
+   Scope: 全局设置页与工作台公共样式
+   This v121 split preserves cascade order; clean-up comes later. */
+
+/* =========================================================
+   Config Workbench UI v0.8.2
+   UI-only polish for /config. Keeps existing ids and API logic.
+   ========================================================= */
+body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
+  --config-card-alpha: 0.92;
+  --config-card-alpha-strong: 0.96;
+  --config-sticky-top: 18px;
+}
+
+body.modern-setting-page .config-workbench-shell {
+  align-items: start;
+  gap: 18px;
+}
+
+body.modern-setting-page .config-hero-toolbar {
+  margin-bottom: 12px;
+}
+
+body.modern-setting-page .config-sticky-actions {
+  position: sticky;
+  top: 16px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 14px 24px 14px;
+  padding: 14px 16px 14px 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--panel-strong) 88%, transparent 12%),
+      color-mix(in srgb, var(--panel) 78%, transparent 22%)
+    );
+  backdrop-filter: blur(22px) saturate(116%);
+  -webkit-backdrop-filter: blur(22px) saturate(116%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.24),
+    0 16px 34px rgba(72, 50, 35, 0.08);
+}
+
+body.modern-setting-page .config-sticky-copy {
+  min-width: 0;
+}
+
+body.modern-setting-page .config-sticky-kicker {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  margin-bottom: 4px;
+  padding: 0.24rem 0.58rem;
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+}
+
+body.modern-setting-page .config-sticky-copy strong {
+  display: block;
+  font-size: 1.02rem;
+  line-height: 1.25;
+}
+
+body.modern-setting-page .config-sticky-copy .status-line {
+  margin: 5px 0 0;
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+body.modern-setting-page .config-sticky-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+body.modern-setting-page .config-sticky-buttons button {
+  width: auto;
+  min-width: 128px;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+body.modern-setting-page .panel.config-panel {
+  background:
+    linear-gradient(180deg,
+      rgba(var(--panel-strong-rgb), var(--config-card-alpha-strong)),
+      rgba(var(--panel-rgb), var(--config-card-alpha))
+    );
+  backdrop-filter: blur(18px) saturate(108%);
+  -webkit-backdrop-filter: blur(18px) saturate(108%);
+}
+
+body.modern-setting-page .config-primary-panel {
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
+}
+
+body.modern-setting-page .config-overview-grid {
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+}
+
+body.modern-setting-page .config-overview-actions {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+body.modern-setting-page .config-advanced-group {
+  grid-column: 1 / -1;
+  display: block;
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent 18%);
+  background:
+    linear-gradient(180deg,
+      rgba(var(--panel-strong-rgb), 0.80),
+      rgba(var(--panel-rgb), 0.70)
+    );
+  box-shadow: 0 14px 34px rgba(72, 50, 35, 0.07);
+  overflow: hidden;
+}
+
+body.modern-setting-page .config-advanced-summary {
+  list-style: none;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 16px 18px;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.modern-setting-page .config-advanced-summary::-webkit-details-marker {
+  display: none;
+}
+
+body.modern-setting-page .config-advanced-summary::after {
+  content: "展开";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent 22%);
+  background: color-mix(in srgb, var(--input-bg) 72%, transparent 28%);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+body.modern-setting-page .config-advanced-group[open] .config-advanced-summary::after {
+  content: "收起";
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line) 78%);
+}
+
+body.modern-setting-page .config-advanced-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.28rem 0.66rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line) 78%);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  font-size: 0.75rem;
+  font-weight: 850;
+  letter-spacing: 0.10em;
+}
+
+body.modern-setting-page .config-advanced-summary strong {
+  font-size: 1.05rem;
+}
+
+body.modern-setting-page .config-advanced-summary .muted {
+  min-width: 0;
+  font-size: 0.88rem;
+}
+
+body.modern-setting-page .config-retrieval-panel {
+  margin: 0 16px 16px;
+  box-shadow: none;
+}
+
+
+
+
+body.modern-setting-page #save-settings,
+body.modern-setting-page #save-retrieval,
+body.modern-setting-page #test-connection,
+body.modern-setting-page #test-embedding {
+  min-height: 44px;
+}
+
+@media (max-width: 1280px) {
+  body.modern-setting-page .config-overview-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  body.modern-setting-page .config-sticky-actions {
+    position: static;
+    margin: 12px 14px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body.modern-setting-page .config-sticky-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body.modern-setting-page .config-sticky-buttons button {
+    width: 100%;
+  }
+  body.modern-setting-page .config-advanced-summary {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  body.modern-setting-page .config-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Config workbench v2: align with Chat feedback language */
+body.modern-setting-page .config-sticky-actions {
+  position: sticky;
+  top: 12px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 72px;
+  padding: 12px 16px;
+  margin: 12px 0 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line) 76%);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
+    color-mix(in srgb, var(--panel-strong) 82%, transparent 18%);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 40px rgba(80, 53, 35, 0.12);
+}
+
+:root[data-theme="dark"] body.modern-setting-page .config-sticky-actions {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+body.modern-setting-page .config-sticky-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+body.modern-setting-page .config-sticky-kicker {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 0.24rem 0.62rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line) 70%);
+  background: color-mix(in srgb, var(--accent) 11%, transparent 89%);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+body.modern-setting-page .config-sticky-copy strong {
+  font-size: 1.05rem;
+}
+
+body.modern-setting-page .config-sticky-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+body.modern-setting-page .config-workbench-shell {
+  grid-template-columns: minmax(420px, 1fr) minmax(420px, 1fr);
+  align-items: start;
+}
+
+body.modern-setting-page .config-primary-panel,
+body.modern-setting-page .config-appearance-panel {
+  min-height: 100%;
+}
+
+body.modern-setting-page .config-overview-grid {
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+}
+
+body.modern-setting-page .config-overview-actions {
+  margin-top: 12px;
+  justify-content: flex-start;
+}
+
+body.modern-setting-page .danger-action {
+  border-color: color-mix(in srgb, #d65a43 42%, var(--line) 58%) !important;
+  background: color-mix(in srgb, #d65a43 16%, var(--input-bg) 84%) !important;
+  color: color-mix(in srgb, #8f2f21 72%, var(--text) 28%) !important;
+}
+
+body.modern-setting-page .danger-action:hover {
+  background: color-mix(in srgb, #d65a43 24%, var(--input-bg) 76%) !important;
+  border-color: color-mix(in srgb, #d65a43 58%, var(--line) 42%) !important;
+}
+
+:root[data-theme="dark"] body.modern-setting-page .danger-action {
+  color: #ffb3a7 !important;
+  background: color-mix(in srgb, #c84f3f 18%, var(--input-bg) 82%) !important;
+}
+
+body.modern-setting-page .danger-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.2rem;
+}
+
+body.modern-setting-page .task-status {
+  display: inline-flex;
+  width: fit-content;
+  max-width: min(720px, 100%);
+  min-height: 34px;
+  align-items: center;
+  gap: 0.52rem;
+  padding: 0.45rem 0.78rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent 18%);
+  background: color-mix(in srgb, var(--input-bg) 70%, transparent 30%);
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent);
+}
+
+body.modern-setting-page .task-status::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 70%, transparent 30%);
+  flex: 0 0 auto;
+}
+
+body.modern-setting-page .task-status.is-busy {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line) 66%);
+  color: color-mix(in srgb, var(--accent) 76%, var(--text) 24%);
+  background: color-mix(in srgb, var(--accent) 10%, var(--input-bg) 90%);
+}
+
+body.modern-setting-page .task-status.is-busy::before {
+  width: 0.68rem;
+  height: 0.68rem;
+  border: 2px solid color-mix(in srgb, var(--accent) 24%, transparent 76%);
+  border-top-color: var(--accent);
+  background: transparent;
+  animation: config-spin 0.78s linear infinite;
+}
+
+body.modern-setting-page .task-status.is-success {
+  border-color: color-mix(in srgb, #68ad7b 38%, var(--line) 62%);
+  color: color-mix(in srgb, #3a8750 72%, var(--text) 28%);
+  background: color-mix(in srgb, #68ad7b 12%, var(--input-bg) 88%);
+}
+
+body.modern-setting-page .task-status.is-success::before {
+  content: "✓";
+  width: 1rem;
+  height: 1rem;
+  display: inline-grid;
+  place-items: center;
+  color: #3a8750;
+  background: color-mix(in srgb, #68ad7b 18%, transparent 82%);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+body.modern-setting-page .task-status.is-error {
+  border-color: color-mix(in srgb, #d65a43 42%, var(--line) 58%);
+  color: color-mix(in srgb, #b43f30 78%, var(--text) 22%);
+  background: color-mix(in srgb, #d65a43 11%, var(--input-bg) 89%);
+}
+
+body.modern-setting-page .task-status.is-error::before {
+  content: "!";
+  width: 1rem;
+  height: 1rem;
+  display: inline-grid;
+  place-items: center;
+  color: #b43f30;
+  background: color-mix(in srgb, #d65a43 18%, transparent 82%);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+@keyframes config-spin {
+  to { transform: rotate(360deg); }
+}
+
+body.modern-setting-page button.is-loading,
+body.modern-setting-page a.secondary.is-loading {
+  opacity: 0.82;
+  cursor: wait;
+  transform: none !important;
+}
+
+body.modern-setting-page button.is-loading::before {
+  content: "";
+  display: inline-block;
+  width: 0.82em;
+  height: 0.82em;
+  margin-right: 0.5em;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent 75%);
+  border-top-color: currentColor;
+  vertical-align: -0.1em;
+  animation: config-spin 0.78s linear infinite;
+}
+
+body.modern-setting-page button.is-success {
+  background: color-mix(in srgb, #68ad7b 58%, var(--accent) 42%) !important;
+  color: #fff !important;
+}
+
+body.modern-setting-page button.is-error {
+  background: color-mix(in srgb, #d65a43 74%, var(--accent) 26%) !important;
+  color: #fff !important;
+  animation: config-shake 0.28s ease;
+}
+
+@keyframes config-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+body.modern-setting-page .config-toast-host.toast-host {
+  position: fixed;
+  right: 22px;
+  bottom: 24px;
+  z-index: 260;
+}
+
+body.modern-setting-page .app-toast {
+  min-width: min(320px, calc(100vw - 44px));
+}
+
+body.modern-setting-page .config-advanced-group {
+  margin-top: 0;
+}
+
+body.modern-setting-page .config-advanced-summary {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%),
+    color-mix(in srgb, var(--panel-strong) 78%, transparent 22%);
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page .config-workbench-shell {
+    grid-template-columns: 1fr;
+  }
+  body.modern-setting-page .config-overview-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  body.modern-setting-page .config-sticky-actions {
+    position: relative;
+    top: auto;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  body.modern-setting-page .config-sticky-buttons {
+    justify-content: stretch;
+  }
+  body.modern-setting-page .config-sticky-buttons button {
+    flex: 1 1 100%;
+  }
+  body.modern-setting-page .config-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   Config Workbench v0.8.4 cleanup
+   - compact aligned workbench
+   - real small toast, not a stretched panel
+   - keep /config functionality unchanged
+   ========================================================= */
+body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
+  --config-main-width: min(1480px, calc(100vw - var(--app-sidebar-width) - 48px));
+}
+
+body.modern-setting-page .topbar-stack > .slot-toolbar.config-hero-toolbar,
+body.modern-setting-page .config-sticky-actions,
+body.modern-setting-page .config-shell.compact.config-workbench-shell {
+  width: var(--config-main-width) !important;
+  max-width: var(--config-main-width) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+body.modern-setting-page .topbar-stack > .slot-toolbar.config-hero-toolbar {
+  margin-top: 18px !important;
+  margin-bottom: 10px !important;
+}
+
+body.modern-setting-page .config-sticky-actions {
+  min-height: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 14px !important;
+  padding: 10px 14px 10px 16px !important;
+  border-radius: 20px !important;
+  align-items: center !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    0 12px 26px rgba(72, 50, 35, 0.075) !important;
+}
+
+body.modern-setting-page .config-sticky-copy {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, auto) minmax(240px, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+body.modern-setting-page .config-sticky-kicker {
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
+body.modern-setting-page .config-sticky-copy strong {
+  font-size: 0.96rem !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+
+body.modern-setting-page .config-sticky-copy .task-status,
+body.modern-setting-page #status-text.task-status {
+  min-height: 30px !important;
+  padding: 0.34rem 0.68rem !important;
+  font-size: 0.82rem !important;
+  max-width: 100% !important;
+}
+
+body.modern-setting-page .config-sticky-buttons {
+  flex: 0 0 auto !important;
+  gap: 8px !important;
+}
+
+body.modern-setting-page .config-sticky-buttons button {
+  min-height: 36px !important;
+  padding: 8px 13px !important;
+  border-radius: 999px !important;
+}
+
+/* Fix: the global toast host has top:24px; if bottom is added without clearing top,
+   CSS grid stretches the toast into a tall blank panel. */
+body.modern-setting-page .config-toast-host.toast-host {
+  top: auto !important;
+  left: auto !important;
+  right: 22px !important;
+  bottom: 22px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  width: auto !important;
+  max-width: min(360px, calc(100vw - 44px)) !important;
+  pointer-events: none !important;
+}
+
+body.modern-setting-page .config-toast-host .app-toast,
+body.modern-setting-page .app-toast {
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: min(340px, calc(100vw - 44px)) !important;
+  min-height: 0 !important;
+  padding: 10px 13px !important;
+  border-radius: 14px !important;
+  line-height: 1.45 !important;
+  white-space: normal !important;
+  align-self: flex-end !important;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
+    --config-main-width: min(100%, calc(100vw - var(--app-sidebar-width) - 32px));
+  }
+  body.modern-setting-page .config-sticky-copy {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+  }
+  body.modern-setting-page .config-sticky-actions {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+  body.modern-setting-page .config-sticky-buttons {
+    justify-content: flex-start !important;
+  }
+}
+
+@media (max-width: 980px) {
+  body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
+    --config-main-width: calc(100vw - 28px);
+  }
+  body.modern-setting-page .topbar-stack > .slot-toolbar.config-hero-toolbar,
+  body.modern-setting-page .config-sticky-actions,
+  body.modern-setting-page .config-shell.compact.config-workbench-shell {
+    width: var(--config-main-width) !important;
+    max-width: var(--config-main-width) !important;
+  }
+  body.modern-setting-page .config-toast-host.toast-host {
+    right: 14px !important;
+    bottom: 14px !important;
+    max-width: calc(100vw - 28px) !important;
+  }
+}
+
+

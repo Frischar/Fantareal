@@ -1,0 +1,67 @@
+/* Split from static/styles.css · 05-config-helpers.css
+   Scope: 从模板移出的本地辅助样式
+   This v121 split preserves cascade order; clean-up comes later. */
+
+/* =========================================================
+   Config local helpers moved out of templates
+   ========================================================= */
+[hidden] {
+  display: none !important;
+}
+
+.model-combo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+.model-combo > input {
+  flex: 1 1 auto;
+}
+.model-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  box-shadow: var(--shadow-soft);
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.model-menu-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: var(--text);
+  padding: 0.7rem 0.8rem;
+  cursor: pointer;
+}
+.model-menu-item:hover {
+  background: var(--input-bg);
+}
+.model-menu-empty {
+  color: var(--muted);
+  padding: 0.7rem 0.8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.modern-setting-page *,
+  body.modern-setting-page *::before,
+  body.modern-setting-page *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
