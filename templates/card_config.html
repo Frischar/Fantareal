@@ -319,7 +319,9 @@
   <body class="modern-setting-page card-config-page app-sidebar-shell">
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/chat">Fantareal</a>
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
         {% include "_grouped_nav.html" %}
       </div>
             <div class="slot-toolbar">
@@ -348,7 +350,7 @@
             </div>
             <div class="card-workbench-status" aria-live="polite">
               <span class="card-status-dot"></span>
-              <p id="status-text" class="muted status-line">就绪</p>
+              <p id="status-text" class="muted status-line" data-state="success">就绪</p>
             </div>
           </div>
 
@@ -518,10 +520,20 @@
       const initialWorkshopTemp = Number({{ workshop_state.temp or 0 }}) || 0;
       let currentWorkshop = null;
 
+      function inferStatusState(text, state = "") {
+        if (state) return state;
+        const value = String(text || "");
+        if (/失败|错误|不能|没有选择|内容为空/.test(value)) return "error";
+        if (/正在|上传中|保存中|加载中|读取中|导入中|导出中/.test(value)) return "saving";
+        if (/修改|未保存|尚未保存/.test(value)) return "dirty";
+        return "success";
+      }
+
       function setStatus(text, state = "") {
         if (!statusEl) return;
+        const resolvedState = inferStatusState(text, state);
         statusEl.textContent = text;
-        statusEl.dataset.state = state;
+        statusEl.dataset.state = resolvedState;
       }
 
       function markCardDirty() {
@@ -1308,26 +1320,29 @@
 
       document.getElementById("save-card").addEventListener("click", async () => {
         try {
+          setStatus("正在保存并加载角色卡...", "saving");
           await saveCard();
         } catch (error) {
-          setStatus(`保存失败：${error.message}`);
+          setStatus(`保存失败：${error.message}`, "error");
         }
       });
 
       document.getElementById("load-card").addEventListener("click", async () => {
         try {
+          setStatus("正在加载角色卡...", "saving");
           await loadCard();
         } catch (error) {
-          setStatus(`加载失败：${error.message}`);
+          setStatus(`加载失败：${error.message}`, "error");
         }
       });
 
       document.getElementById("refresh-cards").addEventListener("click", async () => {
         try {
+          setStatus("正在刷新角色卡列表...", "saving");
           await refreshCardList();
-          setStatus("角色卡列表已刷新。");
+          setStatus("角色卡列表已刷新。", "success");
         } catch (error) {
-          setStatus(`刷新失败：${error.message}`);
+          setStatus(`刷新失败：${error.message}`, "error");
         }
       });
 
@@ -1471,9 +1486,10 @@
         if (!file) return;
 
         try {
+          setStatus("正在导入本地角色卡...", "saving");
           await importLocalCardFile(file);
         } catch (error) {
-          setStatus(`导入失败：${error.message}`);
+          setStatus(`导入失败：${error.message}`, "error");
         } finally {
           event.target.value = "";
         }
@@ -1484,9 +1500,10 @@
           return;
         }
         try {
+          setStatus("正在加载角色卡...", "saving");
           await loadCard();
         } catch (error) {
-          setStatus(`加载失败：${error.message}`);
+          setStatus(`加载失败：${error.message}`, "error");
         }
       });
 

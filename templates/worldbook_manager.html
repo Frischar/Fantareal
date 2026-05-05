@@ -1861,19 +1861,6 @@
         background: rgba(194, 71, 58, 0.94);
       }
 
-      body.worldbook-manager-page .topbar-stack .brand {
-        min-height: 58px;
-        border-radius: 18px;
-        background: rgba(255, 250, 244, 0.72);
-        box-shadow: 0 10px 24px rgba(72, 50, 35, 0.07), inset 0 1px 0 rgba(255,255,255,0.34);
-      }
-
-      body.worldbook-manager-page .topbar-stack .brand::before {
-        width: 38px;
-        height: 38px;
-        border-radius: 999px;
-      }
-
       body.worldbook-manager-page .worldbook-quick-filter-button:hover,
       body.worldbook-manager-page .worldbook-health-chip:hover,
       body.worldbook-manager-page .worldbook-tool-toggle:hover,
@@ -1963,12 +1950,6 @@
         color: #ff9c94;
       }
 
-      html[data-theme="dark"] body.worldbook-manager-page .topbar-stack .brand {
-        background: rgba(18, 29, 41, 0.72);
-        border-color: rgba(126, 149, 169, 0.22);
-        box-shadow: 0 12px 28px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06);
-      }
-
       html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card input:not([type="checkbox"]):not([type="radio"]),
       html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card select,
       html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card textarea,
@@ -1996,67 +1977,14 @@
           grid-template-columns: 1fr;
         }
       }
-
-      /* ================================
-         Worldbook Manager v1.1.2 brand fix
-         - Keep checkbox repair from v109.
-         - Brand card uses flex layout like other config pages, without clipping text.
-         ================================ */
-      body.app-sidebar-shell.worldbook-manager-page:not(.chat-page) .topbar-stack .brand {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 8px !important;
-        min-height: 58px !important;
-        height: auto !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-        padding: 9px 10px !important;
-        border-radius: 17px !important;
-        border: 1px solid rgba(160, 116, 84, 0.24) !important;
-        background: rgba(255, 250, 244, 0.74) !important;
-        color: var(--text) !important;
-        font-size: 22px !important;
-        letter-spacing: 0.02em !important;
-        line-height: 1 !important;
-        white-space: nowrap !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        box-shadow: 0 10px 24px rgba(72, 50, 35, 0.07), inset 0 1px 0 rgba(255,255,255,0.36) !important;
-        transform: none !important;
-      }
-
-      body.app-sidebar-shell.worldbook-manager-page:not(.chat-page) .topbar-stack .brand::before {
-        position: static !important;
-        content: "" !important;
-        flex: 0 0 36px !important;
-        width: 36px !important;
-        height: 36px !important;
-        border-radius: 12px !important;
-        background: url("/static/fantareal_icon.ico") center / cover no-repeat, rgba(255, 252, 248, 0.94) !important;
-        border: 1px solid rgba(190, 152, 121, 0.24) !important;
-        box-shadow: 0 2px 8px rgba(96, 63, 35, 0.10) !important;
-        opacity: 1 !important;
-      }
-
-      body.app-sidebar-shell.worldbook-manager-page:not(.chat-page) .topbar-stack .brand:hover {
-        background: rgba(255, 250, 244, 0.82) !important;
-        border-color: rgba(160, 116, 84, 0.32) !important;
-        transform: none !important;
-      }
-
-      html[data-theme="dark"] body.app-sidebar-shell.worldbook-manager-page:not(.chat-page) .topbar-stack .brand {
-        background: rgba(18, 29, 41, 0.74) !important;
-        border-color: rgba(126, 149, 169, 0.24) !important;
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.06) !important;
-      }
 </style>
   </head>
   <body class="app-sidebar-shell worldbook-manager-page">
     <div class="topbar-stack">
       <div class="topbar">
-        <a class="brand" href="/chat">Fantareal</a>
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
         {% include "_grouped_nav.html" %}
       </div>
       <div class="slot-toolbar">
