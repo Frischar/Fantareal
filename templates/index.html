@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico" />
-    <link rel="stylesheet" href="/static/styles.css?v=global-sidebar-v081" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v128" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=ttsvoice-chip-v1" data-mod-hook="{{ mod.slug }}" />
@@ -1408,10 +1408,15 @@
         rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
         rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
 
+        const clearMode = opacity <= 0.21;
+        bodyEl.classList.toggle("chat-clear-mode", clearMode);
+
         const readingMaskAlpha = theme === "dark"
           ? Math.min(0.42, 0.18 + opacity * 0.22)
           : Math.min(0.62, 0.28 + opacity * 0.30);
-        rootEl.style.setProperty("--chat-reading-mask-alpha", readingMaskAlpha.toFixed(2));
+        const readingMaskBlur = theme === "dark" ? "8px" : "7px";
+        rootEl.style.setProperty("--chat-reading-mask-alpha", clearMode ? "0" : readingMaskAlpha.toFixed(2));
+        rootEl.style.setProperty("--chat-reading-mask-blur", clearMode ? "0px" : readingMaskBlur);
       }
 
       function applyBackground(url, overlay) {
