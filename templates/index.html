@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico" />
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v128" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=ttsvoice-chip-v1" data-mod-hook="{{ mod.slug }}" />
@@ -576,6 +576,9 @@
               <p id="chat-subtitle" class="chat-greeting-scroll">角色卡已加载。</p>
             </div>
             <div class="header-actions">
+              <button id="workshop-opening-audio-toggle" type="button" class="secondary compact icon-button workshop-opening-audio-toggle" aria-label="开场音乐：暂停" title="开场音乐：暂停" hidden>
+                <span id="workshop-opening-audio-toggle-icon" aria-hidden="true">🔊</span>
+              </button>
               <button id="open-drawer-secondary" type="button" class="secondary compact icon-button config-gear-button" aria-label="运行配置" title="运行配置" aria-expanded="false" aria-controls="config-drawer">
                 <span aria-hidden="true">⚙</span>
               </button>
@@ -827,7 +830,23 @@
         </div>
       </div>
     </div>
+    {% if show_workshop_opening and workshop_opening %}
+    <div id="workshop-opening-overlay" class="workshop-opening-overlay workshop-opening-animation-{{ workshop_opening.animation or 'fade' }}" aria-modal="true" role="dialog" aria-labelledby="workshop-opening-title">
+      <div class="workshop-opening-backdrop"></div>
+      <section class="workshop-opening-card" {% if workshop_opening.coverImage %}style="--workshop-opening-cover: url('{{ workshop_opening.coverImage }}');"{% endif %}>
+        <div class="workshop-opening-cover" aria-hidden="true"></div>
+        <div class="workshop-opening-shade" aria-hidden="true"></div>
+        <div class="workshop-opening-content">
+          <p class="eyebrow">创意工坊 · 开场演出</p>
+          <h1 id="workshop-opening-title">{{ workshop_opening.title or persona.name or "Fantareal" }}</h1>
+          {% if workshop_opening.subtitle %}<p class="workshop-opening-subtitle">{{ workshop_opening.subtitle }}</p>{% endif %}
+          <button id="workshop-opening-start" class="workshop-opening-start" type="button">{{ workshop_opening.buttonText or "进入故事" }}</button>
+        </div>
+      </section>
+    </div>
+    {% endif %}
     <audio id="workshop-audio-player" preload="auto"></audio>
+    <audio id="workshop-opening-audio" preload="auto"></audio>
     <div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>
 
     <div id="drawer-overlay" class="drawer-overlay" hidden></div>
@@ -1046,6 +1065,17 @@
       const workshopModalCloseEl = document.getElementById("workshop-modal-close");
       const workshopModalConfirmEl = document.getElementById("workshop-modal-confirm");
       const workshopAudioEl = document.getElementById("workshop-audio-player");
+      const workshopOpeningOverlayEl = document.getElementById("workshop-opening-overlay");
+      const workshopOpeningStartEl = document.getElementById("workshop-opening-start");
+      const workshopOpeningAudioEl = document.getElementById("workshop-opening-audio");
+      const workshopOpeningAudioToggleEl = document.getElementById("workshop-opening-audio-toggle");
+      const workshopOpeningAudioToggleIconEl = document.getElementById("workshop-opening-audio-toggle-icon");
+      const workshopOpeningConfig = {{ workshop_opening | tojson }};
+      const shouldShowWorkshopOpening = {{ show_workshop_opening | tojson }};
+      let workshopOpeningEntering = false;
+      let workshopOpeningMusicStarted = false;
+      let workshopOpeningAudioFadeTimer = null;
+      const WORKSHOP_OPENING_FADE_MS = 420;
       const WORKSHOP_MUSIC_PRESETS = [
         { id: "off", label: "关闭", url: "" },
         { id: "coffee", label: "咖啡馆氛围", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
@@ -2816,6 +2846,120 @@
         }
       }
 
+      function clampAudioVolume(value, fallback = 0.65) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return fallback;
+        return Math.min(Math.max(numeric, 0), 1);
+      }
+
+      function hasWorkshopOpeningMusic() {
+        return Boolean(String(workshopOpeningConfig?.musicUrl || "").trim());
+      }
+
+      function updateWorkshopOpeningAudioToggle() {
+        if (!workshopOpeningAudioToggleEl || !workshopOpeningAudioEl) return;
+        const shouldShow = hasWorkshopOpeningMusic() && workshopOpeningMusicStarted;
+        workshopOpeningAudioToggleEl.hidden = !shouldShow;
+        if (!shouldShow) return;
+        const paused = workshopOpeningAudioEl.paused;
+        const label = paused ? "开场音乐：播放" : "开场音乐：暂停";
+        workshopOpeningAudioToggleEl.setAttribute("aria-label", label);
+        workshopOpeningAudioToggleEl.setAttribute("title", label);
+        workshopOpeningAudioToggleEl.classList.toggle("is-paused", paused);
+        if (workshopOpeningAudioToggleIconEl) {
+          workshopOpeningAudioToggleIconEl.textContent = paused ? "🔇" : "🔊";
+        }
+      }
+
+      function fadeWorkshopOpeningAudio(targetVolume, duration = WORKSHOP_OPENING_FADE_MS) {
+        if (!workshopOpeningAudioEl) return Promise.resolve();
+        if (workshopOpeningAudioFadeTimer) {
+          window.clearInterval(workshopOpeningAudioFadeTimer);
+          workshopOpeningAudioFadeTimer = null;
+        }
+        const target = clampAudioVolume(targetVolume, 0.65);
+        const start = clampAudioVolume(workshopOpeningAudioEl.volume, 0);
+        const startedAt = performance.now();
+        if (duration <= 0 || Math.abs(start - target) < 0.01) {
+          workshopOpeningAudioEl.volume = target;
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+          workshopOpeningAudioFadeTimer = window.setInterval(() => {
+            const progress = Math.min((performance.now() - startedAt) / duration, 1);
+            workshopOpeningAudioEl.volume = start + (target - start) * progress;
+            if (progress >= 1) {
+              window.clearInterval(workshopOpeningAudioFadeTimer);
+              workshopOpeningAudioFadeTimer = null;
+              workshopOpeningAudioEl.volume = target;
+              resolve();
+            }
+          }, 32);
+        });
+      }
+
+      function playWorkshopOpeningMusic() {
+        if (!workshopOpeningAudioEl || !workshopOpeningConfig?.musicUrl) return Promise.resolve();
+        const nextUrl = String(workshopOpeningConfig.musicUrl || "").trim();
+        if (!nextUrl) return Promise.resolve();
+        const targetVolume = clampAudioVolume(workshopOpeningConfig.volume, 0.65);
+        workshopOpeningAudioEl.loop = true;
+        if (workshopOpeningAudioEl.src !== nextUrl) {
+          workshopOpeningAudioEl.src = nextUrl;
+          workshopOpeningAudioEl.load();
+        }
+        workshopOpeningAudioEl.volume = 0;
+        workshopOpeningMusicStarted = true;
+        updateWorkshopOpeningAudioToggle();
+        return workshopOpeningAudioEl.play().then(() => {
+          updateWorkshopOpeningAudioToggle();
+          return fadeWorkshopOpeningAudio(targetVolume, WORKSHOP_OPENING_FADE_MS);
+        }).then(updateWorkshopOpeningAudioToggle).catch(() => {
+          updateWorkshopOpeningAudioToggle();
+          setStatus("开场音乐播放失败，请检查音频文件或浏览器权限。");
+        });
+      }
+
+      function toggleWorkshopOpeningMusic() {
+        if (!workshopOpeningAudioEl || !hasWorkshopOpeningMusic() || !workshopOpeningMusicStarted) return;
+        const targetVolume = clampAudioVolume(workshopOpeningConfig.volume, 0.65);
+        if (workshopOpeningAudioEl.paused) {
+          workshopOpeningAudioEl.volume = 0;
+          workshopOpeningAudioEl.play().then(() => {
+            updateWorkshopOpeningAudioToggle();
+            return fadeWorkshopOpeningAudio(targetVolume, WORKSHOP_OPENING_FADE_MS);
+          }).then(updateWorkshopOpeningAudioToggle).catch(() => {
+            setStatus("开场音乐播放失败，请检查音频文件或浏览器权限。");
+            updateWorkshopOpeningAudioToggle();
+          });
+        } else {
+          fadeWorkshopOpeningAudio(0, WORKSHOP_OPENING_FADE_MS).then(() => {
+            workshopOpeningAudioEl.pause();
+            updateWorkshopOpeningAudioToggle();
+          });
+        }
+      }
+
+      async function enterWorkshopOpening() {
+        if (!workshopOpeningOverlayEl || workshopOpeningEntering) return;
+        workshopOpeningEntering = true;
+        workshopOpeningStartEl?.setAttribute("disabled", "disabled");
+        await playWorkshopOpeningMusic();
+        workshopOpeningOverlayEl.classList.add("is-leaving");
+        window.setTimeout(() => {
+          workshopOpeningOverlayEl.remove();
+          bodyEl.classList.remove("workshop-opening-active");
+          inputEl?.focus();
+        }, 760);
+      }
+
+      function initWorkshopOpening() {
+        if (!shouldShowWorkshopOpening || !workshopOpeningOverlayEl) return;
+        bodyEl.classList.add("workshop-opening-active");
+        window.setTimeout(() => workshopOpeningStartEl?.focus(), 80);
+        workshopOpeningStartEl?.addEventListener("click", enterWorkshopOpening, { once: true });
+      }
+
       function getWorkshopStageLabel(stage) {
         const mapping = {
           A: "A 阶段",
@@ -3295,7 +3439,12 @@
           hideWorkshopImagePopup();
         }
       });
+      workshopOpeningAudioToggleEl?.addEventListener("click", toggleWorkshopOpeningMusic);
+      workshopOpeningAudioEl?.addEventListener("play", updateWorkshopOpeningAudioToggle);
+      workshopOpeningAudioEl?.addEventListener("pause", updateWorkshopOpeningAudioToggle);
+      workshopOpeningAudioEl?.addEventListener("volumechange", updateWorkshopOpeningAudioToggle);
 
+      initWorkshopOpening();
       applyTheme(runtimeState.theme);
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);

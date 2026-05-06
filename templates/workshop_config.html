@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>创意工坊 - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v127" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
 </head>
   <body class="modern-setting-page app-sidebar-shell workshop-config-page">
     <div id="workshop-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
@@ -29,9 +29,90 @@
     <div class="config-shell compact config-workbench-shell workshop-workbench-shell workshop-layout-b">
       <section class="panel config-panel workshop-main-card">
         <div class="section-head workshop-section-head">
+          <p class="eyebrow">Opening / Rules</p>
+          <h2>开场演出与工坊规则</h2>
+          <p class="muted">开场演出是独立新模块；封面图、开场音乐和进入按钮不会写进提示词，只负责进入 Chat 时的前端演出。</p>
+        </div>
+
+        <div id="workshop-opening-config" class="workshop-opening-config-block workshop-panel-block">
+          <div class="workshop-opening-config-head">
+            <div>
+              <p class="eyebrow">Opening</p>
+              <h3>开场演出</h3>
+              <p class="muted compact">新对话第一次进入 Chat 时显示封面；点击按钮后播放音乐并进入 first_mes。</p>
+            </div>
+            <label class="checkbox-row workshop-opening-enabled-row"><input id="workshop-opening-enabled" type="checkbox" /> 启用开场演出</label>
+          </div>
+
+          <div class="grid-two workshop-opening-fields">
+            <div>
+              <label for="workshop-opening-title">开场标题</label>
+              <input id="workshop-opening-title" type="text" placeholder="留空则使用角色名" />
+            </div>
+            <div>
+              <label for="workshop-opening-button-text">进入按钮文字</label>
+              <input id="workshop-opening-button-text" type="text" maxlength="24" placeholder="进入故事 / 入梦 / 启程" />
+            </div>
+          </div>
+
+          <label for="workshop-opening-subtitle">开场副标题</label>
+          <textarea id="workshop-opening-subtitle" rows="2" placeholder="例如：重逢与试探，自此始。"></textarea>
+
+          <div class="grid-two workshop-opening-fields">
+            <div>
+              <label for="workshop-opening-animation">动画模板</label>
+              <select id="workshop-opening-animation">
+                <option value="fade">默认淡入</option>
+                <option value="push">镜头推进</option>
+                <option value="black">黑场显现</option>
+                <option value="dream">旧梦浮现</option>
+                <option value="curtain">幕布展开</option>
+                <option value="still">静止封面</option>
+              </select>
+            </div>
+            <p class="muted compact workshop-opening-animation-hint">只影响封面入场和退场效果，不影响提示词、聊天内容或角色卡阶段。</p>
+          </div>
+
+          <div class="grid-two workshop-opening-media-grid">
+            <div class="workshop-opening-media-card">
+              <label for="workshop-opening-cover-image">封面图地址</label>
+              <input id="workshop-opening-cover-image" type="text" placeholder="上传后自动回填，或粘贴图片地址" />
+              <div class="button-row workshop-asset-row">
+                <button id="workshop-opening-cover-pick" class="secondary compact" type="button">选择本地封面图</button>
+                <button id="workshop-opening-cover-clear" class="secondary compact ghost" type="button">清除封面</button>
+                <input id="workshop-opening-cover-file" type="file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif" hidden />
+                <span class="muted compact">上传或清除后需保存工坊</span>
+              </div>
+              <div class="workshop-opening-preview-wrap">
+                <img id="workshop-opening-cover-preview" class="workshop-opening-cover-preview" loading="lazy" decoding="async" alt="开场封面预览" hidden />
+              </div>
+              <p class="workshop-opening-cover-tip">推荐 16:9 横图；主体尽量放在中间偏右，左下留给标题和按钮。</p>
+            </div>
+
+            <div class="workshop-opening-media-card">
+              <label for="workshop-opening-music-url">开场音乐地址</label>
+              <input id="workshop-opening-music-url" type="text" placeholder="上传后自动回填，或粘贴音乐地址" />
+              <div class="button-row workshop-asset-row">
+                <button id="workshop-opening-music-pick" class="secondary compact" type="button">选择本地音乐</button>
+                <button id="workshop-opening-music-clear" class="secondary compact ghost" type="button">清除音乐</button>
+                <input id="workshop-opening-music-file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm" hidden />
+                <span class="muted compact">点击进入故事后播放</span>
+              </div>
+              <label for="workshop-opening-volume">开场音乐音量</label>
+              <input id="workshop-opening-volume" type="range" min="0" max="1" step="0.01" />
+            </div>
+          </div>
+
+          <div class="workshop-opening-preview-actions">
+            <button id="preview-workshop-opening" class="secondary compact" type="button">测试开场</button>
+            <span class="muted compact">只预览封面、标题、按钮和音乐；不会触发 first_mes，也不会改变聊天记录。</span>
+          </div>
+        </div>
+
+        <div class="section-head workshop-section-head workshop-rules-subhead">
           <p class="eyebrow">Rules</p>
           <h2>工坊规则</h2>
-          <p class="muted">左侧专注编辑规则列表；右侧工坊面板负责状态、搜索、启用与保存。</p>
+          <p class="muted">现有阶段规则和自定义 Temp 规则保持原逻辑，本次不混入开场演出。</p>
         </div>
         <div id="workshop-rule-list" class="stack-list workshop-rule-list-modern"></div>
       </section>
@@ -56,6 +137,10 @@
           <div class="workshop-summary-item">
             <span>工坊开关</span>
             <strong id="workshop-enabled-state">未启用</strong>
+          </div>
+          <div class="workshop-summary-item">
+            <span>开场演出</span>
+            <strong id="workshop-opening-state">未启用</strong>
           </div>
         </div>
 
@@ -103,6 +188,18 @@
       const toastHostEl = document.getElementById("workshop-toast-host");
       const workshopRuleCountEl = document.getElementById("workshop-rule-count");
       const workshopEnabledStateEl = document.getElementById("workshop-enabled-state");
+      const workshopOpeningStateEl = document.getElementById("workshop-opening-state");
+      const workshopOpeningEnabledEl = document.getElementById("workshop-opening-enabled");
+      const workshopOpeningTitleEl = document.getElementById("workshop-opening-title");
+      const workshopOpeningSubtitleEl = document.getElementById("workshop-opening-subtitle");
+      const workshopOpeningButtonTextEl = document.getElementById("workshop-opening-button-text");
+      const workshopOpeningAnimationEl = document.getElementById("workshop-opening-animation");
+      const workshopOpeningCoverImageEl = document.getElementById("workshop-opening-cover-image");
+      const workshopOpeningMusicUrlEl = document.getElementById("workshop-opening-music-url");
+      const workshopOpeningVolumeEl = document.getElementById("workshop-opening-volume");
+      const workshopOpeningCoverPreviewEl = document.getElementById("workshop-opening-cover-preview");
+      const previewWorkshopOpeningBtn = document.getElementById("preview-workshop-opening");
+      let workshopOpeningPreviewAudio = null;
       let currentWorkshop = null;
 
       const MUSIC_PRESETS = [
@@ -152,6 +249,11 @@
       function setButtonState(button, state = "idle", label = "") {
         if (!button) return;
         const defaultLabel = rememberButtonLabel(button);
+        if (button.dataset.stateTimer) {
+          window.clearTimeout(Number(button.dataset.stateTimer));
+          delete button.dataset.stateTimer;
+        }
+        button.dataset.buttonState = state;
         button.classList.remove("is-loading", "is-success", "is-error");
         button.disabled = state === "loading";
         if (state === "loading") {
@@ -160,18 +262,41 @@
           return;
         }
         if (state === "success") {
+          button.disabled = false;
           button.classList.add("is-success");
           button.textContent = label || "已完成 ✓";
-          window.setTimeout(() => setButtonState(button, "idle"), 1200);
+          button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1200));
           return;
         }
         if (state === "error") {
+          button.disabled = false;
           button.classList.add("is-error");
           button.textContent = label || "操作失败";
-          window.setTimeout(() => setButtonState(button, "idle"), 1500);
+          button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1500));
           return;
         }
+        button.disabled = false;
+        delete button.dataset.buttonState;
         button.textContent = defaultLabel;
+      }
+
+      function ensureButtonReleased(button, fallbackLabel = "") {
+        if (!button) return;
+        const text = String(button.textContent || "");
+        const isLocked = button.disabled
+          || button.classList.contains("is-loading")
+          || button.dataset.buttonState === "loading"
+          || text.includes("保存中")
+          || text.includes("读取中");
+        if (!isLocked) return;
+        if (button.dataset.stateTimer) {
+          window.clearTimeout(Number(button.dataset.stateTimer));
+          delete button.dataset.stateTimer;
+        }
+        button.classList.remove("is-loading", "is-error");
+        button.disabled = false;
+        button.textContent = button.dataset.defaultLabel || fallbackLabel || "操作";
+        delete button.dataset.buttonState;
       }
 
       function updateWorkshopPanelStats() {
@@ -179,6 +304,7 @@
         const enabled = workshopEnabledEl?.checked !== false;
         if (workshopRuleCountEl) workshopRuleCountEl.textContent = String(total);
         if (workshopEnabledStateEl) workshopEnabledStateEl.textContent = enabled ? "已启用" : "未启用";
+        if (workshopOpeningStateEl) workshopOpeningStateEl.textContent = workshopOpeningEnabledEl?.checked ? "已启用" : "未启用";
       }
 
       function applyTheme(theme) {
@@ -215,6 +341,16 @@
           throw new Error(data.detail || "请求失败");
         }
         return response.json();
+      }
+
+      function withTimeout(promise, ms = 8000, message = "请求超时") {
+        let timer = null;
+        const timeout = new Promise((_, reject) => {
+          timer = window.setTimeout(() => reject(new Error(message)), ms);
+        });
+        return Promise.race([promise, timeout]).finally(() => {
+          if (timer) window.clearTimeout(timer);
+        });
       }
 
       function escapeHtml(value) {
@@ -292,6 +428,180 @@
         return response.json();
       }
 
+      const WORKSHOP_OPENING_ANIMATIONS = new Set(["fade", "push", "black", "dream", "curtain", "still"]);
+
+      function normalizeWorkshopOpeningAnimation(value) {
+        const animation = String(value || "fade").trim().toLowerCase();
+        return WORKSHOP_OPENING_ANIMATIONS.has(animation) ? animation : "fade";
+      }
+
+      function createDefaultWorkshopOpening() {
+        return {
+          enabled: false,
+          title: "",
+          subtitle: "",
+          coverImage: "",
+          musicUrl: "",
+          buttonText: "进入故事",
+          volume: 0.65,
+          animation: "fade",
+        };
+      }
+
+      function normalizeWorkshopOpening(opening) {
+        const base = createDefaultWorkshopOpening();
+        if (!opening || typeof opening !== "object") return base;
+        const buttonText = String(opening.buttonText || "").trim().slice(0, 24);
+        return {
+          enabled: opening.enabled === true,
+          title: String(opening.title || "").trim().slice(0, 80),
+          subtitle: String(opening.subtitle || "").trim().slice(0, 160),
+          coverImage: String(opening.coverImage || opening.coverUrl || "").trim(),
+          musicUrl: String(opening.musicUrl || "").trim(),
+          buttonText: buttonText || "进入故事",
+          volume: Math.min(Math.max(Number(opening.volume ?? 0.65) || 0.65, 0), 1),
+          animation: normalizeWorkshopOpeningAnimation(opening.animation),
+        };
+      }
+
+      function renderWorkshopOpening(opening = currentWorkshop?.opening) {
+        const data = normalizeWorkshopOpening(opening);
+        if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = Boolean(data.enabled);
+        if (workshopOpeningTitleEl) workshopOpeningTitleEl.value = data.title;
+        if (workshopOpeningSubtitleEl) workshopOpeningSubtitleEl.value = data.subtitle;
+        if (workshopOpeningButtonTextEl) workshopOpeningButtonTextEl.value = data.buttonText || "进入故事";
+        if (workshopOpeningAnimationEl) workshopOpeningAnimationEl.value = data.animation || "fade";
+        if (workshopOpeningCoverImageEl) workshopOpeningCoverImageEl.value = data.coverImage;
+        if (workshopOpeningMusicUrlEl) workshopOpeningMusicUrlEl.value = data.musicUrl;
+        if (workshopOpeningVolumeEl) workshopOpeningVolumeEl.value = String(data.volume);
+        updateWorkshopOpeningPreview();
+        updateWorkshopPanelStats();
+      }
+
+      function updateWorkshopOpeningPreview() {
+        if (!workshopOpeningCoverPreviewEl) return;
+        const imageUrl = String(workshopOpeningCoverImageEl?.value || "").trim();
+        workshopOpeningCoverPreviewEl.src = imageUrl;
+        workshopOpeningCoverPreviewEl.hidden = !imageUrl;
+      }
+
+      function collectWorkshopOpeningPayload() {
+        const buttonText = String(workshopOpeningButtonTextEl?.value || "").trim().slice(0, 24);
+        return {
+          enabled: workshopOpeningEnabledEl?.checked === true,
+          title: String(workshopOpeningTitleEl?.value || "").trim().slice(0, 80),
+          subtitle: String(workshopOpeningSubtitleEl?.value || "").trim().slice(0, 160),
+          coverImage: String(workshopOpeningCoverImageEl?.value || "").trim(),
+          musicUrl: String(workshopOpeningMusicUrlEl?.value || "").trim(),
+          buttonText: buttonText || "进入故事",
+          volume: Math.min(Math.max(Number(workshopOpeningVolumeEl?.value ?? 0.65) || 0.65, 0), 1),
+          animation: normalizeWorkshopOpeningAnimation(workshopOpeningAnimationEl?.value),
+        };
+      }
+
+      function clampOpeningVolume(value, fallback = 0.65) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return fallback;
+        return Math.min(Math.max(numeric, 0), 1);
+      }
+
+      function stopWorkshopOpeningPreviewAudio() {
+        if (!workshopOpeningPreviewAudio) return;
+        workshopOpeningPreviewAudio.pause();
+        workshopOpeningPreviewAudio.removeAttribute("src");
+        workshopOpeningPreviewAudio.load();
+        workshopOpeningPreviewAudio = null;
+      }
+
+      function closeWorkshopOpeningPreview(overlay, returnFocus = true) {
+        if (!overlay) return;
+        overlay.classList.add("is-leaving");
+        window.setTimeout(() => {
+          overlay.remove();
+          bodyEl.classList.remove("workshop-opening-active");
+          stopWorkshopOpeningPreviewAudio();
+          if (returnFocus) previewWorkshopOpeningBtn?.focus();
+        }, 760);
+      }
+
+      function showWorkshopOpeningPreview() {
+        const data = normalizeWorkshopOpening(collectWorkshopOpeningPayload());
+        document.querySelectorAll(".workshop-opening-overlay[data-preview='true']").forEach((node) => node.remove());
+        stopWorkshopOpeningPreviewAudio();
+
+        const overlay = document.createElement("div");
+        overlay.className = `workshop-opening-overlay workshop-opening-animation-${data.animation || "fade"}`;
+        overlay.dataset.preview = "true";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-label", "开场演出预览");
+
+        const backdrop = document.createElement("div");
+        backdrop.className = "workshop-opening-backdrop";
+
+        const card = document.createElement("section");
+        card.className = "workshop-opening-card";
+        if (data.coverImage) {
+          const safeCover = data.coverImage.replace(/["\\\n\r]/g, "");
+          card.style.setProperty("--workshop-opening-cover", `url("${safeCover}")`);
+        }
+        const cover = document.createElement("div");
+        cover.className = "workshop-opening-cover";
+        cover.setAttribute("aria-hidden", "true");
+        const shade = document.createElement("div");
+        shade.className = "workshop-opening-shade";
+        shade.setAttribute("aria-hidden", "true");
+
+        const content = document.createElement("div");
+        content.className = "workshop-opening-content";
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "eyebrow";
+        eyebrow.textContent = "创意工坊 · 开场演出预览";
+        const title = document.createElement("h1");
+        title.textContent = data.title || currentCardName || "Fantareal";
+        content.append(eyebrow, title);
+        if (data.subtitle) {
+          const subtitle = document.createElement("p");
+          subtitle.className = "workshop-opening-subtitle";
+          subtitle.textContent = data.subtitle;
+          content.appendChild(subtitle);
+        }
+        const button = document.createElement("button");
+        button.className = "workshop-opening-start";
+        button.type = "button";
+        button.textContent = data.buttonText || "进入故事";
+        content.appendChild(button);
+
+        card.append(cover, shade, content);
+        overlay.append(backdrop, card);
+        document.body.appendChild(overlay);
+        bodyEl.classList.add("workshop-opening-active");
+        window.setTimeout(() => button.focus(), 80);
+
+        let closing = false;
+        const enterPreview = async () => {
+          if (closing) return;
+          closing = true;
+          button.disabled = true;
+          if (data.musicUrl) {
+            try {
+              workshopOpeningPreviewAudio = new Audio(data.musicUrl);
+              workshopOpeningPreviewAudio.loop = true;
+              workshopOpeningPreviewAudio.volume = clampOpeningVolume(data.volume, 0.65);
+              await workshopOpeningPreviewAudio.play();
+            } catch (error) {
+              showToast("开场音乐播放失败，请检查音频文件或浏览器权限。", "error");
+            }
+          }
+          closeWorkshopOpeningPreview(overlay);
+        };
+        button.addEventListener("click", enterPreview, { once: true });
+        overlay.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closeWorkshopOpeningPreview(overlay);
+        });
+        setStatus("正在预览开场演出。点击按钮测试音乐与退场动画。", "idle");
+      }
+
       function createDefaultWorkshopItem(stage = "A") {
         return {
           id: `workshop_stage_${String(stage).toLowerCase()}`,
@@ -317,6 +627,7 @@
       function normalizeCreativeWorkshop(workshop) {
         const base = {
           enabled: true,
+          opening: createDefaultWorkshopOpening(),
           items: [createDefaultWorkshopItem("A"), createDefaultWorkshopItem("B"), createDefaultWorkshopItem("C")],
         };
         if (!workshop || typeof workshop !== "object") return base;
@@ -361,6 +672,7 @@
         });
 
         base.enabled = workshop.enabled !== false;
+        base.opening = normalizeWorkshopOpening(workshop.opening);
         base.items = ["A", "B", "C"].map((stage) => stageMap.get(stage) || createDefaultWorkshopItem(stage)).concat(extraItems);
         return base;
       }
@@ -607,9 +919,35 @@
             }
           }
 
-          setStatus(`${kind === "image" ? "图片" : "音乐"}已上传并回填地址。`);
+          setStatus(`${kind === "image" ? "图片" : "音乐"}已上传并回填地址，请点击“保存工坊”后生效。`);
         } catch (error) {
           setStatus(`上传失败：${error.message}`);
+        } finally {
+          fileInput.value = "";
+        }
+      }
+
+      async function handleWorkshopOpeningAssetSelection(kind, fileInput) {
+        const file = fileInput?.files?.[0];
+        if (!file) return;
+        try {
+          setStatus(`正在上传开场${kind === "image" ? "封面图" : "音乐"}...`, "busy");
+          const result = await uploadWorkshopAsset(kind, file);
+          if (kind === "image") {
+            if (workshopOpeningCoverImageEl) {
+              workshopOpeningCoverImageEl.value = result.url || "";
+              updateWorkshopOpeningPreview();
+            }
+          } else if (workshopOpeningMusicUrlEl) {
+            workshopOpeningMusicUrlEl.value = result.url || "";
+          }
+          if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = true;
+          updateWorkshopPanelStats();
+          setStatus(`开场${kind === "image" ? "封面图" : "音乐"}已上传并回填地址，请点击“保存工坊”后生效。`, "success");
+          showToast(`开场${kind === "image" ? "封面图" : "音乐"}已上传`, "success");
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`, "error");
+          showToast(`上传失败：${error.message}`, "error");
         } finally {
           fileInput.value = "";
         }
@@ -683,6 +1021,7 @@
 
         currentWorkshop = normalizeCreativeWorkshop(workshop || initialWorkshop);
         if (workshopEnabledEl) workshopEnabledEl.checked = Boolean(currentWorkshop.enabled);
+        renderWorkshopOpening(currentWorkshop.opening);
         if (!workshopRuleListEl) return;
 
         workshopRuleListEl.innerHTML = "";
@@ -749,6 +1088,7 @@
       function collectWorkshopPayload() {
         const creativeWorkshop = {
           enabled: workshopEnabledEl?.checked !== false,
+          opening: collectWorkshopOpeningPayload(),
           items: [],
         };
 
@@ -783,7 +1123,10 @@
 
       async function refreshWorkshopStatus() {
         const response = await fetch("/api/workshop/status");
-        if (!response.ok) return;
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "状态读取失败");
+        }
         const data = await response.json();
         if (workshopRuntimeInfoEl) {
           workshopRuntimeInfoEl.textContent = `当前 temp = ${data.state?.temp ?? 0}，阶段 = ${data.stage_label || getWorkshopStageLabel(data.stage)}。temp 只会在一次聊天结束后增加。`;
@@ -800,9 +1143,56 @@
         const data = await postJson("/api/workshop/save", payload);
         currentWorkshop = normalizeCreativeWorkshop(data.workshop || payload.creativeWorkshop);
         renderWorkshopRules(currentWorkshop);
-        setStatus(`已完成：创意工坊已保存：${currentCardName || "当前角色卡"}`, "success");
-        await refreshWorkshopStatus().catch(() => {});
+        setStatus(`已完成：创意工坊已保存。新对话开始时会显示封面，点击按钮后播放音乐。`, "success");
+        // 保存是否成功只以 /api/workshop/save 为准。
+        // 状态刷新放到后台，避免 /api/workshop/status 慢或卡住时把保存按钮锁在“保存中…”。
+        void refreshWorkshopStatus().catch((error) => {
+          console.warn("创意工坊状态刷新失败，保存本身已完成：", error);
+        });
       }
+
+      previewWorkshopOpeningBtn?.addEventListener("click", (event) => {
+        setButtonState(event.currentTarget, "success", "预览中 ✓");
+        showWorkshopOpeningPreview();
+      });
+
+      workshopOpeningEnabledEl?.addEventListener("change", () => {
+        updateWorkshopPanelStats();
+        setStatus(workshopOpeningEnabledEl.checked ? "已启用开场演出，记得保存工坊。" : "已关闭开场演出，记得保存工坊。", "idle");
+      });
+
+      [workshopOpeningTitleEl, workshopOpeningSubtitleEl, workshopOpeningButtonTextEl, workshopOpeningAnimationEl, workshopOpeningMusicUrlEl, workshopOpeningVolumeEl].forEach((element) => {
+        element?.addEventListener("input", updateWorkshopPanelStats);
+      });
+
+      workshopOpeningCoverImageEl?.addEventListener("input", updateWorkshopOpeningPreview);
+      document.getElementById("workshop-opening-cover-pick")?.addEventListener("click", () => {
+        document.getElementById("workshop-opening-cover-file")?.click();
+      });
+      document.getElementById("workshop-opening-music-pick")?.addEventListener("click", () => {
+        document.getElementById("workshop-opening-music-file")?.click();
+      });
+      document.getElementById("workshop-opening-cover-clear")?.addEventListener("click", () => {
+        if (workshopOpeningCoverImageEl) workshopOpeningCoverImageEl.value = "";
+        updateWorkshopOpeningPreview();
+        if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = true;
+        updateWorkshopPanelStats();
+        setStatus("已清除开场封面，请点击“保存工坊”后生效。", "idle");
+        showToast("已清除开场封面", "success");
+      });
+      document.getElementById("workshop-opening-music-clear")?.addEventListener("click", () => {
+        if (workshopOpeningMusicUrlEl) workshopOpeningMusicUrlEl.value = "";
+        if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = true;
+        updateWorkshopPanelStats();
+        setStatus("已清除开场音乐，请点击“保存工坊”后生效。", "idle");
+        showToast("已清除开场音乐", "success");
+      });
+      document.getElementById("workshop-opening-cover-file")?.addEventListener("change", (event) => {
+        handleWorkshopOpeningAssetSelection("image", event.currentTarget);
+      });
+      document.getElementById("workshop-opening-music-file")?.addEventListener("change", (event) => {
+        handleWorkshopOpeningAssetSelection("music", event.currentTarget);
+      });
 
       workshopEnabledEl?.addEventListener("change", () => {
         if (currentWorkshop) currentWorkshop.enabled = workshopEnabledEl.checked;
@@ -831,31 +1221,55 @@
       });
 
       document.getElementById("reload-workshop-status")?.addEventListener("click", async (event) => {
-        setButtonState(event.currentTarget, "loading", "读取中…");
+        const reloadButton = event.currentTarget;
+        if (!reloadButton || reloadButton.dataset.reloading === "true") return;
+        reloadButton.dataset.reloading = "true";
+        setButtonState(reloadButton, "loading", "读取中…");
         setStatus("正在重新读取创意工坊状态…", "busy");
+        const reloadWatchdog = window.setTimeout(() => {
+          ensureButtonReleased(reloadButton, "重新读取状态");
+        }, 9000);
         try {
-          await refreshWorkshopStatus();
-          setButtonState(event.currentTarget, "success", "已读取 ✓");
+          await withTimeout(refreshWorkshopStatus(), 8000, "读取状态超时，请稍后重试。");
+          window.clearTimeout(reloadWatchdog);
+          setButtonState(reloadButton, "success", "已读取 ✓");
           setStatus("已完成：创意工坊状态已重新读取。", "success");
           showToast("创意工坊状态已重新读取", "success");
+          window.setTimeout(() => ensureButtonReleased(reloadButton, "重新读取状态"), 1600);
         } catch (error) {
-          setButtonState(event.currentTarget, "error", "读取失败");
+          window.clearTimeout(reloadWatchdog);
+          setButtonState(reloadButton, "error", "读取失败");
           setStatus(`读取失败：${error.message}`, "error");
           showToast(`读取失败：${error.message}`, "error");
+        } finally {
+          reloadButton.dataset.reloading = "false";
+          window.setTimeout(() => ensureButtonReleased(reloadButton, "重新读取状态"), 7000);
         }
       });
 
       document.getElementById("save-workshop")?.addEventListener("click", async (event) => {
-        setButtonState(event.currentTarget, "loading", "保存中…");
+        const saveButton = event.currentTarget;
+        if (saveButton?.dataset.saving === "true") return;
+        saveButton.dataset.saving = "true";
+        setButtonState(saveButton, "loading", "保存中…");
         setStatus("正在保存创意工坊规则…", "busy");
+        const saveWatchdog = window.setTimeout(() => {
+          ensureButtonReleased(saveButton, "保存工坊");
+        }, 6000);
         try {
           await saveWorkshop();
-          setButtonState(event.currentTarget, "success", "已保存 ✓");
+          window.clearTimeout(saveWatchdog);
+          setButtonState(saveButton, "success", "已保存 ✓");
           showToast("创意工坊已保存", "success");
+          window.setTimeout(() => ensureButtonReleased(saveButton, "保存工坊"), 1600);
         } catch (error) {
-          setButtonState(event.currentTarget, "error", "保存失败");
+          window.clearTimeout(saveWatchdog);
+          setButtonState(saveButton, "error", "保存失败");
           setStatus(`保存失败：${error.message}`, "error");
           showToast(`保存失败：${error.message}`, "error");
+        } finally {
+          saveButton.dataset.saving = "false";
+          window.setTimeout(() => ensureButtonReleased(saveButton, "保存工坊"), 7000);
         }
       });
 

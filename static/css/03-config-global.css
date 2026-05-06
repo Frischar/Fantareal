@@ -1,10 +1,9 @@
 /* Split from static/styles.css · 03-config-global.css
    Scope: 全局设置页与工作台公共样式
-   This v121 split preserves cascade order; clean-up comes later. */
+   ui-v137: config workbench button and advanced glass hotfix. */
 
 /* =========================================================
-   Config Workbench UI v0.8.2
-   UI-only polish for /config. Keeps existing ids and API logic.
+   Config Workbench shared base
    ========================================================= */
 body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
   --config-card-alpha: 0.92;
@@ -15,85 +14,6 @@ body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
 body.modern-setting-page .config-workbench-shell {
   align-items: start;
   gap: 18px;
-}
-
-body.modern-setting-page .config-hero-toolbar {
-  margin-bottom: 12px;
-}
-
-body.modern-setting-page .config-sticky-actions {
-  position: sticky;
-  top: 16px;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin: 14px 24px 14px;
-  padding: 14px 16px 14px 18px;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
-  border-radius: 22px;
-  background:
-    linear-gradient(135deg,
-      color-mix(in srgb, var(--panel-strong) 88%, transparent 12%),
-      color-mix(in srgb, var(--panel) 78%, transparent 22%)
-    );
-  backdrop-filter: blur(22px) saturate(116%);
-  -webkit-backdrop-filter: blur(22px) saturate(116%);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.24),
-    0 16px 34px rgba(72, 50, 35, 0.08);
-}
-
-body.modern-setting-page .config-sticky-copy {
-  min-width: 0;
-}
-
-body.modern-setting-page .config-sticky-kicker {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  margin-bottom: 4px;
-  padding: 0.24rem 0.58rem;
-  border-radius: 999px;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
-  font-size: 0.72rem;
-  font-weight: 850;
-  letter-spacing: 0.10em;
-  text-transform: uppercase;
-}
-
-body.modern-setting-page .config-sticky-copy strong {
-  display: block;
-  font-size: 1.02rem;
-  line-height: 1.25;
-}
-
-body.modern-setting-page .config-sticky-copy .status-line {
-  margin: 5px 0 0;
-  min-height: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  font-size: 0.86rem;
-  line-height: 1.45;
-}
-
-body.modern-setting-page .config-sticky-buttons {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-}
-
-body.modern-setting-page .config-sticky-buttons button {
-  width: auto;
-  min-width: 128px;
-  margin-top: 0;
-  white-space: nowrap;
 }
 
 body.modern-setting-page .panel.config-panel {
@@ -110,27 +30,27 @@ body.modern-setting-page .config-primary-panel {
   border-color: color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
 }
 
-body.modern-setting-page .config-overview-grid {
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-}
-
-body.modern-setting-page .config-overview-actions {
-  margin-top: 12px;
-  justify-content: flex-end;
-}
-
 body.modern-setting-page .config-advanced-group {
   grid-column: 1 / -1;
   display: block;
   border-radius: 24px;
   border: 1px solid color-mix(in srgb, var(--line) 82%, transparent 18%);
   background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 7%, transparent), transparent 42%),
     linear-gradient(180deg,
-      rgba(var(--panel-strong-rgb), 0.80),
-      rgba(var(--panel-rgb), 0.70)
+      color-mix(in srgb, var(--panel-strong) 70%, transparent),
+      color-mix(in srgb, var(--panel) 58%, transparent)
     );
   box-shadow: 0 14px 34px rgba(72, 50, 35, 0.07);
   overflow: hidden;
+}
+
+body.modern-setting-page .config-advanced-group .panel.config-panel {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 66%, transparent),
+      color-mix(in srgb, var(--panel) 56%, transparent)
+    );
 }
 
 body.modern-setting-page .config-advanced-summary {
@@ -199,45 +119,12 @@ body.modern-setting-page .config-retrieval-panel {
   box-shadow: none;
 }
 
-
-
-
 body.modern-setting-page #save-settings,
 body.modern-setting-page #save-retrieval,
 body.modern-setting-page #test-connection,
 body.modern-setting-page #test-embedding {
   min-height: 44px;
 }
-
-@media (max-width: 1280px) {
-  body.modern-setting-page .config-overview-grid {
-    grid-template-columns: repeat(2, minmax(160px, 1fr));
-  }
-}
-
-@media (max-width: 980px) {
-  body.modern-setting-page .config-sticky-actions {
-    position: static;
-    margin: 12px 14px;
-    flex-direction: column;
-    align-items: stretch;
-  }
-  body.modern-setting-page .config-sticky-buttons {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  body.modern-setting-page .config-sticky-buttons button {
-    width: 100%;
-  }
-  body.modern-setting-page .config-advanced-summary {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
-  body.modern-setting-page .config-overview-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 
 /* Config workbench v2: align with Chat feedback language */
 body.modern-setting-page .config-sticky-actions {
@@ -475,7 +362,7 @@ body.modern-setting-page .config-advanced-group {
 body.modern-setting-page .config-advanced-summary {
   background:
     radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%),
-    color-mix(in srgb, var(--panel-strong) 78%, transparent 22%);
+    color-mix(in srgb, var(--panel-strong) 64%, transparent);
 }
 
 @media (max-width: 1180px) {
@@ -506,10 +393,7 @@ body.modern-setting-page .config-advanced-summary {
 }
 
 /* =========================================================
-   Config Workbench v0.8.4 cleanup
-   - compact aligned workbench
-   - real small toast, not a stretched panel
-   - keep /config functionality unchanged
+   ui-v137: compact aligned workbench + small toast
    ========================================================= */
 body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
   --config-main-width: min(1480px, calc(100vw - var(--app-sidebar-width) - 48px));
@@ -574,9 +458,19 @@ body.modern-setting-page .config-sticky-buttons {
 }
 
 body.modern-setting-page .config-sticky-buttons button {
+  width: auto !important;
+  min-width: 128px !important;
+  max-width: 220px !important;
+  flex: 0 0 auto !important;
   min-height: 36px !important;
   padding: 8px 13px !important;
   border-radius: 999px !important;
+  margin-top: 0 !important;
+  white-space: nowrap !important;
+}
+
+body.modern-setting-page .config-sticky-buttons #save-all {
+  min-width: 180px !important;
 }
 
 /* Fix: the global toast host has top:24px; if bottom is added without clearing top,
@@ -641,6 +535,8 @@ body.modern-setting-page .app-toast {
     bottom: 14px !important;
     max-width: calc(100vw - 28px) !important;
   }
+  body.modern-setting-page .config-advanced-summary {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
 }
-
-

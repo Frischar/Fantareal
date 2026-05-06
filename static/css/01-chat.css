@@ -1813,7 +1813,7 @@ body.chat-page::after {
 }
 
 /* =========================================================
-   ui-v128: single chat reading veil source
+   ui-v134 rollback: restore stable single chat reading veil source from ui-v128
    Normal mode keeps one controllable reading veil on chat-area::before.
    Clear mode removes that veil and its blur instead of stacking extra patches.
    ========================================================= */

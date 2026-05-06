@@ -1,11 +1,6 @@
-/* Split from static/styles.css · 10-worldbook.css
-   Scope: 世界书设置与词条管理相关
-   This v121 split preserves cascade order; clean-up comes later. */
+/* 10-worldbook.css · worldbook settings and entries pages. */
 
-/* =========================================================
-   Worldbook Settings v1.0.4: sticky workbench + WBmanager-aligned controls.
-   Scope only to /config/worldbook settings page.
-   ========================================================= */
+/* Worldbook settings workbench. */
 body.modern-setting-page.worldbook-config-page .config-shell.compact.worldbook-config-shell {
   width: min(1280px, calc(100% - 32px));
   max-width: min(1280px, calc(100% - 32px));
@@ -151,9 +146,9 @@ html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldboo
 html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldbook-workbench-actions .button-link,
 html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldbook-actions-row .secondary,
 html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldbook-actions-row .button-link {
-  background: rgba(25, 37, 50, 0.92);
-  border-color: rgba(126, 149, 169, 0.36);
-  color: rgba(229, 237, 245, 0.92);
+  background: color-mix(in srgb, var(--input-bg) 70%, var(--panel-strong) 30%);
+  border-color: color-mix(in srgb, var(--border) 76%, transparent 24%);
+  color: var(--text);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
@@ -161,8 +156,8 @@ html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldboo
 html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldbook-workbench-actions .button-link:hover,
 html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldbook-actions-row .secondary:hover,
 html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldbook-actions-row .button-link:hover {
-  background: rgba(34, 49, 64, 0.98);
-  border-color: rgba(94, 194, 168, 0.44);
+  background: color-mix(in srgb, var(--input-bg) 82%, var(--accent) 6%);
+  border-color: color-mix(in srgb, var(--accent) 44%, var(--border) 56%);
 }
 
 body.modern-setting-page.worldbook-config-page .worldbook-settings-panel {
@@ -201,30 +196,6 @@ body.modern-setting-page.worldbook-config-page .worldbook-actions-row {
   padding-top: 14px;
   margin-top: 14px;
   border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent 40%);
-}
-
-/* Approved ivory field boundary for light settings pages; keep outer panels glassy. */
-html:not([data-theme="dark"]) body.modern-setting-page.worldbook-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-html:not([data-theme="dark"]) body.modern-setting-page.worldbook-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.worldbook-config-page textarea {
-  background: rgba(255, 248, 236, 0.96) !important;
-  border-color: rgba(150, 101, 65, 0.40) !important;
-  color: #3d2c20;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.64),
-    inset 0 -10px 24px rgba(146, 101, 67, 0.025),
-    0 1px 3px rgba(86, 55, 32, 0.075) !important;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.worldbook-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.worldbook-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.worldbook-config-page textarea:focus {
-  background: rgba(255, 252, 246, 0.99) !important;
-  border-color: rgba(199, 122, 67, 0.72) !important;
-  box-shadow:
-    0 0 0 3px rgba(199, 122, 67, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 2px 8px rgba(86, 55, 32, 0.08) !important;
 }
 
 /* Worldbook settings keeps existing toggle/checkbox styling; no page-specific toggle overrides. */
@@ -275,39 +246,7 @@ body.modern-setting-page.worldbook-config-page .button-link.is-feedback {
   }
 }
 
-/* =========================================================
-   Worldbook Settings v1.0.6: clean switch rows + semantic green status.
-   Keep existing toggles themselves; remove the oversized pill wrapper only on this page.
-   ========================================================= */
-body.modern-setting-page.worldbook-config-page .worldbook-setting-card .checkbox-row {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 14px !important;
-  width: 100% !important;
-  min-height: 42px !important;
-  max-width: 100% !important;
-  padding: 6px 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--text) !important;
-}
-
-body.modern-setting-page.worldbook-config-page .worldbook-setting-card .checkbox-row span {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  font-weight: 780 !important;
-  line-height: 1.45 !important;
-  color: color-mix(in srgb, var(--text) 90%, var(--muted)) !important;
-}
-
-body.modern-setting-page.worldbook-config-page .worldbook-setting-card .checkbox-row input[type="checkbox"] {
-  flex: 0 0 auto !important;
-  order: 2 !important;
-}
-
+/* Worldbook settings switch rows and semantic status. */
 body.modern-setting-page.worldbook-config-page .worldbook-setting-card.wide > .grid-two {
   align-items: center !important;
 }
@@ -339,21 +278,7 @@ html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .config-s
   background: rgba(120, 216, 157, 0.16) !important;
 }
 
-/* Avoid making the simple switch rows look like large action cards on mobile too. */
-@media (max-width: 900px) {
-  body.modern-setting-page.worldbook-config-page .worldbook-setting-card .checkbox-row {
-    flex-direction: row !important;
-    align-items: center !important;
-  }
-}
-
-
-
-/* =========================================================
-   Worldbook Settings v1.0.7: compact local toggles for all switch rows.
-   Only /config/worldbook is affected. Text remains text; switches are small,
-   horizontal, centered controls.
-   ========================================================= */
+/* Scoped compact toggles for worldbook settings. */
 body.modern-setting-page.worldbook-config-page {
   --wb-config-toggle-w: 34px;
   --wb-config-toggle-h: 18px;
@@ -468,20 +393,14 @@ html[data-theme="dark"] body.modern-setting-page.worldbook-config-page .worldboo
   }
 }
 
-/* Defensive reset: WBmanager should not inherit modern config switch overrides. */
 body.worldbook-manager-page .checkbox-row input[type="checkbox"]:not(.wb-quick-enabled) {
   width: 24px;
   height: 24px;
   border-radius: 8px;
 }
 
+/* Worldbook manager styles migrated from template inline CSS. */
 
-/* =========================================================
-   Previous cleanup: scoped worldbook-manager styles migrated from templates/worldbook_manager.html
-   Moved out of inline <style> so this page can be cleaned from static/css/10-worldbook.css.
-   ========================================================= */
-
-/* Previous cleanup: removed local --wb-surface-* bridge; manager surfaces follow --panel / --panel-strong / --input-bg. */
 body.worldbook-manager-page .status-line.strong {
   color: var(--text);
 }
@@ -560,13 +479,6 @@ body.worldbook-manager-page .worldbook-status-box .status-line {
   word-break: keep-all;
 }
 
-body.worldbook-manager-page .worldbook-status-box.is-dirty {
-  border-color: rgba(238, 169, 79, 0.72);
-  border-left-color: rgba(238, 169, 79, 0.95);
-  background: linear-gradient(90deg, rgba(238, 169, 79, 0.22), rgba(94, 194, 168, 0.08));
-  box-shadow: 0 0 0 2px rgba(238, 169, 79, 0.16), 0 8px 18px rgba(0, 0, 0, 0.08);
-}
-
 @media (max-width: 1100px) {
   body.worldbook-manager-page .worldbook-overview-strip {
     flex-direction: column;
@@ -577,11 +489,6 @@ body.worldbook-manager-page .worldbook-status-box.is-dirty {
   }
 }
 
-body.worldbook-manager-page .config-shell.compact {
-  width: min(1760px, calc(100vw - 32px));
-  max-width: min(1760px, calc(100vw - 32px));
-}
-
 body.worldbook-manager-page .worldbook-action-bar {
   position: sticky;
   top: 0;
@@ -589,10 +496,6 @@ body.worldbook-manager-page .worldbook-action-bar {
   margin: -4px -4px 14px;
   padding: 10px 4px 12px;
   backdrop-filter: blur(10px);
-}
-
-body.worldbook-manager-page .worldbook-action-bar .button-row {
-  gap: 10px;
 }
 
 body.worldbook-manager-page .worldbook-control-grid {
@@ -752,7 +655,6 @@ body.worldbook-manager-page #save-worldbook-entries.is-dirty {
   box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
 }
 
-
 body.worldbook-manager-page .worldbook-filter-strip {
   margin: 10px 0 14px;
 }
@@ -847,7 +749,6 @@ body.worldbook-manager-page .worldbook-summary-chip.warning {
   color: var(--text);
   background: rgba(220, 84, 84, 0.12);
 }
-
 
 body.worldbook-manager-page .wb-quick-enabled-switch {
   display: inline-flex;
@@ -981,8 +882,6 @@ body.worldbook-manager-page .worldbook-health-filter-active {
   font-weight: 700;
 }
 
-
-
 body.worldbook-manager-page .worldbook-tool-card {
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
@@ -1025,7 +924,7 @@ body.worldbook-manager-page .worldbook-tool-toggle {
 
 body.worldbook-manager-page .worldbook-tool-toggle:hover {
   border-color: var(--accent);
-  background: rgba(94, 194, 168, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent 86%);
   transform: translateY(-1px);
 }
 
@@ -1090,22 +989,6 @@ body.worldbook-manager-page .memory-card-head .wb-select-control input.wb-select
   transform: translate(-50%, -58%) rotate(-45deg);
 }
 
-body.worldbook-manager-page .worldbook-entry-card .memory-card-head {
-  gap: 10px;
-}
-
-body.worldbook-manager-page .worldbook-entry-card .memory-card-head > strong {
-  min-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-body.worldbook-manager-page .worldbook-entry-card .memory-card-head .button-row {
-  margin-left: auto;
-  align-items: center;
-  gap: 7px;
-}
-
 body.worldbook-manager-page .worldbook-entry-card .icon-button {
   min-width: 30px;
   width: 30px;
@@ -1139,10 +1022,6 @@ body.worldbook-manager-page .worldbook-entry-card .wb-quick-enabled-label {
   display: none;
 }
 
-body.worldbook-manager-page .worldbook-entry-card .worldbook-card-summary {
-  opacity: 0.96;
-}
-
 body.worldbook-manager-page .worldbook-entry-card .memory-card-head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1162,21 +1041,26 @@ body.worldbook-manager-page .worldbook-entry-card .memory-card-head > strong {
   grid-column: 2;
   grid-row: 1;
   align-self: center;
+  min-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 body.worldbook-manager-page .worldbook-entry-card .memory-card-head .button-row {
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
+  margin-left: auto;
+  align-items: center;
+  gap: 7px;
 }
 
 body.worldbook-manager-page .worldbook-entry-card .worldbook-card-summary {
   grid-column: 2 / 4;
   grid-row: 2;
   margin-top: 0;
+  opacity: 0.96;
 }
-
-
 
 body.worldbook-manager-page .worldbook-toolbar-actions {
   justify-content: flex-end;
@@ -1188,35 +1072,23 @@ body.worldbook-manager-page .worldbook-toolbar-actions .helper-text {
   white-space: nowrap;
 }
 
-/* Light theme polish: reduce pure-white controls and improve visual hierarchy. */
-html:not([data-theme="dark"]) body.worldbook-manager-page {
-  --wb-light-panel: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 72%, transparent), color-mix(in srgb, var(--input-bg) 58%, transparent));
-  --wb-light-panel-strong: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 84%, transparent 16%), color-mix(in srgb, var(--panel) 90%, transparent 10%));
-  --wb-light-control: color-mix(in srgb, var(--input-bg) 64%, transparent 36%);
-  --wb-light-control-hover: color-mix(in srgb, var(--input-bg) 78%, var(--accent) 4%);
-  --wb-light-control-soft: color-mix(in srgb, var(--input-bg) 52%, transparent 48%);
-  --wb-light-active: color-mix(in srgb, var(--accent) 72%, var(--input-bg) 28%);
-  --wb-light-border: color-mix(in srgb, var(--border) 78%, transparent);
-  --wb-light-border-strong: color-mix(in srgb, var(--accent) 58%, var(--border));
-  --wb-light-shadow: rgba(80, 53, 35, 0.08);
-  --wb-light-text-soft: var(--muted);
-}
+/* Worldbook manager light-theme control polish. */
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-group-panel {
-  background: var(--wb-light-panel-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 84%, transparent 16%), color-mix(in srgb, var(--panel) 90%, transparent 10%));
   border: 1px solid rgba(160, 116, 84, 0.42);
-  box-shadow: 0 12px 30px var(--wb-light-shadow);
+  box-shadow: 0 12px 30px rgba(80, 53, 35, 0.08);
 }
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-group-button {
-  background: var(--wb-light-control);
-  border-color: var(--wb-light-border);
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent 36%);
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
   color: #403024;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 1px 2px rgba(96, 63, 35, 0.05);
 }
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-group-button:hover {
-  background: var(--wb-light-control-hover);
+  background: color-mix(in srgb, var(--input-bg) 78%, var(--accent) 4%);
   border-color: rgba(138, 93, 63, 0.58);
   box-shadow: 0 6px 16px rgba(96, 63, 35, 0.12);
 }
@@ -1245,7 +1117,7 @@ html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-group-butto
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-quick-filter-panel,
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-health-results,
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-tool-card {
-  background: var(--wb-light-panel);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 72%, transparent), color-mix(in srgb, var(--input-bg) 58%, transparent));
   border-color: rgba(160, 116, 84, 0.38);
   box-shadow: 0 8px 22px rgba(96, 63, 35, 0.10);
 }
@@ -1253,15 +1125,15 @@ html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-tool-card {
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-quick-filter-button,
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-health-chip,
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-summary-chip {
-  background: var(--wb-light-control);
-  border-color: var(--wb-light-border);
-  color: var(--wb-light-text-soft);
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent 36%);
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
+  color: var(--muted);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 1px 2px rgba(96, 63, 35, 0.04);
 }
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-quick-filter-button:hover,
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-health-chip:hover {
-  background: var(--wb-light-control-hover);
+  background: color-mix(in srgb, var(--input-bg) 78%, var(--accent) 4%);
   border-color: rgba(138, 93, 63, 0.58);
   box-shadow: 0 4px 12px rgba(96, 63, 35, 0.10);
 }
@@ -1315,13 +1187,13 @@ html:not([data-theme="dark"]) body.worldbook-manager-page .memory-card-head .wb-
 }
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .wb-quick-enabled-switch {
-  background: var(--wb-light-control);
-  border-color: var(--wb-light-border);
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent 36%);
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
 }
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .wb-quick-enabled-switch:hover {
-  background: var(--wb-light-control-hover);
+  background: color-mix(in srgb, var(--input-bg) 78%, var(--accent) 4%);
   border-color: rgba(148, 101, 72, 0.44);
 }
 
@@ -1354,7 +1226,7 @@ html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-list-pane i
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-list-pane select:focus,
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-list-pane textarea:focus {
   background: rgba(250, 242, 234, 0.99);
-  border-color: var(--wb-light-border-strong);
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   box-shadow: 0 0 0 3px rgba(128, 83, 54, 0.14);
   outline: none;
 }
@@ -1463,12 +1335,12 @@ html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-entry-card 
 }
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-tool-toggle {
-  background: var(--wb-light-control);
-  border-color: var(--wb-light-border);
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent 36%);
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
 }
 
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-entry-card {
-  background: var(--wb-light-panel);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 72%, transparent), color-mix(in srgb, var(--input-bg) 58%, transparent));
   border: 1px solid rgba(160, 116, 84, 0.30);
   box-shadow: 0 3px 10px rgba(96, 63, 35, 0.05);
 }
@@ -1568,87 +1440,74 @@ html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-entry-body 
   min-width: 0;
 }
 
-html[data-theme="dark"] body.worldbook-manager-page {
-  /* ui-v129: dark manager surfaces are mapped back to global opacity variables. */
-  --wb-dark-panel: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 68%, transparent 32%), color-mix(in srgb, var(--input-bg) 52%, transparent 48%));
-  --wb-dark-panel-strong: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 76%, transparent 24%), color-mix(in srgb, var(--panel) 82%, transparent 18%));
-  --wb-dark-control: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
-  --wb-dark-control-hover: color-mix(in srgb, var(--input-bg) 68%, var(--accent) 5%);
-  --wb-dark-control-soft: color-mix(in srgb, var(--input-bg) 50%, transparent 50%);
-  --wb-dark-border: color-mix(in srgb, var(--border) 72%, transparent 28%);
-  --wb-dark-border-strong: color-mix(in srgb, var(--accent) 58%, var(--border));
-  --wb-dark-shadow: rgba(0, 0, 0, 0.16);
-  --wb-dark-text-soft: var(--muted);
-}
-
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-group-panel {
-  background: var(--wb-dark-panel-strong);
-  border: 1px solid var(--wb-dark-border);
-  box-shadow: 0 10px 24px var(--wb-dark-shadow);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 76%, transparent 24%), color-mix(in srgb, var(--panel) 82%, transparent 18%));
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-group-button {
-  background: var(--wb-dark-control);
-  border-color: var(--wb-dark-border);
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-group-button:hover {
-  background: var(--wb-dark-control-hover);
-  border-color: rgba(94, 194, 168, 0.48);
+  background: color-mix(in srgb, var(--input-bg) 68%, var(--accent) 5%);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border) 52%);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-group-button.active {
-  background: linear-gradient(135deg, rgba(94, 194, 168, 0.34), rgba(94, 194, 168, 0.16));
-  border-color: var(--wb-dark-border-strong);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 34%, transparent 66%), color-mix(in srgb, var(--accent) 16%, transparent 84%));
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   color: #f1fff9;
-  box-shadow: inset 4px 0 0 rgba(94, 194, 168, 0.84), 0 8px 22px rgba(0, 0, 0, 0.20);
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--accent) 84%, transparent 16%), 0 8px 22px rgba(0, 0, 0, 0.20);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-group-button.active em {
-  background: rgba(94, 194, 168, 0.14);
-  border-color: rgba(94, 194, 168, 0.40);
+  background: color-mix(in srgb, var(--accent) 14%, transparent 86%);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border) 60%);
   color: #f1fff9;
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-quick-filter-panel,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-health-results,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card {
-  background: var(--wb-dark-panel);
-  border-color: var(--wb-dark-border);
-  box-shadow: 0 8px 20px var(--wb-dark-shadow);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 68%, transparent 32%), color-mix(in srgb, var(--input-bg) 52%, transparent 48%));
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-quick-filter-button,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-health-chip,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-summary-chip {
-  background: var(--wb-dark-control);
-  border-color: var(--wb-dark-border);
-  color: var(--wb-dark-text-soft);
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
+  color: var(--muted);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-quick-filter-button:hover,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-health-chip:hover {
-  background: var(--wb-dark-control-hover);
-  border-color: rgba(94, 194, 168, 0.48);
+  background: color-mix(in srgb, var(--input-bg) 68%, var(--accent) 5%);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border) 52%);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-quick-filter-button.active,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-health-chip.active {
-  background: linear-gradient(135deg, rgba(94, 194, 168, 0.30), rgba(94, 194, 168, 0.16));
-  border-color: var(--wb-dark-border-strong);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 30%, transparent 70%), color-mix(in srgb, var(--accent) 16%, transparent 84%));
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   color: #f1fff9;
-  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.13), 0 4px 12px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 13%, transparent 87%), 0 4px 12px rgba(0, 0, 0, 0.16);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-summary-chip.strong {
   color: #f1fff9;
-  border-color: rgba(94, 194, 168, 0.34);
-  background: rgba(94, 194, 168, 0.12);
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border) 66%);
+  background: color-mix(in srgb, var(--accent) 12%, transparent 88%);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-summary-chip.warning {
@@ -1658,8 +1517,8 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-summary-chip.warn
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .memory-card-head .wb-select-control {
-  background: var(--wb-dark-control-soft);
-  border: 1px solid var(--wb-dark-border);
+  background: color-mix(in srgb, var(--input-bg) 50%, transparent 50%);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
   border-radius: 12px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
@@ -1676,24 +1535,24 @@ html[data-theme="dark"] body.worldbook-manager-page .memory-card-head .wb-select
 html[data-theme="dark"] body.worldbook-manager-page .memory-card-head .wb-select-control input.wb-selected:hover {
   background: color-mix(in srgb, var(--input-bg) 78%, var(--accent) 8%);
   border-color: color-mix(in srgb, var(--accent) 64%, var(--border));
-  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.13), 0 1px 4px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent 87%), 0 1px 4px rgba(0, 0, 0, 0.22);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .memory-card-head .wb-select-control input.wb-selected:checked {
   background: var(--accent);
-  border-color: rgba(131, 222, 198, 0.96);
-  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.18), 0 1px 4px rgba(0, 0, 0, 0.26);
+  border-color: color-mix(in srgb, var(--accent) 74%, white 26%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent 82%), 0 1px 4px rgba(0, 0, 0, 0.26);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .wb-quick-enabled-switch {
-  background: var(--wb-dark-control);
-  border-color: var(--wb-dark-border);
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .wb-quick-enabled-switch:hover {
-  background: var(--wb-dark-control-hover);
-  border-color: rgba(94, 194, 168, 0.48);
+  background: color-mix(in srgb, var(--input-bg) 68%, var(--accent) 5%);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border) 52%);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card input,
@@ -1702,8 +1561,8 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card textare
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane input,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane select,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane textarea {
-  background: var(--wb-dark-control-soft);
-  border: 1px solid rgba(126, 149, 169, 0.42);
+  background: color-mix(in srgb, var(--input-bg) 50%, transparent 50%);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent 22%);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 3px rgba(0, 0, 0, 0.12);
 }
@@ -1725,7 +1584,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane input:f
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane select:focus,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane textarea:focus {
   background: color-mix(in srgb, var(--input-bg) 74%, var(--panel-strong) 26%);
-  border-color: var(--wb-dark-border-strong);
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
   box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.14);
   outline: none;
 }
@@ -1742,7 +1601,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane textare
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card select,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane select {
-  background-image: linear-gradient(45deg, transparent 50%, rgba(196, 220, 235, 0.86) 50%), linear-gradient(135deg, rgba(196, 220, 235, 0.86) 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, color-mix(in srgb, var(--text) 86%, transparent 14%) 50%), linear-gradient(135deg, color-mix(in srgb, var(--text) 86%, transparent 14%) 50%, transparent 50%);
   background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
@@ -1752,14 +1611,14 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane select 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-card .button-row .icon-button,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-card .button-row .danger-icon-button {
   background: linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 78%, var(--panel-strong) 22%), color-mix(in srgb, var(--input-bg) 64%, transparent 36%));
-  border-color: var(--wb-dark-border);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card .checkbox-row,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .grid-two > .checkbox-row,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body > .checkbox-row {
   background: color-mix(in srgb, var(--input-bg) 54%, transparent 46%);
-  border: 1px solid var(--wb-dark-border);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
   border-radius: 14px;
   padding: 10px 12px;
 }
@@ -1773,7 +1632,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .check
   height: 24px;
   margin: 0 10px 0 0;
   border-radius: 8px;
-  border: 2px solid rgba(146, 168, 188, 0.62);
+  border: 2px solid color-mix(in srgb, var(--border) 78%, var(--text) 22%);
   background: color-mix(in srgb, var(--input-bg) 70%, transparent 30%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 4px rgba(0, 0, 0, 0.18);
   cursor: pointer;
@@ -1785,14 +1644,14 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card .checkb
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .checkbox-row input[type="checkbox"]:hover {
   background: color-mix(in srgb, var(--input-bg) 78%, var(--accent) 8%);
   border-color: color-mix(in srgb, var(--accent) 64%, var(--border));
-  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.13), 0 1px 4px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent 87%), 0 1px 4px rgba(0, 0, 0, 0.22);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card .checkbox-row input[type="checkbox"]:checked,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .checkbox-row input[type="checkbox"]:checked {
   background: var(--accent);
-  border-color: rgba(131, 222, 198, 0.96);
-  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.18), 0 1px 4px rgba(0, 0, 0, 0.26);
+  border-color: color-mix(in srgb, var(--accent) 74%, white 26%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent 82%), 0 1px 4px rgba(0, 0, 0, 0.26);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-card .checkbox-row input[type="checkbox"]:checked::after,
@@ -1820,7 +1679,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-toolbar-actions b
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-action-bar button.secondary,
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-card button.secondary {
   background: linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 78%, var(--panel-strong) 22%), color-mix(in srgb, var(--input-bg) 64%, transparent 36%));
-  border-color: var(--wb-dark-border);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
   color: var(--text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.16);
 }
@@ -1834,18 +1693,18 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-card button
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-toggle {
-  background: var(--wb-dark-control);
-  border-color: var(--wb-dark-border);
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-card {
-  background: var(--wb-dark-panel);
-  border: 1px solid rgba(126, 149, 169, 0.30);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 68%, transparent 32%), color-mix(in srgb, var(--input-bg) 52%, transparent 48%));
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-card:hover {
-  border-color: rgba(94, 194, 168, 0.34);
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border) 66%);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.20);
 }
 
@@ -1855,7 +1714,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-card .memor
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body {
   background: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
-  border: 1px solid rgba(126, 149, 169, 0.16);
+  border: 1px solid color-mix(in srgb, var(--border) 52%, transparent 48%);
   border-radius: 18px;
   padding: 12px;
 }
@@ -1863,7 +1722,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body {
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body > .button-row {
   align-items: center;
   padding: 10px;
-  border: 1px solid rgba(126, 149, 169, 0.30);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
   border-radius: 16px;
   background: color-mix(in srgb, var(--input-bg) 60%, transparent 40%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0, 0, 0, 0.12);
@@ -1871,7 +1730,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body > .butt
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body > .grid-two {
   padding: 10px;
-  border: 1px solid rgba(126, 149, 169, 0.22);
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent 40%);
   border-radius: 16px;
   background: color-mix(in srgb, var(--input-bg) 52%, transparent 48%);
 }
@@ -1883,7 +1742,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body > .butt
   font-weight: 700;
   letter-spacing: 0.01em;
   background: linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 80%, var(--panel-strong) 20%), color-mix(in srgb, var(--input-bg) 66%, transparent 34%));
-  border-color: var(--wb-dark-border);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 
@@ -1894,34 +1753,34 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body > .butt
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body > .button-row .danger-button {
-  background: linear-gradient(180deg, rgba(82, 43, 42, 0.98), rgba(61, 34, 36, 0.98));
-  border-color: rgba(220, 84, 84, 0.50);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 42%, var(--input-bg) 58%), color-mix(in srgb, var(--danger) 28%, var(--input-bg) 72%));
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border) 50%);
   color: #ffd9d6;
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-tool-body > .button-row .danger-button:hover {
-  background: linear-gradient(180deg, rgba(92, 49, 47, 0.99), rgba(70, 39, 40, 0.99));
-  border-color: rgba(220, 84, 84, 0.70);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 48%, var(--input-bg) 52%), color-mix(in srgb, var(--danger) 34%, var(--input-bg) 66%));
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--border) 30%);
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body {
   margin-top: 12px;
   padding: 14px;
-  border-top: 1px solid rgba(126, 149, 169, 0.24);
+  border-top: 1px solid color-mix(in srgb, var(--border) 64%, transparent 36%);
   border-radius: 0 0 18px 18px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 52%, transparent), color-mix(in srgb, var(--input-bg) 46%, transparent));
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .grid-two {
   padding: 10px;
-  border: 1px solid rgba(126, 149, 169, 0.18);
+  border: 1px solid color-mix(in srgb, var(--border) 56%, transparent 44%);
   border-radius: 16px;
   background: color-mix(in srgb, var(--input-bg) 52%, transparent 48%);
   margin-bottom: 10px;
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body label:not(.checkbox-row) {
-  color: rgba(229, 237, 245, 0.82);
+  color: color-mix(in srgb, var(--text) 82%, transparent 18%);
   font-weight: 700;
 }
 
@@ -1939,7 +1798,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .grid-
   min-width: 0;
 }
 
-/* compact worldbook entry layout */
+/* Compact worldbook entry layout. */
 body.worldbook-manager-page .worldbook-entry-body .wb-wide-grid,
 body.worldbook-manager-page .worldbook-entry-body .wb-keyword-grid {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -2050,7 +1909,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .wb-op
 }
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .wb-options-grid {
-  border: 1px solid rgba(126, 149, 169, 0.18);
+  border: 1px solid color-mix(in srgb, var(--border) 56%, transparent 44%);
   background: color-mix(in srgb, var(--input-bg) 52%, transparent 48%);
 }
 
@@ -2111,7 +1970,6 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-entry-body .wb-op
     max-height: 220px;
   }
 }
-/* Light theme: keep top overview consistent with preset stat cards. */
 html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-overview-strip {
   border-color: rgba(152, 110, 78, 0.24);
   background: rgba(250, 242, 234, 0.70);
@@ -2174,10 +2032,7 @@ html:not([data-theme="dark"]) body.worldbook-manager-page .worldbook-status-box.
 
     
 
-/* ================================
-   Worldbook Manager v1.0.8 polish
-   Keep WBmanager structure, thicken glass and align final controls.
-   ================================ */
+/* Worldbook manager polish and final controls. */
 body.worldbook-manager-page .config-shell.compact {
   width: min(1480px, calc(100vw - var(--app-sidebar-width, 260px) - 54px));
   max-width: min(1480px, calc(100vw - var(--app-sidebar-width, 260px) - 54px));
@@ -2382,8 +2237,8 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-action-bar {
 
 html[data-theme="dark"] body.worldbook-manager-page .worldbook-action-bar button.secondary:not(#save-worldbook-entries) {
   background: color-mix(in srgb, var(--input-bg) 62%, transparent 38%);
-  border-color: var(--wb-dark-border);
-  color: rgba(229, 237, 245, 0.88);
+  border-color: color-mix(in srgb, var(--border) 72%, transparent 28%);
+  color: color-mix(in srgb, var(--text) 88%, transparent 12%);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 2px 10px rgba(0,0,0,0.16);
 }
 
@@ -2394,8 +2249,8 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-action-bar button
 
 html[data-theme="dark"] body.worldbook-manager-page #add-worldbook-entry,
 html[data-theme="dark"] body.worldbook-manager-page #save-worldbook-entries {
-  background: linear-gradient(180deg, rgba(59, 152, 226, 0.98), rgba(45, 131, 204, 0.98));
-  border-color: rgba(86, 171, 234, 0.62);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 96%, white 4%), color-mix(in srgb, var(--accent) 84%, black 16%));
+  border-color: color-mix(in srgb, var(--accent) 62%, white 14%);
   color: #f5fbff;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 5px 14px rgba(20, 84, 143, 0.28);
 }
@@ -2456,11 +2311,7 @@ html[data-theme="dark"] body.worldbook-manager-page .worldbook-list-pane textare
   }
 }
 
-
-/* =========================================================
-   Previous cleanup: keep manager panels on global glass opacity.
-   Do not create extra fixed-alpha page surface variables here.
-   ========================================================= */
+/* Manager panels follow global glass opacity. */
 body.worldbook-manager-page .worldbook-action-bar,
 body.worldbook-manager-page .worldbook-overview-strip,
 body.worldbook-manager-page .worldbook-group-panel,
@@ -2480,11 +2331,7 @@ body.worldbook-manager-page .worldbook-entry-body .wb-options-grid {
   border-color: color-mix(in srgb, var(--border) 72%, transparent);
 }
 
-
-/* =========================================================
-   ui-v129: worldbook header source
-   Align the two worldbook header bars; dark mode follows accent tone.
-   ========================================================= */
+/* Worldbook header width and theme tone. */
 body.modern-setting-page.worldbook-config-page .topbar-stack > .slot-toolbar,
 body.worldbook-manager-page .topbar-stack > .slot-toolbar {
   width: min(1480px, calc(100vw - var(--app-sidebar-width, 260px) - 48px)) !important;
