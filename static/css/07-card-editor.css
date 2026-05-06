@@ -1,46 +1,6 @@
 /* Split from static/styles.css · 07-card-editor.css
    Scope: 角色卡编辑器
-   This v121 split preserves cascade order; clean-up comes later. */
-
-/* Card editor v0.9.5: warm ivory fields only, keep outer glass panels unchanged. */
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page input:not([type="checkbox"]):not([type="radio"]),
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea {
-  background: rgba(255, 250, 242, 0.88) !important;
-  border-color: rgba(172, 128, 92, 0.24) !important;
-  color: #3f3025;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.52),
-    0 1px 2px rgba(90, 60, 36, 0.04);
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page input:not([type="checkbox"]):not([type="radio"]):hover,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page select:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea:hover {
-  background: rgba(255, 252, 246, 0.93) !important;
-  border-color: rgba(172, 128, 92, 0.34) !important;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page input:not([type="checkbox"]):not([type="radio"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea:focus {
-  background: rgba(255, 253, 248, 0.97) !important;
-  border-color: rgba(202, 139, 83, 0.52) !important;
-  box-shadow:
-    0 0 0 3px rgba(202, 139, 83, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
-  outline: none;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea {
-  padding: 14px 16px;
-  line-height: 1.76;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page input::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea::placeholder {
-  color: rgba(91, 67, 50, 0.58);
-}
+   ui-v138: 浅色字段控件统一迁移到 08-config-fields.css，本文件只保留角色卡页面结构与专属组件。 */
 
 /* Card editor v0.9.6: workbench + compact item actions. Keep glass panels, no hover lift. */
 body.modern-setting-page.card-config-page .card-workbench {
@@ -426,42 +386,6 @@ body.modern-setting-page.card-config-page .card-field-tip {
   line-height: 1.55;
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page input:not([type="checkbox"]):not([type="radio"]),
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea {
-  background: rgba(255, 248, 236, 0.96) !important;
-  border-color: rgba(150, 101, 65, 0.40) !important;
-  color: #3d2c20;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.64),
-    inset 0 -10px 24px rgba(146, 101, 67, 0.025),
-    0 1px 3px rgba(86, 55, 32, 0.075) !important;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page input:not([type="checkbox"]):not([type="radio"]):hover,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page select:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea:hover {
-  background: rgba(255, 250, 241, 0.98) !important;
-  border-color: rgba(142, 91, 56, 0.54) !important;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page input:not([type="checkbox"]):not([type="radio"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea:focus {
-  background: rgba(255, 252, 246, 0.99) !important;
-  border-color: rgba(199, 122, 67, 0.72) !important;
-  box-shadow:
-    0 0 0 3px rgba(199, 122, 67, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 2px 8px rgba(86, 55, 32, 0.08) !important;
-  outline: none;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea {
-  line-height: 1.78;
-  padding: 14px 16px;
-}
-
 @media (max-width: 1180px) {
   body.modern-setting-page.card-config-page .card-persona-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -580,5 +504,4 @@ body.modern-setting-page.card-config-page .card-add-button.is-feedback {
     grid-template-columns: 1fr !important;
   }
 }
-
 

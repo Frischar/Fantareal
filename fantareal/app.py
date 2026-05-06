@@ -273,6 +273,15 @@ def default_role_card() -> dict[str, Any]:
         "tags": [],
         "creativeWorkshop": {
             "enabled": True,
+            "opening": {
+                "enabled": False,
+                "title": "",
+                "subtitle": "",
+                "coverImage": "",
+                "musicUrl": "",
+                "buttonText": "进入故事",
+                "volume": 0.65,
+            },
             "items": [
                 {
                     "id": "workshop_stage_a",
@@ -364,6 +373,7 @@ def workshop_signature(slot: dict[str, Any] | None, workshop: dict[str, Any], st
         "slot": str((slot or {}).get("source_name", "")),
         "enabled": bool(workshop.get("enabled", False)),
         "stage": stage,
+        "opening": workshop.get("opening", {}),
         "items": [
             {
                 **workshop_effective_fields(item),

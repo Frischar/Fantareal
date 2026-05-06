@@ -1,12 +1,6 @@
-/* Split from static/styles.css · 09-preset-memory.css
-   Scope: 预设页与记忆页
-   This v121 split preserves cascade order; clean-up comes later. */
+/* 09-preset-memory.css · preset and memory pages. */
 
-/* =========================================================
-   Preset + Memory v1.0 workbench sync.
-   Keep existing body layout, module toggles and glass panels.
-   Only add centered canvas, workbench actions and ivory editable fields.
-   ========================================================= */
+/* Preset + memory workbench alignment. */
 body.modern-setting-page.preset-config-page .config-shell.compact,
 body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide {
   width: min(1480px, calc(100vw - var(--app-sidebar-width, 0px) - 48px)) !important;
@@ -78,67 +72,11 @@ body.modern-setting-page.preset-config-page .preset-library-head {
   align-items: flex-start;
 }
 
-/* No-motion button guard for these two polished pages. */
 body.modern-setting-page.preset-config-page button:hover,
 body.modern-setting-page.preset-config-page button:active,
 body.modern-setting-page.memory-config-page button:hover,
 body.modern-setting-page.memory-config-page button:active {
   transform: none !important;
-}
-
-/* Sync the approved role-card ivory fields to Preset and Memory pages only.
-   This intentionally does not target checkbox/radio/file inputs or preset module toggles. */
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page textarea,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page textarea {
-  background: rgba(255, 248, 236, 0.96) !important;
-  border-color: rgba(150, 101, 65, 0.40) !important;
-  color: #3d2c20;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.64),
-    inset 0 -10px 24px rgba(146, 101, 67, 0.025),
-    0 1px 3px rgba(86, 55, 32, 0.075) !important;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page select:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page textarea:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page select:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page textarea:hover {
-  background: rgba(255, 250, 241, 0.98) !important;
-  border-color: rgba(142, 91, 56, 0.54) !important;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page textarea:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page textarea:focus {
-  background: rgba(255, 252, 246, 0.99) !important;
-  border-color: rgba(199, 122, 67, 0.72) !important;
-  box-shadow:
-    0 0 0 3px rgba(199, 122, 67, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 2px 8px rgba(86, 55, 32, 0.08) !important;
-  outline: none;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page textarea,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page textarea {
-  line-height: 1.76;
-  padding: 14px 16px;
-}
-
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page input::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page textarea::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page input::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page textarea::placeholder {
-  color: rgba(94, 68, 49, 0.56);
 }
 
 @media (max-width: 1180px) {
@@ -164,11 +102,7 @@ html:not([data-theme="dark"]) body.modern-setting-page.memory-config-page textar
   }
 }
 
-
-/* =========================================================
-   Preset + Memory v1.0.1 status pill polish.
-   Replace heavy white status boxes with lightweight inline state pills.
-   ========================================================= */
+/* Preset + memory status pills. */
 body.modern-setting-page.preset-config-page .preset-status-strip.config-status-strip,
 body.modern-setting-page.memory-config-page .memory-overview-status.config-status-strip {
   display: flex !important;
@@ -327,8 +261,6 @@ html[data-theme="dark"] body.modern-setting-page .config-status-pill {
   }
 }
 
-
-/* v1.0.2 preset restore guard: preset library cards are rectangular cards, not pill buttons. */
 body.modern-setting-page.preset-config-page .preset-card-grid .preset-item {
   border-radius: 18px !important;
   transform: none !important;
@@ -338,15 +270,8 @@ body.modern-setting-page.preset-config-page .preset-card-grid .preset-item:activ
   transform: none !important;
 }
 
+/* Memory page styles migrated from template inline CSS. */
 
-
-
-/* =========================================================
-   v122 migrated from templates/memory_config.html
-   Moved out of inline <style> so this page can be cleaned from static/css/09-preset-memory.css.
-   ========================================================= */
-
-/* ui-v129: memory page dark cleanup. Local hard dark surfaces are removed; panels follow --panel / --panel-strong / --input-bg. */
 body.memory-config-page .config-shell.compact.memory-wide {
   width: min(1760px, calc(100vw - 32px));
   max-width: min(1760px, calc(100vw - 32px));
@@ -422,7 +347,6 @@ body.memory-config-page .memory-overview-status strong {
   color: var(--text);
   font-size: 0.9rem;
 }
-
 
 body.memory-config-page .memory-wide .stats-row {
   gap: 8px;
@@ -590,7 +514,7 @@ body.memory-config-page .selection-chip input[type="checkbox"] {
   width: 20px;
   height: 20px;
   border-radius: 7px;
-  border: 2px solid var(--border);
+  border: 2px solid color-mix(in srgb, var(--border) 82%, var(--text) 18%);
   background: var(--input-bg);
   cursor: pointer;
   flex: 0 0 auto;
@@ -618,6 +542,11 @@ body.memory-config-page .selection-chip input[type="checkbox"]:checked::after {
 
 body.memory-config-page .memory-card.selectable {
   position: relative;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 72%, transparent),
+      color-mix(in srgb, var(--input-bg) 58%, transparent));
+  border-color: color-mix(in srgb, var(--border) 74%, transparent);
 }
 
 body.memory-config-page .memory-card.selectable .memory-card-head {
@@ -685,16 +614,18 @@ body.memory-config-page .memory-select {
   width: 26px;
   height: 26px;
   border-radius: 9px;
-  border: 2px solid var(--border);
+  border: 2px solid color-mix(in srgb, var(--border) 82%, var(--text) 18%);
   background: var(--input-bg);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 22%, transparent), 0 1px 3px rgba(96,63,35,0.10);
   cursor: pointer;
   flex: 0 0 auto;
   transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 body.memory-config-page .memory-select:hover {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.12);
+  background: color-mix(in srgb, var(--input-bg) 82%, var(--accent) 6%);
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent), 0 1px 3px rgba(96,63,35,0.12);
 }
 
 body.memory-config-page .memory-select:checked {
@@ -731,19 +662,6 @@ body.memory-config-page .merged-card {
   -webkit-backdrop-filter: var(--ui-glass-blur-soft);
 }
 
-
-body.memory-config-page .memory-select {
-  background: var(--input-bg);
-  border-color: color-mix(in srgb, var(--border) 82%, var(--text) 18%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 22%, transparent), 0 1px 3px rgba(96,63,35,0.10);
-}
-
-body.memory-config-page .memory-select:hover {
-  background: color-mix(in srgb, var(--input-bg) 82%, var(--accent) 6%);
-  border-color: color-mix(in srgb, var(--accent) 54%, var(--border));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent), 0 1px 3px rgba(96,63,35,0.12);
-}
-
 body.memory-config-page .memory-summary-chip,
 body.memory-config-page .selection-chip,
 body.memory-config-page .merged-badge,
@@ -752,11 +670,6 @@ body.memory-config-page .merged-card-time {
   border-color: color-mix(in srgb, var(--border) 74%, transparent);
   background: color-mix(in srgb, var(--input-bg) 66%, transparent 34%);
   color: var(--muted);
-}
-
-body.memory-config-page .selection-chip input[type="checkbox"] {
-  background: var(--input-bg);
-  border-color: color-mix(in srgb, var(--border) 82%, var(--text) 18%);
 }
 
 body.memory-config-page .selection-chip input[type="checkbox"]:checked,
@@ -776,12 +689,6 @@ body.memory-config-page .memory-list-toolbar {
   -webkit-backdrop-filter: var(--ui-glass-blur-soft);
 }
 
-body.memory-config-page .memory-transfer-select {
-  background-color: var(--input-bg);
-  border-color: color-mix(in srgb, var(--border) 80%, transparent);
-  color: var(--text);
-}
-
 body.memory-config-page .selection-chip input[type="checkbox"]:checked::after,
 body.memory-config-page .memory-select:checked::after {
   width: 13px;
@@ -796,27 +703,6 @@ body.memory-config-page .memory-select:not(:checked) {
   border-color: rgba(108, 72, 46, 0.82);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 0 0 2px rgba(128, 83, 54, 0.08), 0 1px 3px rgba(96,63,35,0.12);
 }
-
-body.memory-config-page .memory-icon-button {
-  background: color-mix(in srgb, var(--input-bg) 70%, transparent 30%);
-  border-color: color-mix(in srgb, var(--border) 78%, transparent);
-  color: var(--text);
-}
-
-body.memory-config-page .outline-brief-summary {
-  border-color: color-mix(in srgb, var(--border) 70%, transparent);
-  background: color-mix(in srgb, var(--input-bg) 52%, transparent 48%);
-}
-
-body.memory-config-page .memory-card.selectable {
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--panel-strong) 72%, transparent),
-      color-mix(in srgb, var(--input-bg) 58%, transparent));
-  border-color: color-mix(in srgb, var(--border) 74%, transparent);
-}
-
-/* ui-v129: removed fixed dark card backgrounds; dark memory panels inherit the global glass opacity above. */
 
 body.memory-config-page .outline-overview-shell {
   display: grid;
@@ -1057,6 +943,9 @@ body.memory-config-page .memory-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: color-mix(in srgb, var(--input-bg) 70%, transparent 30%);
+  border-color: color-mix(in srgb, var(--border) 78%, transparent);
+  color: var(--text);
   font-size: 1rem;
   line-height: 1;
   white-space: nowrap;

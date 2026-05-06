@@ -1,21 +1,14 @@
 /* Split from static/styles.css · 08-config-fields.css
-   Scope: 设置页输入框边界同步
-   This v121 split preserves cascade order; clean-up comes later. */
+   Scope: 设置页字段控件最终层
+   ui-v139: 接管 global / user / workshop / card / preset / memory / worldbook_config 的浅色普通字段标准；暂不接管 worldbook_manager。 */
 
 /* =========================================================
-   Config fields v0.9.9: sync role-card ivory input fields
-   Scope: global settings, user settings, workshop only.
-   Keep glass panels; only make editable fields clearer and warmer.
+   Config fields ui-v139: shared light ivory editable fields
+   Keep glass panels unchanged; only make editable fields clearer and warmer.
    ========================================================= */
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page textarea,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page textarea,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page select,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page textarea {
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) select,
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) textarea {
   background: rgba(255, 248, 236, 0.96) !important;
   border-color: rgba(150, 101, 65, 0.40) !important;
   color: #3d2c20;
@@ -25,28 +18,16 @@ html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page text
     0 1px 3px rgba(86, 55, 32, 0.075) !important;
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page select:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page textarea:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page select:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page textarea:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page select:hover,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page textarea:hover {
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) select:hover,
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) textarea:hover {
   background: rgba(255, 250, 241, 0.98) !important;
   border-color: rgba(142, 91, 56, 0.54) !important;
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page textarea:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page textarea:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page select:focus,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page textarea:focus {
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) select:focus,
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) textarea:focus {
   background: rgba(255, 252, 246, 0.99) !important;
   border-color: rgba(199, 122, 67, 0.72) !important;
   box-shadow:
@@ -56,20 +37,17 @@ html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page text
   outline: none;
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page textarea,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page textarea,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page textarea {
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) textarea {
   line-height: 1.76;
   padding: 14px 16px;
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page input::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.global-config-page textarea::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page input::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.user-config-page textarea::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page input::placeholder,
-html:not([data-theme="dark"]) body.modern-setting-page.workshop-config-page textarea::placeholder {
-  color: rgba(94, 68, 49, 0.56);
+html:not([data-theme="dark"]) body.modern-setting-page.card-config-page textarea {
+  line-height: 1.78;
+  padding: 14px 16px;
 }
 
-
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) input::placeholder,
+html:not([data-theme="dark"]) body.modern-setting-page:is(.global-config-page, .user-config-page, .workshop-config-page, .card-config-page, .preset-config-page, .memory-config-page, .worldbook-config-page) textarea::placeholder {
+  color: rgba(94, 68, 49, 0.56);
+}
