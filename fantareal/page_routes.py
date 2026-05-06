@@ -59,14 +59,41 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             and not _has_workshop_progress(workshop_state)
         )
 
+    def _should_show_workshop_opening(
+        *,
+        opening: dict[str, Any],
+        history: list[dict[str, Any]],
+        memories: list[dict[str, Any]],
+        summary_buffer: str,
+        workshop_state: dict[str, Any],
+    ) -> bool:
+        return bool(
+            isinstance(opening, dict)
+            and opening.get("enabled") is True
+            and not history
+            and not memories
+            and not summary_buffer
+            and not _has_workshop_progress(workshop_state)
+        )
+
     def build_chat_template_context() -> dict[str, Any]:
         active_slot = ctx.get_active_slot_id() if hasattr(ctx, "get_active_slot_id") else None
         persona = ctx.get_persona()
         history = ctx.get_conversation()
         memories = ctx.get_memories()
         workshop_state = ctx.get_workshop_state(active_slot) if active_slot is not None else ctx.get_workshop_state()
+        current_card = ctx.get_current_card(active_slot) if active_slot is not None else ctx.get_current_card()
+        creative_workshop = ctx.sanitize_creative_workshop(current_card.get("raw", {}).get("creativeWorkshop", {}))
+        workshop_opening = creative_workshop.get("opening", {}) if isinstance(creative_workshop, dict) else {}
         summary_buffer = _summary_buffer_content(active_slot)
         opening_message = _opening_message_from_persona(persona)
+        show_opening_message = _should_show_opening_message(
+            opening_message=opening_message,
+            history=history,
+            memories=memories,
+            summary_buffer=summary_buffer,
+            workshop_state=workshop_state,
+        )
         preset_store = ctx.get_preset_store()
         active_preset = ctx.get_active_preset_from_store(preset_store)
         preset_debug = ctx.build_preset_debug_payload()
@@ -82,8 +109,10 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             "active_preset_modules": preset_debug["active_modules"],
             "preset_debug": preset_debug,
             "opening_message": opening_message,
-            "show_opening_message": _should_show_opening_message(
-                opening_message=opening_message,
+            "show_opening_message": show_opening_message,
+            "workshop_opening": workshop_opening,
+            "show_workshop_opening": _should_show_workshop_opening(
+                opening=workshop_opening,
                 history=history,
                 memories=memories,
                 summary_buffer=summary_buffer,

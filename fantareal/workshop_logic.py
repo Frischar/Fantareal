@@ -29,9 +29,31 @@ def _clamp_float(value: Any, minimum: float, maximum: float, default: float) -> 
     return min(max(number, minimum), maximum)
 
 
+WORKSHOP_OPENING_ANIMATIONS = {"fade", "push", "black", "dream", "curtain", "still"}
+
+
+def normalize_workshop_opening_animation(value: Any) -> str:
+    animation = str(value or "fade").strip().lower()
+    return animation if animation in WORKSHOP_OPENING_ANIMATIONS else "fade"
+
+
+def default_workshop_opening() -> dict[str, Any]:
+    return {
+        "enabled": False,
+        "title": "",
+        "subtitle": "",
+        "coverImage": "",
+        "musicUrl": "",
+        "buttonText": "进入故事",
+        "volume": 0.65,
+        "animation": "fade",
+    }
+
+
 def default_creative_workshop() -> dict[str, Any]:
     return {
         "enabled": True,
+        "opening": default_workshop_opening(),
         "items": [
             {
                 "id": "workshop_stage_a",
@@ -69,6 +91,27 @@ def normalize_workshop_trigger_mode(value: Any) -> str:
 def normalize_workshop_action_type(value: Any) -> str:
     action_type = str(value or "music").strip().lower()
     return "image" if action_type == "image" else "music"
+
+
+def sanitize_workshop_opening(raw: Any) -> dict[str, Any]:
+    base = default_workshop_opening()
+    if not isinstance(raw, dict):
+        return base
+
+    button_text = str(raw.get("buttonText", "") or "").strip()[:24]
+    base.update(
+        {
+            "enabled": _parse_bool(raw.get("enabled"), False),
+            "title": str(raw.get("title", "") or "").strip()[:80],
+            "subtitle": str(raw.get("subtitle", "") or "").strip()[:160],
+            "coverImage": str(raw.get("coverImage", "") or raw.get("coverUrl", "") or "").strip(),
+            "musicUrl": str(raw.get("musicUrl", "") or "").strip(),
+            "buttonText": button_text or "进入故事",
+            "volume": _clamp_float(raw.get("volume"), 0.0, 1.0, 0.65),
+            "animation": normalize_workshop_opening_animation(raw.get("animation")),
+        }
+    )
+    return base
 
 
 def sanitize_creative_workshop_item(raw: Any, *, index: int) -> dict[str, Any] | None:
@@ -145,6 +188,7 @@ def sanitize_creative_workshop(raw: Any) -> dict[str, Any]:
         )
 
     base["enabled"] = _parse_bool(raw.get("enabled"), True)
+    base["opening"] = sanitize_workshop_opening(raw.get("opening", {}))
     base["items"] = normalized_items + extras
     return base
 
