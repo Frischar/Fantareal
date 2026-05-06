@@ -1256,6 +1256,15 @@
         return value;
       }
 
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
       function inferStatusKind(text) {
         const value = String(text || "");
         if (/失败|出错|错误|异常/.test(value)) return "error";
