@@ -576,7 +576,7 @@
               <p id="chat-subtitle" class="chat-greeting-scroll">角色卡已加载。</p>
             </div>
             <div class="header-actions">
-              <button id="workshop-opening-audio-toggle" type="button" class="secondary compact icon-button workshop-opening-audio-toggle" aria-label="开场音乐：暂停" title="开场音乐：暂停" hidden>
+              <button id="workshop-opening-audio-toggle" type="button" class="secondary compact icon-button workshop-opening-audio-toggle" aria-label="工坊氛围：播放" title="工坊氛围：播放" hidden>
                 <span id="workshop-opening-audio-toggle-icon" aria-hidden="true">🔊</span>
               </button>
               <button id="open-drawer-secondary" type="button" class="secondary compact icon-button config-gear-button" aria-label="运行配置" title="运行配置" aria-expanded="false" aria-controls="config-drawer">
@@ -841,12 +841,21 @@
           <h1 id="workshop-opening-title">{{ workshop_opening.title or persona.name or "Fantareal" }}</h1>
           {% if workshop_opening.subtitle %}<p class="workshop-opening-subtitle">{{ workshop_opening.subtitle }}</p>{% endif %}
           <button id="workshop-opening-start" class="workshop-opening-start" type="button">{{ workshop_opening.buttonText or "进入故事" }}</button>
+          <div id="workshop-opening-loading" class="workshop-opening-loading" hidden aria-live="polite">
+            <span id="workshop-opening-loading-text" class="workshop-opening-loading-text">正在入梦……</span>
+            <div class="workshop-opening-progress" aria-hidden="true">
+              <span id="workshop-opening-progress-bar" class="workshop-opening-progress-bar"></span>
+            </div>
+          </div>
         </div>
       </section>
     </div>
     {% endif %}
     <audio id="workshop-audio-player" preload="auto"></audio>
     <audio id="workshop-opening-audio" preload="auto"></audio>
+    <audio id="workshop-ambience-music-audio" preload="auto"></audio>
+    <audio id="workshop-ambience-ambient-audio" preload="auto"></audio>
+    <audio id="workshop-dynamic-audio" preload="auto"></audio>
     <div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>
 
     <div id="drawer-overlay" class="drawer-overlay" hidden></div>
@@ -1067,15 +1076,31 @@
       const workshopAudioEl = document.getElementById("workshop-audio-player");
       const workshopOpeningOverlayEl = document.getElementById("workshop-opening-overlay");
       const workshopOpeningStartEl = document.getElementById("workshop-opening-start");
+      const workshopOpeningLoadingEl = document.getElementById("workshop-opening-loading");
+      const workshopOpeningLoadingTextEl = document.getElementById("workshop-opening-loading-text");
+      const workshopOpeningProgressBarEl = document.getElementById("workshop-opening-progress-bar");
       const workshopOpeningAudioEl = document.getElementById("workshop-opening-audio");
+      const workshopAmbienceMusicAudioEl = document.getElementById("workshop-ambience-music-audio");
+      const workshopAmbienceAmbientAudioEl = document.getElementById("workshop-ambience-ambient-audio");
+      const workshopDynamicAudioEl = document.getElementById("workshop-dynamic-audio");
       const workshopOpeningAudioToggleEl = document.getElementById("workshop-opening-audio-toggle");
       const workshopOpeningAudioToggleIconEl = document.getElementById("workshop-opening-audio-toggle-icon");
       const workshopOpeningConfig = {{ workshop_opening | tojson }};
+      const workshopAmbienceConfig = {{ workshop_ambience | tojson }};
+      const workshopDynamicScenesConfig = {{ workshop_dynamic_scenes | tojson }};
+      const workshopRuntimeState = {{ workshop_state | tojson }};
       const shouldShowWorkshopOpening = {{ show_workshop_opening | tojson }};
       let workshopOpeningEntering = false;
       let workshopOpeningMusicStarted = false;
       let workshopOpeningAudioFadeTimer = null;
+      let workshopOpeningAutoPlayAttempted = false;
       const WORKSHOP_OPENING_FADE_MS = 420;
+      const WORKSHOP_OPENING_LOAD_TIMEOUT_MS = 5000;
+      const workshopOpeningMessageEl = document.querySelector(".opening-message[data-opening-message='true']");
+      const workshopOpeningMessageBubbleEl = workshopOpeningMessageEl?.querySelector(".bubble") || null;
+      let workshopOpeningMessageRawText = "";
+      let workshopOpeningMessageTypewriterStarted = false;
+      let workshopOpeningMessageTypewriterTimer = null;
       const WORKSHOP_MUSIC_PRESETS = [
         { id: "off", label: "关闭", url: "" },
         { id: "coffee", label: "咖啡馆氛围", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
@@ -2852,91 +2877,339 @@
         return Math.min(Math.max(numeric, 0), 1);
       }
 
+      function clampSeconds(value, fallback = 0) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return fallback;
+        return Math.min(Math.max(numeric, 0), 10);
+      }
+
+      function clampOpeningSeconds(value, fallback = 0, max = 20) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return fallback;
+        return Math.min(Math.max(numeric, 0), max);
+      }
+
+      function sleep(ms = 0) {
+        return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+      }
+
+      function getOpeningFadeInMs() {
+        return Math.round(clampOpeningSeconds(workshopOpeningConfig?.fadeInSeconds, 2, 8) * 1000);
+      }
+
+      function getOpeningFadeOutMs() {
+        return Math.round(clampOpeningSeconds(workshopOpeningConfig?.fadeOutSeconds, 2, 8) * 1000);
+      }
+
+      function getOpeningTransitionMs() {
+        return Math.round(clampOpeningSeconds(workshopOpeningConfig?.transitionSeconds, 2, 8) * 1000);
+      }
+
+      function resolveWorkshopPresetUrl(presets, presetId) {
+        return presets.find((entry) => entry.id === presetId)?.url || "";
+      }
+
+      const WORKSHOP_AMBIENT_PRESETS = [
+        { id: "off", label: "关闭", url: "" },
+        { id: "rain", label: "雨声", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
+        { id: "coffee", label: "咖啡馆人声", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
+        { id: "night", label: "夜晚底噪", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
+      ];
+
+      let workshopAudioFadeTimers = new WeakMap();
+      let workshopAmbienceStarted = false;
+      let workshopAmbienceMuted = false;
+      let workshopActiveAudioGroup = "none";
+      let workshopRoundCount = Number(workshopRuntimeState?.round_count || 0) || 0;
+      const workshopDynamicTriggeredSession = new Set();
+
+      function fadeAudioElement(audioEl, targetVolume, duration = getOpeningTransitionMs()) {
+        if (!audioEl) return Promise.resolve();
+        const existing = workshopAudioFadeTimers.get(audioEl);
+        if (existing) window.clearInterval(existing);
+        const target = clampAudioVolume(targetVolume, 0.65);
+        const start = clampAudioVolume(audioEl.volume, 0);
+        const startedAt = performance.now();
+        if (duration <= 0 || Math.abs(start - target) < 0.01) {
+          audioEl.volume = target;
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+          const timer = window.setInterval(() => {
+            const progress = Math.min((performance.now() - startedAt) / duration, 1);
+            audioEl.volume = start + (target - start) * progress;
+            if (progress >= 1) {
+              window.clearInterval(timer);
+              workshopAudioFadeTimers.delete(audioEl);
+              audioEl.volume = target;
+              resolve();
+            }
+          }, 32);
+          workshopAudioFadeTimers.set(audioEl, timer);
+        });
+      }
+
+      function setAudioSource(audioEl, url, loop = true) {
+        if (!audioEl || !url) return false;
+        audioEl.loop = loop !== false;
+        const absoluteUrl = new URL(url, window.location.href).href;
+        if (audioEl.src !== absoluteUrl) {
+          audioEl.src = url;
+          audioEl.load();
+        }
+        return true;
+      }
+
+      function setWorkshopOpeningLoading(progress = 0, text = "正在入梦……") {
+        if (!workshopOpeningLoadingEl) return;
+        const percent = Math.min(Math.max(Number(progress) || 0, 0), 100);
+        workshopOpeningLoadingEl.hidden = false;
+        if (workshopOpeningLoadingTextEl) workshopOpeningLoadingTextEl.textContent = text;
+        if (workshopOpeningProgressBarEl) workshopOpeningProgressBarEl.style.width = `${percent}%`;
+      }
+
+      function startWorkshopOpeningLoadingVisual(expectedMs = 0) {
+        let progress = 4;
+        let finished = false;
+        const duration = Math.max(Number(expectedMs) || 0, 450);
+        const startedAt = performance.now();
+        workshopOpeningOverlayEl?.classList.add("is-loading");
+        setWorkshopOpeningLoading(progress, "正在入梦……");
+        const timer = window.setInterval(() => {
+          if (finished) return;
+          const elapsed = performance.now() - startedAt;
+          const timeProgress = Math.min(elapsed / duration, 1);
+          progress = Math.min(92, 6 + timeProgress * 84);
+          const text = timeProgress < 0.28
+            ? "正在载入开场音乐……"
+            : timeProgress < 0.78
+              ? "正在整理开场演出……"
+              : "即将进入故事……";
+          setWorkshopOpeningLoading(progress, text);
+        }, 90);
+
+        return {
+          async finish(text = "即将进入故事……") {
+            finished = true;
+            window.clearInterval(timer);
+            setWorkshopOpeningLoading(100, text);
+            await sleep(260);
+          },
+        };
+      }
+
+      async function runWorkshopOpeningEntryProgress(holdMs, musicTask) {
+        const loading = startWorkshopOpeningLoadingVisual(holdMs);
+        const [_, loadResult] = await Promise.all([
+          sleep(holdMs),
+          waitWorkshopOpeningTask(musicTask || Promise.resolve(), holdMs + WORKSHOP_OPENING_LOAD_TIMEOUT_MS),
+        ]);
+        if (loadResult?.timedOut) {
+          setStatus("开场音乐加载较慢，已继续进入故事。", "idle");
+          await loading.finish("音乐加载较慢，已继续进入……");
+          return;
+        }
+        await loading.finish("即将进入故事……");
+      }
+
+      function waitWorkshopOpeningTask(task, timeoutMs = WORKSHOP_OPENING_LOAD_TIMEOUT_MS) {
+        return new Promise((resolve) => {
+          let settled = false;
+          const timer = window.setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            resolve({ timedOut: true });
+          }, timeoutMs);
+
+          Promise.resolve(task)
+            .then(() => {
+              if (settled) return;
+              settled = true;
+              window.clearTimeout(timer);
+              resolve({ timedOut: false });
+            })
+            .catch((error) => {
+              if (settled) return;
+              settled = true;
+              window.clearTimeout(timer);
+              resolve({ timedOut: false, error });
+            });
+        });
+      }
+
+      function getAmbienceMusicUrl() {
+        const music = workshopAmbienceConfig?.music || {};
+        return String(music.url || resolveWorkshopPresetUrl(WORKSHOP_MUSIC_PRESETS, music.preset) || "").trim();
+      }
+
+      function getAmbienceAmbientUrl() {
+        const ambient = workshopAmbienceConfig?.ambient || {};
+        return String(ambient.url || resolveWorkshopPresetUrl(WORKSHOP_AMBIENT_PRESETS, ambient.preset) || "").trim();
+      }
+
       function hasWorkshopOpeningMusic() {
         return Boolean(String(workshopOpeningConfig?.musicUrl || "").trim());
       }
 
+      function hasWorkshopAmbienceAudio() {
+        const ambience = workshopAmbienceConfig || {};
+        return Boolean(
+          ambience.enabled && (
+            (ambience.music?.enabled && getAmbienceMusicUrl())
+            || (ambience.ambient?.enabled && getAmbienceAmbientUrl())
+          )
+        );
+      }
+
+      function hasWorkshopAnyAudio() {
+        return hasWorkshopOpeningMusic() || hasWorkshopAmbienceAudio();
+      }
+
+      function getCurrentWorkshopAudioElements() {
+        if (workshopActiveAudioGroup === "ambience") {
+          return [workshopAmbienceMusicAudioEl, workshopAmbienceAmbientAudioEl].filter(Boolean);
+        }
+        if (workshopActiveAudioGroup === "opening") {
+          return [workshopOpeningAudioEl].filter(Boolean);
+        }
+        return [workshopOpeningAudioEl, workshopAmbienceMusicAudioEl, workshopAmbienceAmbientAudioEl].filter(Boolean);
+      }
+
       function updateWorkshopOpeningAudioToggle() {
-        if (!workshopOpeningAudioToggleEl || !workshopOpeningAudioEl) return;
-        const shouldShow = hasWorkshopOpeningMusic() && workshopOpeningMusicStarted;
+        if (!workshopOpeningAudioToggleEl) return;
+        const shouldShow = hasWorkshopAnyAudio() && (workshopOpeningMusicStarted || workshopAmbienceStarted || (!shouldShowWorkshopOpening && hasWorkshopAmbienceAudio()));
         workshopOpeningAudioToggleEl.hidden = !shouldShow;
         if (!shouldShow) return;
-        const paused = workshopOpeningAudioEl.paused;
-        const label = paused ? "开场音乐：播放" : "开场音乐：暂停";
+        const activeElements = getCurrentWorkshopAudioElements();
+        const isPaused = activeElements.every((audio) => !audio || audio.paused);
+        const label = isPaused ? "工坊氛围：播放" : "工坊氛围：暂停";
         workshopOpeningAudioToggleEl.setAttribute("aria-label", label);
         workshopOpeningAudioToggleEl.setAttribute("title", label);
-        workshopOpeningAudioToggleEl.classList.toggle("is-paused", paused);
+        workshopOpeningAudioToggleEl.classList.toggle("is-paused", isPaused || workshopAmbienceMuted);
         if (workshopOpeningAudioToggleIconEl) {
-          workshopOpeningAudioToggleIconEl.textContent = paused ? "🔇" : "🔊";
+          workshopOpeningAudioToggleIconEl.textContent = isPaused || workshopAmbienceMuted ? "🔇" : "🔊";
         }
       }
 
-      function fadeWorkshopOpeningAudio(targetVolume, duration = WORKSHOP_OPENING_FADE_MS) {
-        if (!workshopOpeningAudioEl) return Promise.resolve();
-        if (workshopOpeningAudioFadeTimer) {
-          window.clearInterval(workshopOpeningAudioFadeTimer);
-          workshopOpeningAudioFadeTimer = null;
+      function applyWorkshopAmbienceBackground() {
+        const background = workshopAmbienceConfig?.background || {};
+        if (!workshopAmbienceConfig?.enabled || !background.enabled || !background.imageUrl) return;
+        bodyEl.classList.add("workshop-ambience-active");
+        bodyEl.style.setProperty("--workshop-ambience-bg", `url("${String(background.imageUrl).replace(/["\\\n\r]/g, "")}")`);
+        bodyEl.style.setProperty("--workshop-ambience-overlay", String(Math.min(Math.max(Number(background.overlay ?? 0.35) || 0.35, 0), 0.85)));
+      }
+
+      function clearWorkshopAmbienceBackground() {
+        bodyEl.classList.remove("workshop-ambience-active");
+        bodyEl.style.removeProperty("--workshop-ambience-bg");
+        bodyEl.style.removeProperty("--workshop-ambience-overlay");
+      }
+
+      async function startWorkshopAmbience({ fromUserGesture = false } = {}) {
+        if (!hasWorkshopAmbienceAudio()) {
+          applyWorkshopAmbienceBackground();
+          updateWorkshopOpeningAudioToggle();
+          return;
         }
-        const target = clampAudioVolume(targetVolume, 0.65);
-        const start = clampAudioVolume(workshopOpeningAudioEl.volume, 0);
-        const startedAt = performance.now();
-        if (duration <= 0 || Math.abs(start - target) < 0.01) {
-          workshopOpeningAudioEl.volume = target;
-          return Promise.resolve();
+        applyWorkshopAmbienceBackground();
+        const tasks = [];
+        const music = workshopAmbienceConfig.music || {};
+        const ambient = workshopAmbienceConfig.ambient || {};
+        const musicUrl = music.enabled ? getAmbienceMusicUrl() : "";
+        const ambientUrl = ambient.enabled ? getAmbienceAmbientUrl() : "";
+        if (musicUrl && setAudioSource(workshopAmbienceMusicAudioEl, musicUrl, music.loop !== false)) {
+          workshopAmbienceMusicAudioEl.volume = 0;
+          tasks.push(workshopAmbienceMusicAudioEl.play().then(() => fadeAudioElement(workshopAmbienceMusicAudioEl, clampAudioVolume(music.volume, 0.6), getOpeningTransitionMs())));
         }
-        return new Promise((resolve) => {
-          workshopOpeningAudioFadeTimer = window.setInterval(() => {
-            const progress = Math.min((performance.now() - startedAt) / duration, 1);
-            workshopOpeningAudioEl.volume = start + (target - start) * progress;
-            if (progress >= 1) {
-              window.clearInterval(workshopOpeningAudioFadeTimer);
-              workshopOpeningAudioFadeTimer = null;
-              workshopOpeningAudioEl.volume = target;
-              resolve();
-            }
-          }, 32);
+        if (ambientUrl && setAudioSource(workshopAmbienceAmbientAudioEl, ambientUrl, ambient.loop !== false)) {
+          workshopAmbienceAmbientAudioEl.volume = 0;
+          tasks.push(workshopAmbienceAmbientAudioEl.play().then(() => fadeAudioElement(workshopAmbienceAmbientAudioEl, clampAudioVolume(ambient.volume, 0.35), getOpeningTransitionMs())));
+        }
+        workshopAmbienceStarted = true;
+        workshopAmbienceMuted = false;
+        workshopActiveAudioGroup = "ambience";
+        updateWorkshopOpeningAudioToggle();
+        return Promise.all(tasks).catch(() => {
+          setStatus(fromUserGesture ? "常驻氛围播放失败，请检查音频文件或浏览器权限。" : "常驻氛围等待用户点击喇叭后播放。");
+          updateWorkshopOpeningAudioToggle();
         });
       }
 
-      function playWorkshopOpeningMusic() {
+      async function stopOpeningMusic({ fade = true } = {}) {
+        if (!workshopOpeningAudioEl || !workshopOpeningMusicStarted) return;
+        if (fade) await fadeAudioElement(workshopOpeningAudioEl, 0, getOpeningFadeOutMs());
+        workshopOpeningAudioEl.pause();
+        updateWorkshopOpeningAudioToggle();
+      }
+
+      function playWorkshopOpeningMusic(options = {}) {
+        const { silentFailure = false } = options || {};
         if (!workshopOpeningAudioEl || !workshopOpeningConfig?.musicUrl) return Promise.resolve();
         const nextUrl = String(workshopOpeningConfig.musicUrl || "").trim();
         if (!nextUrl) return Promise.resolve();
         const targetVolume = clampAudioVolume(workshopOpeningConfig.volume, 0.65);
-        workshopOpeningAudioEl.loop = true;
-        if (workshopOpeningAudioEl.src !== nextUrl) {
-          workshopOpeningAudioEl.src = nextUrl;
-          workshopOpeningAudioEl.load();
+        setAudioSource(workshopOpeningAudioEl, nextUrl, true);
+        workshopOpeningMusicStarted = true;
+        workshopActiveAudioGroup = "opening";
+        updateWorkshopOpeningAudioToggle();
+        if (!workshopOpeningAudioEl.paused && !workshopOpeningAudioEl.ended) {
+          return fadeAudioElement(workshopOpeningAudioEl, targetVolume, getOpeningFadeInMs()).then(updateWorkshopOpeningAudioToggle);
         }
         workshopOpeningAudioEl.volume = 0;
-        workshopOpeningMusicStarted = true;
-        updateWorkshopOpeningAudioToggle();
         return workshopOpeningAudioEl.play().then(() => {
           updateWorkshopOpeningAudioToggle();
-          return fadeWorkshopOpeningAudio(targetVolume, WORKSHOP_OPENING_FADE_MS);
-        }).then(updateWorkshopOpeningAudioToggle).catch(() => {
+          return fadeAudioElement(workshopOpeningAudioEl, targetVolume, getOpeningFadeInMs());
+        }).then(updateWorkshopOpeningAudioToggle).catch((error) => {
           updateWorkshopOpeningAudioToggle();
-          setStatus("开场音乐播放失败，请检查音频文件或浏览器权限。");
+          if (!silentFailure) {
+            setStatus("开场音乐播放失败，请检查音频文件或浏览器权限。", "error");
+          }
+          throw error;
         });
       }
 
-      function toggleWorkshopOpeningMusic() {
-        if (!workshopOpeningAudioEl || !hasWorkshopOpeningMusic() || !workshopOpeningMusicStarted) return;
-        const targetVolume = clampAudioVolume(workshopOpeningConfig.volume, 0.65);
-        if (workshopOpeningAudioEl.paused) {
-          workshopOpeningAudioEl.volume = 0;
-          workshopOpeningAudioEl.play().then(() => {
-            updateWorkshopOpeningAudioToggle();
-            return fadeWorkshopOpeningAudio(targetVolume, WORKSHOP_OPENING_FADE_MS);
-          }).then(updateWorkshopOpeningAudioToggle).catch(() => {
-            setStatus("开场音乐播放失败，请检查音频文件或浏览器权限。");
-            updateWorkshopOpeningAudioToggle();
+      async function toggleWorkshopOpeningMusic() {
+        if (!hasWorkshopAnyAudio()) return;
+        const activeElements = getCurrentWorkshopAudioElements();
+        const allPaused = activeElements.every((audio) => !audio || audio.paused);
+        if (allPaused) {
+          if (workshopActiveAudioGroup === "none" && hasWorkshopAmbienceAudio()) {
+            await startWorkshopAmbience({ fromUserGesture: true });
+            return;
+          }
+          const resumeTasks = activeElements.map((audio) => {
+            if (!audio || !audio.src) return Promise.resolve();
+            audio.volume = 0;
+            return audio.play().then(() => fadeAudioElement(audio, audio === workshopAmbienceAmbientAudioEl ? clampAudioVolume(workshopAmbienceConfig?.ambient?.volume, 0.35) : clampAudioVolume(workshopAmbienceConfig?.music?.volume || workshopOpeningConfig?.volume, 0.65), getOpeningTransitionMs()));
           });
+          workshopAmbienceMuted = false;
+          await Promise.all(resumeTasks).catch(() => setStatus("工坊氛围播放失败，请检查浏览器权限。"));
         } else {
-          fadeWorkshopOpeningAudio(0, WORKSHOP_OPENING_FADE_MS).then(() => {
-            workshopOpeningAudioEl.pause();
-            updateWorkshopOpeningAudioToggle();
-          });
+          await Promise.all(activeElements.map((audio) => audio ? fadeAudioElement(audio, 0, getOpeningTransitionMs()).then(() => audio.pause()) : Promise.resolve()));
+          workshopAmbienceMuted = true;
+        }
+        updateWorkshopOpeningAudioToggle();
+      }
+
+      async function finalizeOpeningAudioAfterOverlay() {
+        const mode = String(workshopOpeningConfig?.afterMode || "connect_ambience");
+        if (mode === "continue_opening") {
+          workshopActiveAudioGroup = "opening";
+          updateWorkshopOpeningAudioToggle();
+          return;
+        }
+        if (mode === "fade_stop") {
+          await stopOpeningMusic({ fade: true });
+          workshopActiveAudioGroup = hasWorkshopAmbienceAudio() ? "none" : "none";
+          updateWorkshopOpeningAudioToggle();
+          return;
+        }
+        if (hasWorkshopAmbienceAudio() || workshopAmbienceConfig?.background?.enabled) {
+          await stopOpeningMusic({ fade: true });
+          await startWorkshopAmbience({ fromUserGesture: true });
+        } else {
+          workshopActiveAudioGroup = "none";
+          updateWorkshopOpeningAudioToggle();
         }
       }
 
@@ -2944,20 +3217,217 @@
         if (!workshopOpeningOverlayEl || workshopOpeningEntering) return;
         workshopOpeningEntering = true;
         workshopOpeningStartEl?.setAttribute("disabled", "disabled");
-        await playWorkshopOpeningMusic();
+        const holdMs = Math.round(clampOpeningSeconds(workshopOpeningConfig?.holdSeconds, 3, 20) * 1000);
+        const musicTask = hasWorkshopOpeningMusic() ? playWorkshopOpeningMusic({ silentFailure: false }).catch(() => {}) : Promise.resolve();
+        await runWorkshopOpeningEntryProgress(holdMs, musicTask);
         workshopOpeningOverlayEl.classList.add("is-leaving");
-        window.setTimeout(() => {
+        window.setTimeout(async () => {
           workshopOpeningOverlayEl.remove();
           bodyEl.classList.remove("workshop-opening-active");
+          await finalizeOpeningAudioAfterOverlay();
+          startOpeningFirstMessageTypewriter();
           inputEl?.focus();
         }, 760);
       }
 
       function initWorkshopOpening() {
-        if (!shouldShowWorkshopOpening || !workshopOpeningOverlayEl) return;
+        if (!shouldShowWorkshopOpening || !workshopOpeningOverlayEl) {
+          if (workshopAmbienceConfig?.enabled && workshopAmbienceConfig?.startMode === "after_opening") {
+            applyWorkshopAmbienceBackground();
+          }
+          updateWorkshopOpeningAudioToggle();
+          return;
+        }
         bodyEl.classList.add("workshop-opening-active");
         window.setTimeout(() => workshopOpeningStartEl?.focus(), 80);
+        if (workshopOpeningConfig?.autoPlayMusic === true && hasWorkshopOpeningMusic()) {
+          workshopOpeningAutoPlayAttempted = true;
+          window.setTimeout(() => {
+            playWorkshopOpeningMusic({ silentFailure: true }).catch(() => {
+              // 浏览器可能拦截未交互播放；点击进入按钮后仍会再尝试。
+              updateWorkshopOpeningAudioToggle();
+            });
+          }, 240);
+        }
         workshopOpeningStartEl?.addEventListener("click", enterWorkshopOpening, { once: true });
+      }
+
+      function getOpeningTypewriterDelay() {
+        const speed = String(workshopOpeningConfig?.typewriterSpeed || "normal");
+        if (speed === "slow") return 58;
+        if (speed === "fast") return 18;
+        return 34;
+      }
+
+      function prepareOpeningFirstMessageTypewriter() {
+        if (!workshopOpeningMessageBubbleEl || workshopOpeningConfig?.typewriterEnabled !== true) return;
+        if (workshopOpeningMessageBubbleEl.dataset.typewriterPrepared === "true") return;
+        workshopOpeningMessageRawText = workshopOpeningMessageBubbleEl.textContent || "";
+        workshopOpeningMessageBubbleEl.dataset.typewriterPrepared = "true";
+        workshopOpeningMessageBubbleEl.dataset.typewriterRaw = workshopOpeningMessageRawText;
+        workshopOpeningMessageEl?.classList.add("opening-typewriter-pending");
+        renderBubbleContent(workshopOpeningMessageBubbleEl, "");
+      }
+
+      function finishOpeningFirstMessageTypewriter() {
+        if (!workshopOpeningMessageBubbleEl || !workshopOpeningMessageRawText) return;
+        if (workshopOpeningMessageTypewriterTimer) {
+          window.clearTimeout(workshopOpeningMessageTypewriterTimer);
+          workshopOpeningMessageTypewriterTimer = null;
+        }
+        renderBubbleContent(workshopOpeningMessageBubbleEl, workshopOpeningMessageRawText);
+        workshopOpeningMessageEl?.classList.remove("opening-typewriter-pending", "opening-typewriter-active");
+        workshopOpeningMessageEl?.classList.add("opening-typewriter-done");
+        settleMessageScroll(true, true);
+      }
+
+      function startOpeningFirstMessageTypewriter() {
+        if (!workshopOpeningMessageBubbleEl || workshopOpeningConfig?.typewriterEnabled !== true) return;
+        if (workshopOpeningMessageTypewriterStarted) return;
+        prepareOpeningFirstMessageTypewriter();
+        const raw = workshopOpeningMessageBubbleEl.dataset.typewriterRaw || workshopOpeningMessageRawText || "";
+        if (!raw) return;
+        workshopOpeningMessageTypewriterStarted = true;
+        workshopOpeningMessageRawText = raw;
+        workshopOpeningMessageEl?.classList.remove("opening-typewriter-pending");
+        workshopOpeningMessageEl?.classList.add("opening-typewriter-active");
+        const chars = Array.from(raw);
+        let index = 0;
+        const delay = getOpeningTypewriterDelay();
+        const tick = () => {
+          if (index >= chars.length) {
+            finishOpeningFirstMessageTypewriter();
+            return;
+          }
+          const nextText = chars.slice(0, index + 1).join("");
+          renderBubbleContent(workshopOpeningMessageBubbleEl, nextText);
+          settleMessageScroll(true, true);
+          index += 1;
+          workshopOpeningMessageTypewriterTimer = window.setTimeout(tick, delay);
+        };
+        tick();
+      }
+
+      workshopOpeningMessageBubbleEl?.addEventListener("click", () => {
+        if (workshopOpeningMessageTypewriterStarted) finishOpeningFirstMessageTypewriter();
+      });
+
+      function extractWorkshopDynamicEvents(text) {
+        const source = String(text || "");
+        const events = [];
+        let cleaned = source.replace(/\[FT_EVENT:\s*([A-Za-z0-9_-]+)\s*\]/g, (_, eventName) => {
+          events.push(String(eventName || "").trim());
+          return "";
+        });
+        cleaned = cleaned.replace(/```fantareal_workshop\s*([\s\S]*?)```/g, (_, body) => {
+          String(body || "").split(/\r?\n/).forEach((line) => {
+            const match = line.match(/^\s*event\s*:\s*([A-Za-z0-9_-]+)/i);
+            if (match) events.push(match[1]);
+          });
+          return "";
+        });
+        return { cleanedText: cleaned.replace(/\n{3,}/g, "\n\n").trim(), events: [...new Set(events.filter(Boolean))] };
+      }
+
+      function shouldRunDynamicScene(scene, token) {
+        if (!scene?.enabled) return false;
+        const repeat = scene.trigger?.repeat || "once";
+        if (repeat === "always") return true;
+        const sceneKey = `${scene.id || scene.name}:${token}`;
+        if (workshopDynamicTriggeredSession.has(sceneKey)) return false;
+        workshopDynamicTriggeredSession.add(sceneKey);
+        return true;
+      }
+
+      function getDynamicScenes() {
+        return Array.isArray(workshopDynamicScenesConfig) ? workshopDynamicScenesConfig : [];
+      }
+
+      function triggerDynamicScenesByModelEvents(events) {
+        if (!events?.length) return;
+        const normalized = new Set(events.map((item) => String(item || "").trim()).filter(Boolean));
+        getDynamicScenes().forEach((scene) => {
+          if (scene?.trigger?.type !== "model") return;
+          const eventName = String(scene.trigger.event || "").trim();
+          if (eventName && normalized.has(eventName) && shouldRunDynamicScene(scene, `model:${eventName}`)) {
+            runDynamicScene(scene);
+          }
+        });
+      }
+
+      function triggerDynamicScenesByRound(roundCount) {
+        getDynamicScenes().forEach((scene) => {
+          if (scene?.trigger?.type !== "round") return;
+          const target = Number(scene.trigger.round || 1) || 1;
+          const repeat = scene.trigger.repeat || "once";
+          const matched = repeat === "always" ? roundCount >= target && (roundCount - target) % Math.max(target, 1) === 0 : roundCount === target;
+          if (matched && shouldRunDynamicScene(scene, `round:${roundCount}`)) runDynamicScene(scene);
+        });
+      }
+
+      function runDynamicScene(scene) {
+        const content = scene.content || {};
+        const type = content.type || "image";
+        if (type === "sound") {
+          const url = content.soundUrl || scene.audio?.url || "";
+          playDynamicSound(url, scene.audio?.volume ?? 0.5);
+          return;
+        }
+        if (type === "background") {
+          showDynamicBackground(content.backgroundUrl, scene.presentation || {});
+          playDynamicSound(scene.audio?.url || "", scene.audio?.volume ?? 0.5);
+          return;
+        }
+        showDynamicImage(scene);
+        playDynamicSound(scene.audio?.url || content.soundUrl || "", scene.audio?.volume ?? 0.5);
+      }
+
+      function playDynamicSound(url, volume = 0.5) {
+        if (!workshopDynamicAudioEl || !url) return;
+        setAudioSource(workshopDynamicAudioEl, url, false);
+        workshopDynamicAudioEl.volume = clampAudioVolume(volume, 0.5);
+        workshopDynamicAudioEl.currentTime = 0;
+        workshopDynamicAudioEl.play().catch(() => setStatus("动态演出音效播放失败，请检查音频文件。"));
+      }
+
+      function showDynamicImage(scene) {
+        const content = scene.content || {};
+        const presentation = scene.presentation || {};
+        const mode = presentation.mode || "standard";
+        const overlay = document.createElement("div");
+        overlay.className = `workshop-dynamic-overlay workshop-dynamic-${mode}`;
+        overlay.innerHTML = `
+          <div class="workshop-dynamic-backdrop"></div>
+          <section class="workshop-dynamic-card">
+            <button type="button" class="secondary compact workshop-dynamic-close">关闭</button>
+            ${content.imageUrl ? `<img class="workshop-dynamic-image" src="${content.imageUrl.replace(/["<>]/g, "")}" alt="${(content.title || scene.name || "动态演出").replace(/["<>]/g, "")}" />` : ""}
+            <div class="workshop-dynamic-copy">
+              <h2>${escapeHtml(content.title || scene.name || "动态演出")}</h2>
+              ${content.caption ? `<p>${escapeHtml(content.caption)}</p>` : ""}
+            </div>
+          </section>
+        `;
+        document.body.appendChild(overlay);
+        const close = () => {
+          overlay.classList.add("is-leaving");
+          window.setTimeout(() => overlay.remove(), 320);
+        };
+        overlay.querySelector(".workshop-dynamic-close")?.addEventListener("click", close);
+        overlay.querySelector(".workshop-dynamic-backdrop")?.addEventListener("click", close);
+        if (presentation.autoClose !== false && Number(presentation.duration || 0) > 0) {
+          window.setTimeout(close, Number(presentation.duration || 6) * 1000);
+        }
+      }
+
+      function showDynamicBackground(url, presentation = {}) {
+        if (!url) return;
+        bodyEl.classList.add("workshop-dynamic-background-active");
+        bodyEl.style.setProperty("--workshop-dynamic-bg", `url("${String(url).replace(/["\\\n\r]/g, "")}")`);
+        const duration = Number(presentation.duration || 6) || 6;
+        window.setTimeout(() => {
+          bodyEl.classList.remove("workshop-dynamic-background-active");
+          bodyEl.style.removeProperty("--workshop-dynamic-bg");
+        }, Math.max(duration, 1) * 1000);
       }
 
       function getWorkshopStageLabel(stage) {
@@ -3283,10 +3753,14 @@
             },
             onDone(data) {
               finalReply = typeof data.reply === "string" ? data.reply : finalReply;
-              finalReply = processAssistantStatusPanelText(finalReply, {
+              const workshopDynamicParse = extractWorkshopDynamicEvents(finalReply);
+              finalReply = processAssistantStatusPanelText(workshopDynamicParse.cleanedText, {
                 source: "chat_done",
                 userText: text,
               });
+              triggerDynamicScenesByModelEvents(workshopDynamicParse.events);
+              workshopRoundCount += 1;
+              triggerDynamicScenesByRound(workshopRoundCount);
               ensureFinalVisible(assistantEntry, finalReply);
               if (typeof data.think === "string") {
                 assistantEntry.state.think = data.think;
@@ -3444,13 +3918,15 @@
       workshopOpeningAudioEl?.addEventListener("pause", updateWorkshopOpeningAudioToggle);
       workshopOpeningAudioEl?.addEventListener("volumechange", updateWorkshopOpeningAudioToggle);
 
-      initWorkshopOpening();
       applyTheme(runtimeState.theme);
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+      prepareOpeningFirstMessageTypewriter();
+      initWorkshopOpening();
       syncDrawerFromState();
       setWorldbookDebugCollapsed(false);
       hydrateExistingMessages();
+      if (!shouldShowWorkshopOpening) startOpeningFirstMessageTypewriter();
       loadPresetStoreForChat().catch(() => {
         presetDebugPanelEl.hidden = true;
       });

@@ -463,3 +463,101 @@ body.workshop-opening-active {
     width: min(320px, 100%);
   }
 }
+
+/* Opening v1.0.1 · 点击入梦后的加载条反馈 · ui-v140 */
+.workshop-opening-loading {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.82);
+  animation: workshopOpeningLoadingIn 220ms ease both;
+}
+
+.workshop-opening-loading[hidden] {
+  display: none !important;
+}
+
+.workshop-opening-loading-text {
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.42);
+}
+
+.workshop-opening-progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 26px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(12px) saturate(1.08);
+}
+
+.workshop-opening-progress-bar {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg,
+      rgba(255, 255, 255, 0.52),
+      color-mix(in srgb, var(--accent) 64%, rgba(255, 255, 255, 0.84)),
+      rgba(255, 255, 255, 0.72));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 42%, transparent);
+  transition: width 180ms ease;
+}
+
+.workshop-opening-overlay.is-loading .workshop-opening-start {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+  filter: saturate(0.88) brightness(0.96);
+}
+
+@keyframes workshopOpeningLoadingIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Opening v1.1 · 开场体验增强：打字机、时间进度、淡入淡出设置 · ui-v140 */
+body.workshop-config-page .workshop-opening-inline-toggle {
+  min-height: 38px;
+  padding: 9px 12px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent);
+}
+
+body.workshop-config-page .workshop-opening-typewriter-row,
+body.workshop-config-page .workshop-opening-timing-grid {
+  gap: 12px;
+}
+
+body.workshop-config-page .workshop-opening-timing-grid input[type="number"] {
+  min-width: 0;
+}
+
+.message.opening-message.opening-typewriter-pending .bubble {
+  min-height: 1.6em;
+}
+
+.message.opening-message.opening-typewriter-active .bubble .bubble-body::after {
+  content: "";
+  display: inline-block;
+  width: 0.58em;
+  height: 1.12em;
+  margin-left: 0.12em;
+  vertical-align: -0.16em;
+  border-right: 2px solid currentColor;
+  opacity: 0.72;
+  animation: workshopOpeningTypeCaret 860ms steps(2, start) infinite;
+}
+
+@keyframes workshopOpeningTypeCaret {
+  0%, 44% { opacity: 0.75; }
+  45%, 100% { opacity: 0; }
+}

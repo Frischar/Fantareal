@@ -1,0 +1,194 @@
+/* Fantareal 创意工坊 · 前端演出层 v1.0 · 基于 ui-v140
+   入场演出扩展 / 常驻氛围 / 动态演出 */
+
+.workshop-ambience-config-block,
+.workshop-dynamic-config-block {
+  margin-top: 18px;
+}
+
+.workshop-ambience-grid {
+  align-items: stretch;
+  margin-top: 14px;
+}
+
+.workshop-ambience-ambient-card {
+  margin-top: 14px;
+}
+
+.dynamic-state-tip,
+.workshop-state-tip {
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--panel-strong) 86%, transparent);
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.dynamic-state-tip code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--input-bg) 86%, transparent);
+  color: var(--text);
+}
+
+.dynamic-scene-list {
+  margin-top: 14px;
+}
+
+.dynamic-scene-card {
+  display: grid;
+  gap: 12px;
+}
+
+.dynamic-scene-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dynamic-enabled-row {
+  align-self: end;
+  min-height: 40px;
+}
+
+.dynamic-trigger-panel,
+.dynamic-content-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.workshop-empty-note {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px dashed color-mix(in srgb, var(--muted) 26%, transparent);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+
+body.workshop-ambience-active::before {
+  background-image: var(--workshop-ambience-bg, var(--background-image));
+}
+
+body.workshop-ambience-active::after {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(10, 10, 10, calc(var(--workshop-ambience-overlay, var(--background-overlay-opacity)) * 0.74)),
+      rgba(10, 10, 10, var(--workshop-ambience-overlay, var(--background-overlay-opacity)))
+    );
+}
+
+body.workshop-ambience-previewing::before {
+  background-image: var(--workshop-ambience-preview-bg, var(--background-image));
+}
+
+body.workshop-ambience-previewing::after {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(10, 10, 10, calc(var(--workshop-ambience-preview-overlay, var(--background-overlay-opacity)) * 0.74)),
+      rgba(10, 10, 10, var(--workshop-ambience-preview-overlay, var(--background-overlay-opacity)))
+    );
+}
+
+body.workshop-dynamic-background-active::before {
+  background-image: var(--workshop-dynamic-bg, var(--workshop-ambience-bg, var(--background-image)));
+  transition: background-image 260ms ease, filter 260ms ease;
+}
+
+.workshop-dynamic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  animation: workshopDynamicIn 260ms ease both;
+}
+
+.workshop-dynamic-overlay.is-leaving {
+  animation: workshopDynamicOut 320ms ease both;
+}
+
+.workshop-dynamic-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 12, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.workshop-dynamic-card {
+  position: relative;
+  z-index: 1;
+  width: min(880px, 88vw);
+  max-height: min(82vh, 760px);
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--panel-strong) 92%, transparent);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+}
+
+.workshop-dynamic-light {
+  align-items: end;
+  justify-items: end;
+  padding: 24px 32px;
+}
+
+.workshop-dynamic-light .workshop-dynamic-backdrop {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.workshop-dynamic-light .workshop-dynamic-card {
+  width: min(420px, 86vw);
+  border-radius: 22px;
+}
+
+.workshop-dynamic-immersive .workshop-dynamic-card {
+  width: min(1280px, 92vw);
+  max-height: 86vh;
+}
+
+.workshop-dynamic-close {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  z-index: 2;
+}
+
+.workshop-dynamic-image {
+  display: block;
+  width: 100%;
+  max-height: 58vh;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.workshop-dynamic-copy {
+  padding: 20px 24px 24px;
+}
+
+.workshop-dynamic-copy h2 {
+  margin: 0 0 8px;
+  font-size: clamp(1.25rem, 2.4vw, 2rem);
+}
+
+.workshop-dynamic-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+@keyframes workshopDynamicIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes workshopDynamicOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.99); }
+}

@@ -13,5 +13,6 @@
 @import url("./css/09-preset-memory.css?v=ui-v140");
 @import url("./css/10-worldbook.css?v=ui-v140");
 @import url("./css/11-workshop-opening.css?v=ui-v140");
+@import url("./css/12-workshop-performance.css?v=ui-v140");
 
 /* ui-v140: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */
