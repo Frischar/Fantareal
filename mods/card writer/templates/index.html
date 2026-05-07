@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>缃笺</title>
+    <link rel="stylesheet" href="{{ static_stylesheet_url or '/static/card-writer.css' }}" />
+  </head>
+  <body>
+    <div class="app-background-overlay" aria-hidden="true"></div>
+    <div class="page-shell">
+      <main class="workspace-layout">
+        <aside class="sidebar-shell panel">
+          <div class="brand-block">
+            <p class="eyebrow">Card Writer</p>
+            <h1>缃笺</h1>
+            <p class="muted">统一编辑人设、世界书、预设、记忆，并在同一工作台里直接查看预览。</p>
+          </div>
+
+          <div class="sidebar-group">
+            <button class="nav-chip active" type="button" data-view="persona">人设</button>
+            <button class="nav-chip" type="button" data-view="worldbook">世界书</button>
+            <button class="nav-chip" type="button" data-view="preset">预设</button>
+            <button class="nav-chip" type="button" data-view="memory">记忆</button>
+            <button class="nav-chip" type="button" data-view="preview">预览</button>
+          </div>
+
+          <div class="sidebar-card status-card">
+            <strong id="saveStatus">就绪</strong>
+            <span id="editorStats">0 个块</span>
+            <span class="field-tip">编辑时自动保存草稿，保存按钮用于落盘工程文件。</span>
+          </div>
+
+          <div class="sidebar-card project-meta-card">
+            <label for="projectTitle">项目名</label>
+            <input id="projectTitle" type="text" placeholder="例如：莉莉丝" />
+            <p class="field-tip">导出时会自动使用这个名字，例如「莉莉丝的人设.json」。</p>
+          </div>
+
+          <div class="sidebar-actions">
+            <button id="btnNew" class="ghost-button" type="button">新建</button>
+            <button id="btnOpen" class="ghost-button" type="button">打开</button>
+            <button id="btnSave" class="primary-button" type="button">保存</button>
+            <button id="btnSaveAs" class="ghost-button" type="button">另存为</button>
+            <button id="btnImport" class="ghost-button" type="button">导入 JSON</button>
+          </div>
+
+          <div class="sidebar-card export-card">
+            <div>
+              <strong>轮椅模式</strong>
+              <p class="field-tip">配置当前 mod 专用的 API / 模型 / 提示词，不影响别的页面。</p>
+            </div>
+            <div class="export-actions">
+              <button id="btnCopilotSettings" class="ghost-button compact" type="button">AI 设置</button>
+            </div>
+          </div>
+        </aside>
+
+        <section class="panel editor-panel">
+          <section class="view-pane active" id="view-persona">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Persona</p>
+                <h2>人设卡</h2>
+                <p class="muted">固定编辑单 persona 的完整角色卡结构。</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-button compact" type="button" data-export-target="persona">导出人设</button>
+              </div>
+            </div>
+            <div id="personaEditor" class="editor-stack"></div>
+          </section>
+
+          <section class="view-pane" id="view-worldbook">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Worldbook</p>
+                <h2>世界书</h2>
+                <p class="muted">左边选词条，右边编辑全部字段；上方管理全局 settings。</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-button compact" type="button" data-export-target="worldbook">导出世界书</button>
+              </div>
+            </div>
+            <div id="worldbookEditor"></div>
+          </section>
+
+          <section class="view-pane" id="view-preset">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Preset</p>
+                <h2>预设</h2>
+                <p class="muted">完整编辑 active preset、modules、extra prompts 与 prompt groups。</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-button compact" type="button" data-export-target="preset">导出预设</button>
+              </div>
+            </div>
+            <div id="presetEditor"></div>
+          </section>
+
+          <section class="view-pane" id="view-memory">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Memory</p>
+                <h2>记忆</h2>
+                <p class="muted">每条记忆独立编辑，支持标签、备注与正文。</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-button compact" type="button" data-export-target="memory">导出记忆</button>
+              </div>
+            </div>
+            <div id="memoryEditor"></div>
+          </section>
+
+          <section class="view-pane" id="view-preview">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Preview</p>
+                <h2>预览</h2>
+                <p class="muted">这里会显示当前人设卡编译结果，以及世界书 / 预设 / 记忆的实时 JSON。</p>
+              </div>
+              <button id="btnCompileInline" class="primary-button" type="button">刷新预览</button>
+            </div>
+            <div class="preview-stack">
+              <div class="editor-card preview-validation-card">
+                <div class="card-header-solo">
+                  <div>
+                    <h3>终检警告</h3>
+                    <p class="muted">刷新预览时会同步校验；点警告可跳回对应位置修正。</p>
+                  </div>
+                  <div id="previewValidationStatus" class="pill-note">未检查</div>
+                </div>
+                <div id="previewWarnings" class="warning-list">
+                  <div class="empty-state">点击「刷新预览」生成校验结果。</div>
+                </div>
+              </div>
+              <div class="editor-card">
+                <h3>人设卡预览</h3>
+                <div class="card-preview" id="cardPreview">
+                  <p class="muted">点击「刷新预览」生成最终角色卡。</p>
+                </div>
+              </div>
+              <div class="preview-json-grid">
+                <div class="editor-card">
+                  <h3>世界书 JSON</h3>
+                  <pre class="json-preview" id="worldbookPreview"></pre>
+                </div>
+                <div class="editor-card">
+                  <h3>预设 JSON</h3>
+                  <pre class="json-preview" id="presetPreview"></pre>
+                </div>
+                <div class="editor-card span-two">
+                  <h3>记忆 JSON</h3>
+                  <pre class="json-preview" id="memoryPreview"></pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="modal" id="projectListDialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>打开工程</h3>
+          <button class="modal-close" id="btnProjectListClose" type="button">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="project-list" id="projectList">
+            <p class="muted">加载中……</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="ghost-button" id="btnDeleteProject" type="button">删除选中工程</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="importDialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>导入 JSON</h3>
+          <button class="modal-close" id="btnImportClose" type="button">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="muted">可粘贴工程文件，或直接粘贴人设卡 / 世界书 / 记忆 / 预设 JSON。</p>
+          <textarea class="compact-textarea" id="importTextarea" placeholder="{&#10;  &quot;name&quot;: &quot;&quot;&#10;}"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button id="btnImportConfirm" class="primary-button" type="button">导入</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="copilotSettingsDialog">
+      <div class="modal-content copilot-settings-modal">
+        <div class="modal-header">
+          <div>
+            <h3>AI 设置</h3>
+            <p class="muted">这里配置缃笺专用模型与四类写卡提示词。</p>
+          </div>
+          <button class="modal-close" id="btnCopilotSettingsClose" type="button">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="copilot-settings-grid">
+            <div class="field-block span-two">
+              <label for="copilotBaseUrl">API Base URL</label>
+              <input id="copilotBaseUrl" type="text" placeholder="https://api.example.com/v1" />
+            </div>
+            <div class="field-block">
+              <label for="copilotApiKey">API Key</label>
+              <input id="copilotApiKey" type="password" placeholder="sk-..." />
+            </div>
+            <div class="field-block">
+              <label for="copilotModel">Model</label>
+              <input id="copilotModel" type="text" placeholder="gpt-4.1 / claude-opus-4-7 ..." />
+            </div>
+            <div class="field-block">
+              <label for="copilotTimeout">请求超时（秒）</label>
+              <input id="copilotTimeout" type="number" min="10" max="3600" step="1" />
+            </div>
+            <div class="field-block">
+              <label for="copilotTemperature">Temperature</label>
+              <input id="copilotTemperature" type="number" min="0" max="2" step="0.1" />
+            </div>
+            <div class="field-block span-two">
+              <label for="copilotBaseSystemPrompt">全局系统提示词</label>
+              <textarea id="copilotBaseSystemPrompt" rows="4" placeholder="你是缃笺 Card Writer 的结构化写作助手。"></textarea>
+            </div>
+            <div class="field-block span-two">
+              <label for="copilotPersonaPrompt">人设提示词</label>
+              <textarea id="copilotPersonaPrompt" rows="6"></textarea>
+            </div>
+            <div class="field-block span-two">
+              <label for="copilotWorldbookPrompt">世界书提示词</label>
+              <textarea id="copilotWorldbookPrompt" rows="6"></textarea>
+            </div>
+            <div class="field-block span-two">
+              <label for="copilotPresetPrompt">预设提示词</label>
+              <textarea id="copilotPresetPrompt" rows="6"></textarea>
+            </div>
+            <div class="field-block span-two">
+              <label for="copilotMemoryPrompt">记忆提示词</label>
+              <textarea id="copilotMemoryPrompt" rows="6"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnCopilotSettingsSave" class="primary-button" type="button">保存 AI 设置</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div class="copilot-layer" id="copilotLayer">
+      <button class="copilot-fab" id="copilotFab" type="button" data-copilot-action="toggle" aria-expanded="false" aria-controls="copilotWidget">
+        轮椅
+      </button>
+      <section class="copilot-widget" id="copilotWidget" aria-live="polite" hidden>
+        <div class="copilot-header">
+          <strong id="copilotTitle">轮椅模式</strong>
+          <button class="modal-close" type="button" data-copilot-action="close" aria-label="关闭轮椅模式">&times;</button>
+        </div>
+        <div class="copilot-messages" id="copilotMessages"></div>
+        <div class="copilot-input-area" id="copilotInputArea">
+          <textarea id="copilotPrompt" rows="3" placeholder="直接说你想生成、补写或修改什么。"></textarea>
+          <button class="primary-button" id="copilotSend" type="button" data-copilot-action="send">发送</button>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      window.CARD_WRITER_BOOTSTRAP = {{ project | tojson }};
+      window.CARD_WRITER_API_BASE = {{ api_base_path | tojson }};
+    </script>
+    <script src="{{ static_script_url or '/static/card-writer.js' }}"></script>
+  </body>
+</html>
