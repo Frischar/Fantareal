@@ -1941,8 +1941,8 @@ body.chat-page.chat-clear-mode #chat-subtitle,
 body.chat-page.chat-clear-mode .message-meta,
 body.chat-page.chat-clear-mode .task-status.is-idle {
   text-shadow:
-    0 1px 2px rgba(255, 250, 242, 0.72),
-    0 0 12px rgba(255, 248, 238, 0.46);
+    0 1px 2px rgba(255, 250, 242, 0.68),
+    0 0 10px rgba(255, 248, 238, 0.34);
 }
 
 body.chat-page.chat-clear-mode #chat-subtitle,
@@ -1953,34 +1953,52 @@ body.chat-page.chat-clear-mode .message-meta {
 body.chat-page.chat-clear-mode .message-meta {
   padding: 2px 7px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--panel-strong) 24%, transparent 76%);
-  backdrop-filter: blur(4px) saturate(1.04);
-  -webkit-backdrop-filter: blur(4px) saturate(1.04);
+  background: rgba(255, 250, 244, 0.18) !important;
+  border: 1px solid rgba(132, 105, 78, 0.08);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.chat-page.chat-clear-mode .message.assistant .bubble,
+body.chat-page.chat-clear-mode .message.system .bubble {
+  background: rgba(255, 249, 238, 0.24) !important;
+  border-color: rgba(136, 108, 78, 0.12) !important;
+  box-shadow: 0 8px 20px rgba(72, 48, 30, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.chat-page.chat-clear-mode .message.user .bubble {
+  background: rgba(239, 220, 206, 0.22) !important;
+  border-color: rgba(136, 94, 70, 0.11) !important;
+  box-shadow: 0 8px 20px rgba(72, 48, 30, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 body.chat-page.chat-clear-mode #message-input {
-  background: color-mix(in srgb, var(--input-bg) 62%, rgba(255, 250, 244, 0.34) 38%) !important;
-  border-color: color-mix(in srgb, var(--line) 54%, transparent 46%) !important;
-  box-shadow: 0 8px 24px rgba(74, 52, 34, 0.08) !important;
-  backdrop-filter: blur(6px) saturate(1.04);
-  -webkit-backdrop-filter: blur(6px) saturate(1.04);
+  background: rgba(255, 250, 244, 0.22) !important;
+  border-color: rgba(132, 105, 78, 0.12) !important;
+  box-shadow: 0 8px 20px rgba(72, 48, 30, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 body.chat-page.chat-clear-mode #message-input::placeholder {
-  color: color-mix(in srgb, var(--text) 54%, var(--muted) 46%) !important;
+  color: color-mix(in srgb, var(--text) 56%, var(--muted) 44%) !important;
   opacity: 1 !important;
   text-shadow:
-    0 1px 2px rgba(255, 250, 242, 0.72),
-    0 0 10px rgba(255, 248, 238, 0.40);
+    0 1px 2px rgba(255, 250, 242, 0.62),
+    0 0 8px rgba(255, 248, 238, 0.30);
 }
 
 body.chat-page.chat-clear-mode .task-status.is-idle {
   padding: 5px 10px;
-  border: 1px solid color-mix(in srgb, var(--line) 40%, transparent 60%);
-  background: color-mix(in srgb, var(--panel-strong) 28%, transparent 72%);
+  border: 1px solid rgba(132, 105, 78, 0.10);
+  background: rgba(255, 250, 244, 0.18) !important;
   color: color-mix(in srgb, var(--text) 70%, var(--muted) 30%);
-  backdrop-filter: blur(4px) saturate(1.04);
-  -webkit-backdrop-filter: blur(4px) saturate(1.04);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 :root[data-theme="dark"] body.chat-page.chat-clear-mode .chat-header .eyebrow,
@@ -2001,14 +2019,35 @@ body.chat-page.chat-clear-mode .task-status.is-idle {
 
 :root[data-theme="dark"] body.chat-page.chat-clear-mode .message-meta,
 :root[data-theme="dark"] body.chat-page.chat-clear-mode .task-status.is-idle {
-  border-color: color-mix(in srgb, var(--line) 34%, transparent 66%);
-  background: rgba(8, 13, 20, 0.32);
+  border-color: rgba(255, 255, 255, 0.07) !important;
+  background: rgba(10, 16, 24, 0.24) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-theme="dark"] body.chat-page.chat-clear-mode .message.assistant .bubble,
+:root[data-theme="dark"] body.chat-page.chat-clear-mode .message.system .bubble {
+  background: rgba(14, 22, 32, 0.30) !important;
+  border-color: rgba(255, 255, 255, 0.075) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:root[data-theme="dark"] body.chat-page.chat-clear-mode .message.user .bubble {
+  background: rgba(28, 42, 58, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.075) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 :root[data-theme="dark"] body.chat-page.chat-clear-mode #message-input {
-  background: color-mix(in srgb, var(--input-bg) 66%, rgba(8, 13, 20, 0.38) 34%) !important;
-  border-color: color-mix(in srgb, var(--line) 52%, transparent 48%) !important;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24) !important;
+  background: rgba(10, 16, 24, 0.26) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 :root[data-theme="dark"] body.chat-page.chat-clear-mode #message-input::placeholder {
@@ -2017,7 +2056,6 @@ body.chat-page.chat-clear-mode .task-status.is-idle {
     0 1px 2px rgba(0, 0, 0, 0.72),
     0 0 12px rgba(0, 0, 0, 0.50);
 }
-
 
 /* Runtime panel handle contrast polish. */
 /* Keep the slim pull-tab, but make it legible on both bright backgrounds and dark panels. */

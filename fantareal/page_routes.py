@@ -85,6 +85,8 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
         current_card = ctx.get_current_card(active_slot) if active_slot is not None else ctx.get_current_card()
         creative_workshop = ctx.sanitize_creative_workshop(current_card.get("raw", {}).get("creativeWorkshop", {}))
         workshop_opening = creative_workshop.get("opening", {}) if isinstance(creative_workshop, dict) else {}
+        workshop_ambience = creative_workshop.get("ambience", {}) if isinstance(creative_workshop, dict) else {}
+        workshop_dynamic_scenes = creative_workshop.get("dynamicScenes", []) if isinstance(creative_workshop, dict) else []
         summary_buffer = _summary_buffer_content(active_slot)
         opening_message = _opening_message_from_persona(persona)
         show_opening_message = _should_show_opening_message(
@@ -111,6 +113,9 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             "opening_message": opening_message,
             "show_opening_message": show_opening_message,
             "workshop_opening": workshop_opening,
+            "workshop_ambience": workshop_ambience,
+            "workshop_dynamic_scenes": workshop_dynamic_scenes,
+            "workshop_state": workshop_state,
             "show_workshop_opening": _should_show_workshop_opening(
                 opening=workshop_opening,
                 history=history,
