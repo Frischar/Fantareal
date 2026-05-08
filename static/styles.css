@@ -1,8 +1,8 @@
-/* Fantareal main stylesheet · split entry ui-v140
+/* Fantareal main stylesheet · split entry ui-v141
    原始大文件已拆到 static/css/*.css。
-   ui-v140: 字段控件归一第二刀；styles.css 仍只做入口。 */
+   ui-v141: 聊天消息编辑与重 roll；styles.css 仍只做入口。 */
 @import url("./css/00-base.css?v=ui-v140");
-@import url("./css/01-chat.css?v=ui-v140");
+@import url("./css/01-chat.css?v=ui-v141-chat-tools");
 @import url("./css/02-sidebar.css?v=ui-v140");
 @import url("./css/03-config-global.css?v=ui-v140");
 @import url("./css/04-user-workshop.css?v=ui-v140");
@@ -15,4 +15,4 @@
 @import url("./css/11-workshop-opening.css?v=ui-v140");
 @import url("./css/12-workshop-performance.css?v=ui-v140");
 
-/* ui-v140: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */
+/* ui-v141: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */

@@ -5,13 +5,80 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from .app_models import ChatRequest, SlotSummaryBufferPayload
+from .app_models import ChatHistoryEditRequest, ChatHistoryRerollRequest, ChatRequest, SlotSummaryBufferPayload
 
 
 def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
     @app.get("/api/history")
     async def api_get_history() -> list[dict[str, Any]]:
         return ctx.get_conversation()
+
+
+    @app.post("/api/chat/history/edit-user")
+    async def api_edit_user_message(payload: ChatHistoryEditRequest) -> dict[str, Any]:
+        history = ctx.get_conversation()
+        index = int(payload.message_index)
+        if index < 0 or index >= len(history):
+            raise HTTPException(status_code=404, detail="找不到要编辑的消息。")
+
+        item = history[index]
+        if item.get("role") != "user":
+            raise HTTPException(status_code=400, detail="只能编辑用户消息。")
+
+        content = str(payload.content or "").strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="编辑后的消息不能为空。")
+
+        ctx.persist_json(
+            ctx.conversation_path(),
+            history[:index],
+            detail="Chat history edit failed. Please check disk space or file permissions.",
+        )
+        return {
+            "ok": True,
+            "message": content,
+            "trimmed_from": index,
+            "removed_count": len(history) - index,
+        }
+
+    @app.post("/api/chat/history/reroll")
+    async def api_reroll_assistant_message(payload: ChatHistoryRerollRequest) -> dict[str, Any]:
+        history = ctx.get_conversation()
+        index = int(payload.message_index)
+        if index < 0 or index >= len(history):
+            raise HTTPException(status_code=404, detail="找不到要重 roll 的消息。")
+
+        item = history[index]
+        role = item.get("role")
+        if role == "user":
+            user_index = index
+        elif role == "assistant":
+            user_index = -1
+            for cursor in range(index - 1, -1, -1):
+                if history[cursor].get("role") == "user":
+                    user_index = cursor
+                    break
+            if user_index < 0:
+                raise HTTPException(status_code=400, detail="这条回复前没有可用于重 roll 的用户消息。")
+        else:
+            raise HTTPException(status_code=400, detail="只能从用户消息或助手回复开始重 roll。")
+
+        message = str(history[user_index].get("content", "")).strip()
+        if not message:
+            raise HTTPException(status_code=400, detail="原用户消息为空，无法重 roll。")
+
+        ctx.persist_json(
+            ctx.conversation_path(),
+            history[:user_index],
+            detail="Chat history reroll failed. Please check disk space or file permissions.",
+        )
+        return {
+            "ok": True,
+            "message": message,
+            "trimmed_from": user_index,
+            "source_index": index,
+            "removed_count": len(history) - user_index,
+        }
 
     @app.post("/api/chat")
     async def api_chat(payload: ChatRequest) -> dict[str, Any]:

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico" />
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v141-chat-tools" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=ttsvoice-chip-v1" data-mod-hook="{{ mod.slug }}" />
@@ -579,6 +579,9 @@
               <button id="workshop-opening-audio-toggle" type="button" class="secondary compact icon-button workshop-opening-audio-toggle" aria-label="工坊氛围：播放" title="工坊氛围：播放" hidden>
                 <span id="workshop-opening-audio-toggle-icon" aria-hidden="true">🔊</span>
               </button>
+              <button id="workshop-opening-replay" type="button" class="secondary compact icon-button workshop-opening-replay" aria-label="重新播放开场" title="重新播放开场" {% if not workshop_opening.enabled %}hidden{% endif %}>
+                <span aria-hidden="true">↺</span>
+              </button>
               <button id="open-drawer-secondary" type="button" class="secondary compact icon-button config-gear-button" aria-label="运行配置" title="运行配置" aria-expanded="false" aria-controls="config-drawer">
                 <span aria-hidden="true">⚙</span>
               </button>
@@ -607,11 +610,11 @@
             </div>
             {% endif %}
             {% for item in history %}
-            <div class="message {{ item.role }}">
+            <div class="message {{ item.role }}" data-role="{{ item.role }}" data-history-index="{{ loop.index0 }}">
               {% if item.role == "user" %}
               <div class="bubble-wrap">
                 <div class="bubble">{{ item.content }}</div>
-                <div class="message-meta">{{ item.created_at or "" }}</div>
+                <div class="message-meta"><span class="message-meta-text">{{ item.created_at or "" }}</span></div>
               </div>
               <div class="message-avatar user-avatar" aria-hidden="true">
                 {% if user_profile.avatar_url %}
@@ -630,7 +633,7 @@
               </div>
               <div class="bubble-wrap">
                 <div class="bubble">{{ item.content }}</div>
-                <div class="message-meta">{{ item.created_at or "" }}</div>
+                <div class="message-meta"><span class="message-meta-text">{{ item.created_at or "" }}</span></div>
               </div>
               {% endif %}
             </div>
@@ -830,8 +833,8 @@
         </div>
       </div>
     </div>
-    {% if show_workshop_opening and workshop_opening %}
-    <div id="workshop-opening-overlay" class="workshop-opening-overlay workshop-opening-animation-{{ workshop_opening.animation or 'fade' }}" aria-modal="true" role="dialog" aria-labelledby="workshop-opening-title">
+    {% if workshop_opening and workshop_opening.enabled %}
+    <div id="workshop-opening-overlay" class="workshop-opening-overlay workshop-opening-animation-{{ workshop_opening.animation or 'fade' }}" aria-modal="true" role="dialog" aria-labelledby="workshop-opening-title" {% if not show_workshop_opening %}hidden{% endif %}>
       <div class="workshop-opening-backdrop"></div>
       <section class="workshop-opening-card" {% if workshop_opening.coverImage %}style="--workshop-opening-cover: url('{{ workshop_opening.coverImage }}');"{% endif %}>
         <div class="workshop-opening-cover" aria-hidden="true"></div>
@@ -1085,12 +1088,14 @@
       const workshopDynamicAudioEl = document.getElementById("workshop-dynamic-audio");
       const workshopOpeningAudioToggleEl = document.getElementById("workshop-opening-audio-toggle");
       const workshopOpeningAudioToggleIconEl = document.getElementById("workshop-opening-audio-toggle-icon");
+      const workshopOpeningReplayBtn = document.getElementById("workshop-opening-replay");
       const workshopOpeningConfig = {{ workshop_opening | tojson }};
       const workshopAmbienceConfig = {{ workshop_ambience | tojson }};
       const workshopDynamicScenesConfig = {{ workshop_dynamic_scenes | tojson }};
       const workshopRuntimeState = {{ workshop_state | tojson }};
       const shouldShowWorkshopOpening = {{ show_workshop_opening | tojson }};
       let workshopOpeningEntering = false;
+      let workshopOpeningManualReplayMode = false;
       let workshopOpeningMusicStarted = false;
       let workshopOpeningAudioFadeTimer = null;
       let workshopOpeningAutoPlayAttempted = false;
@@ -1200,6 +1205,8 @@
 
       let worldbookDebugCollapsed = true;
       let isEndingConversation = false;
+      let chatRequestInFlight = false;
+      let historyMutationInFlight = false;
       let worldbookDebugFilter = "all";
       let lastWorldbookDebugPayload = null;
       let serverState = normalizeRuntimeState(initialState);
@@ -1303,6 +1310,7 @@
         sendButtonEl.disabled = !!isBusy;
         sendButtonEl.classList.toggle("is-busy", !!isBusy);
         sendButtonEl.textContent = isBusy ? "生成中" : "发送";
+        syncMessageActionState();
       }
 
       function syncComposerState() {
@@ -1932,6 +1940,242 @@
         renderTtsVoiceBody(nodes.body, nextBodyText);
       }
 
+      function ensureMessageMetaText(meta) {
+        if (!meta) return null;
+        let textEl = meta.querySelector(":scope > .message-meta-text");
+        if (!textEl) {
+          const currentText = Array.from(meta.childNodes)
+            .filter((node) => node.nodeType === Node.TEXT_NODE)
+            .map((node) => node.textContent || "")
+            .join("")
+            .trim() || meta.textContent.trim();
+          textEl = document.createElement("span");
+          textEl.className = "message-meta-text";
+          textEl.textContent = currentText;
+          meta.textContent = "";
+          meta.appendChild(textEl);
+        }
+        return textEl;
+      }
+
+      function setMessageMetaText(meta, text) {
+        const textEl = ensureMessageMetaText(meta);
+        if (textEl) textEl.textContent = String(text || "");
+      }
+
+      function getHistoryMessageWrappers() {
+        return Array.from(messagesEl?.querySelectorAll(".message") || []).filter((wrapper) => {
+          if (wrapper.classList.contains("opening-message")) return false;
+          if (wrapper.dataset.openingMessage === "true") return false;
+          if (wrapper.dataset.transientMessage === "true") return false;
+          const role = wrapper.dataset.role || (wrapper.classList.contains("user") ? "user" : wrapper.classList.contains("assistant") ? "assistant" : "");
+          return role === "user" || role === "assistant" || role === "system";
+        });
+      }
+
+      function getWrapperRole(wrapper) {
+        if (!wrapper) return "";
+        return wrapper.dataset.role || (wrapper.classList.contains("user") ? "user" : wrapper.classList.contains("assistant") ? "assistant" : wrapper.classList.contains("system") ? "system" : "");
+      }
+
+      function getWrapperHistoryIndex(wrapper) {
+        const index = Number(wrapper?.dataset?.historyIndex ?? -1);
+        return Number.isInteger(index) && index >= 0 ? index : -1;
+      }
+
+      function getMessagePlainText(wrapper) {
+        const stored = wrapper?.dataset?.messageContent;
+        if (typeof stored === "string" && stored.length) return stored;
+        const body = wrapper?.querySelector?.(".bubble-body");
+        const bubble = wrapper?.querySelector?.(".bubble");
+        return String((body || bubble)?.textContent || "").trim();
+      }
+
+      function hasMessagesAfterIndex(index) {
+        return getHistoryMessageWrappers().some((wrapper) => getWrapperHistoryIndex(wrapper) > index);
+      }
+
+      function removeDomMessagesFromIndex(index) {
+        getHistoryMessageWrappers().forEach((wrapper) => {
+          if (getWrapperHistoryIndex(wrapper) >= index) wrapper.remove();
+        });
+        refreshMessageControls();
+        scrollMessagesToBottom(true);
+      }
+
+      function syncMessageActionState() {
+        const locked = chatRequestInFlight || historyMutationInFlight || isEndingConversation;
+        messagesEl?.querySelectorAll(".message-action-button, .message-edit-save, .message-edit-cancel").forEach((button) => {
+          button.disabled = locked;
+        });
+      }
+
+      function closeMessageEditors() {
+        messagesEl?.querySelectorAll(".message-edit-panel").forEach((panel) => panel.remove());
+        messagesEl?.querySelectorAll(".message-actions").forEach((actions) => {
+          actions.hidden = false;
+        });
+      }
+
+      function ensureMessageActions(wrapper) {
+        const role = getWrapperRole(wrapper);
+        if (!wrapper || !["user", "assistant"].includes(role)) return;
+        const bubbleWrap = wrapper.querySelector(".bubble-wrap");
+        const meta = bubbleWrap?.querySelector(":scope > .message-meta");
+        if (!bubbleWrap || !meta) return;
+
+        ensureMessageMetaText(meta);
+        let actions = meta.querySelector(":scope > .message-actions");
+        if (wrapper.classList.contains("streaming")) {
+          actions?.remove();
+          return;
+        }
+        if (!actions) {
+          actions = document.createElement("span");
+          actions.className = "message-actions";
+          meta.appendChild(actions);
+        }
+        actions.replaceChildren();
+
+        if (role === "user") {
+          const editBtn = document.createElement("button");
+          editBtn.type = "button";
+          editBtn.className = "message-action-button";
+          editBtn.textContent = "✏️";
+          editBtn.setAttribute("aria-label", "编辑这条用户消息");
+          editBtn.title = "编辑这条用户消息，并从这里重新生成";
+          editBtn.addEventListener("click", () => startUserMessageEdit(wrapper));
+          actions.appendChild(editBtn);
+        }
+
+        if (role === "assistant") {
+          const rerollBtn = document.createElement("button");
+          rerollBtn.type = "button";
+          rerollBtn.className = "message-action-button";
+          rerollBtn.textContent = "🎲";
+          rerollBtn.setAttribute("aria-label", "重 roll 这条助手回复");
+          rerollBtn.title = "删除这条回复及后续内容，并用上一条用户消息重新生成";
+          rerollBtn.addEventListener("click", () => rerollAssistantMessage(wrapper));
+          actions.appendChild(rerollBtn);
+        }
+      }
+
+      function refreshMessageControls() {
+        getHistoryMessageWrappers().forEach((wrapper, index) => {
+          wrapper.dataset.historyIndex = String(index);
+          wrapper.dataset.role = getWrapperRole(wrapper);
+          ensureMessageActions(wrapper);
+        });
+        syncMessageActionState();
+      }
+
+      function startUserMessageEdit(wrapper) {
+        if (chatRequestInFlight || historyMutationInFlight || isEndingConversation) return;
+        const index = getWrapperHistoryIndex(wrapper);
+        if (index < 0) return;
+        const bubbleWrap = wrapper.querySelector(".bubble-wrap");
+        if (!bubbleWrap) return;
+
+        closeMessageEditors();
+        const actions = bubbleWrap.querySelector(":scope > .message-actions");
+        if (actions) actions.hidden = true;
+
+        const panel = document.createElement("div");
+        panel.className = "message-edit-panel";
+
+        const textarea = document.createElement("textarea");
+        textarea.className = "message-edit-textarea";
+        textarea.rows = 4;
+        textarea.value = getMessagePlainText(wrapper);
+
+        const footer = document.createElement("div");
+        footer.className = "message-edit-actions";
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "secondary compact message-edit-cancel";
+        cancelBtn.textContent = "取消";
+        cancelBtn.addEventListener("click", closeMessageEditors);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "compact message-edit-save";
+        saveBtn.textContent = "保存并重生成";
+        saveBtn.addEventListener("click", async () => {
+          const nextText = textarea.value.trim();
+          if (!nextText) {
+            showToast("编辑后的消息不能为空", "error");
+            return;
+          }
+          if (hasMessagesAfterIndex(index)) {
+            const confirmed = window.confirm("编辑这里会删除这条消息之后的对话，并从这里重新生成。继续吗？");
+            if (!confirmed) return;
+          }
+          await editUserMessageAndRegenerate(index, nextText);
+        });
+
+        footer.appendChild(cancelBtn);
+        footer.appendChild(saveBtn);
+        panel.appendChild(textarea);
+        panel.appendChild(footer);
+        bubbleWrap.appendChild(panel);
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }
+
+      async function editUserMessageAndRegenerate(index, content) {
+        if (chatRequestInFlight || historyMutationInFlight || isEndingConversation) return;
+        historyMutationInFlight = true;
+        setComposerBusy(true);
+        setStatus("正在回退并编辑消息...", "busy");
+        try {
+          const data = await postJson("/api/chat/history/edit-user", {
+            message_index: index,
+            content,
+          });
+          closeMessageEditors();
+          removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
+          historyMutationInFlight = false;
+          await generateChatTurn(String(data.message || content), { clearInput: false });
+        } catch (error) {
+          setStatus(`编辑失败：${error.message}`, "error");
+          showToast(`编辑失败：${error.message}`, "error");
+        } finally {
+          historyMutationInFlight = false;
+          if (!chatRequestInFlight) setComposerBusy(false);
+          refreshMessageControls();
+        }
+      }
+
+      async function rerollAssistantMessage(wrapper) {
+        if (chatRequestInFlight || historyMutationInFlight || isEndingConversation) return;
+        const index = getWrapperHistoryIndex(wrapper);
+        if (index < 0) return;
+        if (hasMessagesAfterIndex(index)) {
+          const confirmed = window.confirm("重 roll 这里会删除这条回复之后的对话，并从对应用户消息重新生成。继续吗？");
+          if (!confirmed) return;
+        }
+
+        historyMutationInFlight = true;
+        setComposerBusy(true);
+        setStatus("正在准备重 roll...", "busy");
+        try {
+          const data = await postJson("/api/chat/history/reroll", {
+            message_index: index,
+          });
+          removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
+          historyMutationInFlight = false;
+          await generateChatTurn(String(data.message || ""), { clearInput: false });
+        } catch (error) {
+          setStatus(`重 roll 失败：${error.message}`, "error");
+          showToast(`重 roll 失败：${error.message}`, "error");
+        } finally {
+          historyMutationInFlight = false;
+          if (!chatRequestInFlight) setComposerBusy(false);
+          refreshMessageControls();
+        }
+      }
+
       function hydrateExistingMessages() {
         messagesEl.querySelectorAll(".bubble").forEach((bubble) => {
           renderBubbleContent(bubble, bubble.textContent || "");
@@ -1941,6 +2185,8 @@
       function createMessage(role, content, createdAt = new Date().toLocaleString()) {
         const wrapper = document.createElement("div");
         wrapper.className = `message ${role}`;
+        wrapper.dataset.role = role;
+        wrapper.dataset.messageContent = String(content || "");
 
         const bubbleWrap = document.createElement("div");
         bubbleWrap.className = "bubble-wrap";
@@ -1948,12 +2194,11 @@
         const bubble = document.createElement("div");
         bubble.className = "bubble";
         bubble.dataset.role = role;
-        wrapper.dataset.role = role;
         renderBubbleContent(bubble, content);
 
         const meta = document.createElement("div");
         meta.className = "message-meta";
-        meta.textContent = createdAt;
+        setMessageMetaText(meta, createdAt);
 
         const avatar = buildAvatar(role);
         const shouldStickToBottom = isMessagesNearBottom(120);
@@ -1970,6 +2215,7 @@
         }
 
         messagesEl.appendChild(wrapper);
+        refreshMessageControls();
         settleMessageScroll(shouldStickToBottom, true);
 
         return {
@@ -1994,9 +2240,10 @@
       function updateMessage(entry, content, createdAt = "") {
         if (!entry) return;
         const shouldStickToBottom = isMessagesNearBottom(120);
+        entry.wrapper.dataset.messageContent = String(content || "");
         renderBubbleContent(entry.bubble, content);
         if (createdAt) {
-          entry.meta.textContent = createdAt;
+          setMessageMetaText(entry.meta, createdAt);
         }
         settleMessageScroll(shouldStickToBottom, true);
       }
@@ -2931,6 +3178,10 @@
       let workshopActiveAudioGroup = "none";
       let workshopRoundCount = Number(workshopRuntimeState?.round_count || 0) || 0;
       const workshopDynamicTriggeredSession = new Set();
+      const WORKSHOP_DYNAMIC_AUDIO_FADE_MS = 2000;
+      let workshopDynamicAudioStopTimer = null;
+      let workshopDynamicAudioRestoreAmbience = false;
+      let workshopDynamicAudioActive = false;
 
       function fadeAudioElement(audioEl, targetVolume, duration = getOpeningTransitionMs()) {
         if (!audioEl) return Promise.resolve();
@@ -3075,6 +3326,9 @@
       }
 
       function getCurrentWorkshopAudioElements() {
+        if (workshopDynamicAudioActive && workshopDynamicAudioEl && !workshopDynamicAudioEl.paused) {
+          return [workshopDynamicAudioEl];
+        }
         if (workshopActiveAudioGroup === "ambience") {
           return [workshopAmbienceMusicAudioEl, workshopAmbienceAmbientAudioEl].filter(Boolean);
         }
@@ -3178,7 +3432,13 @@
       }
 
       async function toggleWorkshopOpeningMusic() {
-        if (!hasWorkshopAnyAudio()) return;
+        if (!hasWorkshopAnyAudio() && !workshopDynamicAudioActive) return;
+        if (workshopDynamicAudioActive && workshopDynamicAudioEl && !workshopDynamicAudioEl.paused) {
+          await stopDynamicSound({ restoreAmbience: false });
+          workshopAmbienceMuted = true;
+          updateWorkshopOpeningAudioToggle();
+          return;
+        }
         const activeElements = getCurrentWorkshopAudioElements();
         const allPaused = activeElements.every((audio) => !audio || audio.paused);
         if (allPaused) {
@@ -3222,33 +3482,72 @@
         }
       }
 
+      function resetWorkshopOpeningLoadingUi() {
+        if (workshopOpeningLoadingEl) workshopOpeningLoadingEl.hidden = true;
+        if (workshopOpeningLoadingTextEl) workshopOpeningLoadingTextEl.textContent = "正在入梦……";
+        if (workshopOpeningProgressBarEl) workshopOpeningProgressBarEl.style.width = "0%";
+      }
+
+      async function pauseAmbienceBeforeOpeningReplay() {
+        if (!isAmbienceAudioPlaying()) return;
+        await Promise.all(getAmbienceAudioElements().map((audio) => {
+          if (!audio || audio.paused) return Promise.resolve();
+          return fadeAudioElement(audio, 0, getOpeningTransitionMs()).then(() => audio.pause());
+        })).catch(() => {});
+        workshopActiveAudioGroup = "none";
+        updateWorkshopOpeningAudioToggle();
+      }
+
+      function showWorkshopOpeningOverlay({ manualReplay = false } = {}) {
+        if (!workshopOpeningOverlayEl || workshopOpeningConfig?.enabled !== true) return;
+        workshopOpeningManualReplayMode = Boolean(manualReplay);
+        workshopOpeningEntering = false;
+        workshopOpeningOverlayEl.hidden = false;
+        workshopOpeningOverlayEl.classList.remove("is-leaving");
+        workshopOpeningStartEl?.removeAttribute("disabled");
+        resetWorkshopOpeningLoadingUi();
+        bodyEl.classList.add("workshop-opening-active");
+        window.setTimeout(() => workshopOpeningStartEl?.focus(), 80);
+      }
+
       async function enterWorkshopOpening() {
         if (!workshopOpeningOverlayEl || workshopOpeningEntering) return;
         workshopOpeningEntering = true;
         workshopOpeningStartEl?.setAttribute("disabled", "disabled");
+        if (workshopOpeningManualReplayMode) {
+          await pauseAmbienceBeforeOpeningReplay();
+        }
         const holdMs = Math.round(clampOpeningSeconds(workshopOpeningConfig?.holdSeconds, 3, 20) * 1000);
         const musicTask = hasWorkshopOpeningMusic() ? playWorkshopOpeningMusic({ silentFailure: false }).catch(() => {}) : Promise.resolve();
         await runWorkshopOpeningEntryProgress(holdMs, musicTask);
         workshopOpeningOverlayEl.classList.add("is-leaving");
         window.setTimeout(async () => {
-          workshopOpeningOverlayEl.remove();
+          workshopOpeningOverlayEl.hidden = true;
+          workshopOpeningOverlayEl.classList.remove("is-leaving");
           bodyEl.classList.remove("workshop-opening-active");
           await finalizeOpeningAudioAfterOverlay();
-          startOpeningFirstMessageTypewriter();
+          if (!workshopOpeningManualReplayMode) {
+            startOpeningFirstMessageTypewriter();
+          }
+          workshopOpeningManualReplayMode = false;
+          workshopOpeningEntering = false;
+          resetWorkshopOpeningLoadingUi();
           inputEl?.focus();
         }, 760);
       }
 
       function initWorkshopOpening() {
+        workshopOpeningReplayBtn?.addEventListener("click", () => showWorkshopOpeningOverlay({ manualReplay: true }));
+        workshopOpeningStartEl?.addEventListener("click", enterWorkshopOpening);
         if (!shouldShowWorkshopOpening || !workshopOpeningOverlayEl) {
+          if (workshopOpeningOverlayEl) workshopOpeningOverlayEl.hidden = true;
           if (workshopAmbienceConfig?.enabled && workshopAmbienceConfig?.startMode === "after_opening") {
             applyWorkshopAmbienceBackground();
           }
           updateWorkshopOpeningAudioToggle();
           return;
         }
-        bodyEl.classList.add("workshop-opening-active");
-        window.setTimeout(() => workshopOpeningStartEl?.focus(), 80);
+        showWorkshopOpeningOverlay({ manualReplay: false });
         if (workshopOpeningConfig?.autoPlayMusic === true && hasWorkshopOpeningMusic()) {
           workshopOpeningAutoPlayAttempted = true;
           window.setTimeout(() => {
@@ -3258,7 +3557,6 @@
             });
           }, 240);
         }
-        workshopOpeningStartEl?.addEventListener("click", enterWorkshopOpening, { once: true });
       }
 
       function getOpeningTypewriterDelay() {
@@ -3374,29 +3672,114 @@
         });
       }
 
+      function getDynamicPresentationDurationMs(presentation = {}) {
+        const duration = Number(presentation?.duration || 6) || 6;
+        return Math.max(duration, 1) * 1000;
+      }
+
+      function getAmbienceAudioElements() {
+        return [workshopAmbienceMusicAudioEl, workshopAmbienceAmbientAudioEl].filter(Boolean);
+      }
+
+      function isAmbienceAudioPlaying() {
+        return getAmbienceAudioElements().some((audio) => audio && !audio.paused && !audio.ended);
+      }
+
+      async function suspendAmbienceForDynamic() {
+        if (!isAmbienceAudioPlaying()) return false;
+        await Promise.all(getAmbienceAudioElements().map((audio) => {
+          if (!audio || audio.paused) return Promise.resolve();
+          return fadeAudioElement(audio, 0, WORKSHOP_DYNAMIC_AUDIO_FADE_MS).then(() => audio.pause());
+        })).catch(() => {});
+        return true;
+      }
+
+      async function resumeAmbienceAfterDynamic() {
+        if (!workshopDynamicAudioRestoreAmbience || workshopAmbienceMuted || !hasWorkshopAmbienceAudio()) return;
+        const music = workshopAmbienceConfig?.music || {};
+        const ambient = workshopAmbienceConfig?.ambient || {};
+        const musicUrl = music.enabled ? getAmbienceMusicUrl() : "";
+        const ambientUrl = ambient.enabled ? getAmbienceAmbientUrl() : "";
+        const tasks = [];
+        if (musicUrl && setAudioSource(workshopAmbienceMusicAudioEl, musicUrl, music.loop !== false)) {
+          workshopAmbienceMusicAudioEl.volume = 0;
+          tasks.push(workshopAmbienceMusicAudioEl.play().then(() => fadeAudioElement(workshopAmbienceMusicAudioEl, clampAudioVolume(music.volume, 0.6), WORKSHOP_DYNAMIC_AUDIO_FADE_MS)));
+        }
+        if (ambientUrl && setAudioSource(workshopAmbienceAmbientAudioEl, ambientUrl, ambient.loop !== false)) {
+          workshopAmbienceAmbientAudioEl.volume = 0;
+          tasks.push(workshopAmbienceAmbientAudioEl.play().then(() => fadeAudioElement(workshopAmbienceAmbientAudioEl, clampAudioVolume(ambient.volume, 0.35), WORKSHOP_DYNAMIC_AUDIO_FADE_MS)));
+        }
+        if (tasks.length) {
+          workshopAmbienceStarted = true;
+          workshopActiveAudioGroup = "ambience";
+          await Promise.all(tasks).catch(() => setStatus("常驻氛围恢复失败，请检查音频文件或浏览器权限。"));
+        }
+      }
+
+      async function stopDynamicSound({ restoreAmbience = true } = {}) {
+        if (workshopDynamicAudioStopTimer) {
+          window.clearTimeout(workshopDynamicAudioStopTimer);
+          workshopDynamicAudioStopTimer = null;
+        }
+        const shouldRestore = restoreAmbience && workshopDynamicAudioRestoreAmbience;
+        workshopDynamicAudioActive = false;
+        if (workshopDynamicAudioEl) {
+          try {
+            if (!workshopDynamicAudioEl.paused) {
+              await fadeAudioElement(workshopDynamicAudioEl, 0, WORKSHOP_DYNAMIC_AUDIO_FADE_MS);
+            }
+            workshopDynamicAudioEl.pause();
+            workshopDynamicAudioEl.currentTime = 0;
+          } catch (_) {
+            try { workshopDynamicAudioEl.pause(); } catch (__) {}
+          }
+        }
+        if (shouldRestore) await resumeAmbienceAfterDynamic();
+        workshopDynamicAudioRestoreAmbience = false;
+        updateWorkshopOpeningAudioToggle();
+      }
+
+      async function playDynamicSound(url, volume = 0.5, presentation = {}) {
+        if (!workshopDynamicAudioEl || !url) return;
+        await stopDynamicSound({ restoreAmbience: false });
+        workshopDynamicAudioRestoreAmbience = await suspendAmbienceForDynamic();
+        setAudioSource(workshopDynamicAudioEl, url, false);
+        workshopDynamicAudioEl.volume = 0;
+        workshopDynamicAudioEl.currentTime = 0;
+        workshopDynamicAudioActive = true;
+        workshopActiveAudioGroup = "dynamic";
+        updateWorkshopOpeningAudioToggle();
+        const durationMs = getDynamicPresentationDurationMs(presentation);
+        try {
+          await workshopDynamicAudioEl.play();
+          await fadeAudioElement(workshopDynamicAudioEl, clampAudioVolume(volume, 0.5), WORKSHOP_DYNAMIC_AUDIO_FADE_MS);
+          workshopDynamicAudioStopTimer = window.setTimeout(() => {
+            stopDynamicSound({ restoreAmbience: true });
+          }, durationMs);
+        } catch (_) {
+          workshopDynamicAudioActive = false;
+          workshopDynamicAudioRestoreAmbience = false;
+          setStatus("动态演出音乐播放失败，请检查音频文件。", "error");
+          await resumeAmbienceAfterDynamic();
+        }
+      }
+
       function runDynamicScene(scene) {
         const content = scene.content || {};
+        const presentation = scene.presentation || {};
         const type = content.type || "image";
         if (type === "sound") {
           const url = content.soundUrl || scene.audio?.url || "";
-          playDynamicSound(url, scene.audio?.volume ?? 0.5);
+          playDynamicSound(url, scene.audio?.volume ?? 0.5, presentation);
           return;
         }
         if (type === "background") {
-          showDynamicBackground(content.backgroundUrl, scene.presentation || {});
-          playDynamicSound(scene.audio?.url || "", scene.audio?.volume ?? 0.5);
+          showDynamicBackground(content.backgroundUrl, presentation);
+          playDynamicSound(scene.audio?.url || "", scene.audio?.volume ?? 0.5, presentation);
           return;
         }
         showDynamicImage(scene);
-        playDynamicSound(scene.audio?.url || content.soundUrl || "", scene.audio?.volume ?? 0.5);
-      }
-
-      function playDynamicSound(url, volume = 0.5) {
-        if (!workshopDynamicAudioEl || !url) return;
-        setAudioSource(workshopDynamicAudioEl, url, false);
-        workshopDynamicAudioEl.volume = clampAudioVolume(volume, 0.5);
-        workshopDynamicAudioEl.currentTime = 0;
-        workshopDynamicAudioEl.play().catch(() => setStatus("动态演出音效播放失败，请检查音频文件。"));
+        playDynamicSound(scene.audio?.url || content.soundUrl || "", scene.audio?.volume ?? 0.5, presentation);
       }
 
       function showDynamicImage(scene) {
@@ -3417,14 +3800,18 @@
           </section>
         `;
         document.body.appendChild(overlay);
+        let closed = false;
         const close = () => {
+          if (closed) return;
+          closed = true;
+          stopDynamicSound({ restoreAmbience: true });
           overlay.classList.add("is-leaving");
           window.setTimeout(() => overlay.remove(), 320);
         };
         overlay.querySelector(".workshop-dynamic-close")?.addEventListener("click", close);
         overlay.querySelector(".workshop-dynamic-backdrop")?.addEventListener("click", close);
         if (presentation.autoClose !== false && Number(presentation.duration || 0) > 0) {
-          window.setTimeout(close, Number(presentation.duration || 6) * 1000);
+          window.setTimeout(close, getDynamicPresentationDurationMs(presentation));
         }
       }
 
@@ -3432,11 +3819,11 @@
         if (!url) return;
         bodyEl.classList.add("workshop-dynamic-background-active");
         bodyEl.style.setProperty("--workshop-dynamic-bg", `url("${String(url).replace(/["\\\n\r]/g, "")}")`);
-        const duration = Number(presentation.duration || 6) || 6;
         window.setTimeout(() => {
           bodyEl.classList.remove("workshop-dynamic-background-active");
           bodyEl.style.removeProperty("--workshop-dynamic-bg");
-        }, Math.max(duration, 1) * 1000);
+          stopDynamicSound({ restoreAmbience: true });
+        }, getDynamicPresentationDurationMs(presentation));
       }
 
       function getWorkshopStageLabel(stage) {
@@ -3710,18 +4097,24 @@
         }
       });
 
-      chatForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const text = inputEl.value.trim();
-        if (!text) return;
-        addMessage("user", text);
-        inputEl.value = "";
-        syncComposerState();
+      async function generateChatTurn(text, options = {}) {
+        const messageText = String(text || "").trim();
+        if (!messageText || chatRequestInFlight || isEndingConversation) return;
+
+        const clearInput = options.clearInput !== false;
+        chatRequestInFlight = true;
+        const userEntry = addMessage("user", messageText);
+        if (clearInput) {
+          inputEl.value = "";
+          syncComposerState();
+        }
         setStatus("正在回复...");
         setComposerBusy(true);
         const assistantEntry = createMessage("assistant", "", "正在回复...");
         assistantEntry.wrapper.classList.add("streaming");
+        assistantEntry.wrapper.querySelector(".message-actions")?.remove();
         streamingEntries.add(assistantEntry);
+        refreshMessageControls();
         let finalReply = "";
         try {
           try {
@@ -3733,7 +4126,7 @@
             console.warn("Workshop evaluation skipped:", workshopError);
           }
           await streamChat({
-            message: text,
+            message: messageText,
             runtime_config: buildChatRuntimeConfig(),
           }, {
             onMeta(data) {
@@ -3765,12 +4158,13 @@
               const workshopDynamicParse = extractWorkshopDynamicEvents(finalReply);
               finalReply = processAssistantStatusPanelText(workshopDynamicParse.cleanedText, {
                 source: "chat_done",
-                userText: text,
+                userText: messageText,
               });
               triggerDynamicScenesByModelEvents(workshopDynamicParse.events);
               workshopRoundCount += 1;
               triggerDynamicScenesByRound(workshopRoundCount);
               ensureFinalVisible(assistantEntry, finalReply);
+              assistantEntry.wrapper.dataset.messageContent = finalReply;
               if (typeof data.think === "string") {
                 assistantEntry.state.think = data.think;
               }
@@ -3787,26 +4181,38 @@
                 assistantEntry.wrapper.remove();
               }
               assistantEntry.wrapper.classList.remove("streaming");
-              assistantEntry.meta.textContent = new Date().toLocaleString();
+              setMessageMetaText(assistantEntry.meta, new Date().toLocaleString());
               streamingEntries.delete(assistantEntry);
+              refreshMessageControls();
             },
             onError(data) {
               throw new Error(data.detail || "流式请求失败");
             },
           });
           setStatus("就绪", "idle");
-          setComposerBusy(false);
         } catch (error) {
           streamingEntries.delete(assistantEntry);
           assistantEntry.wrapper.remove();
-          addMessage("assistant", `出错了：${error.message}`);
+          userEntry.wrapper.dataset.transientMessage = "true";
+          const errorEntry = addMessage("assistant", `出错了：${error.message}`);
+          errorEntry.wrapper.dataset.transientMessage = "true";
           renderRetrievedItems([]);
           renderWorldbookHits([]);
           renderWorldbookDebug({});
           setStatus("回复失败", "error");
-          setComposerBusy(false);
           showToast(`回复失败：${error.message}`, "error");
+        } finally {
+          chatRequestInFlight = false;
+          setComposerBusy(false);
+          refreshMessageControls();
         }
+      }
+
+      chatForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = inputEl.value.trim();
+        if (!text) return;
+        await generateChatTurn(text);
       });
 
       document.getElementById("end-conversation").addEventListener("click", async () => {
@@ -3935,6 +4341,7 @@
       syncDrawerFromState();
       setWorldbookDebugCollapsed(false);
       hydrateExistingMessages();
+      refreshMessageControls();
       if (!shouldShowWorkshopOpening) startOpeningFirstMessageTypewriter();
       loadPresetStoreForChat().catch(() => {
         presetDebugPanelEl.hidden = true;

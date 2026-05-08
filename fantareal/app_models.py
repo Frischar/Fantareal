@@ -11,6 +11,15 @@ class ChatRequest(BaseModel):
     runtime_config: dict[str, Any] | None = None
 
 
+class ChatHistoryEditRequest(BaseModel):
+    message_index: int = Field(ge=0)
+    content: str
+
+
+class ChatHistoryRerollRequest(BaseModel):
+    message_index: int = Field(ge=0)
+
+
 class PersonaPayload(BaseModel):
     name: str
     system_prompt: str
