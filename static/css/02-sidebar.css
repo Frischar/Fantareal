@@ -199,7 +199,7 @@ body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topnav-grouped {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 0;
+  padding: 0 0 60px 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -405,6 +405,24 @@ body.chat-page .navlink.active,
 body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .navlink.active {
   color: white;
   background: var(--accent);
+}
+
+body.chat-page .topbar > .standalone-about,
+body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar > .standalone-about {
+  position: absolute;
+  bottom: 28px;
+  left: 26px;
+  right: 26px;
+  width: calc(var(--app-sidebar-width) - 52px);
+  border-top: 1px solid var(--border, rgba(128, 128, 128, .18));
+  padding-top: 8px;
+}
+
+body.chat-page .topbar > .standalone-about .nav-group-summary.active,
+body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar > .standalone-about .nav-group-summary.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent 88%);
+  border-color: transparent;
 }
 
 body.app-sidebar-shell:not(.chat-page) .config-shell,

@@ -271,6 +271,16 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             },
         )
 
+    @app.get("/config/about", response_class=HTMLResponse)
+    async def about_config_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "about.html",
+            {
+                "settings": ctx.get_settings(),
+            },
+        )
+
     @app.get("/mods/{mod_slug}", response_class=HTMLResponse)
     async def mod_host_page(request: Request, mod_slug: str) -> HTMLResponse:
         mod = ctx.get_mod(mod_slug)
