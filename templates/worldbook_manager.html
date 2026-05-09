@@ -5,6 +5,215 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
+
+    <style>
+      .worldbook-manager-page .worldbook-selection-panel {
+        position: fixed;
+        right: 24px;
+        top: clamp(112px, 15vh, 156px);
+        width: min(340px, calc(100vw - 32px));
+        max-height: calc(100vh - 140px);
+        z-index: 80;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(calc(100% + 32px));
+        transition: opacity 180ms ease, transform 220ms ease;
+      }
+
+      .worldbook-manager-page .worldbook-selection-panel.is-visible {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(0);
+      }
+
+      .worldbook-manager-page .worldbook-selection-card,
+      .worldbook-manager-page .worldbook-import-modal {
+        background: var(--panel-strong, rgba(18, 27, 37, 0.92));
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        box-shadow: 0 22px 58px rgba(2, 8, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(22px);
+        -webkit-backdrop-filter: blur(22px);
+      }
+
+      .worldbook-manager-page .worldbook-selection-card {
+        overflow: hidden;
+        border-radius: 22px;
+      }
+
+      .worldbook-manager-page .worldbook-selection-head,
+      .worldbook-manager-page .worldbook-import-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 18px 18px 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .worldbook-manager-page .worldbook-selection-head h3,
+      .worldbook-manager-page .worldbook-import-head h2 {
+        margin: 2px 0 4px;
+      }
+
+      .worldbook-manager-page .worldbook-selection-count {
+        color: var(--accent, #7dd3fc);
+      }
+
+      .worldbook-manager-page .worldbook-close-button {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .worldbook-manager-page .worldbook-selection-content {
+        display: grid;
+        gap: 12px;
+        padding: 14px 16px 16px;
+        max-height: calc(100vh - 250px);
+        overflow: auto;
+      }
+
+      .worldbook-manager-page .worldbook-selection-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .worldbook-manager-page .worldbook-selection-actions .full-row {
+        grid-column: 1 / -1;
+      }
+
+      .worldbook-manager-page .worldbook-selection-actions button,
+      .worldbook-manager-page .worldbook-bulk-editor button,
+      .worldbook-manager-page .worldbook-import-modal button {
+        min-height: 36px;
+      }
+
+      .worldbook-manager-page .worldbook-bulk-editor {
+        display: grid;
+        gap: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .worldbook-manager-page .worldbook-bulk-editor.is-collapsed {
+        display: none;
+      }
+
+      .worldbook-manager-page .worldbook-bulk-section {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(148, 163, 184, 0.08);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .worldbook-manager-page .worldbook-bulk-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .worldbook-manager-page .worldbook-import-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 28px;
+        background: rgba(2, 8, 23, 0.46);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
+
+      .worldbook-manager-page .worldbook-import-backdrop.is-hidden {
+        display: none;
+      }
+
+      .worldbook-manager-page .worldbook-import-modal {
+        width: min(760px, calc(100vw - 40px));
+        max-height: calc(100vh - 56px);
+        overflow: hidden;
+        border-radius: 24px;
+      }
+
+      .worldbook-manager-page .worldbook-import-body {
+        display: grid;
+        gap: 16px;
+        padding: 18px;
+        max-height: calc(100vh - 190px);
+        overflow: auto;
+      }
+
+      .worldbook-manager-page .worldbook-import-step {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(148, 163, 184, 0.08);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .worldbook-manager-page .worldbook-import-step-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .worldbook-manager-page .worldbook-import-step-title strong {
+        font-size: 0.98rem;
+      }
+
+      .worldbook-manager-page .worldbook-import-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 18px 18px;
+        border-top: 1px solid rgba(148, 163, 184, 0.14);
+      }
+
+      .worldbook-manager-page .worldbook-inline-hint {
+        margin: 0;
+        line-height: 1.65;
+      }
+
+      @media (max-width: 1180px) {
+        .worldbook-manager-page .worldbook-selection-panel {
+          right: 12px;
+          top: 96px;
+          width: min(320px, calc(100vw - 24px));
+          max-height: calc(100vh - 112px);
+        }
+      }
+
+      @media (max-width: 760px) {
+        .worldbook-manager-page .worldbook-selection-panel {
+          left: 12px;
+          right: 12px;
+          top: auto;
+          bottom: 12px;
+          width: auto;
+          max-height: min(72vh, 620px);
+        }
+
+        .worldbook-manager-page .worldbook-selection-content {
+          max-height: min(58vh, 480px);
+        }
+
+        .worldbook-manager-page .worldbook-bulk-row,
+        .worldbook-manager-page .worldbook-selection-actions {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
   </head>
   <body class="app-sidebar-shell worldbook-manager-page">
     <div class="topbar-stack">
@@ -56,122 +265,6 @@
           </div>
         </div>
 
-        <div class="worldbook-control-grid">
-          <div class="panel config-panel worldbook-control-card worldbook-tool-card" data-tool-card="import" data-tool-static="true">
-            <div class="section-head">
-              <p class="eyebrow">Import</p>
-            <h2>导入增强</h2>
-            <p class="muted">兼容旧版 worldbook。已有注入字段的词条保留原值；缺失注入字段时，按这里的策略补齐。</p>
-          </div>
-          <div class="grid-two">
-            <div>
-              <label for="import-mode">导入模式</label>
-              <select id="import-mode">
-                <option value="replace" selected>替换当前世界书</option>
-                <option value="append">增量追加到当前世界书</option>
-              </select>
-              <p id="import-mode-hint" class="muted helper-text">替换模式会使用导入文件覆盖当前世界书。</p>
-            </div>
-            <label class="checkbox-row">
-              <input id="import-apply-settings" type="checkbox" checked />
-              <span>导入时同时应用包内 settings</span>
-            </label>
-          </div>
-
-          <div class="grid-two">
-            <div>
-              <label for="import-missing-injection-policy">缺失注入字段时</label>
-              <select id="import-missing-injection-policy">
-                <option value="follow_defaults" selected>跟随当前默认设置</option>
-                <option value="force_before_char_defs">统一补到角色定义前</option>
-                <option value="force_after_char_defs">统一补到角色定义后</option>
-                <option value="force_in_chat">统一补到聊天内注入</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid-two">
-            <div>
-              <label for="import-force-in-chat-depth">强制聊天深度</label>
-              <input id="import-force-in-chat-depth" type="number" min="0" max="3" step="1" value="0" />
-              <p class="muted helper-text">仅在“统一补到聊天内注入”时生效。</p>
-            </div>
-            <div>
-              <label for="import-force-injection-order">缺失注入顺序时补为</label>
-              <input id="import-force-injection-order" type="number" min="0" max="999999" step="1" placeholder="留空则不强制" />
-            </div>
-          </div>
-          </div>
-
-          <div class="panel config-panel worldbook-control-card worldbook-tool-card" data-tool-card="batch" data-tool-static="true">
-            <div class="section-head">
-              <p class="eyebrow">Batch</p>
-            <h2>批量编辑（V1）</h2>
-            <p class="muted">先勾选词条，再批量修改位置、深度、注入顺序、递归开关与启用状态。</p>
-          </div>
-
-          <div class="button-row">
-            <button id="select-all-visible-worldbook" type="button" class="secondary">全选当前结果</button>
-            <button id="clear-selected-worldbook" type="button" class="secondary">清空选择</button>
-            <button id="delete-selected-worldbook" type="button" class="secondary danger-button">删除选中词条</button>
-            <span class="muted helper-text">已选中 <strong id="selected-worldbook-count">0</strong> 条</span>
-          </div>
-
-          <div class="grid-two">
-            <div>
-              <label for="bulk-insertion-position">批量插入位置</label>
-              <select id="bulk-insertion-position">
-                <option value="before_char_defs">角色定义前</option>
-                <option value="after_char_defs" selected>角色定义后</option>
-                <option value="in_chat">聊天内注入</option>
-              </select>
-            </div>
-            <div>
-              <label for="bulk-injection-depth">批量聊天深度</label>
-              <input id="bulk-injection-depth" type="number" min="0" max="3" step="1" value="0" />
-            </div>
-          </div>
-
-          <div class="grid-two">
-            <div>
-              <label for="bulk-injection-order">批量注入顺序</label>
-              <input id="bulk-injection-order" type="number" min="0" max="999999" step="1" value="100" />
-            </div>
-            <div class="button-row offset-top">
-              <button id="apply-bulk-injection" type="button" class="secondary">应用注入设置到选中词条</button>
-            </div>
-          </div>
-
-          <div class="grid-two">
-            <div>
-              <label for="bulk-group-target">批量移动到组别</label>
-              <input id="bulk-group-target" list="worldbook-group-options" placeholder="输入新组别，或选择已有组别" />
-              <datalist id="worldbook-group-options"></datalist>
-            </div>
-            <div class="button-row offset-top">
-              <button id="apply-bulk-group" type="button" class="secondary">应用组别到选中词条</button>
-            </div>
-          </div>
-
-          <div class="grid-two">
-            <label class="checkbox-row">
-              <input id="bulk-recursive-enabled" type="checkbox" checked />
-              <span>批量允许递归参与</span>
-            </label>
-            <label class="checkbox-row">
-              <input id="bulk-prevent-further-recursion" type="checkbox" />
-              <span>批量阻止继续递归</span>
-            </label>
-          </div>
-
-          <div class="button-row">
-            <button id="apply-bulk-recursion" type="button" class="secondary">应用递归设置到选中词条</button>
-            <button id="bulk-enable-selected" type="button" class="secondary">启用选中词条</button>
-            <button id="bulk-disable-selected" type="button" class="secondary">禁用选中词条</button>
-          </div>
-          </div>
-        </div>
-
         <div class="worldbook-workspace">
           <aside class="panel config-panel worldbook-group-panel">
             <div class="section-head">
@@ -195,6 +288,7 @@
                 <span id="active-health-filter" class="muted helper-text">问题筛选：未启用</span>
                 <button id="collapse-all-worldbook" type="button" class="secondary">全部折叠</button>
                 <button id="expand-all-worldbook" type="button" class="secondary">全部展开</button>
+                <button id="select-all-visible-worldbook-toolbar" type="button" class="secondary">选择当前结果</button>
               </div>
             </div>
 
@@ -373,6 +467,150 @@
           {% endfor %}
             </div>
           </div>
+        </div>
+      </section>
+    </div>
+
+
+
+    <aside id="worldbook-selection-panel" class="worldbook-selection-panel" aria-hidden="true">
+      <div class="worldbook-selection-card">
+        <div class="worldbook-selection-head">
+          <div>
+            <p class="eyebrow">Selected Tools</p>
+            <h3>已选中 <strong id="selected-worldbook-count" class="worldbook-selection-count">0</strong> 条</h3>
+            <p class="muted helper-text worldbook-inline-hint">针对当前勾选词条进行批量操作。</p>
+          </div>
+          <button id="close-worldbook-selection-panel" type="button" class="secondary worldbook-close-button" aria-label="清空选择并关闭">×</button>
+        </div>
+        <div class="worldbook-selection-content">
+          <div class="worldbook-selection-actions">
+            <button id="toggle-bulk-editor" type="button" class="secondary full-row">批量编辑</button>
+            <button id="bulk-enable-selected" type="button" class="secondary">启用</button>
+            <button id="bulk-disable-selected" type="button" class="secondary">禁用</button>
+            <button id="delete-selected-worldbook" type="button" class="secondary danger-button">删除选中</button>
+            <button id="clear-selected-worldbook" type="button" class="secondary">清空选择</button>
+            <button id="select-all-visible-worldbook" type="button" class="secondary full-row">全选当前筛选结果</button>
+          </div>
+
+          <div id="worldbook-bulk-editor" class="worldbook-bulk-editor is-collapsed" aria-hidden="true">
+            <div class="worldbook-bulk-section">
+              <div class="worldbook-bulk-row">
+                <div>
+                  <label for="bulk-insertion-position">插入位置</label>
+                  <select id="bulk-insertion-position">
+                    <option value="before_char_defs">角色定义前</option>
+                    <option value="after_char_defs" selected>角色定义后</option>
+                    <option value="in_chat">聊天内注入</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="bulk-injection-depth">聊天深度</label>
+                  <input id="bulk-injection-depth" type="number" min="0" max="3" step="1" value="0" />
+                </div>
+              </div>
+              <div>
+                <label for="bulk-injection-order">注入顺序</label>
+                <input id="bulk-injection-order" type="number" min="0" max="999999" step="1" value="100" />
+              </div>
+              <button id="apply-bulk-injection" type="button" class="secondary">应用注入设置</button>
+            </div>
+
+            <div class="worldbook-bulk-section">
+              <div>
+                <label for="bulk-group-target">移动到组别</label>
+                <input id="bulk-group-target" list="worldbook-group-options" placeholder="输入新组别，或选择已有组别" />
+                <datalist id="worldbook-group-options"></datalist>
+              </div>
+              <button id="apply-bulk-group" type="button" class="secondary">应用组别</button>
+            </div>
+
+            <div class="worldbook-bulk-section">
+              <label class="checkbox-row">
+                <input id="bulk-recursive-enabled" type="checkbox" checked />
+                <span>允许递归参与</span>
+              </label>
+              <label class="checkbox-row">
+                <input id="bulk-prevent-further-recursion" type="checkbox" />
+                <span>阻止继续递归</span>
+              </label>
+              <button id="apply-bulk-recursion" type="button" class="secondary">应用递归设置</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div id="worldbook-import-modal" class="worldbook-import-backdrop is-hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="worldbook-import-title">
+      <section class="worldbook-import-modal">
+        <div class="worldbook-import-head">
+          <div>
+            <p class="eyebrow">Import Wizard</p>
+            <h2 id="worldbook-import-title">导入世界书</h2>
+            <p class="muted helper-text worldbook-inline-hint">选择文件前，先确认导入方式和旧字段兼容策略。</p>
+          </div>
+          <button id="close-worldbook-import-modal" type="button" class="secondary worldbook-close-button" aria-label="关闭导入世界书">×</button>
+        </div>
+        <div class="worldbook-import-body">
+          <div class="worldbook-import-step">
+            <div class="worldbook-import-step-title">
+              <strong>1. 导入方式</strong>
+              <span class="muted helper-text">替换或增量</span>
+            </div>
+            <div class="grid-two">
+              <div>
+                <label for="import-mode">导入模式</label>
+                <select id="import-mode">
+                  <option value="replace" selected>替换当前世界书</option>
+                  <option value="append">增量追加到当前世界书</option>
+                </select>
+                <p id="import-mode-hint" class="muted helper-text">替换模式会使用导入文件覆盖当前世界书。</p>
+              </div>
+              <label class="checkbox-row">
+                <input id="import-apply-settings" type="checkbox" checked />
+                <span>导入时同时应用包内 settings</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="worldbook-import-step">
+            <div class="worldbook-import-step-title">
+              <strong>2. 旧字段兼容</strong>
+              <span class="muted helper-text">缺失注入字段时生效</span>
+            </div>
+            <div class="grid-two">
+              <div>
+                <label for="import-missing-injection-policy">缺失注入字段时</label>
+                <select id="import-missing-injection-policy">
+                  <option value="follow_defaults" selected>跟随当前默认设置</option>
+                  <option value="force_before_char_defs">统一补到角色定义前</option>
+                  <option value="force_after_char_defs">统一补到角色定义后</option>
+                  <option value="force_in_chat">统一补到聊天内注入</option>
+                </select>
+              </div>
+              <div>
+                <label for="import-force-in-chat-depth">强制聊天深度</label>
+                <input id="import-force-in-chat-depth" type="number" min="0" max="3" step="1" value="0" />
+                <p class="muted helper-text">仅在“统一补到聊天内注入”时生效。</p>
+              </div>
+            </div>
+            <div>
+              <label for="import-force-injection-order">缺失注入顺序时补为</label>
+              <input id="import-force-injection-order" type="number" min="0" max="999999" step="1" placeholder="留空则不强制" />
+            </div>
+          </div>
+
+          <div class="worldbook-import-step">
+            <div class="worldbook-import-step-title">
+              <strong>3. 选择文件并导入</strong>
+              <span class="muted helper-text">JSON / JSONC</span>
+            </div>
+            <p class="muted helper-text worldbook-inline-hint">选择文件后会立即按以上策略导入。替换模式会覆盖当前页面词条；增量模式只追加到当前列表，检查无误后再保存。</p>
+          </div>
+        </div>
+        <div class="worldbook-import-footer">
+          <button id="cancel-worldbook-import" type="button" class="secondary">取消</button>
+          <button id="confirm-worldbook-import" type="button">选择文件并导入</button>
         </div>
       </section>
     </div>
@@ -977,98 +1215,6 @@
         }
       }
 
-      const TOOL_COLLAPSE_STORAGE_KEY = "fantareal.worldbook.toolCollapse.v1";
-
-      function readToolCollapseState() {
-        try {
-          const raw = localStorage.getItem(TOOL_COLLAPSE_STORAGE_KEY);
-          const parsed = raw ? JSON.parse(raw) : {};
-          return parsed && typeof parsed === "object" ? parsed : {};
-        } catch (error) {
-          return {};
-        }
-      }
-
-      function writeToolCollapseState(state) {
-        try {
-          localStorage.setItem(TOOL_COLLAPSE_STORAGE_KEY, JSON.stringify(state || {}));
-        } catch (error) {
-          // localStorage may be unavailable in some embedded browsers.
-        }
-      }
-
-      function setToolCardCollapsed(card, collapsed, persist = true) {
-        if (!card) return;
-        const key = String(card.dataset.toolCard || "tool");
-        const button = card.querySelector(".worldbook-tool-toggle");
-        card.classList.toggle("is-collapsed", !!collapsed);
-        card.dataset.collapsed = collapsed ? "true" : "false";
-        if (button) {
-          button.textContent = collapsed ? "▸" : "▾";
-          button.title = collapsed ? "展开工具区" : "收起工具区";
-          button.setAttribute("aria-label", collapsed ? "展开工具区" : "收起工具区");
-          button.setAttribute("aria-expanded", collapsed ? "false" : "true");
-        }
-        if (persist) {
-          const state = readToolCollapseState();
-          state[key] = !!collapsed;
-          writeToolCollapseState(state);
-        }
-      }
-
-      function setupCollapsibleToolCards() {
-        const saved = readToolCollapseState();
-        document.querySelectorAll(".worldbook-tool-card").forEach((card) => {
-          const key = String(card.dataset.toolCard || "tool");
-          const head = card.querySelector(".section-head");
-          if (!head) return;
-
-          if (!card.querySelector(".worldbook-tool-body")) {
-            const body = document.createElement("div");
-            body.className = "worldbook-tool-body";
-            while (head.nextSibling) {
-              body.appendChild(head.nextSibling);
-            }
-            card.appendChild(body);
-          }
-
-          if (card.dataset.toolStatic === "true") {
-            card.classList.remove("is-collapsed");
-            card.dataset.collapsed = "false";
-            head.querySelector(".worldbook-tool-toggle")?.remove();
-            head.removeAttribute("tabindex");
-            return;
-          }
-
-          let button = head.querySelector(".worldbook-tool-toggle");
-          if (!button) {
-            button = document.createElement("button");
-            button.type = "button";
-            button.className = "worldbook-tool-toggle";
-            head.insertBefore(button, head.firstChild);
-          }
-
-          const toggle = () => setToolCardCollapsed(card, card.dataset.collapsed !== "true");
-          button.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            toggle();
-          });
-          head.addEventListener("click", (event) => {
-            if (event.target.closest("button, input, select, textarea, a, label")) return;
-            toggle();
-          });
-          head.addEventListener("keydown", (event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            event.preventDefault();
-            toggle();
-          });
-          head.tabIndex = 0;
-
-          setToolCardCollapsed(card, saved[key] ?? true, false);
-        });
-      }
-
       function getSelectedCards() {
         return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].filter((card) => {
           const checkbox = card.querySelector(".wb-selected");
@@ -1076,9 +1222,30 @@
         });
       }
 
+      function setBulkEditorOpen(open) {
+        const editor = document.getElementById("worldbook-bulk-editor");
+        const toggle = document.getElementById("toggle-bulk-editor");
+        if (!editor) return;
+        editor.classList.toggle("is-collapsed", !open);
+        editor.setAttribute("aria-hidden", open ? "false" : "true");
+        if (toggle) {
+          toggle.textContent = open ? "收起批量编辑" : "批量编辑";
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+      }
+
       function updateSelectedCount() {
+        const count = getSelectedCards().length;
         if (selectedWorldbookCountEl) {
-          selectedWorldbookCountEl.textContent = String(getSelectedCards().length);
+          selectedWorldbookCountEl.textContent = String(count);
+        }
+        const panel = document.getElementById("worldbook-selection-panel");
+        if (panel) {
+          panel.classList.toggle("is-visible", count > 0);
+          panel.setAttribute("aria-hidden", count > 0 ? "false" : "true");
+        }
+        if (count === 0) {
+          setBulkEditorOpen(false);
         }
       }
 
@@ -1388,6 +1555,30 @@
         });
       }
 
+
+      function openWorldbookImportModal() {
+        const modal = document.getElementById("worldbook-import-modal");
+        if (!modal) return;
+        modal.classList.remove("is-hidden");
+        modal.setAttribute("aria-hidden", "false");
+        syncImportModeUi();
+        syncImportEnhancementUi();
+      }
+
+      function closeWorldbookImportModal() {
+        const modal = document.getElementById("worldbook-import-modal");
+        if (!modal) return;
+        modal.classList.add("is-hidden");
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      function clearSelectedWorldbookEntries() {
+        [...worldbookListEl.querySelectorAll(".wb-selected")].forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+        updateSelectedCount();
+      }
+
       async function reloadEntries() {
         const data = await fetch("/api/worldbook/entries").then((response) => response.json());
         worldbookListEl.innerHTML = "";
@@ -1664,7 +1855,19 @@
       });
 
       document.getElementById("import-worldbook").addEventListener("click", () => {
-        document.getElementById("import-worldbook-file").click();
+        openWorldbookImportModal();
+      });
+
+      document.getElementById("confirm-worldbook-import")?.addEventListener("click", () => {
+        document.getElementById("import-worldbook-file")?.click();
+      });
+
+      document.getElementById("close-worldbook-import-modal")?.addEventListener("click", closeWorldbookImportModal);
+      document.getElementById("cancel-worldbook-import")?.addEventListener("click", closeWorldbookImportModal);
+      document.getElementById("worldbook-import-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "worldbook-import-modal") {
+          closeWorldbookImportModal();
+        }
       });
 
       document.getElementById("import-worldbook-file").addEventListener("change", async (event) => {
@@ -1672,6 +1875,7 @@
         if (!file) return;
         try {
           await importWorldbookFile(file);
+          closeWorldbookImportModal();
         } catch (error) {
           setStatus(`导入失败：${error.message}`);
         } finally {
@@ -1801,6 +2005,16 @@
         markWorldbookDirty("有未保存修改，记得保存。");
       });
 
+      document.getElementById("toggle-bulk-editor")?.addEventListener("click", () => {
+        const editor = document.getElementById("worldbook-bulk-editor");
+        setBulkEditorOpen(editor?.classList.contains("is-collapsed") !== false);
+      });
+
+      document.getElementById("close-worldbook-selection-panel")?.addEventListener("click", () => {
+        clearSelectedWorldbookEntries();
+        setStatus("已清空当前选择。");
+      });
+
       document.getElementById("select-all-visible-worldbook").addEventListener("click", () => {
         [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => {
           if (card.style.display === "none") return;
@@ -1811,11 +2025,12 @@
         setStatus("已选中当前筛选结果中的全部词条。");
       });
 
+      document.getElementById("select-all-visible-worldbook-toolbar")?.addEventListener("click", () => {
+        document.getElementById("select-all-visible-worldbook")?.click();
+      });
+
       document.getElementById("clear-selected-worldbook").addEventListener("click", () => {
-        [...worldbookListEl.querySelectorAll(".wb-selected")].forEach((checkbox) => {
-          checkbox.checked = false;
-        });
-        updateSelectedCount();
+        clearSelectedWorldbookEntries();
         setStatus("已清空当前选择。");
       });
 
@@ -1950,7 +2165,6 @@
         event.returnValue = "";
       });
 
-      setupCollapsibleToolCards();
       updateCount();
       updateSelectedCount();
       refreshWorldbookNavigation();
