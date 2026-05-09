@@ -137,6 +137,8 @@ ALLOWED_BACKGROUND_SCHEMES = {"http", "https"}
 MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
 MAX_BACKGROUND_UPLOAD_SIZE_BYTES = 30 * 1024 * 1024
 MAX_WORKSHOP_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024
+ALLOWED_FONT_SUFFIXES = {".ttf", ".otf", ".woff", ".woff2"}
+MAX_FONT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 REQUEST_RETRY_ATTEMPTS = 5
 REQUEST_RETRY_BASE_DELAY_SECONDS = 1.0
 DEFAULT_SPRITE_BASE_PATH = "/static/sprites"
@@ -202,6 +204,11 @@ DEFAULT_SETTINGS = {
     "ui_opacity": 0.84,
     "background_image_url": "",
     "background_overlay": 0.42,
+    "font_family_url": "",
+    "font_family_name": "",
+    "font_size": 15,
+    "font_weight": 400,
+    "font_color": "",
     "embedding_base_url": "",
     "embedding_api_key": "",
     "embedding_model": "",
@@ -625,6 +632,32 @@ def sanitize_background_image_url(value: Any, *, strict: bool = False) -> str:
     return ""
 
 
+def sanitize_font_url(value: Any, *, strict: bool = False) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if text.startswith("/static/uploads/"):
+        return text
+    parsed = urlparse(text)
+    if parsed.scheme in ALLOWED_BACKGROUND_SCHEMES and parsed.netloc:
+        return text
+    if strict:
+        raise HTTPException(
+            status_code=400,
+            detail="Font URL must be http/https or a /static/uploads/ local path.",
+        )
+    return ""
+
+
+def sanitize_font_color(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if re.match(r"^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6,8})$", text):
+        return text
+    return ""
+
+
 def sanitize_embedding_fields(value: Any) -> list[str]:
     raw_fields = value if isinstance(value, list) else DEFAULT_SETTINGS["embedding_fields"]
     normalized_fields: list[str] = []
@@ -660,6 +693,14 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
             strict=strict,
         ),
         "background_overlay": clamp_float(settings.get("background_overlay"), 0.0, 0.85, 0.42),
+        "font_family_url": sanitize_font_url(
+            settings.get("font_family_url", ""),
+            strict=strict,
+        ),
+        "font_family_name": str(settings.get("font_family_name", "")).strip()[:64],
+        "font_size": clamp_int(settings.get("font_size"), 10, 28, 15),
+        "font_weight": clamp_int(settings.get("font_weight"), 100, 900, 400),
+        "font_color": sanitize_font_color(settings.get("font_color", "")),
         "sprite_enabled": parse_bool(settings.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
         "embedding_base_url": str(settings.get("embedding_base_url", "")).strip(),
@@ -3827,6 +3868,8 @@ route_ctx = SimpleNamespace(
     CARDS_DIR=CARDS_DIR,
     EXPORT_DIR=EXPORT_DIR,
     MAX_BACKGROUND_UPLOAD_SIZE_BYTES=MAX_BACKGROUND_UPLOAD_SIZE_BYTES,
+    ALLOWED_FONT_SUFFIXES=ALLOWED_FONT_SUFFIXES,
+    MAX_FONT_UPLOAD_SIZE_BYTES=MAX_FONT_UPLOAD_SIZE_BYTES,
     ROLE_CARD_EXTENSIONS=ROLE_CARD_EXTENSIONS,
     UPLOAD_DIR=UPLOAD_DIR,
     activate_preset_in_store=activate_preset_in_store,

@@ -10,6 +10,7 @@
   "ui_opacity": 0.33,
   "background_image_url": "",
   "background_overlay": 0.42,
+  "font_size": 15,
   "sprite_enabled": true,
   "sprite_base_path": "/static/sprites/slot_1",
   "embedding_base_url": "",
@@ -25,5 +26,7 @@
   "rerank_base_url": "",
   "rerank_api_key": "",
   "rerank_model": "",
-  "rerank_top_n": 3
+  "rerank_top_n": 3,
+  "memory_summary_length": "medium",
+  "memory_summary_max_chars": 180
 }

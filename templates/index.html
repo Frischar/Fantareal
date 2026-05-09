@@ -978,6 +978,36 @@
 
         <section class="drawer-section">
           <div class="section-head">
+            <p class="eyebrow">Font</p>
+            <h3>字体设置</h3>
+          </div>
+          <label for="drawer-font-size">字体大小</label>
+          <input id="drawer-font-size" type="range" min="10" max="28" step="1" />
+          <div class="range-value"><span>当前值</span><strong id="drawer-font-size-value">15px</strong></div>
+          <label for="drawer-font-weight">字体粗细</label>
+          <input id="drawer-font-weight" type="range" min="100" max="900" step="100" />
+          <div class="range-value"><span>当前值</span><strong id="drawer-font-weight-value">400</strong></div>
+          <label for="drawer-font-color-text">字体颜色</label>
+          <div class="inline-field">
+            <input id="drawer-font-color" type="color" value="#2d1f18" style="width: 40px; height: 32px; padding: 2px;" />
+            <input id="drawer-font-color-text" placeholder="留空跟随主题" />
+            <button id="drawer-reset-font-color" class="secondary compact" type="button">重置</button>
+          </div>
+          <label for="drawer-font-family-url">自定义字体 URL</label>
+          <div class="inline-field">
+            <input id="drawer-font-family-url" placeholder="上传后自动填入" />
+            <button id="drawer-clear-font" class="secondary compact" type="button">清除</button>
+          </div>
+          <label for="drawer-font-file">上传字体文件</label>
+          <div class="inline-field">
+            <input id="drawer-font-file" type="file" accept=".ttf,.otf,.woff,.woff2" />
+            <button id="drawer-upload-font" class="secondary compact" type="button">上传</button>
+          </div>
+          <p class="muted" id="drawer-font-name-display">未设置自定义字体</p>
+        </section>
+
+        <section class="drawer-section">
+          <div class="section-head">
             <p class="eyebrow">Worldbook</p>
             <h3>世界书</h3>
             <p class="muted">命中触发词后会把对应设定文本临时拼进本轮 Prompt。</p>
@@ -1173,6 +1203,10 @@
         "drawer-ui-opacity",
         "drawer-background-url",
         "drawer-background-overlay",
+        "drawer-font-size",
+        "drawer-font-weight",
+        "drawer-font-color-text",
+        "drawer-font-family-url",
       ]);
       const initialState = {
         llm_base_url: {{ settings.llm_base_url | tojson }},
@@ -1195,7 +1229,12 @@
         theme: {{ settings.theme | tojson }},
         ui_opacity: {{ settings.ui_opacity | tojson }},
         background_image_url: {{ settings.background_image_url | tojson }},
-        background_overlay: {{ settings.background_overlay | tojson }}
+        background_overlay: {{ settings.background_overlay | tojson }},
+        font_family_url: {{ settings.font_family_url | tojson }},
+        font_family_name: {{ settings.font_family_name | tojson }},
+        font_size: {{ settings.font_size | tojson }},
+        font_weight: {{ settings.font_weight | tojson }},
+        font_color: {{ settings.font_color | tojson }}
       };
 
       let worldbookDebugCollapsed = true;
@@ -1221,6 +1260,7 @@
         applyTheme(runtimeState.theme);
         applyUiOpacity(runtimeState.ui_opacity);
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+        applyFontSettings(runtimeState);
         syncDrawerFromState();
         if (statusText) {
           setStatus(statusText);
@@ -1372,6 +1412,16 @@
 
         document.getElementById("drawer-ui-opacity-value").textContent = Number(runtimeState.ui_opacity || 0.84).toFixed(2);
         document.getElementById("drawer-background-overlay-value").textContent = Number(runtimeState.background_overlay || 0.42).toFixed(2);
+
+        drawerInput("drawer-font-size").value = runtimeState.font_size ?? 15;
+        drawerInput("drawer-font-weight").value = runtimeState.font_weight ?? 400;
+        drawerInput("drawer-font-color-text").value = runtimeState.font_color || "";
+        drawerInput("drawer-font-color").value = runtimeState.font_color || "#2d1f18";
+        drawerInput("drawer-font-family-url").value = runtimeState.font_family_url || "";
+        document.getElementById("drawer-font-size-value").textContent = (runtimeState.font_size || 15) + "px";
+        document.getElementById("drawer-font-weight-value").textContent = runtimeState.font_weight || 400;
+        document.getElementById("drawer-font-name-display").textContent =
+          runtimeState.font_family_name ? "当前字体：" + runtimeState.font_family_name : "未设置自定义字体";
       }
 
       function syncStateFromDrawer(event) {
@@ -1398,11 +1448,17 @@
           ui_opacity: Number(drawerInput("drawer-ui-opacity").value || 0.84),
           background_image_url: drawerInput("drawer-background-url").value.trim(),
           background_overlay: Number(drawerInput("drawer-background-overlay").value || 0.42),
+          font_family_url: drawerInput("drawer-font-family-url").value.trim(),
+          font_family_name: runtimeState.font_family_name || "",
+          font_size: Number(drawerInput("drawer-font-size").value || 15),
+          font_weight: Number(drawerInput("drawer-font-weight").value || 400),
+          font_color: drawerInput("drawer-font-color-text").value.trim(),
         };
 
         applyTheme(runtimeState.theme);
         applyUiOpacity(runtimeState.ui_opacity);
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+        applyFontSettings(runtimeState);
         if (runtimeModelLabelEl) runtimeModelLabelEl.textContent = runtimeState.llm_model || "未配置";
         if (runtimeHistoryLabelEl) runtimeHistoryLabelEl.textContent = `${runtimeState.history_limit || 20} 条`;
 
@@ -1492,6 +1548,38 @@
         } else {
           bodyEl.style.setProperty("--background-image", "none");
         }
+      }
+
+      function applyFontSettings(state) {
+        const root = document.documentElement;
+        if (state.font_family_url) {
+          const fontName = state.font_family_name || "CustomFont";
+          const formatMap = { '.ttf': 'truetype', '.otf': 'opentype', '.woff': 'woff', '.woff2': 'woff2' };
+          const ext = (state.font_family_url.match(/\.\w+$/)?.[0] || '').toLowerCase();
+          const formatHint = formatMap[ext] ? ` format('${formatMap[ext]}')` : '';
+          if (!document.getElementById("custom-font-face")) {
+            const style = document.createElement("style");
+            style.id = "custom-font-face";
+            document.head.appendChild(style);
+          }
+          document.getElementById("custom-font-face").textContent =
+            `@font-face { font-family: '${fontName}'; src: url('${state.font_family_url}')${formatHint}; }`;
+          root.style.setProperty("--chat-font-family", `'${fontName}', "Microsoft YaHei", "PingFang SC", sans-serif`);
+        } else {
+          root.style.setProperty("--chat-font-family", '"Microsoft YaHei", "PingFang SC", sans-serif');
+          const el = document.getElementById("custom-font-face");
+          if (el) el.remove();
+        }
+        const fontSize = Math.min(Math.max(Number(state.font_size || 15), 10), 28);
+        root.style.setProperty("--chat-font-size", fontSize + "px");
+        const fontWeight = Math.min(Math.max(Number(state.font_weight || 400), 100), 900);
+        root.style.setProperty("--chat-font-weight", String(fontWeight));
+        const fontColor = String(state.font_color || "").trim();
+        root.style.setProperty("--chat-font-color", fontColor || "inherit");
+        const sizeEl = document.getElementById("drawer-font-size-value");
+        if (sizeEl) sizeEl.textContent = fontSize + "px";
+        const weightEl = document.getElementById("drawer-font-weight-value");
+        if (weightEl) weightEl.textContent = fontWeight;
       }
 
       const THINK_TAG_NAMES = [
@@ -1814,6 +1902,21 @@
         return card;
       }
 
+      function formatInlineMarkup(text) {
+        if (!text) return "";
+        let s = String(text);
+        s = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+        s = s.replace(/__(.+?)__/g, "<strong>$1</strong>");
+        s = s.replace(/\*(.+?)\*/g, "<em>$1</em>");
+        s = s.replace(/_(.+?)_/g, "<em>$1</em>");
+        s = s.replace(/~~(.+?)~~/g, "<del>$1</del>");
+        s = s.replace(/\^(.+?)\^/g, "<sup>$1</sup>");
+        s = s.replace(/(?<!~)~([^~]+?)~(?!~)/g, "<sub>$1</sub>");
+        s = s.replace(/`(.+?)`/g, "<code>$1</code>");
+        return s;
+      }
+
       function renderTtsVoiceBody(body, sourceText) {
         const source = String(sourceText || "");
         if (body._ttsVoiceSource === source) return;
@@ -1845,7 +1948,9 @@
           if (piece.type === "voice") {
             body.appendChild(createTtsVoiceCard(piece));
           } else if (piece.text) {
-            body.appendChild(document.createTextNode(piece.text));
+            const span = document.createElement("span");
+            span.innerHTML = formatInlineMarkup(piece.text);
+            body.appendChild(span);
           }
         }
       }
@@ -3672,6 +3777,27 @@
         await saveRuntimeStateToServer("背景图已上传并同步到服务端配置");
       }
 
+      async function uploadDrawerFont() {
+        const fileInput = document.getElementById("drawer-font-file");
+        const file = fileInput.files[0];
+        if (!file) throw new Error("请先选择一个字体文件");
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/font", { method: "POST", body: formData });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "上传失败");
+        }
+        const data = await response.json();
+        runtimeState.font_family_url = data.url || "";
+        runtimeState.font_family_name = data.font_name || file.name.replace(/\.(ttf|otf|woff|woff2)$/i, "");
+        drawerInput("drawer-font-family-url").value = runtimeState.font_family_url;
+        document.getElementById("drawer-font-name-display").textContent =
+          "当前字体：" + runtimeState.font_family_name;
+        applyFontSettings(runtimeState);
+        await saveRuntimeStateToServer("字体文件已上传并同步到服务端配置");
+      }
+
       function buildChatRuntimeConfig() {
         return {
           llm_base_url: runtimeState.llm_base_url,
@@ -3878,6 +4004,62 @@
         }
       });
 
+      document.getElementById("drawer-upload-font").addEventListener("click", async () => {
+        try {
+          await uploadDrawerFont();
+        } catch (error) {
+          setStatus(`字体上传失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("drawer-font-size").addEventListener("input", (e) => {
+        document.getElementById("drawer-font-size-value").textContent = e.target.value + "px";
+        runtimeState.font_size = Number(e.target.value);
+        applyFontSettings(runtimeState);
+        scheduleRuntimeStateSave();
+      });
+
+      document.getElementById("drawer-font-weight").addEventListener("input", (e) => {
+        document.getElementById("drawer-font-weight-value").textContent = e.target.value;
+        runtimeState.font_weight = Number(e.target.value);
+        applyFontSettings(runtimeState);
+        scheduleRuntimeStateSave();
+      });
+
+      document.getElementById("drawer-font-color").addEventListener("input", (e) => {
+        document.getElementById("drawer-font-color-text").value = e.target.value;
+        runtimeState.font_color = e.target.value;
+        applyFontSettings(runtimeState);
+        scheduleRuntimeStateSave();
+      });
+
+      document.getElementById("drawer-font-color-text").addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        if (/^#[0-9a-fA-F]{3,4}$/.test(val) || /^#([0-9a-fA-F]{6,8})$/.test(val)) {
+          document.getElementById("drawer-font-color").value = val;
+        }
+        runtimeState.font_color = val;
+        applyFontSettings(runtimeState);
+        scheduleRuntimeStateSave();
+      });
+
+      document.getElementById("drawer-reset-font-color").addEventListener("click", () => {
+        document.getElementById("drawer-font-color-text").value = "";
+        document.getElementById("drawer-font-color").value = "#2d1f18";
+        runtimeState.font_color = "";
+        applyFontSettings(runtimeState);
+        scheduleRuntimeStateSave();
+      });
+
+      document.getElementById("drawer-clear-font").addEventListener("click", () => {
+        document.getElementById("drawer-font-family-url").value = "";
+        runtimeState.font_family_url = "";
+        runtimeState.font_family_name = "";
+        document.getElementById("drawer-font-name-display").textContent = "未设置自定义字体";
+        applyFontSettings(runtimeState);
+        scheduleRuntimeStateSave();
+      });
+
       document.getElementById("add-worldbook").addEventListener("click", () => {
         worldbookEntries.push({ trigger: "", content: "" });
         renderWorldbookEditor();
@@ -3930,6 +4112,7 @@
       applyTheme(runtimeState.theme);
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+      applyFontSettings(runtimeState);
       prepareOpeningFirstMessageTypewriter();
       initWorkshopOpening();
       syncDrawerFromState();

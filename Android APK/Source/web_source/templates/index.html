@@ -233,6 +233,16 @@
 
         <section class="drawer-section">
           <div class="section-head">
+            <p class="eyebrow">Font</p>
+            <h3>字体大小</h3>
+          </div>
+          <label for="drawer-font-size">字体大小</label>
+          <input id="drawer-font-size" type="range" min="10" max="28" step="1" />
+          <div class="range-value"><span>当前值</span><strong id="drawer-font-size-value">15px</strong></div>
+        </section>
+
+        <section class="drawer-section">
+          <div class="section-head">
             <p class="eyebrow">Sprite</p>
             <h3>表情驱动立绘</h3>
           </div>
@@ -320,6 +330,7 @@
         ui_opacity: {{ settings.ui_opacity | tojson }},
         background_image_url: {{ settings.background_image_url | tojson }},
         background_overlay: {{ settings.background_overlay | tojson }},
+        font_size: {{ settings.font_size | tojson }},
         sprite_enabled: {{ settings.sprite_enabled | tojson }},
         sprite_base_path: DEFAULT_SLOT_SPRITE_BASE_PATH
       };
@@ -393,6 +404,8 @@
         drawerInput("drawer-ui-opacity").value = runtimeState.ui_opacity ?? 0.84;
         drawerInput("drawer-background-url").value = runtimeState.background_image_url || "";
         drawerInput("drawer-background-overlay").value = runtimeState.background_overlay ?? 0.42;
+        drawerInput("drawer-font-size").value = runtimeState.font_size ?? 15;
+        document.getElementById("drawer-font-size-value").textContent = (runtimeState.font_size || 15) + "px";
         drawerInput("drawer-sprite-enabled").checked = runtimeState.sprite_enabled !== false;
         drawerInput("drawer-sprite-base-path").value = runtimeState.sprite_base_path || {{ settings.sprite_base_path | tojson }};
 
@@ -428,6 +441,7 @@
           ui_opacity: Number(drawerInput("drawer-ui-opacity").value || 0.84),
           background_image_url: drawerInput("drawer-background-url").value.trim(),
           background_overlay: Number(drawerInput("drawer-background-overlay").value || 0.42),
+          font_size: Number(drawerInput("drawer-font-size").value || 15),
           sprite_enabled: drawerInput("drawer-sprite-enabled").checked,
           sprite_base_path: drawerInput("drawer-sprite-base-path").value.trim() || {{ settings.sprite_base_path | tojson }},
         };
@@ -436,6 +450,7 @@
         applyTheme(runtimeState.theme);
         applyUiOpacity(runtimeState.ui_opacity);
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+        applyFontSize(runtimeState.font_size);
       }
 
       function openDrawer() {
@@ -484,6 +499,13 @@
         } else {
           bodyEl.style.setProperty("--background-image", "none");
         }
+      }
+
+      function applyFontSize(size) {
+        const fontSize = Math.min(Math.max(Number(size || 15), 10), 28);
+        document.documentElement.style.setProperty("--chat-font-size", fontSize + "px");
+        const sizeEl = document.getElementById("drawer-font-size-value");
+        if (sizeEl) sizeEl.textContent = fontSize + "px";
       }
 
       function spriteUrlFor(tag) {
@@ -912,6 +934,7 @@
       applyTheme(runtimeState.theme);
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+      applyFontSize(runtimeState.font_size);
       syncDrawerFromState();
       loadWorldbook().catch(() => {
         worldbookEntries = [];
