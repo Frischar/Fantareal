@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v141" />
 
 </head>
   <body class="modern-setting-page app-sidebar-shell global-config-page">
@@ -145,6 +145,48 @@
       </section>
 
 
+
+      <section class="panel config-panel config-font-panel">
+        <div class="section-head">
+          <p class="eyebrow">Typography</p>
+          <h2>字体设置</h2>
+          <p class="muted">调整聊天消息的字体大小、粗细和颜色，也可上传自定义字体文件。</p>
+        </div>
+
+        <label for="font-size">聊天字体大小</label>
+        <input id="font-size" type="range" min="10" max="28" step="1" value="{{ settings.font_size }}" />
+        <div class="range-value"><span>当前值</span><strong id="font-size-value">{{ settings.font_size }}px</strong></div>
+
+        <label for="font-weight">字体粗细</label>
+        <input id="font-weight" type="range" min="100" max="900" step="100" value="{{ settings.font_weight }}" />
+        <div class="range-value"><span>当前值</span><strong id="font-weight-value">{{ settings.font_weight }}</strong></div>
+
+        <label for="font-color">字体颜色</label>
+        <div class="inline-field">
+          <input id="font-color" type="color" value="{{ settings.font_color or '#2d1f18' }}" style="width: 48px; height: 36px; padding: 2px;" />
+          <input id="font-color-text" value="{{ settings.font_color }}" placeholder="留空则跟随主题色" />
+          <button type="button" id="reset-font-color" class="secondary compact">重置</button>
+        </div>
+
+        <label for="font-family-url">自定义字体</label>
+        <div class="inline-field">
+          <input id="font-family-url" value="{{ settings.font_family_url }}" placeholder="上传字体文件或填写字体 URL" />
+          <button type="button" id="clear-font" class="secondary compact">清除</button>
+        </div>
+        <label for="font-file">上传字体文件</label>
+        <div class="inline-field">
+          <input id="font-file" type="file" accept=".ttf,.otf,.woff,.woff2" />
+          <button type="button" id="upload-font" class="secondary compact">上传</button>
+        </div>
+        <input type="hidden" id="font-family-name" value="{{ settings.font_family_name }}" />
+        <p class="helper-text" id="font-name-display">
+          {% if settings.font_family_name %}当前字体：{{ settings.font_family_name }}{% else %}未设置自定义字体{% endif %}
+        </p>
+
+        <div class="button-row">
+          <button id="reset-font-defaults" type="button" class="secondary">恢复默认字体/颜色/粗细</button>
+        </div>
+      </section>
 
       <section class="panel config-panel config-appearance-panel">
         <div class="section-head">
@@ -451,6 +493,34 @@
         backgroundPreviewEl.style.setProperty("--preview-overlay-opacity", String(normalizedOverlay));
       }
 
+      function applyFontSettings(settings) {
+        const root = document.documentElement;
+        if (settings.font_family_url) {
+          const fontName = settings.font_family_name || "CustomFont";
+          const formatMap = { '.ttf': 'truetype', '.otf': 'opentype', '.woff': 'woff', '.woff2': 'woff2' };
+          const ext = (settings.font_family_url.match(/\.\w+$/)?.[0] || '').toLowerCase();
+          const formatHint = formatMap[ext] ? ` format('${formatMap[ext]}')` : '';
+          if (!document.getElementById("custom-font-face")) {
+            const style = document.createElement("style");
+            style.id = "custom-font-face";
+            document.head.appendChild(style);
+          }
+          document.getElementById("custom-font-face").textContent =
+            `@font-face { font-family: '${fontName}'; src: url('${settings.font_family_url}')${formatHint}; }`;
+          root.style.setProperty("--chat-font-family", `'${fontName}', "Microsoft YaHei", "PingFang SC", sans-serif`);
+        } else {
+          root.style.setProperty("--chat-font-family", '"Microsoft YaHei", "PingFang SC", sans-serif');
+          const el = document.getElementById("custom-font-face");
+          if (el) el.remove();
+        }
+        const fontSize = Math.min(Math.max(Number(settings.font_size || 15), 10), 28);
+        root.style.setProperty("--chat-font-size", fontSize + "px");
+        const fontWeight = Math.min(Math.max(Number(settings.font_weight || 400), 100), 900);
+        root.style.setProperty("--chat-font-weight", String(fontWeight));
+        const fontColor = String(settings.font_color || "").trim();
+        root.style.setProperty("--chat-font-color", fontColor || "inherit");
+      }
+
       async function postJson(url, payload) {
         const response = await fetch(url, {
           method: "POST",
@@ -548,6 +618,11 @@
           ui_opacity: Number(uiOpacityEl.value || 0.84),
           background_image_url: backgroundUrlEl.value.trim(),
           background_overlay: Number(backgroundOverlayEl.value || 0.42),
+          font_family_url: document.getElementById("font-family-url").value.trim(),
+          font_family_name: document.getElementById("font-family-name").value.trim(),
+          font_size: Number(document.getElementById("font-size").value || 15),
+          font_weight: Number(document.getElementById("font-weight").value || 400),
+          font_color: document.getElementById("font-color-text").value.trim(),
           embedding_base_url: document.getElementById("embedding-base-url").value.trim(),
           embedding_api_key: document.getElementById("embedding-api-key").value.trim(),
           embedding_model: document.getElementById("embedding-model").value.trim(),
@@ -577,6 +652,10 @@
         applyTheme(data.settings.theme);
         applyUiOpacity(data.settings.ui_opacity);
         applyBackground(data.settings.background_image_url, data.settings.background_overlay);
+        applyFontSettings(data.settings);
+        document.getElementById("font-family-name").value = data.settings.font_family_name || "";
+        document.getElementById("font-name-display").textContent =
+          data.settings.font_family_name ? "当前字体：" + data.settings.font_family_name : "未设置自定义字体";
         setStatus(statusText);
         return data;
       }
@@ -793,6 +872,89 @@
         scheduleSave(saveSettings, "背景遮罩调整中...", 250);
       });
 
+      // Font settings event listeners
+      document.getElementById("font-size").addEventListener("input", (e) => {
+        document.getElementById("font-size-value").textContent = e.target.value + "px";
+        applyFontSettings({ ...settingsPayload(), font_size: Number(e.target.value) });
+        scheduleSave(saveSettings, "字体大小调整中...", 250);
+      });
+
+      document.getElementById("font-weight").addEventListener("input", (e) => {
+        document.getElementById("font-weight-value").textContent = e.target.value;
+        applyFontSettings({ ...settingsPayload(), font_weight: Number(e.target.value) });
+        scheduleSave(saveSettings, "字体粗细调整中...", 250);
+      });
+
+      document.getElementById("font-color").addEventListener("input", (e) => {
+        document.getElementById("font-color-text").value = e.target.value;
+        applyFontSettings({ ...settingsPayload(), font_color: e.target.value });
+        scheduleSave(saveSettings, "字体颜色调整中...", 250);
+      });
+
+      document.getElementById("font-color-text").addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        if (/^#[0-9a-fA-F]{3,4}$/.test(val) || /^#([0-9a-fA-F]{6,8})$/.test(val)) {
+          document.getElementById("font-color").value = val;
+        }
+        applyFontSettings({ ...settingsPayload(), font_color: val });
+        scheduleSave(saveSettings, "字体颜色调整中...", 250);
+      });
+
+      document.getElementById("reset-font-color").addEventListener("click", () => {
+        document.getElementById("font-color-text").value = "";
+        document.getElementById("font-color").value = "#2d1f18";
+        applyFontSettings({ ...settingsPayload(), font_color: "" });
+        scheduleSave(saveSettings, "字体颜色已重置", 250);
+      });
+
+      document.getElementById("clear-font").addEventListener("click", () => {
+        document.getElementById("font-family-url").value = "";
+        document.getElementById("font-family-name").value = "";
+        document.getElementById("font-name-display").textContent = "未设置自定义字体";
+        applyFontSettings({ ...settingsPayload(), font_family_url: "", font_family_name: "" });
+        scheduleSave(saveSettings, "自定义字体已清除", 250);
+      });
+
+      document.getElementById("upload-font").addEventListener("click", async () => {
+        const fileInput = document.getElementById("font-file");
+        const file = fileInput.files[0];
+        if (!file) { setStatus("请先选择一个字体文件"); return; }
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch("/api/font", { method: "POST", body: formData });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "上传失败");
+          }
+          const data = await response.json();
+          document.getElementById("font-family-url").value = data.url || "";
+          document.getElementById("font-family-name").value = data.font_name || "";
+          document.getElementById("font-name-display").textContent = "当前字体：" + (data.font_name || file.name);
+          applyFontSettings({ ...settingsPayload(), font_family_url: data.url, font_family_name: data.font_name });
+          await saveSettings("字体文件已上传并保存");
+        } catch (error) {
+          setStatus(`字体上传失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("font-family-url").addEventListener("input", () => {
+        applyFontSettings(settingsPayload());
+        scheduleSave(saveSettings, "字体地址变更中...", 250);
+      });
+
+      document.getElementById("reset-font-defaults").addEventListener("click", () => {
+        document.getElementById("font-size").value = 15;
+        document.getElementById("font-size-value").textContent = "15px";
+        document.getElementById("font-weight").value = 400;
+        document.getElementById("font-weight-value").textContent = "400";
+        document.getElementById("font-color-text").value = "";
+        document.getElementById("font-color").value = "#2d1f18";
+        applyFontSettings({ ...settingsPayload(), font_size: 15, font_weight: 400, font_color: "" });
+        scheduleSave(saveSettings, "字体已恢复默认", 250);
+        showToast("字体大小、粗细、颜色已恢复默认", "success");
+      });
+
       backgroundUrlEl.addEventListener("input", () => {
         applyBackground(backgroundUrlEl.value, backgroundOverlayEl.value);
       });
@@ -833,6 +995,13 @@
       applyTheme({{ settings.theme | tojson }});
       applyUiOpacity({{ settings.ui_opacity | tojson }});
       applyBackground({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
+      applyFontSettings({
+        font_family_url: {{ settings.font_family_url | tojson }},
+        font_family_name: {{ settings.font_family_name | tojson }},
+        font_size: {{ settings.font_size | tojson }},
+        font_weight: {{ settings.font_weight | tojson }},
+        font_color: {{ settings.font_color | tojson }}
+      });
     </script>
   </body>
 </html>

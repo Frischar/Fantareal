@@ -2168,6 +2168,24 @@ body.chat-page .chat-layout.runtime-panel-open .runtime-panel-handle:focus-visib
   }
 }
 
+/* Inline formatting elements */
+.bubble-body code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted) 12%, transparent 88%);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.92em;
+}
 
+.bubble-body sup {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+}
 
+.bubble-body sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+  line-height: 0;
+}
 

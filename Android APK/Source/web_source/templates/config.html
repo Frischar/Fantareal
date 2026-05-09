@@ -208,6 +208,13 @@
           <div class="preview-user">用户消息示例</div>
           <div class="preview-ai">AI 回复示例</div>
         </div>
+
+        <hr style="margin: 18px 0 14px; border: 0; border-top: 1px solid var(--line);" />
+        <p class="sub-title" style="font-weight:600; margin-bottom: 8px;">字体大小</p>
+
+        <label for="font-size">聊天字体大小</label>
+        <input id="font-size" type="range" min="10" max="28" step="1" value="{{ settings.font_size }}" />
+        <div class="range-value"><span>当前值</span><strong id="font-size-value">{{ settings.font_size }}px</strong></div>
       </section>
 
       <section class="panel config-panel full-span">
@@ -310,6 +317,13 @@
         backgroundPreviewEl.style.setProperty("--preview-overlay-opacity", String(normalizedOverlay));
       }
 
+      function applyFontSize(size) {
+        const fontSize = Math.min(Math.max(Number(size || 15), 10), 28);
+        document.documentElement.style.setProperty("--chat-font-size", fontSize + "px");
+        const sizeEl = document.getElementById("font-size-value");
+        if (sizeEl) sizeEl.textContent = fontSize + "px";
+      }
+
       async function postJson(url, payload) {
         const response = await fetch(url, {
           method: "POST",
@@ -352,6 +366,7 @@
           ui_opacity: Number(uiOpacityEl.value || 0.84),
           background_image_url: backgroundUrlEl.value.trim(),
           background_overlay: Number(backgroundOverlayEl.value || 0.42),
+          font_size: Number(document.getElementById("font-size").value || 15),
           embedding_base_url: document.getElementById("embedding-base-url").value.trim(),
           embedding_api_key: document.getElementById("embedding-api-key").value.trim(),
           embedding_model: document.getElementById("embedding-model").value.trim(),
@@ -505,6 +520,12 @@
         scheduleSave(saveSettings, "背景遮罩调整中...", 250);
       });
 
+      document.getElementById("font-size").addEventListener("input", (e) => {
+        document.getElementById("font-size-value").textContent = e.target.value + "px";
+        applyFontSize(e.target.value);
+        scheduleSave(saveSettings, "字体大小调整中...", 250);
+      });
+
       backgroundUrlEl.addEventListener("input", () => {
         applyBackground(backgroundUrlEl.value, backgroundOverlayEl.value);
       });
@@ -541,6 +562,7 @@
       applyTheme({{ settings.theme | tojson }});
       applyUiOpacity({{ settings.ui_opacity | tojson }});
       applyBackground({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
+      applyFontSize({{ settings.font_size | tojson }});
     </script>
   </body>
 </html>

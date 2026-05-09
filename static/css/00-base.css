@@ -42,6 +42,10 @@
   --ui-border-strong: color-mix(in srgb, var(--line) 100%, transparent 0%);
   --ui-glass-blur: blur(18px) saturate(1.06);
   --ui-glass-blur-soft: blur(14px) saturate(1.04);
+  --chat-font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  --chat-font-size: 15px;
+  --chat-font-weight: 400;
+  --chat-font-color: inherit;
 }
 
 :root[data-theme="dark"] {
@@ -902,6 +906,10 @@ a.compact {
 .bubble-body {
   white-space: pre-wrap;
   word-break: break-word;
+  font-family: var(--chat-font-family);
+  font-size: var(--chat-font-size);
+  font-weight: var(--chat-font-weight);
+  color: var(--chat-font-color);
 }
 
 .bubble-think {

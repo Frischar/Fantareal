@@ -1135,6 +1135,33 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
         return {"ok": True, "url": f"/static/uploads/{filename}"}
 
+    @app.post("/api/font")
+    async def api_upload_font(file: UploadFile = File(...)) -> dict[str, Any]:
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix not in ctx.ALLOWED_FONT_SUFFIXES:
+            raise HTTPException(status_code=400, detail="Only .ttf, .otf, .woff, .woff2 fonts are supported.")
+
+        content = await file.read(ctx.MAX_FONT_UPLOAD_SIZE_BYTES + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file cannot be empty.")
+        if len(content) > ctx.MAX_FONT_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Font file cannot be larger than 5 MB.")
+
+        ctx.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        filename = f"font_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}{suffix}"
+        target = ctx.UPLOAD_DIR / filename
+        try:
+            target.write_bytes(content)
+        except OSError as exc:
+            ctx.logger.exception("Font file write failed: %s", target)
+            raise HTTPException(
+                status_code=500,
+                detail="Font file save failed. Please check disk space or file permissions.",
+            ) from exc
+
+        font_name = Path(file.filename or "CustomFont").stem
+        return {"ok": True, "url": f"/static/uploads/{filename}", "font_name": font_name}
+
     @app.post("/api/workshop/upload")
     async def api_upload_workshop_asset(
         kind: str = Form("image"),

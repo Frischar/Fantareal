@@ -29,6 +29,11 @@ class SettingsPayload(BaseModel):
     ui_opacity: float = 0.84
     background_image_url: str = ""
     background_overlay: float = 0.42
+    font_family_url: str = ""
+    font_family_name: str = ""
+    font_size: int = 15
+    font_weight: int = 400
+    font_color: str = ""
     sprite_enabled: bool = False
     sprite_base_path: str = DEFAULT_SPRITE_BASE_PATH
     embedding_base_url: str = ""

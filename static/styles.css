@@ -1,18 +1,18 @@
-/* Fantareal main stylesheet · split entry ui-v140
+/* Fantareal main stylesheet · split entry ui-v141
    原始大文件已拆到 static/css/*.css。
-   ui-v140: 字段控件归一第二刀；styles.css 仍只做入口。 */
-@import url("./css/00-base.css?v=ui-v140");
-@import url("./css/01-chat.css?v=ui-v140");
-@import url("./css/02-sidebar.css?v=ui-v140");
-@import url("./css/03-config-global.css?v=ui-v140");
-@import url("./css/04-user-workshop.css?v=ui-v140");
-@import url("./css/05-config-helpers.css?v=ui-v140");
-@import url("./css/06-workshop-controls.css?v=ui-v140");
-@import url("./css/07-card-editor.css?v=ui-v140");
-@import url("./css/08-config-fields.css?v=ui-v140");
-@import url("./css/09-preset-memory.css?v=ui-v140");
-@import url("./css/10-worldbook.css?v=ui-v140");
-@import url("./css/11-workshop-opening.css?v=ui-v140");
-@import url("./css/12-workshop-performance.css?v=ui-v140");
+   ui-v141: 配置页界面与背景面板加宽；styles.css 仍只做入口。 */
+@import url("./css/00-base.css?v=ui-v141");
+@import url("./css/01-chat.css?v=ui-v141");
+@import url("./css/02-sidebar.css?v=ui-v141");
+@import url("./css/03-config-global.css?v=ui-v141");
+@import url("./css/04-user-workshop.css?v=ui-v141");
+@import url("./css/05-config-helpers.css?v=ui-v141");
+@import url("./css/06-workshop-controls.css?v=ui-v141");
+@import url("./css/07-card-editor.css?v=ui-v141");
+@import url("./css/08-config-fields.css?v=ui-v141");
+@import url("./css/09-preset-memory.css?v=ui-v141");
+@import url("./css/10-worldbook.css?v=ui-v141");
+@import url("./css/11-workshop-opening.css?v=ui-v141");
+@import url("./css/12-workshop-performance.css?v=ui-v141");
 
-/* ui-v140: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */
+/* ui-v141: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */

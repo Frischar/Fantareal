@@ -30,6 +30,10 @@ body.modern-setting-page .config-primary-panel {
   border-color: color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
 }
 
+body.modern-setting-page .config-font-panel {
+  border-color: color-mix(in srgb, var(--accent) 12%, var(--line) 88%);
+}
+
 body.modern-setting-page .config-advanced-group {
   grid-column: 1 / -1;
   display: block;
@@ -185,13 +189,18 @@ body.modern-setting-page .config-sticky-buttons {
 }
 
 body.modern-setting-page .config-workbench-shell {
-  grid-template-columns: minmax(420px, 1fr) minmax(420px, 1fr);
+  grid-template-columns: repeat(2, minmax(520px, 1fr));
   align-items: start;
 }
 
 body.modern-setting-page .config-primary-panel,
+body.modern-setting-page .config-font-panel,
 body.modern-setting-page .config-appearance-panel {
   min-height: 100%;
+}
+
+body.modern-setting-page .config-appearance-panel {
+  grid-column: 1 / -1;
 }
 
 body.modern-setting-page .config-overview-grid {
@@ -365,12 +374,24 @@ body.modern-setting-page .config-advanced-summary {
     color-mix(in srgb, var(--panel-strong) 64%, transparent);
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1320px) {
   body.modern-setting-page .config-workbench-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(420px, 1fr) minmax(420px, 1fr);
+  }
+  body.modern-setting-page .config-appearance-panel {
+    grid-column: 1 / -1;
   }
   body.modern-setting-page .config-overview-grid {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  body.modern-setting-page .config-workbench-shell {
+    grid-template-columns: 1fr;
+  }
+  body.modern-setting-page .config-appearance-panel {
+    grid-column: 1 / -1;
   }
 }
 
@@ -396,7 +417,7 @@ body.modern-setting-page .config-advanced-summary {
    ui-v137: compact aligned workbench + small toast
    ========================================================= */
 body.modern-setting-page.app-sidebar-shell:not(.chat-page) {
-  --config-main-width: min(1480px, calc(100vw - var(--app-sidebar-width) - 48px));
+  --config-main-width: min(1680px, calc(100vw - var(--app-sidebar-width) - 28px));
 }
 
 body.modern-setting-page .topbar-stack > .slot-toolbar.config-hero-toolbar,
