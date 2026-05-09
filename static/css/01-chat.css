@@ -2189,3 +2189,115 @@ body.chat-page .chat-layout.runtime-panel-open .runtime-panel-handle:focus-visib
   line-height: 0;
 }
 
+
+
+/* ui-v141: message edit + reroll controls */
+.chat-page .message-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-page .message.user .message-meta {
+  justify-content: flex-end;
+}
+
+.chat-page .message.assistant .message-meta,
+.chat-page .message.system .message-meta {
+  justify-content: flex-start;
+}
+
+.chat-page .message-meta-text {
+  min-width: 0;
+}
+
+.chat-page .message-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(1px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.chat-page .message:hover .message-actions,
+.chat-page .message:focus-within .message-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.chat-page .message-action-button {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--line) 28%, transparent 72%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-strong) 50%, transparent 50%);
+  color: color-mix(in srgb, var(--text) 78%, var(--muted) 22%);
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  box-shadow: none;
+}
+
+.chat-page .message-action-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line) 62%);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-strong) 90%);
+}
+
+.chat-page .message-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.chat-page .message-edit-panel {
+  width: min(100%, 560px);
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
+  background: color-mix(in srgb, var(--panel-strong) 86%, transparent 14%);
+  box-shadow: 0 12px 28px color-mix(in srgb, #000 10%, transparent 90%);
+}
+
+.chat-page .message-edit-textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 42%, transparent 58%);
+  background: color-mix(in srgb, var(--panel-strong) 92%, transparent 8%);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+  line-height: 1.6;
+  outline: none;
+}
+
+.chat-page .message-edit-textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line) 54%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent 88%);
+}
+
+.chat-page .message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+:root[data-theme="dark"] .chat-page .message-action-button {
+  background: color-mix(in srgb, var(--panel-strong) 62%, #0f172a 38%);
+}
+
+:root[data-theme="dark"] .chat-page .message-edit-panel,
+:root[data-theme="dark"] .chat-page .message-edit-textarea {
+  background: color-mix(in srgb, var(--panel-strong) 88%, #101827 12%);
+}

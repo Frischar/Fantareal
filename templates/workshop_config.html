@@ -246,12 +246,6 @@
           </div>
           <div id="dynamic-scene-list" class="stack-list dynamic-scene-list"></div>
         </div>
-        <div class="section-head workshop-section-head workshop-rules-subhead">
-          <p class="eyebrow">Legacy Rules</p>
-          <h2>旧版高级规则</h2>
-          <p class="muted">这里保留旧 A/B/C 阶段和 Temp 规则，主要用于兼容旧卡；新卡建议优先使用入场演出、常驻氛围和动态演出。</p>
-        </div>
-        <div id="workshop-rule-list" class="stack-list workshop-rule-list-modern"></div>
       </section>
 
       <aside class="panel config-panel workshop-control-panel">
@@ -260,16 +254,23 @@
           <h2>工坊面板</h2>
         </div>
 
-        <p id="status-text" class="task-status is-idle">已准备 · 修改规则后点击保存工坊。</p>
+        <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存工坊。</p>
+
+        <div class="workshop-panel-actions workshop-panel-actions-top">
+          <button id="save-workshop" type="button">保存工坊</button>
+          <a class="secondary compact button-link workshop-return-link" href="/config/card">返回角色卡</a>
+          <button id="reload-workshop-status" type="button" class="secondary compact">重新读取状态</button>
+        </div>
+
+        <div class="workshop-panel-block workshop-runtime-panel-side">
+          <label class="checkbox-row"><input id="workshop-enabled" type="checkbox" /> 启用创意工坊</label>
+          <p class="muted compact" id="workshop-runtime-info">当前 temp = {{ workshop_state.temp or 0 }}，阶段 = {{ workshop_stage }}阶段。</p>
+        </div>
 
         <div class="workshop-panel-block workshop-side-summary">
           <div class="workshop-summary-item">
             <span>当前角色卡</span>
             <strong id="workshop-current-card-name">{{ current_card.source_name or "未命名角色卡" }}</strong>
-          </div>
-          <div class="workshop-summary-item">
-            <span>规则数量</span>
-            <strong id="workshop-rule-count">0</strong>
           </div>
           <div class="workshop-summary-item">
             <span>工坊开关</span>
@@ -279,30 +280,14 @@
             <span>开场演出</span>
             <strong id="workshop-opening-state">未启用</strong>
           </div>
-        </div>
-
-        <div class="workshop-panel-block workshop-runtime-panel-side">
-          <label class="checkbox-row"><input id="workshop-enabled" type="checkbox" /> 启用创意工坊</label>
-          <p class="muted compact" id="workshop-runtime-info">当前 temp = {{ workshop_state.temp or 0 }}，阶段 = {{ workshop_stage }}阶段。</p>
-        </div>
-
-        <div class="workshop-panel-block workshop-search-panel">
-          <label for="workshop-rule-search">搜索规则</label>
-          <input id="workshop-rule-search" type="text" placeholder="按标题、备注、Temp 或链接搜索" />
-        </div>
-
-        <div class="workshop-panel-block workshop-quick-actions">
-          <button id="add-workshop-rule" type="button" class="secondary compact">+ 新增规则</button>
-          <div class="workshop-quick-row">
-            <button id="collapse-workshop-rules" type="button" class="secondary compact">全部折叠</button>
-            <button id="expand-workshop-rules" type="button" class="secondary compact">全部展开</button>
+          <div class="workshop-summary-item">
+            <span>常驻氛围</span>
+            <strong id="workshop-ambience-state">未启用</strong>
           </div>
-          <button id="reload-workshop-status" type="button" class="secondary compact">重新读取状态</button>
-        </div>
-
-        <div class="workshop-panel-actions">
-          <button id="save-workshop" type="button">保存工坊</button>
-          <a class="secondary compact button-link workshop-return-link" href="/config/card">返回角色卡</a>
+          <div class="workshop-summary-item">
+            <span>动态演出</span>
+            <strong id="workshop-dynamic-state">0 项</strong>
+          </div>
         </div>
       </aside>
     </div>
@@ -319,13 +304,12 @@
       const bodyEl = document.body;
       const statusEl = document.getElementById("status-text");
       const workshopEnabledEl = document.getElementById("workshop-enabled");
-      const workshopRuleListEl = document.getElementById("workshop-rule-list");
-      const workshopSearchEl = document.getElementById("workshop-rule-search");
       const workshopRuntimeInfoEl = document.getElementById("workshop-runtime-info");
       const toastHostEl = document.getElementById("workshop-toast-host");
-      const workshopRuleCountEl = document.getElementById("workshop-rule-count");
       const workshopEnabledStateEl = document.getElementById("workshop-enabled-state");
       const workshopOpeningStateEl = document.getElementById("workshop-opening-state");
+      const workshopAmbienceStateEl = document.getElementById("workshop-ambience-state");
+      const workshopDynamicStateEl = document.getElementById("workshop-dynamic-state");
       const workshopOpeningEnabledEl = document.getElementById("workshop-opening-enabled");
       const workshopOpeningTitleEl = document.getElementById("workshop-opening-title");
       const workshopOpeningSubtitleEl = document.getElementById("workshop-opening-subtitle");
@@ -437,11 +421,14 @@
       }
 
       function updateWorkshopPanelStats() {
-        const total = workshopRuleListEl?.querySelectorAll(".workshop-rule-card").length || currentWorkshop?.items?.length || 0;
         const enabled = workshopEnabledEl?.checked !== false;
-        if (workshopRuleCountEl) workshopRuleCountEl.textContent = String(total);
+        const ambienceEnabled = ambienceEnabledEl?.checked === true || currentWorkshop?.ambience?.enabled === true;
+        const dynamicCount = dynamicSceneListEl?.querySelectorAll(".dynamic-scene-card").length
+          || (Array.isArray(currentWorkshop?.dynamicScenes) ? currentWorkshop.dynamicScenes.length : 0);
         if (workshopEnabledStateEl) workshopEnabledStateEl.textContent = enabled ? "已启用" : "未启用";
         if (workshopOpeningStateEl) workshopOpeningStateEl.textContent = workshopOpeningEnabledEl?.checked ? "已启用" : "未启用";
+        if (workshopAmbienceStateEl) workshopAmbienceStateEl.textContent = ambienceEnabled ? "已启用" : "未启用";
+        if (workshopDynamicStateEl) workshopDynamicStateEl.textContent = `${dynamicCount} 项`;
       }
 
       function applyTheme(theme) {
@@ -1226,34 +1213,9 @@
         const creativeWorkshop = {
           enabled: workshopEnabledEl?.checked !== false,
           opening: collectWorkshopOpeningPayload(),
-          items: [],
+          // 旧版 items 不再在前端展示和编辑，但保存时必须原样保留，避免旧卡数据被清空。
+          items: Array.isArray(currentWorkshop?.items) ? currentWorkshop.items : [],
         };
-
-        workshopRuleListEl?.querySelectorAll(".workshop-rule-card").forEach((card, index) => {
-          let triggerTempMin = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-min")?.value || initialWorkshopTemp, initialWorkshopTemp);
-          let triggerTempMax = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-max")?.value || initialWorkshopTemp, triggerTempMin);
-          if (triggerTempMax < triggerTempMin) [triggerTempMin, triggerTempMax] = [triggerTempMax, triggerTempMin];
-
-          creativeWorkshop.items.push({
-            id: String(card.querySelector(".workshop-rule-id")?.value || "").trim() || `workshop-item-${Date.now()}-${index}`,
-            name: String(card.querySelector(".workshop-rule-name")?.value || "").trim() || `规则 ${index + 1}`,
-            enabled: card.querySelector(".workshop-rule-enabled")?.checked !== false,
-            triggerMode: normalizeWorkshopTriggerMode(card.querySelector(".workshop-rule-trigger-mode")?.value || "stage"),
-            triggerStage: normalizeWorkshopStage(card.querySelector(".workshop-rule-trigger")?.value || "A"),
-            triggerTempMin,
-            triggerTempMax,
-            actionType: normalizeWorkshopActionType(card.querySelector(".workshop-rule-action")?.value),
-            popupTitle: String(card.querySelector(".workshop-rule-popup-title")?.value || "").trim(),
-            musicPreset: String(card.querySelector(".workshop-rule-preset")?.value || "off").trim() || "off",
-            musicUrl: String(card.querySelector(".workshop-rule-url")?.value || "").trim(),
-            autoplay: card.querySelector(".workshop-rule-autoplay")?.checked !== false,
-            loop: card.querySelector(".workshop-rule-loop")?.checked !== false,
-            volume: Math.min(Math.max(Number(card.querySelector(".workshop-rule-volume")?.value ?? 0.85) || 0.85, 0), 1),
-            imageUrl: String(card.querySelector(".workshop-rule-image-url")?.value || "").trim(),
-            imageAlt: String(card.querySelector(".workshop-rule-image-alt")?.value || "").trim(),
-            note: String(card.querySelector(".workshop-rule-note")?.value || "").trim(),
-          });
-        });
 
         return { creativeWorkshop };
       }
@@ -1337,26 +1299,6 @@
         setStatus(workshopEnabledEl.checked ? "已启用创意工坊，记得保存工坊。" : "已关闭创意工坊，记得保存工坊。", "idle");
       });
 
-      workshopSearchEl?.addEventListener("input", applyWorkshopRuleSearch);
-
-      document.getElementById("add-workshop-rule")?.addEventListener("click", (event) => {
-        addWorkshopRuleToCurrentCard();
-        setButtonState(event.currentTarget, "success", "已新增 ✓");
-        showToast("已新增创意工坊规则", "success");
-      });
-
-      document.getElementById("collapse-workshop-rules")?.addEventListener("click", (event) => {
-        setAllWorkshopRulesCollapsed(true);
-        setButtonState(event.currentTarget, "success", "已折叠 ✓");
-        setStatus("已折叠全部创意工坊规则。", "success");
-      });
-
-      document.getElementById("expand-workshop-rules")?.addEventListener("click", (event) => {
-        setAllWorkshopRulesCollapsed(false);
-        setButtonState(event.currentTarget, "success", "已展开 ✓");
-        setStatus("已展开全部创意工坊规则。", "success");
-      });
-
       document.getElementById("reload-workshop-status")?.addEventListener("click", async (event) => {
         const reloadButton = event.currentTarget;
         if (!reloadButton || reloadButton.dataset.reloading === "true") return;
@@ -1410,85 +1352,6 @@
         }
       });
 
-      workshopRuleListEl?.addEventListener("input", (event) => {
-        const card = event.target.closest(".workshop-rule-card");
-        if (!card) return;
-        if (event.target.matches(".workshop-rule-trigger-mode, .workshop-rule-trigger, .workshop-rule-trigger-temp-min, .workshop-rule-trigger-temp-max")) {
-          updateWorkshopRuleTriggerUI(card);
-        }
-        if (event.target.matches(".workshop-rule-name")) {
-          const title = card.querySelector(".workshop-rule-summary-title");
-          if (title) title.textContent = String(event.target.value || "").trim() || "未命名规则";
-        }
-        updateWorkshopRuleActionUI(card);
-        applyWorkshopRuleSearch();
-      });
-
-      workshopRuleListEl?.addEventListener("change", (event) => {
-        const card = event.target.closest(".workshop-rule-card");
-        if (!card) return;
-        if (event.target.matches(".workshop-rule-trigger-mode, .workshop-rule-trigger, .workshop-rule-trigger-temp-min, .workshop-rule-trigger-temp-max")) {
-          updateWorkshopRuleTriggerUI(card);
-        }
-        if (event.target.matches(".workshop-rule-action, .workshop-rule-image-url")) {
-          updateWorkshopRuleActionUI(card);
-        }
-        if (event.target.matches(".workshop-rule-file")) {
-          handleWorkshopAssetSelection(card, String(event.target.dataset.workshopFileKind || "image"), event.target);
-          return;
-        }
-        applyWorkshopRuleSearch();
-      });
-
-      workshopRuleListEl?.addEventListener("click", (event) => {
-        const pickerButton = event.target.closest(".workshop-asset-pick");
-        if (pickerButton) {
-          event.preventDefault();
-          event.stopPropagation();
-          const card = pickerButton.closest(".workshop-rule-card");
-          if (!card) return;
-          const kind = String(pickerButton.dataset.workshopPickKind || "image");
-          const input = card.querySelector(`.workshop-rule-file[data-workshop-file-kind="${kind}"]`);
-          if (input) input.click();
-          return;
-        }
-
-        const removeButton = event.target.closest("[data-remove-workshop-rule]");
-        if (removeButton) {
-          event.preventDefault();
-          event.stopPropagation();
-          const card = removeButton.closest(".workshop-rule-card");
-          if (!card) return;
-          if (String(card.querySelector(".workshop-rule-id")?.value || "").startsWith("workshop_stage_")) {
-            setStatus("固定阶段规则不能删除。", "error");
-            return;
-          }
-          card.remove();
-          setStatus("创意工坊规则已删除。", "success");
-          updateWorkshopPanelStats();
-          applyWorkshopRuleSearch();
-          return;
-        }
-
-        const toggleButton = event.target.closest("[data-toggle-workshop-rule]");
-        if (toggleButton) {
-          event.preventDefault();
-          event.stopPropagation();
-          const shell = toggleButton.closest(".workshop-rule-shell");
-          if (!shell) return;
-          const collapsed = shell.dataset.collapsed === "true";
-          setWorkshopRuleCollapsed(shell, !collapsed);
-          return;
-        }
-
-        const summary = event.target.closest(".workshop-rule-summary");
-        if (summary && !event.target.closest("button, input, select, textarea, label")) {
-          const shell = summary.closest(".workshop-rule-shell");
-          if (!shell) return;
-          const collapsed = shell.dataset.collapsed === "true";
-          setWorkshopRuleCollapsed(shell, !collapsed);
-        }
-      });
 
 
       // ===== Workshop Performance Layer v1.0: opening extension / ambience / dynamic scenes =====
@@ -1906,11 +1769,13 @@
         return data;
       };
 
-      const previousRenderWorkshopRules = renderWorkshopRules;
       renderWorkshopRules = function(workshop = currentWorkshop) {
-        previousRenderWorkshopRules(workshop);
+        currentWorkshop = normalizeCreativeWorkshop(workshop || initialWorkshop);
+        if (workshopEnabledEl) workshopEnabledEl.checked = Boolean(currentWorkshop.enabled);
+        renderWorkshopOpening(currentWorkshop.opening);
         renderAmbience(currentWorkshop?.ambience);
         renderDynamicScenes(currentWorkshop?.dynamicScenes || []);
+        updateWorkshopPanelStats();
       };
 
       const previousCollectWorkshopPayload = collectWorkshopPayload;
@@ -1964,7 +1829,7 @@
         if (!file) return;
         try {
           setStatus("正在上传常驻氛围资源…", "busy");
-          const uploadKind = kind === "image" ? "image" : "music";
+          const uploadKind = ["background", "image"].includes(kind) ? "image" : "music";
           const result = await uploadWorkshopAsset(uploadKind, file);
           const url = result.url || "";
           if (kind === "background" && ambienceBgUrlEl) ambienceBgUrlEl.value = url;
