@@ -108,6 +108,7 @@
     </div>
   </details>
   {% endif %}
+
 </nav>
 <script>
   (() => {
@@ -144,3 +145,9 @@
     });
   })();
 </script>
+<div class="nav-group standalone-about">
+  <a class="nav-group-summary{% if current_path == '/config/about' %} active{% endif %}" href="/config/about" style="text-decoration:none;cursor:pointer;">
+    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5v.5"/></svg></span>
+    <span class="nav-label">关于</span>
+  </a>
+</div>
