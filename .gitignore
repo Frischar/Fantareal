@@ -19,3 +19,5 @@ cards/*.txt
 !cards/template_role_card.json
 !cards/template_single_role_card.json
 CLAUDE.md
+.idea/
+mods/*/data/*.json

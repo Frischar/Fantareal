@@ -59,6 +59,26 @@ ENTRY_DEFAULTS: dict = {
 
 app = FastAPI()
 
+MAX_CARD_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024
+MAX_WORLDBOOK_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
+
+
+async def read_upload_bytes(file: UploadFile, *, max_bytes: int, label: str) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(413, f"{label}文件不能大于 {max_bytes // (1024 * 1024)} MB")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data:
+        raise HTTPException(400, f"{label}不能为空")
+    return data
+
 # ── Pydantic models for save endpoints ──
 class SaveCardPayload(BaseModel):
     card_json: str
@@ -407,7 +427,9 @@ async def convert_card(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(400, "未提供文件名")
     try:
-        raw = await file.read()
+        raw = await read_upload_bytes(file, max_bytes=MAX_CARD_UPLOAD_SIZE_BYTES, label="角色卡")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(400, "读取上传文件失败")
 
@@ -453,7 +475,9 @@ async def convert_worldbook(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(400, "未提供文件名")
     try:
-        raw = await file.read()
+        raw = await read_upload_bytes(file, max_bytes=MAX_WORLDBOOK_UPLOAD_SIZE_BYTES, label="世界书")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(400, "读取上传文件失败")
 
