@@ -1,0 +1,4 @@
+{
+  "label": "酒馆卡转换器",
+  "description": "将酒馆（SillyTavern）PNG角色卡和世界书转换为Xuqi_LLM可用的JSON格式"
+}
