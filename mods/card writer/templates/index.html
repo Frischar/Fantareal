@@ -260,7 +260,10 @@
       <section class="copilot-widget" id="copilotWidget" aria-live="polite" hidden>
         <div class="copilot-header">
           <strong id="copilotTitle">轮椅模式</strong>
-          <button class="modal-close" type="button" data-copilot-action="close" aria-label="关闭轮椅模式">&times;</button>
+          <div class="copilot-header-actions">
+            <button class="ghost-button compact" type="button" data-copilot-action="clear" title="清空对话记录">清空</button>
+            <button class="modal-close" type="button" data-copilot-action="close" aria-label="关闭轮椅模式">&times;</button>
+          </div>
         </div>
         <div class="copilot-messages" id="copilotMessages"></div>
         <div class="copilot-input-area" id="copilotInputArea">

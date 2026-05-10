@@ -1864,6 +1864,18 @@
     }
   }
 
+  function clearCopilotMessages() {
+    copilotState.messages = [];
+    copilotState.pendingReview = null;
+    copilotState.selectedCandidateIds = [];
+    copilotState.collapsedCandidateIds = [];
+    copilotState.lastPrompt = "";
+    const promptInput = $("#copilotPrompt");
+    if (promptInput) promptInput.value = "";
+    persistLocalDraft();
+    renderCopilotWidget();
+  }
+
   function discardCopilotDraft() {
     if (!copilotState.pendingReview) return;
     copilotState.messages.push({ role: "assistant", text: "这轮候选建议已放弃，你可以继续补充要求。" });
@@ -2049,6 +2061,9 @@
           return;
         } else if (action === "discard") {
           discardCopilotDraft();
+          return;
+        } else if (action === "clear") {
+          clearCopilotMessages();
           return;
         }
         persistLocalDraft();

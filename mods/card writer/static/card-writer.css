@@ -791,8 +791,8 @@ textarea {
 .copilot-widget {
   position: absolute;
   bottom: 0;
-  width: min(420px, calc(100vw - 32px));
-  max-height: min(72vh, 680px);
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(80vh, 800px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
@@ -814,6 +814,11 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.copilot-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .copilot-header h3,
@@ -905,6 +910,8 @@ textarea {
   border: 1px solid rgba(131, 93, 66, 0.12);
   background: rgba(255, 251, 247, 0.92);
   backdrop-filter: blur(14px);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .copilot-message.user .copilot-bubble {
@@ -975,6 +982,8 @@ textarea {
   font-family: "Cascadia Code", "JetBrains Mono", monospace;
   font-weight: 800;
   color: var(--accent);
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .copilot-field-change {
@@ -987,6 +996,8 @@ textarea {
   margin: 4px 0 0;
   white-space: pre-wrap;
   line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .copilot-review-actions {
