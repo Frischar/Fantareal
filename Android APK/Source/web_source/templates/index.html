@@ -6,19 +6,8 @@
     <title>Xuqi LLM Chat</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>
-    <div class="topbar topbar-chat">
-      <div class="topbar-left">
-        <button id="open-drawer" class="menu-button" type="button">Config</button>
-        <a class="brand" href="/">Xuqi LLM Chat</a>
-      </div>
-      <nav class="topnav topnav-chat">
-        <a class="ghost-link" href="/">Welcome</a>
-        <a class="ghost-link" href="/config/card">Card</a>
-        <a class="ghost-link" href="/config/sprite">Sprite</a>
-        <a class="ghost-link" href="/config/memory">Memory</a>
-      </nav>
-    </div>
+  <body class="chat-page app-sidebar-shell">
+    {% include '_sidebar.html' %}
 
     <div class="slot-toolbar">
       <div class="slot-toolbar-left">
@@ -40,22 +29,21 @@
     </div>
 
     <div class="chat-shell">
-      <div class="chat-layout">
-        <aside class="sprite-stage panel">
-          <div class="section-head">
-            <p class="eyebrow">Sprite</p>
-            <h2>差分立绘</h2>
-            <p id="sprite-tag-label" class="muted">当前表情：未命中</p>
+      <aside class="sprite-stage panel" hidden>
+        <div class="section-head">
+          <p class="eyebrow">Sprite</p>
+          <h2>差分立绘</h2>
+          <p id="sprite-tag-label" class="muted">当前表情：未命中</p>
+        </div>
+        <div class="sprite-frame">
+          <img id="sprite-image" class="sprite-image" alt="当前立绘" hidden />
+          <div id="sprite-placeholder" class="sprite-placeholder">
+            这里会显示 `{{ settings.sprite_base_path }}/标签.png`
           </div>
-          <div class="sprite-frame">
-            <img id="sprite-image" class="sprite-image" alt="当前立绘" hidden />
-            <div id="sprite-placeholder" class="sprite-placeholder">
-              这里会显示 `{{ settings.sprite_base_path }}/标签.png`
-            </div>
-          </div>
-        </aside>
+        </div>
+      </aside>
 
-        <main class="chat-area standalone">
+      <main class="chat-area standalone">
           <div class="chat-header">
             <div>
               <p class="eyebrow">陪伴模式</p>
@@ -109,8 +97,7 @@
               </div>
             </div>
           </form>
-        </main>
-      </div>
+      </main>
     </div>
 
     <div id="drawer-overlay" class="drawer-overlay" hidden></div>

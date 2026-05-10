@@ -66,6 +66,7 @@
         </div>
         <div class="button-row config-overview-actions">
           <button id="export-current-bundle" type="button" class="secondary export-action">导出当前人设存档 ZIP</button>
+          <button id="export-logs" type="button" class="secondary export-action">导出日志</button>
         </div>
       </section>
 
@@ -974,6 +975,35 @@
           setStatus("已完成：人设存档下载已开始", "success");
         }, 700);
         window.location.href = "/api/export/current-bundle";
+      });
+
+      document.getElementById("export-logs").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        try {
+          setButtonState(button, "loading", "导出中…");
+          setStatus("正在导出日志文件…", "busy");
+          showToast("正在导出日志", "info");
+          const response = await fetch("/api/logs/export");
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "日志导出失败");
+          }
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `fantareal_logs_${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          setButtonState(button, "success", "已开始下载 ✓");
+          setStatus("已完成：日志下载已开始", "success");
+        } catch (error) {
+          setButtonState(button, "idle", "导出日志");
+          setStatus(`日志导出失败：${error.message}`, "error");
+          showToast(`日志导出失败：${error.message}`, "error");
+        }
       });
 
       document.getElementById("preset-provider").addEventListener("change", () => {

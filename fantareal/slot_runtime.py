@@ -47,7 +47,7 @@ class SlotRuntimeService:
         try:
             return SlotState.model_validate(raw)
         except Exception as exc:  # noqa: BLE001
-            self.ctx.logger.warning("Slot runtime snapshot parse failed, rebuilding from legacy files: %s", exc)
+            self.ctx.logger.warning("槽位运行快照解析失败，改从旧文件重建：%s", exc)
             return None
 
     def _guess_created_at(self, slot_id: str) -> str:

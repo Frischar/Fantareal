@@ -6,36 +6,25 @@
     <title>Config - Xuqi LLM Chat</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>
-    <div class="topbar-stack">
-      <div class="topbar">
-        <a class="brand" href="/">Xuqi LLM Chat</a>
-        <nav class="topnav">
-          <a class="navlink" href="/">Welcome</a>
-          <a class="navlink" href="/chat">Chat</a>
-          <a class="navlink active" href="/config">Config</a>
-          <a class="navlink" href="/config/card">Card Config</a>
-          <a class="navlink" href="/config/sprite">Sprite</a>
-          <a class="navlink" href="/config/memory">Memory</a>
-        </nav>
+  <body class="app-sidebar-shell">
+    {% include '_sidebar_config.html' %}
+
+    <div class="slot-toolbar">
+      <div class="slot-toolbar-left">
+        <span class="slot-badge">Save</span>
+        <div class="slot-meta">
+          <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
+          <p class="slot-hint">模型设置、立绘、记忆、人设和世界书都会跟随当前存档。</p>
+        </div>
       </div>
-      <div class="slot-toolbar">
-        <div class="slot-toolbar-left">
-          <span class="slot-badge">Save</span>
-          <div class="slot-meta">
-            <strong>当前存档：{{ slot_registry.slots | selectattr("id", "equalto", active_slot) | map(attribute="name") | first or active_slot }}</strong>
-            <p class="slot-hint">模型设置、立绘、记忆、人设和世界书都会跟随当前存档。</p>
-          </div>
-        </div>
-        <div class="slot-toolbar-right">
-          <select id="slot-select" class="slot-select">
-            {% for slot in slot_registry.slots %}
-            <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
-            {% endfor %}
-          </select>
-          <button id="rename-slot" type="button" class="secondary compact">重命名</button>
-          <button id="reset-slot" type="button" class="secondary compact">重置</button>
-        </div>
+      <div class="slot-toolbar-right">
+        <select id="slot-select" class="slot-select">
+          {% for slot in slot_registry.slots %}
+          <option value="{{ slot.id }}" {% if slot.id == active_slot %}selected{% endif %}>{{ slot.name }}</option>
+          {% endfor %}
+        </select>
+        <button id="rename-slot" type="button" class="secondary compact">重命名</button>
+        <button id="reset-slot" type="button" class="secondary compact">重置</button>
       </div>
     </div>
 

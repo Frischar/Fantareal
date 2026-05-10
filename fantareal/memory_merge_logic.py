@@ -519,7 +519,7 @@ async def merge_memories_to_outline(
         merge_mode = "model"
     except Exception as exc:  # noqa: BLE001
         if hasattr(ctx, "logger"):
-            ctx.logger.warning("Memory merge model call failed, fallback engaged: %s", exc)
+            ctx.logger.warning("记忆合并模型调用失败，改用本地合并：%s", exc)
         merge_payload = _fallback_merge_result(
             selected_memories,
             merged_title=merged_title,

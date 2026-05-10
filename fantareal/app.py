@@ -1,11 +1,13 @@
 import asyncio
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import random
 import re
 import shutil
 import sys
+import time
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -13,8 +15,9 @@ from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlparse
 
+import colorama
 import httpx
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from .chat_api_routes import register_chat_api_routes
@@ -148,9 +151,99 @@ LEGACY_SLOT_IDS = ("slot_1", "slot_2", "slot_3")
 DEFAULT_SLOT_IDS = (GLOBAL_RUNTIME_ID,)
 WORKSHOP_STAGE_LIMITS = {"aMax": 2, "bMax": 5}
 
+colorama.just_fix_windows_console()
+
+LOG_COLORS = {
+    "reset": colorama.Style.RESET_ALL,
+    "muted": colorama.Fore.LIGHTBLACK_EX,
+    "view": colorama.Fore.CYAN,
+    "data": colorama.Fore.YELLOW,
+    "success": colorama.Fore.GREEN,
+    "error": colorama.Fore.RED,
+}
+
+LOG_FILE_DIR = DATA_DIR / "logs"
+LOG_FILE_PATH = LOG_FILE_DIR / "fantareal.log"
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+class StripAnsiFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return ANSI_ESCAPE_RE.sub("", super().format(record))
+
+
+LOG_FILE_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE_PATH.touch(exist_ok=True)
+
 logger = logging.getLogger("xuqi_llm_chat")
-if not logging.getLogger().handlers:
-    logging.basicConfig(level=logging.INFO)
+logger.setLevel(logging.INFO)
+logger.handlers.clear()
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(_handler)
+_file_handler = RotatingFileHandler(LOG_FILE_PATH, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+_file_handler.setFormatter(StripAnsiFormatter("%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S"))
+logger.addHandler(_file_handler)
+logger.propagate = False
+logging.getLogger("uvicorn.access").disabled = True
+
+
+def flush_log_handlers() -> None:
+    for handler in logger.handlers:
+        flush = getattr(handler, "flush", None)
+        if callable(flush):
+            flush()
+
+
+def make_access_style(label: str, method: str, status_code: int) -> str:
+    if status_code >= 400:
+        return LOG_COLORS["error"]
+    if method in {"POST", "PUT", "PATCH", "DELETE"}:
+        return LOG_COLORS["data"]
+    if label.startswith("打开"):
+        return LOG_COLORS["view"]
+    return LOG_COLORS["muted"]
+
+
+def format_access_log(label: str, method: str, status_code: int, mood: str) -> str:
+    base_color = make_access_style(label, method, status_code)
+    status_color = LOG_COLORS["success"] if status_code < 400 else LOG_COLORS["error"]
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    return f"{LOG_COLORS['muted']}[{timestamp}]{base_color}[日志]{label} {status_color}{status_code}{base_color} {mood}{LOG_COLORS['reset']}"
+
+
+def resolve_access_label(method: str, path: str) -> str:
+    label_map = {
+        "GET /api/history": "获取历史",
+        "GET /api/memories/merged": "获取合并记忆",
+        "GET /api/memories/outline": "获取记忆提要",
+        "GET /api/conversation/end": "结束对话",
+        "POST /api/conversation/end": "结束对话",
+        "GET /api/chat": "打开聊天页",
+        "POST /api/chat": "发送聊天",
+        "POST /api/chat/stream": "发送聊天",
+        "POST /api/chat/prompt-preview": "预览提示词",
+        "GET /config": "打开设置页",
+        "GET /config/memory": "打开记忆页",
+        "GET /config/about": "打开关于页",
+    }
+    direct_label = label_map.get(f"{method} {path}") or label_map.get(path)
+    if direct_label:
+        return direct_label
+
+    if path.startswith("/config"):
+        return "打开设置页"
+    if path.startswith("/mods/"):
+        parts = [part for part in path.split("/") if part]
+        mod_labels = {
+            "status-panel": "角色状态面板",
+            "worldbook-maker": "世界书工坊",
+            "soul-weaver": "余声",
+            "card-writer": "缃笺",
+        }
+        if len(parts) >= 2:
+            return f"打开{mod_labels.get(parts[1], parts[1])}模块"
+    return {"GET": "访问页面", "POST": "提交请求", "PUT": "更新数据", "PATCH": "更新数据", "DELETE": "删除数据"}.get(method, "请求接口")
 
 _LAST_WORLDBOOK_DEBUG_SNAPSHOT: dict[str, Any] = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
 
@@ -566,7 +659,7 @@ def read_json(path: Path, default: Any) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        logger.warning("璇诲彇 JSON 澶辫触锛屼娇鐢ㄩ粯璁ゅ€? %s (%s)", path, exc)
+        logger.warning("读取 JSON 失败，改用默认值：%s (%s)", path, exc)
         return default
 
 
@@ -582,7 +675,7 @@ def persist_json(path: Path, payload: Any, *, detail: str, status_code: int = 50
     try:
         write_json(path, payload)
     except OSError as exc:
-        logger.exception("鍐欏叆 JSON 澶辫触: %s", path)
+        logger.exception("写入 JSON 失败：%s", path)
         raise HTTPException(status_code=status_code, detail=detail) from exc
 
 
@@ -956,7 +1049,7 @@ def save_image_upload_for_slot(
     try:
         target.write_bytes(content)
     except OSError as exc:
-        logger.exception("Avatar write failed: %s", target)
+        logger.exception("头像写入失败：%s", target)
         raise HTTPException(status_code=500, detail=save_failed_detail) from exc
     return avatar_upload_url(target.name)
 
@@ -1005,7 +1098,7 @@ async def save_workshop_asset_upload(*, kind: str, file: UploadFile) -> dict[str
     try:
         target.write_bytes(content)
     except OSError as exc:
-        logger.exception("Workshop asset write failed: %s", target)
+        logger.exception("工坊资源写入失败：%s", target)
         raise HTTPException(status_code=500, detail="Workshop asset save failed. Please check disk space or file permissions.") from exc
 
     return {
@@ -1191,7 +1284,7 @@ def sanitize_conversation(raw: Any) -> list[dict[str, Any]]:
         )
 
     if changed:
-        logger.info("Detected legacy demo messages and filtered them from chat history.")
+        logger.info("已过滤旧示例消息，清理了聊天历史。")
     return cleaned
 
 
@@ -1339,7 +1432,7 @@ def migrate_slot_runtime_to_global_files() -> None:
     migrate_legacy_avatar_upload("role_avatar", source_slot)
     migrate_legacy_sprite_assets(source_slot)
     GLOBAL_RUNTIME_MIGRATION_MARKER_PATH.write_text(source_slot, encoding="utf-8")
-    logger.info("Migrated legacy slot runtime data from %s to the global workspace.", source_slot)
+    logger.info("已把旧槽位数据迁移到全局工作区：%s", source_slot)
 
 
 def slot_looks_uninitialized(slot_id: str) -> bool:
@@ -1396,7 +1489,7 @@ def migrate_legacy_root_to_primary_slot() -> None:
         detail="Legacy worldbook migration failed. Please check disk space or file permissions.",
     )
     SLOT_MIGRATION_MARKER_PATH.write_text("migrated-slot-1", encoding="utf-8")
-    logger.info("Migrated legacy data root contents to slot_1.")
+    logger.info("已把旧数据根目录内容迁移到 slot_1。")
 
 
 def slot_role_state_seed_order() -> list[str]:
@@ -2161,37 +2254,19 @@ async def request_json(
                 return response.json()
             except ValueError as exc:
                 last_error = exc
-                logger.warning(
-                    "Upstream JSON parse failed on attempt %s/%s for %s",
-                    attempt,
-                    REQUEST_RETRY_ATTEMPTS,
-                    url,
-                )
+                logger.warning("上游 JSON 解析失败，第 %s/%s 次：%s", attempt, REQUEST_RETRY_ATTEMPTS, url)
         except httpx.HTTPStatusError as exc:
             last_error = exc
             response_text = exc.response.text.strip() if exc.response is not None else ""
             last_error_detail = response_text[:500]
-            logger.warning(
-                "Upstream request failed on attempt %s/%s for %s: %s | body=%s",
-                attempt,
-                REQUEST_RETRY_ATTEMPTS,
-                url,
-                exc,
-                last_error_detail or "<empty>",
-            )
+            logger.warning("上游请求失败，第 %s/%s 次：%s | 返回=%s", attempt, REQUEST_RETRY_ATTEMPTS, url, last_error_detail or "<空>")
             status_code = exc.response.status_code if exc.response is not None else 0
             if 400 <= status_code < 500 and not should_retry_status_code(status_code):
                 break
         except httpx.HTTPError as exc:
             last_error = exc
             last_error_detail = ""
-            logger.warning(
-                "Upstream request failed on attempt %s/%s for %s: %s",
-                attempt,
-                REQUEST_RETRY_ATTEMPTS,
-                url,
-                exc,
-            )
+            logger.warning("上游请求失败，第 %s/%s 次：%s", attempt, REQUEST_RETRY_ATTEMPTS, url)
 
         if attempt < REQUEST_RETRY_ATTEMPTS:
             await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
@@ -2344,7 +2419,7 @@ async def rerank_documents(
 
     results = data.get("results") or data.get("data") or []
     if not isinstance(results, list):
-        logger.warning("Rerank model returned a non-list result; falling back to original documents.")
+        logger.warning("重排模型返回的结果不是列表，改用原文档。")
         return documents
 
     reranked: list[dict[str, Any]] = []
@@ -2906,7 +2981,7 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
     }
 
     if selected_hits:
-        logger.info("Worldbook hits: %s", ", ".join(item.get("title") or item.get("matched") or item.get("trigger", "") for item in selected_hits))
+        logger.info("世界书命中：%s", ", ".join(item.get("title") or item.get("matched") or item.get("trigger", "") for item in selected_hits))
     return selected_hits
 
 
@@ -3165,11 +3240,7 @@ async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None
     vectors = await fetch_embeddings([query] + [item["text"] for item in documents], runtime_overrides)
     expected_count = len(documents) + 1
     if len(vectors) != expected_count:
-        logger.warning(
-            "Embedding model returned an unexpected number of vectors: expected %s, got %s; skipping memory recall for this turn.",
-            expected_count,
-            len(vectors),
-        )
+        logger.warning("向量数量不对，跳过本轮记忆召回：预计 %s，实际 %s。", expected_count, len(vectors))
         return []
 
     query_vector = vectors[0]
@@ -3668,9 +3739,9 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
 
     try:
         summary = parse_summary_json(text)
-        logger.info("Automatic memory summary parsed as strict JSON on first pass.")
+        logger.info("自动记忆摘要首次就解析成了严格 JSON。")
     except ValueError:
-        logger.warning("Automatic memory summary was not strict JSON, trying one repair pass.")
+        logger.warning("自动记忆摘要不是严格 JSON，准备修复一次。")
         repair_payload = {
             "model": llm_config["model"],
             "temperature": 0.0,
@@ -3706,10 +3777,10 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
         except (KeyError, IndexError, TypeError) as exc:
             raise ValueError("invalid summary repair payload") from exc
         summary = parse_summary_json(repaired_text)
-        logger.info("Automatic memory summary repaired into strict JSON successfully.")
+        logger.info("自动记忆摘要已修复为严格 JSON。")
 
     if is_mostly_english_summary(summary):
-        logger.warning("Automatic memory summary is mostly English, trying one Chinese rewrite pass.")
+        logger.warning("自动记忆摘要偏英文，准备再翻成中文一次。")
         rewrite_payload = {
             "model": llm_config["model"],
             "temperature": 0.0,
@@ -3749,11 +3820,11 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
             rewritten_summary = parse_summary_json(rewrite_text)
             if not is_mostly_english_summary(rewritten_summary):
                 summary = rewritten_summary
-                logger.info("Automatic memory summary rewritten into Chinese successfully.")
+                logger.info("自动记忆摘要已改写为中文。")
             else:
-                logger.warning("Chinese rewrite pass still looks mostly English, keeping previous summary.")
+                logger.warning("中文改写后仍然偏英文，保留上一版摘要。")
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Chinese rewrite pass failed, keeping previous summary: %s", exc)
+            logger.warning("中文改写失败，保留上一版摘要：%s", exc)
 
     return summary
 
@@ -3793,7 +3864,7 @@ async def summarize_conversation_to_memory(history: list[dict[str, Any]]) -> dic
     try:
         summary_payload = await request_conversation_summary_with_model(history)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Automatic memory summary failed, falling back to local summary: %s", exc)
+        logger.warning("自动记忆摘要失败，改用本地摘要：%s", exc)
         summary_payload = fallback
 
     return sanitize_memory_summary(summary_payload, fallback=fallback)
@@ -3856,6 +3927,21 @@ ensure_data_files()
 bootstrap_runtime_layout()
 
 app = FastAPI(title="Xuqi LLM Chat")
+
+
+@app.middleware("http")
+async def chinese_access_log(request: Request, call_next):
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    method = request.method.upper()
+    path = request.url.path
+    label = resolve_access_label(method, path)
+    mood = "成功了喵~" if response.status_code < 400 else "出错了喵呜..."
+    logger.info(format_access_log(label, method, response.status_code, mood))
+    logger.debug("请求耗时%dms", elapsed_ms)
+    return response
+
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 registered_mods = mount_discovered_mods(app, MODS_DIR)
@@ -3919,6 +4005,8 @@ route_ctx = SimpleNamespace(
     list_role_card_files=list_role_card_files,
     list_sprite_assets=list_sprite_assets,
     logger=logger,
+    log_file_path=LOG_FILE_PATH,
+    flush_log_handlers=flush_log_handlers,
     match_worldbook_entries=match_worldbook_entries,
     normalize_role_card=normalize_role_card,
     parse_role_card_json=parse_role_card_json,
