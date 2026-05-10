@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>酒馆卡转换器</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./static/tavern-card-converter.css?v=2" />
+</head>
+<body class="tcc-page">
+  <main class="tcc-shell">
+    <header class="tcc-header">
+      <div>
+        <p class="tcc-kicker">Tavern Card Converter</p>
+        <h1>酒馆卡转换器</h1>
+        <p>将 SillyTavern / 酒馆 的 PNG 角色卡和世界书 JSON 转换为 Xuqi_LLM 兼容格式</p>
+      </div>
+    </header>
+
+    <div class="tcc-tabs">
+      <button class="tcc-tab active" data-tab="card">角色卡转换</button>
+      <button class="tcc-tab" data-tab="worldbook">世界书转换</button>
+    </div>
+
+    <!-- ═══ Card Converter ═══ -->
+    <section id="tab-card" class="tcc-tab-panel active">
+      <div class="tcc-card-grid">
+        <div class="tcc-panel">
+          <h2>上传酒馆 PNG 角色卡</h2>
+          <label class="tcc-drop-zone" id="card-drop-zone">
+            <input type="file" id="card-file-input" accept="image/png" hidden />
+            <div class="tcc-drop-content">
+              <span class="tcc-drop-icon">&#x1F4C1;</span>
+              <span>拖拽 PNG 到此处，或点击选择文件</span>
+              <span class="tcc-drop-hint">支持酒馆 (SillyTavern) V2 规格的 PNG 角色卡</span>
+            </div>
+          </label>
+          <div id="card-error" class="tcc-msg tcc-msg-error" hidden></div>
+          <div id="card-preview" class="tcc-image-preview" hidden>
+            <img id="card-preview-img" src="" alt="角色立绘预览" />
+          </div>
+        </div>
+
+        <div class="tcc-panel">
+          <h2>转换结果</h2>
+          <div id="card-result-empty" class="tcc-empty-state">
+            <span>上传 PNG 后在此处查看转换结果</span>
+          </div>
+          <div id="card-result" hidden>
+            <div class="tcc-result-meta">
+              <span id="card-result-name"></span>
+              <span id="card-result-preserved" class="tcc-preserved-badge"></span>
+            </div>
+            <pre id="card-json-output" class="tcc-json-block"></pre>
+            <div class="tcc-actions">
+              <button id="card-download-btn" class="tcc-btn tcc-btn-primary" disabled>下载角色卡 JSON</button>
+              <button id="card-copy-btn" class="tcc-btn" disabled>复制 JSON</button>
+              <button id="card-download-png-btn" class="tcc-btn" disabled>下载纯图片</button>
+            </div>
+            <p id="card-save-path-hint" class="tcc-save-path-hint" hidden>
+              当前保存至: <span id="card-save-path-label"></span> · <a id="card-change-path">点击更改保存路径...</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Worldbook Converter ═══ -->
+    <section id="tab-worldbook" class="tcc-tab-panel">
+      <div class="tcc-card-grid">
+        <div class="tcc-panel">
+          <h2>上传酒馆世界书 JSON</h2>
+          <label class="tcc-drop-zone" id="wb-drop-zone">
+            <input type="file" id="wb-file-input" accept=".json,application/json" hidden />
+            <div class="tcc-drop-content">
+              <span class="tcc-drop-icon">&#x1F4C4;</span>
+              <span>拖拽 JSON 到此处，或点击选择文件</span>
+              <span class="tcc-drop-hint">支持酒馆 (SillyTavern) 世界书 / Lorebook 格式</span>
+            </div>
+          </label>
+          <div id="wb-error" class="tcc-msg tcc-msg-error" hidden></div>
+        </div>
+
+        <div class="tcc-panel">
+          <h2>转换结果</h2>
+          <div id="wb-result-empty" class="tcc-empty-state">
+            <span>上传 JSON 后在此处查看转换结果</span>
+          </div>
+          <div id="wb-result" hidden>
+            <div class="tcc-result-meta">
+              <span id="wb-result-name"></span>
+              <span id="wb-entry-count"></span>
+            </div>
+            <div id="wb-conversion-info" class="tcc-conversion-info" hidden></div>
+            <pre id="wb-json-output" class="tcc-json-block"></pre>
+            <div class="tcc-actions">
+              <button id="wb-download-btn" class="tcc-btn tcc-btn-primary" disabled>下载世界书 JSON</button>
+              <button id="wb-copy-btn" class="tcc-btn" disabled>复制 JSON</button>
+            </div>
+            <p id="wb-save-path-hint" class="tcc-save-path-hint" hidden>
+              当前保存至: <span id="wb-save-path-label"></span> · <a id="wb-change-path">点击更改保存路径...</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Save Dialog (card) ═══ -->
+    <div id="card-save-dialog" class="tcc-dialog-overlay" hidden>
+      <div class="tcc-dialog">
+        <h3>保存角色卡 JSON</h3>
+        <p id="card-save-filename" class="tcc-dialog-filename"></p>
+        <div class="tcc-dialog-actions">
+          <button id="card-save-to-assets" class="tcc-btn tcc-btn-primary">保存到人设卡目录</button>
+          <p class="tcc-dialog-path" id="card-assets-path"></p>
+        </div>
+        <hr class="tcc-dialog-sep" />
+        <div class="tcc-dialog-actions">
+          <button id="card-save-browse" class="tcc-btn">浏览文件夹下载</button>
+          <p class="tcc-dialog-hint">选择本地磁盘上的其他位置保存</p>
+        </div>
+        <div class="tcc-dialog-footer">
+          <button id="card-save-cancel" class="tcc-btn tcc-btn-ghost">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Save Dialog (worldbook) ═══ -->
+    <div id="wb-save-dialog" class="tcc-dialog-overlay" hidden>
+      <div class="tcc-dialog">
+        <h3>保存世界书 JSON</h3>
+        <p id="wb-save-filename" class="tcc-dialog-filename"></p>
+        <div class="tcc-dialog-actions">
+          <button id="wb-save-to-assets" class="tcc-btn tcc-btn-primary">保存到世界书目录</button>
+          <p class="tcc-dialog-path" id="wb-assets-path"></p>
+        </div>
+        <hr class="tcc-dialog-sep" />
+        <div class="tcc-dialog-actions">
+          <button id="wb-save-browse" class="tcc-btn">浏览文件夹下载</button>
+          <p class="tcc-dialog-hint">选择本地磁盘上的其他位置保存</p>
+        </div>
+        <div class="tcc-dialog-footer">
+          <button id="wb-save-cancel" class="tcc-btn tcc-btn-ghost">取消</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="./static/tavern-card-converter.js?v=2"></script>
+</body>
+</html>
