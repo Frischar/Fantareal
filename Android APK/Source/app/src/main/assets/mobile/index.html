@@ -1,331 +1,425 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Fantareal Mobile</title>
+    <title>Fantareal</title>
     <link rel="stylesheet" href="./app.css" />
   </head>
   <body>
-    <div class="mobile-app" id="mobileApp">
-      <header class="topbar panel topbar-compact">
-        <div class="topbar-main">
-          <button class="ghost-button icon-button" id="openDrawerButton" type="button" aria-label="打开菜单">
-            ☰
-          </button>
-          <div class="brand-block">
-            <h1 id="currentRouteTitle">聊天</h1>
-          </div>
+    <!-- ═══ Sidebar ═══ -->
+    <div class="sidebar-overlay" id="sidebarOverlay">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <h1>Fantareal</h1>
+          <button class="sidebar-close" id="sidebarClose" type="button" aria-label="关闭菜单">&times;</button>
         </div>
-      </header>
-
-      <div class="drawer-backdrop hidden" id="drawerBackdrop">
-        <aside class="side-drawer panel" id="sideDrawer">
-          <div class="drawer-head">
-            <div>
-              <p class="eyebrow">导航</p>
-              <h2>聊天</h2>
-            </div>
-            <button class="ghost-button icon-button" id="closeDrawerButton" type="button" aria-label="关闭菜单">
-              ×
-            </button>
+        <nav class="sidebar-nav" id="sidebarNav">
+          <button class="navlink active" data-page="chat" type="button">Chat</button>
+          <button class="navlink" data-page="config" type="button">Config</button>
+          <button class="navlink" data-page="card" type="button">Card</button>
+          <button class="navlink" data-page="memory" type="button">Memory</button>
+          <button class="navlink" data-page="sprite" type="button">Sprite</button>
+          <button class="navlink" data-page="preview" type="button">Preview</button>
+          <button class="navlink" data-page="card-writer" type="button">Card Writer</button>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="sidebar-runtime">
+            <p class="eyebrow">Runtime</p>
+            <h3 id="sidebarRuntimeName">全局运行数据</h3>
+            <p id="sidebarRuntimeSummary">记忆、世界书、预设和聊天记录都保存在本地。</p>
           </div>
-
-          <section class="drawer-section">
-            <p class="eyebrow">页面</p>
-            <nav class="drawer-nav">
-              <button data-nav="chat" type="button">聊天</button>
-              <button data-nav="preview" type="button">预览</button>
-              <button data-nav="config" type="button">设置</button>
-            </nav>
-          </section>
-
-          <section class="drawer-section">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">运行态</p>
-                <h3 id="activeRuntimeName">全局运行数据</h3>
-                <p class="muted compact" id="runtimeSummaryText"></p>
-              </div>
-            </div>
-            <p class="muted compact">记忆、世界书、预设、工坊进度和聊天记录都保存在这份全局运行态里；切换角色卡不会清空它们。</p>
-          </section>
-
-          <section class="drawer-section">
-            <p class="eyebrow">快捷</p>
-            <div class="button-row stacked-buttons">
-              <button class="ghost-button" id="themeToggleButton" type="button">切换主题</button>
-              <button class="ghost-button" id="exportRuntimeButton" type="button">导出运行态备份</button>
-            </div>
-          </section>
-        </aside>
-      </div>
-
-      <main class="route-host">
-        <section class="route-screen" data-route="chat">
-          <section class="chat-panel panel chat-only-panel">
-            <div class="section-head chat-header">
-              <div>
-                <p class="eyebrow">Persona</p>
-                <h3 id="chatPersonaName">Template Character</h3>
-                <p class="muted compact" id="chatGreeting"></p>
-              </div>
-              <div class="button-row compact-buttons">
-                <button class="ghost-button small-chip" id="previewPromptButton" type="button">预览 Prompt</button>
-                <button class="ghost-button small-chip" id="refreshChatRouteButton" type="button">刷新</button>
-              </div>
-            </div>
-            <div class="chat-reading-shell">
-              <div class="message-list" id="messageList"></div>
-            </div>
-            <div class="composer-card">
-              <textarea id="messageInput" rows="4" placeholder="输入你想说的话..."></textarea>
-              <div class="composer-toolbar">
-                <p class="muted" id="statusText">就绪</p>
-                <div class="composer-actions">
-                  <button class="ghost-button" id="endConversationButton" type="button">结束当前对话</button>
-                  <button class="ghost-button" id="exportChatButton" type="button">导出记录</button>
-                  <button class="primary-button" id="sendButton" type="button">发送</button>
-                </div>
-              </div>
-            </div>
-          </section>
-        </section>
-
-        <section class="route-screen hidden" data-route="config">
-          <div class="config-grid">
-            <article class="panel section-card">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">Model</p>
-                  <h3>模型配置</h3>
-                </div>
-                <button class="ghost-button" id="testConnectionButton" type="button">测试连接</button>
-              </div>
-
-              <label for="presetSelect">接口预设</label>
-              <select id="presetSelect"></select>
-
-              <label for="apiBaseUrl">API URL</label>
-              <input id="apiBaseUrl" placeholder="例如 https://api.openai.com/v1" />
-
-              <label for="apiKey">API Key</label>
-              <input id="apiKey" type="password" placeholder="仅保存在手机本地" />
-
-              <label for="modelName">模型名</label>
-              <input id="modelName" placeholder="例如 gpt-4.1-mini" />
-
-              <div class="two-col">
-                <div>
-                  <label for="temperature">Temperature</label>
-                  <input id="temperature" type="number" min="0" max="2" step="0.05" />
-                </div>
-                <div>
-                  <label for="timeoutSec">超时秒数</label>
-                  <input id="timeoutSec" type="number" min="15" max="300" step="1" />
-                </div>
-              </div>
-
-              <div class="two-col">
-                <div>
-                  <label for="historyLimit">上下文保留轮数</label>
-                  <input id="historyLimit" type="number" min="4" max="60" step="1" />
-                </div>
-                <div>
-                  <label for="maxTokens">最大输出 Token（0 为不限制）</label>
-                  <input id="maxTokens" type="number" min="0" max="32768" step="1" />
-                </div>
-                <div>
-                  <label for="themeSelect">主题</label>
-                  <select id="themeSelect">
-                    <option value="dark">暗色</option>
-                    <option value="light">浅色</option>
-                  </select>
-                </div>
-              </div>
-              <div class="button-row compact-buttons">
-                <button class="ghost-button" id="saveRefreshConfigButton" type="button">保存并刷新模型配置</button>
-              </div>
-            </article>
-
-            <article class="panel section-card">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">Appearance</p>
-                  <h3>界面与背景</h3>
-                </div>
-              </div>
-
-              <label for="uiOpacity">界面透明度</label>
-              <input id="uiOpacity" type="range" min="0.25" max="1" step="0.01" />
-              <div class="inline-value" id="uiOpacityValue">0.88</div>
-
-              <label for="backgroundOverlay">背景遮罩强度</label>
-              <input id="backgroundOverlay" type="range" min="0" max="0.9" step="0.01" />
-              <div class="inline-value" id="backgroundOverlayValue">0.36</div>
-
-              <label for="backgroundImageUrl">背景图 URL</label>
-              <input id="backgroundImageUrl" placeholder="可以填写远程图片地址" />
-
-              <div class="button-row">
-                <label class="ghost-button fake-file-button">
-                  上传背景图
-                  <input id="backgroundFileInput" type="file" accept="image/*" hidden />
-                </label>
-                <button class="ghost-button" id="clearBackgroundButton" type="button">清空背景</button>
-              </div>
-            </article>
-
-            <article class="panel section-card">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">Memory</p>
-                  <h3>记忆输出设置</h3>
-                </div>
-              </div>
-              <p class="muted compact">控制"结束当前对话"时自动生成的记忆长度。</p>
-              <div>
-                <label for="memorySummaryLength">总结长度</label>
-                <select id="memorySummaryLength">
-                  <option value="short">简短 (1-2句)</option>
-                  <option value="medium" selected>中等 (2-5句, 默认)</option>
-                  <option value="long">详细 (5-10句)</option>
-                  <option value="custom">自定义</option>
-                </select>
-              </div>
-              <div id="memoryMaxCharsGroup" style="display:none">
-                <label for="memorySummaryMaxChars">自定义最大字符数 (80-2000)</label>
-                <input id="memorySummaryMaxChars" type="number" min="80" max="2000" step="1" value="520" />
-              </div>
-              <button class="ghost-button" id="saveMemoryLengthSettings" type="button" style="margin-top:8px">保存记忆输出设置</button>
-              <span class="muted compact" id="memorySettingsStatus"></span>
-            </article>
-
-            <article class="panel section-card">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">Bundle</p>
-                  <h3>导入 PC 运行包</h3>
-                </div>
-              </div>
-              <p class="muted compact">从 PC 端导出的 JSON 或 ZIP 运行包，包含角色卡、世界书、记忆、预设等只读数据。</p>
-              <div class="button-row">
-                <label class="ghost-button fake-file-button">
-                  选择文件并导入
-                  <input id="pcBundleFileInput" type="file" accept=".json,.zip,application/json,application/zip" hidden />
-                </label>
-              </div>
-              <p class="muted compact" id="bundleImportStatus"></p>
-            </article>
-
-            <article class="panel section-card">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">Persona</p>
-                  <h3>当前加载人设摘要</h3>
-                </div>
-              </div>
-              <p class="muted compact">当前角色卡生成的人设摘要，只读。需要编辑请前往 PC 端。</p>
-              <label for="personaName">角色名</label>
-              <input id="personaName" readonly />
-              <label for="personaGreeting">开场白</label>
-              <textarea id="personaGreeting" rows="4" readonly></textarea>
-              <label for="personaPrompt">系统设定</label>
-              <textarea id="personaPrompt" rows="8" readonly></textarea>
-            </article>
-
-            <article class="panel section-card">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">Soundtrack</p>
-                  <h3>剧情音乐</h3>
-                </div>
-              </div>
-
-              <label for="musicPresetSelect">音乐预设</label>
-              <select id="musicPresetSelect"></select>
-
-              <label for="musicUrlInput">自定义音乐 URL</label>
-              <input id="musicUrlInput" placeholder="可留空，优先使用预设" />
-
-              <div class="button-row">
-                <button class="ghost-button" id="playMusicButton" type="button">播放</button>
-                <button class="ghost-button" id="pauseMusicButton" type="button">暂停</button>
-                <button class="ghost-button" id="stopMusicButton" type="button">停止</button>
-              </div>
-            </article>
-
-            <article class="panel section-card">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">Data</p>
-                  <h3>运行态备份与组合包</h3>
-                </div>
-              </div>
-              <p class="muted compact">可导入 PC 运行包（含人设、预设、世界书、记忆）；可导出本地运行态备份或当前组合包 ZIP 供存档。人设、预设、世界书、记忆请在 PC 端编辑。</p>
-              <div class="button-row stacked-buttons">
-                <button class="ghost-button" id="exportStateButton" type="button">导出运行态备份</button>
-                <button class="ghost-button" id="exportBundleButton" type="button">导出当前组合包 ZIP</button>
-                <label class="ghost-button fake-file-button">
-                  导入运行态备份
-                  <input id="importStateInput" type="file" accept="application/json" hidden />
-                </label>
-              </div>
-            </article>
-          </div>
-        </section>
-
-
-
-          <section class="route-screen hidden" data-route="preview">
-            <div class="preview-shell">
-              <div class="preview-tabs">
-                <button class="preview-tab active" data-preview-tab="persona" type="button">人设</button>
-                <button class="preview-tab" data-preview-tab="memory" type="button">记忆</button>
-                <button class="preview-tab" data-preview-tab="worldbook" type="button">世界书</button>
-                <button class="preview-tab" data-preview-tab="preset" type="button">预设</button>
-              </div>
-              <div class="preview-panels">
-                <div class="preview-panel active" data-preview-panel="persona" id="previewPersonaPanel"></div>
-                <div class="preview-panel" data-preview-panel="memory" id="previewMemoryPanel"></div>
-                <div class="preview-panel" data-preview-panel="worldbook" id="previewWorldbookPanel"></div>
-                <div class="preview-panel" data-preview-panel="preset" id="previewPresetPanel"></div>
-              </div>
-            </div>
-          </section>
-
-      </main>
+          <button class="ghost small-chip" id="themeToggleBtn" type="button">切换主题</button>
+          <button class="ghost small-chip" id="exportRuntimeBtn" type="button">导出运行态</button>
+        </div>
+      </aside>
     </div>
 
-    <div class="modal-backdrop hidden" id="modalBackdrop">
-      <div class="modal-card panel">
+    <!-- ═══ Main Content ═══ -->
+    <div class="main-content">
+      <!-- ── Topbar ── -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="hamburger" id="hamburgerBtn" type="button" aria-label="打开菜单">&#9776;</button>
+          <span class="topbar-title" id="pageTitle">Chat</span>
+        </div>
+        <div class="topbar-actions" id="topbarActions"></div>
+      </header>
+
+      <!-- ═══ Chat Page ═══ -->
+      <section class="page active" data-page="chat">
+        <div class="chat-page">
+          <div class="chat-header">
+            <div>
+              <p class="eyebrow">Persona</p>
+              <h2 id="chatPersonaName">Template Character</h2>
+              <p class="chat-greeting muted" id="chatGreeting"></p>
+            </div>
+            <div class="header-actions">
+              <div class="theme-pill" id="themePill">暗色模式</div>
+            </div>
+          </div>
+
+          <div class="retrieval-bar" id="retrievalBar">
+            <div class="retrieval-title">记忆命中</div>
+            <div class="retrieval-items" id="retrievalItems"></div>
+          </div>
+          <div class="retrieval-bar" id="worldbookBar">
+            <div class="retrieval-title">Worldbook</div>
+            <div class="retrieval-items" id="worldbookItems"></div>
+          </div>
+
+          <div class="messages" id="messageList"></div>
+
+          <div class="composer">
+            <textarea id="messageInput" rows="3" placeholder="输入你想说的话..."></textarea>
+            <div class="composer-actions">
+              <span class="muted" id="statusText">就绪</span>
+              <div class="action-group">
+                <button class="secondary compact" id="endConvBtn" type="button">结束对话</button>
+                <button class="secondary compact" id="exportChatBtn" type="button">导出</button>
+                <button class="compact" id="sendBtn" type="button">发送</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ Config Page ═══ -->
+      <section class="page" data-page="config">
+        <div class="page-inner config-grid">
+          <!-- Guide -->
+          <article class="panel full-span config-guide">
+            <div class="section-head">
+              <p class="eyebrow">Guide</p>
+              <h2>设置总览</h2>
+            </div>
+            <div class="stats-row">
+              <div class="stat-box">
+                <span class="stat-label">当前角色卡</span>
+                <strong id="cfgStatCard">未加载</strong>
+              </div>
+              <div class="stat-box">
+                <span class="stat-label">记忆条数</span>
+                <strong id="cfgStatMemory">0</strong>
+              </div>
+            </div>
+          </article>
+
+          <!-- LLM Settings -->
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Model</p>
+              <h3>模型配置</h3>
+            </div>
+            <label>接口预设</label>
+            <select id="cfgPreset"></select>
+            <label>API URL</label>
+            <input id="cfgApiUrl" placeholder="https://api.openai.com/v1" />
+            <label>API Key</label>
+            <input id="cfgApiKey" type="password" placeholder="仅保存在本地" />
+            <label>模型名</label>
+            <input id="cfgModel" placeholder="gpt-4.1-mini" />
+            <div class="grid-two">
+              <div>
+                <label>Temperature</label>
+                <input id="cfgTemp" type="number" min="0" max="2" step="0.05" />
+              </div>
+              <div>
+                <label>超时 (秒)</label>
+                <input id="cfgTimeout" type="number" min="15" max="300" step="1" />
+              </div>
+            </div>
+            <div class="grid-two">
+              <div>
+                <label>上下文轮数</label>
+                <input id="cfgHistory" type="number" min="4" max="60" step="1" />
+              </div>
+              <div>
+                <label>最大 Token</label>
+                <input id="cfgMaxTokens" type="number" min="0" max="32768" step="1" />
+              </div>
+            </div>
+            <div class="button-row">
+              <button class="secondary" id="cfgTestBtn" type="button">测试连接</button>
+              <button id="cfgSaveBtn" type="button">保存配置</button>
+            </div>
+          </article>
+
+          <!-- Appearance -->
+          <article class="panel full-span">
+            <div class="section-head">
+              <p class="eyebrow">Appearance</p>
+              <h3>界面与背景</h3>
+            </div>
+            <label>主题</label>
+            <select id="cfgTheme">
+              <option value="dark">暗色</option>
+              <option value="light">浅色</option>
+            </select>
+            <label>界面透明度</label>
+            <input id="cfgOpacity" type="range" min="0.25" max="1" step="0.01" />
+            <div class="range-row"><span>透明度</span><span id="cfgOpacityVal">0.82</span></div>
+            <label>背景遮罩</label>
+            <input id="cfgOverlay" type="range" min="0" max="0.9" step="0.01" />
+            <div class="range-row"><span>遮罩</span><span id="cfgOverlayVal">0.42</span></div>
+            <label>背景图 URL</label>
+            <input id="cfgBgUrl" placeholder="远程图片地址" />
+            <div class="button-row">
+              <label class="ghost compact" style="cursor:pointer;text-align:center;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid var(--line);border-radius:var(--radius-sm);margin:0">
+                上传背景图
+                <input id="cfgBgFile" type="file" accept="image/*" hidden />
+              </label>
+              <button class="secondary" id="cfgBgClear" type="button">清空背景</button>
+            </div>
+          </article>
+
+          <!-- Memory Output -->
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Memory</p>
+              <h3>记忆输出设置</h3>
+            </div>
+            <label>总结长度</label>
+            <select id="cfgMemLen">
+              <option value="short">简短</option>
+              <option value="medium" selected>中等</option>
+              <option value="long">详细</option>
+              <option value="custom">自定义</option>
+            </select>
+            <div id="cfgMemCustom" class="hidden">
+              <label>最大字符数</label>
+              <input id="cfgMemMaxChars" type="number" min="80" max="2000" value="520" />
+            </div>
+            <button class="secondary" id="cfgMemSave" type="button">保存记忆设置</button>
+            <p class="status-line muted" id="cfgMemStatus"></p>
+          </article>
+
+          <!-- Import/Export -->
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Data</p>
+              <h3>备份与导入</h3>
+            </div>
+            <p class="muted small">导入 PC 端运行包或导出本地数据备份。</p>
+            <div class="button-row" style="flex-direction:column">
+              <label class="ghost" style="cursor:pointer;text-align:center;display:block;padding:12px 16px;border:1px solid var(--line);border-radius:var(--radius-sm);margin:0;font-weight:700">
+                导入 PC 运行包
+                <input id="cfgBundleImport" type="file" accept=".json,.zip" hidden />
+              </label>
+              <button class="secondary full" id="cfgExportState" type="button">导出运行态备份</button>
+              <button class="secondary full" id="cfgExportBundle" type="button">导出组合包</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ═══ Card Config Page ═══ -->
+      <section class="page" data-page="card">
+        <div class="page-inner">
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Card</p>
+              <h2>角色卡编辑器</h2>
+            </div>
+            <div class="button-row">
+              <select id="cardFileSelect" style="flex:2"><option value="">选择文件...</option></select>
+              <button class="secondary compact" id="cardLoadBtn" type="button">加载</button>
+              <button class="compact" id="cardSaveBtn" type="button">保存</button>
+              <button class="secondary compact" id="cardExportBtn" type="button">导出</button>
+            </div>
+          </article>
+
+          <div class="card-grid">
+            <div class="card-block">
+              <h3>基础信息</h3>
+              <label>角色名</label>
+              <input id="cardName" />
+              <label>标签</label>
+              <input id="cardTags" placeholder="逗号分隔" />
+              <label>描述</label>
+              <textarea id="cardDesc" rows="3"></textarea>
+              <label>性格</label>
+              <textarea id="cardPersonality" rows="3"></textarea>
+              <label>场景</label>
+              <textarea id="cardScenario" rows="2"></textarea>
+            </div>
+            <div class="card-block">
+              <h3>对话内容</h3>
+              <label>开场白</label>
+              <textarea id="cardFirstMes" rows="4"></textarea>
+              <label>对话示例</label>
+              <textarea id="cardMesExample" rows="4"></textarea>
+              <label>作者笔记</label>
+              <textarea id="cardCreatorNotes" rows="2"></textarea>
+            </div>
+          </div>
+
+          <!-- Plot Stages -->
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Plot</p>
+              <h3>剧情阶段</h3>
+            </div>
+            <div class="card-grid">
+              <div class="card-block">
+                <h3>A 阶段</h3>
+                <label>描述</label>
+                <textarea id="plotADesc" rows="3"></textarea>
+                <label>规则</label>
+                <textarea id="plotARules" rows="3"></textarea>
+              </div>
+              <div class="card-block">
+                <h3>B 阶段</h3>
+                <label>描述</label>
+                <textarea id="plotBDesc" rows="3"></textarea>
+                <label>规则</label>
+                <textarea id="plotBRules" rows="3"></textarea>
+              </div>
+              <div class="card-block full-span">
+                <h3>C 阶段</h3>
+                <label>描述</label>
+                <textarea id="plotCDesc" rows="3"></textarea>
+                <label>规则</label>
+                <textarea id="plotCRules" rows="3"></textarea>
+              </div>
+            </div>
+          </article>
+
+          <!-- Personas -->
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Personas</p>
+              <h3>人设组</h3>
+            </div>
+            <div class="persona-grid">
+              <div class="persona-block">
+                <h3>Persona 1</h3>
+                <label>名称</label><input id="p1Name" />
+                <label>描述</label><textarea id="p1Desc" rows="2"></textarea>
+                <label>性格</label><textarea id="p1Personality" rows="2"></textarea>
+              </div>
+              <div class="persona-block">
+                <h3>Persona 2</h3>
+                <label>名称</label><input id="p2Name" />
+                <label>描述</label><textarea id="p2Desc" rows="2"></textarea>
+                <label>性格</label><textarea id="p2Personality" rows="2"></textarea>
+              </div>
+              <div class="persona-block">
+                <h3>Persona 3</h3>
+                <label>名称</label><input id="p3Name" />
+                <label>描述</label><textarea id="p3Desc" rows="2"></textarea>
+                <label>性格</label><textarea id="p3Personality" rows="2"></textarea>
+              </div>
+            </div>
+          </article>
+          <p class="status-line muted" id="cardStatus"></p>
+        </div>
+      </section>
+
+      <!-- ═══ Memory Page ═══ -->
+      <section class="page" data-page="memory">
+        <div class="page-inner">
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Memory</p>
+              <h2>记忆库管理</h2>
+            </div>
+            <div class="stats-row">
+              <div class="stat-box">
+                <span class="stat-label">记忆条数</span>
+                <strong id="memCount">0</strong>
+              </div>
+              <div class="stat-box">
+                <span class="stat-label">注入方式</span>
+                <strong id="memInject">默认</strong>
+              </div>
+            </div>
+            <div class="button-row" style="margin-top:12px">
+              <button class="secondary compact" id="memAddBtn" type="button">新增记忆</button>
+              <button class="secondary compact" id="memSaveBtn" type="button">保存全部</button>
+              <button class="secondary compact" id="memReloadBtn" type="button">刷新</button>
+            </div>
+          </article>
+
+          <div class="memory-list" id="memoryList">
+            <div class="empty-state">暂无记忆条目。点击"新增记忆"开始添加。</div>
+          </div>
+          <p class="status-line muted" id="memStatus"></p>
+        </div>
+      </section>
+
+      <!-- ═══ Sprite Page ═══ -->
+      <section class="page" data-page="sprite">
+        <div class="page-inner">
+          <article class="panel">
+            <div class="section-head">
+              <p class="eyebrow">Sprite</p>
+              <h2>立绘管理</h2>
+            </div>
+            <div class="stats-row">
+              <div class="stat-box">
+                <span class="stat-label">立绘数量</span>
+                <strong id="spriteCount">0</strong>
+              </div>
+              <div class="stat-box">
+                <span class="stat-label">存储路径</span>
+                <strong id="spritePath">-</strong>
+              </div>
+            </div>
+            <label>标签</label>
+            <input id="spriteTag" placeholder="例如 happy, sad, angry" />
+            <div class="button-row">
+              <label class="ghost compact" style="cursor:pointer;text-align:center;display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid var(--line);border-radius:var(--radius-sm);margin:0">
+                选择图片
+                <input id="spriteFile" type="file" accept="image/*" hidden />
+              </label>
+              <button class="compact" id="spriteUploadBtn" type="button">上传</button>
+              <button class="secondary compact" id="spriteRescanBtn" type="button">刷新列表</button>
+            </div>
+          </article>
+
+          <div class="sprite-grid" id="spriteGrid">
+            <div class="empty-state">暂无立绘资源。</div>
+          </div>
+          <p class="status-line muted" id="spriteStatus"></p>
+        </div>
+      </section>
+
+      <!-- ═══ Preview Page ═══ -->
+      <section class="page" data-page="preview">
+        <div class="page-inner">
+          <div class="preview-tabs" id="previewTabs">
+            <button class="preview-tab active" data-tab="persona" type="button">人设</button>
+            <button class="preview-tab" data-tab="memory" type="button">记忆</button>
+            <button class="preview-tab" data-tab="worldbook" type="button">世界书</button>
+            <button class="preview-tab" data-tab="preset" type="button">预设</button>
+          </div>
+          <div id="previewPanels">
+            <div class="preview-panel active" data-panel="persona" id="previewPersona"></div>
+            <div class="preview-panel" data-panel="memory" id="previewMemory"></div>
+            <div class="preview-panel" data-panel="worldbook" id="previewWorldbook"></div>
+            <div class="preview-panel" data-panel="preset" id="previewPreset"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ Card Writer Page ═══ -->
+      <section class="page" data-page="card-writer">
+        <iframe class="card-writer-frame" id="cardWriterFrame" src="about:blank"></iframe>
+      </section>
+    </div>
+
+    <!-- ═══ Modals ═══ -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal-card">
         <div class="modal-head">
           <h3 id="modalTitle">提示</h3>
-          <button class="ghost-button icon-button" id="closeModalButton" type="button">×</button>
+          <button class="icon-btn" id="modalClose" type="button">&times;</button>
         </div>
         <div class="modal-body" id="modalBody"></div>
         <div class="modal-actions">
-          <button class="primary-button" id="confirmModalButton" type="button">我知道了</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-backdrop hidden workshop-modal-backdrop" id="workshopModalBackdrop">
-      <div class="modal-card panel workshop-modal-card">
-        <div class="modal-head">
-          <div>
-            <p class="eyebrow">创意工坊</p>
-            <h3 id="workshopModalTitle">图片弹窗</h3>
-          </div>
-          <button class="ghost-button icon-button" id="closeWorkshopModalButton" type="button">×</button>
-        </div>
-        <div class="workshop-modal-stage" id="workshopModalStage">触发阶段：A 阶段</div>
-        <div class="workshop-modal-body">
-          <img id="workshopModalImage" class="workshop-modal-image" loading="lazy" decoding="async" alt="创意工坊图片" />
-          <p id="workshopModalText" class="workshop-modal-text">这里会显示图片说明。</p>
-        </div>
-        <div class="modal-actions">
-          <button class="primary-button" id="confirmWorkshopModalButton" type="button">我知道了</button>
+          <button id="modalConfirm" type="button">确定</button>
         </div>
       </div>
     </div>

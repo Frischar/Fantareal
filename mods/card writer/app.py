@@ -11,8 +11,12 @@ from typing import Any, Callable
 from urllib.parse import quote
 from uuid import uuid4
 
+import colorama
 import hashlib
 import httpx
+import logging
+import time
+import unicodedata
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
@@ -1937,7 +1941,75 @@ def normalized_has_content(project: dict[str, Any]) -> bool:
     return False
 
 
-app = FastAPI(title="Fantareal Card Writer Mod")
+colorama.just_fix_windows_console()
+
+LOG_COLORS = {
+    "reset": colorama.Style.RESET_ALL,
+    "muted": colorama.Fore.LIGHTBLACK_EX,
+    "view": colorama.Fore.CYAN,
+    "data": colorama.Fore.YELLOW,
+    "success": colorama.Fore.GREEN,
+    "error": colorama.Fore.RED,
+}
+
+def make_access_style(label: str, method: str, status_code: int) -> str:
+    if status_code >= 400:
+        return LOG_COLORS["error"]
+    if method in {"POST", "PUT", "PATCH", "DELETE"}:
+        return LOG_COLORS["data"]
+    if label.startswith("打开"):
+        return LOG_COLORS["view"]
+    return LOG_COLORS["muted"]
+
+
+def format_access_log(label: str, method: str, status_code: int, mood: str) -> str:
+    base_color = make_access_style(label, method, status_code)
+    status_color = LOG_COLORS["success"] if status_code < 400 else LOG_COLORS["error"]
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    return f"{LOG_COLORS['muted']}[{timestamp}]{base_color}[日志]{label} {status_color}{status_code}{base_color} {mood}{LOG_COLORS['reset']}"
+
+
+logger = logging.getLogger("card_writer_mod")
+logger.setLevel(logging.INFO)
+logger.handlers.clear()
+_handler = logging.StreamHandler(sys.stdout)
+_handler.setFormatter(logging.Formatter("%(message)s"))
+logger.addHandler(_handler)
+logger.propagate = False
+logging.getLogger("uvicorn.access").disabled = True
+
+
+def resolve_access_label(method: str, path: str) -> str:
+    label_map = {
+        "/": "打开缃笺首页",
+        "/api/projects": "项目列表",
+        "/api/settings": "AI 设置",
+        "/api/workspace": "工作区",
+        "/api/autosave": "自动保存",
+    }
+    direct_label = label_map.get(path)
+    if direct_label:
+        return direct_label
+    if path.startswith("/api/"):
+        return "访问接口"
+    return {"GET": "访问页面", "POST": "提交请求", "PUT": "更新数据", "PATCH": "更新数据", "DELETE": "删除数据"}.get(method, "请求接口")
+
+
+app = FastAPI(title="Card Writer")
+
+@app.middleware("http")
+async def chinese_access_log(request: Request, call_next):
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    method = request.method.upper()
+    path = request.url.path
+    label = resolve_access_label(method, path)
+    mood = "成功了喵~" if response.status_code < 400 else "出错了喵呜..."
+    logger.info(format_access_log(label, method, response.status_code, mood))
+    logger.debug("请求耗时%dms", elapsed_ms)
+    return response
+
 store = ProjectStore(PROJECTS_DIR, AUTOSAVES_DIR, EXPORTS_DIR, WORKSPACE_PATH)
 compiler = CardCompiler()
 

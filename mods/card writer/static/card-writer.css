@@ -924,6 +924,29 @@ textarea {
   background: rgba(255, 244, 244, 0.94);
 }
 
+.copilot-error-detail {
+  margin-top: 10px;
+  border-top: 1px solid rgba(207, 94, 94, 0.16);
+  padding-top: 8px;
+}
+
+.copilot-error-detail summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #9f4545;
+}
+
+.copilot-error-detail pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #6e3333;
+}
+
 .copilot-bubble strong {
   display: block;
   margin-bottom: 6px;

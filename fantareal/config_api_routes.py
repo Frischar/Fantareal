@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
+import shutil
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -1059,6 +1060,27 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             filename=export_path.name,
             media_type="application/zip",
         )
+
+    @app.get("/api/logs/export")
+    async def api_export_logs() -> FileResponse:
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        ctx.flush_log_handlers()
+        source_path = Path(ctx.log_file_path)
+        if not source_path.exists() or source_path.stat().st_size <= 0:
+            raise HTTPException(status_code=404, detail="当前还没有可导出的日志。")
+
+        filename = f"fantareal_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        export_path = ctx.EXPORT_DIR / filename
+        try:
+            shutil.copyfile(source_path, export_path)
+        except OSError as exc:
+            ctx.logger.exception("Log export failed: %s", export_path)
+            raise HTTPException(
+                status_code=500,
+                detail="日志导出失败，请检查磁盘空间或文件权限。",
+            ) from exc
+
+        return FileResponse(path=export_path, filename=filename, media_type="text/plain")
 
     @app.get("/api/workshop/status")
     async def api_get_workshop_status() -> dict[str, Any]:
