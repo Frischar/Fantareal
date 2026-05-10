@@ -1,0 +1,50 @@
+{
+  "id": "storyboard_frame",
+  "name": "剧本分镜",
+  "version": "1.0.0",
+  "author": "Fantareal",
+  "description": "镜头、场记、分镜格与动作记录，适合演出感、动画感和剧情截图式展示。",
+  "style": {
+    "class_name": "theme-storyboard",
+    "accent": "#f59e0b",
+    "layout": {
+      "title_card": "time_card",
+      "scene_card": "time_panel",
+      "character_card": "info_rows",
+      "relationship_card": "status_strip",
+      "status_bar": "compact"
+    },
+    "tokens": {
+      "time": "🎬",
+      "location": "📍",
+      "weather": "🌫",
+      "atmosphere": "🎞",
+      "characters": "👥",
+      "emotion": "表情",
+      "clothing": "服装",
+      "posture": "动作",
+      "scene": "镜头",
+      "sensory_field": "音画",
+      "body_temperature": "体感",
+      "body_motion": "运动",
+      "micro_reaction": "细节",
+      "visual_focus": "焦点",
+      "interaction": "调度",
+      "summary": "镜头记"
+    },
+    "title_card": {
+      "background": "storyboard",
+      "border": "frame",
+      "radius": "small",
+      "shadow": "soft"
+    },
+    "character_card": {
+      "background": "storyboard",
+      "field_style": "shot_row",
+      "spacing": "compact"
+    },
+    "relationship_card": {
+      "style": "cut_note"
+    }
+  }
+}

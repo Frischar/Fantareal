@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "id": "relationship",
+    "name": "关系表",
+    "description": "记录主要角色之间的关系状态、态度与变化摘要。",
+    "primary_key": "pair_id",
+    "fields": [
+      {"key": "pair_id", "label": "关系主键", "type": "text", "required": true, "note": "建议格式：角色A-角色B。"},
+      {"key": "from", "label": "角色A", "type": "text", "note": "关系观察起点。"},
+      {"key": "to", "label": "角色B", "type": "text", "note": "关系观察对象。"},
+      {"key": "relation", "label": "关系阶段", "type": "enum", "options": ["陌生", "警惕", "信任", "依赖", "暧昧", "恋慕", "敌对"], "note": "当前关系的阶段判断。"},
+      {"key": "attitude", "label": "当前态度", "type": "textarea", "note": "角色A对角色B的态度。"},
+      {"key": "summary", "label": "关系摘要", "type": "textarea", "note": "关系现状与最近变化。"},
+      {"key": "updated_at", "label": "更新时间", "type": "text", "note": "由心笺自动写入。"}
+    ],
+    "rules": {
+      "note": "只记录主要角色之间有持续意义的关系，不记录一次性互动。",
+      "init": "两个角色之间产生明确关系张力、承诺、冲突、依赖或长期互动时初始化。",
+      "insert": "出现新的重要关系组合时新增一行。",
+      "update": "信任、依赖、敌意、暧昧、承诺或冲突出现明确变化时更新。",
+      "delete": "关系彻底失效或不再需要追踪时才删除。",
+      "ignore": "普通寒暄、重复照料、没有新信息的互动不要反复更新。"
+    }
+  },
+  "rows": []
+}
