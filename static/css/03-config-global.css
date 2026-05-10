@@ -563,6 +563,14 @@ body.modern-setting-page .app-toast {
 }
 
 /* ---- About page ---- */
+.about-body a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.about-body a:hover {
+  opacity: 0.8;
+}
 .about-body p {
   margin: 0 0 0.75em;
   line-height: 1.7;
