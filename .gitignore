@@ -21,3 +21,4 @@ cards/*.txt
 CLAUDE.md
 .idea/
 mods/*/data/*.json
+data/logs/
