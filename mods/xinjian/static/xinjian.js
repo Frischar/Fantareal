@@ -65,6 +65,14 @@
     cfgMujianDensity: $("#cfgMujianDensity"),
     cfgMujianCharacterFilter: $("#cfgMujianCharacterFilter"),
     cfgMujianCharacterNames: $("#cfgMujianCharacterNames"),
+    cfgMujianProtagonistEnabled: $("#cfgMujianProtagonistEnabled"),
+    cfgMujianProtagonistMode: $("#cfgMujianProtagonistMode"),
+    cfgMujianProtagonistName: $("#cfgMujianProtagonistName"),
+    cfgMujianProtagonistAliases: $("#cfgMujianProtagonistAliases"),
+    cfgMujianWorkerPromptEnabled: $("#cfgMujianWorkerPromptEnabled"),
+    cfgMujianWorkerStylePrompt: $("#cfgMujianWorkerStylePrompt"),
+    cfgMujianWorkerProtagonistPrompt: $("#cfgMujianWorkerProtagonistPrompt"),
+    resetWorkerPromptBtn: $("#resetWorkerPromptBtn"),
     cfgBaseUrl: $("#cfgBaseUrl"),
     cfgApiKey: $("#cfgApiKey"),
     cfgModel: $("#cfgModel"),
@@ -521,6 +529,13 @@
     renderTemplateSelectors();
     if (els.cfgMujianTemplateSelect) els.cfgMujianTemplateSelect.value = state.currentTemplateId;
     if (els.cfgMujianCharacterNames) els.cfgMujianCharacterNames.value = cfg.mujian_character_names || "";
+    if (els.cfgMujianProtagonistEnabled) els.cfgMujianProtagonistEnabled.checked = !!cfg.mujian_protagonist_card_enabled;
+    if (els.cfgMujianProtagonistMode) els.cfgMujianProtagonistMode.value = cfg.mujian_protagonist_card_mode || "when_relevant";
+    if (els.cfgMujianProtagonistName) els.cfgMujianProtagonistName.value = cfg.mujian_protagonist_name || "";
+    if (els.cfgMujianProtagonistAliases) els.cfgMujianProtagonistAliases.value = cfg.mujian_protagonist_aliases || "";
+    if (els.cfgMujianWorkerPromptEnabled) els.cfgMujianWorkerPromptEnabled.checked = !!cfg.mujian_worker_custom_prompt_enabled;
+    if (els.cfgMujianWorkerStylePrompt) els.cfgMujianWorkerStylePrompt.value = cfg.mujian_worker_style_prompt || "";
+    if (els.cfgMujianWorkerProtagonistPrompt) els.cfgMujianWorkerProtagonistPrompt.value = cfg.mujian_worker_protagonist_prompt || "";
     bindTemplateEditor();
     updateMujianStyleHelp();
     els.cfgBaseUrl.value = cfg.api_base_url || "";
@@ -549,6 +564,13 @@
       mujian_note_density: els.cfgMujianDensity ? els.cfgMujianDensity.value : "standard",
       mujian_character_filter: els.cfgMujianCharacterFilter ? els.cfgMujianCharacterFilter.value : "turn",
       mujian_character_names: els.cfgMujianCharacterNames ? els.cfgMujianCharacterNames.value.trim() : "",
+      mujian_protagonist_card_enabled: els.cfgMujianProtagonistEnabled ? els.cfgMujianProtagonistEnabled.checked : false,
+      mujian_protagonist_card_mode: els.cfgMujianProtagonistMode ? els.cfgMujianProtagonistMode.value : "when_relevant",
+      mujian_protagonist_name: els.cfgMujianProtagonistName ? els.cfgMujianProtagonistName.value.trim() : "",
+      mujian_protagonist_aliases: els.cfgMujianProtagonistAliases ? els.cfgMujianProtagonistAliases.value.trim() : "",
+      mujian_worker_custom_prompt_enabled: els.cfgMujianWorkerPromptEnabled ? els.cfgMujianWorkerPromptEnabled.checked : false,
+      mujian_worker_style_prompt: els.cfgMujianWorkerStylePrompt ? els.cfgMujianWorkerStylePrompt.value.trim() : "",
+      mujian_worker_protagonist_prompt: els.cfgMujianWorkerProtagonistPrompt ? els.cfgMujianWorkerProtagonistPrompt.value.trim() : "",
       mujian_template_id: activeTemplateId(),
       mujian_templates: mujianTemplates(),
       mujian_theme_id: activeThemeId(),
@@ -1069,6 +1091,12 @@
   $("#saveConfigBtn").addEventListener("click", () => saveConfig("model").catch((error) => { setStatus(error.message, "error"); pageToast("保存模型配置失败", error.message, "error"); }));
   $("#saveLinkConfigBtn").addEventListener("click", () => saveConfig("link").catch((error) => { setStatus(error.message, "error"); pageToast("保存联动设置失败", error.message, "error"); }));
   $("#saveMujianConfigBtn").addEventListener("click", () => saveConfig("mujian").catch((error) => { setStatus(error.message, "error"); pageToast("保存幕笺设置失败", error.message, "error"); }));
+  els.resetWorkerPromptBtn?.addEventListener("click", () => {
+    if (els.cfgMujianWorkerPromptEnabled) els.cfgMujianWorkerPromptEnabled.checked = false;
+    if (els.cfgMujianWorkerStylePrompt) els.cfgMujianWorkerStylePrompt.value = "";
+    if (els.cfgMujianWorkerProtagonistPrompt) els.cfgMujianWorkerProtagonistPrompt.value = "";
+    pageToast("已恢复默认附加提示词", "保存幕笺设置后生效。", "ok");
+  });
   $("#saveTemplateConfigBtn")?.addEventListener("click", () => saveConfig("template").catch((error) => { setStatus(error.message, "error"); pageToast("保存模板设置失败", error.message, "error"); }));
   $("#saveThemeConfigBtn")?.addEventListener("click", () => saveConfig("theme").catch((error) => { setStatus(error.message, "error"); pageToast("保存美化设置失败", error.message, "error"); }));
   $("#refreshHookBtn").addEventListener("click", () => refreshHookStatus().catch((error) => pageToast("刷新 Hook 状态失败", error.message, "error")));

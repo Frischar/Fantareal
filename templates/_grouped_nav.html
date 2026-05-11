@@ -99,7 +99,7 @@
         <a class="navlink{% if current_path.startswith('/mods/tts-studio') %} active{% endif %}" href="/mods/tts-studio">语音 TTS</a>
         {% endif %}
         {% if mod_state.has_status_panel %}
-        <a class="navlink{% if current_path.startswith('/mods/status-panel') %} active{% endif %}" href="/mods/status-panel/app/">游玩状态栏</a>
+        <a class="navlink{% if current_path.startswith('/mods/status-panel') %} active{% endif %}" href="/mods/status-panel">游玩状态栏</a>
         {% endif %}
         {% if mod_state.has_worldbook_maker %}
         <a class="navlink{% if current_path.startswith('/mods/worldbook-maker') %} active{% endif %}" href="/mods/worldbook-maker">世界书生成器</a>
@@ -111,7 +111,7 @@
         <a class="navlink{% if current_path.startswith('/mods/card-writer') %} active{% endif %}" href="/mods/card-writer/app/">古法写卡器</a>
         {% endif %}
         {% if mod_state.has_tavern_card_converter %}
-        <a class="navlink{% if current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/xinjian') %} active{% endif %}" href="/mods/tavern-card-converter/app/">酒馆卡转换器</a>
+        <a class="navlink{% if current_path.startswith('/mods/tavern-card-converter') %} active{% endif %}" href="/mods/tavern-card-converter">酒馆卡转换器</a>
         {% endif %}
         {% if mod_state.has_xinjian %}
         <a class="navlink{% if current_path.startswith('/mods/xinjian') %} active{% endif %}" href="/mods/xinjian">心笺</a>
