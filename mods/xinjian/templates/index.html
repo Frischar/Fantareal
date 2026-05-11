@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>心笺 - Fantareal</title>
-    <link rel="stylesheet" href="./static/xinjian.css?v=xinjian-v0-7-6-1-theme-delete" />
+    <link rel="stylesheet" href="./static/xinjian.css?v=xinjian-admin-ui-v0-1-3-rework" />
   </head>
   <body>
     <main class="xinjian-shell" data-version="{{ version }}">
@@ -27,69 +27,89 @@
         <span id="updateSummaryText">暂无填表记录。</span>
       </section>
 
-      <section class="xinjian-grid">
-        <aside class="panel table-list-panel">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Tables</p>
-              <h2>表册</h2>
-            </div>
-            <button id="newTableBtn" class="round-btn" title="新建表">＋</button>
-          </div>
-          <div id="tableList" class="table-list"></div>
-          <div class="panel-actions stacked">
-            <button id="exportBtn" class="ghost-btn">导出全部</button>
-            <label class="ghost-btn file-btn">导入 JSON<input id="importInput" type="file" accept="application/json" /></label>
-          </div>
+      <section class="xinjian-workbench">
+        <aside class="panel workspace-nav" aria-label="心笺后台一级导航">
+          <button class="workspace-nav-btn active" type="button" data-workspace="xinjian">
+            <span class="nav-icon">✦</span><span><strong>心笺</strong><small>状态记录与填表</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="mujian" data-default-tab="mujian">
+            <span class="nav-icon">▣</span><span><strong>幕笺</strong><small>展示与附笺</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="generate" data-default-tab="generate">
+            <span class="nav-icon">☷</span><span><strong>生成规则</strong><small>规则与约束</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="beauty" data-default-tab="template">
+            <span class="nav-icon">✧</span><span><strong>美化</strong><small>外观与模板</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="settings" data-default-tab="model">
+            <span class="nav-icon">⚙</span><span><strong>设置</strong><small>系统与偏好</small></span>
+          </button>
         </aside>
 
-        <section class="panel data-panel">
-          <div class="panel-head split data-panel-head">
-            <div>
-              <p class="eyebrow">Rows</p>
-              <h2 id="currentTableTitle">未选择表</h2>
-              <p id="currentTableDesc" class="muted"></p>
+        <div class="workspace-main">
+          <section id="databaseWorkspace" class="workspace-page active" data-workspace-page="xinjian">
+            <div class="xinjian-grid">
+              <aside class="panel table-list-panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="eyebrow">Tables</p>
+                    <h2>表册</h2>
+                  </div>
+                  <button id="newTableBtn" class="round-btn" title="新建表">＋</button>
+                </div>
+                <div id="tableList" class="table-list"></div>
+                <div class="panel-actions stacked">
+                  <button id="exportBtn" class="ghost-btn">导出全部</button>
+                  <label class="ghost-btn file-btn">导入 JSON<input id="importInput" type="file" accept="application/json" /></label>
+                </div>
+              </aside>
+
+              <section class="panel data-panel">
+                <div class="panel-head split data-panel-head">
+                  <div>
+                    <p class="eyebrow">Rows</p>
+                    <h2 id="currentTableTitle">未选择表</h2>
+                    <p id="currentTableDesc" class="muted"></p>
+                  </div>
+                  <div class="panel-actions data-actions">
+                    <div class="view-switch" aria-label="视图切换">
+                      <button id="cardViewBtn" class="view-btn active" type="button">卡片</button>
+                      <button id="tableViewBtn" class="view-btn" type="button">表格</button>
+                    </div>
+                    <button id="openSchemaDrawerBtn" class="ghost-btn">字段</button>
+                    <button id="openRulesDrawerBtn" class="ghost-btn">规则</button>
+                    <button id="addRowBtn" class="ghost-btn">新增行</button>
+                    <button id="manualWorkerBtn" class="primary-btn">根据最近对话更新</button>
+                  </div>
+                </div>
+                <div id="rowsEditor" class="rows-editor"></div>
+              </section>
             </div>
-            <div class="panel-actions data-actions">
-              <div class="view-switch" aria-label="视图切换">
-                <button id="cardViewBtn" class="view-btn active" type="button">卡片</button>
-                <button id="tableViewBtn" class="view-btn" type="button">表格</button>
+          </section>
+
+          <aside id="configDrawer" class="config-drawer-panel config-workspace-panel workspace-page" aria-hidden="true" data-active-workspace="xinjian">
+            <div class="drawer-toolbar">
+              <div>
+                <p class="eyebrow">Workbench</p>
+                <h2 id="drawerTitle">心笺设置</h2>
               </div>
-              <button id="openSchemaDrawerBtn" class="ghost-btn">字段</button>
-              <button id="openRulesDrawerBtn" class="ghost-btn">规则</button>
-              <button id="openModelDrawerBtn" class="ghost-btn">模型</button>
-              <button id="openLinkDrawerBtn" class="ghost-btn">联动</button>
-              <button id="openMujianDrawerBtn" class="ghost-btn">幕笺</button>
-              <button id="openTemplateDrawerBtn" class="ghost-btn">模板</button>
-              <button id="openLogDrawerBtn" class="ghost-btn">日志</button>
-              <button id="addRowBtn" class="ghost-btn">新增行</button>
-              <button id="manualWorkerBtn" class="primary-btn">根据最近对话更新</button>
+              <button id="closeConfigDrawerBtn" class="ghost-btn small">返回表册</button>
             </div>
-          </div>
-          <div id="rowsEditor" class="rows-editor"></div>
-        </section>
-      </section>
+            <div class="tabs drawer-tabs" data-tab-scope="xinjian">
+              <button class="tab-btn active" data-tab="schema">字段</button>
+              <button class="tab-btn" data-tab="rules">规则</button>
+            </div>
+            <div class="tabs drawer-tabs" data-tab-scope="beauty">
+              <button class="tab-btn" data-tab="template">模板</button>
+              <button class="tab-btn" data-tab="theme">美化包</button>
+            </div>
+            <div class="tabs drawer-tabs" data-tab-scope="settings">
+              <button class="tab-btn" data-tab="model">模型</button>
+              <button class="tab-btn" data-tab="link">联动</button>
+              <button class="tab-btn" data-tab="log">调试日志</button>
+            </div>
 
-      <aside id="configDrawer" class="config-drawer-panel" aria-hidden="true">
-        <div class="drawer-toolbar">
-          <div>
-            <p class="eyebrow">Settings</p>
-            <h2 id="drawerTitle">心笺设置</h2>
-          </div>
-          <button id="closeConfigDrawerBtn" class="ghost-btn small">关闭</button>
-        </div>
-        <div class="tabs drawer-tabs">
-          <button class="tab-btn active" data-tab="schema">字段</button>
-          <button class="tab-btn" data-tab="rules">规则</button>
-          <button class="tab-btn" data-tab="model">模型</button>
-          <button class="tab-btn" data-tab="link">联动</button>
-          <button class="tab-btn" data-tab="mujian">幕笺</button>
-          <button class="tab-btn" data-tab="template">模板</button>
-          <button class="tab-btn" data-tab="theme">美化</button>
-          <button class="tab-btn" data-tab="log">日志</button>
-        </div>
-
-        <section class="tab-page active" data-page="schema">
+        <section class="tab-page" data-page="schema">
           <label>表 ID<input id="schemaId" placeholder="character_status" /></label>
           <label>表名<input id="schemaName" placeholder="角色状态表" /></label>
           <label>描述<textarea id="schemaDesc" rows="3"></textarea></label>
@@ -111,58 +131,36 @@
           <label>Ignore：什么时候不要更新<textarea id="ruleIgnore" rows="3"></textarea></label>
         </section>
 
-        <section class="tab-page" data-page="model">
-          <p class="microcopy">模型页只保存心笺辅助模型 API。自动触发请到「联动」，展示样式请到「幕笺」。</p>
-          <div class="preset-row">
-            <label>预设服务<select id="servicePresetSelect">
-              <option value="custom">自定义</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="openai">OpenAI</option>
-              <option value="minimax">MiniMax</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="siliconflow">SiliconFlow</option>
-            </select></label>
-            <button id="applyPresetBtn" type="button" class="ghost-btn">一键填入预设</button>
-          </div>
-          <label>API URL<input id="cfgBaseUrl" placeholder="https://api.openai.com/v1" /></label>
-          <label>API Key
-            <div class="inline-field">
-              <input id="cfgApiKey" type="password" autocomplete="off" />
-              <button id="toggleApiKeyBtn" type="button" class="ghost-btn mini">显示</button>
+        <section class="tab-page" data-page="generate">
+          <div class="mujian-config-card standalone">
+            <div class="subhead"><strong>生成规则</strong><span class="micro-badge">worker</span></div>
+            <p class="microcopy">这里决定辅助模型怎么读取最近聊天、什么时候写入心笺、是否生成主角状态卡，以及允许用户附加哪些安全提示。</p>
+            <div class="model-toggle-grid">
+              <label class="check-row"><input id="cfgAutoUpdate" type="checkbox" /> 聊天后自动填表</label>
             </div>
-          </label>
-          <label>模型名
-            <div class="inline-field model-field">
-              <input id="cfgModel" list="modelDatalist" placeholder="gpt-4.1-mini / deepseek-chat" />
-              <button id="fetchModelsBtn" type="button" class="ghost-btn mini">拉取模型</button>
+            <label>最近输入轮数<input id="cfgTurns" type="number" min="1" max="10" /></label>
+            <p class="microcopy">轮数越高，worker 读取的最近聊天越多；建议默认 3 轮，剧情复杂时可提高到 5。</p>
+            <div class="mujian-config-card soft-card">
+              <div class="subhead"><strong>主角状态卡</strong><span class="micro-badge">安全生成</span></div>
+              <label class="check-row"><input id="cfgMujianProtagonistEnabled" type="checkbox" /> 生成主角状态卡</label>
+              <div class="grid-two">
+                <label>主角名称<input id="cfgMujianProtagonistName" placeholder="例如：顾知微" /></label>
+                <label>生成方式<select id="cfgMujianProtagonistMode"><option value="when_relevant">明显涉及时生成</option><option value="always">每轮生成</option></select></label>
+              </div>
+              <label>主角别名<input id="cfgMujianProtagonistAliases" placeholder="用逗号分隔，例如：我，先生，顾先生" /></label>
+              <p class="microcopy">主角状态卡只写可观察状态、身体状态、伤势、气息、位置与互动关系；不会替用户决定行动、台词或内心。</p>
             </div>
-          </label>
-          <datalist id="modelDatalist"></datalist>
-                    <div class="grid-two">
-            <label>最近轮数<input id="cfgTurns" type="number" min="1" max="10" /></label>
-            <label>超时秒数<input id="cfgTimeout" type="number" min="10" max="600" /></label>
-          </div>
-          <div class="model-tools pinned">
-            <button id="fillMainConfigBtn" type="button" class="ghost-btn">从本体配置填入</button>
-            <button id="testConnectionBtn" type="button" class="ghost-btn">测试连接</button>
-            <button id="saveConfigBtn" class="primary-btn">保存模型配置</button>
-          </div>
-        </section>
-
-        <section class="tab-page" data-page="link">
-          <div class="model-status-card" id="hookStatusCard">
-            <strong>聊天页 Hook</strong>
-            <span id="hookStatusText">正在检测……</span>
-          </div>
-          <p class="microcopy">这里控制心笺什么时候在聊天页触发。模型页只负责 API；幕笺页只负责展示样式。</p>
-          <div class="model-toggle-grid">
-            <label class="check-row"><input id="cfgEnabled" type="checkbox" /> 启用心笺</label>
-            <label class="check-row"><input id="cfgAutoUpdate" type="checkbox" /> 聊天后自动填表</label>
-            <label class="check-row"><input id="cfgNotify" type="checkbox" /> 聊天页显示提示</label>
-          </div>
-          <div class="model-tools pinned">
-            <button id="refreshHookBtn" type="button" class="ghost-btn">刷新 Hook 状态</button>
-            <button id="saveLinkConfigBtn" type="button" class="primary-btn">保存联动设置</button>
+            <div class="mujian-config-card soft-card">
+              <div class="subhead"><strong>安全提示词开放</strong><span class="micro-badge">仅附加</span></div>
+              <label class="check-row"><input id="cfgMujianWorkerPromptEnabled" type="checkbox" /> 启用自定义 worker 附加提示词</label>
+              <label>幕笺语言风格补充<textarea id="cfgMujianWorkerStylePrompt" rows="4" placeholder="例如：语言古风、克制、含蓄；多写光影、袖口、呼吸、视线；少用夸张现代词。"></textarea></label>
+              <label>主角状态卡规则<textarea id="cfgMujianWorkerProtagonistPrompt" rows="4" placeholder="例如：主角状态卡重点记录旧伤、调息、气息和与其他角色的距离关系；不要替主角说话或行动。"></textarea></label>
+              <div class="model-actions"><button id="resetWorkerPromptBtn" type="button" class="ghost-btn">恢复默认附加提示词</button></div>
+              <p class="microcopy">这里只会附加到安全区域，不会开放 JSON 根结构、updates 协议、SQLite 写入规则或字段 key。</p>
+            </div>
+            <div class="model-tools pinned">
+              <button id="saveGenerateConfigBtn" type="button" class="primary-btn">保存生成规则</button>
+            </div>
           </div>
         </section>
 
@@ -199,25 +197,7 @@
               <label>角色显示<select id="cfgMujianCharacterFilter"><option value="turn">本轮生成</option><option value="heroine">双女主</option><option value="protagonist">主角相关</option><option value="custom">自定义名单</option><option value="all">全部角色</option></select></label>
             </div>
             <label>自定义角色名单<input id="cfgMujianCharacterNames" placeholder="用逗号分隔，例如：角色甲，角色乙" /></label>
-            <div class="mujian-config-card soft-card">
-              <div class="subhead"><strong>主角状态卡</strong><span class="micro-badge">安全生成</span></div>
-              <label class="check-row"><input id="cfgMujianProtagonistEnabled" type="checkbox" /> 生成主角状态卡</label>
-              <div class="grid-two">
-                <label>主角名称<input id="cfgMujianProtagonistName" placeholder="例如：顾知微" /></label>
-                <label>生成方式<select id="cfgMujianProtagonistMode"><option value="when_relevant">明显涉及时生成</option><option value="always">每轮生成</option></select></label>
-              </div>
-              <label>主角别名<input id="cfgMujianProtagonistAliases" placeholder="用逗号分隔，例如：我，先生，顾先生" /></label>
-              <p class="microcopy">主角状态卡只写可观察状态、身体状态、伤势、气息、位置与互动关系；不会替用户决定行动、台词或内心。</p>
-            </div>
-            <div class="mujian-config-card soft-card">
-              <div class="subhead"><strong>安全提示词开放</strong><span class="micro-badge">仅附加</span></div>
-              <label class="check-row"><input id="cfgMujianWorkerPromptEnabled" type="checkbox" /> 启用自定义 worker 附加提示词</label>
-              <label>幕笺语言风格补充<textarea id="cfgMujianWorkerStylePrompt" rows="4" placeholder="例如：语言古风、克制、含蓄；多写光影、袖口、呼吸、视线；少用夸张现代词。"></textarea></label>
-              <label>主角状态卡规则<textarea id="cfgMujianWorkerProtagonistPrompt" rows="4" placeholder="例如：主角状态卡重点记录旧伤、调息、气息和与其他角色的距离关系；不要替主角说话或行动。"></textarea></label>
-              <div class="model-actions"><button id="resetWorkerPromptBtn" type="button" class="ghost-btn">恢复默认附加提示词</button></div>
-              <p class="microcopy">这里只会附加到安全区域，不会开放 JSON 根结构、updates 协议、SQLite 写入规则或字段 key。</p>
-            </div>
-            <p class="microcopy">附笺会先生成完整数据，再由前端筛选显示。Chat 状态显示模式只影响聊天页展示，不改变 SQLite 后台记录。感官标签会真正启用感官场域、躯体温差、肢体动态、微生理反应、视觉焦点等字段。</p>
+            <p class="microcopy">附笺会先生成完整数据，再由前端筛选显示。Chat 状态显示模式只影响聊天页展示，不改变 SQLite 后台记录。</p>
           </div>
           <div class="model-tools pinned">
             <button id="saveMujianConfigBtn" type="button" class="primary-btn">保存幕笺设置</button>
@@ -235,7 +215,7 @@
             <label>模板名称<input id="templateName" placeholder="感官标签" /></label>
             <label>模板说明<textarea id="templateDesc" rows="2" placeholder="说明这个模板适合什么场景"></textarea></label>
             <label>附笺生成风格<select id="templateNoteStyle"><option value="classic">经典状态</option><option value="gufeng">古风旁白</option><option value="sensory">感官标签</option></select></label>
-            <div class="subhead"><strong>字段列表</strong><button id="addTemplateFieldBtn" type="button" class="ghost-btn small">新增字段</button></div>
+            <div class="subhead"><strong>字段列表</strong><div class="template-field-toolbar"><button id="collapseTemplateFieldsBtn" type="button" class="ghost-btn small">全部折叠</button><button id="addTemplateFieldBtn" type="button" class="ghost-btn small">新增字段</button></div></div>
             <p class="microcopy">字段 Key 用英文下划线；显示名和生成说明会进入心笺提示词。拖拽暂未开放，可以用上移/下移调整顺序。</p>
             <div id="templateFieldsEditor" class="template-fields-editor"></div>
             <label>输出格式模板<textarea id="templateOutput" rows="8" placeholder="例如：<情绪({emotion})>\n<衣着({clothing})>"></textarea></label>
@@ -250,7 +230,6 @@
             </div>
           </div>
         </section>
-
 
         <section class="tab-page" data-page="theme">
           <div class="mujian-config-card standalone">
@@ -279,14 +258,72 @@
           </div>
         </section>
 
-        <section class="tab-page" data-page="log">
-          <div class="panel-actions">
-            <button id="loadLogBtn" class="ghost-btn">读取最近日志</button>
-            <button id="exportDebugLogBtn" class="ghost-btn">导出排查日志</button>
+        <section class="tab-page" data-page="model">
+          <p class="microcopy">模型页只保存心笺辅助模型 API。生成触发请到「生成规则」，展示样式请到「幕笺」。</p>
+          <div class="preset-row">
+            <label>预设服务<select id="servicePresetSelect">
+              <option value="custom">自定义</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+              <option value="minimax">MiniMax</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="siliconflow">SiliconFlow</option>
+            </select></label>
+            <button id="applyPresetBtn" type="button" class="ghost-btn">一键填入预设</button>
           </div>
-          <pre id="logBox" class="log-box">暂无日志</pre>
+          <label>API URL<input id="cfgBaseUrl" placeholder="https://api.openai.com/v1" /></label>
+          <label>API Key
+            <div class="inline-field">
+              <input id="cfgApiKey" type="password" autocomplete="off" />
+              <button id="toggleApiKeyBtn" type="button" class="ghost-btn mini">显示</button>
+            </div>
+          </label>
+          <label>模型名
+            <div class="inline-field model-field">
+              <input id="cfgModel" list="modelDatalist" placeholder="gpt-4.1-mini / deepseek-chat" />
+              <button id="fetchModelsBtn" type="button" class="ghost-btn mini">拉取模型</button>
+            </div>
+          </label>
+          <datalist id="modelDatalist"></datalist>
+          <label>请求超时秒数<input id="cfgTimeout" type="number" min="10" max="600" /></label>
+          <div class="model-tools pinned">
+            <button id="fillMainConfigBtn" type="button" class="ghost-btn">从本体配置填入</button>
+            <button id="testConnectionBtn" type="button" class="ghost-btn">测试连接</button>
+            <button id="saveConfigBtn" class="primary-btn">保存模型配置</button>
+          </div>
         </section>
-      </aside>
+
+        <section class="tab-page" data-page="link">
+          <div class="model-status-card" id="hookStatusCard">
+            <strong>聊天页 Hook</strong>
+            <span id="hookStatusText">正在检测……</span>
+          </div>
+          <p class="microcopy">这里控制心笺基础启用、聊天页 Hook 和通知。自动填表触发已归入「生成规则」。</p>
+          <div class="model-toggle-grid">
+            <label class="check-row"><input id="cfgEnabled" type="checkbox" /> 启用心笺</label>
+            <label class="check-row"><input id="cfgNotify" type="checkbox" /> 聊天页显示提示</label>
+          </div>
+          <div class="model-tools pinned">
+            <button id="refreshHookBtn" type="button" class="ghost-btn">刷新 Hook 状态</button>
+            <button id="saveLinkConfigBtn" type="button" class="primary-btn">保存联动设置</button>
+          </div>
+        </section>
+
+        <section class="tab-page" data-page="log">
+          <div class="mujian-config-card standalone log-config-card">
+            <div class="subhead"><strong>调试与日志</strong><span class="micro-badge">debug</span></div>
+            <p class="microcopy">这里集中放置心笺运行日志、Hook 排查与导出信息。它不属于状态数据库内容，只用于定位生成、重 roll、编辑重算和幕笺恢复问题。</p>
+            <div class="panel-actions log-actions">
+              <button id="loadLogBtn" class="ghost-btn">读取最近日志</button>
+              <button id="exportDebugLogBtn" class="ghost-btn">导出排查日志</button>
+            </div>
+            <pre id="logBox" class="log-box">暂无日志</pre>
+          </div>
+        </section>
+          </aside>
+        </div>
+      </section>
+
       <div id="drawerMask" class="drawer-mask" hidden></div>
 
       <aside id="rowDetailDrawer" class="row-detail-drawer" aria-hidden="true">
@@ -305,6 +342,6 @@
       </aside>
       <div id="rowDetailMask" class="drawer-mask" hidden></div>
     </main>
-    <script src="./static/xinjian.js?v=xinjian-v0-7-6-1-theme-delete"></script>
+    <script src="./static/xinjian.js?v=xinjian-admin-ui-v0-1-3-rework"></script>
   </body>
 </html>
