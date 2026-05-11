@@ -800,12 +800,12 @@
                 <p class="muted">聊天辅助栏只放运行时入口。状态栏浮球保持旧模式，继续覆盖在页面之上。</p>
                 <div class="runtime-plugin-links">
                   {% for mod in registered_mods or [] %}
-                    {% if mod.slug == 'tts-studio' %}<a href="/mods/tts-studio" class="secondary compact">语音 TTS</a>{% endif %}
-                    {% if mod.slug == 'status-panel' %}<a href="/mods/status-panel" class="secondary compact">游玩状态栏</a>{% endif %}
-                    {% if mod.slug == 'worldbook-maker' %}<a href="/mods/worldbook-maker" class="secondary compact">世界书生成器</a>{% endif %}
-                    {% if mod.slug == 'soul-weaver' %}<a href="/mods/soul-weaver" class="secondary compact">余音</a>{% endif %}
-                    {% if mod.slug == 'tavern-card-converter' %}<a href="/mods/tavern-card-converter" class="secondary compact">酒馆卡转换器</a>{% endif %}
-                    {% if mod.slug == 'xinjian' %}<a href="/mods/xinjian" class="secondary compact">心笺</a>{% endif %}
+                    {% if mod.slug == 'tts-studio' %}<a href="/mods/tts-studio" class="secondary compact">语声 · 语音 TTS</a>{% endif %}
+                    {% if mod.slug == 'status-panel' %}<a href="/mods/status-panel" class="secondary compact">游录 · 游玩状态栏</a>{% endif %}
+                    {% if mod.slug == 'worldbook-maker' %}<a href="/mods/worldbook-maker" class="secondary compact">界笺 · 世界书生成器</a>{% endif %}
+                    {% if mod.slug == 'soul-weaver' %}<a href="/mods/soul-weaver" class="secondary compact">余音 · 小说提卡器</a>{% endif %}
+                    {% if mod.slug == 'tavern-card-converter' %}<a href="/mods/tavern-card-converter" class="secondary compact">渡笺 · 酒馆卡转换器</a>{% endif %}
+                    {% if mod.slug == 'xinjian' %}<a href="/mods/xinjian" class="secondary compact">心笺 · 状态数据库</a>{% endif %}
                   {% endfor %}
                 </div>
               </div>
