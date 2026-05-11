@@ -1,0 +1,45 @@
+{
+  "id": "moon_white_letter",
+  "name": "月白冷笺",
+  "version": "1.0.0",
+  "author": "Fantareal",
+  "description": "月白、冷灰、留白与细线，适合清冷女主、病弱感和含蓄情绪。",
+  "style": {
+    "class_name": "theme-moon-white",
+    "accent": "#7e9bb8",
+    "layout": {
+      "title_card": "gufeng_chapter",
+      "scene_card": "paper_chips",
+      "character_card": "paper_fields",
+      "relationship_card": "side_note",
+      "status_bar": "seal"
+    },
+    "tokens": {
+      "emotion": "月",
+      "clothing": "衣",
+      "posture": "影",
+      "scene": "境",
+      "sensory_field": "息",
+      "body_temperature": "温",
+      "body_motion": "动",
+      "micro_reaction": "微",
+      "visual_focus": "眸",
+      "interaction": "缘",
+      "summary": "记"
+    },
+    "title_card": {
+      "background": "moon_paper",
+      "border": "thin",
+      "radius": "soft",
+      "shadow": "mist"
+    },
+    "character_card": {
+      "background": "moon_paper",
+      "field_style": "thin_note",
+      "spacing": "comfortable"
+    },
+    "relationship_card": {
+      "style": "side_note"
+    }
+  }
+}

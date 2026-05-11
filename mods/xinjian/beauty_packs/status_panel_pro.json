@@ -1,0 +1,50 @@
+{
+  "id": "status_panel_pro",
+  "name": "状态面板 Pro",
+  "version": "1.0.0",
+  "author": "Fantareal",
+  "description": "深色半透明游戏 UI、状态条、字段编号和高亮标签，适合 RPG、战斗、属性与状态栏联动预备。",
+  "style": {
+    "class_name": "theme-status-pro",
+    "accent": "#7c3aed",
+    "layout": {
+      "title_card": "time_card",
+      "scene_card": "time_panel",
+      "character_card": "info_rows",
+      "relationship_card": "status_strip",
+      "status_bar": "pill"
+    },
+    "tokens": {
+      "time": "T",
+      "location": "POS",
+      "weather": "ENV",
+      "atmosphere": "MODE",
+      "characters": "UNIT",
+      "emotion": "MIND",
+      "clothing": "EQUIP",
+      "posture": "POSE",
+      "scene": "AREA",
+      "sensory_field": "SENS",
+      "body_temperature": "TEMP",
+      "body_motion": "ACT",
+      "micro_reaction": "BIO",
+      "visual_focus": "LOCK",
+      "interaction": "LINK",
+      "summary": "SUM"
+    },
+    "title_card": {
+      "background": "hud",
+      "border": "glow",
+      "radius": "medium",
+      "shadow": "hud"
+    },
+    "character_card": {
+      "background": "hud",
+      "field_style": "stat_row",
+      "spacing": "compact"
+    },
+    "relationship_card": {
+      "style": "status_strip"
+    }
+  }
+}

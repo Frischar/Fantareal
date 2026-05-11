@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "id": "character_status",
+    "name": "角色状态表",
+    "description": "记录当前剧情中重要角色的所在位置、心绪、外观、身体状态与状态摘要。",
+    "primary_key": "name",
+    "fields": [
+      {"key": "name", "label": "角色名", "type": "text", "required": true, "note": "角色的稳定称呼，作为唯一主键。"},
+      {"key": "location", "label": "当前位置", "type": "text", "note": "角色当前所在地点。"},
+      {"key": "mood", "label": "当前心绪", "type": "text", "note": "角色当下主要情绪与心理状态。"},
+      {"key": "appearance", "label": "外观姿态", "type": "textarea", "note": "衣着、姿态、表情、外观变化。"},
+      {"key": "condition", "label": "身体状态", "type": "textarea", "note": "伤势、异常、疲惫、病弱、状态效果等。"},
+      {"key": "summary", "label": "状态摘要", "type": "textarea", "note": "用一两句话概括角色当前状态。"},
+      {"key": "updated_at", "label": "更新时间", "type": "text", "note": "由心笺自动写入。"}
+    ],
+    "rules": {
+      "note": "只记录剧情中已经明确出现的重要角色，不记录路人。",
+      "init": "角色首次在剧情中有明确行动、台词或状态时初始化。",
+      "insert": "出现尚未记录的重要角色时新增一行。",
+      "update": "角色的位置、心绪、外观、身体状态或状态摘要发生明确变化时更新。",
+      "delete": "角色彻底离开当前剧情且不再需要追踪时才删除；普通离场不要删除。",
+      "ignore": "没有明确变化时不要为了补全而改写旧状态。"
+    }
+  },
+  "rows": []
+}
