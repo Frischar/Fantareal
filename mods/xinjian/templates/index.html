@@ -199,6 +199,24 @@
               <label>角色显示<select id="cfgMujianCharacterFilter"><option value="turn">本轮生成</option><option value="heroine">双女主</option><option value="protagonist">主角相关</option><option value="custom">自定义名单</option><option value="all">全部角色</option></select></label>
             </div>
             <label>自定义角色名单<input id="cfgMujianCharacterNames" placeholder="用逗号分隔，例如：角色甲，角色乙" /></label>
+            <div class="mujian-config-card soft-card">
+              <div class="subhead"><strong>主角状态卡</strong><span class="micro-badge">安全生成</span></div>
+              <label class="check-row"><input id="cfgMujianProtagonistEnabled" type="checkbox" /> 生成主角状态卡</label>
+              <div class="grid-two">
+                <label>主角名称<input id="cfgMujianProtagonistName" placeholder="例如：顾知微" /></label>
+                <label>生成方式<select id="cfgMujianProtagonistMode"><option value="when_relevant">明显涉及时生成</option><option value="always">每轮生成</option></select></label>
+              </div>
+              <label>主角别名<input id="cfgMujianProtagonistAliases" placeholder="用逗号分隔，例如：我，先生，顾先生" /></label>
+              <p class="microcopy">主角状态卡只写可观察状态、身体状态、伤势、气息、位置与互动关系；不会替用户决定行动、台词或内心。</p>
+            </div>
+            <div class="mujian-config-card soft-card">
+              <div class="subhead"><strong>安全提示词开放</strong><span class="micro-badge">仅附加</span></div>
+              <label class="check-row"><input id="cfgMujianWorkerPromptEnabled" type="checkbox" /> 启用自定义 worker 附加提示词</label>
+              <label>幕笺语言风格补充<textarea id="cfgMujianWorkerStylePrompt" rows="4" placeholder="例如：语言古风、克制、含蓄；多写光影、袖口、呼吸、视线；少用夸张现代词。"></textarea></label>
+              <label>主角状态卡规则<textarea id="cfgMujianWorkerProtagonistPrompt" rows="4" placeholder="例如：主角状态卡重点记录旧伤、调息、气息和与其他角色的距离关系；不要替主角说话或行动。"></textarea></label>
+              <div class="model-actions"><button id="resetWorkerPromptBtn" type="button" class="ghost-btn">恢复默认附加提示词</button></div>
+              <p class="microcopy">这里只会附加到安全区域，不会开放 JSON 根结构、updates 协议、SQLite 写入规则或字段 key。</p>
+            </div>
             <p class="microcopy">附笺会先生成完整数据，再由前端筛选显示。Chat 状态显示模式只影响聊天页展示，不改变 SQLite 后台记录。感官标签会真正启用感官场域、躯体温差、肢体动态、微生理反应、视觉焦点等字段。</p>
           </div>
           <div class="model-tools pinned">
