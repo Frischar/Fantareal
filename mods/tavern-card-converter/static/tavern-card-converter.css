@@ -30,10 +30,27 @@ body.tcc-page {
   -webkit-font-smoothing: antialiased;
 }
 
-.tcc-shell { max-width: 1100px; margin: 0 auto; padding: 40px 28px 72px; }
+.tcc-shell { max-width: 1100px; margin: 0 auto; padding: 24px 28px 72px; }
+
+/* ── Top bar (back + guide) ── */
+.tcc-topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 24px; padding-bottom: 16px;
+  border-bottom: 1px solid var(--tcc-line);
+}
+.tcc-back-btn {
+  font-size: 13px; color: var(--tcc-muted); text-decoration: none;
+  padding: 6px 12px; border-radius: 8px; transition: color .15s, background .15s;
+}
+.tcc-back-btn:hover { color: var(--tcc-text); background: rgba(152, 190, 233, 0.06); }
+.tcc-guide-link {
+  font-size: 12px; color: var(--tcc-accent); cursor: pointer; text-decoration: underline;
+  transition: color .15s;
+}
+.tcc-guide-link:hover { color: var(--tcc-accent-dark); }
 
 /* ── Header ── */
-.tcc-header { margin-bottom: 32px; }
+.tcc-header { margin-bottom: 28px; }
 .tcc-kicker {
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em;
   color: var(--tcc-accent); margin-bottom: 8px; font-weight: 500;
@@ -57,6 +74,9 @@ body.tcc-page {
 
 .tcc-tab-panel { display: none; }
 .tcc-tab-panel.active { display: block; }
+
+/* ── Tab description ── */
+.tcc-tab-desc { color: var(--tcc-muted); font-size: 13px; line-height: 1.5; margin-bottom: 20px; }
 
 /* ── Grid ── */
 .tcc-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -126,6 +146,10 @@ body.tcc-page {
   background: rgba(220, 60, 70, 0.12);
   color: #f4a0a6;
   border: 1px solid rgba(220, 60, 70, 0.25);
+}
+/* Warning is warmer — used for friendly suggestions, not errors */
+.tcc-msg-error a.tcc-warning-link {
+  color: #f0c860; cursor: pointer; text-decoration: underline; font-weight: 500;
 }
 
 /* ── Empty state ── */
@@ -233,3 +257,49 @@ body.tcc-page {
 .tcc-save-path-hint span { color: var(--tcc-accent); font-weight: 500; }
 .tcc-save-path-hint a { color: var(--tcc-accent); cursor: pointer; text-decoration: underline; }
 .tcc-save-path-hint a:hover { color: var(--tcc-accent-dark); }
+
+/* ── Parsing hint ── */
+.tcc-parsing-hint {
+  margin-top: 10px; font-size: 13px; color: #5ec27e; font-weight: 500;
+}
+
+/* ── Section blocks ── */
+.tcc-section {
+  margin-bottom: 16px; padding: 18px; border-radius: var(--tcc-radius-sm);
+  background: rgba(152, 190, 233, 0.04); border: 1px solid var(--tcc-line);
+}
+.tcc-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tcc-section-title { font-size: 14px; font-weight: 600; color: var(--tcc-text); }
+.tcc-section-badge {
+  font-size: 11px; padding: 2px 10px; border-radius: 10px; font-weight: 500;
+  background: rgba(92, 167, 255, 0.14); color: #8abeff; border: 1px solid rgba(92, 167, 255, 0.22);
+}
+.tcc-section-empty { background: rgba(157, 177, 200, 0.08); color: var(--tcc-muted); border-color: var(--tcc-line); }
+.tcc-section-reason { font-size: 13px; color: var(--tcc-muted); line-height: 1.5; margin: 0; }
+.tcc-section-content {
+  background: var(--tcc-input); border: 1px solid var(--tcc-line);
+  border-radius: 8px; padding: 12px; font-size: 13px; color: var(--tcc-muted);
+  white-space: pre-wrap; word-break: break-all;
+}
+.tcc-section-json { margin-top: 8px; max-height: 200px; }
+.tcc-actions-inline { display: flex; gap: 8px; margin-top: 10px; }
+.tcc-btn-sm { padding: 6px 14px; font-size: 12px; }
+
+/* ── Pure character hint ── */
+.tcc-pure-hint {
+  margin-top: 10px; padding: 10px 14px; border-radius: var(--tcc-radius-sm);
+  background: rgba(255, 200, 60, 0.08); border: 1px solid rgba(255, 200, 60, 0.18);
+  font-size: 12px; color: #f0c860; line-height: 1.5;
+}
+
+/* ── Guide dialog ── */
+.tcc-guide-dialog { max-width: 580px; max-height: 80vh; overflow-y: auto; }
+.tcc-guide-sources { margin-bottom: 8px; }
+.tcc-guide-item {
+  margin-bottom: 18px; padding-bottom: 16px;
+  border-bottom: 1px solid var(--tcc-line);
+}
+.tcc-guide-item:last-child { border-bottom: none; margin-bottom: 0; }
+.tcc-guide-item strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.tcc-guide-item p { font-size: 12px; color: var(--tcc-muted); line-height: 1.55; margin: 4px 0 6px; }
+.tcc-guide-item a { font-size: 12px; color: var(--tcc-accent); word-break: break-all; }

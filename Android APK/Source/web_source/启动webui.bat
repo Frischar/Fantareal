@@ -27,6 +27,6 @@ if errorlevel 1 (
 
 start "" "http://127.0.0.1:8000"
 echo [Startup] Launching WebUI. Closing this window will stop the server.
-".venv\Scripts\python.exe" -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
+".venv\Scripts\python.exe" -m uvicorn app:app --reload --host 127.0.0.1 --port 8000 --no-access-log
 
 pause

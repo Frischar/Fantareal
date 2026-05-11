@@ -1,0 +1,50 @@
+{
+  "id": "midnight_archive",
+  "name": "暗夜档案",
+  "version": "1.0.0",
+  "author": "Fantareal",
+  "description": "暗色终端、档案编号、警告条与冷光边框，适合悬疑、末世、克系和暗色剧情。",
+  "style": {
+    "class_name": "theme-midnight-archive",
+    "accent": "#62d6ff",
+    "layout": {
+      "title_card": "time_card",
+      "scene_card": "time_panel",
+      "character_card": "info_rows",
+      "relationship_card": "status_strip",
+      "status_bar": "pill"
+    },
+    "tokens": {
+      "time": "TIME",
+      "location": "LOC",
+      "weather": "ENV",
+      "atmosphere": "MOOD",
+      "characters": "SUBJ",
+      "emotion": "PSY",
+      "clothing": "GEAR",
+      "posture": "POSE",
+      "scene": "AREA",
+      "sensory_field": "SENS",
+      "body_temperature": "TEMP",
+      "body_motion": "MOVE",
+      "micro_reaction": "BIO",
+      "visual_focus": "FOCUS",
+      "interaction": "LINK",
+      "summary": "NOTE"
+    },
+    "title_card": {
+      "background": "terminal",
+      "border": "neon",
+      "radius": "medium",
+      "shadow": "neon"
+    },
+    "character_card": {
+      "background": "terminal",
+      "field_style": "archive_row",
+      "spacing": "compact"
+    },
+    "relationship_card": {
+      "style": "warning_strip"
+    }
+  }
+}

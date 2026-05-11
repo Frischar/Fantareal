@@ -4,10 +4,17 @@
   <meta charset="utf-8" />
   <title>酒馆卡转换器</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="./static/tavern-card-converter.css?v=2" />
+  <link rel="stylesheet" href="./static/tavern-card-converter.css?v=3" />
 </head>
 <body class="tcc-page">
   <main class="tcc-shell">
+
+    <!-- Top bar: back + guide -->
+    <div class="tcc-topbar">
+      <a href="/chat" class="tcc-back-btn">&larr; 返回</a>
+      <a id="tcc-guide-trigger" class="tcc-guide-link">如何获取酒馆卡...</a>
+    </div>
+
     <header class="tcc-header">
       <div>
         <p class="tcc-kicker">Tavern Card Converter</p>
@@ -17,12 +24,56 @@
     </header>
 
     <div class="tcc-tabs">
-      <button class="tcc-tab active" data-tab="card">角色卡转换</button>
+      <button class="tcc-tab active" data-tab="general">角色卡通用转换</button>
+      <button class="tcc-tab" data-tab="card">纯角色卡转换</button>
       <button class="tcc-tab" data-tab="worldbook">世界书转换</button>
     </div>
 
-    <!-- ═══ Card Converter ═══ -->
-    <section id="tab-card" class="tcc-tab-panel active">
+    <!-- ═══ Tab: General Card Converter ═══ -->
+    <section id="tab-general" class="tcc-tab-panel active">
+      <p class="tcc-tab-desc">包含角色信息、世界书、预设等综合内容的酒馆卡，自动识别并分类输出。</p>
+      <div class="tcc-card-grid">
+        <div class="tcc-panel">
+          <h2>上传酒馆 PNG 角色卡</h2>
+          <label class="tcc-drop-zone" id="general-drop-zone">
+            <input type="file" id="general-file-input" accept="image/png" hidden />
+            <div class="tcc-drop-content">
+              <span class="tcc-drop-icon">&#x1F4C1;</span>
+              <span>拖拽 PNG 到此处，或点击选择文件</span>
+              <span class="tcc-drop-hint">支持所有酒馆 PNG 卡（tEXt / iTXt 元数据格式），自动识别内嵌世界书</span>
+            </div>
+          </label>
+          <div id="general-parsing-hint" class="tcc-parsing-hint" hidden>正在解析，请稍等喵~</div>
+          <div id="general-error" class="tcc-msg tcc-msg-error" hidden></div>
+          <div id="general-preview" class="tcc-image-preview" hidden>
+            <img id="general-preview-img" src="" alt="角色立绘预览" />
+          </div>
+        </div>
+
+        <div class="tcc-panel">
+          <h2>转换结果</h2>
+          <div id="general-result-empty" class="tcc-empty-state">
+            <span>上传 PNG 后在此处查看转换结果</span>
+          </div>
+          <div id="general-result" hidden>
+            <div id="general-pure-hint" class="tcc-pure-hint" hidden>
+              这张卡仅含纯角色信息，建议切换到「纯角色卡转换」获得更精准的 JSON 文件。
+            </div>
+            <div id="general-sections"></div>
+            <div class="tcc-actions">
+              <button id="general-download-png-btn" class="tcc-btn" disabled>下载纯图片</button>
+            </div>
+            <p id="general-save-path-hint" class="tcc-save-path-hint" hidden>
+              当前保存至: <span id="general-save-path-label"></span> · <a id="general-change-path">点击更改保存路径...</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ Tab: Pure Card Converter ═══ -->
+    <section id="tab-card" class="tcc-tab-panel">
+      <p class="tcc-tab-desc">仅包含超详细角色设定的纯角色卡，不含世界书等附加信息，可获得最精准的角色卡 JSON。</p>
       <div class="tcc-card-grid">
         <div class="tcc-panel">
           <h2>上传酒馆 PNG 角色卡</h2>
@@ -31,9 +82,10 @@
             <div class="tcc-drop-content">
               <span class="tcc-drop-icon">&#x1F4C1;</span>
               <span>拖拽 PNG 到此处，或点击选择文件</span>
-              <span class="tcc-drop-hint">支持酒馆 (SillyTavern) V2 规格的 PNG 角色卡</span>
+              <span class="tcc-drop-hint">支持酒馆 (SillyTavern) V2 规格的 PNG 角色卡（仅角色信息）</span>
             </div>
           </label>
+          <div id="card-parsing-hint" class="tcc-parsing-hint" hidden>正在解析，请稍等喵~</div>
           <div id="card-error" class="tcc-msg tcc-msg-error" hidden></div>
           <div id="card-preview" class="tcc-image-preview" hidden>
             <img id="card-preview-img" src="" alt="角色立绘预览" />
@@ -64,8 +116,9 @@
       </div>
     </section>
 
-    <!-- ═══ Worldbook Converter ═══ -->
+    <!-- ═══ Tab: Worldbook Converter ═══ -->
     <section id="tab-worldbook" class="tcc-tab-panel">
+      <p class="tcc-tab-desc">独立世界书 / Lorebook JSON 文件的格式转换，将酒馆格式映射为 Xuqi_LLM 兼容的世界书。</p>
       <div class="tcc-card-grid">
         <div class="tcc-panel">
           <h2>上传酒馆世界书 JSON</h2>
@@ -77,6 +130,7 @@
               <span class="tcc-drop-hint">支持酒馆 (SillyTavern) 世界书 / Lorebook 格式</span>
             </div>
           </label>
+          <div id="wb-parsing-hint" class="tcc-parsing-hint" hidden>正在解析，请稍等喵~</div>
           <div id="wb-error" class="tcc-msg tcc-msg-error" hidden></div>
         </div>
 
@@ -143,8 +197,44 @@
         </div>
       </div>
     </div>
+
+    <!-- ═══ Guide Popup ═══ -->
+    <div id="tcc-guide-dialog" class="tcc-dialog-overlay" hidden>
+      <div class="tcc-dialog tcc-guide-dialog">
+        <h3>如何获取酒馆卡</h3>
+        <div class="tcc-guide-sources">
+          <div class="tcc-guide-item">
+            <strong>1. 全球最大"卡池"：Chub.ai</strong>
+            <p>这是目前国际上最核心的酒馆卡站。拥有极其详尽的标签系统（SFW/NSFW、属性、世界观等），你几乎能在这里找到任何你想要的动漫角色或原创 OC。</p>
+            <a href="https://chub.ai/" target="_blank" rel="noopener">https://chub.ai/</a>
+          </div>
+          <div class="tcc-guide-item">
+            <strong>2. 高质量社区：Character Tavern</strong>
+            <p>界面友好，卡片质量普遍较高，社区氛围活跃。适合寻找精心制作的原创角色和高人气动漫角色卡。</p>
+            <a href="https://character-tavern.com/" target="_blank" rel="noopener">https://character-tavern.com/</a>
+          </div>
+          <div class="tcc-guide-item">
+            <strong>3. 专注分享：AI Character Cards</strong>
+            <p>专注于 AI 角色卡的分享与发现平台，收录了大量来自不同创作者的优质角色卡，分类清晰、易于浏览。</p>
+            <a href="https://aicharactercards.com/" target="_blank" rel="noopener">https://aicharactercards.com/</a>
+          </div>
+          <div class="tcc-guide-item">
+            <strong>4. Reddit 社区</strong>
+            <p>r/SillyTavernAI、r/CharacterAI 等 subreddit 有大量用户分享的角色卡和世界书资源，是发现新卡和交流使用技巧的好地方。</p>
+          </div>
+          <div class="tcc-guide-item">
+            <strong>5. Discord 社区</strong>
+            <p>SillyTavern 官方 Discord 服务器设有活跃的角色卡分享频道，创作者们会在这里首发最新作品并接受反馈。</p>
+          </div>
+        </div>
+        <div class="tcc-dialog-footer">
+          <button id="tcc-guide-close" class="tcc-btn tcc-btn-primary">知道了</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
-  <script src="./static/tavern-card-converter.js?v=2"></script>
+  <script src="./static/tavern-card-converter.js?v=3"></script>
 </body>
 </html>

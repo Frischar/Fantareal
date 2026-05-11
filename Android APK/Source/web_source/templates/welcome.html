@@ -6,20 +6,8 @@
     <title>Welcome - Xuqi LLM Chat</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>
-    <div class="topbar-stack">
-      <div class="topbar mobile-friendly-topbar">
-        <a class="brand" href="/">Xuqi Chat</a>
-        <nav class="topnav mobile-topnav">
-          <a class="navlink active" href="/">欢迎</a>
-          <a class="navlink" href="/chat">聊天</a>
-          <a class="navlink" href="/config">配置</a>
-          <a class="navlink" href="/config/card">角色卡</a>
-          <a class="navlink" href="/config/sprite">立绘</a>
-          <a class="navlink" href="/config/memory">记忆</a>
-        </nav>
-      </div>
-    </div>
+  <body class="app-sidebar-shell">
+    {% include '_sidebar_config.html' %}
 
     <main class="welcome-shell welcome-shell-mobile">
       <section class="welcome-hero panel welcome-hero-mobile">

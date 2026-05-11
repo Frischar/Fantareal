@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+import struct
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -59,6 +60,26 @@ ENTRY_DEFAULTS: dict = {
 
 app = FastAPI()
 
+MAX_CARD_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024
+MAX_WORLDBOOK_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
+
+
+async def read_upload_bytes(file: UploadFile, *, max_bytes: int, label: str) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(413, f"{label}文件不能大于 {max_bytes // (1024 * 1024)} MB")
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data:
+        raise HTTPException(400, f"{label}不能为空")
+    return data
+
 # ── Pydantic models for save endpoints ──
 class SaveCardPayload(BaseModel):
     card_json: str
@@ -85,57 +106,83 @@ def strip_chara_metadata(file_bytes: bytes) -> bytes:
         return file_bytes
 
 
+def _extract_chara_raw(file_bytes: bytes) -> str | None:
+    """Parse PNG chunks directly to find chara data (handles both tEXt and iTXt)."""
+    i = 8  # skip 8-byte PNG signature
+    while i + 8 <= len(file_bytes):
+        length = struct.unpack('>I', file_bytes[i:i + 4])[0]
+        chunk_type = file_bytes[i + 4:i + 8].decode('latin-1', errors='replace')
+        chunk_data = file_bytes[i + 8:i + 8 + length]
+        i += 12 + length
+        if chunk_type in ('tEXt', 'iTXt'):
+            parts = chunk_data.split(b'\x00')
+            if parts[0] == b'chara':
+                # Last non-empty segment is the text value
+                text = parts[-1]
+                return base64.b64decode(text).decode('utf-8', errors='ignore')
+    return None
+
+
 def extract_tavern_card(file_bytes: bytes) -> tuple[dict, dict]:
-    """Extract V2-spec JSON from a tavern PNG via the iTXt 'chara' chunk.
+    """Extract V2-spec JSON from a tavern PNG via iTXt/tEXt 'chara' chunk.
 
-    Returns (tavern_data, png_meta) where png_meta includes all PNG metadata keys
-    and the raw image bytes for preservation.
+    Returns (tavern_data, png_meta) where png_meta includes PNG metadata
+    and the raw image bytes.
     """
-    png_meta: dict = {"format": "", "size": (0, 0), "info_keys": [], "file_bytes": file_bytes}
+    png_meta: dict = {"format": "", "size": (0, 0), "info_keys": [], "file_bytes": file_bytes, "chunk_type": ""}
 
+    # Validate as an image first
     try:
         img = Image.open(io.BytesIO(file_bytes))
     except Exception as exc:
-        raise ValueError(f"无法识别为有效的图片文件，请确认上传的是 PNG 格式: {exc}")
+        raise ValueError(f"这个文件不是有效的图片格式喵，请上传 PNG 格式的酒馆卡~")
 
     try:
         with img:
             png_meta["format"] = img.format or "unknown"
             png_meta["size"] = (img.width, img.height)
-            png_meta["info_keys"] = list(img.info.keys())
+            png_meta["info_keys"] = list(img.info.keys()) if img.info else []
 
             if img.format and img.format.upper() != "PNG":
                 raise ValueError(
-                    f"文件格式为 {img.format}，而非 PNG。酒馆角色卡的 JSON 数据存储在 PNG 的元数据块中，"
-                    "请上传 PNG 格式的角色卡"
+                    f"这个文件是 {img.format} 格式而不是 PNG 喵，请上传 PNG 格式的酒馆卡~"
                 )
 
-            if "chara" not in img.info:
-                available = ", ".join(str(k) for k in img.info) if img.info else "（无）"
-                raise ValueError(
-                    f"PNG 元数据中未找到 'chara' 键。"
-                    f"当前 PNG 包含的元数据键: {available}。"
-                    "请确认这是一张酒馆（SillyTavern）导出的 PNG 角色卡，而非普通图片"
-                )
+            json_str: str | None = None
 
-            encoded = img.info["chara"]
-            try:
-                decoded = base64.b64decode(encoded)
-            except Exception as exc:
-                raise ValueError(
-                    f"'chara' 数据的 Base64 解码失败。卡片可能使用了非标准编码或已损坏: {exc}"
-                ) from exc
+            # 1. Try Pillow (handles iTXt well)
+            if "chara" in img.info:
+                png_meta["chunk_type"] = "iTXt"
+                try:
+                    encoded = img.info["chara"]
+                    decoded = base64.b64decode(encoded)
+                    json_str = decoded.decode("utf-8", errors="ignore")
+                except Exception:
+                    pass  # Fall through to raw parsing
 
-            json_str = decoded.decode("utf-8", errors="ignore")
+            # 2. Fallback: raw chunk parsing (handles tEXt and edge cases)
+            if json_str is None:
+                raw_json = _extract_chara_raw(file_bytes)
+                if raw_json:
+                    json_str = raw_json
+                    png_meta["chunk_type"] = "tEXt"
+                else:
+                    available = ", ".join(str(k) for k in img.info) if img.info else "（无）"
+                    raise ValueError(
+                        f"这不是一张酒馆卡喵~ PNG 元数据中没有找到角色信息。"
+                        f"当前元数据键: {available}。"
+                        "请确认这是从 SillyTavern / 酒馆 导出的 PNG 角色卡，而不是普通图片~"
+                    )
+
             try:
                 tavern_data = json.loads(json_str)
             except json.JSONDecodeError as exc:
                 raise ValueError(
-                    f"解码后的数据不是有效的 JSON。卡片可能已损坏，或使用了加密/二次编码: {exc}"
+                    "这张卡的数据无法解析喵，可能文件已损坏或使用了加密~"
                 ) from exc
 
             if not isinstance(tavern_data, dict):
-                raise ValueError(f"卡片 JSON 结构异常（类型为 {type(tavern_data).__name__}），应为对象")
+                raise ValueError("卡片数据结构异常喵，可能不是标准的酒馆卡格式~")
 
             png_meta["other_info"] = {
                 k: v for k, v in img.info.items() if k != "chara"
@@ -144,7 +191,7 @@ def extract_tavern_card(file_bytes: bytes) -> tuple[dict, dict]:
     except ValueError:
         raise
     except Exception as exc:
-        raise ValueError(f"解析 PNG 时发生未知错误: {exc}") from exc
+        raise ValueError(f"解析 PNG 时发生未知错误喵~ 请检查文件是否完整: {exc}") from exc
 
 
 def convert_card_to_xuqi(tavern_data: dict) -> tuple[dict, list[str]]:
@@ -242,6 +289,113 @@ def convert_card_to_xuqi(tavern_data: dict) -> tuple[dict, list[str]]:
         },
     }
     return xuqi_card, preserved
+
+
+# ═══════════════════════════════════════════════════
+#  General card conversion (character_book aware)
+# ═══════════════════════════════════════════════════
+
+def _has_meaningful_card(src: dict) -> bool:
+    """Check if the card has enough character content to be worth converting."""
+    name = str(src.get("name") or "").strip()
+    if not name:
+        return False
+    for field in ("description", "personality", "first_mes", "mes_example", "scenario", "creator_notes"):
+        if len(str(src.get(field) or "").strip()) > 50:
+            return True
+    return False
+
+
+def convert_card_general(tavern_data: dict) -> dict:
+    """General converter: auto-detects content types and returns named sections.
+
+    Each section has: type, title, has_content, and type-specific fields
+    (json, filename, entry_count, reason, content, etc.)
+    """
+    if "data" in tavern_data and isinstance(tavern_data["data"], dict):
+        src = tavern_data["data"]
+    else:
+        src = tavern_data
+
+    safe_name = str(src.get("name") or "").strip() or "未命名角色"
+    sections: list[dict] = []
+
+    # ── Section 1: Worldbook ──
+    character_book = src.get("character_book")
+    if isinstance(character_book, dict):
+        cb_entries = character_book.get("entries")
+        if isinstance(cb_entries, list) and cb_entries:
+            cb_name = str(character_book.get("name") or f"{safe_name}的世界书").strip()
+            cb_data = {"entries": cb_entries}
+            xuqi_wb, wb_info = convert_worldbook_to_xuqi(cb_data)
+            sections.append({
+                "type": "worldbook",
+                "title": "世界书",
+                "has_content": True,
+                "json": json.dumps(xuqi_wb, ensure_ascii=False, indent=2),
+                "filename": f"{cb_name}的世界书.json",
+                "entry_count": len(xuqi_wb["entries"]),
+                "conversion_info": wb_info,
+            })
+    if not any(s["type"] == "worldbook" for s in sections):
+        sections.append({"type": "worldbook", "title": "世界书", "has_content": False,
+                         "reason": "未检测到嵌入的世界书内容"})
+
+    # ── Section 2: Role Card ──
+    if _has_meaningful_card(src):
+        xuqi_card, preserved = convert_card_to_xuqi(tavern_data)
+        sections.append({
+            "type": "card",
+            "title": "角色卡",
+            "has_content": True,
+            "json": json.dumps(xuqi_card, ensure_ascii=False, indent=2),
+            "filename": f"{safe_name}的人设卡.json",
+            "preserved_fields": preserved,
+        })
+    else:
+        sections.append({"type": "card", "title": "角色卡", "has_content": False,
+                         "reason": "未检测到角色卡信息，该卡可能仅含世界书等附加内容，建议到「纯角色卡转换」使用纯角色卡"})
+
+    # ── Section 3+: Auto-detect extensions ──
+    exts = src.get("extensions")
+    if isinstance(exts, dict):
+        ext_map = {
+            "depth_prompt": "深度提示",
+            "regex_scripts": "正则脚本",
+            "tavern_helper": "酒馆辅助配置",
+            "xiaobaix-tasks": "小白任务配置",
+            "world": "世界设定",
+            "talkativeness": "话量设定",
+            "fav": "收藏标记",
+        }
+        for key, title in ext_map.items():
+            val = exts.get(key)
+            if val is not None and val != "" and val != [] and val != {}:
+                if isinstance(val, (dict, list)):
+                    sections.append({
+                        "type": key,
+                        "title": title,
+                        "has_content": True,
+                        "json": json.dumps(val, ensure_ascii=False, indent=2),
+                    })
+                elif isinstance(val, (str, int, float, bool)):
+                    sections.append({
+                        "type": key,
+                        "title": title,
+                        "has_content": True,
+                        "content": str(val),
+                    })
+
+    all_empty = not any(s["has_content"] for s in sections)
+    return {
+        "success": True,
+        "sections": sections,
+        "is_pure_character": not any(s["type"] == "worldbook" and s["has_content"] for s in sections),
+        "warning": "empty_card" if all_empty else None,
+        "message": "这个PNG文件没有包含任何可识别的内容喵，可能不是一张酒馆卡~" if all_empty else None,
+        "tavern_spec": tavern_data.get("spec", "unknown"),
+        "tavern_spec_version": tavern_data.get("spec_version", "unknown"),
+    }
 
 
 # ═══════════════════════════════════════════════════
@@ -407,7 +561,9 @@ async def convert_card(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(400, "未提供文件名")
     try:
-        raw = await file.read()
+        raw = await read_upload_bytes(file, max_bytes=MAX_CARD_UPLOAD_SIZE_BYTES, label="角色卡")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(400, "读取上传文件失败")
 
@@ -415,6 +571,20 @@ async def convert_card(file: UploadFile = File(...)):
         tavern_data, png_meta = extract_tavern_card(raw)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+
+    # Check if card has meaningful character content
+    src = tavern_data.get("data", tavern_data)
+    if not _has_meaningful_card(src):
+        has_wb = bool(src.get("character_book", {}).get("entries"))
+        if has_wb:
+            return JSONResponse({
+                "success": True,
+                "warning": "worldbook_only",
+                "message": "没找到角色信息喵，但是检测到世界书信息，推荐去「角色卡通用转换」使用这个文件喵~",
+            })
+        else:
+            raise HTTPException(400,
+                "这不是一个包含信息的有效PNG文件喵，可能是没有原图保存或者只是一张单纯的PNG图片喵~")
 
     xuqi_card, preserved = convert_card_to_xuqi(tavern_data)
     xuqi_json = json.dumps(xuqi_card, ensure_ascii=False, indent=2)
@@ -448,12 +618,58 @@ async def convert_card(file: UploadFile = File(...)):
     })
 
 
+@app.post("/api/convert/card/general")
+async def convert_card_general_endpoint(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(400, "未提供文件名")
+    try:
+        raw = await read_upload_bytes(file, max_bytes=MAX_CARD_UPLOAD_SIZE_BYTES, label="角色卡")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "读取上传文件失败")
+
+    try:
+        tavern_data, png_meta = extract_tavern_card(raw)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    result = convert_card_general(tavern_data)
+
+    png_b64 = base64.b64encode(raw).decode("ascii")
+    clean_png = strip_chara_metadata(raw)
+    clean_png_b64 = base64.b64encode(clean_png).decode("ascii")
+
+    # Find card section name for image filename
+    safe_name = "未命名角色"
+    for s in result["sections"]:
+        if s["type"] == "card" and s["has_content"]:
+            card_data = json.loads(s["json"])
+            safe_name = card_data.get("name", "") or safe_name
+            break
+
+    result["preview_png"] = f"data:image/png;base64,{png_b64}"
+    result["clean_png_base64"] = clean_png_b64
+    result["clean_png_filename"] = f"{safe_name}（纯图片）.png"
+    result["png_info"] = {
+        "format": png_meta["format"],
+        "width": png_meta["size"][0],
+        "height": png_meta["size"][1],
+        "meta_keys": png_meta["info_keys"],
+        "chunk_type": png_meta.get("chunk_type", ""),
+    }
+
+    return JSONResponse(result)
+
+
 @app.post("/api/convert/worldbook")
 async def convert_worldbook(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(400, "未提供文件名")
     try:
-        raw = await file.read()
+        raw = await read_upload_bytes(file, max_bytes=MAX_WORLDBOOK_UPLOAD_SIZE_BYTES, label="世界书")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(400, "读取上传文件失败")
 
@@ -466,6 +682,18 @@ async def convert_worldbook(file: UploadFile = File(...)):
     xuqi_json = json.dumps(xuqi_wb, ensure_ascii=False, indent=2)
 
     wb_name = str(tavern_wb.get("name") or "未命名世界书").strip()
+    if len(xuqi_wb["entries"]) == 0:
+        return JSONResponse({
+            "success": True,
+            "warning": "empty_worldbook",
+            "message": "这个世界书JSON没有任何条目喵，建议检查文件来源~",
+            "worldbook": xuqi_wb,
+            "worldbook_json": xuqi_json,
+            "entry_count": 0,
+            "filename": f"{wb_name}的世界书.json",
+            "conversion_info": conversion_info,
+        })
+
     return JSONResponse({
         "success": True,
         "worldbook": xuqi_wb,

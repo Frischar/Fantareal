@@ -805,6 +805,7 @@
                     {% if mod.slug == 'worldbook-maker' %}<a href="/mods/worldbook-maker" class="secondary compact">世界书生成器</a>{% endif %}
                     {% if mod.slug == 'soul-weaver' %}<a href="/mods/soul-weaver" class="secondary compact">余音</a>{% endif %}
                     {% if mod.slug == 'tavern-card-converter' %}<a href="/mods/tavern-card-converter/app/" class="secondary compact">酒馆卡转换器</a>{% endif %}
+                    {% if mod.slug == 'xinjian' %}<a href="/mods/xinjian" class="secondary compact">心笺</a>{% endif %}
                   {% endfor %}
                 </div>
               </div>
@@ -2235,6 +2236,15 @@
         setComposerBusy(true);
         setStatus("正在回退并编辑消息...", "busy");
         try {
+          const editedWrapper = messagesEl?.querySelector(`[data-history-index="${index}"]`);
+          const xinjianTurnId = editedWrapper?.dataset?.xinjianTurn || "";
+          dispatchChatLifecycleEvent("fantareal:chat-edit", {
+            turnId: xinjianTurnId,
+            messageIndex: index,
+            trimmedFrom: index,
+            userText: content,
+            source: "edit",
+          });
           const data = await postJson("/api/chat/history/edit-user", {
             message_index: index,
             content,
@@ -2242,7 +2252,7 @@
           closeMessageEditors();
           removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
           historyMutationInFlight = false;
-          await generateChatTurn(String(data.message || content), { clearInput: false });
+          await generateChatTurn(String(data.message || content), { clearInput: false, source: "edit", turnId: xinjianTurnId || undefined });
         } catch (error) {
           setStatus(`编辑失败：${error.message}`, "error");
           showToast(`编辑失败：${error.message}`, "error");
@@ -2266,12 +2276,20 @@
         setComposerBusy(true);
         setStatus("正在准备重 roll...", "busy");
         try {
+          const xinjianTurnId = wrapper?.dataset?.xinjianTurn || "";
+          dispatchChatLifecycleEvent("fantareal:chat-reroll", {
+            turnId: xinjianTurnId,
+            messageIndex: index,
+            trimmedFrom: index,
+            userText: "",
+            source: "reroll",
+          });
           const data = await postJson("/api/chat/history/reroll", {
             message_index: index,
           });
           removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
           historyMutationInFlight = false;
-          await generateChatTurn(String(data.message || ""), { clearInput: false });
+          await generateChatTurn(String(data.message || ""), { clearInput: false, source: "reroll", turnId: xinjianTurnId || undefined });
         } catch (error) {
           setStatus(`重 roll 失败：${error.message}`, "error");
           showToast(`重 roll 失败：${error.message}`, "error");
@@ -4224,13 +4242,36 @@
         }
       });
 
+      function createChatTurnId(text) {
+        let hash = 0x811c9dc5;
+        const value = String(text || "");
+        for (let i = 0; i < value.length; i += 1) {
+          hash ^= value.charCodeAt(i);
+          hash = Math.imul(hash, 0x01000193);
+        }
+        return `turn_${Date.now()}_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+      }
+
+      function dispatchChatLifecycleEvent(name, detail = {}) {
+        window.dispatchEvent(new CustomEvent(name, { detail }));
+      }
+
       async function generateChatTurn(text, options = {}) {
         const messageText = String(text || "").trim();
         if (!messageText || chatRequestInFlight || isEndingConversation) return;
 
         const clearInput = options.clearInput !== false;
+        const chatTurnId = options.turnId || createChatTurnId(messageText);
+        const chatTurnCreatedAt = new Date().toISOString();
         chatRequestInFlight = true;
+        dispatchChatLifecycleEvent("fantareal:chat-user-submit", {
+          turnId: chatTurnId,
+          userText: messageText,
+          createdAt: chatTurnCreatedAt,
+          source: options.source || "send",
+        });
         const userEntry = addMessage("user", messageText);
+        userEntry.wrapper.dataset.xinjianTurn = chatTurnId;
         if (clearInput) {
           inputEl.value = "";
           syncComposerState();
@@ -4311,6 +4352,16 @@
               setMessageMetaText(assistantEntry.meta, new Date().toLocaleString());
               streamingEntries.delete(assistantEntry);
               refreshMessageControls();
+              assistantEntry.wrapper.dataset.xinjianTurn = chatTurnId;
+              dispatchChatLifecycleEvent("fantareal:chat-done", {
+                turnId: chatTurnId,
+                userText: messageText,
+                assistantText: finalReply,
+                replyData: data || {},
+                createdAt: chatTurnCreatedAt,
+                completedAt: new Date().toISOString(),
+                source: options.source || "send",
+              });
             },
             onError(data) {
               throw new Error(data.detail || "流式请求失败");

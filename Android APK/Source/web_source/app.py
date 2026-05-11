@@ -1,5 +1,7 @@
 import asyncio
+import copy
 import difflib
+import hashlib
 import json
 import logging
 import os
@@ -10,11 +12,12 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
+from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -2296,7 +2299,7 @@ async def summarize_conversation_to_memory(history: list[dict[str, Any]]) -> dic
     try:
         summary_payload = await request_conversation_summary_with_model(history)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Automatic memory summary failed, falling back to local summary: %s", exc)
+        logger.warning("自动记忆摘要失败，改用本地摘要：%s", exc)
         summary_payload = fallback
 
     return sanitize_memory_summary(summary_payload, fallback=fallback)
@@ -3002,3 +3005,1213 @@ async def api_export_history() -> FileResponse:
         filename=f"{slot_id}_chat_history_export.json",
         media_type="application/json",
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Card Writer (缃笺) — embedded built-in, not a mod
+# ──────────────────────────────────────────────────────────────────────────────
+
+CARD_WRITER_DATA_DIR = DATA_DIR / "card_writer"
+CARD_WRITER_PROJECTS_DIR = CARD_WRITER_DATA_DIR / "projects"
+CARD_WRITER_EXPORTS_DIR = CARD_WRITER_DATA_DIR / "exports"
+CARD_WRITER_AUTOSAVES_DIR = CARD_WRITER_DATA_DIR / "autosaves"
+CARD_WRITER_SETTINGS_PATH = CARD_WRITER_DATA_DIR / "settings.json"
+CARD_WRITER_WORKSPACE_PATH = CARD_WRITER_DATA_DIR / "workspace.cardwork.json"
+
+FILENAME_RE = re.compile(r'[\\/:*?"<>|]')
+TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+CW_AUTOSAVE_FILENAME = "autosave.cardwork.json"
+PROJECT_TYPE = "fantareal_card_writer_project"
+AUTHOR_PATTERNS = ["这是一个角色卡", "角色介绍", "设定如下", "以下是角色"]
+DEFAULT_LLM_TIMEOUT = 120
+DEFAULT_LLM_TEMPERATURE = 0.8
+
+PERSONA_FIELDS = [
+    "name",
+    "description",
+    "personality",
+    "first_mes",
+    "mes_example",
+    "scenario",
+    "creator_notes",
+]
+
+PLOT_STAGE_DEFAULT = {"description": "", "rules": ""}
+PERSONA_SINGLE_DEFAULT = {
+    "name": "", "description": "", "personality": "", "scenario": "", "creator_notes": "",
+}
+WORKSHOP_ITEM_DEFAULT = {
+    "id": "", "name": "", "enabled": True, "triggerMode": "manual", "triggerStage": "",
+    "triggerTempMin": 0, "triggerTempMax": 1, "actionType": "note", "popupTitle": "",
+    "musicPreset": "", "musicUrl": "", "autoplay": False, "loop": False, "volume": 0.7,
+    "imageUrl": "", "imageAlt": "", "note": "",
+}
+PERSONA_CARD_DEFAULTS = {
+    "name": "", "description": "", "personality": "", "first_mes": "", "mes_example": "",
+    "scenario": "", "creator_notes": "", "tags": [],
+    "creativeWorkshop": {"enabled": True, "items": []},
+    "plotStages": {},
+    "personas": {"1": copy.deepcopy(PERSONA_SINGLE_DEFAULT)},
+}
+WORLDBOOK_SETTINGS_DEFAULTS = {
+    "enabled": True, "debug_enabled": False, "max_hits": 10,
+    "default_case_sensitive": False, "default_whole_word": False,
+    "default_match_mode": "includes", "default_secondary_mode": "includes",
+    "default_entry_type": "lore", "default_group_operator": "and",
+    "default_chance": 100, "default_sticky_turns": 0, "default_cooldown_turns": 0,
+    "default_insertion_position": "after_system", "default_injection_depth": 0,
+    "default_injection_role": "system", "default_injection_order": 100,
+    "default_prompt_layer": "default", "recursive_scan_enabled": False, "recursion_max_depth": 3,
+}
+WORLDBOOK_ENTRY_DEFAULT = {
+    "id": "", "title": "", "trigger": "", "secondary_trigger": "", "entry_type": "lore",
+    "group_operator": "and", "match_mode": "includes", "secondary_mode": "includes",
+    "content": "", "group": "", "chance": 100, "sticky_turns": 0, "cooldown_turns": 0,
+    "order": 0, "priority": 0, "insertion_position": "after_system",
+    "injection_depth": 0, "injection_order": 100, "injection_role": "system",
+    "prompt_layer": "default", "recursive_enabled": False, "prevent_further_recursion": False,
+    "enabled": True, "case_sensitive": False, "whole_word": False, "comment": "",
+}
+MEMORY_ITEM_DEFAULT = {"id": "", "title": "", "content": "", "tags": [], "notes": ""}
+PRESET_MODULE_DEFAULTS = {
+    "no_user_speaking": False, "short_paragraph": False, "long_paragraph": False,
+    "second_person": False, "third_person": False, "anti_repeat": False,
+    "no_closing_feel": False, "emotion_detail": False, "multi_character_boundary": False,
+    "scene_continuation": False, "v4f_output_guard": False,
+}
+EXTRA_PROMPT_DEFAULT = {"id": "", "name": "", "enabled": True, "content": "", "order": 0}
+PRESET_ITEM_DEFAULT = {
+    "id": "", "name": "", "enabled": True, "base_system_prompt": "",
+    "modules": copy.deepcopy(PRESET_MODULE_DEFAULTS), "extra_prompts": [], "prompt_groups": [],
+}
+NEW_PROJECT_DEFAULTS = {
+    "version": 3, "type": PROJECT_TYPE, "title": "",
+    "persona_card": copy.deepcopy(PERSONA_CARD_DEFAULTS),
+    "worldbook": {"settings": copy.deepcopy(WORLDBOOK_SETTINGS_DEFAULTS), "entries": []},
+    "memory": {"items": []},
+    "preset": {"active_preset_id": "", "presets": []},
+    "updated_at": "",
+}
+
+DEFAULT_COPILOT_SETTINGS = {
+    "base_url": "", "api_key": "", "model": "",
+    "request_timeout": DEFAULT_LLM_TIMEOUT, "temperature": DEFAULT_LLM_TEMPERATURE,
+    "base_system_prompt": "你是缃笺 Card Writer 的结构化写作助手。",
+    "persona_prompt": "你要为 Card Writer 生成人设卡草稿，输出内容必须可直接写入编辑器表单。",
+    "worldbook_prompt": "你要为 Card Writer 生成单条世界书词条，输出必须适合直接落入当前 entry。",
+    "preset_prompt": "你要为 Card Writer 生成单个聊天预设，输出必须能直接成为可用 preset。",
+    "memory_prompt": "你要为 Card Writer 生成单条记忆，输出必须适合直接写入 memory item。",
+}
+
+
+class CW_CardWriterProject(BaseModel):
+    version: int = 3
+    type: str = PROJECT_TYPE
+    title: str = ""
+    persona_card: dict[str, Any] = Field(default_factory=dict)
+    worldbook: dict[str, Any] = Field(default_factory=dict)
+    memory: dict[str, Any] = Field(default_factory=dict)
+    preset: dict[str, Any] = Field(default_factory=dict)
+    updated_at: str = ""
+
+
+class CW_ExportPayload(BaseModel):
+    project: CW_CardWriterProject = Field(default_factory=CW_CardWriterProject)
+    filename: str = ""
+    target: str = "persona"
+
+
+class CW_CopilotSettingsPayload(BaseModel):
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+    request_timeout: int = Field(default=DEFAULT_LLM_TIMEOUT)
+    temperature: float = Field(default=DEFAULT_LLM_TEMPERATURE)
+    base_system_prompt: str = ""
+    persona_prompt: str = ""
+    worldbook_prompt: str = ""
+    preset_prompt: str = ""
+    memory_prompt: str = ""
+
+
+class CW_CopilotGeneratePayload(BaseModel):
+    project: CW_CardWriterProject = Field(default_factory=CW_CardWriterProject)
+    module: str = "persona"
+    prompt: str = ""
+    follow_up: str = ""
+    current_view: str = "persona"
+    focus_hint: dict[str, Any] = Field(default_factory=dict)
+    project_revision: str = ""
+
+
+class CW_CopilotGenerateResponse(BaseModel):
+    ok: bool = True
+    review_id: str = ""
+    summary: str = ""
+    prompt_used: str = ""
+    current_view: str = "persona"
+    base_revision: str = ""
+    focus_hint: dict[str, Any] = Field(default_factory=dict)
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+
+
+CW_CardWriterProject.model_rebuild()
+CW_ExportPayload.model_rebuild()
+CW_CopilotSettingsPayload.model_rebuild()
+CW_CopilotGeneratePayload.model_rebuild()
+CW_CopilotGenerateResponse.model_rebuild()
+
+
+def cw_now_text() -> str:
+    return datetime.now().strftime(TIMESTAMP_FORMAT)
+
+
+def cw_read_json(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def cw_write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def cw_clamp_float(value: Any, minimum: float, maximum: float, default: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
+def cw_sanitize_copilot_settings(raw: Any) -> dict[str, Any]:
+    data = copy.deepcopy(DEFAULT_COPILOT_SETTINGS)
+    if not isinstance(raw, dict):
+        return data
+    data["base_url"] = cw_normalize_text(raw.get("base_url"))
+    data["api_key"] = cw_normalize_text(raw.get("api_key"))
+    data["model"] = cw_normalize_text(raw.get("model"))
+    data["request_timeout"] = cw_as_int(raw.get("request_timeout"), DEFAULT_LLM_TIMEOUT)
+    data["request_timeout"] = max(10, min(3600, data["request_timeout"]))
+    data["temperature"] = cw_clamp_float(raw.get("temperature"), 0.0, 2.0, DEFAULT_LLM_TEMPERATURE)
+    data["base_system_prompt"] = cw_normalize_text(raw.get("base_system_prompt")) or DEFAULT_COPILOT_SETTINGS["base_system_prompt"]
+    data["persona_prompt"] = cw_normalize_text(raw.get("persona_prompt")) or DEFAULT_COPILOT_SETTINGS["persona_prompt"]
+    data["worldbook_prompt"] = cw_normalize_text(raw.get("worldbook_prompt")) or DEFAULT_COPILOT_SETTINGS["worldbook_prompt"]
+    data["preset_prompt"] = cw_normalize_text(raw.get("preset_prompt")) or DEFAULT_COPILOT_SETTINGS["preset_prompt"]
+    data["memory_prompt"] = cw_normalize_text(raw.get("memory_prompt")) or DEFAULT_COPILOT_SETTINGS["memory_prompt"]
+    return data
+
+
+def cw_get_copilot_settings() -> dict[str, Any]:
+    return cw_sanitize_copilot_settings(cw_read_json(CARD_WRITER_SETTINGS_PATH, DEFAULT_COPILOT_SETTINGS))
+
+
+def cw_save_copilot_settings(payload: Any) -> dict[str, Any]:
+    settings = cw_sanitize_copilot_settings(payload)
+    cw_write_json(CARD_WRITER_SETTINGS_PATH, settings)
+    return settings
+
+
+def cw_sanitize_filename(name: str) -> str:
+    return FILENAME_RE.sub("_", str(name or "")).strip()
+
+
+def cw_ensure_project_filename(name: str) -> str:
+    safe = cw_sanitize_filename(name) or "untitled"
+    return safe if safe.endswith(".cardwork.json") else f"{safe}.cardwork.json"
+
+
+def cw_ensure_export_filename(name: str) -> str:
+    safe = cw_sanitize_filename(name) or "untitled"
+    return safe if safe.endswith(".json") else f"{safe}.json"
+
+
+def cw_make_id(prefix: str) -> str:
+    return f"{prefix}_{uuid4().hex[:8]}"
+
+
+def cw_create_empty_project() -> dict[str, Any]:
+    return copy.deepcopy(NEW_PROJECT_DEFAULTS)
+
+
+def cw_split_tags(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in re.split(r"[，,]", str(value or "")) if item.strip()]
+
+
+def cw_as_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off", ""}:
+        return False
+    return default
+
+
+def cw_as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def cw_as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def cw_normalize_text(value: Any) -> str:
+    return str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
+def cw_normalize_stage_item(key: str, stage: Any) -> dict[str, Any]:
+    raw = stage if isinstance(stage, dict) else {}
+    label = cw_normalize_text(raw.get("label", "")) or key
+    return {"label": label, "description": cw_normalize_text(raw.get("description", "")), "rules": cw_normalize_text(raw.get("rules", ""))}
+
+
+def cw_normalize_plot_stage_map(value: Any) -> dict[str, dict[str, Any]]:
+    if isinstance(value, dict):
+        items = value.items()
+    elif isinstance(value, list):
+        items = ((str(item.get("id") or item.get("label") or chr(ord("A") + idx)).strip().upper(), item) for idx, item in enumerate(value) if isinstance(item, dict))
+    else:
+        items = []
+    result: dict[str, dict[str, Any]] = {}
+    for key, item in items:
+        stage_key = str(key or "").strip().upper() or "A"
+        result[stage_key] = cw_normalize_stage_item(stage_key, item)
+    return result
+
+
+def cw_normalize_persona_single(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    result = copy.deepcopy(PERSONA_SINGLE_DEFAULT)
+    for key in result.keys():
+        result[key] = cw_normalize_text(raw.get(key, ""))
+    return result
+
+
+def cw_normalize_personas_map(value: Any) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    if isinstance(value, dict):
+        for key, item in value.items():
+            result[str(key or "1").strip() or "1"] = cw_normalize_persona_single(item)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("id") or index + 1).strip() or str(index + 1)
+            result[key] = cw_normalize_persona_single(item)
+    if not result:
+        result["1"] = copy.deepcopy(PERSONA_SINGLE_DEFAULT)
+    return result
+
+
+def cw_normalize_workshop_item(item: Any, index: int) -> dict[str, Any]:
+    raw = item if isinstance(item, dict) else {}
+    data = copy.deepcopy(WORKSHOP_ITEM_DEFAULT)
+    data["id"] = cw_normalize_text(raw.get("id")) or cw_make_id("workshop")
+    data["name"] = cw_normalize_text(raw.get("name"))
+    data["enabled"] = cw_as_bool(raw.get("enabled"), True)
+    data["triggerMode"] = cw_normalize_text(raw.get("triggerMode")) or WORKSHOP_ITEM_DEFAULT["triggerMode"]
+    data["triggerStage"] = cw_normalize_text(raw.get("triggerStage"))
+    data["triggerTempMin"] = cw_as_int(raw.get("triggerTempMin"), WORKSHOP_ITEM_DEFAULT["triggerTempMin"])
+    data["triggerTempMax"] = cw_as_int(raw.get("triggerTempMax"), WORKSHOP_ITEM_DEFAULT["triggerTempMax"])
+    data["actionType"] = cw_normalize_text(raw.get("actionType")) or WORKSHOP_ITEM_DEFAULT["actionType"]
+    data["popupTitle"] = cw_normalize_text(raw.get("popupTitle"))
+    data["musicPreset"] = cw_normalize_text(raw.get("musicPreset"))
+    data["musicUrl"] = cw_normalize_text(raw.get("musicUrl"))
+    data["autoplay"] = cw_as_bool(raw.get("autoplay"), False)
+    data["loop"] = cw_as_bool(raw.get("loop"), False)
+    data["volume"] = cw_as_float(raw.get("volume"), WORKSHOP_ITEM_DEFAULT["volume"])
+    data["imageUrl"] = cw_normalize_text(raw.get("imageUrl"))
+    data["imageAlt"] = cw_normalize_text(raw.get("imageAlt"))
+    data["note"] = cw_normalize_text(raw.get("note"))
+    return data
+
+
+def cw_normalize_creative_workshop(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    items = raw.get("items") if isinstance(raw.get("items"), list) else []
+    return {"enabled": cw_as_bool(raw.get("enabled"), True), "items": [cw_normalize_workshop_item(item, index) for index, item in enumerate(items)]}
+
+
+def cw_normalize_persona_card(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    data = copy.deepcopy(PERSONA_CARD_DEFAULTS)
+    for key in PERSONA_FIELDS:
+        data[key] = cw_normalize_text(raw.get(key, data[key]))
+    data["tags"] = cw_split_tags(raw.get("tags", []))
+    data["creativeWorkshop"] = cw_normalize_creative_workshop(raw.get("creativeWorkshop"))
+    data["plotStages"] = cw_normalize_plot_stage_map(raw.get("plotStages"))
+    data["personas"] = cw_normalize_personas_map(raw.get("personas"))
+    return data
+
+
+def cw_normalize_worldbook_entry(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    data = copy.deepcopy(WORLDBOOK_ENTRY_DEFAULT)
+    data["id"] = cw_normalize_text(raw.get("id")) or cw_make_id("wb")
+    text_fields = ["title", "trigger", "secondary_trigger", "entry_type", "group_operator",
+                   "match_mode", "secondary_mode", "content", "group", "insertion_position",
+                   "injection_role", "prompt_layer", "comment"]
+    for key in text_fields:
+        data[key] = cw_normalize_text(raw.get(key, data[key])) or data[key]
+    for key in ["chance", "sticky_turns", "cooldown_turns", "order", "priority", "injection_depth", "injection_order"]:
+        data[key] = cw_as_int(raw.get(key), data[key])
+    for key in ["recursive_enabled", "prevent_further_recursion", "enabled", "case_sensitive", "whole_word"]:
+        data[key] = cw_as_bool(raw.get(key), data[key])
+    if not cw_normalize_text(raw.get("title")):
+        data["title"] = data["title"] or f"词条 {index + 1}"
+    for field, default_val in [
+        ("entry_type", WORLDBOOK_ENTRY_DEFAULT["entry_type"]),
+        ("group_operator", WORLDBOOK_ENTRY_DEFAULT["group_operator"]),
+        ("match_mode", WORLDBOOK_ENTRY_DEFAULT["match_mode"]),
+        ("secondary_mode", WORLDBOOK_ENTRY_DEFAULT["secondary_mode"]),
+        ("insertion_position", WORLDBOOK_ENTRY_DEFAULT["insertion_position"]),
+        ("injection_role", WORLDBOOK_ENTRY_DEFAULT["injection_role"]),
+        ("prompt_layer", WORLDBOOK_ENTRY_DEFAULT["prompt_layer"]),
+    ]:
+        if not cw_normalize_text(raw.get(field)):
+            data[field] = default_val
+    data["order"] = cw_as_int(raw.get("order"), index)
+    return data
+
+
+def cw_normalize_worldbook(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    settings_raw = raw.get("settings") if isinstance(raw.get("settings"), dict) else {}
+    settings = copy.deepcopy(WORLDBOOK_SETTINGS_DEFAULTS)
+    for key, default in WORLDBOOK_SETTINGS_DEFAULTS.items():
+        if isinstance(default, bool):
+            settings[key] = cw_as_bool(settings_raw.get(key), default)
+        elif isinstance(default, int):
+            settings[key] = cw_as_int(settings_raw.get(key), default)
+        else:
+            settings[key] = cw_normalize_text(settings_raw.get(key, default)) or default
+    entries_raw = raw.get("entries") if isinstance(raw.get("entries"), list) else []
+    return {"settings": settings, "entries": [cw_normalize_worldbook_entry(item, index) for index, item in enumerate(entries_raw)]}
+
+
+def cw_normalize_memory_item(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "id": cw_normalize_text(raw.get("id")) or f"memory_{index + 1:03d}",
+        "title": cw_normalize_text(raw.get("title")),
+        "content": cw_normalize_text(raw.get("content")),
+        "tags": cw_split_tags(raw.get("tags", [])),
+        "notes": cw_normalize_text(raw.get("notes")),
+    }
+
+
+def cw_normalize_memory(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    items_raw = raw.get("items") if isinstance(raw.get("items"), list) else []
+    return {"items": [cw_normalize_memory_item(item, index) for index, item in enumerate(items_raw)]}
+
+
+def cw_normalize_extra_prompt(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "id": cw_normalize_text(raw.get("id")) or cw_make_id("extra"),
+        "name": cw_normalize_text(raw.get("name")),
+        "enabled": cw_as_bool(raw.get("enabled"), True),
+        "content": cw_normalize_text(raw.get("content")),
+        "order": cw_as_int(raw.get("order"), index),
+    }
+
+
+def cw_normalize_modules(value: Any) -> dict[str, bool]:
+    raw = value if isinstance(value, dict) else {}
+    result = copy.deepcopy(PRESET_MODULE_DEFAULTS)
+    for key in list(raw.keys()):
+        result[str(key)] = cw_as_bool(raw.get(key), False)
+    for key in list(result.keys()):
+        result[key] = cw_as_bool(result.get(key), False)
+    return result
+
+
+def cw_normalize_preset_item(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    extra_prompts = raw.get("extra_prompts") if isinstance(raw.get("extra_prompts"), list) else []
+    prompt_groups = raw.get("prompt_groups") if isinstance(raw.get("prompt_groups"), list) else []
+    return {
+        "id": cw_normalize_text(raw.get("id")) or cw_make_id("preset"),
+        "name": cw_normalize_text(raw.get("name")),
+        "enabled": cw_as_bool(raw.get("enabled"), True),
+        "base_system_prompt": cw_normalize_text(raw.get("base_system_prompt")),
+        "modules": cw_normalize_modules(raw.get("modules")),
+        "extra_prompts": [cw_normalize_extra_prompt(item, ei) for ei, item in enumerate(extra_prompts)],
+        "prompt_groups": copy.deepcopy(prompt_groups),
+    }
+
+
+def cw_normalize_preset(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    presets_raw = raw.get("presets") if isinstance(raw.get("presets"), list) else []
+    presets = [cw_normalize_preset_item(item, index) for index, item in enumerate(presets_raw)]
+    active_id = cw_normalize_text(raw.get("active_preset_id"))
+    if not active_id and presets:
+        active_id = presets[0]["id"]
+    return {"active_preset_id": active_id, "presets": presets}
+
+
+def cw_normalize_project(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return cw_create_empty_project()
+    if payload.get("type") == PROJECT_TYPE and any(key in payload for key in ["persona_card", "worldbook", "memory", "preset"]):
+        project = cw_create_empty_project()
+        project["version"] = cw_as_int(payload.get("version"), 3)
+        project["type"] = PROJECT_TYPE
+        project["title"] = cw_normalize_text(payload.get("title"))
+        project["updated_at"] = cw_normalize_text(payload.get("updated_at"))
+        project["persona_card"] = cw_normalize_persona_card(payload.get("persona_card"))
+        project["worldbook"] = cw_normalize_worldbook(payload.get("worldbook"))
+        project["memory"] = cw_normalize_memory(payload.get("memory"))
+        project["preset"] = cw_normalize_preset(payload.get("preset"))
+        if not project["title"]:
+            project["title"] = project["persona_card"].get("name", "")
+        return project
+    if cw_looks_like_persona_card(payload):
+        project = cw_create_empty_project()
+        project["persona_card"] = cw_normalize_persona_card(payload)
+        project["title"] = project["persona_card"].get("name", "") or "导入的人设卡"
+        return project
+    if cw_looks_like_worldbook(payload):
+        project = cw_create_empty_project()
+        project["worldbook"] = cw_normalize_worldbook(payload)
+        project["title"] = "导入的世界书"
+        return project
+    if cw_looks_like_memory(payload):
+        project = cw_create_empty_project()
+        project["memory"] = cw_normalize_memory(payload)
+        project["title"] = "导入的记忆"
+        return project
+    if cw_looks_like_preset(payload):
+        project = cw_create_empty_project()
+        project["preset"] = cw_normalize_preset(payload)
+        project["title"] = "导入的预设"
+        return project
+    return cw_create_empty_project()
+
+
+def cw_looks_like_persona_card(payload: dict[str, Any]) -> bool:
+    return "personas" in payload or "creativeWorkshop" in payload or all(key in payload for key in ["name", "description", "first_mes"])
+
+
+def cw_looks_like_worldbook(payload: dict[str, Any]) -> bool:
+    return "settings" in payload and "entries" in payload
+
+
+def cw_looks_like_memory(payload: dict[str, Any]) -> bool:
+    return list(payload.keys()) == ["items"] or "items" in payload
+
+
+def cw_looks_like_preset(payload: dict[str, Any]) -> bool:
+    return "active_preset_id" in payload or "presets" in payload
+
+
+def cw_normalized_has_content(project: dict[str, Any]) -> bool:
+    normalized = cw_normalize_project(project)
+    persona = normalized["persona_card"]
+    if any(str(persona.get(key, "")).strip() for key in PERSONA_FIELDS):
+        return True
+    if persona.get("tags"):
+        return True
+    if normalized["worldbook"].get("entries"):
+        return True
+    if normalized["memory"].get("items"):
+        return True
+    if normalized["preset"].get("presets"):
+        return True
+    return False
+
+
+def cw_build_project_revision(project: dict[str, Any]) -> str:
+    serialized = json.dumps(cw_normalize_project(project), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
+
+
+class CW_ProjectStore:
+    def __init__(self, projects_dir: Path, autosaves_dir: Path, exports_dir: Path, workspace_path: Path) -> None:
+        self.projects_dir = projects_dir
+        self.autosaves_dir = autosaves_dir
+        self.exports_dir = exports_dir
+        self.workspace_path = workspace_path
+
+    def ensure_dirs(self) -> None:
+        for d in [self.projects_dir, self.autosaves_dir, self.exports_dir, self.workspace_path.parent]:
+            d.mkdir(parents=True, exist_ok=True)
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        projects: list[dict[str, Any]] = []
+        if not self.projects_dir.exists():
+            return projects
+        for path in sorted(self.projects_dir.glob("*.cardwork.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+            data = cw_read_json(path, {})
+            normalized = cw_normalize_project(data)
+            projects.append({"filename": path.name, "title": normalized.get("title") or path.stem.replace(".cardwork", ""), "updated_at": normalized.get("updated_at", "")})
+        return projects
+
+    def load_project(self, filename: str) -> dict[str, Any]:
+        path = self.projects_dir / cw_sanitize_filename(filename)
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="工程文件不存在。")
+        data = cw_read_json(path, None)
+        if data is None:
+            raise HTTPException(status_code=400, detail="无法解析工程文件。")
+        return cw_normalize_project(data)
+
+    def save_project(self, filename: str, project: dict[str, Any]) -> dict[str, Any]:
+        safe = cw_ensure_project_filename(filename)
+        normalized = cw_normalize_project(project)
+        normalized["updated_at"] = cw_now_text()
+        cw_write_json(self.projects_dir / safe, normalized)
+        return {"ok": True, "filename": safe, "updated_at": normalized["updated_at"]}
+
+    def delete_project(self, filename: str) -> None:
+        path = self.projects_dir / cw_sanitize_filename(filename)
+        if path.exists():
+            path.unlink()
+
+    def load_workspace(self) -> dict[str, Any]:
+        data = cw_read_json(self.workspace_path, None)
+        if data is None:
+            return cw_create_empty_project()
+        return cw_normalize_project(data)
+
+    def save_workspace(self, project: dict[str, Any]) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        normalized["updated_at"] = cw_now_text()
+        cw_write_json(self.workspace_path, normalized)
+        return {"ok": True, "updated_at": normalized["updated_at"]}
+
+    def clear_workspace(self) -> dict[str, Any]:
+        cw_write_json(self.workspace_path, cw_create_empty_project())
+        return {"ok": True}
+
+    def save_autosave(self, project: dict[str, Any]) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        normalized["updated_at"] = cw_now_text()
+        cw_write_json(self.autosaves_dir / CW_AUTOSAVE_FILENAME, normalized)
+        cw_write_json(self.workspace_path, normalized)
+        return {"ok": True, "updated_at": normalized["updated_at"]}
+
+
+class CW_CardCompiler:
+    def compile(self, project: dict[str, Any]) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        card = copy.deepcopy(normalized["persona_card"])
+        card["tags"] = cw_split_tags(card.get("tags", []))
+        card["creativeWorkshop"] = cw_normalize_creative_workshop(card.get("creativeWorkshop"))
+        card["plotStages"] = cw_normalize_plot_stage_map(card.get("plotStages"))
+        card["personas"] = cw_normalize_personas_map(card.get("personas"))
+        return card
+
+    def export_payload(self, project: dict[str, Any], target: str) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        export_target = str(target or "persona").strip().lower()
+        if export_target == "persona":
+            return self.compile(normalized)
+        if export_target == "worldbook":
+            return copy.deepcopy(normalized["worldbook"])
+        if export_target == "preset":
+            return copy.deepcopy(normalized["preset"])
+        if export_target == "memory":
+            return copy.deepcopy(normalized["memory"])
+        raise HTTPException(status_code=400, detail="不支持的导出类型。")
+
+    def validate(self, project: dict[str, Any], card: dict[str, Any]) -> list[dict[str, Any]]:
+        warnings: list[dict[str, Any]] = []
+        if not str(card.get("name", "")).strip():
+            warnings.append({"level": "error", "field": "name", "message": "角色名不能为空。"})
+        if not str(card.get("first_mes", "")).strip():
+            warnings.append({"level": "error", "field": "first_mes", "message": "开场白不能为空。"})
+        if not isinstance(card.get("tags"), list):
+            warnings.append({"level": "error", "field": "tags", "message": "标签必须是数组。"})
+        if len(str(card.get("personality", ""))) < 10:
+            warnings.append({"level": "warning", "field": "personality", "message": "性格口吻较短，角色表现可能不稳定。"})
+        if not str(card.get("mes_example", "")).strip():
+            warnings.append({"level": "warning", "field": "mes_example", "message": "示例对话为空。"})
+        if not str(card.get("creator_notes", "")).strip():
+            warnings.append({"level": "warning", "field": "creator_notes", "message": "隐藏规则为空。"})
+        first_mes = str(card.get("first_mes", ""))
+        for pattern in AUTHOR_PATTERNS:
+            if pattern in first_mes:
+                warnings.append({"level": "warning", "field": "first_mes", "message": f"开场白可能像作者说明（检测到「{pattern}」）。"})
+                break
+        if not cw_normalized_has_content(project):
+            warnings.append({"level": "warning", "field": "project", "message": "当前工程内容几乎为空。"})
+        return warnings
+
+    def import_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return cw_normalize_project(payload)
+
+    def generate_copilot_draft(self, payload: CW_CopilotGeneratePayload) -> CW_CopilotGenerateResponse:
+        prompt_text = cw_build_copilot_prompt_text(payload.prompt, payload.follow_up)
+        if not prompt_text:
+            raise HTTPException(status_code=400, detail="请输入想让 AI 处理的内容。")
+        project = cw_normalize_project(payload.project.model_dump())
+        current_view = cw_normalize_copilot_view(payload.current_view)
+        focus_hint = cw_normalize_copilot_focus_hint(payload.focus_hint, project, current_view)
+        base_revision = cw_build_project_revision(project)
+        review = cw_request_copilot_review(
+            prompt_text=prompt_text, current_view=current_view,
+            focus_hint=focus_hint, project=project, project_revision=base_revision,
+        )
+        candidates = cw_normalize_copilot_candidates(review.get("candidates"), project)
+        summary = cw_normalize_text(review.get("summary")) or cw_build_copilot_review_summary(candidates, current_view)
+        return CW_CopilotGenerateResponse(
+            ok=True, review_id=cw_make_id("review"), summary=summary,
+            prompt_used=prompt_text, current_view=current_view,
+            base_revision=base_revision, focus_hint=focus_hint, candidates=candidates,
+        )
+
+
+def cw_normalize_copilot_view(value: Any) -> str:
+    view_name = str(value or "persona").strip().lower()
+    if view_name not in {"persona", "worldbook", "preset", "memory", "preview"}:
+        return "persona"
+    return view_name
+
+
+def cw_normalize_copilot_focus_hint(raw: Any, project: dict[str, Any], current_view: str) -> dict[str, Any]:
+    hint = raw if isinstance(raw, dict) else {}
+    normalized: dict[str, Any] = {
+        "view": current_view, "title": "", "subtitle": "",
+        "module": current_view if current_view in {"persona", "worldbook", "preset", "memory"} else "persona",
+        "persona_key": "", "worldbook_id": "", "preset_id": "", "memory_id": "",
+    }
+    for key in ["title", "subtitle", "module", "persona_key", "worldbook_id", "preset_id", "memory_id"]:
+        if key in hint:
+            normalized[key] = cw_normalize_text(hint.get(key))
+    if current_view == "persona":
+        persona_key = normalized["persona_key"]
+        personas = (project.get("persona_card") or {}).get("personas", {})
+        if persona_key and persona_key in personas:
+            persona = personas[persona_key]
+            normalized["title"] = normalized["title"] or f"当前浏览：分身 · {persona.get('name') or persona_key}"
+            normalized["subtitle"] = normalized["subtitle"] or f"焦点提示：personas.{persona_key}"
+        else:
+            normalized["persona_key"] = ""
+            normalized["title"] = normalized["title"] or "当前浏览：角色主体"
+            normalized["subtitle"] = normalized["subtitle"] or "焦点提示：persona_card 主字段"
+    elif current_view == "worldbook":
+        normalized["title"] = normalized["title"] or "当前浏览：世界书"
+    elif current_view == "preset":
+        normalized["title"] = normalized["title"] or "当前浏览：预设"
+    elif current_view == "memory":
+        normalized["title"] = normalized["title"] or "当前浏览：记忆"
+    else:
+        normalized["title"] = normalized["title"] or "当前浏览：预览"
+    return normalized
+
+
+def cw_build_copilot_prompt_text(prompt: Any, follow_up: Any) -> str:
+    base = cw_normalize_text(prompt)
+    extra = cw_normalize_text(follow_up)
+    if base and extra:
+        return f"{base}\n\n补充要求：{extra}"
+    return base or extra
+
+
+def cw_get_runtime_llm_config() -> dict[str, Any]:
+    settings = cw_get_copilot_settings()
+    env_base_url = cw_normalize_text(os.getenv("LLM_BASE_URL", ""))
+    env_api_key = cw_normalize_text(os.getenv("LLM_API_KEY", ""))
+    env_model = cw_normalize_text(os.getenv("LLM_MODEL", ""))
+    return {
+        "base_url": cw_normalize_text(settings.get("base_url")) or env_base_url.rstrip("/"),
+        "api_key": cw_normalize_text(settings.get("api_key")) or env_api_key,
+        "model": cw_normalize_text(settings.get("model")) or env_model,
+        "request_timeout": max(cw_as_int(settings.get("request_timeout"), DEFAULT_LLM_TIMEOUT), 1),
+        "temperature": cw_clamp_float(settings.get("temperature"), 0.0, 2.0, DEFAULT_LLM_TEMPERATURE),
+    }
+
+
+def cw_request_copilot_review(*, prompt_text: str, current_view: str, focus_hint: dict[str, Any], project: dict[str, Any], project_revision: str) -> dict[str, Any]:
+    config = cw_get_runtime_llm_config()
+    if config["base_url"] and config["model"]:
+        return cw_call_copilot_llm(prompt_text=prompt_text, current_view=current_view, focus_hint=focus_hint, project=project, project_revision=project_revision, config=config)
+    return cw_generate_copilot_fallback(prompt_text, current_view, focus_hint, project)
+
+
+def cw_build_copilot_candidate(*, module: str, action: str, label: str, reason: str, target: dict[str, Any], before: Any, after: Any) -> dict[str, Any]:
+    fingerprint = cw_build_copilot_fingerprint(module, action, target, copy.deepcopy(before))
+    return {
+        "id": cw_make_id("candidate"), "module": module, "action": action,
+        "label": cw_normalize_text(label) or "未命名修改", "reason": cw_normalize_text(reason),
+        "target": cw_normalize_copilot_target_ref(module, action, target),
+        "before": copy.deepcopy(before), "after": copy.deepcopy(after), "fingerprint": fingerprint,
+    }
+
+
+def cw_build_copilot_fingerprint(module: str, action: str, target: dict[str, Any], before: Any) -> str:
+    payload = {"module": module, "action": action, "target": cw_normalize_copilot_target_ref(module, action, target), "before": before}
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
+
+
+def cw_normalize_copilot_target_ref(module: str, action: str, raw: Any) -> dict[str, Any]:
+    target = raw if isinstance(raw, dict) else {}
+    normalized: dict[str, Any] = {"module": module, "action": action}
+    for key in ["path", "persona_key", "id", "field", "operation"]:
+        value = cw_normalize_text(target.get(key))
+        if value:
+            normalized[key] = value
+    if "index" in target:
+        normalized["index"] = cw_as_int(target.get("index"), 0)
+    return normalized
+
+
+def cw_normalize_copilot_candidates(raw_candidates: Any, project: dict[str, Any]) -> list[dict[str, Any]]:
+    if not isinstance(raw_candidates, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for item in raw_candidates:
+        normalized_items = cw_normalize_single_copilot_candidate(item, project)
+        if isinstance(normalized_items, list):
+            result.extend([c for c in normalized_items if c])
+        elif normalized_items:
+            result.append(normalized_items)
+    return result
+
+
+def cw_get_project_path_value(project: dict[str, Any], path: str) -> Any:
+    if not path:
+        return None
+    ref: Any = project
+    for part in path.split("."):
+        if isinstance(ref, dict):
+            if part not in ref:
+                return None
+            ref = ref.get(part)
+        elif isinstance(ref, list) and part.isdigit():
+            index = int(part)
+            if index < 0 or index >= len(ref):
+                return None
+            ref = ref[index]
+        else:
+            return None
+    return copy.deepcopy(ref)
+
+
+def cw_is_allowed_json_patch_path(path: str) -> bool:
+    if not path or ".." in path:
+        return False
+    parts = path.split(".")
+    if not parts or parts[0] not in {"persona_card", "worldbook", "preset", "memory"}:
+        return False
+    blocked = {"version", "type", "updated_at"}
+    return not any(part in blocked for part in parts)
+
+
+def cw_should_keep_patch_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, list):
+        return bool(value)
+    if isinstance(value, dict):
+        return any(cw_should_keep_patch_value(item) for item in value.values())
+    return True
+
+
+def cw_build_json_patch_candidate(module_name: str, path: str, operation: str, before: Any, after: Any, label: str, reason: str) -> dict[str, Any] | None:
+    if operation != "delete" and not cw_should_keep_patch_value(after):
+        return None
+    return cw_build_copilot_candidate(
+        module=module_name, action="json_patch", label=label,
+        reason=reason or "根据 JSON 路径精确修改对应键。",
+        target={"path": path, "operation": operation},
+        before=before, after=None if operation == "delete" else copy.deepcopy(after),
+    )
+
+
+def cw_normalize_json_patch_candidate(raw: dict[str, Any], project: dict[str, Any], module_name: str, label: str, reason: str) -> dict[str, Any] | None:
+    target = raw.get("target") if isinstance(raw.get("target"), dict) else {}
+    path = cw_normalize_text(target.get("path") or raw.get("path"))
+    if not cw_is_allowed_json_patch_path(path):
+        return None
+    operation = cw_normalize_text(target.get("operation") or raw.get("operation") or "set").lower()
+    if operation not in {"set", "delete", "append"}:
+        operation = "set"
+    before_value = cw_get_project_path_value(project, path)
+    after_value = copy.deepcopy(raw.get("after"))
+    if operation == "delete":
+        after_value = None
+    return cw_build_json_patch_candidate(
+        module_name, path, operation,
+        raw.get("before") if "before" in raw else before_value,
+        after_value, label or f"{operation} · {path}", reason,
+    )
+
+
+def cw_persona_replace_to_json_patch_candidates(raw: dict[str, Any], project: dict[str, Any], label: str, reason: str) -> list[dict[str, Any]]:
+    after_raw = raw.get("after") if isinstance(raw.get("after"), dict) else {}
+    before_raw = raw.get("before") if isinstance(raw.get("before"), dict) else {}
+    normalized_after = cw_normalize_persona_card({**copy.deepcopy(project.get("persona_card") or {}), **after_raw})
+    result: list[dict[str, Any]] = []
+    for key in PERSONA_FIELDS + ["tags"]:
+        if key not in after_raw:
+            continue
+        after_value = copy.deepcopy(normalized_after.get(key))
+        before_value = before_raw.get(key) if key in before_raw else cw_get_project_path_value(project, f"persona_card.{key}")
+        candidate = cw_build_json_patch_candidate(
+            "persona", f"persona_card.{key}", "set", before_value, after_value,
+            label or f"填充 persona_card.{key}", reason or "按人设卡 JSON 键填充对应字段。",
+        )
+        if candidate:
+            result.append(candidate)
+    return result
+
+
+def cw_normalize_single_copilot_candidate(raw: Any, project: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]] | None:
+    if not isinstance(raw, dict):
+        return None
+    module_name = str(raw.get("module") or "").strip().lower()
+    if module_name not in {"persona", "worldbook", "preset", "memory"}:
+        return None
+    action = str(raw.get("action") or "").strip().lower()
+    if action not in {"replace_field", "update_array_item", "append_array_item", "json_patch"}:
+        action = "replace_field" if module_name == "persona" else "update_array_item"
+    target = raw.get("target") if isinstance(raw.get("target"), dict) else {}
+    label = cw_normalize_text(raw.get("label"))
+    reason = cw_normalize_text(raw.get("reason"))
+    if action == "json_patch":
+        return cw_normalize_json_patch_candidate(raw, project, module_name, label, reason)
+    if module_name == "persona":
+        persona_key = cw_normalize_text(target.get("persona_key"))
+        if not persona_key:
+            patch_candidates = cw_persona_replace_to_json_patch_candidates(raw, project, label, reason)
+            if patch_candidates:
+                return patch_candidates
+        if persona_key:
+            personas = (project.get("persona_card") or {}).get("personas", {})
+            current_item = personas.get(persona_key)
+            if current_item is None:
+                return None
+            return cw_build_copilot_candidate(
+                module="persona", action=action,
+                label=label or f"更新分身 · {persona_key}", reason=reason or "根据你的要求调整分身设定。",
+                target={"persona_key": persona_key},
+                before=cw_normalize_persona_single(raw.get("before") or current_item),
+                after=cw_normalize_persona_single(raw.get("after")),
+            )
+        after_value = cw_normalize_persona_card({**copy.deepcopy(project.get("persona_card") or {}), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})})
+        after_main = {key: copy.deepcopy(after_value.get(key)) for key in PERSONA_FIELDS + ["tags"]}
+        return cw_build_copilot_candidate(
+            module="persona", action=action,
+            label=label or f"更新角色主体", reason=reason or "根据你的要求调整主卡字段。",
+            target={"path": "persona_card"},
+            before=raw.get("before") if isinstance(raw.get("before"), dict) else {k: copy.deepcopy((project.get("persona_card") or {}).get(k)) for k in PERSONA_FIELDS + ["tags"]},
+            after=after_main,
+        )
+    if module_name == "worldbook":
+        if action == "append_array_item":
+            index = len((project.get("worldbook") or {}).get("entries", []))
+            after_value = cw_normalize_worldbook_entry(raw.get("after"), index)
+            return cw_build_copilot_candidate(
+                module="worldbook", action=action,
+                label=label or f"新增世界书", reason=reason or "根据你的要求补充新的世界书词条。",
+                target={"id": cw_normalize_text(after_value.get("id")), "index": index},
+                before=None, after=after_value,
+            )
+        entry_id = cw_normalize_text(target.get("id"))
+        entries = (project.get("worldbook") or {}).get("entries", [])
+        current_item = next((item for item in entries if cw_normalize_text(item.get("id")) == entry_id), None)
+        if not current_item:
+            return None
+        idx = entries.index(current_item)
+        return cw_build_copilot_candidate(
+            module="worldbook", action="update_array_item",
+            label=label or f"更新世界书", reason=reason or "根据你的要求改写世界书词条。",
+            target={"id": entry_id, "index": idx},
+            before=cw_normalize_worldbook_entry(raw.get("before") or current_item, idx),
+            after=cw_normalize_worldbook_entry({**copy.deepcopy(current_item), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})}, idx),
+        )
+    if module_name == "preset":
+        if action == "append_array_item":
+            index = len((project.get("preset") or {}).get("presets", []))
+            after_value = cw_normalize_preset_item(raw.get("after"), index)
+            return cw_build_copilot_candidate(
+                module="preset", action=action,
+                label=label or f"新增预设", reason=reason or "根据你的要求补充新的预设。",
+                target={"id": cw_normalize_text(after_value.get("id")), "index": index},
+                before=None, after=after_value,
+            )
+        item_id = cw_normalize_text(target.get("id"))
+        items = (project.get("preset") or {}).get("presets", [])
+        current_item = next((item for item in items if cw_normalize_text(item.get("id")) == item_id), None)
+        if not current_item:
+            return None
+        idx = items.index(current_item)
+        return cw_build_copilot_candidate(
+            module="preset", action="update_array_item",
+            label=label or f"更新预设", reason=reason or "根据你的要求改写预设。",
+            target={"id": item_id, "index": idx},
+            before=cw_normalize_preset_item(raw.get("before") or current_item, idx),
+            after=cw_normalize_preset_item({**copy.deepcopy(current_item), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})}, idx),
+        )
+    if action == "append_array_item":
+        index = len((project.get("memory") or {}).get("items", []))
+        after_value = cw_normalize_memory_item(raw.get("after"), index)
+        return cw_build_copilot_candidate(
+            module="memory", action=action,
+            label=label or f"新增记忆", reason=reason or "根据你的要求补充新的记忆。",
+            target={"id": cw_normalize_text(after_value.get("id")), "index": index},
+            before=None, after=after_value,
+        )
+    item_id = cw_normalize_text(target.get("id"))
+    items = (project.get("memory") or {}).get("items", [])
+    current_item = next((item for item in items if cw_normalize_text(item.get("id")) == item_id), None)
+    if not current_item:
+        return None
+    idx = items.index(current_item)
+    return cw_build_copilot_candidate(
+        module="memory", action="update_array_item",
+        label=label or f"更新记忆", reason=reason or "根据你的要求改写记忆。",
+        target={"id": item_id, "index": idx},
+        before=cw_normalize_memory_item(raw.get("before") or current_item, idx),
+        after=cw_normalize_memory_item({**copy.deepcopy(current_item), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})}, idx),
+    )
+
+
+def cw_build_copilot_review_summary(candidates: list[dict[str, Any]], current_view: str) -> str:
+    if not candidates:
+        return "这次没有整理出可安全应用的候选修改。"
+    module_labels = {"persona": "人设", "worldbook": "世界书", "preset": "预设", "memory": "记忆"}
+    touched = []
+    for c in candidates:
+        name = module_labels.get(c.get("module"))
+        if name and name not in touched:
+            touched.append(name)
+    return f"已基于整张卡内容整理出 {len(candidates)} 条候选修改，涉及 {'、'.join(touched) or module_labels.get(current_view, '当前卡')}。"
+
+
+def cw_generate_copilot_fallback(prompt_text: str, current_view: str, focus_hint: dict[str, Any], project: dict[str, Any]) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    persona_after = {
+        "name": "新角色", "description": f"围绕“{cw_normalize_text(prompt_text)[:60]}”生成的原创角色。",
+        "personality": "语气鲜明、反应具体，保持角色身份稳定。",
+        "first_mes": "{{user}}，你终于来了。新角色轻轻靠近，像是已经等了很久。",
+        "mes_example": "{{char}}: 我是新角色。\n{{user}}: 你好。\n{{char}}: 很高兴见到你。",
+        "scenario": "{{user}}与新角色刚开始近距离相处。",
+        "creator_notes": "必须直接扮演角色，不输出字段说明；保持人设一致。",
+        "tags": ["新角色", "AI草稿"],
+    }
+    persona_before = {k: copy.deepcopy((project.get("persona_card") or {}).get(k)) for k in PERSONA_FIELDS + ["tags"]}
+    for key, value in persona_after.items():
+        candidates.append({
+            "module": "persona", "action": "json_patch",
+            "label": f"填充 persona_card.{key}", "reason": "根据你的要求生成人设卡字段。",
+            "target": {"path": f"persona_card.{key}", "operation": "set"},
+            "before": persona_before.get(key), "after": value, "fingerprint": "",
+        })
+    for c in candidates:
+        c["fingerprint"] = hashlib.sha1(json.dumps({k: v for k, v in c.items() if k != "fingerprint"}, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
+    return {"summary": f"已根据整张卡整理出 {len(candidates)} 条候选修改，请选择 YES 填充或 NO 取消。", "candidates": candidates}
+
+
+def cw_build_copilot_system_prompt(current_view: str, focus_hint: dict[str, Any], settings: dict[str, Any]) -> str:
+    shared = cw_normalize_text(settings.get("base_system_prompt")) or "你是缃笺 Card Writer 的结构化写作助手。"
+    focus_title = cw_normalize_text(focus_hint.get("title")) or "当前卡"
+    return "\n\n".join([
+        shared,
+        "你现在负责分析整张 Card Writer 工程，而不是只重写当前条目。",
+        f"当前视图是 {current_view}，当前焦点提示是：{focus_title}。",
+        "必须只返回一个 JSON 对象，不要输出 markdown、解释、代码块或额外文字。",
+        '{"summary":"string","candidates":[{"module":"persona|worldbook|preset|memory","action":"json_patch","label":"string","reason":"string","target":{"path":"persona_card.name","operation":"set"},"before":"current","after":"new value"}]}',
+    ])
+
+
+def cw_build_copilot_user_payload(prompt_text: str, focus_hint: dict[str, Any], project: dict[str, Any], project_revision: str, current_view: str) -> str:
+    return json.dumps({"prompt": prompt_text, "current_view": current_view, "focus_hint": focus_hint, "project_revision": project_revision, "project": project}, ensure_ascii=False)
+
+
+def cw_call_copilot_llm(*, prompt_text: str, current_view: str, focus_hint: dict[str, Any], project: dict[str, Any], project_revision: str, config: dict[str, Any]) -> dict[str, Any]:
+    url = cw_build_copilot_api_url(config["base_url"], "chat/completions")
+    settings = cw_get_copilot_settings()
+    payload = {
+        "model": config["model"],
+        "messages": [
+            {"role": "system", "content": cw_build_copilot_system_prompt(current_view, focus_hint, settings)},
+            {"role": "user", "content": cw_build_copilot_user_payload(prompt_text, focus_hint, project, project_revision, current_view)},
+        ],
+        "temperature": cw_clamp_float(config.get("temperature"), 0.0, 2.0, DEFAULT_LLM_TEMPERATURE),
+        "response_format": {"type": "json_object"},
+    }
+    data = cw_request_json_sync(url=url, api_key=config["api_key"], payload=payload, request_timeout=int(config["request_timeout"]))
+    try:
+        raw_reply = str(data["choices"][0]["message"]["content"])
+    except (KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(status_code=502, detail="AI 返回格式无效。") from exc
+    text = raw_reply.strip()
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, re.IGNORECASE)
+    if fenced:
+        text = fenced.group(1).strip()
+    try:
+        parsed = json.loads(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="AI 返回的不是合法 JSON。") from exc
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=502, detail="AI 返回的 JSON 根节点必须是对象。")
+    return parsed
+
+
+def cw_build_copilot_api_url(base_url: str, endpoint: str) -> str:
+    clean_base = base_url.strip().rstrip("/")
+    clean_endpoint = endpoint.strip("/")
+    if not clean_base:
+        raise HTTPException(status_code=400, detail="未配置 LLM_BASE_URL。")
+    if clean_base.endswith(f"/{clean_endpoint}") or clean_base.endswith(clean_endpoint):
+        return clean_base
+    return f"{clean_base}/{clean_endpoint}"
+
+
+def cw_request_json_sync(*, url: str, api_key: str, payload: dict[str, Any], request_timeout: int) -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    key = api_key.strip()
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    try:
+        with httpx.Client(timeout=float(request_timeout)) as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        response_text = exc.response.text.strip() if exc.response is not None else ""
+        raise HTTPException(status_code=502, detail=f"AI 请求失败：{response_text[:500] or str(exc)}") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"AI 请求失败：{exc}") from exc
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="AI 返回的不是合法 JSON。") from exc
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="AI 返回的根结构无效。")
+    return data
+
+
+# ── Card Writer store & compiler instances ──
+
+cw_store = CW_ProjectStore(CARD_WRITER_PROJECTS_DIR, CARD_WRITER_AUTOSAVES_DIR, CARD_WRITER_EXPORTS_DIR, CARD_WRITER_WORKSPACE_PATH)
+cw_compiler = CW_CardCompiler()
+cw_store.ensure_dirs()
+
+
+# ── Card Writer page route ──
+
+@app.get("/card-writer", response_class=HTMLResponse)
+async def card_writer_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "card_writer.html",
+        {
+            "project": cw_store.load_workspace(),
+            "api_base_path": "/card-writer",
+            "settings": get_settings(active_slot),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+# ── Card Writer API routes ──
+
+@app.get("/card-writer/api/projects")
+async def cw_list_projects() -> dict[str, Any]:
+    return {"projects": cw_store.list_projects()}
+
+
+@app.get("/card-writer/api/projects/{filename}")
+async def cw_get_project(filename: str) -> dict[str, Any]:
+    return {"project": cw_store.load_project(filename)}
+
+
+@app.post("/card-writer/api/projects/{filename}")
+async def cw_save_project(filename: str, payload: CW_CardWriterProject) -> dict[str, Any]:
+    return cw_store.save_project(filename, payload.model_dump())
+
+
+@app.delete("/card-writer/api/projects/{filename}")
+async def cw_delete_project(filename: str) -> dict[str, Any]:
+    cw_store.delete_project(filename)
+    return {"ok": True}
+
+
+@app.get("/card-writer/api/workspace")
+async def cw_get_workspace() -> dict[str, Any]:
+    return {"project": cw_store.load_workspace()}
+
+
+@app.post("/card-writer/api/workspace")
+async def cw_save_workspace(payload: CW_CardWriterProject) -> dict[str, Any]:
+    return cw_store.save_workspace(payload.model_dump())
+
+
+@app.delete("/card-writer/api/workspace")
+async def cw_clear_workspace() -> dict[str, Any]:
+    return cw_store.clear_workspace()
+
+
+@app.post("/card-writer/api/autosave")
+async def cw_save_autosave(payload: CW_CardWriterProject) -> dict[str, Any]:
+    return cw_store.save_autosave(payload.model_dump())
+
+
+@app.post("/card-writer/api/compile")
+async def cw_compile(payload: CW_CardWriterProject) -> dict[str, Any]:
+    return {"ok": True, "card": cw_compiler.compile(payload.model_dump())}
+
+
+@app.post("/card-writer/api/validate")
+async def cw_validate(payload: CW_CardWriterProject) -> dict[str, Any]:
+    project = payload.model_dump()
+    card = cw_compiler.compile(project)
+    warnings = cw_compiler.validate(project, card)
+    return {"ok": not any(item["level"] == "error" for item in warnings), "warnings": warnings}
+
+
+@app.get("/card-writer/api/settings")
+async def cw_get_settings() -> dict[str, Any]:
+    return {"ok": True, "settings": cw_get_copilot_settings()}
+
+
+@app.post("/card-writer/api/settings")
+async def cw_save_settings(payload: CW_CopilotSettingsPayload) -> dict[str, Any]:
+    return {"ok": True, "settings": cw_save_copilot_settings(payload.model_dump())}
+
+
+@app.post("/card-writer/api/ai/generate")
+async def cw_ai_generate(payload: CW_CopilotGeneratePayload) -> dict[str, Any]:
+    return cw_compiler.generate_copilot_draft(payload).model_dump()
+
+
+@app.post("/card-writer/api/export")
+async def cw_export(payload: CW_ExportPayload) -> Response:
+    export_target = str(payload.target or "persona").strip().lower()
+    content_payload = cw_compiler.export_payload(payload.project.model_dump(), export_target)
+    safe_name = cw_ensure_export_filename(payload.filename) or "untitled.json"
+    content = json.dumps(content_payload, ensure_ascii=False, indent=2)
+    encoded_filename = quote(safe_name)
+    headers = {"Content-Disposition": f"attachment; filename=download.json; filename*=UTF-8''{encoded_filename}"}
+    return Response(content=content, media_type="application/json; charset=utf-8", headers=headers)
+
+
+@app.post("/card-writer/api/import-card")
+async def cw_import_card(payload: dict[str, Any]) -> dict[str, Any]:
+    return {"ok": True, "project": cw_compiler.import_payload(payload)}

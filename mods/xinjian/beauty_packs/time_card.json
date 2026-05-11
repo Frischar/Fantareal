@@ -1,0 +1,39 @@
+{
+  "id": "time_card",
+  "name": "现代 Time Card",
+  "version": "1.0.0",
+  "author": "Fantareal",
+  "description": "白卡、图标、时间场景信息块，适合现代信息卡式展示与高信息密度测试。",
+  "style": {
+    "class_name": "theme-time-card",
+    "accent": "#1f6feb",
+    "layout": {
+      "title_card": "time_card",
+      "scene_card": "time_panel",
+      "character_card": "info_rows",
+      "relationship_card": "status_strip",
+      "status_bar": "pill"
+    },
+    "tokens": {
+      "time": "📅",
+      "location": "🧭",
+      "weather": "🌦️",
+      "atmosphere": "📝",
+      "characters": "👥",
+      "emotion": "💗",
+      "clothing": "👘",
+      "posture": "🧍",
+      "scene": "🌄",
+      "sensory_field": "🌫️",
+      "body_temperature": "🌡️",
+      "body_motion": "〰️",
+      "micro_reaction": "💫",
+      "visual_focus": "👁️",
+      "interaction": "🤝",
+      "summary": "📌"
+    },
+    "title_card": {"background": "white", "border": "line", "radius": "large", "shadow": "paper"},
+    "character_card": {"background": "white", "field_style": "icon_row", "spacing": "compact"},
+    "relationship_card": {"style": "status_strip"}
+  }
+}

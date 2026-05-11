@@ -1557,14 +1557,23 @@
         </div>
       </div>
     `;
-    const history = copilotState.messages.map((item) => `
+    const history = copilotState.messages.map((item) => {
+      const detailBlock = item.detail ? `
+          <details class="copilot-error-detail">
+            <summary>详细报错</summary>
+            <pre>${escHtml(item.detail)}</pre>
+          </details>
+        ` : "";
+      return `
       <div class="copilot-message ${escAttr(item.role || "assistant")}">
         <div class="copilot-bubble${item.error ? " is-error" : ""}">
           <strong>${escHtml(item.role === "user" ? "你" : "轮椅模式")}</strong>
           <p>${escHtml(item.text || "")}</p>
+          ${detailBlock}
         </div>
       </div>
-    `).join("");
+    `;
+    }).join("");
     const review = renderCopilotReviewMessage();
     const loading = copilotState.loading ? `
       <div class="copilot-message assistant">
@@ -1864,6 +1873,27 @@
     }
   }
 
+  function clearCopilotMessages() {
+    copilotState.messages = [];
+    copilotState.pendingReview = null;
+    copilotState.selectedCandidateIds = [];
+    copilotState.collapsedCandidateIds = [];
+    copilotState.lastPrompt = "";
+    const promptInput = $("#copilotPrompt");
+    if (promptInput) promptInput.value = "";
+    persistLocalDraft();
+    renderCopilotWidget();
+  }
+
+  function summarizeCopilotError(detailText) {
+    const detail = String(detailText || "").trim();
+    if (!detail) return "生成失败";
+    const match = detail.match(/^(AI 请求失败|AI 返回的不是合法 JSON|AI 返回的 JSON 根节点必须是对象|AI 返回格式无效|AI 返回的根结构无效|未配置 LLM_BASE_URL|API Key 只能包含 ASCII 字符|请输入想让 AI 处理的内容)[:：]?\s*(.*)$/);
+    if (match) return match[1];
+    const firstLine = detail.split(/\r?\n/)[0].trim();
+    return firstLine.length > 120 ? `${firstLine.slice(0, 117)}…` : firstLine;
+  }
+
   function discardCopilotDraft() {
     if (!copilotState.pendingReview) return;
     copilotState.messages.push({ role: "assistant", text: "这轮候选建议已放弃，你可以继续补充要求。" });
@@ -1972,7 +2002,10 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.detail || "生成失败");
+        const detail = String(data.detail || `HTTP ${response.status}` || "生成失败").trim();
+        const err = new Error(summarizeCopilotError(detail));
+        err.detail = detail;
+        throw err;
       }
       copilotState.pendingReview = data;
       copilotState.selectedCandidateIds = Array.isArray(data.candidates) ? data.candidates.map((item) => String(item.id || "")).filter(Boolean) : [];
@@ -1983,9 +2016,11 @@
       persistLocalDraft();
       if (input) input.value = "";
     } catch (error) {
-      copilotState.messages.push({ role: "assistant", text: `生成失败：${error.message || String(error)}`, error: true });
+      const detail = String(error.detail || error.message || String(error)).trim();
+      const summary = summarizeCopilotError(detail);
+      copilotState.messages.push({ role: "assistant", text: `生成失败：${summary}`, detail, error: true });
       persistLocalDraft();
-      toast(`AI 生成失败：${error.message || String(error)}`, "error");
+      toast(`AI 生成失败：${summary}`, "error");
     } finally {
       copilotState.loading = false;
       renderCopilotWidget();
@@ -2049,6 +2084,9 @@
           return;
         } else if (action === "discard") {
           discardCopilotDraft();
+          return;
+        } else if (action === "clear") {
+          clearCopilotMessages();
           return;
         }
         persistLocalDraft();
