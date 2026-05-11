@@ -214,22 +214,112 @@ def format_access_log(label: str, method: str, status_code: int, mood: str) -> s
 
 def resolve_access_label(method: str, path: str) -> str:
     label_map = {
+        "GET /": "打开入口",
+
+        # 聊天与历史
         "GET /api/history": "获取历史",
-        "GET /api/memories/merged": "获取合并记忆",
-        "GET /api/memories/outline": "获取记忆提要",
+        "POST /api/chat/history/edit-user": "编辑历史消息",
+        "POST /api/chat/history/reroll": "重生成消息",
         "GET /api/conversation/end": "结束对话",
         "POST /api/conversation/end": "结束对话",
         "GET /api/chat": "打开聊天页",
         "POST /api/chat": "发送聊天",
         "POST /api/chat/stream": "发送聊天",
         "POST /api/chat/prompt-preview": "预览提示词",
+        "POST /api/reset": "清空聊天",
+        "GET /api/export/history": "导出历史",
+
+        # 页面
         "GET /config": "打开设置页",
+        "GET /config/preset": "打开预设页",
+        "GET /config/user": "打开用户设定页",
+        "GET /config/card": "打开角色卡页",
+        "GET /config/workshop": "打开创意工坊",
         "GET /config/memory": "打开记忆页",
+        "GET /config/worldbook": "打开世界书配置",
+        "GET /config/worldbook/entries": "打开词条管理",
+        "GET /config/sprite": "打开立绘页",
         "GET /config/about": "打开关于页",
+
+        # 用户与角色
+        "GET /api/user-profile": "获取用户设定",
+        "POST /api/user-profile": "保存用户设定",
+        "POST /api/user-avatar": "上传用户头像",
+        "POST /api/role-avatar": "上传角色头像",
+        "GET /api/persona": "获取人设",
+        "POST /api/persona": "保存人设",
+
+        # 预设
+        "GET /api/preset": "获取预设",
+        "POST /api/preset": "保存预设",
+        "POST /api/preset/create": "新建预设",
+        "POST /api/preset/activate": "启用预设",
+        "POST /api/preset/duplicate": "复制预设",
+        "POST /api/preset/delete": "删除预设",
+        "GET /api/preset/export/current": "导出当前预设",
+        "POST /api/preset/import": "导入预设",
+
+        # 设置与模型
+        "GET /api/settings": "获取设置",
+        "POST /api/settings": "保存设置",
+        "POST /api/models": "获取模型列表",
+        "POST /api/test-connection": "测试连接",
+        "POST /api/test-embedding": "测试嵌入",
+
+        # 记忆
+        "GET /api/memories": "获取记忆",
+        "POST /api/memories": "保存记忆",
+        "GET /api/memories/export": "导出记忆",
+        "POST /api/memories/import": "导入记忆",
+        "GET /api/memories/merged": "获取合并记忆",
+        "POST /api/memories/merged": "保存合并记忆",
+        "GET /api/memories/merged/export": "导出合并记忆",
+        "GET /api/memories/outline": "获取记忆提要",
+        "POST /api/memories/outline": "保存记忆提要",
+        "GET /api/memories/outline/export": "导出记忆提要",
+        "GET /api/memories/export-bundle": "导出记忆包",
+        "POST /api/memories/import-bundle": "导入记忆包",
+        "POST /api/memories/merge": "生成合并记忆",
+
+        # 世界书
+        "GET /api/worldbook": "获取世界书",
+        "POST /api/worldbook": "保存世界书",
+        "GET /api/worldbook/export": "导出世界书",
+        "POST /api/worldbook/import": "导入世界书",
+        "GET /api/worldbook/settings": "获取世界书设置",
+        "POST /api/worldbook/settings": "保存世界书设置",
+        "GET /api/worldbook/entries": "获取世界书词条",
+        "POST /api/worldbook/entries": "保存世界书词条",
+        "POST /api/worldbook/dynamic-preview": "预览动态世界书",
+
+        # 立绘与角色卡
+        "GET /api/sprites": "获取立绘",
+        "POST /api/sprites": "上传立绘",
+        "POST /api/sprites/delete": "删除立绘",
+        "GET /api/cards": "获取角色卡",
+        "POST /api/cards/import": "导入角色卡",
+        "POST /api/cards/load": "加载角色卡",
+        "GET /api/cards/export/current": "导出当前角色卡",
+        "GET /api/export/current-bundle": "导出当前存档包",
+
+        # 工坊与资源
+        "GET /api/workshop/status": "获取创意工坊状态",
+        "POST /api/workshop/save": "保存创意工坊",
+        "POST /api/workshop/evaluate": "评估创意工坊",
+        "POST /api/workshop/upload": "上传工坊资源",
+        "POST /api/background": "上传聊天背景",
+        "POST /api/font": "上传字体",
+
+        # 模块与日志
+        "GET /api/mods": "获取模块列表",
+        "GET /api/logs/export": "导出日志",
     }
     direct_label = label_map.get(f"{method} {path}") or label_map.get(path)
     if direct_label:
         return direct_label
+
+    if path.startswith("/api/mods/"):
+        return "获取模块信息"
 
     if path.startswith("/config"):
         return "打开设置页"
@@ -240,6 +330,8 @@ def resolve_access_label(method: str, path: str) -> str:
             "worldbook-maker": "世界书工坊",
             "soul-weaver": "余声",
             "card-writer": "缃笺",
+            "xinjian": "心笺",
+            "tavern-card-converter": "酒馆卡转换器",
         }
         if len(parts) >= 2:
             return f"打开{mod_labels.get(parts[1], parts[1])}模块"
