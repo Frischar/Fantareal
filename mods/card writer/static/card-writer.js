@@ -854,7 +854,36 @@
     return safe;
   }
 
-  function renderAll() {
+  function captureBrowserScrollPositions() {
+    const positions = {};
+    $$(".browser-list[data-browser-type]").forEach((list) => {
+      const type = list.dataset.browserType;
+      if (type) positions[type] = list.scrollTop;
+    });
+    return positions;
+  }
+
+  function restoreBrowserScrollPositions(positions) {
+    if (!positions) return;
+    $$(".browser-list[data-browser-type]").forEach((list) => {
+      const type = list.dataset.browserType;
+      if (type && Object.prototype.hasOwnProperty.call(positions, type)) {
+        list.scrollTop = positions[type];
+      }
+    });
+  }
+
+  function revealActiveBrowserItem(dataType) {
+    if (!dataType) return;
+    const list = $$(".browser-list[data-browser-type]").find((item) => item.dataset.browserType === dataType);
+    const activeItem = list?.querySelector(".browser-item.active");
+    activeItem?.scrollIntoView({ block: "nearest" });
+  }
+
+  function renderAll(options = {}) {
+    const shouldPreserveBrowserScroll = Boolean(options.preserveBrowserScroll);
+    const browserScrollPositions = shouldPreserveBrowserScroll ? captureBrowserScrollPositions() : null;
+
     ensureSelections();
     renderSidebarMeta();
     renderCurrentView();
@@ -865,6 +894,9 @@
     renderJsonPreviews();
     renderWarnings(validationCache, !validationCache.some((item) => item.level === "error"));
     if (compileCache) renderCardPreview(compileCache);
+
+    if (shouldPreserveBrowserScroll) restoreBrowserScrollPositions(browserScrollPositions);
+    if (options.revealBrowserType) revealActiveBrowserItem(options.revealBrowserType);
   }
 
   function renderSidebarMeta() {
@@ -1212,7 +1244,7 @@
           <strong>${escHtml(title)}</strong>
           <button class="ghost-button compact" type="button" data-action="${escAttr(action)}">${escHtml(addLabel)}</button>
         </div>
-        <div class="browser-list">
+        <div class="browser-list" data-browser-type="${escAttr(dataType)}">
           ${items.length ? items.map((item, index) => `
             <button class="browser-item${index === selectedIndex ? " active" : ""}" type="button" data-select-type="${escAttr(dataType)}" data-index="${index}">
               <div class="browser-item-head">
@@ -2132,7 +2164,7 @@
         if (type === "memory-item") selectedIndices.memoryItem = index;
         if (type === "preset-item") selectedIndices.presetItem = index;
         if (type === "persona-item") selectedIndices.personaItem = index;
-        renderAll();
+        renderAll({ preserveBrowserScroll: true });
         return;
       }
 
@@ -2205,6 +2237,8 @@
     const delta = Number(button.dataset.delta);
     const extraIndex = Number(button.dataset.extraIndex);
 
+    let revealBrowserType = "";
+
     if (action === "add-stage") {
       const nextKey = getNextStageKey();
       project.persona_card.plotStages[nextKey] = { label: nextKey, description: "", rules: "" };
@@ -2228,10 +2262,11 @@
       const nextKey = getNextPersonaKey();
       project.persona_card.personas[nextKey] = normalizePersonaValue({ name: `分身 ${Object.keys(project.persona_card.personas).length + 1}` });
       selectedIndices.personaItem = Object.keys(project.persona_card.personas).length - 1;
+      revealBrowserType = "persona-item";
     } else if (action === "copy-persona-item") {
-      copyPersonaEntry(button.dataset.personaKey);
+      if (copyPersonaEntry(button.dataset.personaKey)) revealBrowserType = "persona-item";
     } else if (action === "move-persona-item") {
-      movePersonaEntry(button.dataset.personaKey, delta);
+      if (movePersonaEntry(button.dataset.personaKey, delta)) revealBrowserType = "persona-item";
     } else if (action === "remove-persona-item") {
       const personaKey = button.dataset.personaKey;
       const keys = Object.keys(project.persona_card.personas || {});
@@ -2244,25 +2279,30 @@
     } else if (action === "add-worldbook-entry") {
       project.worldbook.entries.push(normalizeWorldbookEntry({ order: project.worldbook.entries.length }, project.worldbook.entries.length));
       selectedIndices.worldbookEntry = project.worldbook.entries.length - 1;
+      revealBrowserType = "worldbook-entry";
     } else if (action === "remove-worldbook-entry") {
       project.worldbook.entries.splice(index, 1);
       selectedIndices.worldbookEntry = clampIndex(selectedIndices.worldbookEntry, project.worldbook.entries.length);
     } else if (action === "move-worldbook-entry") {
       moveItem(project.worldbook.entries, index, delta);
       selectedIndices.worldbookEntry = clampIndex(index + delta, project.worldbook.entries.length);
+      revealBrowserType = "worldbook-entry";
     } else if (action === "add-memory-item") {
       project.memory.items.push(normalizeMemoryItem({}, project.memory.items.length));
       selectedIndices.memoryItem = project.memory.items.length - 1;
+      revealBrowserType = "memory-item";
     } else if (action === "remove-memory-item") {
       project.memory.items.splice(index, 1);
       selectedIndices.memoryItem = clampIndex(selectedIndices.memoryItem, project.memory.items.length);
     } else if (action === "move-memory-item") {
       moveItem(project.memory.items, index, delta);
       selectedIndices.memoryItem = clampIndex(index + delta, project.memory.items.length);
+      revealBrowserType = "memory-item";
     } else if (action === "add-preset-item") {
       project.preset.presets.push(normalizePresetItem({}, project.preset.presets.length));
       selectedIndices.presetItem = project.preset.presets.length - 1;
       if (!project.preset.active_preset_id) project.preset.active_preset_id = project.preset.presets[selectedIndices.presetItem].id;
+      revealBrowserType = "preset-item";
     } else if (action === "remove-preset-item") {
       const removed = project.preset.presets.splice(index, 1)[0];
       if (removed?.id === project.preset.active_preset_id) {
@@ -2272,6 +2312,7 @@
     } else if (action === "move-preset-item") {
       moveItem(project.preset.presets, index, delta);
       selectedIndices.presetItem = clampIndex(index + delta, project.preset.presets.length);
+      revealBrowserType = "preset-item";
     } else if (action === "add-extra-prompt") {
       project.preset.presets[index].extra_prompts.push(normalizeExtraPrompt({}, project.preset.presets[index].extra_prompts.length));
     } else if (action === "remove-extra-prompt") {
@@ -2279,7 +2320,7 @@
     }
 
     scheduleAutosave();
-    renderAll();
+    renderAll({ preserveBrowserScroll: true, revealBrowserType });
   }
 
   function moveItem(list, index, delta) {
