@@ -306,6 +306,72 @@ def _has_meaningful_card(src: dict) -> bool:
     return False
 
 
+def _is_non_empty_tavern_value(value) -> bool:
+    """Return True when a SillyTavern extension/top-level value actually carries content."""
+    if value is None:
+        return False
+    if value in ("", [], {}):
+        return False
+    if isinstance(value, str) and not value.strip():
+        return False
+    return True
+
+
+def detect_non_character_content(src: dict) -> list[dict]:
+    """Detect content that pure character conversion will not split out.
+
+    The pure role-card endpoint intentionally returns only the Fantareal role card.
+    When a PNG also contains an embedded worldbook or SillyTavern extensions,
+    the frontend should suggest trying the general converter instead.
+    """
+    found: list[dict] = []
+
+    character_book = src.get("character_book")
+    if isinstance(character_book, dict):
+        entries = character_book.get("entries")
+        entry_count = len(entries) if isinstance(entries, list) else 0
+        if entry_count > 0:
+            found.append({
+                "type": "worldbook",
+                "label": "内嵌世界书",
+                "detail": f"{entry_count} 条",
+                "count": entry_count,
+            })
+
+    exts = src.get("extensions")
+    if isinstance(exts, dict):
+        ext_labels = {
+            "depth_prompt": "深度提示",
+            "regex_scripts": "正则脚本",
+            "tavern_helper": "酒馆辅助配置",
+            "xiaobaix-tasks": "小白任务配置",
+            "world": "世界设定",
+            "talkativeness": "话量设定",
+            "fav": "收藏标记",
+        }
+        for key, label in ext_labels.items():
+            if _is_non_empty_tavern_value(exts.get(key)):
+                found.append({
+                    "type": key,
+                    "label": label,
+                    "detail": "已检测",
+                })
+
+        # Unknown extension keys can also contain useful non-character content.
+        known = set(ext_labels)
+        unknown_keys = [str(k) for k, v in exts.items() if k not in known and _is_non_empty_tavern_value(v)]
+        if unknown_keys:
+            preview = "、".join(unknown_keys[:5])
+            suffix = "等" if len(unknown_keys) > 5 else ""
+            found.append({
+                "type": "extensions",
+                "label": "其他扩展字段",
+                "detail": f"{preview}{suffix}",
+            })
+
+    return found
+
+
 def convert_card_general(tavern_data: dict) -> dict:
     """General converter: auto-detects content types and returns named sections.
 
@@ -577,10 +643,14 @@ async def convert_card(file: UploadFile = File(...)):
     if not _has_meaningful_card(src):
         has_wb = bool(src.get("character_book", {}).get("entries"))
         if has_wb:
+            mixed_content = detect_non_character_content(src)
             return JSONResponse({
                 "success": True,
                 "warning": "worldbook_only",
                 "message": "没找到角色信息喵，但是检测到世界书信息，推荐去「角色卡通用转换」使用这个文件喵~",
+                "has_non_character_content": True,
+                "non_character_content": mixed_content,
+                "recommend_general_conversion": True,
             })
         else:
             raise HTTPException(400,
@@ -588,6 +658,7 @@ async def convert_card(file: UploadFile = File(...)):
 
     xuqi_card, preserved = convert_card_to_xuqi(tavern_data)
     xuqi_json = json.dumps(xuqi_card, ensure_ascii=False, indent=2)
+    mixed_content = detect_non_character_content(src)
 
     # Preview
     png_b64 = base64.b64encode(raw).decode("ascii")
@@ -613,6 +684,9 @@ async def convert_card(file: UploadFile = File(...)):
             "meta_keys": png_meta["info_keys"],
         },
         "preserved_fields": preserved,
+        "has_non_character_content": bool(mixed_content),
+        "non_character_content": mixed_content,
+        "recommend_general_conversion": bool(mixed_content),
         "tavern_spec": tavern_data.get("spec", "unknown"),
         "tavern_spec_version": tavern_data.get("spec_version", "unknown"),
     })

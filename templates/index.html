@@ -610,7 +610,13 @@
             </div>
             {% endif %}
             {% for item in history %}
-            <div class="message {{ item.role }}" data-role="{{ item.role }}" data-history-index="{{ loop.index0 }}">
+            <div class="message {{ item.role }}"
+                 data-role="{{ item.role }}"
+                 data-history-index="{{ loop.index0 }}"
+                 {% if item.message_id %}data-message-id="{{ item.message_id }}"{% endif %}
+                 {% if item.turn_id or item.state_journal_turn %}data-turn-id="{{ item.turn_id or item.state_journal_turn }}" data-state-journal-turn="{{ item.state_journal_turn or item.turn_id }}"{% endif %}
+                 {% if item.turn_index %}data-turn-index="{{ item.turn_index }}"{% endif %}
+                 {% if item.content_hash %}data-content-hash="{{ item.content_hash }}"{% endif %}>
               {% if item.role == "user" %}
               <div class="bubble-wrap">
                 <div class="bubble">{{ item.content }}</div>
@@ -805,7 +811,7 @@
                     {% if mod.slug == 'worldbook-maker' %}<a href="/mods/worldbook-maker" class="secondary compact">界笺 · 世界书生成器</a>{% endif %}
                     {% if mod.slug == 'soul-weaver' %}<a href="/mods/soul-weaver" class="secondary compact">余音 · 小说提卡器</a>{% endif %}
                     {% if mod.slug == 'tavern-card-converter' %}<a href="/mods/tavern-card-converter" class="secondary compact">渡笺 · 酒馆卡转换器</a>{% endif %}
-                    {% if mod.slug == 'xinjian' %}<a href="/mods/xinjian" class="secondary compact">心笺 · 状态数据库</a>{% endif %}
+                    {% if mod.slug == 'state-journal' %}<a href="/mods/state-journal" class="secondary compact">心笺 · 状态数据库</a>{% endif %}
                   {% endfor %}
                 </div>
               </div>
@@ -2016,6 +2022,45 @@
         }
         return stripStatusPanelBlocksLocal(original);
       }
+
+
+      function cleanAssistantTextForModHooks(text) {
+        let value = stripStatusPanelBlocksLocal(text || "");
+        const thought = parseThoughtSections(value);
+        value = thought.visible || value;
+        const parsed = parseTtsVoiceRichText(value);
+        if (parsed.pieces && parsed.pieces.length) {
+          value = parsed.pieces.map((piece) => {
+            if (piece.type === "voice") return piece.speech || "";
+            return piece.text || "";
+          }).join("");
+        }
+        return String(value || "").replace(/\n{3,}/g, "\n\n").trim();
+      }
+
+      function buildRecentHistoryForModHook(currentWrapper = null, limit = 8) {
+        const currentMessageId = String(currentWrapper?.dataset?.messageId || "");
+        const rows = [];
+        for (const wrapper of getHistoryMessageWrappers()) {
+          if (wrapper === currentWrapper) continue;
+          if (currentMessageId && wrapper.dataset.messageId === currentMessageId) continue;
+          const role = getWrapperRole(wrapper);
+          if (role !== "user" && role !== "assistant" && role !== "system") continue;
+          let content = getMessagePlainText(wrapper);
+          if (role === "assistant") content = cleanAssistantTextForModHooks(content);
+          content = String(content || "").trim();
+          if (!content) continue;
+          rows.push({
+            role,
+            content,
+            message_id: wrapper.dataset.messageId || "",
+            turn_id: wrapper.dataset.turnId || wrapper.dataset.stateJournalTurn || "",
+            turn_index: Number(wrapper.dataset.turnIndex || 0) || 0,
+            content_hash: wrapper.dataset.contentHash || hashMessageText(content),
+          });
+        }
+        return rows.slice(-Math.max(1, Number(limit) || 8));
+      }
       function renderBubbleContent(bubble, content) {
         if (!bubble) return;
         const state = typeof content === "object" && content !== null
@@ -2070,6 +2115,36 @@
         if (textEl) textEl.textContent = String(text || "");
       }
 
+      function ensureMessageTurnBadge(meta) {
+        if (!meta) return null;
+        let badge = meta.querySelector(":scope > .message-turn-badge");
+        if (!badge) {
+          badge = document.createElement("span");
+          badge.className = "message-turn-badge";
+          badge.hidden = true;
+          meta.appendChild(badge);
+        }
+        return badge;
+      }
+
+      function syncMessageTurnBadge(wrapper) {
+        if (!wrapper) return;
+        const bubbleWrap = wrapper.querySelector(":scope > .bubble-wrap");
+        const meta = bubbleWrap?.querySelector(":scope > .message-meta");
+        if (!meta) return;
+        const role = getWrapperRole(wrapper);
+        const badge = ensureMessageTurnBadge(meta);
+        if (!badge) return;
+        const turnIndex = Number(wrapper.dataset.turnIndex || 0);
+        if (role === "assistant" && turnIndex > 0 && wrapper.dataset.openingMessage !== "true" && !wrapper.classList.contains("opening-message")) {
+          badge.textContent = ` · #${turnIndex}`;
+          badge.hidden = false;
+        } else {
+          badge.textContent = "";
+          badge.hidden = true;
+        }
+      }
+
       function getHistoryMessageWrappers() {
         return Array.from(messagesEl?.querySelectorAll(".message") || []).filter((wrapper) => {
           if (wrapper.classList.contains("opening-message")) return false;
@@ -2096,6 +2171,69 @@
         const body = wrapper?.querySelector?.(".bubble-body");
         const bubble = wrapper?.querySelector?.(".bubble");
         return String((body || bubble)?.textContent || "").trim();
+      }
+
+      function hashMessageText(value) {
+        let hash = 0x811c9dc5;
+        const text = String(value || "");
+        for (let i = 0; i < text.length; i += 1) {
+          hash ^= text.charCodeAt(i);
+          hash = Math.imul(hash, 0x01000193);
+        }
+        return (hash >>> 0).toString(16).padStart(8, "0");
+      }
+
+      function safeMessageIdPart(value) {
+        return String(value || "")
+          .trim()
+          .replace(/[^a-zA-Z0-9_.:-]+/g, "_")
+          .replace(/^_+|_+$/g, "") || "msg";
+      }
+
+      function ensureTurnIdentity(wrapper, role = "", fallbackIndex = 0, previousUserTurnId = "", explicitTurnIndex = null) {
+        if (!wrapper) return { turnId: "", messageId: "", turnIndex: 0, contentHash: "" };
+        const actualRole = role || getWrapperRole(wrapper) || "message";
+        const content = getMessagePlainText(wrapper);
+        const computedHash = hashMessageText(content);
+        const contentHash = String(wrapper.dataset.contentHash || computedHash).trim() || computedHash;
+        const historyIndex = getWrapperHistoryIndex(wrapper);
+        const index = historyIndex >= 0 ? historyIndex : fallbackIndex;
+        const explicitIndex = Number(explicitTurnIndex || 0);
+        const storedTurnIndex = Number(wrapper.dataset.turnIndex || 0);
+        const turnIndex = explicitIndex > 0 ? explicitIndex : (storedTurnIndex > 0 ? storedTurnIndex : Math.max(1, Math.floor(index / 2) + 1));
+        let turnId = String(wrapper.dataset.stateJournalTurn || wrapper.dataset.turnId || "").trim();
+        if (!turnId && actualRole === "assistant" && previousUserTurnId) turnId = previousUserTurnId;
+        if (!turnId) turnId = `turn_${String(turnIndex).padStart(4, "0")}_${contentHash}`;
+        turnId = safeMessageIdPart(turnId);
+        const messageId = safeMessageIdPart(wrapper.dataset.messageId || `msg_${turnId}_${actualRole}`);
+        wrapper.dataset.stateJournalTurn = turnId;
+        wrapper.dataset.turnId = turnId;
+        wrapper.dataset.turnIndex = String(turnIndex);
+        wrapper.dataset.messageId = messageId;
+        wrapper.dataset.contentHash = contentHash;
+        wrapper.dataset.role = actualRole;
+        syncMessageTurnBadge(wrapper);
+        return { turnId, messageId, turnIndex, contentHash };
+      }
+
+      function assignTurnToMessage(wrapper, turnId, role = "", content = "", turnIndex = null) {
+        if (!wrapper) return { turnId: "", messageId: "", turnIndex: 0, contentHash: "" };
+        if (typeof content === "string" && content.length) wrapper.dataset.messageContent = content;
+        const actualRole = role || getWrapperRole(wrapper) || "message";
+        const safeTurnId = safeMessageIdPart(turnId || wrapper.dataset.stateJournalTurn || wrapper.dataset.turnId || `turn_${Date.now()}_${hashMessageText(content || getMessagePlainText(wrapper))}`);
+        const safeIndex = Number.isFinite(Number(turnIndex)) && Number(turnIndex) > 0
+          ? Number(turnIndex)
+          : Number(wrapper.dataset.turnIndex || Math.max(1, Math.floor((getWrapperHistoryIndex(wrapper) || 0) / 2) + 1));
+        const contentHash = hashMessageText(content || getMessagePlainText(wrapper));
+        const messageId = safeMessageIdPart(`msg_${safeTurnId}_${actualRole}`);
+        wrapper.dataset.stateJournalTurn = safeTurnId;
+        wrapper.dataset.turnId = safeTurnId;
+        wrapper.dataset.turnIndex = String(safeIndex);
+        wrapper.dataset.messageId = messageId;
+        wrapper.dataset.contentHash = contentHash;
+        wrapper.dataset.role = actualRole;
+        syncMessageTurnBadge(wrapper);
+        return { turnId: safeTurnId, messageId, turnIndex: safeIndex, contentHash };
       }
 
       function hasMessagesAfterIndex(index) {
@@ -2168,10 +2306,22 @@
       }
 
       function refreshMessageControls() {
-        getHistoryMessageWrappers().forEach((wrapper, index) => {
+        const wrappers = getHistoryMessageWrappers();
+        let previousUserTurnId = "";
+        let nextTurnIndex = 1;
+        wrappers.forEach((wrapper, index) => {
+          const role = getWrapperRole(wrapper);
           wrapper.dataset.historyIndex = String(index);
-          wrapper.dataset.role = getWrapperRole(wrapper);
+          wrapper.dataset.role = role;
+          const desiredTurnIndex = role === "assistant" ? nextTurnIndex : (role === "user" ? nextTurnIndex : null);
+          const meta = ensureTurnIdentity(wrapper, role, index, previousUserTurnId, desiredTurnIndex);
+          if (role === "user") previousUserTurnId = meta.turnId;
+          if (role === "assistant") {
+            nextTurnIndex += 1;
+            previousUserTurnId = "";
+          }
           ensureMessageActions(wrapper);
+          syncMessageTurnBadge(wrapper);
         });
         syncMessageActionState();
       }
@@ -2237,9 +2387,9 @@
         setStatus("正在回退并编辑消息...", "busy");
         try {
           const editedWrapper = messagesEl?.querySelector(`[data-history-index="${index}"]`);
-          const xinjianTurnId = editedWrapper?.dataset?.xinjianTurn || "";
+          const stateJournalTurnId = editedWrapper?.dataset?.stateJournalTurn || "";
           dispatchChatLifecycleEvent("fantareal:chat-edit", {
-            turnId: xinjianTurnId,
+            turnId: stateJournalTurnId,
             messageIndex: index,
             trimmedFrom: index,
             userText: content,
@@ -2252,7 +2402,7 @@
           closeMessageEditors();
           removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
           historyMutationInFlight = false;
-          await generateChatTurn(String(data.message || content), { clearInput: false, source: "edit", turnId: xinjianTurnId || undefined });
+          await generateChatTurn(String(data.message || content), { clearInput: false, source: "edit", turnId: stateJournalTurnId || undefined });
         } catch (error) {
           setStatus(`编辑失败：${error.message}`, "error");
           showToast(`编辑失败：${error.message}`, "error");
@@ -2276,9 +2426,9 @@
         setComposerBusy(true);
         setStatus("正在准备重 roll...", "busy");
         try {
-          const xinjianTurnId = wrapper?.dataset?.xinjianTurn || "";
+          const stateJournalTurnId = wrapper?.dataset?.stateJournalTurn || "";
           dispatchChatLifecycleEvent("fantareal:chat-reroll", {
-            turnId: xinjianTurnId,
+            turnId: stateJournalTurnId,
             messageIndex: index,
             trimmedFrom: index,
             userText: "",
@@ -2289,7 +2439,7 @@
           });
           removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
           historyMutationInFlight = false;
-          await generateChatTurn(String(data.message || ""), { clearInput: false, source: "reroll", turnId: xinjianTurnId || undefined });
+          await generateChatTurn(String(data.message || ""), { clearInput: false, source: "reroll", turnId: stateJournalTurnId || undefined });
         } catch (error) {
           setStatus(`重 roll 失败：${error.message}`, "error");
           showToast(`重 roll 失败：${error.message}`, "error");
@@ -2301,8 +2451,12 @@
       }
 
       function hydrateExistingMessages() {
-        messagesEl.querySelectorAll(".bubble").forEach((bubble) => {
-          renderBubbleContent(bubble, bubble.textContent || "");
+        messagesEl.querySelectorAll(".message").forEach((wrapper) => {
+          const bubble = wrapper.querySelector(".bubble");
+          if (!bubble) return;
+          const raw = wrapper.dataset.messageContent || bubble.textContent || "";
+          wrapper.dataset.messageContent = String(raw || "");
+          renderBubbleContent(bubble, raw);
         });
       }
 
@@ -4050,6 +4204,38 @@
         return response.json();
       }
 
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      async function syncChatMessageIdentity(detail = {}) {
+        const payload = {
+          turn_id: detail.turn_id || detail.turnId || "",
+          turn_index: detail.turn_index || detail.turnIndex || 0,
+          user_message_id: detail.user_message_id || detail.userMessageId || "",
+          assistant_message_id: detail.assistant_message_id || detail.assistantMessageId || detail.message_id || detail.messageId || "",
+          message_id: detail.message_id || detail.messageId || "",
+          user_text: detail.user_text || detail.userText || "",
+          assistant_text: detail.assistant_text || detail.assistantText || "",
+          assistant_clean_text: detail.assistant_clean_text || detail.assistantCleanText || "",
+          user_hash: detail.user_hash || detail.userHash || "",
+          assistant_hash: detail.assistant_hash || detail.assistantHash || detail.content_hash || detail.contentHash || "",
+          content_hash: detail.content_hash || detail.contentHash || detail.assistantHash || detail.assistant_hash || "",
+          source: detail.source || detail.trigger_source || detail.triggerSource || "chat_hook",
+        };
+        if (!payload.turn_id || !payload.assistant_message_id || !payload.assistant_text) return;
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+          try {
+            const result = await postJson("/api/chat/history/message-meta", payload);
+            if (result?.ok || Number(result?.patched || 0) > 0) return result;
+          } catch (error) {
+            if (attempt >= 7) console.warn("Chat message identity sync failed:", error);
+          }
+          await wait(220 + attempt * 180);
+        }
+        return null;
+      }
+
       async function streamChat(payload, handlers = {}) {
         const response = await fetch("/api/chat/stream", {
           method: "POST",
@@ -4242,14 +4428,8 @@
         }
       });
 
-      function createChatTurnId(text) {
-        let hash = 0x811c9dc5;
-        const value = String(text || "");
-        for (let i = 0; i < value.length; i += 1) {
-          hash ^= value.charCodeAt(i);
-          hash = Math.imul(hash, 0x01000193);
-        }
-        return `turn_${Date.now()}_${(hash >>> 0).toString(16).padStart(8, "0")}`;
+      function createChatTurnId(text, turnIndex = 1) {
+        return `turn_${String(Math.max(1, Number(turnIndex) || 1)).padStart(4, "0")}_${hashMessageText(text)}`;
       }
 
       function dispatchChatLifecycleEvent(name, detail = {}) {
@@ -4261,7 +4441,8 @@
         if (!messageText || chatRequestInFlight || isEndingConversation) return;
 
         const clearInput = options.clearInput !== false;
-        const chatTurnId = options.turnId || createChatTurnId(messageText);
+        const chatTurnIndex = Math.max(1, Math.floor(getHistoryMessageWrappers().length / 2) + 1);
+        const chatTurnId = options.turnId || createChatTurnId(messageText, chatTurnIndex);
         const chatTurnCreatedAt = new Date().toISOString();
         chatRequestInFlight = true;
         dispatchChatLifecycleEvent("fantareal:chat-user-submit", {
@@ -4271,7 +4452,7 @@
           source: options.source || "send",
         });
         const userEntry = addMessage("user", messageText);
-        userEntry.wrapper.dataset.xinjianTurn = chatTurnId;
+        const userMessageMeta = assignTurnToMessage(userEntry.wrapper, chatTurnId, "user", messageText, chatTurnIndex);
         if (clearInput) {
           inputEl.value = "";
           syncComposerState();
@@ -4279,6 +4460,7 @@
         setStatus("正在回复...");
         setComposerBusy(true);
         const assistantEntry = createMessage("assistant", "", "正在回复...");
+        const assistantInitialMeta = assignTurnToMessage(assistantEntry.wrapper, chatTurnId, "assistant", "", userMessageMeta.turnIndex);
         assistantEntry.wrapper.classList.add("streaming");
         assistantEntry.wrapper.querySelector(".message-actions")?.remove();
         streamingEntries.add(assistantEntry);
@@ -4350,18 +4532,46 @@
               }
               assistantEntry.wrapper.classList.remove("streaming");
               setMessageMetaText(assistantEntry.meta, new Date().toLocaleString());
+              const assistantMessageMeta = assignTurnToMessage(assistantEntry.wrapper, chatTurnId, "assistant", finalReply, userMessageMeta.turnIndex);
               streamingEntries.delete(assistantEntry);
               refreshMessageControls();
-              assistantEntry.wrapper.dataset.xinjianTurn = chatTurnId;
-              dispatchChatLifecycleEvent("fantareal:chat-done", {
+              const assistantCleanText = cleanAssistantTextForModHooks(finalReply);
+              const recentHistory = buildRecentHistoryForModHook(assistantEntry.wrapper, Math.max(6, Number(runtimeState.history_limit || 6)));
+              const assistantReadyDetail = {
                 turnId: chatTurnId,
+                turn_id: chatTurnId,
+                turnIndex: assistantMessageMeta.turnIndex,
+                turn_index: assistantMessageMeta.turnIndex,
+                messageId: assistantMessageMeta.messageId,
+                message_id: assistantMessageMeta.messageId,
+                assistantMessageId: assistantMessageMeta.messageId,
+                assistant_message_id: assistantMessageMeta.messageId,
+                assistantHash: assistantMessageMeta.contentHash,
+                contentHash: assistantMessageMeta.contentHash,
+                content_hash: assistantMessageMeta.contentHash,
+                userMessageId: userMessageMeta.messageId,
+                user_message_id: userMessageMeta.messageId,
                 userText: messageText,
+                user_text: messageText,
                 assistantText: finalReply,
+                assistant_text: finalReply,
+                assistantCleanText,
+                assistant_clean_text: assistantCleanText,
+                recentHistory,
+                recent_history: recentHistory,
                 replyData: data || {},
                 createdAt: chatTurnCreatedAt,
+                created_at: chatTurnCreatedAt,
                 completedAt: new Date().toISOString(),
+                completed_at: new Date().toISOString(),
                 source: options.source || "send",
-              });
+                triggerSource: "chat_hook",
+                trigger_source: "chat_hook",
+              };
+              dispatchChatLifecycleEvent("fantareal:chat-done", assistantReadyDetail);
+              dispatchChatLifecycleEvent("fantareal:assistant-message-ready", assistantReadyDetail);
+              dispatchChatLifecycleEvent("fantareal:assistant-finalized", assistantReadyDetail);
+              syncChatMessageIdentity(assistantReadyDetail).catch((error) => console.warn("Chat message identity sync failed:", error));
             },
             onError(data) {
               throw new Error(data.detail || "流式请求失败");

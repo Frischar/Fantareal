@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>心笺 - Fantareal</title>
-    <link rel="stylesheet" href="./static/xinjian.css?v=xinjian-admin-ui-v0-1-3-rework" />
+    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-admin-ui-v0-1-3-rework" />
   </head>
   <body>
-    <main class="xinjian-shell" data-version="{{ version }}">
-      <header class="xinjian-hero">
+    <main class="state-journal-shell" data-version="{{ version }}">
+      <header class="state-journal-hero">
         <div>
           <p class="eyebrow">Fantareal Mod · v{{ version }}</p>
           <h1>心笺</h1>
@@ -27,9 +27,9 @@
         <span id="updateSummaryText">暂无填表记录。</span>
       </section>
 
-      <section class="xinjian-workbench">
+      <section class="state-journal-workbench">
         <aside class="panel workspace-nav" aria-label="心笺后台一级导航">
-          <button class="workspace-nav-btn active" type="button" data-workspace="xinjian">
+          <button class="workspace-nav-btn active" type="button" data-workspace="journal">
             <span class="nav-icon">✦</span><span><strong>心笺</strong><small>状态记录与填表</small></span>
           </button>
           <button class="workspace-nav-btn" type="button" data-workspace="mujian" data-default-tab="mujian">
@@ -47,8 +47,8 @@
         </aside>
 
         <div class="workspace-main">
-          <section id="databaseWorkspace" class="workspace-page active" data-workspace-page="xinjian">
-            <div class="xinjian-grid">
+          <section id="databaseWorkspace" class="workspace-page active" data-workspace-page="journal">
+            <div class="state-journal-grid">
               <aside class="panel table-list-panel">
                 <div class="panel-head">
                   <div>
@@ -87,7 +87,7 @@
             </div>
           </section>
 
-          <aside id="configDrawer" class="config-drawer-panel config-workspace-panel workspace-page" aria-hidden="true" data-active-workspace="xinjian">
+          <aside id="configDrawer" class="config-drawer-panel config-workspace-panel workspace-page" aria-hidden="true" data-active-workspace="journal">
             <div class="drawer-toolbar">
               <div>
                 <p class="eyebrow">Workbench</p>
@@ -95,7 +95,7 @@
               </div>
               <button id="closeConfigDrawerBtn" class="ghost-btn small">返回表册</button>
             </div>
-            <div class="tabs drawer-tabs" data-tab-scope="xinjian">
+            <div class="tabs drawer-tabs" data-tab-scope="journal">
               <button class="tab-btn active" data-tab="schema">字段</button>
               <button class="tab-btn" data-tab="rules">规则</button>
             </div>
@@ -342,6 +342,6 @@
       </aside>
       <div id="rowDetailMask" class="drawer-mask" hidden></div>
     </main>
-    <script src="./static/xinjian.js?v=xinjian-admin-ui-v0-1-3-rework"></script>
+    <script src="./static/state-journal.js?v=state-journal-admin-ui-v0-1-3-rework"></script>
   </body>
 </html>
