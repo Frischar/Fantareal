@@ -8,6 +8,10 @@
     detailIndex: -1,
     currentTemplateId: "",
     currentThemeId: "",
+    expandedTemplateFieldIndex: null,
+    metricCharacterFilter: localStorage.getItem("xinjian:metricCharacterFilter") || "all",
+    metricLabelFilter: localStorage.getItem("xinjian:metricLabelFilter") || "all",
+    metricSort: localStorage.getItem("xinjian:metricSort") || "newest",
   };
 
   const SERVICE_PRESETS = {
@@ -65,6 +69,14 @@
     cfgMujianDensity: $("#cfgMujianDensity"),
     cfgMujianCharacterFilter: $("#cfgMujianCharacterFilter"),
     cfgMujianCharacterNames: $("#cfgMujianCharacterNames"),
+    cfgMujianProtagonistEnabled: $("#cfgMujianProtagonistEnabled"),
+    cfgMujianProtagonistMode: $("#cfgMujianProtagonistMode"),
+    cfgMujianProtagonistName: $("#cfgMujianProtagonistName"),
+    cfgMujianProtagonistAliases: $("#cfgMujianProtagonistAliases"),
+    cfgMujianWorkerPromptEnabled: $("#cfgMujianWorkerPromptEnabled"),
+    cfgMujianWorkerStylePrompt: $("#cfgMujianWorkerStylePrompt"),
+    cfgMujianWorkerProtagonistPrompt: $("#cfgMujianWorkerProtagonistPrompt"),
+    resetWorkerPromptBtn: $("#resetWorkerPromptBtn"),
     cfgBaseUrl: $("#cfgBaseUrl"),
     cfgApiKey: $("#cfgApiKey"),
     cfgModel: $("#cfgModel"),
@@ -442,21 +454,35 @@
   function renderTemplateFields(template) {
     if (!els.templateFieldsEditor) return;
     const fields = Array.isArray(template?.fields) ? template.fields : [];
-    els.templateFieldsEditor.innerHTML = fields.map((field, index) => `
-      <div class="template-field-card" data-template-field-index="${index}">
-        <div class="template-field-head"><strong>${escapeHtml(field.label || field.key || "字段")}</strong><span>${escapeHtml(field.key || "")}</span></div>
-        <div class="grid-two">
-          <label>字段 Key<input data-tpl-key value="${escapeAttr(field.key || "")}" placeholder="emotion" /></label>
-          <label>显示名<input data-tpl-label value="${escapeAttr(field.label || "")}" placeholder="情绪" /></label>
+    if (state.expandedTemplateFieldIndex !== null && state.expandedTemplateFieldIndex >= fields.length) {
+      state.expandedTemplateFieldIndex = null;
+    }
+    els.templateFieldsEditor.innerHTML = fields.map((field, index) => {
+      const expanded = state.expandedTemplateFieldIndex === index;
+      const key = safeTemplateId(field.key || "");
+      const label = field.label || key || "字段";
+      const instruction = String(field.instruction || "根据本轮上下文生成该字段。").replace(/\s+/g, " ").trim();
+      return `
+      <div class="template-field-card ${expanded ? "expanded" : ""}" data-template-field-index="${index}">
+        <div class="template-field-head" data-tpl-toggle="${index}">
+          <button type="button" class="ghost-btn mini template-field-toggle" data-tpl-toggle="${index}">${expanded ? "收起" : "展开"}</button>
+          <span class="template-field-title"><strong>${escapeHtml(label)}</strong><small class="template-field-summary">${escapeHtml(instruction)}</small></span>
+          <span class="template-field-key">${escapeHtml(key)}</span>
         </div>
-        <label>生成说明<textarea data-tpl-instruction rows="2">${escapeHtml(field.instruction || "")}</textarea></label>
-        <div class="template-field-actions">
-          <button type="button" class="ghost-btn mini" data-tpl-up="${index}">上移</button>
-          <button type="button" class="ghost-btn mini" data-tpl-down="${index}">下移</button>
-          <button type="button" class="ghost-btn mini danger" data-tpl-delete="${index}">删除</button>
+        <div class="template-field-body">
+          <div class="grid-two">
+            <label>字段 Key<input data-tpl-key value="${escapeAttr(field.key || "")}" placeholder="emotion" /></label>
+            <label>显示名<input data-tpl-label value="${escapeAttr(field.label || "")}" placeholder="情绪" /></label>
+          </div>
+          <label>生成说明<textarea data-tpl-instruction rows="2">${escapeHtml(field.instruction || "")}</textarea></label>
+          <div class="template-field-actions">
+            <button type="button" class="ghost-btn mini" data-tpl-up="${index}">上移</button>
+            <button type="button" class="ghost-btn mini" data-tpl-down="${index}">下移</button>
+            <button type="button" class="ghost-btn mini danger" data-tpl-delete="${index}">删除</button>
+          </div>
         </div>
-      </div>
-    `).join("") || `<div class="empty-state"><strong>暂无字段。</strong><span>点击“新增字段”开始配置。</span></div>`;
+      </div>`;
+    }).join("") || `<div class="empty-state"><strong>暂无字段。</strong><span>点击“新增字段”开始配置。</span></div>`;
   }
 
   function readTemplateEditor() {
@@ -521,6 +547,13 @@
     renderTemplateSelectors();
     if (els.cfgMujianTemplateSelect) els.cfgMujianTemplateSelect.value = state.currentTemplateId;
     if (els.cfgMujianCharacterNames) els.cfgMujianCharacterNames.value = cfg.mujian_character_names || "";
+    if (els.cfgMujianProtagonistEnabled) els.cfgMujianProtagonistEnabled.checked = !!cfg.mujian_protagonist_card_enabled;
+    if (els.cfgMujianProtagonistMode) els.cfgMujianProtagonistMode.value = cfg.mujian_protagonist_card_mode || "when_relevant";
+    if (els.cfgMujianProtagonistName) els.cfgMujianProtagonistName.value = cfg.mujian_protagonist_name || "";
+    if (els.cfgMujianProtagonistAliases) els.cfgMujianProtagonistAliases.value = cfg.mujian_protagonist_aliases || "";
+    if (els.cfgMujianWorkerPromptEnabled) els.cfgMujianWorkerPromptEnabled.checked = !!cfg.mujian_worker_custom_prompt_enabled;
+    if (els.cfgMujianWorkerStylePrompt) els.cfgMujianWorkerStylePrompt.value = cfg.mujian_worker_style_prompt || "";
+    if (els.cfgMujianWorkerProtagonistPrompt) els.cfgMujianWorkerProtagonistPrompt.value = cfg.mujian_worker_protagonist_prompt || "";
     bindTemplateEditor();
     updateMujianStyleHelp();
     els.cfgBaseUrl.value = cfg.api_base_url || "";
@@ -549,6 +582,13 @@
       mujian_note_density: els.cfgMujianDensity ? els.cfgMujianDensity.value : "standard",
       mujian_character_filter: els.cfgMujianCharacterFilter ? els.cfgMujianCharacterFilter.value : "turn",
       mujian_character_names: els.cfgMujianCharacterNames ? els.cfgMujianCharacterNames.value.trim() : "",
+      mujian_protagonist_card_enabled: els.cfgMujianProtagonistEnabled ? els.cfgMujianProtagonistEnabled.checked : false,
+      mujian_protagonist_card_mode: els.cfgMujianProtagonistMode ? els.cfgMujianProtagonistMode.value : "when_relevant",
+      mujian_protagonist_name: els.cfgMujianProtagonistName ? els.cfgMujianProtagonistName.value.trim() : "",
+      mujian_protagonist_aliases: els.cfgMujianProtagonistAliases ? els.cfgMujianProtagonistAliases.value.trim() : "",
+      mujian_worker_custom_prompt_enabled: els.cfgMujianWorkerPromptEnabled ? els.cfgMujianWorkerPromptEnabled.checked : false,
+      mujian_worker_style_prompt: els.cfgMujianWorkerStylePrompt ? els.cfgMujianWorkerStylePrompt.value.trim() : "",
+      mujian_worker_protagonist_prompt: els.cfgMujianWorkerProtagonistPrompt ? els.cfgMujianWorkerProtagonistPrompt.value.trim() : "",
       mujian_template_id: activeTemplateId(),
       mujian_templates: mujianTemplates(),
       mujian_theme_id: activeThemeId(),
@@ -753,25 +793,60 @@
     return selected;
   }
 
+  function pickField(fields, keys) {
+    return keys.map((key) => fields.find((field) => field.key === key)).find(Boolean) || null;
+  }
+
+  function rowValue(row, key) {
+    return key ? row?.[key] : "";
+  }
+
+  function cardSummaryForRow(table, row, fields, displayFields) {
+    const summaryField = pickField(fields, ["summary", "status_summary", "description", "note"]);
+    if (summaryField && textValue(rowValue(row, summaryField.key)).trim()) return summaryField;
+    return displayFields.find((field) => field.type === "textarea") || displayFields[0] || null;
+  }
+
+  function relationTitle(row, primaryFallback) {
+    const from = textValue(row.from || row.role_a || row.source || "").trim();
+    const to = textValue(row.to || row.role_b || row.target || "").trim();
+    if (from || to) return `${from || "未知角色"} → ${to || "未知角色"}`;
+    return primaryFallback;
+  }
+
   function renderRowsAsCards(table) {
     const fields = table.schema.fields || [];
     const primary = table.schema.primary_key || fields[0]?.key;
     const displayFields = getDisplayFields(table).filter((field) => field.key !== primary);
     const list = document.createElement("div");
-    list.className = "row-card-list";
+    list.className = `row-card-list ${table.schema?.id === "relationship" ? "relationship-list" : ""}`;
     (table.rows || []).forEach((row, index) => {
       const card = document.createElement("article");
-      card.className = "row-card";
-      const title = primary ? (row[primary] || `第 ${index + 1} 行`) : `第 ${index + 1} 行`;
-      const subtitleField = displayFields.find((field) => ["location", "mood", "summary", "condition"].includes(field.key)) || displayFields[0];
-      const subtitle = subtitleField ? compactText(row[subtitleField.key], 56) : "";
+      card.className = `row-card readable-row-card ${table.schema?.id === "character_status" ? "character-row-card" : ""} ${table.schema?.id === "relationship" ? "relationship-row-card" : ""}`;
+      const primaryTitle = primary ? (row[primary] || `第 ${index + 1} 行`) : `第 ${index + 1} 行`;
+      const title = table.schema?.id === "relationship" ? relationTitle(row, primaryTitle) : primaryTitle;
+      const summaryField = cardSummaryForRow(table, row, fields, displayFields);
+      const summary = summaryField ? compactText(row[summaryField.key], 150) : "暂无摘要。";
+      const chipFields = displayFields
+        .filter((field) => field.key !== summaryField?.key)
+        .filter((field) => !["from", "to", "role_a", "role_b", "source", "target"].includes(field.key))
+        .slice(0, 5);
+      const badgeField = pickField(fields, ["relation", "mood", "condition", "status", "state"]);
+      const badgeText = badgeField ? compactText(row[badgeField.key], 18) : (table.schema?.name || "记录");
       card.innerHTML = `
-        <div class="row-card-head">
-          <span class="row-card-title"><strong>${escapeHtml(title)}</strong><span class="row-card-subtitle">${escapeHtml(subtitle)}</span></span>
-          <button class="ghost-btn small" type="button" data-edit-row="${index}">详情</button>
+        <div class="row-card-head readable-row-head">
+          <span class="row-card-title"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(table.schema?.name || table.schema?.id || "记录")}</small></span>
+          <div class="row-card-head-actions">
+            <span class="row-status-badge">${escapeHtml(badgeText)}</span>
+            <button class="ghost-btn small" type="button" data-edit-row="${index}">详情</button>
+          </div>
         </div>
-        <div class="row-chip-grid">
-          ${displayFields.slice(0, 4).map((field) => `<div class="row-chip"><span>${escapeHtml(fieldLabel(field))}</span><strong>${escapeHtml(compactText(row[field.key], field.type === "textarea" ? 88 : 54))}</strong></div>`).join("")}
+        <div class="row-summary-block">
+          <span>${escapeHtml(summaryField ? fieldLabel(summaryField) : "状态摘要")}</span>
+          <p>${escapeHtml(summary)}</p>
+        </div>
+        <div class="row-chip-grid readable-chip-grid">
+          ${chipFields.map((field) => `<div class="row-chip"><span>${escapeHtml(fieldLabel(field))}</span><strong>${escapeHtml(compactText(row[field.key], field.type === "textarea" ? 92 : 48))}</strong></div>`).join("")}
         </div>
         <div class="row-card-actions">
           <button class="delete-btn" type="button" data-delete-row="${index}">删除</button>
@@ -779,6 +854,123 @@
       list.appendChild(card);
     });
     els.rowsEditor.appendChild(list);
+  }
+
+  function metricDeltaKind(value) {
+    const text = String(value ?? "").trim();
+    if (/^-/.test(text)) return "negative";
+    if (/^\+/.test(text) && !/^\+?0(?:\.0+)?$/.test(text.replace(/[^+\-0-9.]/g, ""))) return "positive";
+    const num = Number(text.replace(/[^\-0-9.]/g, ""));
+    if (Number.isFinite(num) && num > 0) return "positive";
+    if (Number.isFinite(num) && num < 0) return "negative";
+    return "neutral";
+  }
+
+  function uniqueSorted(values) {
+    return [...new Set(values.map((item) => String(item ?? "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  }
+
+  function renderMetricSelect(label, className, value, options) {
+    return `<label class="metric-filter-label"><span>${escapeHtml(label)}</span><select class="${className}"><option value="all">全部</option>${options.map((item) => `<option value="${escapeAttr(item)}" ${value === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select></label>`;
+  }
+
+  function metricRecordDate(row) {
+    const value = row.created_at || row.updated_at || "";
+    if (!value) return "未记录时间";
+    return String(value).replace("T", " ").replace(/\.\d+.*$/, "");
+  }
+
+  function metricDisplayValue(value) {
+    const text = String(value ?? "").trim();
+    return text || "—";
+  }
+
+  function renderMetricHistory(table) {
+    const rows = (table.rows || []).map((row, index) => ({ ...row, __index: index }));
+    if (!rows.length) {
+      els.rowsEditor.innerHTML = `<div class="empty-state"><strong>当前暂无数值变化记录。</strong><span>当 worker 识别到好感、信任、戒备、伤势、疲惫等数值变化后，会在这里按时间线显示。</span></div>`;
+      return;
+    }
+    const characters = uniqueSorted(rows.map((row) => row.character_name));
+    const metrics = uniqueSorted(rows.map((row) => row.metric_label));
+    if (state.metricCharacterFilter !== "all" && !characters.includes(state.metricCharacterFilter)) state.metricCharacterFilter = "all";
+    if (state.metricLabelFilter !== "all" && !metrics.includes(state.metricLabelFilter)) state.metricLabelFilter = "all";
+    let filtered = rows.filter((row) => (state.metricCharacterFilter === "all" || row.character_name === state.metricCharacterFilter) && (state.metricLabelFilter === "all" || row.metric_label === state.metricLabelFilter));
+    filtered.sort((a, b) => state.metricSort === "oldest" ? a.__index - b.__index : b.__index - a.__index);
+    const latestByCharacter = new Map();
+    rows.forEach((row) => {
+      const name = row.character_name || "未命名角色";
+      const current = latestByCharacter.get(name) || { count: 0, deltas: [] };
+      current.count += 1;
+      if (row.metric_label) current.deltas.push(`${row.metric_label} ${row.delta_display || ""}`.trim());
+      latestByCharacter.set(name, current);
+    });
+    const summary = [...latestByCharacter.entries()].slice(0, 4).map(([name, data]) => `<span class="metric-summary-chip"><strong>${escapeHtml(name)}</strong><small>${data.count} 条 · ${escapeHtml(data.deltas.slice(-2).join(" / ") || "暂无变化值")}</small></span>`).join("");
+    const cards = filtered.map((row) => {
+      const delta = row.delta_display || "±0";
+      const kind = metricDeltaKind(delta);
+      const character = row.character_name || "未命名角色";
+      const metric = row.metric_label || "未命名数值";
+      const oldValue = metricDisplayValue(row.old_value);
+      const newValue = metricDisplayValue(row.new_value);
+      const rawValue = metricDisplayValue(row.raw_value) !== "—" ? metricDisplayValue(row.raw_value) : `${newValue} (${delta})`;
+      const turn = row.turn_id || row.record_id || "未记录来源";
+      return `
+        <article class="metric-event-card ${kind}">
+          <div class="metric-event-main">
+            <div class="metric-event-title">
+              <strong>${escapeHtml(character)}</strong>
+              <span>${escapeHtml(metric)}</span>
+            </div>
+            <div class="metric-event-values">
+              <span>${escapeHtml(oldValue)}</span>
+              <b>→</b>
+              <span>${escapeHtml(newValue)}</span>
+              <em>${escapeHtml(rawValue)}</em>
+            </div>
+            <div class="metric-event-meta">
+              <span>来源：${escapeHtml(turn)}</span>
+              <span>${escapeHtml(metricRecordDate(row))}</span>
+            </div>
+          </div>
+          <span class="metric-delta-badge">${escapeHtml(delta)}</span>
+          <div class="metric-event-actions">
+            <button class="ghost-btn small" type="button" data-edit-row="${row.__index}">详情</button>
+            <button class="delete-btn" type="button" data-delete-row="${row.__index}">删除</button>
+          </div>
+        </article>`;
+    }).join("");
+    els.rowsEditor.innerHTML = `
+      <section class="metric-history-view">
+        <div class="metric-history-toolbar">
+          <div>
+            <strong>数值变化时间线</strong>
+            <p>把系统记录从普通表格改成事件流，按角色、数值项和时间筛选。</p>
+          </div>
+          <div class="metric-filter-grid">
+            ${renderMetricSelect("角色", "metric-character-filter", state.metricCharacterFilter, characters)}
+            ${renderMetricSelect("数值项", "metric-label-filter", state.metricLabelFilter, metrics)}
+            <label class="metric-filter-label"><span>排序</span><select class="metric-sort-filter"><option value="newest" ${state.metricSort === "newest" ? "selected" : ""}>最新优先</option><option value="oldest" ${state.metricSort === "oldest" ? "selected" : ""}>最早优先</option></select></label>
+          </div>
+        </div>
+        ${summary ? `<div class="metric-summary-row">${summary}</div>` : ""}
+        <div class="metric-event-list">${cards || `<div class="empty-state"><strong>当前筛选无记录。</strong><span>请调整角色或数值项筛选。</span></div>`}</div>
+      </section>`;
+    els.rowsEditor.querySelector(".metric-character-filter")?.addEventListener("change", (event) => {
+      state.metricCharacterFilter = event.target.value;
+      localStorage.setItem("xinjian:metricCharacterFilter", state.metricCharacterFilter);
+      renderRows(table);
+    });
+    els.rowsEditor.querySelector(".metric-label-filter")?.addEventListener("change", (event) => {
+      state.metricLabelFilter = event.target.value;
+      localStorage.setItem("xinjian:metricLabelFilter", state.metricLabelFilter);
+      renderRows(table);
+    });
+    els.rowsEditor.querySelector(".metric-sort-filter")?.addEventListener("change", (event) => {
+      state.metricSort = event.target.value;
+      localStorage.setItem("xinjian:metricSort", state.metricSort);
+      renderRows(table);
+    });
   }
 
   function renderRowsAsTable(table) {
@@ -821,6 +1013,10 @@
       els.rowsEditor.innerHTML = `<div class="empty-state"><strong>这张表还没有字段。</strong><span>请打开“字段”设置，至少添加一个主键字段。</span></div>`;
       return;
     }
+    if (table.schema?.id === "metric_history") {
+      renderMetricHistory(table);
+      return;
+    }
     if (!table.rows?.length) {
       els.rowsEditor.innerHTML = `<div class="empty-state"><strong>当前表暂无数据。</strong><span>心笺不会在加载角色卡时自动写入状态。你可以先聊天一轮，再点击“根据最近对话更新”；也可以开启“聊天后自动填表”。</span><span>后续版本会加入“从角色卡 / 记忆初始化”。</span></div>`;
       return;
@@ -848,30 +1044,87 @@
     if (!state.currentId && state.tables[0]) state.currentId = state.tables[0].schema.id;
     const table = currentTable();
     renderTableList(); bindConfig(); updateViewButtons();
+    const dataPanel = els.rowsEditor?.closest(".data-panel");
+    if (dataPanel) dataPanel.dataset.tableKind = table?.schema?.id || "";
     if (!table) { els.currentTitle.textContent = "未选择表"; els.currentDesc.textContent = ""; els.rowsEditor.innerHTML = `<div class="empty-state"><strong>暂无表格。</strong><span>点击左侧“＋”新建表，或导入心笺 JSON。</span></div>`; return; }
     els.currentTitle.textContent = table.schema.name || table.schema.id;
     els.currentDesc.textContent = table.schema.description || "";
     bindSchema(table); renderFields(table); renderRows(table);
   }
 
+  const WORKSPACE_DEFAULT_TAB = {
+    xinjian: null,
+    mujian: "mujian",
+    generate: "generate",
+    beauty: "template",
+    settings: "model",
+  };
+
+  const TAB_WORKSPACE = {
+    schema: "xinjian",
+    rules: "xinjian",
+    log: "settings",
+    mujian: "mujian",
+    generate: "generate",
+    template: "beauty",
+    theme: "beauty",
+    model: "settings",
+    link: "settings",
+  };
+
+  const TAB_TITLES = {
+    schema: "字段设置",
+    rules: "规则设置",
+    log: "调试与日志",
+    mujian: "幕笺设置",
+    generate: "生成规则",
+    template: "幕笺模板",
+    theme: "幕笺美化包",
+    model: "模型设置",
+    link: "聊天联动",
+  };
+
+  function setWorkspaceNav(workspace) {
+    document.querySelectorAll(".workspace-nav-btn").forEach((item) => {
+      item.classList.toggle("active", item.dataset.workspace === workspace);
+    });
+  }
+
+  function switchWorkspace(workspace = "xinjian", tab = null) {
+    const database = document.getElementById("databaseWorkspace");
+    const showConfig = workspace !== "xinjian" || !!tab;
+    setWorkspaceNav(workspace);
+    if (database) database.classList.toggle("active", !showConfig);
+    if (els.configDrawer) {
+      els.configDrawer.classList.toggle("active", showConfig);
+      els.configDrawer.dataset.activeWorkspace = workspace;
+      els.configDrawer.setAttribute("aria-hidden", showConfig ? "false" : "true");
+    }
+    if (els.drawerMask) els.drawerMask.hidden = true;
+    if (showConfig) {
+      switchTab(tab || WORKSPACE_DEFAULT_TAB[workspace] || "schema");
+    }
+  }
+
   function openConfigDrawer(tab = "schema") {
-    switchTab(tab);
-    els.drawerTitle.textContent = { schema: "字段设置", rules: "规则设置", model: "模型设置", link: "聊天联动", mujian: "幕笺设置", template: "幕笺模板", log: "日志" }[tab] || "心笺设置";
-    els.configDrawer.classList.add("open");
-    els.configDrawer.setAttribute("aria-hidden", "false");
-    els.drawerMask.hidden = false;
+    const workspace = TAB_WORKSPACE[tab] || "xinjian";
+    switchWorkspace(workspace, tab);
+    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "心笺设置";
     if (tab === "link") refreshHookStatus();
+    if (tab === "log") loadLog().catch(() => {});
   }
 
   function closeConfigDrawer() {
-    els.configDrawer.classList.remove("open");
-    els.configDrawer.setAttribute("aria-hidden", "true");
-    els.drawerMask.hidden = true;
+    switchWorkspace("xinjian");
   }
 
   function switchTab(tab) {
+    const workspace = TAB_WORKSPACE[tab] || "xinjian";
+    if (els.configDrawer) els.configDrawer.dataset.activeWorkspace = workspace;
+    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "心笺设置";
     document.querySelectorAll(".tab-btn").forEach((item) => item.classList.toggle("active", item.dataset.tab === tab));
     document.querySelectorAll(".tab-page").forEach((item) => item.classList.toggle("active", item.dataset.page === tab));
+    setWorkspaceNav(workspace);
   }
 
   function openRowDetail(index) {
@@ -965,6 +1218,7 @@
       model: "模型配置已保存",
       link: "聊天联动设置已保存",
       mujian: "幕笺设置已保存",
+      generate: "生成规则已保存",
       template: "幕笺模板已保存",
       theme: "幕笺美化已保存",
       all: "心笺配置已保存",
@@ -973,6 +1227,7 @@
       model: `${state.config.model || "未填写模型"} · ${state.config.api_base_url || "未填写 API URL"}`,
       link: `心笺${state.config.enabled === false ? "关闭" : "开启"}｜自动填表${state.config.auto_update ? "开启" : "关闭"}｜聊天提示${state.config.notify_in_chat ? "开启" : "关闭"}`,
       mujian: `幕笺${state.config.mujian_enabled === false ? "关闭" : "开启"}｜显示：${({ collapsed: "折叠", expanded: "展开", compact: "状态条", hidden: "不显示" }[state.config.mujian_chat_display_mode || "collapsed"] || "折叠")}｜标题：${state.config.mujian_title_style || "classic"}｜附笺：${state.config.mujian_note_style || state.config.mujian_style || "classic"}｜密度：${state.config.mujian_note_density || "standard"}`,
+      generate: `自动填表${state.config.auto_update ? "开启" : "关闭"}｜读取最近 ${state.config.input_turn_count || 3} 轮｜主角状态卡${state.config.mujian_protagonist_card_enabled ? "开启" : "关闭"}`,
       template: `${activeTemplate().name || activeTemplate().id}｜字段 ${activeTemplate().fields?.length || 0} 个`,
       theme: `${activeThemePack().name || activeThemePack().id}｜${activeThemePack().description || "美化包已启用"}`,
       all: `${state.config.model || "未填写模型"} · 幕笺${state.config.mujian_enabled === false ? "关闭" : "开启"}`,
@@ -1042,18 +1297,23 @@
   async function exportAll() { const payload = await requestJson("./api/export"); const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `xinjian-export-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url); pageToast("导出完成", "默认不包含 API Key，可放心分享表结构与数据。", "ok"); }
   async function importFile(file) { if (!file) return; const payload = JSON.parse(await file.text()); await requestJson("./api/import", { method: "POST", body: JSON.stringify(payload) }); await loadState(); setStatus("导入完成。", "ok"); pageToast("导入完成", "JSON 数据已写入心笺 SQLite。", "ok"); }
 
-  document.querySelectorAll(".tab-btn").forEach((button) => button.addEventListener("click", () => { switchTab(button.dataset.tab); if (button.dataset.tab === "link") refreshHookStatus(); }));
+  document.querySelectorAll(".workspace-nav-btn").forEach((button) => button.addEventListener("click", () => {
+    const workspace = button.dataset.workspace || "xinjian";
+    const defaultTab = button.dataset.defaultTab || WORKSPACE_DEFAULT_TAB[workspace];
+    if (workspace === "xinjian") switchWorkspace("xinjian"); else openConfigDrawer(defaultTab);
+  }));
+  document.querySelectorAll(".tab-btn").forEach((button) => button.addEventListener("click", () => openConfigDrawer(button.dataset.tab)));
   els.cardViewBtn.addEventListener("click", () => { state.viewMode = "card"; localStorage.setItem("xinjian:viewMode", state.viewMode); renderAll(); });
   els.tableViewBtn.addEventListener("click", () => { state.viewMode = "table"; localStorage.setItem("xinjian:viewMode", state.viewMode); renderAll(); });
-  $("#openSchemaDrawerBtn").addEventListener("click", () => openConfigDrawer("schema"));
-  $("#openRulesDrawerBtn").addEventListener("click", () => openConfigDrawer("rules"));
-  $("#openModelDrawerBtn").addEventListener("click", () => openConfigDrawer("model"));
-  $("#openLinkDrawerBtn").addEventListener("click", () => openConfigDrawer("link"));
-  $("#openMujianDrawerBtn").addEventListener("click", () => openConfigDrawer("mujian"));
+  $("#openSchemaDrawerBtn")?.addEventListener("click", () => openConfigDrawer("schema"));
+  $("#openRulesDrawerBtn")?.addEventListener("click", () => openConfigDrawer("rules"));
+  $("#openModelDrawerBtn")?.addEventListener("click", () => openConfigDrawer("model"));
+  $("#openLinkDrawerBtn")?.addEventListener("click", () => openConfigDrawer("link"));
+  $("#openMujianDrawerBtn")?.addEventListener("click", () => openConfigDrawer("mujian"));
   $("#openTemplateDrawerBtn")?.addEventListener("click", () => openConfigDrawer("template"));
-  $("#openLogDrawerBtn").addEventListener("click", () => { openConfigDrawer("log"); loadLog().catch(() => {}); });
-  $("#closeConfigDrawerBtn").addEventListener("click", closeConfigDrawer);
-  els.drawerMask.addEventListener("click", closeConfigDrawer);
+  $("#openLogDrawerBtn")?.addEventListener("click", () => { openConfigDrawer("log"); });
+  $("#closeConfigDrawerBtn")?.addEventListener("click", closeConfigDrawer);
+  els.drawerMask?.addEventListener("click", closeConfigDrawer);
   $("#closeRowDetailBtn").addEventListener("click", closeRowDetail);
   els.rowDetailMask.addEventListener("click", closeRowDetail);
   $("#saveRowDetailBtn").addEventListener("click", saveRowDetail);
@@ -1066,9 +1326,16 @@
   });
   $("#refreshBtn").addEventListener("click", () => loadState().catch((error) => setStatus(error.message, "error")));
   $("#saveBtn").addEventListener("click", () => saveCurrentTable().catch((error) => { setStatus(error.message, "error"); pageToast("保存失败", error.message, "error"); }));
-  $("#saveConfigBtn").addEventListener("click", () => saveConfig("model").catch((error) => { setStatus(error.message, "error"); pageToast("保存模型配置失败", error.message, "error"); }));
-  $("#saveLinkConfigBtn").addEventListener("click", () => saveConfig("link").catch((error) => { setStatus(error.message, "error"); pageToast("保存联动设置失败", error.message, "error"); }));
-  $("#saveMujianConfigBtn").addEventListener("click", () => saveConfig("mujian").catch((error) => { setStatus(error.message, "error"); pageToast("保存幕笺设置失败", error.message, "error"); }));
+  $("#saveConfigBtn")?.addEventListener("click", () => saveConfig("model").catch((error) => { setStatus(error.message, "error"); pageToast("保存模型配置失败", error.message, "error"); }));
+  $("#saveLinkConfigBtn")?.addEventListener("click", () => saveConfig("link").catch((error) => { setStatus(error.message, "error"); pageToast("保存联动设置失败", error.message, "error"); }));
+  $("#saveMujianConfigBtn")?.addEventListener("click", () => saveConfig("mujian").catch((error) => { setStatus(error.message, "error"); pageToast("保存幕笺设置失败", error.message, "error"); }));
+  $("#saveGenerateConfigBtn")?.addEventListener("click", () => saveConfig("generate").catch((error) => { setStatus(error.message, "error"); pageToast("保存生成规则失败", error.message, "error"); }));
+  els.resetWorkerPromptBtn?.addEventListener("click", () => {
+    if (els.cfgMujianWorkerPromptEnabled) els.cfgMujianWorkerPromptEnabled.checked = false;
+    if (els.cfgMujianWorkerStylePrompt) els.cfgMujianWorkerStylePrompt.value = "";
+    if (els.cfgMujianWorkerProtagonistPrompt) els.cfgMujianWorkerProtagonistPrompt.value = "";
+    pageToast("已恢复默认附加提示词", "保存幕笺设置后生效。", "ok");
+  });
   $("#saveTemplateConfigBtn")?.addEventListener("click", () => saveConfig("template").catch((error) => { setStatus(error.message, "error"); pageToast("保存模板设置失败", error.message, "error"); }));
   $("#saveThemeConfigBtn")?.addEventListener("click", () => saveConfig("theme").catch((error) => { setStatus(error.message, "error"); pageToast("保存美化设置失败", error.message, "error"); }));
   $("#refreshHookBtn").addEventListener("click", () => refreshHookStatus().catch((error) => pageToast("刷新 Hook 状态失败", error.message, "error")));
@@ -1079,7 +1346,7 @@
   els.cfgMujianStyle?.addEventListener("change", updateMujianStyleHelp);
   els.cfgMujianTitleStyle?.addEventListener("change", updateMujianStyleHelp);
   els.cfgMujianNoteStyle?.addEventListener("change", updateMujianStyleHelp);
-  els.cfgMujianTemplateSelect?.addEventListener("change", () => { state.currentTemplateId = els.cfgMujianTemplateSelect.value; if (els.templateSelect) els.templateSelect.value = state.currentTemplateId; const tmpl = activeTemplate(); if (els.cfgMujianNoteStyle) els.cfgMujianNoteStyle.value = tmpl.note_style || "classic"; bindTemplateEditor(); updateMujianStyleHelp(); });
+  els.cfgMujianTemplateSelect?.addEventListener("change", () => { state.currentTemplateId = els.cfgMujianTemplateSelect.value; state.expandedTemplateFieldIndex = null; if (els.templateSelect) els.templateSelect.value = state.currentTemplateId; const tmpl = activeTemplate(); if (els.cfgMujianNoteStyle) els.cfgMujianNoteStyle.value = tmpl.note_style || "classic"; bindTemplateEditor(); updateMujianStyleHelp(); });
 
   els.cfgMujianThemeSelect?.addEventListener("change", () => setActiveTheme(els.cfgMujianThemeSelect.value));
   els.themeSelect?.addEventListener("change", () => setActiveTheme(els.themeSelect.value));
@@ -1113,6 +1380,7 @@
     const nextId = els.templateSelect.value;
     commitTemplateEditorToState({ rebind: false });
     state.currentTemplateId = nextId;
+    state.expandedTemplateFieldIndex = null;
     state.config = { ...state.config, mujian_template_id: nextId };
     bindTemplateEditor();
     if (els.cfgMujianTemplateSelect) els.cfgMujianTemplateSelect.value = nextId;
@@ -1120,12 +1388,15 @@
   els.templateFieldsEditor?.addEventListener("input", (event) => {
     const card = event.target.closest(".template-field-card");
     if (card) {
-      const title = card.querySelector(".template-field-head strong");
-      const keyText = card.querySelector(".template-field-head span");
+      const title = card.querySelector(".template-field-title strong");
+      const keyText = card.querySelector(".template-field-key");
+      const summary = card.querySelector(".template-field-summary");
       const key = safeTemplateId(card.querySelector("[data-tpl-key]")?.value || "");
       const label = (card.querySelector("[data-tpl-label]")?.value || key || "字段").trim();
+      const instruction = (card.querySelector("[data-tpl-instruction]")?.value || "根据本轮上下文生成该字段。").replace(/\s+/g, " ").trim();
       if (title) title.textContent = label;
       if (keyText) keyText.textContent = key;
+      if (summary) summary.textContent = instruction;
     }
     updateTemplatePreview();
   });
@@ -1134,20 +1405,42 @@
   els.templateDesc?.addEventListener("input", updateTemplatePreview);
   els.templateNoteStyle?.addEventListener("change", updateTemplatePreview);
   els.templateFieldsEditor?.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-tpl-toggle]");
     const up = event.target.closest("[data-tpl-up]");
     const down = event.target.closest("[data-tpl-down]");
     const del = event.target.closest("[data-tpl-delete]");
-    if (!up && !down && !del) return;
+    if (!toggle && !up && !down && !del) return;
     const template = readTemplateEditor();
+    if (toggle && !up && !down && !del) {
+      const index = Number(toggle.dataset.tplToggle);
+      state.expandedTemplateFieldIndex = state.expandedTemplateFieldIndex === index ? null : index;
+      renderTemplateFields(template);
+      updateTemplatePreview();
+      return;
+    }
     let index = Number((up || down || del).dataset.tplUp ?? (up || down || del).dataset.tplDown ?? (up || down || del).dataset.tplDelete);
-    if (del) template.fields.splice(index, 1);
-    if (up && index > 0) [template.fields[index - 1], template.fields[index]] = [template.fields[index], template.fields[index - 1]];
-    if (down && index < template.fields.length - 1) [template.fields[index + 1], template.fields[index]] = [template.fields[index], template.fields[index + 1]];
+    if (del) {
+      template.fields.splice(index, 1);
+      state.expandedTemplateFieldIndex = null;
+    }
+    if (up && index > 0) {
+      [template.fields[index - 1], template.fields[index]] = [template.fields[index], template.fields[index - 1]];
+      state.expandedTemplateFieldIndex = index - 1;
+    }
+    if (down && index < template.fields.length - 1) {
+      [template.fields[index + 1], template.fields[index]] = [template.fields[index], template.fields[index + 1]];
+      state.expandedTemplateFieldIndex = index + 1;
+    }
     const templates = mujianTemplates().slice();
     const pos = templates.findIndex((item) => item.id === template.id);
     if (pos >= 0) templates[pos] = template;
     state.config = { ...state.config, mujian_templates: templates };
     renderTemplateFields(template);
+    updateTemplatePreview();
+  });
+  $("#collapseTemplateFieldsBtn")?.addEventListener("click", () => {
+    state.expandedTemplateFieldIndex = null;
+    renderTemplateFields(readTemplateEditor());
     updateTemplatePreview();
   });
   $("#addTemplateFieldBtn")?.addEventListener("click", () => {
@@ -1157,6 +1450,7 @@
     while (used.has(`field_${n}`)) n += 1;
     const field = { key: `field_${n}`, label: "新字段", instruction: "根据本轮上下文生成该字段。" };
     template.fields.push(field);
+    state.expandedTemplateFieldIndex = template.fields.length - 1;
     const token = `{${field.key}}`;
     if (!String(template.output_template || "").includes(token)) {
       const line = `<${field.label}(${token})>`;
@@ -1173,7 +1467,7 @@
     const source = readTemplateEditor();
     const copy = { ...source, id: `custom_${Date.now()}`, name: `${source.name || "模板"} 副本` };
     state.config = { ...state.config, mujian_templates: [...mujianTemplates(), copy], mujian_template_id: copy.id };
-    state.currentTemplateId = copy.id; bindTemplateEditor(); pageToast("已复制模板", "修改后点击保存模板设置。", "ok");
+    state.currentTemplateId = copy.id; state.expandedTemplateFieldIndex = null; bindTemplateEditor(); pageToast("已复制模板", "修改后点击保存模板设置。", "ok");
   });
   $("#exportTemplateBtn")?.addEventListener("click", () => {
     const template = readTemplateEditor();
@@ -1189,14 +1483,13 @@
       const id = safeTemplateId(template.id || template.name || `custom_${Date.now()}`);
       const normalized = { ...template, id, fields: Array.isArray(template.fields) ? template.fields : [] };
       state.config = { ...state.config, mujian_templates: [...mujianTemplates().filter((item) => item.id !== id), normalized], mujian_template_id: id };
-      state.currentTemplateId = id; bindTemplateEditor(); pageToast("模板已导入", normalized.name || id, "ok");
+      state.currentTemplateId = id; state.expandedTemplateFieldIndex = null; bindTemplateEditor(); pageToast("模板已导入", normalized.name || id, "ok");
     } catch (error) { pageToast("导入模板失败", error.message, "error"); }
     event.target.value = "";
   });
   $("#toggleApiKeyBtn").addEventListener("click", () => { const hidden = els.cfgApiKey.type === "password"; els.cfgApiKey.type = hidden ? "text" : "password"; $("#toggleApiKeyBtn").textContent = hidden ? "隐藏" : "显示"; });
   $("#manualWorkerBtn").addEventListener("click", () => manualWorkerUpdate().catch((error) => { setStatus(error.message, "error"); pageToast("心笺填表失败", error.message, "error"); }));
   $("#loadLogBtn").addEventListener("click", () => loadLog().catch((error) => { els.logBox.textContent = error.message; }));
-  $("#exportDebugLogBtn")?.addEventListener("click", () => exportDebugLog().catch((error) => pageToast("导出排查日志失败", error.message, "error")));
   $("#exportDebugLogBtn")?.addEventListener("click", () => exportDebugLog().catch((error) => pageToast("导出排查日志失败", error.message, "error")));
   $("#addFieldBtn").addEventListener("click", addField); $("#addRowBtn").addEventListener("click", addRow); $("#newTableBtn").addEventListener("click", newTable);
   $("#exportBtn").addEventListener("click", () => exportAll().catch((error) => setStatus(error.message, "error")));

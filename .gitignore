@@ -22,3 +22,5 @@ CLAUDE.md
 .idea/
 mods/*/data/*.json
 data/logs/
+# Runtime data, saves, logs, local databases
+/data/

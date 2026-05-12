@@ -119,6 +119,37 @@ button { color: inherit; }
   letter-spacing: -0.03em;
 }
 
+.sidebar-return-chat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.sidebar-return-chat:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 36%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 72%, white 28%);
+  box-shadow: 0 10px 24px rgba(201, 106, 51, 0.12);
+}
+
+.sidebar-return-chat:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 52%, white);
+  box-shadow: 0 0 0 4px rgba(201, 106, 51, 0.10);
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;

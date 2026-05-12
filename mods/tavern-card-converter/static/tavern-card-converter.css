@@ -303,3 +303,39 @@ body.tcc-page {
 .tcc-guide-item strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .tcc-guide-item p { font-size: 12px; color: var(--tcc-muted); line-height: 1.55; margin: 4px 0 6px; }
 .tcc-guide-item a { font-size: 12px; color: var(--tcc-accent); word-break: break-all; }
+
+/* Mod 管理页内嵌化 v0.1 修正版：保留原酒馆卡配色，只补管理页顶部操作区 */
+body.tcc-page.mod-admin-embedded-page {
+  background: var(--tcc-bg);
+  color: var(--tcc-text);
+  min-height: 100vh;
+}
+.mod-admin-embedded-page .tcc-shell {
+  width: min(100%, 1180px);
+  max-width: none;
+  margin: 0 auto;
+  padding: 36px 28px 72px;
+}
+.mod-admin-embedded-page .mod-admin-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 32px;
+}
+.mod-admin-embedded-page .mod-admin-hero .tcc-header {
+  margin-bottom: 0;
+}
+.mod-admin-embedded-page .mod-admin-hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .55rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+@media (max-width: 820px) {
+  .mod-admin-embedded-page .tcc-shell { padding: 28px 18px 56px; }
+  .mod-admin-embedded-page .mod-admin-hero { flex-direction: column; }
+  .mod-admin-embedded-page .mod-admin-hero-actions { width: 100%; justify-content: flex-start; }
+}

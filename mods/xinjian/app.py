@@ -219,6 +219,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "mujian_note_density": "standard",
     "mujian_character_filter": "turn",
     "mujian_character_names": "",
+    "mujian_protagonist_card_enabled": False,
+    "mujian_protagonist_card_mode": "when_relevant",
+    "mujian_protagonist_name": "",
+    "mujian_protagonist_aliases": "",
+    "mujian_worker_custom_prompt_enabled": False,
+    "mujian_worker_style_prompt": "",
+    "mujian_worker_protagonist_prompt": "",
     "mujian_template_id": "standard_metrics",
     "mujian_templates": DEFAULT_MUJIAN_TEMPLATES,
     "mujian_theme_id": "standard",
@@ -649,9 +656,9 @@ def normalize_config(config: Any) -> dict[str, Any]:
         merged["temperature"] = max(0, min(2, float(merged.get("temperature", 0) or 0)))
     except (TypeError, ValueError):
         merged["temperature"] = 0
-    for key in ["enabled", "auto_update", "notify_in_chat", "strict_mode", "debug_enabled", "mujian_enabled", "mujian_title_card", "mujian_turn_note", "mujian_default_collapsed"]:
+    for key in ["enabled", "auto_update", "notify_in_chat", "strict_mode", "debug_enabled", "mujian_enabled", "mujian_title_card", "mujian_turn_note", "mujian_default_collapsed", "mujian_protagonist_card_enabled", "mujian_worker_custom_prompt_enabled"]:
         merged[key] = bool(merged.get(key))
-    for key in ["api_type", "api_base_url", "api_key", "model", "mujian_style", "mujian_title_style", "mujian_note_style", "mujian_expand_level", "mujian_note_density", "mujian_chat_display_mode", "mujian_character_filter", "mujian_character_names", "mujian_template_id", "mujian_theme_id"]:
+    for key in ["api_type", "api_base_url", "api_key", "model", "mujian_style", "mujian_title_style", "mujian_note_style", "mujian_expand_level", "mujian_note_density", "mujian_chat_display_mode", "mujian_character_filter", "mujian_character_names", "mujian_protagonist_card_mode", "mujian_protagonist_name", "mujian_protagonist_aliases", "mujian_worker_style_prompt", "mujian_worker_protagonist_prompt", "mujian_template_id", "mujian_theme_id"]:
         merged[key] = str(merged.get(key) or "").strip()
     legacy_style = merged.get("mujian_style") or "classic"
     if merged.get("mujian_title_style") not in {"classic", "gufeng", "chapter"}:
@@ -668,6 +675,8 @@ def normalize_config(config: Any) -> dict[str, Any]:
     merged["mujian_default_collapsed"] = merged.get("mujian_chat_display_mode") == "collapsed"
     if merged.get("mujian_character_filter") not in {"turn", "heroine", "protagonist", "custom", "all"}:
         merged["mujian_character_filter"] = "turn"
+    if merged.get("mujian_protagonist_card_mode") not in {"when_relevant", "always"}:
+        merged["mujian_protagonist_card_mode"] = "when_relevant"
     merged["mujian_templates"] = normalize_mujian_templates(merged.get("mujian_templates"))
     merged["mujian_theme_packs"] = normalize_mujian_theme_packs(merged.get("mujian_theme_packs"))
     active_theme = active_mujian_theme_pack(merged)
@@ -2331,6 +2340,38 @@ NOTE_STYLE_RULES = {
     "sensory": "角色附笺必须偏标签式细节：重点生成情绪、衣着、角色神态、感官场域、躯体温差、肢体动态、微生理反应、视觉焦点、角色互动。每个字段都要有可展示内容，尤其不要把感官场域、躯体温差、肢体动态、微生理反应、视觉焦点留空。",
 }
 
+
+def split_prompt_names(value: object) -> list[str]:
+    return [item.strip() for item in re.split(r"[，,、;；\n]+", str(value or "")) if item.strip()]
+
+def build_protagonist_prompt_rule(config: dict[str, Any]) -> str:
+    if not config.get("mujian_protagonist_card_enabled"):
+        return ""
+    name = str(config.get("mujian_protagonist_name") or "").strip()
+    aliases = split_prompt_names(config.get("mujian_protagonist_aliases"))
+    mode = str(config.get("mujian_protagonist_card_mode") or "when_relevant")
+    name_line = f"主角名称：{name}。" if name else "主角名称未填写；如果无法稳定识别主角，不要凭空猜测具体姓名。"
+    alias_line = f"主角别名：{'、'.join(aliases)}。" if aliases else "主角别名：无。"
+    if mode == "always":
+        mode_line = "生成方式：每轮都生成。display.characters 必须包含主角状态卡；若本轮主角信息较少，也只能写可观察的低推断状态。"
+    else:
+        mode_line = "生成方式：明显涉及时生成。只有本轮正文、用户输入、最近上下文或旧状态明确涉及主角的身体状态、伤势、调息、位置、气息、被照料或与他人的互动时，才生成主角状态卡。"
+    return "\n20. 当前设置启用主角状态卡。" + name_line + alias_line + mode_line + "主角状态卡只记录可观察状态、身体状态、衣着、姿态、位置、气息与互动关系；不得替用户决定未发生的行动、台词、心理活动和选择。"
+
+def build_worker_custom_prompt_rule(config: dict[str, Any]) -> str:
+    if not config.get("mujian_worker_custom_prompt_enabled"):
+        return ""
+    parts: list[str] = []
+    style_prompt = str(config.get("mujian_worker_style_prompt") or "").strip()
+    protagonist_prompt = str(config.get("mujian_worker_protagonist_prompt") or "").strip()
+    if style_prompt:
+        parts.append("用户自定义幕笺语言风格补充：" + style_prompt)
+    if protagonist_prompt:
+        parts.append("用户自定义主角状态卡规则：" + protagonist_prompt)
+    if not parts:
+        return ""
+    return "\n21. 以下是用户提供的安全附加提示词，只影响幕笺表达和主角状态卡取舍，不得覆盖 JSON 输出协议、updates 协议、SQLite 写入规则、字段 key 或禁止替用户行动的硬性规则：" + "\n".join(parts)
+
 def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, Any] | None, history: list[dict[str, str]], config: dict[str, Any], metric_states: dict[str, Any] | None = None) -> tuple[str, str]:
     mujian_enabled = bool(config.get("mujian_enabled", True))
     expand_level = str(config.get("mujian_expand_level") or "standard")
@@ -2361,6 +2402,8 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
             if has_metric_fields:
                 system_prompt += "\n18. 当前模板包含关系/状态数值字段：这类字段必须使用固定格式 `当前值/100（本轮变化）`，例如 `65/100（+2）`、`72/100（+0）`、`18/100（-1）`。当前值限制在 0-100；变化值只表示本轮变化，不要写成长句解释。"
                 system_prompt += "\n19. 如果 current_metrics 提供了该角色上一轮数值，必须以上一轮数值为基准，根据本轮剧情判断 delta，再输出新当前值；不要每回合机械 +1 或凭空重置。"
+        system_prompt += build_protagonist_prompt_rule(config)
+        system_prompt += build_worker_custom_prompt_rule(config)
 
 
     display_schema = {
@@ -2400,6 +2443,13 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
         "note_generation_rule": note_style_rule,
         "active_note_template": active_template,
         "current_metrics": metric_states or {},
+        "protagonist_card": {
+            "enabled": bool(config.get("mujian_protagonist_card_enabled")),
+            "mode": config.get("mujian_protagonist_card_mode"),
+            "name": config.get("mujian_protagonist_name"),
+            "aliases": split_prompt_names(config.get("mujian_protagonist_aliases")),
+            "custom_rule_enabled": bool(config.get("mujian_worker_custom_prompt_enabled")),
+        },
         "metric_rules": {
             "range": "0-100",
             "delta": "本轮变化，通常 -5 到 +5；心绪类可 -10 到 +10",
