@@ -66,8 +66,10 @@
         </div>
         <div class="button-row config-overview-actions">
           <button id="export-current-bundle" type="button" class="secondary export-action">导出当前人设存档 ZIP</button>
+          <button id="import-bundle" type="button" class="secondary import-action">导入人设存档 ZIP</button>
           <button id="export-logs" type="button" class="secondary export-action">导出日志</button>
         </div>
+        <input type="file" id="import-bundle-file" accept=".zip" hidden />
       </section>
 
       <section class="panel config-panel config-primary-panel">
@@ -975,6 +977,53 @@
           setStatus("已完成：人设存档下载已开始", "success");
         }, 700);
         window.location.href = "/api/export/current-bundle";
+      });
+
+      document.getElementById("import-bundle").addEventListener("click", () => {
+        document.getElementById("import-bundle-file").click();
+      });
+
+      document.getElementById("import-bundle-file").addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        const button = document.getElementById("import-bundle");
+        try {
+          setButtonState(button, "loading", "导入中…");
+          setStatus("正在导入人设存档…", "busy");
+          showToast("正在导入人设存档", "info");
+
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const response = await fetch("/api/import/bundle", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "导入失败");
+          }
+
+          const data = await response.json();
+          const filesInfo = data.imported_files || {};
+          let msg = "人设存档导入成功。";
+          if (filesInfo.role_card) msg += ` 已加载：${filesInfo.role_card}`;
+          if (filesInfo.memories) msg += " 记忆已导入";
+          if (filesInfo.worldbook) msg += " 世界书已导入";
+          if (filesInfo.preset) msg += " 预设已导入";
+
+          setButtonState(button, "success", "导入成功 ✓");
+          setStatus(msg, "success");
+          showToast(msg, "success");
+        } catch (error) {
+          setButtonState(button, "idle", "导入人设存档 ZIP");
+          setStatus(`导入失败：${error.message}`, "error");
+          showToast(`导入失败：${error.message}`, "error");
+        } finally {
+          event.target.value = "";
+        }
       });
 
       document.getElementById("export-logs").addEventListener("click", async (event) => {

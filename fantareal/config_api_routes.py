@@ -1061,6 +1061,82 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             media_type="application/zip",
         )
 
+    @app.post("/api/import/bundle")
+    async def api_import_bundle(file: UploadFile = File(...)) -> dict[str, Any]:
+        """导入四卡完整存档 ZIP 包"""
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix != ".zip":
+            raise HTTPException(status_code=400, detail="请选择 .zip 格式的存档文件。")
+
+        content = await file.read(50 * 1024 * 1024 + 1)
+        if len(content) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="文件大小不能超过 50 MB。")
+
+        active_slot = ctx.get_active_slot_id()
+
+        try:
+            with ZipFile(BytesIO(content)) as archive:
+                namelist = archive.namelist()
+
+                def read_json(name: str) -> dict[str, Any] | None:
+                    try:
+                        return json.loads(archive.read(name).decode("utf-8"))
+                    except Exception:
+                        return None
+
+                role_card = None
+                memories = None
+                worldbook = None
+                preset = None
+
+                for name in namelist:
+                    if "人设卡" in name and name.endswith(".json"):
+                        role_card = read_json(name)
+                    elif "记忆" in name and name.endswith(".json"):
+                        memories = read_json(name)
+                    elif "世界书" in name and name.endswith(".json"):
+                        worldbook = read_json(name)
+                    elif "预设" in name and name.endswith(".json"):
+                        preset = read_json(name)
+
+                if role_card is None:
+                    raise HTTPException(status_code=400, detail="存档包中未找到人设卡文件。")
+
+                if isinstance(memories, dict) and "items" in memories:
+                    ctx.save_memories(memories.get("items", []), active_slot)
+                elif isinstance(memories, list):
+                    ctx.save_memories(memories, active_slot)
+
+                if isinstance(worldbook, dict):
+                    ctx.save_worldbook_store(worldbook, active_slot)
+
+                if isinstance(preset, dict):
+                    ctx.save_preset_store(preset, active_slot)
+
+                card_to_apply = role_card
+                source_name = "imported_bundle"
+                for name in namelist:
+                    if name.endswith(".json") and "人设卡" in name:
+                        source_name = name.replace(".json", "")
+                        break
+
+                result = ctx.apply_role_card(card_to_apply, source_name=source_name, slot_id=active_slot)
+                result["workshop"] = ctx.evaluate_creative_workshop(slot_id=active_slot, reason="import")
+                result["ok"] = True
+                result["imported_files"] = {
+                    "role_card": source_name,
+                    "memories": bool(memories),
+                    "worldbook": bool(worldbook),
+                    "preset": bool(preset),
+                }
+                return result
+
+        except HTTPException:
+            raise
+        except Exception as exc:
+            ctx.logger.exception("Bundle import failed")
+            raise HTTPException(status_code=500, detail=f"导入存档失败：{exc}") from exc
+
     @app.get("/api/logs/export")
     async def api_export_logs() -> FileResponse:
         ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1190,6 +1266,98 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         file: UploadFile = File(...),
     ) -> dict[str, Any]:
         return await ctx.save_workshop_asset_upload(kind=kind, file=file)
+
+    @app.get("/api/workspace/export")
+    async def api_export_workspace_bundle() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        current_card = ctx.get_current_card(active_slot)
+        card = ctx.normalize_role_card(current_card.get("raw", {}))
+        settings = ctx.get_settings(active_slot)
+        safe_settings = {k: v for k, v in settings.items() if "api_key" not in k and "base_url" not in k}
+
+        return {
+            "version": 1,
+            "exported_at": datetime.now().isoformat(timespec="seconds"),
+            "source": "pc",
+            "persona": ctx.get_persona(active_slot),
+            "current_card": current_card,
+            "memories": ctx.get_memories(active_slot),
+            "worldbook": ctx.get_worldbook_store(active_slot),
+            "preset_store": ctx.get_preset_store(active_slot),
+            "workshop_state": ctx.get_workshop_state(active_slot),
+            "user_profile": ctx.get_user_profile(active_slot),
+            "messages": ctx.get_conversation(active_slot),
+            "settings": safe_settings,
+        }
+
+    @app.post("/api/workspace/import")
+    async def api_import_workspace_bundle(payload: JsonImportPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        parsed = parse_json_import_payload(payload.raw_json, label="Workspace")
+
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=400, detail="Workspace bundle must be a JSON object.")
+
+        raw_persona = parsed.get("persona")
+        if isinstance(raw_persona, dict):
+            persona_payload = {
+                "name": str(raw_persona.get("name", "")).strip(),
+                "system_prompt": str(raw_persona.get("system_prompt", "")).strip(),
+                "greeting": str(raw_persona.get("greeting", "")).strip(),
+            }
+            ctx.persist_json(
+                ctx.global_persona_path(),
+                persona_payload,
+                detail="Workspace import failed: could not save persona.",
+            )
+
+        raw_card = parsed.get("current_card")
+        if isinstance(raw_card, dict):
+            existing_card = ctx.read_json(ctx.current_card_path(), {})
+            merged_card = {**existing_card, **raw_card}
+            ctx.persist_json(
+                ctx.current_card_path(),
+                merged_card,
+                detail="Workspace import failed: could not save current card.",
+            )
+
+        memories = parsed.get("memories")
+        if isinstance(memories, list):
+            ctx.save_memories(memories, active_slot)
+
+        worldbook = parsed.get("worldbook")
+        if isinstance(worldbook, dict):
+            ctx.save_worldbook_store(worldbook, active_slot)
+
+        preset_store = parsed.get("preset_store")
+        if isinstance(preset_store, dict):
+            ctx.save_preset_store(preset_store, active_slot)
+
+        workshop_state = parsed.get("workshop_state")
+        if isinstance(workshop_state, dict):
+            ctx.save_workshop_state(workshop_state, active_slot)
+
+        user_profile = parsed.get("user_profile")
+        if isinstance(user_profile, dict):
+            ctx.save_user_profile(user_profile, active_slot)
+
+        messages = parsed.get("messages")
+        if isinstance(messages, list):
+            ctx.persist_json(
+                ctx.conversation_path(active_slot),
+                messages,
+                detail="Workspace import failed: could not save conversation.",
+            )
+
+        settings = parsed.get("settings")
+        if isinstance(settings, dict):
+            ctx.persist_json(
+                ctx.settings_path(active_slot),
+                ctx.sanitize_settings(settings, slot_id=active_slot),
+                detail="Workspace import failed: could not save settings.",
+            )
+
+        return {"ok": True, "active_slot": active_slot}
 
     @app.post("/api/models")
     async def api_get_models() -> dict[str, Any]:
