@@ -14,6 +14,122 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         return ctx.get_conversation()
 
 
+    @app.post("/api/chat/history/message-meta")
+    async def api_patch_message_metadata(payload: dict[str, Any]) -> dict[str, Any]:
+        """Persist client-side chat message identity for mod hooks.
+
+        The streaming endpoint saves chat history after the final SSE event. The
+        browser already knows the stable turn/message identity used by mods, so
+        it patches the latest user/assistant pair after the turn completes.
+        """
+        history = ctx.get_conversation()
+        if not history:
+            return {"ok": False, "reason": "empty_history", "patched": 0}
+
+        turn_id = str(payload.get("turn_id") or payload.get("turnId") or "").strip()
+        turn_index_raw = payload.get("turn_index", payload.get("turnIndex", 0))
+        try:
+            turn_index = int(turn_index_raw)
+        except (TypeError, ValueError):
+            turn_index = 0
+        user_text = str(payload.get("user_text") or payload.get("userText") or "").strip()
+        assistant_text = str(payload.get("assistant_text") or payload.get("assistantText") or "").strip()
+        user_message_id = str(payload.get("user_message_id") or payload.get("userMessageId") or "").strip()
+        assistant_message_id = str(payload.get("assistant_message_id") or payload.get("assistantMessageId") or payload.get("message_id") or payload.get("messageId") or "").strip()
+        content_hash = str(payload.get("content_hash") or payload.get("contentHash") or payload.get("assistant_hash") or payload.get("assistantHash") or "").strip()
+        user_hash = str(payload.get("user_hash") or payload.get("userHash") or "").strip()
+        assistant_hash = str(payload.get("assistant_hash") or payload.get("assistantHash") or content_hash or "").strip()
+        assistant_clean_text = str(payload.get("assistant_clean_text") or payload.get("assistantCleanText") or "").strip()
+        source = str(payload.get("source") or payload.get("trigger_source") or payload.get("triggerSource") or "chat_hook").strip()
+
+        def same_text(left: str, right: str) -> bool:
+            return str(left or "").strip() == str(right or "").strip()
+
+        assistant_index = -1
+        if assistant_text:
+            for idx in range(len(history) - 1, -1, -1):
+                item = history[idx]
+                if item.get("role") == "assistant" and same_text(item.get("content", ""), assistant_text):
+                    assistant_index = idx
+                    break
+        if assistant_index < 0:
+            for idx in range(len(history) - 1, -1, -1):
+                if history[idx].get("role") == "assistant":
+                    assistant_index = idx
+                    break
+
+        user_index = -1
+        if assistant_index >= 0:
+            for idx in range(assistant_index - 1, -1, -1):
+                item = history[idx]
+                if item.get("role") != "user":
+                    continue
+                if user_text and not same_text(item.get("content", ""), user_text):
+                    continue
+                user_index = idx
+                break
+            if user_index < 0:
+                for idx in range(assistant_index - 1, -1, -1):
+                    if history[idx].get("role") == "user":
+                        user_index = idx
+                        break
+
+        patched = 0
+        if user_index >= 0:
+            user_item = dict(history[user_index])
+            if user_message_id:
+                user_item["message_id"] = user_message_id
+            if turn_id:
+                user_item["turn_id"] = turn_id
+                user_item["state_journal_turn"] = turn_id
+            if turn_index > 0:
+                user_item["turn_index"] = turn_index
+            if user_hash:
+                user_item["content_hash"] = user_hash
+                user_item["user_hash"] = user_hash
+            if source:
+                user_item["source"] = source
+            history[user_index] = user_item
+            patched += 1
+
+        if assistant_index >= 0:
+            assistant_item = dict(history[assistant_index])
+            if assistant_message_id:
+                assistant_item["message_id"] = assistant_message_id
+            if turn_id:
+                assistant_item["turn_id"] = turn_id
+                assistant_item["state_journal_turn"] = turn_id
+            if turn_index > 0:
+                assistant_item["turn_index"] = turn_index
+            if content_hash:
+                assistant_item["content_hash"] = content_hash
+                assistant_item["assistant_hash"] = assistant_hash or content_hash
+            if assistant_text:
+                assistant_item["raw_content"] = assistant_text
+            if assistant_clean_text:
+                assistant_item["assistant_clean_text"] = assistant_clean_text
+            if source:
+                assistant_item["source"] = source
+            history[assistant_index] = assistant_item
+            patched += 1
+
+        if patched:
+            ctx.persist_json(
+                ctx.conversation_path(),
+                history,
+                detail="Chat message metadata save failed. Please check disk space or file permissions.",
+            )
+        return {
+            "ok": bool(patched),
+            "patched": patched,
+            "user_index": user_index,
+            "assistant_index": assistant_index,
+            "turn_id": turn_id,
+            "message_id": assistant_message_id,
+            "content_hash": content_hash,
+        }
+
+
     @app.post("/api/chat/history/edit-user")
     async def api_edit_user_message(payload: ChatHistoryEditRequest) -> dict[str, Any]:
         history = ctx.get_conversation()

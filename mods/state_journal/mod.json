@@ -3,7 +3,7 @@
   "description": "AI 结构化状态记录与幕笺展示工具。v1.0.0 正式稳定版。",
   "hooks": {
     "chat_scripts": [
-      "/static/xinjian-chat.js?v=xinjian-v1-0-0-stable"
+      "/static/state-journal-chat.js?v=state-journal-v1-0-0-stable"
     ]
   }
 }

@@ -5,240 +5,265 @@
   <title>酒馆卡转换器</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="/static/styles.css?v=mod-admin-embed-v0-1" />
-  <link rel="stylesheet" href="./static/tavern-card-converter.css?v=3" />
+  <link rel="stylesheet" href="./static/tavern-card-converter.css?v=0-2" />
 </head>
 <body class="tcc-page mod-admin-embedded-page">
   <main class="tcc-shell">
-    <!-- Top bar: back + guide -->
     <div class="tcc-topbar">
-      <a href="/chat" class="tcc-back-btn">&larr; 返回</a>
-      <a id="tcc-guide-trigger" class="tcc-guide-link">如何获取酒馆卡...</a>
+      <a href="/chat" class="tcc-back-btn" target="_top">← 回到聊天</a>
+      <div class="tcc-topbar-actions">
+        <button id="tcc-guide-trigger" class="tcc-link-btn" type="button">获取酒馆卡说明</button>
+        <a class="tcc-link-btn" href="/mods/tavern-card-converter/app/" target="_blank" rel="noopener noreferrer">独立打开</a>
+      </div>
     </div>
 
-    <header class="tcc-header mod-admin-hero">
-      <div>
-        <p class="tcc-kicker">Fantareal Mod · Tavern Card Converter</p>
+    <header class="tcc-header">
+      <div class="tcc-header-main">
+        <p class="tcc-kicker">Fantareal Official Mod · Tavern Workbench</p>
         <h1>酒馆卡转换器</h1>
-        <p>将 SillyTavern / 酒馆 的 PNG 角色卡和世界书 JSON 转换为 Fantareal 兼容格式。页面已接入主程序内嵌管理页，原转换逻辑保持不变。</p>
+        <p>将 SillyTavern / 酒馆 的 PNG 角色卡、纯角色卡与世界书 JSON 转换为 Fantareal 可用格式。转换逻辑保持原样，本版只重构前端工作台与结果展示。</p>
       </div>
-      <div class="mod-admin-hero-actions">
-        <a class="tcc-btn tcc-btn-ghost" href="/chat" target="_top">回到聊天</a>
-        <a class="tcc-btn" href="/mods/tavern-card-converter/app/" target="_blank" rel="noopener noreferrer">独立打开</a>
+      <div class="tcc-header-stats" aria-hidden="true">
+        <span>PNG</span>
+        <span>JSON</span>
+        <span>Worldbook</span>
       </div>
     </header>
 
-    <div class="tcc-tabs">
-      <button class="tcc-tab active" data-tab="general">角色卡通用转换</button>
-      <button class="tcc-tab" data-tab="card">纯角色卡转换</button>
-      <button class="tcc-tab" data-tab="worldbook">世界书转换</button>
-    </div>
+    <nav class="tcc-tabs" aria-label="转换类型">
+      <button class="tcc-tab active" type="button" data-tab="general">
+        <span class="tcc-tab-title">角色卡通用转换</span>
+        <span class="tcc-tab-note">自动拆分角色卡 / 世界书 / 扩展配置</span>
+      </button>
+      <button class="tcc-tab" type="button" data-tab="card">
+        <span class="tcc-tab-title">纯角色卡转换</span>
+        <span class="tcc-tab-note">只处理角色设定字段</span>
+      </button>
+      <button class="tcc-tab" type="button" data-tab="worldbook">
+        <span class="tcc-tab-title">世界书转换</span>
+        <span class="tcc-tab-note">转换独立 Lorebook JSON</span>
+      </button>
+    </nav>
 
-    <!-- ═══ Tab: General Card Converter ═══ -->
     <section id="tab-general" class="tcc-tab-panel active">
-      <p class="tcc-tab-desc">包含角色信息、世界书、预设等综合内容的酒馆卡，自动识别并分类输出。</p>
+      <p class="tcc-tab-desc">适合大多数酒馆 PNG 角色卡。上传后自动识别角色卡、内嵌世界书、深度提示、话量设定等内容。</p>
       <div class="tcc-card-grid">
-        <div class="tcc-panel">
-          <h2>上传酒馆 PNG 角色卡</h2>
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>上传酒馆 PNG 角色卡</h2>
+            <span class="tcc-panel-tag">综合</span>
+          </div>
           <label class="tcc-drop-zone" id="general-drop-zone">
             <input type="file" id="general-file-input" accept="image/png" hidden />
-            <div class="tcc-drop-content">
-              <span class="tcc-drop-icon">&#x1F4C1;</span>
-              <span>拖拽 PNG 到此处，或点击选择文件</span>
-              <span class="tcc-drop-hint">支持所有酒馆 PNG 卡（tEXt / iTXt 元数据格式），自动识别内嵌世界书</span>
-            </div>
+            <span class="tcc-drop-icon">⌁</span>
+            <span class="tcc-drop-title">拖拽 PNG 到此处</span>
+            <span class="tcc-drop-hint">或点击选择文件，支持 tEXt / iTXt 元数据</span>
           </label>
-          <div id="general-parsing-hint" class="tcc-parsing-hint" hidden>正在解析，请稍等喵~</div>
+          <div id="general-parsing-hint" class="tcc-parsing-hint" hidden>正在解析酒馆卡，请稍等…</div>
           <div id="general-error" class="tcc-msg tcc-msg-error" hidden></div>
           <div id="general-preview" class="tcc-image-preview" hidden>
             <img id="general-preview-img" src="" alt="角色立绘预览" />
           </div>
-        </div>
+          <div id="general-file-summary" class="tcc-file-summary" hidden></div>
+          <div class="tcc-sidebar-actions">
+            <button id="general-download-png-btn" class="tcc-btn tcc-btn-soft" type="button" disabled>下载纯图片</button>
+          </div>
+        </aside>
 
-        <div class="tcc-panel">
-          <h2>转换结果</h2>
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>转换结果</h2>
+              <p>默认显示摘要，详细内容与 JSON 可逐项展开。</p>
+            </div>
+            <div class="tcc-result-tools" id="general-result-tools" hidden>
+              <button class="tcc-btn tcc-btn-sm tcc-collapse-all" type="button" data-target="general">全部折叠</button>
+              <button class="tcc-btn tcc-btn-sm tcc-expand-all" type="button" data-target="general">展开详情</button>
+            </div>
+          </div>
           <div id="general-result-empty" class="tcc-empty-state">
-            <span>上传 PNG 后在此处查看转换结果</span>
+            <strong>等待上传</strong>
+            <span>转换完成后会在这里生成结果卡片。</span>
           </div>
           <div id="general-result" hidden>
-            <div id="general-pure-hint" class="tcc-pure-hint" hidden>
-              这张卡仅含纯角色信息，建议切换到「纯角色卡转换」获得更精准的 JSON 文件。
-            </div>
-            <div id="general-sections"></div>
-            <div class="tcc-actions">
-              <button id="general-download-png-btn" class="tcc-btn" disabled>下载纯图片</button>
-            </div>
-            <p id="general-save-path-hint" class="tcc-save-path-hint" hidden>
-              当前保存至: <span id="general-save-path-label"></span> · <a id="general-change-path">点击更改保存路径...</a>
-            </p>
+            <div id="general-pure-hint" class="tcc-pure-hint" hidden>这张卡看起来更接近纯角色卡，也可以切换到「纯角色卡转换」获得更专注的角色字段输出。</div>
+            <div id="general-sections" class="tcc-result-stack"></div>
           </div>
-        </div>
+        </section>
       </div>
     </section>
 
-    <!-- ═══ Tab: Pure Card Converter ═══ -->
     <section id="tab-card" class="tcc-tab-panel">
-      <p class="tcc-tab-desc">仅包含超详细角色设定的纯角色卡，不含世界书等附加信息，可获得最精准的角色卡 JSON。</p>
+      <p class="tcc-tab-desc">用于只包含角色设定的酒馆 PNG 卡。不处理内嵌世界书，重点检查名称、描述、性格、场景、开场白与示例对话。</p>
       <div class="tcc-card-grid">
-        <div class="tcc-panel">
-          <h2>上传酒馆 PNG 角色卡</h2>
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>上传纯角色 PNG 卡</h2>
+            <span class="tcc-panel-tag">角色</span>
+          </div>
           <label class="tcc-drop-zone" id="card-drop-zone">
             <input type="file" id="card-file-input" accept="image/png" hidden />
-            <div class="tcc-drop-content">
-              <span class="tcc-drop-icon">&#x1F4C1;</span>
-              <span>拖拽 PNG 到此处，或点击选择文件</span>
-              <span class="tcc-drop-hint">支持酒馆 (SillyTavern) V2 规格的 PNG 角色卡（仅角色信息）</span>
-            </div>
+            <span class="tcc-drop-icon">⌁</span>
+            <span class="tcc-drop-title">拖拽 PNG 到此处</span>
+            <span class="tcc-drop-hint">适合 SillyTavern V2 纯角色卡</span>
           </label>
-          <div id="card-parsing-hint" class="tcc-parsing-hint" hidden>正在解析，请稍等喵~</div>
+          <div id="card-parsing-hint" class="tcc-parsing-hint" hidden>正在解析角色卡，请稍等…</div>
           <div id="card-error" class="tcc-msg tcc-msg-error" hidden></div>
           <div id="card-preview" class="tcc-image-preview" hidden>
             <img id="card-preview-img" src="" alt="角色立绘预览" />
           </div>
-        </div>
+          <div id="card-file-summary" class="tcc-file-summary" hidden></div>
+          <div class="tcc-sidebar-actions">
+            <button id="card-download-png-btn" class="tcc-btn tcc-btn-soft" type="button" disabled>下载纯图片</button>
+          </div>
+        </aside>
 
-        <div class="tcc-panel">
-          <h2>转换结果</h2>
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>转换结果</h2>
+              <p>先看字段摘要，再展开角色设定和完整 JSON。</p>
+            </div>
+            <div class="tcc-result-tools" id="card-result-tools" hidden>
+              <button class="tcc-btn tcc-btn-sm tcc-collapse-all" type="button" data-target="card">全部折叠</button>
+              <button class="tcc-btn tcc-btn-sm tcc-expand-all" type="button" data-target="card">展开详情</button>
+            </div>
+          </div>
           <div id="card-result-empty" class="tcc-empty-state">
-            <span>上传 PNG 后在此处查看转换结果</span>
+            <strong>等待上传</strong>
+            <span>上传后会生成角色卡字段摘要。</span>
           </div>
           <div id="card-result" hidden>
-            <div class="tcc-result-meta">
+            <div class="tcc-result-meta" hidden>
               <span id="card-result-name"></span>
               <span id="card-result-preserved" class="tcc-preserved-badge"></span>
             </div>
-            <pre id="card-json-output" class="tcc-json-block"></pre>
-            <div class="tcc-actions">
-              <button id="card-download-btn" class="tcc-btn tcc-btn-primary" disabled>下载角色卡 JSON</button>
-              <button id="card-copy-btn" class="tcc-btn" disabled>复制 JSON</button>
-              <button id="card-download-png-btn" class="tcc-btn" disabled>下载纯图片</button>
+            <div id="card-result-body" class="tcc-result-stack"></div>
+            <pre id="card-json-output" class="tcc-json-block tcc-hidden-buffer"></pre>
+            <div class="tcc-actions tcc-hidden-buffer">
+              <button id="card-download-btn" class="tcc-btn tcc-btn-primary" type="button" disabled>保存 / 下载角色卡 JSON</button>
+              <button id="card-copy-btn" class="tcc-btn" type="button" disabled>复制 JSON</button>
             </div>
-            <p id="card-save-path-hint" class="tcc-save-path-hint" hidden>
-              当前保存至: <span id="card-save-path-label"></span> · <a id="card-change-path">点击更改保存路径...</a>
-            </p>
           </div>
-        </div>
+        </section>
       </div>
     </section>
 
-    <!-- ═══ Tab: Worldbook Converter ═══ -->
     <section id="tab-worldbook" class="tcc-tab-panel">
-      <p class="tcc-tab-desc">独立世界书 / Lorebook JSON 文件的格式转换，将酒馆格式映射为 Xuqi_LLM 兼容的世界书。</p>
+      <p class="tcc-tab-desc">用于独立世界书 / Lorebook JSON 文件，将酒馆条目映射为 Fantareal 世界书格式。</p>
       <div class="tcc-card-grid">
-        <div class="tcc-panel">
-          <h2>上传酒馆世界书 JSON</h2>
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>上传世界书 JSON</h2>
+            <span class="tcc-panel-tag">世界书</span>
+          </div>
           <label class="tcc-drop-zone" id="wb-drop-zone">
-            <input type="file" id="wb-file-input" accept=".json,application/json" hidden />
-            <div class="tcc-drop-content">
-              <span class="tcc-drop-icon">&#x1F4C4;</span>
-              <span>拖拽 JSON 到此处，或点击选择文件</span>
-              <span class="tcc-drop-hint">支持酒馆 (SillyTavern) 世界书 / Lorebook 格式</span>
-            </div>
+            <input type="file" id="wb-file-input" accept=".json,.jsonc,application/json" hidden />
+            <span class="tcc-drop-icon">◇</span>
+            <span class="tcc-drop-title">拖拽 JSON 到此处</span>
+            <span class="tcc-drop-hint">支持 SillyTavern Lorebook / World Info</span>
           </label>
-          <div id="wb-parsing-hint" class="tcc-parsing-hint" hidden>正在解析，请稍等喵~</div>
+          <div id="wb-parsing-hint" class="tcc-parsing-hint" hidden>正在转换世界书，请稍等…</div>
           <div id="wb-error" class="tcc-msg tcc-msg-error" hidden></div>
-        </div>
+          <div id="wb-file-summary" class="tcc-file-summary" hidden></div>
+        </aside>
 
-        <div class="tcc-panel">
-          <h2>转换结果</h2>
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>转换结果</h2>
+              <p>世界书条目默认二级折叠，避免一次拉出过长内容。</p>
+            </div>
+            <div class="tcc-result-tools" id="wb-result-tools" hidden>
+              <button class="tcc-btn tcc-btn-sm tcc-collapse-all" type="button" data-target="wb">全部折叠</button>
+              <button class="tcc-btn tcc-btn-sm tcc-expand-all" type="button" data-target="wb">展开详情</button>
+            </div>
+          </div>
           <div id="wb-result-empty" class="tcc-empty-state">
-            <span>上传 JSON 后在此处查看转换结果</span>
+            <strong>等待上传</strong>
+            <span>上传 JSON 后会生成世界书摘要和条目列表。</span>
           </div>
           <div id="wb-result" hidden>
-            <div class="tcc-result-meta">
+            <div class="tcc-result-meta" hidden>
               <span id="wb-result-name"></span>
               <span id="wb-entry-count"></span>
             </div>
             <div id="wb-conversion-info" class="tcc-conversion-info" hidden></div>
-            <pre id="wb-json-output" class="tcc-json-block"></pre>
-            <div class="tcc-actions">
-              <button id="wb-download-btn" class="tcc-btn tcc-btn-primary" disabled>下载世界书 JSON</button>
-              <button id="wb-copy-btn" class="tcc-btn" disabled>复制 JSON</button>
+            <div id="wb-result-body" class="tcc-result-stack"></div>
+            <pre id="wb-json-output" class="tcc-json-block tcc-hidden-buffer"></pre>
+            <div class="tcc-actions tcc-hidden-buffer">
+              <button id="wb-download-btn" class="tcc-btn tcc-btn-primary" type="button" disabled>保存 / 下载世界书 JSON</button>
+              <button id="wb-copy-btn" class="tcc-btn" type="button" disabled>复制 JSON</button>
             </div>
-            <p id="wb-save-path-hint" class="tcc-save-path-hint" hidden>
-              当前保存至: <span id="wb-save-path-label"></span> · <a id="wb-change-path">点击更改保存路径...</a>
-            </p>
           </div>
-        </div>
+        </section>
       </div>
     </section>
 
-    <!-- ═══ Save Dialog (card) ═══ -->
     <div id="card-save-dialog" class="tcc-dialog-overlay" hidden>
       <div class="tcc-dialog">
         <h3>保存角色卡 JSON</h3>
         <p id="card-save-filename" class="tcc-dialog-filename"></p>
         <div class="tcc-dialog-actions">
-          <button id="card-save-to-assets" class="tcc-btn tcc-btn-primary">保存到人设卡目录</button>
+          <button id="card-save-to-assets" class="tcc-btn tcc-btn-primary" type="button">保存到人设卡目录</button>
           <p class="tcc-dialog-path" id="card-assets-path"></p>
         </div>
         <hr class="tcc-dialog-sep" />
         <div class="tcc-dialog-actions">
-          <button id="card-save-browse" class="tcc-btn">浏览文件夹下载</button>
-          <p class="tcc-dialog-hint">选择本地磁盘上的其他位置保存</p>
+          <button id="card-save-browse" class="tcc-btn" type="button">下载到本地</button>
+          <p class="tcc-dialog-hint">通过浏览器下载到本地磁盘。</p>
         </div>
         <div class="tcc-dialog-footer">
-          <button id="card-save-cancel" class="tcc-btn tcc-btn-ghost">取消</button>
+          <button id="card-save-cancel" class="tcc-btn tcc-btn-ghost" type="button">取消</button>
         </div>
       </div>
     </div>
 
-    <!-- ═══ Save Dialog (worldbook) ═══ -->
     <div id="wb-save-dialog" class="tcc-dialog-overlay" hidden>
       <div class="tcc-dialog">
         <h3>保存世界书 JSON</h3>
         <p id="wb-save-filename" class="tcc-dialog-filename"></p>
         <div class="tcc-dialog-actions">
-          <button id="wb-save-to-assets" class="tcc-btn tcc-btn-primary">保存到世界书目录</button>
+          <button id="wb-save-to-assets" class="tcc-btn tcc-btn-primary" type="button">保存到世界书目录</button>
           <p class="tcc-dialog-path" id="wb-assets-path"></p>
         </div>
         <hr class="tcc-dialog-sep" />
         <div class="tcc-dialog-actions">
-          <button id="wb-save-browse" class="tcc-btn">浏览文件夹下载</button>
-          <p class="tcc-dialog-hint">选择本地磁盘上的其他位置保存</p>
+          <button id="wb-save-browse" class="tcc-btn" type="button">下载到本地</button>
+          <p class="tcc-dialog-hint">通过浏览器下载到本地磁盘。</p>
         </div>
         <div class="tcc-dialog-footer">
-          <button id="wb-save-cancel" class="tcc-btn tcc-btn-ghost">取消</button>
+          <button id="wb-save-cancel" class="tcc-btn tcc-btn-ghost" type="button">取消</button>
         </div>
       </div>
     </div>
 
-    <!-- ═══ Guide Popup ═══ -->
     <div id="tcc-guide-dialog" class="tcc-dialog-overlay" hidden>
       <div class="tcc-dialog tcc-guide-dialog">
         <h3>如何获取酒馆卡</h3>
         <div class="tcc-guide-sources">
           <div class="tcc-guide-item">
-            <strong>1. 全球最大"卡池"：Chub.ai</strong>
-            <p>这是目前国际上最核心的酒馆卡站。拥有极其详尽的标签系统（SFW/NSFW、属性、世界观等），你几乎能在这里找到任何你想要的动漫角色或原创 OC。</p>
+            <strong>1. Chub.ai</strong>
+            <p>国际上常见的酒馆卡分享站，标签系统比较完整，适合寻找动漫角色或原创 OC。</p>
             <a href="https://chub.ai/" target="_blank" rel="noopener">https://chub.ai/</a>
           </div>
           <div class="tcc-guide-item">
-            <strong>2. 高质量社区：Character Tavern</strong>
-            <p>界面友好，卡片质量普遍较高，社区氛围活跃。适合寻找精心制作的原创角色和高人气动漫角色卡。</p>
+            <strong>2. Character Tavern</strong>
+            <p>界面友好，适合寻找高质量原创角色卡和常见角色卡。</p>
             <a href="https://character-tavern.com/" target="_blank" rel="noopener">https://character-tavern.com/</a>
           </div>
           <div class="tcc-guide-item">
-            <strong>3. 专注分享：AI Character Cards</strong>
-            <p>专注于 AI 角色卡的分享与发现平台，收录了大量来自不同创作者的优质角色卡，分类清晰、易于浏览。</p>
-            <a href="https://aicharactercards.com/" target="_blank" rel="noopener">https://aicharactercards.com/</a>
-          </div>
-          <div class="tcc-guide-item">
-            <strong>4. Reddit 社区</strong>
-            <p>r/SillyTavernAI、r/CharacterAI 等 subreddit 有大量用户分享的角色卡和世界书资源，是发现新卡和交流使用技巧的好地方。</p>
-          </div>
-          <div class="tcc-guide-item">
-            <strong>5. Discord 社区</strong>
-            <p>SillyTavern 官方 Discord 服务器设有活跃的角色卡分享频道，创作者们会在这里首发最新作品并接受反馈。</p>
+            <strong>3. 本地 SillyTavern 导出</strong>
+            <p>在 SillyTavern 的角色卡管理中导出 PNG 角色卡，再拖入本工具转换。</p>
           </div>
         </div>
         <div class="tcc-dialog-footer">
-          <button id="tcc-guide-close" class="tcc-btn tcc-btn-primary">知道了</button>
+          <button id="tcc-guide-close" class="tcc-btn tcc-btn-primary" type="button">知道了</button>
         </div>
       </div>
     </div>
-
   </main>
 
-  <script src="./static/tavern-card-converter.js?v=3"></script>
+  <script src="./static/tavern-card-converter.js?v=0-2"></script>
 </body>
 </html>

@@ -4,14 +4,14 @@
     config: {},
     tables: [],
     currentId: "",
-    viewMode: localStorage.getItem("xinjian:viewMode") || "card",
+    viewMode: localStorage.getItem("state_journal:viewMode") || "card",
     detailIndex: -1,
     currentTemplateId: "",
     currentThemeId: "",
     expandedTemplateFieldIndex: null,
-    metricCharacterFilter: localStorage.getItem("xinjian:metricCharacterFilter") || "all",
-    metricLabelFilter: localStorage.getItem("xinjian:metricLabelFilter") || "all",
-    metricSort: localStorage.getItem("xinjian:metricSort") || "newest",
+    metricCharacterFilter: localStorage.getItem("state_journal:metricCharacterFilter") || "all",
+    metricLabelFilter: localStorage.getItem("state_journal:metricLabelFilter") || "all",
+    metricSort: localStorage.getItem("state_journal:metricSort") || "newest",
   };
 
   const SERVICE_PRESETS = {
@@ -123,20 +123,44 @@
 
   let toastTimer = null;
   function pageToast(title, detail = "", type = "ok") {
-    let toast = document.getElementById("xinjian-page-toast");
+    let toast = document.getElementById("state-journal-page-toast");
     if (!toast) {
       toast = document.createElement("div");
-      toast.id = "xinjian-page-toast";
-      toast.className = "xinjian-page-toast";
+      toast.id = "state-journal-page-toast";
+      toast.className = "state-journal-page-toast";
       toast.innerHTML = "<strong></strong><span></span>";
       document.body.appendChild(toast);
     }
-    toast.className = `xinjian-page-toast ${type}`;
+    toast.className = `state-journal-page-toast ${type}`;
     toast.querySelector("strong").textContent = title;
     toast.querySelector("span").textContent = detail;
     requestAnimationFrame(() => toast.classList.add("show"));
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => toast.classList.remove("show"), type === "error" ? 6200 : 3600);
+  }
+
+  function workerErrorTitle(errorType = "") {
+    const titles = {
+      timeout: "心笺生成超时",
+      empty_response: "心笺返回为空",
+      invalid_json: "心笺解析失败",
+      invalid_provider_response: "服务商返回异常",
+      rate_limit: "服务商限流",
+      auth_error: "鉴权失败",
+      network_error: "连接失败",
+      config_error: "配置不完整",
+      provider_error: "服务商异常",
+    };
+    return titles[errorType] || "心笺生成失败";
+  }
+
+  function setManualWorkerBusy(busy) {
+    const button = document.getElementById("manualWorkerBtn");
+    if (!button) return;
+    button.disabled = Boolean(busy);
+    button.classList.toggle("is-busy", Boolean(busy));
+    button.dataset.originalText = button.dataset.originalText || button.textContent || "根据最近对话更新";
+    button.textContent = busy ? "心笺生成中……" : button.dataset.originalText;
   }
 
   async function requestJson(url, options = {}) {
@@ -346,7 +370,7 @@
     state.currentThemeId = pack.id;
     renderThemeSelectors();
     renderThemePreview();
-    window.xinjianChatBridge?.reloadConfig?.();
+    window.stateJournalChatBridge?.reloadConfig?.();
     return payload;
   }
 
@@ -378,7 +402,7 @@
     state.currentThemeId = state.config.mujian_theme_id || nextThemeId;
     renderThemeSelectors();
     renderThemePreview();
-    window.xinjianChatBridge?.reloadConfig?.();
+    window.stateJournalChatBridge?.reloadConfig?.();
     pageToast("导入外观包已删除", `已切回：${activeThemePack().name || activeThemePack().id}`, "ok");
     setStatus(`已删除导入外观包：${pack.name || pack.id}`, "ok");
   }
@@ -958,17 +982,17 @@
       </section>`;
     els.rowsEditor.querySelector(".metric-character-filter")?.addEventListener("change", (event) => {
       state.metricCharacterFilter = event.target.value;
-      localStorage.setItem("xinjian:metricCharacterFilter", state.metricCharacterFilter);
+      localStorage.setItem("state_journal:metricCharacterFilter", state.metricCharacterFilter);
       renderRows(table);
     });
     els.rowsEditor.querySelector(".metric-label-filter")?.addEventListener("change", (event) => {
       state.metricLabelFilter = event.target.value;
-      localStorage.setItem("xinjian:metricLabelFilter", state.metricLabelFilter);
+      localStorage.setItem("state_journal:metricLabelFilter", state.metricLabelFilter);
       renderRows(table);
     });
     els.rowsEditor.querySelector(".metric-sort-filter")?.addEventListener("change", (event) => {
       state.metricSort = event.target.value;
-      localStorage.setItem("xinjian:metricSort", state.metricSort);
+      localStorage.setItem("state_journal:metricSort", state.metricSort);
       renderRows(table);
     });
   }
@@ -1053,7 +1077,7 @@
   }
 
   const WORKSPACE_DEFAULT_TAB = {
-    xinjian: null,
+    journal: null,
     mujian: "mujian",
     generate: "generate",
     beauty: "template",
@@ -1061,8 +1085,8 @@
   };
 
   const TAB_WORKSPACE = {
-    schema: "xinjian",
-    rules: "xinjian",
+    schema: "journal",
+    rules: "journal",
     log: "settings",
     mujian: "mujian",
     generate: "generate",
@@ -1090,9 +1114,9 @@
     });
   }
 
-  function switchWorkspace(workspace = "xinjian", tab = null) {
+  function switchWorkspace(workspace = "journal", tab = null) {
     const database = document.getElementById("databaseWorkspace");
-    const showConfig = workspace !== "xinjian" || !!tab;
+    const showConfig = workspace !== "journal" || !!tab;
     setWorkspaceNav(workspace);
     if (database) database.classList.toggle("active", !showConfig);
     if (els.configDrawer) {
@@ -1107,7 +1131,7 @@
   }
 
   function openConfigDrawer(tab = "schema") {
-    const workspace = TAB_WORKSPACE[tab] || "xinjian";
+    const workspace = TAB_WORKSPACE[tab] || "journal";
     switchWorkspace(workspace, tab);
     if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "心笺设置";
     if (tab === "link") refreshHookStatus();
@@ -1115,11 +1139,11 @@
   }
 
   function closeConfigDrawer() {
-    switchWorkspace("xinjian");
+    switchWorkspace("journal");
   }
 
   function switchTab(tab) {
-    const workspace = TAB_WORKSPACE[tab] || "xinjian";
+    const workspace = TAB_WORKSPACE[tab] || "journal";
     if (els.configDrawer) els.configDrawer.dataset.activeWorkspace = workspace;
     if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "心笺设置";
     document.querySelectorAll(".tab-btn").forEach((item) => item.classList.toggle("active", item.dataset.tab === tab));
@@ -1235,7 +1259,7 @@
     const title = titles[kind] || titles.all;
     setStatus(`${title}。`, "ok");
     pageToast(title, details[kind] || details.all, "ok");
-    window.xinjianChatBridge?.reloadConfig?.();
+    window.stateJournalChatBridge?.reloadConfig?.();
   }
 
   async function fillFromMainConfig() {
@@ -1266,15 +1290,38 @@
   }
 
   async function manualWorkerUpdate() {
-    await saveCurrentTable(); setStatus("心笺正在根据最近对话更新表格...");
-    const history = await fetch("/api/history").then((res) => res.json()).catch(() => []);
-    const result = await requestJson("./api/worker/update", { method: "POST", body: JSON.stringify({ manual: true, history, table_ids: [state.currentId] }) });
-    await loadState();
-    const count = result.summary?.total ?? result.result?.applied?.length ?? 0; const errors = result.result?.errors || [];
-    const displayTitle = result.display?.title ? `｜幕笺：《${result.display.title}》` : "";
-    const msg = (result.message || (count ? `心笺已应用 ${count} 条更新。` : "心笺判断本次无变化。")) + displayTitle;
-    els.updateSummaryText.textContent = msg;
-    if (errors.length || result.ok === false) { setStatus(msg, "error"); pageToast("心笺填表失败", msg, "error"); } else { setStatus(msg, "ok"); pageToast(count ? "心笺已更新" : "心笺无变化", msg, "ok"); }
+    setManualWorkerBusy(true);
+    try {
+      setStatus("正在保存当前表，准备请求心笺辅助模型...");
+      await saveCurrentTable();
+      setStatus("正在读取最近聊天记录...");
+      const history = await fetch("/api/history").then((res) => res.json()).catch(() => []);
+      const timeoutSeconds = Number(els.cfgTimeout?.value || state.config?.request_timeout || 120);
+      setStatus(`正在请求辅助模型，最多等待 ${timeoutSeconds} 秒...`);
+      const result = await requestJson("./api/worker/update", { method: "POST", body: JSON.stringify({ manual: true, history, table_ids: [state.currentId] }) });
+      setStatus("心笺已收到响应，正在刷新状态表...");
+      await loadState();
+      const count = result.summary?.total ?? result.result?.applied?.length ?? 0;
+      const errors = result.result?.errors || [];
+      const displayTitle = result.display?.title ? `｜幕笺：《${result.display.title}》` : "";
+      const msg = (result.message || (count ? `心笺已应用 ${count} 条更新。` : "心笺判断本次无变化。")) + displayTitle;
+      els.updateSummaryText.textContent = msg;
+      if (errors.length || result.ok === false) {
+        const title = workerErrorTitle(result.error_type);
+        setStatus(msg, "error");
+        pageToast(title, msg, "error");
+      } else {
+        setStatus(msg, "ok");
+        pageToast(count ? "心笺已更新" : "心笺无变化", msg, "ok");
+      }
+    } catch (error) {
+      const msg = error.message || "心笺请求异常。";
+      els.updateSummaryText.textContent = msg;
+      setStatus(msg, "error");
+      pageToast("心笺填表失败", msg, "error");
+    } finally {
+      setManualWorkerBusy(false);
+    }
   }
 
   async function loadLog() { const payload = await requestJson("./api/logs/latest"); els.logBox.textContent = JSON.stringify(payload.log || {}, null, 2); }
@@ -1284,7 +1331,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `xinjian-debug-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    a.download = `state-journal-debug-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1294,17 +1341,17 @@
   function addField() { const table = currentTable(); if (!table) return; table.schema.fields.push({ key: `field_${table.schema.fields.length + 1}`, label: "新字段", type: "text", required: false, options: [], note: "" }); renderFields(table); refreshPrimaryOptions(); openConfigDrawer("schema"); }
   function addRow() { const table = currentTable(); if (!table) return; const row = {}; (table.schema.fields || []).forEach((field) => { row[field.key] = field.type === "boolean" ? false : ""; }); table.rows.push(row); renderRows(table); openRowDetail(table.rows.length - 1); }
   function newTable() { const id = `custom_table_${Date.now()}`; state.tables.push({ schema: { id, name: "新表", description: "", primary_key: "id", fields: [{ key: "id", label: "ID", type: "text", required: true, options: [], note: "主键字段" }], rules: { note: "", init: "", insert: "", update: "", delete: "", ignore: "" } }, rows: [] }); state.currentId = id; renderAll(); openConfigDrawer("schema"); }
-  async function exportAll() { const payload = await requestJson("./api/export"); const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `xinjian-export-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url); pageToast("导出完成", "默认不包含 API Key，可放心分享表结构与数据。", "ok"); }
+  async function exportAll() { const payload = await requestJson("./api/export"); const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `state-journal-export-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url); pageToast("导出完成", "默认不包含 API Key，可放心分享表结构与数据。", "ok"); }
   async function importFile(file) { if (!file) return; const payload = JSON.parse(await file.text()); await requestJson("./api/import", { method: "POST", body: JSON.stringify(payload) }); await loadState(); setStatus("导入完成。", "ok"); pageToast("导入完成", "JSON 数据已写入心笺 SQLite。", "ok"); }
 
   document.querySelectorAll(".workspace-nav-btn").forEach((button) => button.addEventListener("click", () => {
-    const workspace = button.dataset.workspace || "xinjian";
+    const workspace = button.dataset.workspace || "journal";
     const defaultTab = button.dataset.defaultTab || WORKSPACE_DEFAULT_TAB[workspace];
-    if (workspace === "xinjian") switchWorkspace("xinjian"); else openConfigDrawer(defaultTab);
+    if (workspace === "journal") switchWorkspace("journal"); else openConfigDrawer(defaultTab);
   }));
   document.querySelectorAll(".tab-btn").forEach((button) => button.addEventListener("click", () => openConfigDrawer(button.dataset.tab)));
-  els.cardViewBtn.addEventListener("click", () => { state.viewMode = "card"; localStorage.setItem("xinjian:viewMode", state.viewMode); renderAll(); });
-  els.tableViewBtn.addEventListener("click", () => { state.viewMode = "table"; localStorage.setItem("xinjian:viewMode", state.viewMode); renderAll(); });
+  els.cardViewBtn.addEventListener("click", () => { state.viewMode = "card"; localStorage.setItem("state_journal:viewMode", state.viewMode); renderAll(); });
+  els.tableViewBtn.addEventListener("click", () => { state.viewMode = "table"; localStorage.setItem("state_journal:viewMode", state.viewMode); renderAll(); });
   $("#openSchemaDrawerBtn")?.addEventListener("click", () => openConfigDrawer("schema"));
   $("#openRulesDrawerBtn")?.addEventListener("click", () => openConfigDrawer("rules"));
   $("#openModelDrawerBtn")?.addEventListener("click", () => openConfigDrawer("model"));
@@ -1354,7 +1401,7 @@
     const pack = activeThemePack();
     const blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = `xinjian-beauty-${pack.id || Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    a.href = url; a.download = `state-journal-beauty-${pack.id || Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     pageToast("美化包已导出", pack.name || pack.id, "ok");
   });
   els.deleteThemeBtn?.addEventListener("click", () => deleteActiveImportedTheme().catch((error) => {
@@ -1473,7 +1520,7 @@
     const template = readTemplateEditor();
     const blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a");
-    a.href = url; a.download = `xinjian-template-${template.id || Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    a.href = url; a.download = `state-journal-template-${template.id || Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     pageToast("模板已导出", template.name || template.id, "ok");
   });
   els.importTemplateInput?.addEventListener("change", async (event) => {
@@ -1488,13 +1535,13 @@
     event.target.value = "";
   });
   $("#toggleApiKeyBtn").addEventListener("click", () => { const hidden = els.cfgApiKey.type === "password"; els.cfgApiKey.type = hidden ? "text" : "password"; $("#toggleApiKeyBtn").textContent = hidden ? "隐藏" : "显示"; });
-  $("#manualWorkerBtn").addEventListener("click", () => manualWorkerUpdate().catch((error) => { setStatus(error.message, "error"); pageToast("心笺填表失败", error.message, "error"); }));
+  $("#manualWorkerBtn").addEventListener("click", () => manualWorkerUpdate());
   $("#loadLogBtn").addEventListener("click", () => loadLog().catch((error) => { els.logBox.textContent = error.message; }));
   $("#exportDebugLogBtn")?.addEventListener("click", () => exportDebugLog().catch((error) => pageToast("导出排查日志失败", error.message, "error")));
   $("#addFieldBtn").addEventListener("click", addField); $("#addRowBtn").addEventListener("click", addRow); $("#newTableBtn").addEventListener("click", newTable);
   $("#exportBtn").addEventListener("click", () => exportAll().catch((error) => setStatus(error.message, "error")));
   $("#importInput").addEventListener("change", (event) => importFile(event.target.files?.[0]).catch((error) => { setStatus(error.message, "error"); pageToast("导入失败", error.message, "error"); }));
-  window.addEventListener("xinjian:updated", (event) => { els.updateSummaryText.textContent = event.detail?.message || "聊天页自动填表已完成。"; loadState().catch(() => {}); });
+  window.addEventListener("state_journal:updated", (event) => { els.updateSummaryText.textContent = event.detail?.message || "聊天页自动填表已完成。"; loadState().catch(() => {}); });
 
   loadState().catch((error) => { setStatus(error.message, "error"); pageToast("心笺载入失败", error.message, "error"); });
 })();

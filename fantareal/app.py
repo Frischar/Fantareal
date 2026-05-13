@@ -330,7 +330,7 @@ def resolve_access_label(method: str, path: str) -> str:
             "worldbook-maker": "世界书工坊",
             "soul-weaver": "余声",
             "card-writer": "缃笺",
-            "xinjian": "心笺",
+            "state-journal": "心笺",
             "tavern-card-converter": "酒馆卡转换器",
         }
         if len(parts) >= 2:
@@ -1343,6 +1343,19 @@ def normalize_legacy_message_content(role: str, content: str) -> str:
     return text
 
 
+CHAT_MESSAGE_META_TEXT_KEYS = {
+    "message_id",
+    "turn_id",
+    "state_journal_turn",
+    "content_hash",
+    "raw_content",
+    "assistant_clean_text",
+    "user_hash",
+    "assistant_hash",
+    "source",
+}
+
+
 def sanitize_conversation(raw: Any) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         return []
@@ -1367,13 +1380,26 @@ def sanitize_conversation(raw: Any) -> list[dict[str, Any]]:
             changed = True
             continue
 
-        cleaned.append(
-            {
-                "role": role,
-                "content": content,
-                "created_at": created_at,
-            }
-        )
+        message = {
+            "role": role,
+            "content": content,
+            "created_at": created_at,
+        }
+        for key in CHAT_MESSAGE_META_TEXT_KEYS:
+            value = item.get(key)
+            if value is None:
+                continue
+            text = str(value).strip()
+            if text:
+                message[key] = text
+        turn_index = item.get("turn_index")
+        try:
+            parsed_index = int(turn_index)
+        except (TypeError, ValueError):
+            parsed_index = 0
+        if parsed_index > 0:
+            message["turn_index"] = parsed_index
+        cleaned.append(message)
 
     if changed:
         logger.info("已过滤旧示例消息，清理了聊天历史。")

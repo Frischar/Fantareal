@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import sqlite3
 import sys
 from datetime import datetime
@@ -29,8 +30,10 @@ def get_resource_dir() -> Path:
 APP_DIR = Path(__file__).resolve().parent
 RESOURCE_DIR = get_resource_dir()
 PROJECT_ROOT = APP_DIR.parent.parent if APP_DIR.parent.name.lower() == "mods" else APP_DIR.parent
-DATA_DIR = PROJECT_ROOT / "data" / "xinjian"
-DB_PATH = DATA_DIR / "xinjian.db"
+DATA_DIR = PROJECT_ROOT / "data" / "mods" / "state_journal"
+DB_PATH = DATA_DIR / "state_journal.db"
+LEGACY_DATA_DIR = PROJECT_ROOT / "data" / "xinjian"
+LEGACY_DB_PATH = LEGACY_DATA_DIR / "xinjian.db"
 EXPORTS_DIR = DATA_DIR / "exports"
 BACKUPS_DIR = DATA_DIR / "backups"
 LOGS_DIR = DATA_DIR / "logs"
@@ -245,7 +248,7 @@ OPERATION_ALIASES = {
     "remove": "delete",
 }
 
-app = FastAPI(title="Fantareal Xinjian Mod")
+app = FastAPI(title="Fantareal State Journal Mod")
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -313,8 +316,20 @@ def sqlite_type(field_type: str) -> str:
     return "TEXT"
 
 
-def connect_db() -> sqlite3.Connection:
+def migrate_legacy_data_dir() -> None:
+    """Copy pre-release data/xinjian runtime files to data/mods/state_journal once."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if not DB_PATH.exists() and LEGACY_DB_PATH.exists():
+        shutil.copy2(LEGACY_DB_PATH, DB_PATH)
+    for folder_name in ("exports", "backups", "logs"):
+        legacy_folder = LEGACY_DATA_DIR / folder_name
+        target_folder = DATA_DIR / folder_name
+        if legacy_folder.exists() and not target_folder.exists():
+            shutil.copytree(legacy_folder, target_folder)
+
+
+def connect_db() -> sqlite3.Connection:
+    migrate_legacy_data_dir()
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -730,6 +745,10 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS xj_turn_displays (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             turn_id TEXT NOT NULL,
+            message_id TEXT NOT NULL DEFAULT '',
+            content_hash TEXT NOT NULL DEFAULT '',
+            turn_index INTEGER NOT NULL DEFAULT 0,
+            trigger_source TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '',
             subtitle TEXT NOT NULL DEFAULT '',
@@ -748,12 +767,15 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
         );
         CREATE TABLE IF NOT EXISTS xj_turn_records (
             turn_id TEXT PRIMARY KEY,
+            message_id TEXT NOT NULL DEFAULT '',
+            turn_index INTEGER NOT NULL DEFAULT 0,
+            trigger_source TEXT NOT NULL DEFAULT '',
             user_hash TEXT NOT NULL DEFAULT '',
             user_text TEXT NOT NULL DEFAULT '',
             assistant_hash TEXT NOT NULL DEFAULT '',
             assistant_text TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'pending_assistant',
-            xinjian_status TEXT NOT NULL DEFAULT 'pending',
+            state_journal_status TEXT NOT NULL DEFAULT 'pending',
             stale_reason TEXT NOT NULL DEFAULT '',
             seq_no INTEGER NOT NULL DEFAULT 0,
             revision INTEGER NOT NULL DEFAULT 0,
@@ -802,10 +824,38 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
         """
     )
     turn_cols = {row["name"] for row in conn.execute("PRAGMA table_info(xj_turn_records)").fetchall()}
+    if "xinjian_status" in turn_cols and "state_journal_status" not in turn_cols:
+        conn.execute("ALTER TABLE xj_turn_records RENAME COLUMN xinjian_status TO state_journal_status")
+        turn_cols = {row["name"] for row in conn.execute("PRAGMA table_info(xj_turn_records)").fetchall()}
+    if "state_journal_status" not in turn_cols:
+        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN state_journal_status TEXT NOT NULL DEFAULT 'pending'")
+        turn_cols.add("state_journal_status")
     if "seq_no" not in turn_cols:
         conn.execute("ALTER TABLE xj_turn_records ADD COLUMN seq_no INTEGER NOT NULL DEFAULT 0")
     if "revision" not in turn_cols:
         conn.execute("ALTER TABLE xj_turn_records ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+        turn_cols.add("revision")
+    if "message_id" not in turn_cols:
+        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN message_id TEXT NOT NULL DEFAULT ''")
+        turn_cols.add("message_id")
+    if "turn_index" not in turn_cols:
+        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 0")
+        turn_cols.add("turn_index")
+    if "trigger_source" not in turn_cols:
+        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN trigger_source TEXT NOT NULL DEFAULT ''")
+        turn_cols.add("trigger_source")
+
+    display_cols = {row["name"] for row in conn.execute("PRAGMA table_info(xj_turn_displays)").fetchall()}
+    if "message_id" not in display_cols:
+        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN message_id TEXT NOT NULL DEFAULT ''")
+    if "content_hash" not in display_cols:
+        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
+    if "turn_index" not in display_cols:
+        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 0")
+        display_cols.add("turn_index")
+    if "trigger_source" not in display_cols:
+        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN trigger_source TEXT NOT NULL DEFAULT ''")
+        display_cols.add("trigger_source")
     rows = conn.execute("SELECT turn_id FROM xj_turn_records WHERE seq_no IS NULL OR seq_no<=0 ORDER BY created_at, rowid").fetchall()
     if rows:
         max_row = conn.execute("SELECT COALESCE(MAX(seq_no), 0) AS max_seq FROM xj_turn_records").fetchone()
@@ -1294,25 +1344,79 @@ async def test_chat_completion(base_url: str, api_key: str, model: str, timeout:
         raise HTTPException(status_code=502, detail="测试连接失败：返回不是 OpenAI Chat Completions 兼容格式。") from exc
 
 
+def strip_json_fence(text: str) -> str:
+    raw = str(text or "").strip()
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw, re.IGNORECASE)
+    if fenced:
+        return fenced.group(1).strip()
+    return raw
+
+
+def extract_json_candidates(text: str) -> list[str]:
+    raw = strip_json_fence(text)
+    candidates: list[str] = []
+    if raw:
+        candidates.append(raw)
+    start_obj = raw.find("{")
+    end_obj = raw.rfind("}")
+    if start_obj >= 0 and end_obj > start_obj:
+        obj = raw[start_obj : end_obj + 1].strip()
+        if obj and obj not in candidates:
+            candidates.append(obj)
+    start_arr = raw.find("[")
+    end_arr = raw.rfind("]")
+    if start_arr >= 0 and end_arr > start_arr:
+        arr = raw[start_arr : end_arr + 1].strip()
+        if arr and arr not in candidates:
+            candidates.append(arr)
+    return candidates
+
+
+def repair_common_json_issues(text: str) -> str:
+    """Fix small model-formatting mistakes without changing semantics.
+
+    This intentionally stays conservative: code fences, tail commas, control chars,
+    and unescaped ASCII quotes inside simple string-value lines.
+    """
+    raw = strip_json_fence(text)
+    raw = raw.replace("\ufeff", "")
+    raw = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", raw)
+    start_obj = raw.find("{")
+    end_obj = raw.rfind("}")
+    if start_obj >= 0 and end_obj > start_obj:
+        raw = raw[start_obj : end_obj + 1]
+    raw = re.sub(r",\s*([}\]])", r"\1", raw)
+    fixed_lines: list[str] = []
+    for line in raw.splitlines():
+        # Handles common model bug:
+        #   "interaction": "说"你该添一件"时透露关心",
+        m = re.match(r'^(\s*"[^"\n]+"\s*:\s*")(.*)("\s*,?\s*)$', line)
+        if m:
+            prefix, body, suffix = m.groups()
+            if '"' in body:
+                body = body.replace('"', '”')
+                line = prefix + body + suffix
+        fixed_lines.append(line)
+    return "\n".join(fixed_lines).strip()
+
+
 def extract_json_from_text(text: str) -> Any:
     raw = str(text or "").strip()
     if not raw:
         raise ValueError("辅助模型没有返回内容。")
-    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw, re.IGNORECASE)
-    if fenced:
-        raw = fenced.group(1).strip()
-    try:
-        return json.loads(raw)
-    except ValueError:
-        start_obj = raw.find("{")
-        end_obj = raw.rfind("}")
-        if start_obj >= 0 and end_obj > start_obj:
-            return json.loads(raw[start_obj : end_obj + 1])
-        start_arr = raw.find("[")
-        end_arr = raw.rfind("]")
-        if start_arr >= 0 and end_arr > start_arr:
-            return json.loads(raw[start_arr : end_arr + 1])
-        raise
+    errors: list[str] = []
+    for candidate in extract_json_candidates(raw):
+        try:
+            return json.loads(candidate)
+        except ValueError as exc:
+            errors.append(str(exc))
+    repaired = repair_common_json_issues(raw)
+    for candidate in extract_json_candidates(repaired):
+        try:
+            return json.loads(candidate)
+        except ValueError as exc:
+            errors.append(str(exc))
+    raise ValueError(errors[-1] if errors else "模型返回内容不是合法 JSON。")
 
 
 def normalize_updates(payload: Any) -> list[dict[str, Any]]:
@@ -1526,17 +1630,20 @@ def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = 
     conn.execute("DELETE FROM xj_turn_effects WHERE turn_id=?", (safe_turn,))
     conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (safe_turn,))
     conn.execute(
-        "UPDATE xj_turn_records SET xinjian_status='rolled_back', stale_reason=?, updated_at=? WHERE turn_id=?",
+        "UPDATE xj_turn_records SET state_journal_status='rolled_back', stale_reason=?, updated_at=? WHERE turn_id=?",
         (reason, now_string(), safe_turn),
     )
     return count
 
 
-def save_turn_record(conn: sqlite3.Connection, *, turn_id: str, user_text: str = "", assistant_text: str = "", status: str = "pending_assistant", xinjian_status: str = "pending") -> dict[str, Any]:
+def save_turn_record(conn: sqlite3.Connection, *, turn_id: str, user_text: str = "", assistant_text: str = "", status: str = "pending_assistant", state_journal_status: str = "pending", message_id: str = "", turn_index: int | None = None, trigger_source: str = "") -> dict[str, Any]:
     safe_turn = normalize_turn_id(turn_id)
     now = now_string()
     user_hash = hash_text(user_text) if user_text else ""
     assistant_hash = hash_text(assistant_text) if assistant_text else ""
+    safe_message_id = normalize_turn_id(message_id) if message_id else ""
+    safe_turn_index = int(turn_index or 0) if str(turn_index or "").strip() else 0
+    safe_trigger_source = str(trigger_source or "").strip()[:80]
     existing = conn.execute("SELECT * FROM xj_turn_records WHERE turn_id=?", (safe_turn,)).fetchone()
     if existing:
         user_text = user_text or str(existing["user_text"] or "")
@@ -1547,15 +1654,19 @@ def save_turn_record(conn: sqlite3.Connection, *, turn_id: str, user_text: str =
         old_assistant_hash = str(existing["assistant_hash"] or "")
         old_user_hash = str(existing["user_hash"] or "")
         revision = int(existing["revision"] or 0)
+        if not safe_message_id:
+            safe_message_id = str(existing["message_id"] or "") if "message_id" in existing.keys() else ""
+        if not safe_turn_index:
+            safe_turn_index = int(existing["turn_index"] or 0) if "turn_index" in existing.keys() else 0
         if status in {"assistant_ready", "completed"} and ((assistant_hash and assistant_hash != old_assistant_hash) or (user_hash and user_hash != old_user_hash)):
             revision += 1
         conn.execute(
             """
             UPDATE xj_turn_records
-            SET user_text=?, user_hash=?, assistant_text=?, assistant_hash=?, status=?, xinjian_status=?, stale_reason='', seq_no=?, revision=?, updated_at=?
+            SET user_text=?, user_hash=?, assistant_text=?, assistant_hash=?, status=?, state_journal_status=?, stale_reason='', seq_no=?, revision=?, message_id=?, turn_index=?, trigger_source=?, updated_at=?
             WHERE turn_id=?
             """,
-            (user_text, user_hash, assistant_text, assistant_hash, status, xinjian_status, seq_no, revision, now, safe_turn),
+            (user_text, user_hash, assistant_text, assistant_hash, status, state_journal_status, seq_no, revision, safe_message_id, safe_turn_index, safe_trigger_source, now, safe_turn),
         )
         created_at = str(existing["created_at"] or now)
     else:
@@ -1564,18 +1675,20 @@ def save_turn_record(conn: sqlite3.Connection, *, turn_id: str, user_text: str =
         revision = 0
         conn.execute(
             """
-            INSERT INTO xj_turn_records(turn_id, user_hash, user_text, assistant_hash, assistant_text, status, xinjian_status, stale_reason, seq_no, revision, created_at, updated_at)
-            VALUES(?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+            INSERT INTO xj_turn_records(turn_id, message_id, turn_index, user_hash, user_text, assistant_hash, assistant_text, status, state_journal_status, stale_reason, seq_no, revision, created_at, updated_at)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
             """,
-            (safe_turn, user_hash, user_text, assistant_hash, assistant_text, status, xinjian_status, seq_no, revision, now, now),
+            (safe_turn, safe_message_id, safe_turn_index, user_hash, user_text, assistant_hash, assistant_text, status, state_journal_status, seq_no, revision, now, now),
         )
         created_at = now
     return {
         "turn_id": safe_turn,
+        "message_id": safe_message_id,
+        "turn_index": safe_turn_index,
         "user_hash": user_hash,
         "assistant_hash": assistant_hash,
         "status": status,
-        "xinjian_status": xinjian_status,
+        "state_journal_status": state_journal_status,
         "seq_no": seq_no,
         "revision": revision,
         "created_at": created_at,
@@ -1591,13 +1704,13 @@ def mark_turns_stale(conn: sqlite3.Connection, from_turn_id: str | None = None, 
         if row:
             created_at = row["created_at"]
             affected = conn.execute(
-                "UPDATE xj_turn_records SET status='stale', xinjian_status='stale', stale_reason=?, updated_at=? WHERE created_at>=?",
+                "UPDATE xj_turn_records SET status='stale', state_journal_status='stale', stale_reason=?, updated_at=? WHERE created_at>=?",
                 (reason, now, created_at),
             ).rowcount
             conn.execute("DELETE FROM xj_turn_displays WHERE turn_id IN (SELECT turn_id FROM xj_turn_records WHERE created_at>=?)", (created_at,))
             return {"affected": affected, "from_turn_id": normalize_turn_id(from_turn_id), "reason": reason}
     affected = conn.execute(
-        "UPDATE xj_turn_records SET status='stale', xinjian_status='stale', stale_reason=?, updated_at=?",
+        "UPDATE xj_turn_records SET status='stale', state_journal_status='stale', stale_reason=?, updated_at=?",
         (reason, now),
     ).rowcount
     conn.execute("DELETE FROM xj_turn_displays")
@@ -2210,23 +2323,42 @@ def get_turn_sequence(conn: sqlite3.Connection, turn_id: str) -> int:
     return allocate_turn_sequence(conn, turn_id)
 
 
-def save_turn_display(display: dict[str, Any], *, turn_id: str | None = None) -> dict[str, Any]:
+def save_turn_display(display: dict[str, Any], *, turn_id: str | None = None, message_id: str = "", content_hash: str = "", turn_index: int | None = None, trigger_source: str = "") -> dict[str, Any]:
     payload = normalize_display_payload({"display": display})
     safe_turn_id = normalize_turn_id(turn_id or datetime.now().isoformat(timespec="seconds"))
+    safe_message_id = normalize_turn_id(message_id) if message_id else ""
+    safe_content_hash = normalize_turn_id(content_hash) if content_hash else hash_text(payload.get("title") or json.dumps(payload, ensure_ascii=False))
+    safe_turn_index = int(turn_index or 0) if str(turn_index or "").strip() else 0
+    safe_trigger_source = str(trigger_source or "").strip()[:80]
     created_at = now_string()
     with connect_db() as conn:
         init_meta_tables(conn)
-        sequence = get_turn_sequence(conn, safe_turn_id)
+        db_sequence = get_turn_sequence(conn, safe_turn_id)
+        if not safe_turn_index:
+            row = conn.execute("SELECT turn_index FROM xj_turn_records WHERE turn_id=?", (safe_turn_id,)).fetchone()
+            safe_turn_index = int(row["turn_index"] or 0) if row else 0
+        sequence = safe_turn_index or db_sequence
         payload["sequence"] = sequence
         payload["sequence_label"] = f"第 {sequence} 笺"
-        conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (safe_turn_id,))
+        payload["message_id"] = safe_message_id
+        payload["content_hash"] = safe_content_hash
+        payload["turn_index"] = safe_turn_index
+        payload["trigger_source"] = safe_trigger_source
+        if safe_message_id:
+            conn.execute("DELETE FROM xj_turn_displays WHERE message_id=? OR turn_id=?", (safe_message_id, safe_turn_id))
+        else:
+            conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (safe_turn_id,))
         conn.execute(
             """
-            INSERT INTO xj_turn_displays(turn_id, created_at, title, subtitle, scene_json, characters_json, relationships_json, raw_json)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO xj_turn_displays(turn_id, message_id, content_hash, turn_index, trigger_source, created_at, title, subtitle, scene_json, characters_json, relationships_json, raw_json)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 safe_turn_id,
+                safe_message_id,
+                safe_content_hash,
+                safe_turn_index,
+                safe_trigger_source,
                 created_at,
                 payload.get("title", ""),
                 payload.get("subtitle", ""),
@@ -2259,7 +2391,6 @@ def save_turn_display(display: dict[str, Any], *, turn_id: str | None = None) ->
     payload["turn_id"] = safe_turn_id
     payload["created_at"] = created_at
     return payload
-
 
 def latest_turn_display() -> dict[str, Any]:
     ensure_runtime_data()
@@ -2385,23 +2516,24 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
     character_schema = build_template_character_schema(template_fields)
     metric_field_keys = {"favor_level", "trust_level", "bond_level", "guard_level", "pulse_level", "tension_level", "fatigue_level", "injury_level", "intimacy_level", "stress_level"}
     has_metric_fields = any(str(item.get("key") or "") in metric_field_keys for item in template_fields if isinstance(item, dict))
-    system_prompt = """你是 Fantareal 的“心笺”结构化记录与幕笺展示助手。你的任务不是继续剧情，也不是扮演角色，而是根据聊天内容维护结构化表格，并生成正文之外给用户看的幕笺展示。\n\n硬性规则：\n1. 只输出一个合法 JSON 对象，不要输出 Markdown、解释、寒暄或代码块。\n2. JSON 根结构必须是 {\"updates\": [], \"display\": {}}。\n3. updates 用于写入事实表；没有明确事实变化时，updates 可以为空数组。\n4. display 是给用户看的幕笺展示，每轮都要生成，除非输入为空。\n5. 不要输出 SQL，心笺后端会把 JSON 更新安全写入 SQLite。\n6. 不要新增重大剧情事实，不要替用户行动，不要改变主模型正文已经确定的结果。\n7. 幕笺可以对情绪、衣着、姿态、感官、互动潜台词做合理扩写，但只能基于正文、上下文、角色状态与氛围自然延展。\n8. 事实表要保守，幕笺可以写意；不要把展示扩写当成长期事实强行写入 updates。\n9. updates 只能更新表结构中已经存在的字段，不得新增未知字段。\n10. operation 只能使用 upsert、update、delete。"""
+    system_prompt = """你是 Fantareal 的“心笺”结构化记录与幕笺展示助手。你的任务不是继续剧情，也不是扮演角色，而是根据聊天内容维护结构化表格，并生成正文之外给用户看的幕笺展示。\n\n硬性规则：\n1. 只输出一个合法 JSON 对象，不要输出 Markdown、解释、寒暄或代码块。\n2. JSON 根结构必须是 {\"updates\": [], \"display\": {}}。\n3. updates 用于写入事实表；没有明确事实变化时，updates 可以为空数组。\n4. display 是给用户看的幕笺展示，每轮都要生成，除非输入为空。\n5. 不要输出 SQL，心笺后端会把 JSON 更新安全写入 SQLite。\n6. 不要新增重大剧情事实，不要替用户行动，不要改变主模型正文已经确定的结果。\n7. 幕笺可以对情绪、衣着、姿态、感官、互动潜台词做合理扩写，但只能基于正文、上下文、角色状态与氛围自然延展。\n8. 事实表要保守，幕笺可以写意；不要把展示扩写当成长期事实强行写入 updates。\n9. updates 只能更新表结构中已经存在的字段，不得新增未知字段。\n10. operation 只能使用 upsert、update、delete。
+11. JSON 字符串内容中不要使用英文双引号；如需引用台词，请使用中文引号“……”或单引号，避免破坏 JSON。"""
     if config.get("strict_mode"):
-        system_prompt += "\n11. 严格模式：updates 的字段类型、枚举范围、主键必须完全符合表结构。"
+        system_prompt += "\n12. 严格模式：updates 的字段类型、枚举范围、主键必须完全符合表结构。"
     if not mujian_enabled:
-        system_prompt += "\n12. 当前幕笺关闭：display 可返回空对象，但 updates 仍按事实变化处理。"
+        system_prompt += "\n13. 当前幕笺关闭：display 可返回空对象，但 updates 仍按事实变化处理。"
     else:
-        system_prompt += f"\n12. 当前幕笺扩写强度：{expand_level}。保守=少量推断；standard=自然细化；rich=更丰富的氛围与感官，但仍不得新增重大事件。"
-        system_prompt += f"\n13. 标题生成风格：{title_style_rule}"
-        system_prompt += f"\n14. 附笺生成风格：{note_style_rule}"
+        system_prompt += f"\n13. 当前幕笺扩写强度：{expand_level}。保守=少量推断；standard=自然细化；rich=更丰富的氛围与感官，但仍不得新增重大事件。"
+        system_prompt += f"\n14. 标题生成风格：{title_style_rule}"
+        system_prompt += f"\n15. 附笺生成风格：{note_style_rule}"
         if note_style == "sensory":
-            system_prompt += "\n15. 感官标签不是外观皮肤，而是角色附笺内容结构。必须优先填满当前模板字段列表中的每一个字段。"
+            system_prompt += "\n16. 感官标签不是外观皮肤，而是角色附笺内容结构。必须优先填满当前模板字段列表中的每一个字段。"
         if template_lines:
-            system_prompt += "\n16. 当前附笺模板字段如下，display.characters 中每个角色都要按这些字段 key 输出；新增字段也必须真实生成，不得只保留在前端预览：\n" + "\n".join(template_lines)
-            system_prompt += "\n17. display.output_template 里的 {field_key} 占位符必须能从角色对象中取到对应 key 的内容。"
+            system_prompt += "\n17. 当前附笺模板字段如下，display.characters 中每个角色都要按这些字段 key 输出；新增字段也必须真实生成，不得只保留在前端预览：\n" + "\n".join(template_lines)
+            system_prompt += "\n18. display.output_template 里的 {field_key} 占位符必须能从角色对象中取到对应 key 的内容。"
             if has_metric_fields:
-                system_prompt += "\n18. 当前模板包含关系/状态数值字段：这类字段必须使用固定格式 `当前值/100（本轮变化）`，例如 `65/100（+2）`、`72/100（+0）`、`18/100（-1）`。当前值限制在 0-100；变化值只表示本轮变化，不要写成长句解释。"
-                system_prompt += "\n19. 如果 current_metrics 提供了该角色上一轮数值，必须以上一轮数值为基准，根据本轮剧情判断 delta，再输出新当前值；不要每回合机械 +1 或凭空重置。"
+                system_prompt += "\n19. 当前模板包含关系/状态数值字段：这类字段必须使用固定格式 `当前值/100（本轮变化）`，例如 `65/100（+2）`、`72/100（+0）`、`18/100（-1）`。当前值限制在 0-100；变化值只表示本轮变化，不要写成长句解释。"
+                system_prompt += "\n20. 如果 current_metrics 提供了该角色上一轮数值，必须以上一轮数值为基准，根据本轮剧情判断 delta，再输出新当前值；不要每回合机械 +1 或凭空重置。"
         system_prompt += build_protagonist_prompt_rule(config)
         system_prompt += build_worker_custom_prompt_rule(config)
 
@@ -2481,11 +2613,53 @@ def normalize_chat_completion_url(base_url: str) -> str:
     return f"{url}/chat/completions"
 
 
-async def call_worker_model(*, config: dict[str, Any], system_prompt: str, user_prompt: str) -> str:
+class WorkerProviderError(Exception):
+    def __init__(self, error_type: str, message: str, *, status_code: int = 502, detail: str = "") -> None:
+        super().__init__(message)
+        self.error_type = error_type
+        self.message = message
+        self.status_code = status_code
+        self.detail = detail
+
+
+def classify_provider_status(status_code: int) -> str:
+    if status_code == 429:
+        return "rate_limit"
+    if status_code in {401, 403}:
+        return "auth_error"
+    if status_code in {408, 504}:
+        return "timeout"
+    if status_code >= 500:
+        return "provider_error"
+    return "provider_error"
+
+
+def provider_error_message(error_type: str, detail: str = "", *, timeout: float | int | None = None) -> str:
+    clean_detail = re.sub(r"\s+", " ", str(detail or "")).strip()[:360]
+    suffix = f" 服务商返回：{clean_detail}" if clean_detail else ""
+    if error_type == "timeout":
+        seconds = int(float(timeout or 0)) if timeout else 0
+        return f"心笺生成超时：服务商在 {seconds} 秒内未返回结果。本轮没有写入新数据，可以稍后重试。" if seconds else "心笺生成超时：服务商长时间未返回结果。本轮没有写入新数据，可以稍后重试。"
+    if error_type == "empty_response":
+        return "心笺生成失败：服务商返回了空内容。本轮没有写入新数据。"
+    if error_type == "invalid_provider_response":
+        return "心笺生成失败：服务商返回格式不是 OpenAI Chat Completions 兼容格式。本轮没有写入新数据。"
+    if error_type == "rate_limit":
+        return "心笺生成失败：服务商限流或拒绝请求。请稍后重试，或检查额度与并发限制。" + suffix
+    if error_type == "auth_error":
+        return "心笺生成失败：服务商鉴权失败。请检查 API Key、Base URL 与模型权限。" + suffix
+    if error_type == "network_error":
+        return "无法连接心笺模型服务。请检查 API 地址、网络状态或代理设置。" + suffix
+    if error_type == "config_error":
+        return "请先在心笺里配置辅助模型 Base URL 和模型名。"
+    return "心笺生成失败：服务商请求异常。本轮没有写入新数据。" + suffix
+
+
+async def call_worker_model(*, config: dict[str, Any], system_prompt: str, user_prompt: str, json_mode: bool = True) -> str:
     api_url = normalize_chat_completion_url(config.get("api_base_url", ""))
     model = str(config.get("model") or "").strip()
     if not api_url or not model:
-        raise HTTPException(status_code=400, detail="请先在心笺里配置辅助模型 Base URL 和模型名。")
+        raise WorkerProviderError("config_error", provider_error_message("config_error"), status_code=400)
     headers = {"Content-Type": "application/json"}
     api_key = str(config.get("api_key") or "").strip()
     if api_key:
@@ -2498,21 +2672,68 @@ async def call_worker_model(*, config: dict[str, Any], system_prompt: str, user_
         ],
         "temperature": float(config.get("temperature", 0) or 0),
     }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
     timeout = float(config.get("request_timeout", 120) or 120)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        try:
-            response = await client.post(api_url, headers=headers, json=payload)
+
+    async def _post(current_payload: dict[str, Any]) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(api_url, headers=headers, json=current_payload)
             response.raise_for_status()
-            data = response.json()
-        except httpx.HTTPStatusError as exc:
-            detail = exc.response.text[:600] if exc.response is not None else str(exc)
-            raise HTTPException(status_code=502, detail=f"辅助模型请求失败：{detail}") from exc
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"辅助模型请求失败：{exc}") from exc
+            return response.json()
+
     try:
-        return str(data["choices"][0]["message"]["content"] or "")
+        try:
+            data = await _post(payload)
+        except httpx.HTTPStatusError as exc:
+            # Some OpenAI-compatible providers do not support response_format yet.
+            # Fall back once to plain Chat Completions when JSON mode is rejected.
+            status_code = exc.response.status_code if exc.response is not None else 502
+            detail = exc.response.text[:600] if exc.response is not None else str(exc)
+            if json_mode and status_code in {400, 422} and "response_format" in detail:
+                payload.pop("response_format", None)
+                data = await _post(payload)
+            else:
+                error_type = classify_provider_status(status_code)
+                raise WorkerProviderError(error_type, provider_error_message(error_type, detail, timeout=timeout), status_code=502, detail=detail) from exc
+    except WorkerProviderError:
+        raise
+    except httpx.TimeoutException as exc:
+        raise WorkerProviderError("timeout", provider_error_message("timeout", timeout=timeout), detail=str(exc)) from exc
+    except httpx.RequestError as exc:
+        raise WorkerProviderError("network_error", provider_error_message("network_error", str(exc)), detail=str(exc)) from exc
+    except ValueError as exc:
+        raise WorkerProviderError("invalid_provider_response", provider_error_message("invalid_provider_response"), detail=str(exc)) from exc
+    except Exception as exc:
+        raise WorkerProviderError("provider_error", provider_error_message("provider_error", str(exc)), detail=str(exc)) from exc
+    try:
+        content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
-        raise HTTPException(status_code=502, detail="辅助模型返回格式不是 OpenAI Chat Completions 兼容格式。") from exc
+        raise WorkerProviderError("invalid_provider_response", provider_error_message("invalid_provider_response"), detail=str(exc)) from exc
+    text = str(content or "").strip()
+    if not text:
+        raise WorkerProviderError("empty_response", provider_error_message("empty_response"))
+    return text
+
+
+async def repair_worker_json(*, config: dict[str, Any], raw_output: str, parse_error: str) -> str:
+    system_prompt = (
+        "你是严格的 JSON 修复器。只修复用户提供的非法 JSON 文本，"
+        "不要新增、删减或改写剧情含义。必须只返回一个合法 JSON 对象，"
+        "根结构必须是 {\"updates\": [], \"display\": {}}。"
+    )
+    user_prompt = (
+        "下面是一段模型返回的非法 JSON，请修复为合法 JSON。\n"
+        "要求：\n"
+        "1. 只返回 JSON 对象，不要 Markdown、解释或代码块。\n"
+        "2. 保留原字段和原内容含义。\n"
+        "3. 字符串中的英文双引号请改为中文引号或正确转义。\n"
+        "4. 不要新增重大剧情事实。\n\n"
+        f"解析错误：{parse_error}\n\n"
+        "非法 JSON 原文：\n"
+        f"{raw_output}"
+    )
+    return await call_worker_model(config=config, system_prompt=system_prompt, user_prompt=user_prompt, json_mode=True)
 
 
 def save_worker_log(payload: dict[str, Any]) -> None:
@@ -2663,9 +2884,11 @@ async def api_turn_start(request: Request) -> dict[str, Any]:
         payload = {}
     turn_id = normalize_turn_id(payload.get("turn_id") or payload.get("created_at") or datetime.now().isoformat(timespec="microseconds"))
     user_text = str(payload.get("user_text") or payload.get("userText") or "")
+    message_id = str(payload.get("message_id") or payload.get("user_message_id") or "")
+    turn_index = payload.get("turn_index") or payload.get("turnIndex")
     with connect_db() as conn:
         init_meta_tables(conn)
-        record = save_turn_record(conn, turn_id=turn_id, user_text=user_text, status="pending_assistant", xinjian_status="pending")
+        record = save_turn_record(conn, turn_id=turn_id, user_text=user_text, status="pending_assistant", state_journal_status="pending", message_id=message_id, turn_index=turn_index, trigger_source=str(payload.get("trigger_source") or payload.get("triggerSource") or payload.get("source") or "turn_start"))
         conn.commit()
     return {"ok": True, "turn": record}
 
@@ -2678,9 +2901,11 @@ async def api_turn_complete(request: Request) -> dict[str, Any]:
     turn_id = normalize_turn_id(payload.get("turn_id") or payload.get("created_at") or datetime.now().isoformat(timespec="microseconds"))
     user_text = str(payload.get("user_text") or payload.get("userText") or "")
     assistant_text = str(payload.get("assistant_text") or payload.get("assistantText") or "")
+    message_id = str(payload.get("assistant_message_id") or payload.get("message_id") or "")
+    turn_index = payload.get("turn_index") or payload.get("turnIndex")
     with connect_db() as conn:
         init_meta_tables(conn)
-        record = save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="assistant_ready", xinjian_status="pending")
+        record = save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="assistant_ready", state_journal_status="pending", message_id=message_id, turn_index=turn_index, trigger_source=str(payload.get("trigger_source") or payload.get("triggerSource") or payload.get("source") or "turn_complete"))
         conn.commit()
     return {"ok": True, "turn": record}
 
@@ -2695,11 +2920,16 @@ async def api_turn_invalidate(request: Request) -> dict[str, Any]:
     with connect_db() as conn:
         init_meta_tables(conn)
         rollback_count = 0
+        deleted_displays = 0
         if turn_id:
             rollback_count = rollback_turn_effects(conn, turn_id, reason=reason)
+            try:
+                deleted_displays = conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (turn_id,)).rowcount or 0
+            except Exception:
+                deleted_displays = 0
         stale = mark_turns_stale(conn, turn_id or None, reason=reason)
         conn.commit()
-    return {"ok": True, "rollback_count": rollback_count, "stale": stale, "message": "已标记心笺记录过期。"}
+    return {"ok": True, "rollback_count": rollback_count, "deleted_displays": deleted_displays, "stale": stale, "message": "已标记心笺记录过期。"}
 
 
 @app.get("/api/turns/recent")
@@ -2829,7 +3059,7 @@ def recent_turn_displays(limit: int = 20) -> list[dict[str, Any]]:
     with connect_db() as conn:
         init_meta_tables(conn)
         rows = conn.execute(
-            "SELECT turn_id, created_at, raw_json FROM xj_turn_displays ORDER BY id DESC LIMIT ?",
+            "SELECT turn_id, message_id, content_hash, turn_index, trigger_source, created_at, raw_json FROM xj_turn_displays ORDER BY id DESC LIMIT ?",
             (safe_limit,),
         ).fetchall()
     items: list[dict[str, Any]] = []
@@ -2841,11 +3071,20 @@ def recent_turn_displays(limit: int = 20) -> list[dict[str, Any]]:
         if not isinstance(payload, dict):
             payload = {}
         payload["turn_id"] = row["turn_id"]
+        payload["message_id"] = row["message_id"]
+        payload["content_hash"] = row["content_hash"]
+        payload["turn_index"] = row["turn_index"]
+        payload["trigger_source"] = row["trigger_source"]
         payload["created_at"] = row["created_at"]
-        if not payload.get("sequence"):
-            payload["sequence"] = len(items) + 1
-        if not payload.get("sequence_label"):
-            payload["sequence_label"] = f"第 {payload.get('sequence')} 笺"
+        display_sequence = int(row["turn_index"] or 0) if str(row["turn_index"] or "").strip() else 0
+        if display_sequence:
+            payload["sequence"] = display_sequence
+            payload["sequence_label"] = f"第 {display_sequence} 笺"
+        else:
+            if not payload.get("sequence"):
+                payload["sequence"] = len(items) + 1
+            if not payload.get("sequence_label"):
+                payload["sequence_label"] = f"第 {payload.get('sequence')} 笺"
         items.append(payload)
     return items
 
@@ -2897,8 +3136,8 @@ async def api_export_debug_log(limit: int = 80) -> JSONResponse:
             for row in conn.execute("SELECT * FROM xj_turn_effects ORDER BY created_at DESC LIMIT ?", (safe_limit,)).fetchall()
         ]
         turn_displays = [
-            {"turn_id": row["turn_id"], "created_at": row["created_at"], "display": load_json_row(row["raw_json"], {})}
-            for row in conn.execute("SELECT turn_id, created_at, raw_json FROM xj_turn_displays ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
+            {"turn_id": row["turn_id"], "message_id": row["message_id"], "content_hash": row["content_hash"], "turn_index": row["turn_index"], "trigger_source": row["trigger_source"], "created_at": row["created_at"], "display": load_json_row(row["raw_json"], {})}
+            for row in conn.execute("SELECT turn_id, message_id, content_hash, turn_index, trigger_source, created_at, raw_json FROM xj_turn_displays ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
         ]
         hook_events = [
             {"id": row["id"], "created_at": row["created_at"], "event": row["event"], "page": row["page"], "turn_id": row["turn_id"], "payload": load_json_row(row["payload_json"], {})}
@@ -2955,10 +3194,95 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     if not tables:
         return {"ok": True, "skipped": True, "status": "skipped", "message": "没有可更新的表。", "reason": "没有可更新的表。"}
     latest_turn = payload.get("latest_turn") if isinstance(payload.get("latest_turn"), dict) else None
-    history = format_history(payload.get("history"), int(config.get("input_turn_count", 3) or 3))
+    trigger_source = str(payload.get("trigger_source") or payload.get("triggerSource") or payload.get("source") or payload.get("event_type") or "manual_backend").strip() or "manual_backend"
+    direct_user_text = str(payload.get("user_text") or payload.get("userText") or "")
+    direct_assistant_text = str(
+        payload.get("assistant_clean_text")
+        or payload.get("assistantCleanText")
+        or payload.get("assistant_text")
+        or payload.get("assistantText")
+        or ""
+    )
+    if latest_turn is None and (direct_user_text or direct_assistant_text):
+        latest_turn = {"user": direct_user_text, "assistant": direct_assistant_text}
+    elif isinstance(latest_turn, dict):
+        latest_turn = {**latest_turn}
+        if direct_user_text:
+            latest_turn["user"] = direct_user_text
+        if direct_assistant_text:
+            latest_turn["assistant"] = direct_assistant_text
+    history_source = payload.get("recent_history") if isinstance(payload.get("recent_history"), list) else payload.get("recentHistory")
+    if history_source is None:
+        history_source = payload.get("history")
+    history = format_history(history_source, int(config.get("input_turn_count", 3) or 3))
+    turn_id = normalize_turn_id(payload.get("turn_id") or payload.get("turnId") or payload.get("created_at") or payload.get("createdAt") or datetime.now().isoformat(timespec="seconds"))
+    message_id = normalize_turn_id(payload.get("assistant_message_id") or payload.get("assistantMessageId") or payload.get("message_id") or payload.get("messageId") or "") if (payload.get("assistant_message_id") or payload.get("assistantMessageId") or payload.get("message_id") or payload.get("messageId")) else ""
+    turn_index = payload.get("turn_index") or payload.get("turnIndex")
+    safe_turn_index = int(turn_index or 0) if str(turn_index or "").strip() else 0
+    user_text = str((latest_turn or {}).get("user") or (latest_turn or {}).get("userText") or "")
+    assistant_text = str((latest_turn or {}).get("assistant") or (latest_turn or {}).get("assistantText") or "")
+    if trigger_source in {"chat_hook", "dom_fallback"} and not assistant_text.strip():
+        result = {"applied": [], "errors": ["心笺未检测到可绑定的 assistant 正文，本轮未生成幕笺。"], "touched_tables": []}
+        log_payload = {
+            "created_at": now_string(),
+            "storage_engine": "sqlite",
+            "database": str(DB_PATH),
+            "request": {"turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "event_type": payload.get("event_type") or payload.get("source") or "auto_update", "latest_turn": latest_turn, "history": history, "table_ids": table_ids, "dry_run": bool(payload.get("dry_run", False)), "user_hash": payload.get("user_hash"), "assistant_hash": payload.get("assistant_hash")},
+            "system_prompt": "",
+            "user_prompt": "",
+            "raw_output": "",
+            "parsed": None,
+            "updates": [],
+            "display": {},
+            "result": result,
+            "error_type": "empty_context",
+        }
+        if config.get("debug_enabled", True):
+            save_worker_log(log_payload)
+        return {"ok": False, "status": "error", "error_type": "empty_context", "message": result["errors"][0], "summary": build_update_summary(result, tables), "updates": [], "turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "display": {}, "result": result, "raw_output": ""}
     system_prompt, user_prompt = build_worker_prompt(tables=tables, latest_turn=latest_turn, history=history, config=config, metric_states=metric_states)
-    raw_output = await call_worker_model(config=config, system_prompt=system_prompt, user_prompt=user_prompt)
+    raw_output = ""
+    try:
+        raw_output = await call_worker_model(config=config, system_prompt=system_prompt, user_prompt=user_prompt)
+    except WorkerProviderError as exc:
+        result = {"applied": [], "errors": [exc.message], "touched_tables": []}
+        log_payload = {
+            "created_at": now_string(),
+            "storage_engine": "sqlite",
+            "database": str(DB_PATH),
+            "request": {"turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "event_type": payload.get("event_type") or payload.get("source") or "auto_update", "latest_turn": latest_turn, "history": history, "table_ids": table_ids, "dry_run": bool(payload.get("dry_run", False)), "user_hash": payload.get("user_hash"), "assistant_hash": payload.get("assistant_hash")},
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "raw_output": raw_output,
+            "parsed": None,
+            "updates": [],
+            "display": {},
+            "result": result,
+            "error_type": exc.error_type,
+            "error_detail": exc.detail,
+        }
+        if config.get("debug_enabled", True):
+            save_worker_log(log_payload)
+        summary = build_update_summary(result, tables)
+        return {
+            "ok": False,
+            "status": "error",
+            "error_type": exc.error_type,
+            "message": exc.message,
+            "summary": summary,
+            "updates": [],
+            "turn_id": turn_id,
+            "message_id": message_id,
+            "turn_index": safe_turn_index,
+            "trigger_source": trigger_source,
+            "display": {},
+            "result": result,
+            "raw_output": "",
+        }
     parse_error = ""
+    repair_error = ""
+    repair_used = False
+    repair_output = ""
     parsed: Any = None
     updates: list[dict[str, Any]] = []
     display_payload: dict[str, Any] = {}
@@ -2969,17 +3293,27 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
     except Exception as exc:
         parse_error = str(exc)
-    turn_id = normalize_turn_id(payload.get("turn_id") or payload.get("created_at") or datetime.now().isoformat(timespec="seconds"))
-    user_text = str((latest_turn or {}).get("user") or (latest_turn or {}).get("userText") or "")
-    assistant_text = str((latest_turn or {}).get("assistant") or (latest_turn or {}).get("assistantText") or "")
+        try:
+            repair_output = await repair_worker_json(config=config, raw_output=raw_output, parse_error=parse_error)
+            parsed = extract_json_from_text(repair_output)
+            updates = normalize_updates(parsed)
+            if config.get("mujian_enabled", True):
+                display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
+            repair_used = True
+            parse_error = ""
+        except Exception as repair_exc:
+            repair_error = str(repair_exc)
+    worker_error_type = ""
     if parse_error:
-        result = {"applied": [], "errors": [f"解析辅助模型输出失败：{parse_error}"], "touched_tables": []}
+        worker_error_type = "invalid_json"
+        detail = parse_error + (f"；JSON 修复失败：{repair_error}" if repair_error else "")
+        result = {"applied": [], "errors": [f"心笺解析失败：模型返回内容不是合法 JSON。本轮没有写入新数据。详情：{detail}"], "touched_tables": []}
     else:
         if not payload.get("dry_run", False):
             with connect_db() as conn:
                 init_meta_tables(conn)
                 rollback_turn_effects(conn, turn_id, reason="regenerate_before_update")
-                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="assistant_ready", xinjian_status="running")
+                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="assistant_ready", state_journal_status="running", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
         result = apply_updates(updates, dry_run=bool(payload.get("dry_run", False)))
         if config.get("mujian_enabled", True) and not payload.get("dry_run", False):
@@ -2990,13 +3324,13 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                     result["metrics"] = metric_applied
                     result["metric_count"] = len(metric_applied)
                 save_turn_effects(conn, turn_id, result)
-                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", xinjian_status="done" if not result.get("errors") else "error")
+                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
         elif not payload.get("dry_run", False):
             with connect_db() as conn:
                 init_meta_tables(conn)
                 save_turn_effects(conn, turn_id, result)
-                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", xinjian_status="done" if not result.get("errors") else "error")
+                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
         if config.get("mujian_enabled", True) and not payload.get("dry_run", False):
             try:
@@ -3006,33 +3340,45 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                     refreshed_tables = build_table_snapshot(conn, table_ids)
                 if not display_payload:
                     display_payload = build_fallback_display(latest_turn=latest_turn, tables=refreshed_tables)
-                display_payload = save_turn_display(display_payload, turn_id=turn_id)
+                display_payload = save_turn_display(display_payload, turn_id=turn_id, message_id=message_id, content_hash=payload.get("assistant_hash") or payload.get("content_hash") or payload.get("contentHash") or hash_text(assistant_text), turn_index=safe_turn_index, trigger_source=trigger_source)
             except Exception as exc:
                 result.setdefault("errors", []).append(f"幕笺保存失败：{exc}")
     log_payload = {
         "created_at": now_string(),
         "storage_engine": "sqlite",
         "database": str(DB_PATH),
-        "request": {"turn_id": turn_id, "event_type": payload.get("event_type") or payload.get("source") or "auto_update", "latest_turn": latest_turn, "history": history, "table_ids": table_ids, "dry_run": bool(payload.get("dry_run", False)), "user_hash": payload.get("user_hash"), "assistant_hash": payload.get("assistant_hash")},
+        "request": {"turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "event_type": payload.get("event_type") or payload.get("source") or "auto_update", "latest_turn": latest_turn, "history": history, "table_ids": table_ids, "dry_run": bool(payload.get("dry_run", False)), "user_hash": payload.get("user_hash"), "assistant_hash": payload.get("assistant_hash")},
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
         "raw_output": raw_output,
+        "repair_output": repair_output if repair_used or repair_error else "",
+        "repair_used": repair_used,
+        "repair_error": repair_error,
+        "parse_error": parse_error,
         "parsed": parsed,
         "updates": updates,
         "display": display_payload,
         "result": result,
+        "error_type": worker_error_type,
     }
     if config.get("debug_enabled", True):
         save_worker_log(log_payload)
     summary = build_update_summary(result, tables)
+    has_errors = bool(result.get("errors"))
+    ok = not has_errors or bool(result.get("applied"))
     return {
-        "ok": not result.get("errors") or bool(result.get("applied")),
-        "status": summary.get("status"),
-        "message": summary.get("message"),
+        "ok": ok,
+        "status": "error" if has_errors and not result.get("applied") else summary.get("status"),
+        "error_type": worker_error_type,
+        "message": (result.get("errors") or [summary.get("message")])[0] if has_errors and not result.get("applied") else summary.get("message"),
         "summary": summary,
         "updates": updates,
         "turn_id": turn_id,
-        "display": display_payload if config.get("mujian_enabled", True) else {},
+        "message_id": message_id,
+        "turn_index": safe_turn_index,
+        "trigger_source": trigger_source,
+        "repair_used": repair_used,
+        "display": display_payload if config.get("mujian_enabled", True) and ok else {},
         "result": result,
         "raw_output": raw_output if config.get("debug_enabled") else "",
     }
