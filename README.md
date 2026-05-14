@@ -1,7 +1,7 @@
 # Fantareal
 
 <p align="center">
-  <img src="./assets/preview.png" alt="Fantareal Chat WebUI Preview" width="80%">
+  <img src="./assets/default.png" alt="Fantareal Chat WebUI Preview" width="80%">
 </p>
 
 本地运行的 AI 伴侣聊天项目，基于 `FastAPI + WebUI`，支持角色卡、记忆库、世界书、预设、差分立绘、创意工坊、Mod 扩展和桌面启动器。
