@@ -201,6 +201,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "enabled": True,
     "auto_update": False,
     "notify_in_chat": True,
+    "ui_sync_global": False,
     "input_turn_count": 3,
     "api_type": "openai_compatible",
     "api_base_url": "",
@@ -671,7 +672,7 @@ def normalize_config(config: Any) -> dict[str, Any]:
         merged["temperature"] = max(0, min(2, float(merged.get("temperature", 0) or 0)))
     except (TypeError, ValueError):
         merged["temperature"] = 0
-    for key in ["enabled", "auto_update", "notify_in_chat", "strict_mode", "debug_enabled", "mujian_enabled", "mujian_title_card", "mujian_turn_note", "mujian_default_collapsed", "mujian_protagonist_card_enabled", "mujian_worker_custom_prompt_enabled"]:
+    for key in ["enabled", "auto_update", "notify_in_chat", "ui_sync_global", "strict_mode", "debug_enabled", "mujian_enabled", "mujian_title_card", "mujian_turn_note", "mujian_default_collapsed", "mujian_protagonist_card_enabled", "mujian_worker_custom_prompt_enabled"]:
         merged[key] = bool(merged.get(key))
     for key in ["api_type", "api_base_url", "api_key", "model", "mujian_style", "mujian_title_style", "mujian_note_style", "mujian_expand_level", "mujian_note_density", "mujian_chat_display_mode", "mujian_character_filter", "mujian_character_names", "mujian_protagonist_card_mode", "mujian_protagonist_name", "mujian_protagonist_aliases", "mujian_worker_style_prompt", "mujian_worker_protagonist_prompt", "mujian_template_id", "mujian_theme_id"]:
         merged[key] = str(merged.get(key) or "").strip()

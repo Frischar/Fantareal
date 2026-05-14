@@ -57,6 +57,7 @@
     cfgEnabled: $("#cfgEnabled"),
     cfgAutoUpdate: $("#cfgAutoUpdate"),
     cfgNotify: $("#cfgNotify"),
+    cfgUiSyncGlobal: $("#cfgUiSyncGlobal"),
     cfgMujianEnabled: $("#cfgMujianEnabled"),
     cfgMujianTitle: $("#cfgMujianTitle"),
     cfgMujianNote: $("#cfgMujianNote"),
@@ -548,11 +549,17 @@
     return template;
   }
 
+  function applyAdminUiSyncMode(cfg = state.config || {}) {
+    document.documentElement.dataset.xjUiSync = cfg.ui_sync_global ? "global" : "native";
+  }
+
   function bindConfig() {
     const cfg = state.config || {};
     els.cfgEnabled.checked = !!cfg.enabled;
     els.cfgAutoUpdate.checked = !!cfg.auto_update;
     els.cfgNotify.checked = !!cfg.notify_in_chat;
+    if (els.cfgUiSyncGlobal) els.cfgUiSyncGlobal.checked = !!cfg.ui_sync_global;
+    applyAdminUiSyncMode(cfg);
     if (els.cfgMujianEnabled) els.cfgMujianEnabled.checked = cfg.mujian_enabled !== false;
     if (els.cfgMujianTitle) els.cfgMujianTitle.checked = cfg.mujian_title_card !== false;
     if (els.cfgMujianNote) els.cfgMujianNote.checked = cfg.mujian_turn_note !== false;
@@ -594,6 +601,7 @@
       enabled: els.cfgEnabled.checked,
       auto_update: els.cfgAutoUpdate.checked,
       notify_in_chat: els.cfgNotify.checked,
+      ui_sync_global: els.cfgUiSyncGlobal ? els.cfgUiSyncGlobal.checked : false,
       mujian_enabled: els.cfgMujianEnabled ? els.cfgMujianEnabled.checked : true,
       mujian_title_card: els.cfgMujianTitle ? els.cfgMujianTitle.checked : true,
       mujian_turn_note: els.cfgMujianNote ? els.cfgMujianNote.checked : true,
@@ -1249,7 +1257,7 @@
     };
     const details = {
       model: `${state.config.model || "未填写模型"} · ${state.config.api_base_url || "未填写 API URL"}`,
-      link: `心笺${state.config.enabled === false ? "关闭" : "开启"}｜自动填表${state.config.auto_update ? "开启" : "关闭"}｜聊天提示${state.config.notify_in_chat ? "开启" : "关闭"}`,
+      link: `心笺${state.config.enabled === false ? "关闭" : "开启"}｜自动填表${state.config.auto_update ? "开启" : "关闭"}｜聊天提示${state.config.notify_in_chat ? "开启" : "关闭"}｜跟随全局UI${state.config.ui_sync_global ? "开启" : "关闭"}`,
       mujian: `幕笺${state.config.mujian_enabled === false ? "关闭" : "开启"}｜显示：${({ collapsed: "折叠", expanded: "展开", compact: "状态条", hidden: "不显示" }[state.config.mujian_chat_display_mode || "collapsed"] || "折叠")}｜标题：${state.config.mujian_title_style || "classic"}｜附笺：${state.config.mujian_note_style || state.config.mujian_style || "classic"}｜密度：${state.config.mujian_note_density || "standard"}`,
       generate: `自动填表${state.config.auto_update ? "开启" : "关闭"}｜读取最近 ${state.config.input_turn_count || 3} 轮｜主角状态卡${state.config.mujian_protagonist_card_enabled ? "开启" : "关闭"}`,
       template: `${activeTemplate().name || activeTemplate().id}｜字段 ${activeTemplate().fields?.length || 0} 个`,
