@@ -4,7 +4,7 @@
   <img src="./assets/default.png" alt="Fantareal Chat WebUI Preview" width="80%">
 </p>
 
-本地运行的 AI 伴侣聊天项目，基于 `FastAPI + WebUI`，支持角色卡、记忆库、世界书、预设、差分立绘、创意工坊、Mod 扩展和桌面启动器。
+本地运行的 AI 聊天项目，基于 `FastAPI + WebUI`，支持角色卡、记忆库、世界书、预设、差分立绘、演出工坊、Mod 扩展和桌面启动器。
 
 
 ## 快速启动
@@ -28,7 +28,7 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 1. **配置模型** — 在 `/config` 填写 API URL、Key、Model，兼容 OpenAI Chat Completions 风格即可
 2. **加载角色卡** — 在 `/config/card` 导入、编辑、导出，支持热切换
 3. **管理记忆 / 世界书 / 预设** — 各自在对应页面维护，支持独立导入导出，设置页可一键打包四卡组合
-4. **Mod 扩展** — `mods/` 目录下通过 `mod.json` 声明，运行时自动加载（当前内置：心笺、角色卡写手、灵魂织手、状态面板、酒馆转换器）
+4. **Mod 扩展** — `mods/` 目录下通过 `mod.json` 声明，运行时自动加载（当前内置：游录、界笺、余音、渡笺、缃笺,心笺）
 5. **路由转发** — `/config/route-forwarding` 配置多 Provider 路由、Key 轮换与故障转移
 6. **Prompt 预览** — 聊天侧栏查看本轮注入的完整上下文
 
