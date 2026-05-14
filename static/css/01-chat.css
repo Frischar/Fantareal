@@ -1904,6 +1904,38 @@ body.chat-page .messages,
   outline: 0 !important;
 }
 
+/* Soften chat scrollbars so they don't cut through the reading surface. */
+body.chat-page .messages,
+body.chat-page #message-input {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 42%, transparent) transparent;
+}
+
+body.chat-page .messages::-webkit-scrollbar,
+body.chat-page #message-input::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+body.chat-page .messages::-webkit-scrollbar-track,
+body.chat-page #message-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.chat-page .messages::-webkit-scrollbar-thumb,
+body.chat-page #message-input::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 34%, transparent);
+  background-clip: content-box;
+}
+
+body.chat-page .messages:hover::-webkit-scrollbar-thumb,
+body.chat-page #message-input:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 52%, transparent);
+  background-clip: content-box;
+}
+
 body.chat-page.chat-clear-mode {
   --chat-reading-mask-alpha: 0 !important;
   --chat-reading-mask-blur: 0px !important;
