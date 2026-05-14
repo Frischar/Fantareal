@@ -857,11 +857,11 @@
       .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row strong { color:#f6ecd7; font-weight:520; line-height:1.72; }
 
       /* Keep Xinjian chat surfaces in sync with Fantareal global color and opacity settings. */
-      .state-journal-chat-bubble,
-      .state-journal-turn-status,
-      .state-journal-inline-scene-card,
-      .state-journal-turn-note,
-      .state-journal-turn-note-compact {
+      body.state-journal-global-ui-sync .state-journal-chat-bubble,
+      body.state-journal-global-ui-sync .state-journal-turn-status,
+      body.state-journal-global-ui-sync .state-journal-inline-scene-card,
+      body.state-journal-global-ui-sync .state-journal-turn-note,
+      body.state-journal-global-ui-sync .state-journal-turn-note-compact {
         background:
           linear-gradient(
             180deg,
@@ -872,80 +872,80 @@
         backdrop-filter: var(--ui-glass-blur-soft, blur(14px) saturate(1.04));
         -webkit-backdrop-filter: var(--ui-glass-blur-soft, blur(14px) saturate(1.04));
       }
-      .state-journal-note-section,
-      .state-journal-note-field,
-      .state-journal-scene-chip,
-      .state-journal-paper-time-row,
-      .state-journal-status-scene-hud span,
-      .state-journal-status-row,
-      .state-journal-metric-chip,
-      .state-journal-metric-diary-row,
-      .state-journal-status-pro-card,
-      .state-journal-status-pro-row,
-      .state-journal-status-meter,
-      .state-journal-paper-note-row,
-      .state-journal-storyboard-meta,
-      .state-journal-storyboard-group,
-      .state-journal-storyboard-group-title,
-      .state-journal-storyboard-row,
-      .state-journal-note-template-output,
-      .state-journal-source-badge {
+      body.state-journal-global-ui-sync .state-journal-note-section,
+      body.state-journal-global-ui-sync .state-journal-note-field,
+      body.state-journal-global-ui-sync .state-journal-scene-chip,
+      body.state-journal-global-ui-sync .state-journal-paper-time-row,
+      body.state-journal-global-ui-sync .state-journal-status-scene-hud span,
+      body.state-journal-global-ui-sync .state-journal-status-row,
+      body.state-journal-global-ui-sync .state-journal-metric-chip,
+      body.state-journal-global-ui-sync .state-journal-metric-diary-row,
+      body.state-journal-global-ui-sync .state-journal-status-pro-card,
+      body.state-journal-global-ui-sync .state-journal-status-pro-row,
+      body.state-journal-global-ui-sync .state-journal-status-meter,
+      body.state-journal-global-ui-sync .state-journal-paper-note-row,
+      body.state-journal-global-ui-sync .state-journal-storyboard-meta,
+      body.state-journal-global-ui-sync .state-journal-storyboard-group,
+      body.state-journal-global-ui-sync .state-journal-storyboard-group-title,
+      body.state-journal-global-ui-sync .state-journal-storyboard-row,
+      body.state-journal-global-ui-sync .state-journal-note-template-output,
+      body.state-journal-global-ui-sync .state-journal-source-badge {
         background: rgba(var(--input-rgb, 11, 18, 26), var(--input-alpha, .78)) !important;
       }
-      .state-journal-note-section,
-      .state-journal-note-field,
-      .state-journal-scene-chip,
-      .state-journal-paper-time-row,
-      .state-journal-status-scene-hud span,
-      .state-journal-status-row,
-      .state-journal-metric-chip,
-      .state-journal-metric-diary-row,
-      .state-journal-status-pro-card,
-      .state-journal-status-pro-row,
-      .state-journal-status-meter,
-      .state-journal-paper-note-row,
-      .state-journal-storyboard-meta,
-      .state-journal-storyboard-group,
-      .state-journal-storyboard-row {
+      body.state-journal-global-ui-sync .state-journal-note-section,
+      body.state-journal-global-ui-sync .state-journal-note-field,
+      body.state-journal-global-ui-sync .state-journal-scene-chip,
+      body.state-journal-global-ui-sync .state-journal-paper-time-row,
+      body.state-journal-global-ui-sync .state-journal-status-scene-hud span,
+      body.state-journal-global-ui-sync .state-journal-status-row,
+      body.state-journal-global-ui-sync .state-journal-metric-chip,
+      body.state-journal-global-ui-sync .state-journal-metric-diary-row,
+      body.state-journal-global-ui-sync .state-journal-status-pro-card,
+      body.state-journal-global-ui-sync .state-journal-status-pro-row,
+      body.state-journal-global-ui-sync .state-journal-status-meter,
+      body.state-journal-global-ui-sync .state-journal-paper-note-row,
+      body.state-journal-global-ui-sync .state-journal-storyboard-meta,
+      body.state-journal-global-ui-sync .state-journal-storyboard-group,
+      body.state-journal-global-ui-sync .state-journal-storyboard-row {
         border-color: var(--border, rgba(152, 190, 233, .11)) !important;
       }
-      .state-journal-inline-scene-card .state-journal-scene-title,
-      .state-journal-inline-scene-card .state-journal-scene-event,
-      .state-journal-turn-note .state-journal-note-section h4,
-      .state-journal-turn-note .state-journal-note-field strong,
-      .state-journal-turn-note .state-journal-relation-list strong,
-      .state-journal-turn-note-compact,
-      .state-journal-status-row strong,
-      .state-journal-status-pro-card summary b,
-      .state-journal-status-pro-row strong,
-      .state-journal-status-meter i,
-      .state-journal-paper-note-row strong,
-      .state-journal-storyboard-row strong {
+      body.state-journal-global-ui-sync .state-journal-inline-scene-card .state-journal-scene-title,
+      body.state-journal-global-ui-sync .state-journal-inline-scene-card .state-journal-scene-event,
+      body.state-journal-global-ui-sync .state-journal-turn-note .state-journal-note-section h4,
+      body.state-journal-global-ui-sync .state-journal-turn-note .state-journal-note-field strong,
+      body.state-journal-global-ui-sync .state-journal-turn-note .state-journal-relation-list strong,
+      body.state-journal-global-ui-sync .state-journal-turn-note-compact,
+      body.state-journal-global-ui-sync .state-journal-status-row strong,
+      body.state-journal-global-ui-sync .state-journal-status-pro-card summary b,
+      body.state-journal-global-ui-sync .state-journal-status-pro-row strong,
+      body.state-journal-global-ui-sync .state-journal-status-meter i,
+      body.state-journal-global-ui-sync .state-journal-paper-note-row strong,
+      body.state-journal-global-ui-sync .state-journal-storyboard-row strong {
         color: var(--text, #edf5ff) !important;
       }
-      .state-journal-inline-scene-card summary,
-      .state-journal-inline-scene-card .state-journal-scene-subtitle,
-      .state-journal-inline-scene-card .state-journal-scene-toggle,
-      .state-journal-turn-note summary,
-      .state-journal-turn-note .state-journal-note-toolbar,
-      .state-journal-turn-note .state-journal-relation-list,
-      .state-journal-turn-note .state-journal-note-empty,
-      .state-journal-turn-note-compact span,
-      .state-journal-status-pro-card summary i,
-      .state-journal-status-meter i small {
+      body.state-journal-global-ui-sync .state-journal-inline-scene-card summary,
+      body.state-journal-global-ui-sync .state-journal-inline-scene-card .state-journal-scene-subtitle,
+      body.state-journal-global-ui-sync .state-journal-inline-scene-card .state-journal-scene-toggle,
+      body.state-journal-global-ui-sync .state-journal-turn-note summary,
+      body.state-journal-global-ui-sync .state-journal-turn-note .state-journal-note-toolbar,
+      body.state-journal-global-ui-sync .state-journal-turn-note .state-journal-relation-list,
+      body.state-journal-global-ui-sync .state-journal-turn-note .state-journal-note-empty,
+      body.state-journal-global-ui-sync .state-journal-turn-note-compact span,
+      body.state-journal-global-ui-sync .state-journal-status-pro-card summary i,
+      body.state-journal-global-ui-sync .state-journal-status-meter i small {
         color: var(--muted, #9db1c8) !important;
       }
-      .state-journal-inline-scene-card .state-journal-scene-kicker,
-      .state-journal-scene-chip b,
-      .state-journal-turn-note .state-journal-note-field span,
-      .state-journal-turn-note-compact strong,
-      .state-journal-status-row span,
-      .state-journal-status-pro-card summary span,
-      .state-journal-status-pro-row span,
-      .state-journal-status-meter span,
-      .state-journal-paper-note-row span,
-      .state-journal-storyboard-row span,
-      .state-journal-storyboard-row b {
+      body.state-journal-global-ui-sync .state-journal-inline-scene-card .state-journal-scene-kicker,
+      body.state-journal-global-ui-sync .state-journal-scene-chip b,
+      body.state-journal-global-ui-sync .state-journal-turn-note .state-journal-note-field span,
+      body.state-journal-global-ui-sync .state-journal-turn-note-compact strong,
+      body.state-journal-global-ui-sync .state-journal-status-row span,
+      body.state-journal-global-ui-sync .state-journal-status-pro-card summary span,
+      body.state-journal-global-ui-sync .state-journal-status-pro-row span,
+      body.state-journal-global-ui-sync .state-journal-status-meter span,
+      body.state-journal-global-ui-sync .state-journal-paper-note-row span,
+      body.state-journal-global-ui-sync .state-journal-storyboard-row span,
+      body.state-journal-global-ui-sync .state-journal-storyboard-row b {
         color: var(--accent, #5ca7ff) !important;
       }
 
@@ -2169,9 +2169,14 @@
     }
   }
 
+  function applyChatUiSyncMode(config = configCache || {}) {
+    document.body?.classList.toggle("state-journal-global-ui-sync", !!config.ui_sync_global);
+  }
+
   async function loadConfig() {
     const payload = await requestJson(new URL("config", apiBase).toString());
     configCache = payload.config || {};
+    applyChatUiSyncMode(configCache);
     return configCache;
   }
 
