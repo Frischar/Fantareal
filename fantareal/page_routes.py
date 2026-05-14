@@ -221,6 +221,18 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             },
         )
 
+    @app.get("/config/route-forwarding", response_class=HTMLResponse)
+    async def route_forwarding_config_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "route_forwarding_config.html",
+            {
+                "settings": ctx.get_settings(),
+                "route_forwarding": ctx.get_route_forwarding_config(),
+                "route_forwarding_stats": ctx.get_route_forwarding_runtime_stats(),
+            },
+        )
+
     @app.get("/config/memory", response_class=HTMLResponse)
     async def memory_config_page(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(

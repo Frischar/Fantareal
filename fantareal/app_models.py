@@ -30,13 +30,13 @@ class SettingsPayload(BaseModel):
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = ""
-    theme: str = "light"
+    theme: str = "dark"
     temperature: float = 0.85
     history_limit: int = 20
     request_timeout: int = 120
     demo_mode: bool = False
     ui_opacity: float = 0.84
-    background_image_url: str = ""
+    background_image_url: str = "/assets/default.jpg"
     background_overlay: float = 0.42
     font_family_url: str = ""
     font_family_name: str = ""

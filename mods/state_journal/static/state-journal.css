@@ -1,13 +1,13 @@
 :root {
   --xj-bg: #10100e;
-  --xj-card: rgba(38, 34, 29, 0.82);
-  --xj-card-strong: rgba(47, 42, 35, 0.94);
-  --xj-card-soft: rgba(255, 255, 255, 0.045);
-  --xj-border: rgba(226, 204, 170, 0.17);
+  --xj-card: rgba(var(--panel-rgb, 38, 34, 29), var(--panel-alpha, 0.82));
+  --xj-card-strong: rgba(var(--panel-strong-rgb, 47, 42, 35), var(--panel-strong-alpha, 0.94));
+  --xj-card-soft: rgba(var(--input-rgb, 255, 255, 255), var(--input-alpha, 0.045));
+  --xj-border: var(--border, rgba(226, 204, 170, 0.17));
   --xj-line: rgba(226, 204, 170, 0.1);
-  --xj-text: #f1e7d6;
-  --xj-muted: rgba(241, 231, 214, 0.62);
-  --xj-accent: #e8b974;
+  --xj-text: var(--text, #f1e7d6);
+  --xj-muted: var(--muted, rgba(241, 231, 214, 0.62));
+  --xj-accent: var(--accent, #e8b974);
   --xj-ok: #63d384;
   --xj-danger: #f07878;
   --xj-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);

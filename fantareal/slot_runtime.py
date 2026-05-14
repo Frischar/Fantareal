@@ -21,7 +21,7 @@ from .app_models import (
     SlotWorldbookContext,
 )
 from .worldbook_logic import keyword_matches_query, sanitize_worldbook_store, split_trigger_aliases
-from .workshop_logic import get_workshop_stage, sanitize_creative_workshop, select_workshop_match
+from .workshop_logic import get_workshop_stage
 
 
 class SlotRuntimeService:
@@ -183,21 +183,6 @@ class SlotRuntimeService:
         except (TypeError, ValueError):
             base["background_overlay"] = 0.42
 
-        raw_workshop = current_card.get("raw", {}).get("creativeWorkshop", {}) if isinstance(current_card, dict) else {}
-        workshop = sanitize_creative_workshop(raw_workshop)
-        temp = int(workshop_state.get("temp", 0) or 0)
-        stage = get_workshop_stage(temp)
-        match = select_workshop_match(workshop, temp=temp, stage=stage)
-        if isinstance(match, dict):
-            action_type = str(match.get("actionType", "")).strip().lower()
-            if action_type == "music":
-                base["bgm_url"] = str(match.get("musicUrl", "")).strip()
-                base["bgm_preset"] = str(match.get("musicPreset", "")).strip()
-                base["media_note"] = str(match.get("note", "")).strip()
-            elif action_type == "image":
-                image_url = str(match.get("imageUrl", "")).strip()
-                if image_url:
-                    base["media_note"] = str(match.get("note", "")).strip()
         return SlotRuntimeMedia.model_validate(base)
 
     def build_slot_state(self, slot_id: str | None = None, *, persist_snapshot: bool = False) -> SlotState:

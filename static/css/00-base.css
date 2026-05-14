@@ -42,6 +42,11 @@
   --ui-border-strong: color-mix(in srgb, var(--line) 100%, transparent 0%);
   --ui-glass-blur: blur(18px) saturate(1.06);
   --ui-glass-blur-soft: blur(14px) saturate(1.04);
+  --danger: #9d3d2f;
+  --danger-rgb: 220, 84, 84;
+  --danger-bg: #fff2ef;
+  --danger-border: #cf6b5d;
+  --danger-hover-bg: rgba(220, 84, 84, 0.12);
   --chat-font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
   --chat-font-size: 15px;
   --chat-font-weight: 400;
@@ -85,6 +90,11 @@
   --ui-border-strong: color-mix(in srgb, var(--line) 100%, transparent 0%);
   --ui-glass-blur: blur(18px) saturate(1.06);
   --ui-glass-blur-soft: blur(14px) saturate(1.04);
+  --danger: #ff6b6b;
+  --danger-rgb: 255, 80, 80;
+  --danger-bg: rgba(255, 80, 80, 0.12);
+  --danger-border: #ff6b6b;
+  --danger-hover-bg: rgba(255, 80, 80, 0.2);
 }
 
 * {
