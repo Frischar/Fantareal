@@ -23,7 +23,7 @@
     {% set mod_state.has_state_journal = true %}
   {% endif %}
 {% endfor %}
-{% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' %}
+{% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' or current_path == '/config/route-forwarding' %}
 {% set persona_active = current_path == '/config/card' or current_path == '/config/preset' or current_path == '/config/memory' %}
 {% set worldbook_active = current_path.startswith('/config/worldbook') %}
 {% set plugins_active = current_path.startswith('/mods/tts-studio') or current_path.startswith('/mods/status-panel') or current_path.startswith('/mods/worldbook-maker') or current_path.startswith('/mods/soul-weaver') or current_path.startswith('/mods/card-writer') or current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/state-journal') %}
@@ -52,7 +52,8 @@
       <div class="nav-group-links">
         <a class="navlink{% if current_path == '/config' %} active{% endif %}" href="/config">全局设置</a>
         <a class="navlink{% if current_path == '/config/user' %} active{% endif %}" href="/config/user">用户设定</a>
-        <a class="navlink{% if current_path == '/config/workshop' %} active{% endif %}" href="/config/workshop">创意工坊</a>
+        <a class="navlink{% if current_path == '/config/route-forwarding' %} active{% endif %}" href="/config/route-forwarding">路由转发</a>
+        <a class="navlink{% if current_path == '/config/workshop' %} active{% endif %}" href="/config/workshop">演出工坊</a>
       </div>
     </div>
   </details>

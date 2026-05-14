@@ -826,14 +826,14 @@
       <div class="panel workshop-modal-card">
         <div class="drawer-head">
           <div>
-            <p class="eyebrow">创意工坊</p>
+            <p class="eyebrow">演出工坊</p>
             <h2 id="workshop-modal-title">图片弹窗</h2>
           </div>
           <button id="workshop-modal-close" class="secondary compact" type="button">关闭</button>
         </div>
         <div class="workshop-modal-stage" id="workshop-modal-stage">触发阶段：A 阶段</div>
         <div class="workshop-modal-body">
-          <img id="workshop-modal-image" class="workshop-modal-image" loading="lazy" decoding="async" alt="创意工坊图片" />
+          <img id="workshop-modal-image" class="workshop-modal-image" loading="lazy" decoding="async" alt="演出工坊图片" />
           <p id="workshop-modal-text" class="workshop-modal-text">这里会显示图片说明。</p>
         </div>
         <div class="workshop-modal-actions">
@@ -848,7 +848,7 @@
         <div class="workshop-opening-cover" aria-hidden="true"></div>
         <div class="workshop-opening-shade" aria-hidden="true"></div>
         <div class="workshop-opening-content">
-          <p class="eyebrow">创意工坊 · 开场演出</p>
+          <p class="eyebrow">演出工坊 · 开场演出</p>
           <h1 id="workshop-opening-title">{{ workshop_opening.title or persona.name or "Fantareal" }}</h1>
           {% if workshop_opening.subtitle %}<p class="workshop-opening-subtitle">{{ workshop_opening.subtitle }}</p>{% endif %}
           <button id="workshop-opening-start" class="workshop-opening-start" type="button">{{ workshop_opening.buttonText or "进入故事" }}</button>
@@ -977,6 +977,9 @@
           <div class="range-value"><span>当前值</span><strong id="drawer-ui-opacity-value">0.84</strong></div>
           <label for="drawer-background-url">背景图 URL</label>
           <input id="drawer-background-url" placeholder="远程地址或上传后的本地地址" />
+          <div class="button-row background-preset-row" aria-label="背景预设">
+            <button id="drawer-use-default-background" class="secondary compact" type="button">使用默认背景</button>
+          </div>
           <label for="drawer-background-overlay">背景遮罩</label>
           <input id="drawer-background-overlay" type="range" min="0" max="0.85" step="0.01" />
           <div class="range-value"><span>当前值</span><strong id="drawer-background-overlay-value">0.42</strong></div>
@@ -1248,6 +1251,12 @@
         font_size: {{ settings.font_size | tojson }},
         font_weight: {{ settings.font_weight | tojson }},
         font_color: {{ settings.font_color | tojson }}
+      };
+      const DEFAULT_BACKGROUND_PRESET = {
+        label: "默认背景",
+        url: "/assets/default.jpg",
+        theme: "dark",
+        overlay: 0.42,
       };
 
       let worldbookDebugCollapsed = true;
@@ -1538,11 +1547,26 @@
           ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
           : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
 
-        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
-        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
-        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
+        const panelAlpha = opacity.toFixed(2);
+        const strongAlpha = Math.min(opacity + 0.1, 0.98).toFixed(2);
+        const inputAlpha = Math.max(opacity - 0.1, 0.16).toFixed(2);
+        const userAlpha = Math.min(opacity + 0.1, 0.98).toFixed(2);
+        const assistantAlpha = Math.min(opacity + 0.12, 0.99).toFixed(2);
+        rootEl.style.setProperty("--panel-rgb", palette.panel);
+        rootEl.style.setProperty("--panel-strong-rgb", palette.strong);
+        rootEl.style.setProperty("--input-rgb", palette.input);
+        rootEl.style.setProperty("--user-rgb", palette.user);
+        rootEl.style.setProperty("--assistant-rgb", palette.assistant);
+        rootEl.style.setProperty("--panel-alpha", panelAlpha);
+        rootEl.style.setProperty("--panel-strong-alpha", strongAlpha);
+        rootEl.style.setProperty("--input-alpha", inputAlpha);
+        rootEl.style.setProperty("--user-alpha", userAlpha);
+        rootEl.style.setProperty("--assistant-alpha", assistantAlpha);
+        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${panelAlpha})`);
+        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${strongAlpha})`);
+        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${inputAlpha})`);
+        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${userAlpha})`);
+        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${assistantAlpha})`);
 
         const clearMode = opacity <= 0.21;
         bodyEl.classList.toggle("chat-clear-mode", clearMode);
@@ -4138,12 +4162,12 @@
 
       function showWorkshopImagePopup(action) {
         if (!workshopModalEl || !workshopModalTitleEl || !workshopModalStageEl || !workshopModalTextEl || !workshopModalImageEl) return;
-        workshopModalTitleEl.textContent = String(action?.popup_title || action?.name || "创意工坊弹窗").trim();
+        workshopModalTitleEl.textContent = String(action?.popup_title || action?.name || "演出工坊弹窗").trim();
         workshopModalStageEl.textContent = `触发阶段：${action?.stage_label || getWorkshopStageLabel(action?.stage)}`;
         workshopModalTextEl.textContent = String(action?.note || "这里会显示图片说明。").trim() || "这里会显示图片说明。";
         const imageUrl = String(action?.image_url || "").trim();
         workshopModalImageEl.src = imageUrl;
-        workshopModalImageEl.alt = String(action?.image_alt || action?.name || "创意工坊图片").trim();
+        workshopModalImageEl.alt = String(action?.image_alt || action?.name || "演出工坊图片").trim();
         workshopModalImageEl.hidden = !imageUrl;
         workshopModalEl.classList.remove("hidden");
         workshopModalEl.setAttribute("aria-hidden", "false");
@@ -4162,7 +4186,7 @@
         workshopAudioEl.currentTime = 0;
         if (action?.autoplay !== false) {
           workshopAudioEl.play().catch(() => {
-            setStatus("创意工坊音乐播放失败，请点击页面后重试。");
+            setStatus("演出工坊音乐播放失败，请点击页面后重试。");
           });
         }
       }
@@ -4179,7 +4203,7 @@
         } else {
           playWorkshopMusic(action);
         }
-        return `创意工坊已触发：${action.name || action.stage_label || getWorkshopStageLabel(action.stage)}`;
+        return `演出工坊已触发：${action.name || action.stage_label || getWorkshopStageLabel(action.stage)}`;
       }
 
       async function triggerWorkshopEvaluation(reason = "load") {
@@ -4367,6 +4391,20 @@
         drawerInput("drawer-background-url").value = runtimeState.background_image_url;
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
         await saveRuntimeStateToServer("背景图已上传并同步到服务端配置");
+      }
+
+      async function useDefaultBackgroundPreset() {
+        runtimeState = {
+          ...runtimeState,
+          theme: DEFAULT_BACKGROUND_PRESET.theme,
+          background_image_url: DEFAULT_BACKGROUND_PRESET.url,
+          background_overlay: DEFAULT_BACKGROUND_PRESET.overlay,
+        };
+        syncDrawerFromState();
+        applyTheme(runtimeState.theme);
+        applyUiOpacity(runtimeState.ui_opacity);
+        applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
+        await saveRuntimeStateToServer("默认背景预设已同步到服务端配置");
       }
 
       async function uploadDrawerFont() {
@@ -4672,6 +4710,18 @@
         }
       });
 
+      document.getElementById("drawer-use-default-background")?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "应用中…");
+        try {
+          await useDefaultBackgroundPreset();
+          setButtonState(button, "success", "已应用 ✓");
+        } catch (error) {
+          setButtonState(button, "error", "应用失败");
+          setStatus(`默认背景应用失败：${error.message}`);
+        }
+      });
+
       document.getElementById("drawer-upload-font").addEventListener("click", async () => {
         try {
           await uploadDrawerFont();
@@ -4798,7 +4848,7 @@
     </script>
     {% for mod in registered_mods or [] %}
       {% for src in mod.hooks.chat_scripts or [] %}
-    <script src="{{ src }}{% if '?' in src %}&{% else %}?{% endif %}v=ttsvoice-chip-v1" data-mod-hook="{{ mod.slug }}"></script>
+    <script src="{{ src }}{% if '?' in src %}&{% else %}?{% endif %}v=state-journal-opacity-sync-v2" data-mod-hook="{{ mod.slug }}"></script>
       {% endfor %}
     {% endfor %}
   </body>

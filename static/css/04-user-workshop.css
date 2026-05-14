@@ -1,5 +1,5 @@
 /* Split from static/styles.css · 04-user-workshop.css
-   Scope: 用户资料页、创意工坊页与共享控件
+   Scope: 用户资料页、演出工坊页与共享控件
    This v121 split preserves cascade order; clean-up comes later. */
 
 /* =========================================================
@@ -274,6 +274,35 @@ body.modern-setting-page .workshop-layout-b .workshop-main-card {
   min-width: 0;
   padding: 26px 28px 30px !important;
   min-height: 640px;
+}
+
+body.workshop-config-page .workshop-main-card,
+body.workshop-config-page .workshop-control-panel,
+body.workshop-config-page .workshop-panel-block,
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .dynamic-scene-card {
+  backdrop-filter: var(--ui-glass-blur-soft);
+}
+
+body.workshop-config-page .workshop-main-card,
+body.workshop-config-page .workshop-control-panel {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 70%, transparent),
+      color-mix(in srgb, var(--panel) 94%, transparent)) !important;
+}
+
+body.workshop-config-page .workshop-summary-item,
+body.workshop-config-page .workshop-runtime-panel-side,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-scene-card {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 76%, transparent),
+      color-mix(in srgb, var(--panel) 82%, transparent)) !important;
 }
 
 body.modern-setting-page .workshop-layout-b .workshop-section-head {
@@ -690,7 +719,7 @@ body.modern-setting-page .checkbox-row input[type="checkbox"] {
   padding: 0 !important;
   border-radius: 999px !important;
   border: 1px solid color-mix(in srgb, var(--border) 86%, transparent) !important;
-  background: rgba(148, 163, 184, 0.42) !important;
+  background: color-mix(in srgb, var(--muted) 55%, transparent) !important;
   cursor: pointer;
   box-shadow: none !important;
   transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
@@ -848,7 +877,7 @@ body.modern-setting-page .fr-setting-switch-row input[type="checkbox"] {
   padding: 0 !important;
   border-radius: 999px !important;
   border: 1px solid color-mix(in srgb, var(--border) 86%, transparent) !important;
-  background: rgba(148, 163, 184, 0.42) !important;
+  background: color-mix(in srgb, var(--muted) 55%, transparent) !important;
   cursor: pointer;
   box-shadow: none !important;
   vertical-align: middle !important;
@@ -994,20 +1023,20 @@ body.modern-setting-page .toggle-workshop-rule:hover {
 }
 
 body.modern-setting-page .workshop-rule-actions [data-remove-workshop-rule].fr-danger-button {
-  color: color-mix(in srgb, #9d3d2f 78%, var(--text));
-  border-color: rgba(220, 84, 84, 0.45) !important;
+  color: color-mix(in srgb, var(--danger) 78%, var(--text));
+  border-color: color-mix(in srgb, var(--danger-rgb) 45%, transparent) !important;
 }
 
 body.modern-setting-page .workshop-rule-actions [data-remove-workshop-rule].fr-danger-button:hover {
-  border-color: rgba(220, 84, 84, 0.8) !important;
-  background: rgba(220, 84, 84, 0.12) !important;
+  border-color: color-mix(in srgb, var(--danger-rgb) 80%, transparent) !important;
+  background: var(--danger-hover-bg) !important;
 }
 
 body.modern-setting-page .danger-button:not([data-remove-workshop-rule]),
 body.modern-setting-page .fr-danger-button:not([data-remove-workshop-rule]) {
-  color: color-mix(in srgb, #9d3d2f 78%, var(--text));
-  border-color: color-mix(in srgb, #cf6b5d 30%, var(--border)) !important;
-  background: color-mix(in srgb, #fff2ef 52%, var(--input-bg)) !important;
+  color: color-mix(in srgb, var(--danger) 78%, var(--text));
+  border-color: color-mix(in srgb, var(--danger-border) 30%, var(--border)) !important;
+  background: color-mix(in srgb, var(--danger-bg) 52%, var(--input-bg)) !important;
 }
 
 body.modern-setting-page .preset-pill,

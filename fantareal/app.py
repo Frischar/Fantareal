@@ -25,6 +25,11 @@ from .config_api_routes import register_config_api_routes
 from .mod_api_routes import register_mod_api_routes
 from .mods_runtime import mount_discovered_mods
 from .page_routes import register_page_routes
+from .route_forwarding import (
+    DEFAULT_ROUTE_FORWARDING_CONFIG,
+    RouteForwardingRuntime,
+    sanitize_route_forwarding_config,
+)
 from .preset_rules import (
     PRESET_MODULE_RULES,
     activate_preset_in_store,
@@ -38,19 +43,11 @@ from .preset_rules import (
 )
 from .slot_runtime import SlotRuntimeService
 from .workshop_logic import (
-    build_workshop_trigger_token,
     default_workshop_state,
     get_workshop_stage,
     get_workshop_stage_label,
-    get_workshop_trigger_label,
-    normalize_workshop_action_type,
-    normalize_workshop_stage,
-    normalize_workshop_trigger_mode,
     sanitize_creative_workshop,
     sanitize_workshop_state,
-    select_workshop_match,
-    workshop_effective_fields,
-    workshop_rule_matches_trigger,
 )
 from .worldbook_logic import (
     DEFAULT_WORLDBOOK_SETTINGS,
@@ -109,7 +106,9 @@ RESOURCE_DIR = get_resource_dir()
 DATA_DIR = BASE_DIR / "data"
 SLOTS_DIR = DATA_DIR / "slots"
 STATIC_DIR = BASE_DIR / "static"
+ASSETS_DIR = BASE_DIR / "assets"
 RESOURCE_STATIC_DIR = RESOURCE_DIR / "static"
+RESOURCE_ASSETS_DIR = RESOURCE_DIR / "assets"
 TEMPLATES_DIR = RESOURCE_DIR / "templates"
 UPLOAD_DIR = STATIC_DIR / "uploads"
 SPRITES_DIR = STATIC_DIR / "sprites"
@@ -129,6 +128,7 @@ GLOBAL_PRESET_PATH = DATA_DIR / "preset.json"
 GLOBAL_WORKSHOP_STATE_PATH = DATA_DIR / "creative_workshop_state.json"
 GLOBAL_USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
 GLOBAL_WORLDBOOK_RUNTIME_STATE_PATH = DATA_DIR / "worldbook_runtime_state.json"
+GLOBAL_ROUTE_FORWARDING_PATH = DATA_DIR / "route_forwarding.json"
 SLOT_MIGRATION_MARKER_PATH = DATA_DIR / ".slot_migration_done"
 GLOBAL_RUNTIME_MIGRATION_MARKER_PATH = DATA_DIR / ".global_runtime_migration_done"
 PRESET_FILENAME = "preset.json"
@@ -145,6 +145,7 @@ MAX_FONT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 REQUEST_RETRY_ATTEMPTS = 5
 REQUEST_RETRY_BASE_DELAY_SECONDS = 1.0
 DEFAULT_SPRITE_BASE_PATH = "/static/sprites"
+DEFAULT_BACKGROUND_IMAGE_URL = "/assets/default.jpg"
 GLOBAL_RUNTIME_ID = "global_workspace"
 GLOBAL_RUNTIME_NAME = "当前记忆"
 LEGACY_SLOT_IDS = ("slot_1", "slot_2", "slot_3")
@@ -205,11 +206,20 @@ def make_access_style(label: str, method: str, status_code: int) -> str:
     return LOG_COLORS["muted"]
 
 
-def format_access_log(label: str, method: str, status_code: int, mood: str) -> str:
+def format_access_log(label: str, method: str, status_code: int, mood: str, route_tag: str = "") -> str:
     base_color = make_access_style(label, method, status_code)
     status_color = LOG_COLORS["success"] if status_code < 400 else LOG_COLORS["error"]
     timestamp = datetime.now().strftime("%H:%M:%S")
-    return f"{LOG_COLORS['muted']}[{timestamp}]{base_color}[日志]{label} {status_color}{status_code}{base_color} {mood}{LOG_COLORS['reset']}"
+    suffix = f" {LOG_COLORS['muted']}[{route_tag}]" if route_tag else ""
+    return f"{LOG_COLORS['muted']}[{timestamp}]{base_color}[日志]{label} {status_color}{status_code}{base_color} {mood}{suffix}{LOG_COLORS['reset']}"
+
+
+def format_access_route_tag(method: str, path: str) -> str:
+    clean_method = str(method or "").upper().strip() or "REQUEST"
+    clean_path = str(path or "/").strip() or "/"
+    if len(clean_path) > 180:
+        clean_path = clean_path[:177].rstrip() + "..."
+    return f"{clean_method} {clean_path}"
 
 
 def resolve_access_label(method: str, path: str) -> str:
@@ -234,7 +244,7 @@ def resolve_access_label(method: str, path: str) -> str:
         "GET /config/preset": "打开预设页",
         "GET /config/user": "打开用户设定页",
         "GET /config/card": "打开角色卡页",
-        "GET /config/workshop": "打开创意工坊",
+        "GET /config/workshop": "打开演出工坊",
         "GET /config/memory": "打开记忆页",
         "GET /config/worldbook": "打开世界书配置",
         "GET /config/worldbook/entries": "打开词条管理",
@@ -302,11 +312,11 @@ def resolve_access_label(method: str, path: str) -> str:
         "GET /api/cards/export/current": "导出当前角色卡",
         "GET /api/export/current-bundle": "导出当前存档包",
 
-        # 工坊与资源
-        "GET /api/workshop/status": "获取创意工坊状态",
-        "POST /api/workshop/save": "保存创意工坊",
-        "POST /api/workshop/evaluate": "评估创意工坊",
-        "POST /api/workshop/upload": "上传工坊资源",
+        # 演出工坊与资源
+        "GET /api/workshop/status": "获取演出工坊状态",
+        "POST /api/workshop/save": "保存演出工坊",
+        "POST /api/workshop/evaluate": "评估演出工坊",
+        "POST /api/workshop/upload": "上传演出工坊资源",
         "POST /api/background": "上传聊天背景",
         "POST /api/font": "上传字体",
 
@@ -359,8 +369,12 @@ def get_worldbook_debug_snapshot() -> dict[str, Any]:
 
 def bootstrap_runtime_layout() -> None:
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
+    ASSETS_DIR.mkdir(parents=True, exist_ok=True)
     if RESOURCE_STATIC_DIR.exists() and not (STATIC_DIR / "styles.css").exists():
         shutil.copytree(RESOURCE_STATIC_DIR, STATIC_DIR, dirs_exist_ok=True)
+
+    if RESOURCE_ASSETS_DIR.exists() and not ASSETS_DIR.exists():
+        shutil.copytree(RESOURCE_ASSETS_DIR, ASSETS_DIR, dirs_exist_ok=True)
 
     if RESOURCE_CARDS_DIR.exists() and not CARDS_DIR.exists():
         shutil.copytree(RESOURCE_CARDS_DIR, CARDS_DIR, dirs_exist_ok=True)
@@ -381,13 +395,13 @@ DEFAULT_SETTINGS = {
     "llm_base_url": "",
     "llm_api_key": "",
     "llm_model": "",
-    "theme": "light",
+    "theme": "dark",
     "temperature": 0.85,
     "history_limit": 20,
     "request_timeout": 120,
     "demo_mode": False,
     "ui_opacity": 0.84,
-    "background_image_url": "",
+    "background_image_url": DEFAULT_BACKGROUND_IMAGE_URL,
     "background_overlay": 0.42,
     "font_family_url": "",
     "font_family_name": "",
@@ -474,27 +488,6 @@ def default_role_card() -> dict[str, Any]:
                 "buttonText": "进入故事",
                 "volume": 0.65,
             },
-            "items": [
-                {
-                    "id": "workshop_stage_a",
-                    "name": "A阶段规则",
-                    "enabled": True,
-                    "triggerMode": "stage",
-                    "triggerStage": "A",
-                    "triggerTempMin": 0,
-                    "triggerTempMax": 0,
-                    "actionType": "music",
-                    "popupTitle": "",
-                    "musicPreset": "off",
-                    "musicUrl": "",
-                    "autoplay": True,
-                    "loop": True,
-                    "volume": 0.85,
-                    "imageUrl": "",
-                    "imageAlt": "",
-                    "note": "",
-                }
-            ],
         },
         "plotStages": {
             "A": {"description": "", "rules": ""},
@@ -551,7 +544,7 @@ def save_workshop_state(payload: dict[str, Any], slot_id: str | None = None) -> 
     persist_json(
         workshop_state_path(slot_id),
         sanitized,
-        detail="Creative workshop state save failed. Please check disk space or file permissions.",
+        detail="Performance workshop state save failed. Please check disk space or file permissions.",
     )
     return sanitized
 
@@ -566,23 +559,8 @@ def workshop_signature(slot: dict[str, Any] | None, workshop: dict[str, Any], st
         "enabled": bool(workshop.get("enabled", False)),
         "stage": stage,
         "opening": workshop.get("opening", {}),
-        "items": [
-            {
-                **workshop_effective_fields(item),
-            }
-            for item in workshop.get("items", [])
-            if isinstance(item, dict)
-        ],
     }
     return json.dumps(payload, ensure_ascii=False, sort_keys=True)
-
-
-def resolve_workshop_music_url(item: dict[str, Any]) -> str:
-    return str(item.get("musicUrl", "")).strip()
-
-
-def resolve_workshop_image_url(item: dict[str, Any]) -> str:
-    return str(item.get("imageUrl", "")).strip()
 
 
 def evaluate_creative_workshop(*, slot_id: str | None = None, reason: str = "sync") -> dict[str, Any]:
@@ -604,74 +582,8 @@ def evaluate_creative_workshop(*, slot_id: str | None = None, reason: str = "syn
         "current_card_name": str(current_card.get("source_name", "")).strip(),
     }
 
-    if reason != "chat_round_start":
-        return result
-
-    pending_temp = clamp_int(state.get("pending_temp"), -1, 9999, -1)
-    if pending_temp != current_temp:
-        return result
-
-    match = select_workshop_match(workshop, temp=current_temp, stage=stage)
-    signature = build_workshop_trigger_token(match, temp=current_temp, stage=stage) if match else ""
-    previous = str(state.get("last_signature", "")).strip()
     state["pending_temp"] = -1
-    state["last_signature"] = signature
     save_workshop_state(state, target_slot)
-
-    if not workshop.get("enabled", False) or not match:
-        return result
-
-    trigger_history = state.get("trigger_history", []) if isinstance(state.get("trigger_history"), list) else []
-    if signature and (signature == previous or signature in trigger_history):
-        return result
-
-    if signature:
-        updated_state = get_workshop_state(target_slot)
-        updated_history = updated_state.get("trigger_history", []) if isinstance(updated_state.get("trigger_history"), list) else []
-        updated_history = [token for token in updated_history if token != signature]
-        updated_state["trigger_history"] = (updated_history + [signature])[-128:]
-        updated_state["last_signature"] = signature
-        save_workshop_state(updated_state, target_slot)
-
-    action_type = normalize_workshop_action_type(match.get("actionType"))
-    action = {
-        "id": match.get("id", ""),
-        "name": match.get("name", ""),
-        "stage": stage,
-        "stage_label": result["stage_label"],
-        "trigger_mode": normalize_workshop_trigger_mode(match.get("triggerMode")),
-        "trigger_label": get_workshop_trigger_label(match, temp=current_temp, stage=stage),
-        "reason": reason,
-        "action_type": action_type,
-        "note": str(match.get("note", "")).strip(),
-    }
-
-    if action_type == "image":
-        action.update(
-            {
-                "popup_title": str(match.get("popupTitle", "")).strip() or str(match.get("name", "")).strip() or "鍒涙剰宸ュ潑寮圭獥",
-                "image_url": resolve_workshop_image_url(match),
-                "image_alt": str(match.get("imageAlt", "")).strip() or str(match.get("name", "")).strip() or "鍒涙剰宸ュ潑鍥剧墖",
-            }
-        )
-    else:
-        action.update(
-            {
-                "music_preset": str(match.get("musicPreset", "off")).strip() or "off",
-                "music_url": resolve_workshop_music_url(match),
-                "autoplay": bool(match.get("autoplay", True)),
-                "loop": bool(match.get("loop", True)),
-                "volume": clamp_float(match.get("volume"), 0.0, 1.0, 0.85),
-            }
-        )
-
-    if action_type == "image" and not action["image_url"]:
-        return result
-    if action_type == "music" and not action["music_url"] and action["music_preset"] == "off":
-        return result
-
-    result["triggered"] = True
-    result["action"] = action
     return result
 
 
@@ -804,6 +716,8 @@ def sanitize_background_image_url(value: Any, *, strict: bool = False) -> str:
 
     if text.startswith("/static/uploads/"):
         return text
+    if text.startswith("/assets/") and Path(urlparse(text).path).suffix.lower() in ALLOWED_IMAGE_SUFFIXES:
+        return text
 
     parsed = urlparse(text)
     if parsed.scheme in ALLOWED_BACKGROUND_SCHEMES and parsed.netloc:
@@ -812,7 +726,7 @@ def sanitize_background_image_url(value: Any, *, strict: bool = False) -> str:
     if strict:
         raise HTTPException(
             status_code=400,
-            detail="Background image URLs must be http/https or a /static/uploads/ local path.",
+            detail="Background image URLs must be http/https, a /static/uploads/ local path, or a bundled /assets/ image.",
         )
     return ""
 
@@ -867,7 +781,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "llm_base_url": str(settings.get("llm_base_url", "")).strip(),
         "llm_api_key": str(settings.get("llm_api_key", "")).strip(),
         "llm_model": str(settings.get("llm_model", "")).strip(),
-        "theme": "dark" if str(settings.get("theme", "light")).strip() == "dark" else "light",
+        "theme": "dark" if str(settings.get("theme", "dark")).strip() == "dark" else "light",
         "temperature": clamp_float(settings.get("temperature"), 0.0, 2.0, 0.85),
         "history_limit": clamp_int(settings.get("history_limit"), 1, 100, 20),
         "request_timeout": clamp_int(settings.get("request_timeout"), 10, 600, 120),
@@ -1103,6 +1017,10 @@ def user_profile_path(slot_id: str | None = None) -> Path:
     return get_slot_dir(slot_id) / "user_profile.json"
 
 
+def route_forwarding_path() -> Path:
+    return GLOBAL_ROUTE_FORWARDING_PATH
+
+
 def avatar_upload_url(filename: str) -> str:
     safe_name = Path(str(filename or "")).name
     return f"/static/uploads/{safe_name}" if safe_name else ""
@@ -1163,8 +1081,8 @@ async def save_workshop_asset_upload(*, kind: str, file: UploadFile) -> dict[str
     allowed_suffixes = ALLOWED_IMAGE_SUFFIXES if normalized_kind == "image" else ALLOWED_AUDIO_SUFFIXES
     if suffix not in allowed_suffixes:
         if normalized_kind == "image":
-            raise HTTPException(status_code=400, detail="Creative workshop images only support png / jpg / jpeg / webp / gif.")
-        raise HTTPException(status_code=400, detail="Creative workshop audio only supports mp3 / wav / ogg / m4a / aac / flac / webm.")
+            raise HTTPException(status_code=400, detail="Performance workshop images only support png / jpg / jpeg / webp / gif.")
+        raise HTTPException(status_code=400, detail="Performance workshop audio only supports mp3 / wav / ogg / m4a / aac / flac / webm.")
 
     content_type = str(file.content_type or "").strip().lower()
     if normalized_kind == "image":
@@ -1706,6 +1624,8 @@ def ensure_data_files() -> None:
         write_json(user_profile_path(), default_user_profile())
     if not worldbook_runtime_state_path().exists():
         write_json(worldbook_runtime_state_path(), default_worldbook_runtime_state())
+    if not route_forwarding_path().exists():
+        write_json(route_forwarding_path(), sanitize_route_forwarding_config(DEFAULT_ROUTE_FORWARDING_CONFIG))
     if not preset_path().exists():
         write_json(preset_path(), default_preset_store())
     migrate_slot_runtime_to_global_files()
@@ -1765,7 +1685,13 @@ def get_conversation(slot_id: str | None = None) -> list[dict[str, Any]]:
 
 def get_settings(slot_id: str | None = None) -> dict[str, Any]:
     target = sanitize_slot_id(slot_id, get_active_slot_id())
-    return sanitize_settings(read_json(settings_path(target), {}), slot_id=target)
+    settings = sanitize_settings(read_json(settings_path(target), {}), slot_id=target)
+    route_defaults = get_route_forwarding_chat_defaults()
+    if route_defaults["base_url"]:
+        settings["llm_base_url"] = route_defaults["base_url"]
+        settings["llm_api_key"] = route_defaults["api_key"]
+        settings["llm_model"] = route_defaults["model"]
+    return settings
 
 
 def sanitize_user_profile(payload: Any, *, slot_id: str | None = None) -> dict[str, Any]:
@@ -2185,7 +2111,7 @@ def save_workshop_card(workshop: dict[str, Any], *, slot_id: str | None = None) 
     persist_json(
         source_path,
         normalized_card,
-        detail="Creative workshop config save failed. Could not write the role card file.",
+        detail="Performance workshop config save failed. Could not write the role card file.",
     )
     current_card_payload = {
         "source_name": source_path.name,
@@ -2194,7 +2120,7 @@ def save_workshop_card(workshop: dict[str, Any], *, slot_id: str | None = None) 
     persist_json(
         global_current_card_path(),
         current_card_payload,
-        detail="Creative workshop config save failed. Could not update the current card record.",
+        detail="Performance workshop config save failed. Could not update the current card record.",
     )
     return {
         "current_card": current_card_payload,
@@ -2251,13 +2177,43 @@ def resolve_runtime_value(override_value: Any, stored_value: Any, env_key: str |
     return stored_value
 
 
+def get_route_forwarding_chat_defaults() -> dict[str, str]:
+    try:
+        config = sanitize_route_forwarding_config(
+            read_json(route_forwarding_path(), DEFAULT_ROUTE_FORWARDING_CONFIG)
+        )
+    except Exception:
+        return {"base_url": "", "api_key": "", "model": ""}
+    if not config.get("enabled"):
+        return {"base_url": "", "api_key": "", "model": ""}
+    providers = [
+        item
+        for item in config.get("providers", [])
+        if isinstance(item, dict) and item.get("enabled") and str(item.get("base_url", "") or "").strip()
+    ]
+    providers.sort(key=lambda item: (clamp_int(item.get("priority"), 1, 999, 999), str(item.get("name", ""))))
+    if not providers:
+        return {"base_url": "", "api_key": "", "model": ""}
+    provider = providers[0]
+    keys = provider.get("keys") if isinstance(provider.get("keys"), list) else []
+    return {
+        "base_url": str(provider.get("base_url", "") or "").strip(),
+        "api_key": str(keys[0] if keys else "").strip(),
+        "model": str(provider.get("model", "") or "").strip(),
+    }
+
+
 def get_runtime_chat_config(runtime_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
     settings = get_settings()
     overrides = sanitize_runtime_overrides(runtime_overrides)
+    route_defaults = get_route_forwarding_chat_defaults()
+    base_url = resolve_runtime_value(overrides.get("llm_base_url"), settings.get("llm_base_url", ""), "LLM_BASE_URL")
+    model = resolve_runtime_value(overrides.get("llm_model"), settings.get("llm_model", ""), "LLM_MODEL")
     return {
-        "base_url": resolve_runtime_value(overrides.get("llm_base_url"), settings.get("llm_base_url", ""), "LLM_BASE_URL"),
-        "api_key": resolve_runtime_value(overrides.get("llm_api_key"), settings.get("llm_api_key", ""), "LLM_API_KEY"),
-        "model": resolve_runtime_value(overrides.get("llm_model"), settings.get("llm_model", ""), "LLM_MODEL"),
+        "base_url": base_url or route_defaults["base_url"],
+        "api_key": resolve_runtime_value(overrides.get("llm_api_key"), settings.get("llm_api_key", ""), "LLM_API_KEY")
+        or route_defaults["api_key"],
+        "model": model or route_defaults["model"],
         "temperature": overrides.get("temperature") if runtime_overrides else settings.get("temperature", 0.85),
         "history_limit": overrides.get("history_limit") if runtime_overrides else settings.get("history_limit", 20),
         "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
@@ -2604,6 +2560,51 @@ def save_worldbook_runtime_state(payload: dict[str, Any], slot_id: str | None = 
         sanitized,
         detail="Worldbook runtime state save failed. Please check disk space or file permissions.",
     )
+    return sanitized
+
+
+def get_route_forwarding_config() -> dict[str, Any]:
+    return sanitize_route_forwarding_config(
+        read_json(route_forwarding_path(), DEFAULT_ROUTE_FORWARDING_CONFIG)
+    )
+
+
+def sync_route_forwarding_p1_to_chat_settings(config: dict[str, Any]) -> None:
+    if not config.get("enabled"):
+        return
+    providers = [
+        item
+        for item in config.get("providers", [])
+        if isinstance(item, dict) and item.get("enabled") and str(item.get("base_url", "") or "").strip()
+    ]
+    providers.sort(key=lambda item: (clamp_int(item.get("priority"), 1, 999, 999), str(item.get("name", ""))))
+    if not providers:
+        return
+    provider = providers[0]
+    keys = provider.get("keys") if isinstance(provider.get("keys"), list) else []
+    current = sanitize_settings(read_json(settings_path(), {}))
+    current.update(
+        {
+            "llm_base_url": str(provider.get("base_url", "") or "").strip(),
+            "llm_api_key": str(keys[0] if keys else "").strip(),
+            "llm_model": str(provider.get("model", "") or "").strip(),
+        }
+    )
+    persist_json(
+        settings_path(),
+        sanitize_settings(current),
+        detail="Route forwarding P1 sync failed. Please check disk space or file permissions.",
+    )
+
+
+def save_route_forwarding_config(payload: dict[str, Any]) -> dict[str, Any]:
+    sanitized = sanitize_route_forwarding_config(payload)
+    persist_json(
+        route_forwarding_path(),
+        sanitized,
+        detail="Route forwarding settings save failed. Please check disk space or file permissions.",
+    )
+    sync_route_forwarding_p1_to_chat_settings(sanitized)
     return sanitized
 
 
@@ -4056,14 +4057,18 @@ async def chinese_access_log(request: Request, call_next):
     path = request.url.path
     label = resolve_access_label(method, path)
     mood = "成功了喵~" if response.status_code < 400 else "出错了喵呜..."
-    logger.info(format_access_log(label, method, response.status_code, mood))
+    logger.info(format_access_log(label, method, response.status_code, mood, format_access_route_tag(method, path)))
     logger.debug("请求耗时%dms", elapsed_ms)
     return response
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 registered_mods = mount_discovered_mods(app, MODS_DIR)
 templates.env.globals["registered_mods"] = [mod.to_dict() for mod in registered_mods]
+
+route_forwarding_runtime = RouteForwardingRuntime(get_route_forwarding_config)
+route_forwarding_runtime.install()
 
 
 
@@ -4104,6 +4109,8 @@ route_ctx = SimpleNamespace(
     get_persona=get_persona,
     get_preset_store=get_preset_store,
     get_role_avatar_url=get_role_avatar_url,
+    get_route_forwarding_config=get_route_forwarding_config,
+    get_route_forwarding_runtime_stats=route_forwarding_runtime.snapshot,
     get_runtime_chat_config=get_runtime_chat_config,
     get_runtime_embedding_config=get_runtime_embedding_config,
     get_settings=get_settings,
@@ -4148,6 +4155,8 @@ route_ctx = SimpleNamespace(
     save_image_upload_for_slot=save_image_upload_for_slot,
     save_memories=save_memories,
     save_preset_store=save_preset_store,
+    save_route_forwarding_config=save_route_forwarding_config,
+    test_route_forwarding_provider=route_forwarding_runtime.test_provider,
     save_slot_registry=save_slot_registry,
     save_user_profile=save_user_profile,
     save_workshop_asset_upload=save_workshop_asset_upload,

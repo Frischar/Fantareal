@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>路由转发 - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v148-route-pointer-drag" />
+  </head>
+  <body class="modern-setting-page app-sidebar-shell route-forwarding-page">
+    <div id="route-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+    </div>
+
+    <main class="config-shell wide route-forwarding-shell">
+      <section class="route-switch-app">
+        <header class="route-switch-topbar">
+          <div>
+            <span class="route-switch-brand">路由转发</span>
+            <p>只转发 Fantareal 内部外发 POST；按队列顺序和故障转发规则处理。</p>
+          </div>
+          <div class="route-switch-actions">
+            <label class="route-switch-toggle" title="启用 Fantareal POST 转发">
+              <span class="toggle-label">启用</span>
+              <input id="rf-enabled" type="checkbox" />
+              <span class="toggle-track"></span>
+            </label>
+            <label class="route-switch-toggle" title="故障转移">
+              <span class="toggle-label">故障转发</span>
+              <input id="rf-failover" type="checkbox" />
+              <span class="toggle-track"></span>
+            </label>
+            <label class="route-retry-inline">
+              <span>P 节点重连</span>
+              <input id="rf-retry-attempts" type="number" min="1" max="10" step="1" />
+            </label>
+            <button id="add-provider" type="button" class="route-add-button">添加</button>
+            <button id="save-route-forwarding" type="button" class="route-save-button">保存</button>
+          </div>
+        </header>
+
+        <section class="route-switch-options">
+          <div class="route-forwarding-note">拖拽调整 P1/P2/P3 顺序。某个 P 节点重连失败达到次数后会红色熔断，并切到下一个节点；测试成功后恢复。</div>
+          <div class="route-stat-grid">
+            <div><span>捕获 POST</span><strong id="stat-total">0</strong></div>
+            <div><span>已转发</span><strong id="stat-routed">0</strong></div>
+            <div><span>故障转移</span><strong id="stat-failovers">0</strong></div>
+            <div><span>当前 API</span><strong id="stat-provider">-</strong></div>
+          </div>
+        </section>
+
+        <section class="route-forwarding-list" id="provider-list" aria-label="供应商列表"></section>
+      </section>
+    </main>
+
+    <template id="provider-template">
+      <article class="route-provider-card">
+        <div class="route-provider-head">
+          <button type="button" class="drag-dot" title="拖拽排序" aria-label="拖拽排序">⋮⋮</button>
+          <span class="provider-rank" data-rank>P1</span>
+          <label class="provider-name">
+            <span>供应商名称</span>
+            <input data-field="name" placeholder="例如 DeepSeek / MiniMax / GPT" />
+          </label>
+          <span class="provider-status" data-status>就绪</span>
+          <label class="provider-enabled"><input data-field="enabled" type="checkbox" /><span>启用</span></label>
+          <button type="button" class="route-test-button provider-test">测试</button>
+          <button type="button" class="route-delete-button provider-delete">删除</button>
+        </div>
+        <div class="route-provider-body">
+        <div class="route-provider-grid">
+          <label>
+            <span>转发地址</span>
+            <input data-field="base_url" placeholder="https://api.example.com/v1 或完整 endpoint" />
+          </label>
+          <label>
+            <span>覆盖模型名</span>
+            <input data-field="model" placeholder="全局模型为空时这里必填；否则沿用原请求 model" />
+          </label>
+        </div>
+        <label>
+          <span>API Key 池 · 每行一个</span>
+          <textarea data-field="keys" rows="6" spellcheck="false" placeholder="每行一个 key，可粘贴很多行"></textarea>
+        </label>
+        </div>
+      </article>
+    </template>
+
+    <script>
+      const initialConfig = {{ route_forwarding | tojson }};
+      const initialStats = {{ route_forwarding_stats | tojson }};
+      const rootEl = document.documentElement;
+      const bodyEl = document.body;
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+      const providerListEl = document.getElementById("provider-list");
+      const providerTemplate = document.getElementById("provider-template");
+      const toastHostEl = document.getElementById("route-toast-host");
+      let config = normalizeConfig(initialConfig);
+      let runtimeStats = initialStats || {};
+      const collapsedProviders = readCollapsedProviders();
+
+      function applyTheme(theme) {
+        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+      }
+
+      function applyUiOpacity(value) {
+        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const palette = theme === "dark"
+          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
+          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
+        const panelAlpha = opacity.toFixed(2);
+        const strongAlpha = Math.min(opacity + 0.1, 0.98).toFixed(2);
+        const inputAlpha = Math.max(opacity - 0.1, 0.16).toFixed(2);
+        rootEl.style.setProperty("--panel-rgb", palette.panel);
+        rootEl.style.setProperty("--panel-strong-rgb", palette.strong);
+        rootEl.style.setProperty("--input-rgb", palette.input);
+        rootEl.style.setProperty("--panel-alpha", panelAlpha);
+        rootEl.style.setProperty("--panel-strong-alpha", strongAlpha);
+        rootEl.style.setProperty("--input-alpha", inputAlpha);
+        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${panelAlpha})`);
+        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${strongAlpha})`);
+        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${inputAlpha})`);
+      }
+
+      function applyBackground(url, overlay) {
+        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
+        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
+        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
+      }
+
+      function toast(title, detail = "", type = "ok") {
+        const node = document.createElement("div");
+        node.className = `toast ${type}`;
+        node.innerHTML = `<strong>${escapeHtml(title)}</strong>${detail ? `<span>${escapeHtml(detail)}</span>` : ""}`;
+        toastHostEl.appendChild(node);
+        requestAnimationFrame(() => node.classList.add("show"));
+        setTimeout(() => {
+          node.classList.remove("show");
+          setTimeout(() => node.remove(), 220);
+        }, 2600);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[char]));
+      }
+
+      function readCollapsedProviders() {
+        try {
+          const value = JSON.parse(localStorage.getItem("fantareal.routeForwarding.collapsed") || "[]");
+          return new Set(Array.isArray(value) ? value : []);
+        } catch (error) {
+          return new Set();
+        }
+      }
+
+      function normalizeConfig(raw = {}) {
+        return {
+          enabled: Boolean(raw.enabled),
+          hook_all_posts: raw.hook_all_posts !== false,
+          failover_enabled: raw.failover_enabled !== false,
+          rotate_keys: raw.rotate_keys !== false,
+          retry_attempts: Math.min(Math.max(Number(raw.retry_attempts || 3), 1), 10),
+          strategy: "priority",
+          providers: Array.isArray(raw.providers) ? raw.providers.map((item, index) => ({
+            id: item.id || `provider-${Date.now()}-${index}`,
+            name: item.name || `Provider ${index + 1}`,
+            base_url: item.base_url || "",
+            model: item.model || "",
+            enabled: item.enabled !== false,
+            priority: Number(item.priority || index + 1),
+            keys: Array.isArray(item.keys) ? item.keys : [],
+          })) : [],
+        };
+      }
+
+      function bindTopControls() {
+        document.getElementById("rf-enabled").checked = config.enabled;
+        document.getElementById("rf-failover").checked = config.failover_enabled;
+        document.getElementById("rf-retry-attempts").value = config.retry_attempts || 3;
+      }
+
+      function updateStats(stats = {}) {
+        runtimeStats = stats || {};
+        document.getElementById("stat-total").textContent = stats.total_posts || 0;
+        document.getElementById("stat-routed").textContent = stats.routed_posts || 0;
+        document.getElementById("stat-failovers").textContent = stats.failovers || 0;
+        document.getElementById("stat-provider").textContent = stats.current_provider || stats.last_provider || "-";
+        applyProviderStatuses();
+      }
+
+      function providerStatus(providerId) {
+        return (runtimeStats.providers && runtimeStats.providers[providerId]) || {};
+      }
+
+      function statusLabel(status = {}) {
+        if (status.state === "circuit_open") return "熔断";
+        if (status.state === "testing") return "测试中";
+        if (status.current) return "使用中";
+        if (status.state === "retrying") return "重连中";
+        if (status.state === "disabled") return "停用";
+        return "就绪";
+      }
+
+      function applyProviderStatus(node, provider) {
+        const status = providerStatus(provider.id);
+        const statusNode = node.querySelector("[data-status]");
+        const state = status.state || (provider.enabled === false ? "disabled" : "ready");
+        node.classList.toggle("is-circuit-open", state === "circuit_open");
+        node.classList.toggle("is-current", Boolean(status.current));
+        node.classList.toggle("is-testing", state === "testing");
+        statusNode.textContent = statusLabel(status);
+        statusNode.dataset.state = state;
+        statusNode.title = status.last_error || "";
+      }
+
+      function providerSummary(provider) {
+        const keyCount = Array.isArray(provider.keys) ? provider.keys.filter(Boolean).length : 0;
+        const model = String(provider.model || "").trim() || "model";
+        const url = String(provider.base_url || "").trim() || "url";
+        return `${model} / ${keyCount} key / ${url}`;
+      }
+
+      function saveCollapsedProviders() {
+        localStorage.setItem("fantareal.routeForwarding.collapsed", JSON.stringify([...collapsedProviders]));
+      }
+
+      function setProviderCollapsed(node, providerId, collapsed) {
+        node.classList.toggle("is-collapsed", collapsed);
+        const button = node.querySelector(".provider-collapse");
+        if (button) button.textContent = collapsed ? "展开" : "收起";
+        if (collapsed) collapsedProviders.add(providerId);
+        else collapsedProviders.delete(providerId);
+        saveCollapsedProviders();
+      }
+
+      function applyProviderStatuses() {
+        document.querySelectorAll(".route-provider-card").forEach((node) => {
+          const provider = config.providers.find((item) => item.id === node.dataset.providerId);
+          if (provider) applyProviderStatus(node, provider);
+        });
+      }
+
+      function renderProviders() {
+        providerListEl.innerHTML = "";
+        if (!config.providers.length) {
+          const empty = document.createElement("section");
+          empty.className = "panel route-empty-state";
+          empty.innerHTML = "<strong>还没有供应商</strong><span>添加一个供应商后，填入转发地址和 key 池即可开始使用。</span>";
+          providerListEl.appendChild(empty);
+          return;
+        }
+        normalizeProviderOrder();
+        config.providers.forEach((provider, index) => {
+            const node = providerTemplate.content.firstElementChild.cloneNode(true);
+            node.dataset.providerId = provider.id;
+            node.querySelector('[data-field="enabled"]').checked = provider.enabled !== false;
+            node.querySelector('[data-field="name"]').value = provider.name || "";
+            node.querySelector("[data-rank]").textContent = `P${index + 1}`;
+            node.querySelector('[data-field="base_url"]').value = provider.base_url || "";
+            node.querySelector('[data-field="model"]').value = provider.model || "";
+            node.querySelector('[data-field="keys"]').value = (provider.keys || []).join("\n");
+            const deleteButton = node.querySelector(".provider-delete");
+            const collapseButton = document.createElement("button");
+            collapseButton.type = "button";
+            collapseButton.className = "route-collapse-button provider-collapse";
+            collapseButton.textContent = "收起";
+            deleteButton?.before(collapseButton);
+            const summaryNode = document.createElement("span");
+            summaryNode.className = "provider-compact-summary";
+            summaryNode.textContent = providerSummary(provider);
+            node.querySelector(".provider-name")?.after(summaryNode);
+            applyProviderStatus(node, provider);
+            node.querySelectorAll("input, textarea").forEach((input) => {
+              input.addEventListener("input", () => {
+                syncProviderFromNode(node);
+                summaryNode.textContent = providerSummary(provider);
+              });
+              input.addEventListener("change", () => {
+                syncProviderFromNode(node);
+                summaryNode.textContent = providerSummary(provider);
+              });
+            });
+            node.querySelector(".provider-test").addEventListener("click", () => testProvider(provider.id));
+            collapseButton.addEventListener("click", () => {
+              setProviderCollapsed(node, provider.id, !node.classList.contains("is-collapsed"));
+            });
+            node.querySelector(".provider-delete").addEventListener("click", () => {
+              config.providers = config.providers.filter((item) => item.id !== provider.id);
+              collapsedProviders.delete(provider.id);
+              saveCollapsedProviders();
+              normalizeProviderOrder();
+              renderProviders();
+            });
+            bindDragHandlers(node);
+            setProviderCollapsed(node, provider.id, collapsedProviders.has(provider.id));
+            providerListEl.appendChild(node);
+          });
+      }
+
+      function normalizeProviderOrder() {
+        config.providers.sort((a, b) => Number(a.priority || 999) - Number(b.priority || 999));
+        config.providers.forEach((provider, index) => {
+          provider.priority = index + 1;
+        });
+      }
+
+      function syncProviderFromNode(node) {
+        const provider = config.providers.find((item) => item.id === node.dataset.providerId);
+        if (!provider) return;
+        provider.enabled = node.querySelector('[data-field="enabled"]').checked;
+        provider.name = node.querySelector('[data-field="name"]').value.trim();
+        provider.base_url = node.querySelector('[data-field="base_url"]').value.trim();
+        provider.model = node.querySelector('[data-field="model"]').value.trim();
+        provider.keys = node.querySelector('[data-field="keys"]').value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+      }
+
+      function bindDragHandlers(node) {
+        const dragHandle = node.querySelector(".drag-dot");
+        dragHandle.draggable = false;
+        node.draggable = false;
+
+        function finishDrag(event) {
+          if (!node.classList.contains("is-dragging")) return;
+          try {
+            dragHandle.releasePointerCapture(event.pointerId);
+          } catch (error) {
+            // Pointer capture may already be released by the browser.
+          }
+          node.classList.remove("is-dragging");
+          document.body.classList.remove("route-provider-drag-active");
+          syncProviderFromNode(node);
+          syncProviderOrderFromDom();
+          renderProviders();
+        }
+
+        dragHandle.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0) return;
+          event.preventDefault();
+          dragHandle.focus();
+          syncProviderFromNode(node);
+          node.classList.add("is-dragging");
+          document.body.classList.add("route-provider-drag-active");
+          dragHandle.setPointerCapture(event.pointerId);
+        });
+
+        dragHandle.addEventListener("pointermove", (event) => {
+          if (!node.classList.contains("is-dragging")) return;
+          event.preventDefault();
+          const siblings = [...providerListEl.querySelectorAll(".route-provider-card")]
+            .filter((item) => item !== node);
+          const beforeNode = siblings.find((item) => {
+            const rect = item.getBoundingClientRect();
+            return event.clientY < rect.top + rect.height / 2;
+          }) || null;
+          if (beforeNode !== node && beforeNode !== node.nextSibling) {
+            providerListEl.insertBefore(node, beforeNode);
+            syncProviderOrderFromDom();
+            updateProviderRankLabels();
+          }
+        });
+
+        dragHandle.addEventListener("pointerup", finishDrag);
+        dragHandle.addEventListener("pointercancel", finishDrag);
+      }
+
+      function reorderProviders(fromId, toId) {
+        if (!fromId || !toId || fromId === toId) return;
+        document.querySelectorAll(".route-provider-card").forEach(syncProviderFromNode);
+        const fromIndex = config.providers.findIndex((item) => item.id === fromId);
+        const toIndex = config.providers.findIndex((item) => item.id === toId);
+        if (fromIndex < 0 || toIndex < 0) return;
+        const [moved] = config.providers.splice(fromIndex, 1);
+        config.providers.splice(toIndex, 0, moved);
+        normalizeProviderOrder();
+        renderProviders();
+      }
+
+      function syncProviderOrderFromDom() {
+        document.querySelectorAll(".route-provider-card").forEach(syncProviderFromNode);
+        const order = [...providerListEl.querySelectorAll(".route-provider-card")]
+          .map((node) => node.dataset.providerId)
+          .filter(Boolean);
+        if (!order.length) return;
+        const providersById = new Map(config.providers.map((provider) => [provider.id, provider]));
+        config.providers = order.map((id) => providersById.get(id)).filter(Boolean);
+        normalizeProviderOrder();
+      }
+
+      function updateProviderRankLabels() {
+        [...providerListEl.querySelectorAll(".route-provider-card")].forEach((node, index) => {
+          const rankNode = node.querySelector("[data-rank]");
+          if (rankNode) rankNode.textContent = `P${index + 1}`;
+        });
+      }
+
+      function collectConfig() {
+        document.querySelectorAll(".route-provider-card").forEach(syncProviderFromNode);
+        config.enabled = document.getElementById("rf-enabled").checked;
+        config.failover_enabled = document.getElementById("rf-failover").checked;
+        config.rotate_keys = true;
+        config.retry_attempts = Math.min(Math.max(Number(document.getElementById("rf-retry-attempts").value || 3), 1), 10);
+        config.strategy = "priority";
+        config.hook_all_posts = true;
+        syncProviderOrderFromDom();
+        return normalizeConfig(config);
+      }
+
+      async function saveConfig(options = {}) {
+        const button = document.getElementById("save-route-forwarding");
+        button.disabled = true;
+        try {
+          const response = await fetch("/api/route-forwarding", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(collectConfig()),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(data.detail || "保存失败");
+          config = normalizeConfig(data.config || {});
+          bindTopControls();
+          renderProviders();
+          updateStats(data.stats || {});
+          if (!options.silent) {
+            toast("路由转发已保存", "新的 POST 请求会立即使用这份配置。");
+          }
+          return data;
+        } catch (error) {
+          if (!options.silent) {
+            toast("保存失败", error.message || String(error), "error");
+          }
+          throw error;
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      async function testProvider(providerId) {
+        const card = document.querySelector(`.route-provider-card[data-provider-id="${CSS.escape(providerId)}"]`);
+        const button = card?.querySelector(".provider-test");
+        if (button) button.disabled = true;
+        try {
+          await saveConfig({ silent: true });
+          updateLocalProviderState(providerId, "testing");
+          const response = await fetch("/api/route-forwarding/test-provider", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider_id: providerId }),
+          });
+          const data = await response.json().catch(() => ({}));
+          updateStats(data.stats || {});
+          const result = data.result || {};
+          if (!response.ok || !result.ok) {
+            throw new Error(result.error || data.detail || "测试失败");
+          }
+          toast("测试成功", "该 API 已恢复，可以重新参与转发。");
+        } catch (error) {
+          toast("测试失败", error.message || String(error), "error");
+        } finally {
+          if (button) button.disabled = false;
+          refreshRouteStats();
+        }
+      }
+
+      function updateLocalProviderState(providerId, state) {
+        runtimeStats.providers = runtimeStats.providers || {};
+        runtimeStats.providers[providerId] = { ...(runtimeStats.providers[providerId] || {}), state };
+        applyProviderStatuses();
+      }
+
+      async function refreshRouteStats() {
+        if (document.hidden) return;
+        try {
+          const response = await fetch("/api/route-forwarding", { headers: { "Accept": "application/json" } });
+          const data = await response.json().catch(() => ({}));
+          if (response.ok) updateStats(data.stats || {});
+        } catch (error) {
+          // Keep the page editable if polling is interrupted.
+        }
+      }
+
+      document.getElementById("add-provider").addEventListener("click", () => {
+        config.providers.push({
+          id: `provider-${Date.now()}`,
+          name: "新供应商",
+          base_url: "",
+          model: "",
+          enabled: true,
+          priority: config.providers.length + 1,
+          keys: [],
+        });
+        normalizeProviderOrder();
+        renderProviders();
+      });
+      document.getElementById("save-route-forwarding").addEventListener("click", saveConfig);
+      ["rf-enabled", "rf-failover", "rf-retry-attempts"].forEach((id) => {
+        document.getElementById(id).addEventListener("change", collectConfig);
+      });
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+      bindTopControls();
+      renderProviders();
+      updateStats(initialStats);
+      window.setInterval(refreshRouteStats, 2000);
+    </script>
+  </body>
+</html>

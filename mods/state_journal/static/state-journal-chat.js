@@ -856,6 +856,99 @@
       .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row span { color:#d18a38; font-size:.76rem; letter-spacing:.14em; font-weight:900; }
       .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row strong { color:#f6ecd7; font-weight:520; line-height:1.72; }
 
+      /* Keep Xinjian chat surfaces in sync with Fantareal global color and opacity settings. */
+      .state-journal-chat-bubble,
+      .state-journal-turn-status,
+      .state-journal-inline-scene-card,
+      .state-journal-turn-note,
+      .state-journal-turn-note-compact {
+        background:
+          linear-gradient(
+            180deg,
+            rgba(var(--panel-strong-rgb, 20, 30, 41), var(--panel-strong-alpha, .92)),
+            rgba(var(--panel-rgb, 18, 27, 37), var(--panel-alpha, .82))
+          ) !important;
+        color: var(--text, #edf5ff);
+        backdrop-filter: var(--ui-glass-blur-soft, blur(14px) saturate(1.04));
+        -webkit-backdrop-filter: var(--ui-glass-blur-soft, blur(14px) saturate(1.04));
+      }
+      .state-journal-note-section,
+      .state-journal-note-field,
+      .state-journal-scene-chip,
+      .state-journal-paper-time-row,
+      .state-journal-status-scene-hud span,
+      .state-journal-status-row,
+      .state-journal-metric-chip,
+      .state-journal-metric-diary-row,
+      .state-journal-status-pro-card,
+      .state-journal-status-pro-row,
+      .state-journal-status-meter,
+      .state-journal-paper-note-row,
+      .state-journal-storyboard-meta,
+      .state-journal-storyboard-group,
+      .state-journal-storyboard-group-title,
+      .state-journal-storyboard-row,
+      .state-journal-note-template-output,
+      .state-journal-source-badge {
+        background: rgba(var(--input-rgb, 11, 18, 26), var(--input-alpha, .78)) !important;
+      }
+      .state-journal-note-section,
+      .state-journal-note-field,
+      .state-journal-scene-chip,
+      .state-journal-paper-time-row,
+      .state-journal-status-scene-hud span,
+      .state-journal-status-row,
+      .state-journal-metric-chip,
+      .state-journal-metric-diary-row,
+      .state-journal-status-pro-card,
+      .state-journal-status-pro-row,
+      .state-journal-status-meter,
+      .state-journal-paper-note-row,
+      .state-journal-storyboard-meta,
+      .state-journal-storyboard-group,
+      .state-journal-storyboard-row {
+        border-color: var(--border, rgba(152, 190, 233, .11)) !important;
+      }
+      .state-journal-inline-scene-card .state-journal-scene-title,
+      .state-journal-inline-scene-card .state-journal-scene-event,
+      .state-journal-turn-note .state-journal-note-section h4,
+      .state-journal-turn-note .state-journal-note-field strong,
+      .state-journal-turn-note .state-journal-relation-list strong,
+      .state-journal-turn-note-compact,
+      .state-journal-status-row strong,
+      .state-journal-status-pro-card summary b,
+      .state-journal-status-pro-row strong,
+      .state-journal-status-meter i,
+      .state-journal-paper-note-row strong,
+      .state-journal-storyboard-row strong {
+        color: var(--text, #edf5ff) !important;
+      }
+      .state-journal-inline-scene-card summary,
+      .state-journal-inline-scene-card .state-journal-scene-subtitle,
+      .state-journal-inline-scene-card .state-journal-scene-toggle,
+      .state-journal-turn-note summary,
+      .state-journal-turn-note .state-journal-note-toolbar,
+      .state-journal-turn-note .state-journal-relation-list,
+      .state-journal-turn-note .state-journal-note-empty,
+      .state-journal-turn-note-compact span,
+      .state-journal-status-pro-card summary i,
+      .state-journal-status-meter i small {
+        color: var(--muted, #9db1c8) !important;
+      }
+      .state-journal-inline-scene-card .state-journal-scene-kicker,
+      .state-journal-scene-chip b,
+      .state-journal-turn-note .state-journal-note-field span,
+      .state-journal-turn-note-compact strong,
+      .state-journal-status-row span,
+      .state-journal-status-pro-card summary span,
+      .state-journal-status-pro-row span,
+      .state-journal-status-meter span,
+      .state-journal-paper-note-row span,
+      .state-journal-storyboard-row span,
+      .state-journal-storyboard-row b {
+        color: var(--accent, #5ca7ff) !important;
+      }
+
       @keyframes state-journal-spin { to { transform: rotate(360deg); } }
       @media (max-width: 900px) { .state-journal-chat-bubble { left: 50%; top: 4.8rem; } }
     `;
