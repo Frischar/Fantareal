@@ -585,6 +585,56 @@ body.modern-setting-page .app-toast {
   border-radius: 4px;
   font-size: 0.92em;
 }
+body.modern-setting-page .about-secret-trigger,
+.about-secret-trigger {
+  --secret-progress: 0;
+  position: relative;
+  appearance: none;
+  display: inline !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  text-align: inherit !important;
+  text-decoration: none !important;
+  vertical-align: baseline !important;
+  transform: none !important;
+  transition: opacity 0.12s ease !important;
+  cursor: pointer;
+}
+body.modern-setting-page .about-secret-trigger::after,
+.about-secret-trigger::after {
+  display: none;
+  content: none;
+}
+body.modern-setting-page .about-secret-trigger:hover,
+body.modern-setting-page .about-secret-trigger:active,
+.about-secret-trigger:hover,
+.about-secret-trigger:active,
+.about-secret-trigger:focus-visible {
+  background: transparent !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  opacity: 0.84;
+  transform: none !important;
+  outline: 1px dotted color-mix(in srgb, var(--muted) 58%, transparent 42%);
+  outline-offset: 0.16em;
+}
+body.modern-setting-page .about-secret-trigger.unlocked,
+.about-secret-trigger.unlocked {
+  color: inherit !important;
+  text-shadow: none !important;
+}
 .about-thanks-list {
   margin: 0;
   padding: 0;
@@ -609,4 +659,1161 @@ body.modern-setting-page .app-toast {
   font-size: 0.82em;
   opacity: 0.55;
 }
+
+.abyss-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 520;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(4, 8, 14, 0.48);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.abyss-modal {
+  width: min(440px, calc(100vw - 44px));
+  padding: 22px 24px 20px;
+  border: 1px solid color-mix(in srgb, var(--line) 72%, rgba(118, 184, 255, 0.28) 28%);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 94%, transparent 6%), color-mix(in srgb, var(--panel) 88%, transparent 12%)),
+    var(--panel-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 24px 80px rgba(0, 0, 0, 0.34);
+}
+.abyss-modal h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.16rem;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+.abyss-modal p:not(.eyebrow) {
+  margin: 0;
+  color: color-mix(in srgb, var(--muted) 86%, var(--text) 14%);
+  line-height: 1.7;
+}
+body.modern-setting-page .abyss-modal-close {
+  width: auto !important;
+  min-height: 34px !important;
+  margin: 18px 0 0 !important;
+  padding: 7px 14px !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--input-bg) 74%, transparent 26%) !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+body.modern-setting-page .abyss-modal-close:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--input-bg) 88%) !important;
+  opacity: 1;
+}
+
+/* ---- Challenge mode ---- */
+.challenge-mode-page {
+  --challenge-blue: #76b8ff;
+  --challenge-rose: #d58aa5;
+  --challenge-red: #cf334b;
+  --challenge-green: #8bd7c7;
+  --challenge-ink: #1a1118;
+}
+
+body.modern-setting-page.challenge-mode-page .config-shell.compact.challenge-shell {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+body.modern-setting-page.challenge-mode-page .challenge-countdown-panel,
+body.modern-setting-page.challenge-mode-page .challenge-diary-panel {
+  grid-column: 1 / -1;
+  grid-row: auto;
+}
+
+.challenge-mode-page .challenge-hero-toolbar .slot-hint {
+  color: color-mix(in srgb, var(--muted) 88%, var(--challenge-rose) 12%);
+}
+
+.challenge-mode-panel,
+.challenge-countdown-panel,
+.challenge-status-panel,
+.challenge-case-panel,
+.challenge-password-panel,
+.challenge-puzzle-panel,
+.challenge-corridor-panel,
+.challenge-diary-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.challenge-mode-panel::before,
+.challenge-countdown-panel::before,
+.challenge-status-panel::before,
+.challenge-case-panel::before,
+.challenge-password-panel::before,
+.challenge-puzzle-panel::before,
+.challenge-corridor-panel::before,
+.challenge-diary-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--challenge-rose) 18%, transparent 82%), transparent 28%),
+    linear-gradient(90deg, rgba(118, 184, 255, 0.10), transparent 46%),
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.032) 0 1px, transparent 1px 8px);
+  opacity: 0.48;
+}
+
+.challenge-mode-panel > *,
+.challenge-countdown-panel > *,
+.challenge-status-panel > *,
+.challenge-case-panel > *,
+.challenge-password-panel > *,
+.challenge-puzzle-panel > *,
+.challenge-corridor-panel > *,
+.challenge-diary-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.challenge-brief-copy h2 {
+  max-width: 760px;
+}
+
+.challenge-countdown-panel {
+  min-height: clamp(170px, 26vh, 300px);
+  display: grid;
+  place-items: center;
+  border-color: color-mix(in srgb, var(--challenge-red) 30%, var(--line) 70%) !important;
+}
+
+.challenge-countdown-panel strong {
+  position: relative;
+  color: #ff334f;
+  font-size: clamp(4.5rem, 14vw, 13rem);
+  font-weight: 950;
+  line-height: 0.9;
+  letter-spacing: 0.03em;
+  text-shadow:
+    0 0 18px rgba(207, 51, 75, 0.36),
+    0 0 58px rgba(207, 51, 75, 0.22);
+  font-variant-numeric: tabular-nums;
+}
+
+.challenge-brief-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 18px;
+  align-items: end;
+}
+
+.challenge-progress-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 22%, var(--line) 78%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+}
+
+.challenge-progress-card span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.challenge-progress-card strong {
+  color: var(--challenge-blue);
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.challenge-progress-card i {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--input-bg) 76%, transparent 24%);
+}
+
+.challenge-progress-card b {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--challenge-blue), var(--challenge-green), var(--challenge-rose));
+  transition: width 0.24s ease;
+}
+
+.challenge-corridor-panel {
+  grid-row: span 2;
+}
+
+.challenge-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 24%, var(--line) 76%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--input-bg) 76%, transparent 24%);
+}
+
+.challenge-countdown span,
+.challenge-stat span,
+.challenge-ending-list span {
+  color: var(--muted);
+}
+
+.challenge-countdown strong {
+  color: var(--challenge-blue);
+  font-size: 1.35rem;
+  letter-spacing: 0.08em;
+}
+
+.challenge-stat-list {
+  display: grid;
+  gap: 13px;
+}
+
+.challenge-stat {
+  display: grid;
+  gap: 8px;
+}
+
+.challenge-stat div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+.challenge-stat strong {
+  color: var(--text);
+}
+
+.challenge-stat i {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--input-bg) 76%, transparent 24%);
+}
+
+.challenge-stat b {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.22s ease;
+}
+
+.challenge-stat[data-stat="hope"] b,
+.challenge-stat[data-stat="trust"] b {
+  background: linear-gradient(90deg, var(--challenge-blue), #9ee0d0);
+}
+
+.challenge-stat[data-stat="despair"] b {
+  background: linear-gradient(90deg, var(--challenge-rose), #b34c68);
+}
+
+.challenge-stat[data-stat="stability"] b {
+  background: linear-gradient(90deg, #b9c1cc, #7f9fcb);
+}
+
+.challenge-stat[data-stat="clarity"] b {
+  background: linear-gradient(90deg, #97d7ff, #f4efff);
+}
+
+.challenge-stat[data-stat="echo"] b,
+.challenge-stat[data-stat="doorPressure"] b {
+  background: linear-gradient(90deg, var(--challenge-rose), var(--challenge-red));
+}
+
+.challenge-puzzle-panel {
+  align-self: stretch;
+}
+
+.challenge-puzzle-list {
+  display: grid;
+  gap: 12px;
+}
+
+.challenge-puzzle-card {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 18%, var(--line) 82%);
+  border-radius: 8px;
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--panel-strong) 78%, transparent 22%), color-mix(in srgb, var(--input-bg) 52%, transparent 48%));
+}
+
+.challenge-puzzle-card.locked {
+  opacity: 0.58;
+  border-style: dashed;
+}
+
+.challenge-puzzle-card.solved {
+  border-color: color-mix(in srgb, var(--challenge-green) 32%, var(--line) 68%);
+}
+
+.challenge-puzzle-card span {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 7px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 28%, transparent 72%);
+  color: var(--challenge-blue);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.challenge-puzzle-card strong {
+  display: block;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.challenge-puzzle-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+body.modern-setting-page .challenge-puzzle-option {
+  width: auto !important;
+  min-height: 34px !important;
+  margin: 0 !important;
+  padding: 7px 11px !important;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 18%, var(--line) 82%) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--input-bg) 68%, transparent 32%) !important;
+  color: color-mix(in srgb, var(--text) 78%, var(--muted) 22%) !important;
+  font-size: 0.84rem !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page .challenge-puzzle-option:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--challenge-blue) 42%, var(--line) 58%) !important;
+  background: color-mix(in srgb, var(--challenge-blue) 10%, var(--input-bg) 90%) !important;
+}
+
+body.modern-setting-page .challenge-puzzle-option:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.challenge-case-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.challenge-case-card {
+  min-height: 142px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 18%, var(--line) 82%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel-strong) 82%, transparent 18%);
+}
+
+.challenge-case-card.locked {
+  border-style: dashed;
+  opacity: 0.66;
+}
+
+.challenge-case-card span {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 28%, transparent 72%);
+  color: var(--challenge-blue);
+  font-size: 0.76rem;
+  letter-spacing: 0.10em;
+}
+
+.challenge-case-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.challenge-case-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.challenge-corridor-stage {
+  --challenge-phase: 0;
+  position: relative;
+  min-height: 250px;
+  margin: 16px 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 22%, var(--line) 78%);
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 50% 28%, color-mix(in srgb, var(--challenge-rose) calc(10% + var(--challenge-phase) * 4%), transparent), transparent 34%),
+    linear-gradient(90deg, color-mix(in srgb, var(--challenge-ink) 24%, transparent), transparent 28%, transparent 72%, color-mix(in srgb, var(--challenge-ink) 24%, transparent)),
+    color-mix(in srgb, var(--panel-strong) 74%, transparent 26%);
+}
+
+.challenge-corridor-stage::before,
+.challenge-corridor-stage::after {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+}
+
+.challenge-corridor-stage::before {
+  background:
+    repeating-radial-gradient(ellipse at center, rgba(255, 255, 255, 0.05) 0 1px, transparent 2px 16px),
+    linear-gradient(110deg, transparent 0 42%, rgba(118, 184, 255, 0.08) 48%, transparent 56% 100%);
+  transform: perspective(360px) rotateX(58deg) scaleY(1.5);
+  opacity: 0.48;
+}
+
+.challenge-corridor-stage::after {
+  background:
+    linear-gradient(90deg, transparent, rgba(213, 138, 165, 0.10), transparent),
+    repeating-linear-gradient(0deg, transparent 0 16px, rgba(255, 255, 255, 0.03) 17px 18px);
+  opacity: calc(0.18 + var(--challenge-phase) * 0.05);
+}
+
+.challenge-corridor-lines {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(72deg, transparent 0 46%, rgba(118, 184, 255, 0.16) 48%, transparent 50%),
+    linear-gradient(108deg, transparent 0 46%, rgba(213, 138, 165, 0.14) 48%, transparent 50%);
+  opacity: 0.32;
+}
+
+.challenge-door {
+  position: relative;
+  z-index: 1;
+  width: min(138px, 44%);
+  min-width: 112px;
+  aspect-ratio: 0.58;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 30%, var(--line) 70%);
+  border-radius: 8px 8px 4px 4px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 28%),
+    color-mix(in srgb, var(--challenge-ink) 56%, var(--panel-strong) 44%);
+  box-shadow:
+    0 26px 48px rgba(0, 0, 0, 0.22),
+    inset 0 0 38px rgba(118, 184, 255, 0.08);
+}
+
+.challenge-door-name {
+  position: absolute;
+  top: 18px;
+  color: color-mix(in srgb, var(--muted) 72%, white 28%);
+  font-size: 0.74rem;
+  letter-spacing: 0.28em;
+}
+
+.challenge-door-lock {
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 42%, var(--line) 58%);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, var(--challenge-blue) 0 2px, transparent 3px),
+    color-mix(in srgb, var(--panel-strong) 72%, transparent 28%);
+  box-shadow: 0 0 22px rgba(118, 184, 255, 0.18);
+}
+
+.challenge-password-fragments {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 14px;
+}
+
+.challenge-password-fragments span {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 24%, var(--line) 76%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--input-bg) 72%, transparent 28%);
+  color: var(--text);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.challenge-password-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+body.modern-setting-page .challenge-password-row input {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.challenge-feedback {
+  min-height: 48px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid color-mix(in srgb, var(--challenge-rose) 56%, var(--challenge-blue) 44%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--input-bg) 66%, transparent 34%);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.challenge-feedback[data-mood="good"] {
+  border-left-color: color-mix(in srgb, var(--challenge-green) 68%, var(--challenge-blue) 32%);
+  color: color-mix(in srgb, var(--text) 78%, var(--challenge-green) 22%);
+}
+
+.challenge-feedback[data-mood="bad"] {
+  border-left-color: var(--challenge-red);
+  color: color-mix(in srgb, var(--text) 70%, var(--challenge-red) 30%);
+  animation: config-shake 0.28s ease;
+}
+
+.challenge-ending-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.challenge-ending-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--input-bg) 56%, transparent 44%);
+}
+
+.challenge-ending-list strong {
+  color: var(--muted);
+}
+
+.challenge-ending-list strong.active {
+  color: var(--challenge-blue);
+}
+
+.challenge-diary-workbench {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.38fr) minmax(0, 0.62fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.challenge-diary-list {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+body.modern-setting-page .challenge-diary-item {
+  width: 100% !important;
+  min-height: 70px !important;
+  margin: 0 !important;
+  padding: 11px 12px !important;
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "tag title"
+    "tag phase";
+  gap: 3px 10px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 18%, var(--line) 82%) !important;
+  border-radius: 8px !important;
+  background: color-mix(in srgb, var(--input-bg) 56%, transparent 44%) !important;
+  color: var(--text) !important;
+  text-align: left !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page .challenge-diary-item:hover:not(:disabled),
+body.modern-setting-page .challenge-diary-item.active {
+  border-color: color-mix(in srgb, var(--challenge-blue) 40%, var(--line) 60%) !important;
+  background: color-mix(in srgb, var(--challenge-blue) 10%, var(--input-bg) 90%) !important;
+}
+
+body.modern-setting-page .challenge-diary-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.challenge-diary-item span {
+  grid-area: tag;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 24%, transparent 76%);
+  color: var(--challenge-blue);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.challenge-diary-item strong {
+  grid-area: title;
+  min-width: 0;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.challenge-diary-item em {
+  grid-area: phase;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+}
+
+.challenge-diary-reader {
+  position: relative;
+  min-height: 290px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--challenge-rose) 20%, var(--line) 80%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 84%, transparent 16%), color-mix(in srgb, var(--input-bg) 62%, transparent 38%));
+}
+
+.challenge-diary-reader.is-glitching {
+  animation: challenge-diary-tremble 0.18s steps(2, end) infinite;
+  border-color: color-mix(in srgb, var(--challenge-red) 28%, var(--line) 72%);
+}
+
+.challenge-diary-reader.is-glitching::after {
+  content: "它在学你";
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  color: color-mix(in srgb, var(--challenge-red) 72%, transparent 28%);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.18em;
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.challenge-diary-reader span {
+  display: inline-flex;
+  margin-bottom: 14px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--challenge-rose) 34%, transparent 66%);
+  color: var(--challenge-rose);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.challenge-diary-reader h3 {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 1.15rem;
+}
+
+.challenge-diary-reader p {
+  margin: 0;
+  color: color-mix(in srgb, var(--text) 76%, var(--muted) 24%);
+  line-height: 1.85;
+  white-space: pre-wrap;
+}
+
+.challenge-diary-margin {
+  margin-top: 18px;
+  padding: 10px 12px;
+  border-left: 2px solid color-mix(in srgb, var(--challenge-red) 36%, transparent 64%);
+  color: color-mix(in srgb, var(--challenge-red) 52%, var(--muted) 48%);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  opacity: 0.78;
+  transform: rotate(-0.18deg);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--challenge-red) 7%, transparent 93%), transparent 68%);
+}
+
+.challenge-diary-corrupt {
+  display: inline-block;
+  min-width: 0.72em;
+  color: color-mix(in srgb, var(--challenge-red) 70%, var(--text) 30%);
+  text-shadow: 0 0 12px rgba(207, 51, 75, 0.35);
+  transform: translateY(-0.04em) skewX(-8deg);
+}
+
+body.challenge-ui-warp-3 .challenge-diary-margin,
+body.challenge-ui-warp-4 .challenge-diary-margin {
+  animation: challenge-margin-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes challenge-margin-breathe {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: rotate(-0.18deg) translateX(0);
+  }
+
+  50% {
+    opacity: 0.9;
+    transform: rotate(0.12deg) translateX(2px);
+  }
+}
+
+.challenge-bottom-lock {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 18%, var(--line) 82%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--input-bg) 46%, transparent 54%);
+}
+
+.challenge-bottom-lock .section-head {
+  margin-bottom: 12px;
+}
+
+.challenge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+body.modern-setting-page .challenge-disable-button {
+  width: auto !important;
+  min-height: 34px !important;
+  margin: 0 !important;
+  padding: 8px 14px !important;
+  color: color-mix(in srgb, var(--muted) 82%, var(--text) 18%) !important;
+}
+
+body.modern-setting-page .challenge-disable-button:hover {
+  color: var(--text) !important;
+  background: color-mix(in srgb, var(--danger) 10%, var(--input-bg) 90%) !important;
+}
+
+body.modern-setting-page .challenge-exit-button {
+  width: auto !important;
+  min-height: 0 !important;
+  margin: 10px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: color-mix(in srgb, var(--muted) 62%, transparent 38%) !important;
+  font-size: 0.78rem !important;
+  line-height: 1.4 !important;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
+}
+
+body.modern-setting-page .challenge-exit-button:hover,
+body.modern-setting-page .challenge-exit-button:focus-visible {
+  color: color-mix(in srgb, var(--challenge-red) 66%, var(--muted) 34%) !important;
+  background: transparent !important;
+  transform: none !important;
+}
+
+.challenge-exit-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 860;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(207, 51, 75, 0.12), transparent 28%),
+    rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.challenge-exit-modal-backdrop[hidden] {
+  display: none !important;
+}
+
+.challenge-exit-modal {
+  width: min(520px, calc(100vw - 48px));
+  padding: 28px;
+  border: 1px solid color-mix(in srgb, var(--challenge-red) 26%, var(--line) 74%);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 90%, transparent 10%), color-mix(in srgb, var(--panel) 82%, transparent 18%));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 28px 90px rgba(0, 0, 0, 0.48);
+}
+
+.challenge-exit-modal h2 {
+  margin: 0;
+  color: color-mix(in srgb, var(--text) 82%, var(--challenge-red) 18%);
+  font-size: clamp(1.45rem, 3vw, 2.2rem);
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.challenge-exit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+  flex-wrap: wrap;
+}
+
+body.modern-setting-page .challenge-exit-confirm,
+body.modern-setting-page .challenge-exit-cancel {
+  width: auto !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 9px 16px !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page .challenge-exit-confirm {
+  border: 1px solid color-mix(in srgb, var(--challenge-red) 42%, var(--line) 58%) !important;
+  background: color-mix(in srgb, var(--challenge-red) 14%, var(--input-bg) 86%) !important;
+  color: color-mix(in srgb, var(--challenge-red) 70%, var(--text) 30%) !important;
+}
+
+body.modern-setting-page .challenge-exit-cancel {
+  border: 1px solid color-mix(in srgb, var(--challenge-blue) 26%, var(--line) 74%) !important;
+  background: color-mix(in srgb, var(--input-bg) 78%, transparent 22%) !important;
+  color: var(--text) !important;
+}
+
+.challenge-black-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgba(207, 51, 75, 0.16), transparent 28%),
+    rgba(0, 0, 0, 0.92);
+  color: rgba(255, 78, 103, 0.86);
+  font-size: clamp(1.4rem, 4vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-align: center;
+  opacity: 0;
+  transform: scale(1.02);
+}
+
+.challenge-red-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 905;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.18), transparent 20%),
+    rgba(207, 16, 42, 0.92);
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+
+.challenge-red-flash.is-active {
+  animation: challenge-red-flash 0.28s ease both;
+}
+
+.challenge-red-flash.is-active.is-hard {
+  background: #d90024;
+  mix-blend-mode: normal;
+  animation: challenge-hard-red 1s linear both;
+}
+
+.challenge-black-flash.is-active {
+  animation: challenge-black-flash 0.95s ease both;
+}
+
+.challenge-black-flash.is-active.is-hard {
+  background: #000;
+  color: transparent;
+  animation: challenge-hard-black 3s linear both;
+}
+
+.challenge-black-flash.is-active.is-long {
+  animation: challenge-black-flash-long 3.2s ease both;
+}
+
+.challenge-whisper-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.challenge-whisper-layer.is-awake::before {
+  content: "307 不是房间  ·  别让它替她回答  ·  雨在校验名字  ·  门不是出口";
+  position: absolute;
+  left: 4vw;
+  right: 4vw;
+  bottom: 4vh;
+  color: rgba(207, 51, 75, 0.14);
+  font-size: clamp(1.2rem, 4vw, 4.2rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  transform: skewX(-6deg);
+}
+
+.challenge-float-whisper {
+  position: absolute;
+  color: rgba(207, 51, 75, 0.58);
+  font-size: clamp(0.8rem, 1.2vw, 1.15rem);
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 16px rgba(207, 51, 75, 0.18);
+  animation: challenge-float-whisper 2.6s ease-out both;
+}
+
+body.challenge-danger .challenge-mode-panel::before,
+body.challenge-danger .challenge-countdown-panel::before,
+body.challenge-danger .challenge-status-panel::before,
+body.challenge-danger .challenge-puzzle-panel::before,
+body.challenge-danger .challenge-diary-panel::before {
+  background:
+    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--challenge-red) 20%, transparent 80%), transparent 28%),
+    linear-gradient(90deg, rgba(207, 51, 75, 0.12), transparent 46%),
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 7px);
+  opacity: 0.62;
+}
+
+body.challenge-input-possessed .challenge-password-row {
+  animation: challenge-possession-shiver 0.11s steps(2, end) infinite;
+}
+
+body.challenge-input-possessed #challenge-password-input {
+  border-color: color-mix(in srgb, var(--challenge-red) 48%, var(--line) 52%) !important;
+  color: color-mix(in srgb, var(--challenge-red) 72%, var(--text) 28%) !important;
+  text-shadow: 0 0 14px rgba(207, 51, 75, 0.38);
+}
+
+body.challenge-ui-warp-1 .challenge-countdown-panel,
+body.challenge-ui-warp-1 .challenge-diary-panel {
+  filter: saturate(1.08) contrast(1.04);
+}
+
+body.challenge-ui-warp-2 .challenge-countdown-panel strong {
+  animation: challenge-clock-sick 2.8s ease-in-out infinite;
+}
+
+body.challenge-ui-warp-2 .challenge-diary-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(207, 51, 75, 0.05), transparent),
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.032) 0 1px, transparent 1px 5px);
+  mix-blend-mode: screen;
+  opacity: 0.42;
+  z-index: 2;
+}
+
+body.challenge-ui-warp-3 .challenge-shell {
+  transform: skewX(-0.32deg);
+}
+
+body.challenge-ui-warp-3 .challenge-diary-reader,
+body.challenge-ui-warp-3 .challenge-bottom-lock {
+  transform: translateX(-2px);
+}
+
+body.challenge-ui-warp-4 .challenge-shell {
+  animation: challenge-shell-warp 0.22s steps(2, end) infinite;
+}
+
+body.challenge-ui-warp-4 .challenge-countdown-panel strong {
+  color: #ff1f3e;
+  text-shadow:
+    2px 0 0 rgba(118, 184, 255, 0.32),
+    -3px 0 0 rgba(207, 51, 75, 0.48),
+    0 0 22px rgba(207, 51, 75, 0.44),
+    0 0 82px rgba(207, 51, 75, 0.34);
+}
+
+body.challenge-ui-warp-3 .challenge-countdown-panel strong::before,
+body.challenge-ui-warp-4 .challenge-countdown-panel strong::before {
+  content: attr(data-clean-time);
+  position: absolute;
+  inset: 0;
+  color: rgba(118, 184, 255, 0.28);
+  transform: translate(-0.035em, 0.018em) skewX(-5deg);
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+body.challenge-ui-warp-4 .challenge-countdown-panel strong::after {
+  content: attr(data-clean-time);
+  position: absolute;
+  inset: 0;
+  color: rgba(207, 51, 75, 0.34);
+  transform: translate(0.042em, -0.018em) scaleX(1.018);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  clip-path: polygon(0 18%, 100% 8%, 100% 34%, 0 42%, 0 64%, 100% 58%, 100% 76%, 0 84%);
+}
+
+body.challenge-ui-warp-4 .challenge-diary-item:nth-child(2n) {
+  transform: translateX(3px);
+}
+
+body.challenge-timer-ended .challenge-countdown-panel {
+  border-color: color-mix(in srgb, var(--challenge-red) 64%, var(--line) 36%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(207, 51, 75, 0.18),
+    0 0 38px rgba(207, 51, 75, 0.16);
+}
+
+body.challenge-timer-ended .challenge-countdown-panel strong {
+  color: #ff102f;
+  text-shadow:
+    0 0 18px rgba(255, 16, 47, 0.62),
+    0 0 72px rgba(207, 51, 75, 0.46);
+  animation: challenge-terminal-countdown 0.9s steps(2, end) infinite;
+}
+
+body.challenge-timer-ended .challenge-diary-reader,
+body.challenge-timer-ended .challenge-bottom-lock {
+  border-color: color-mix(in srgb, var(--challenge-red) 34%, var(--line) 66%);
+  box-shadow: inset 0 0 34px rgba(207, 51, 75, 0.08);
+}
+
+body.challenge-timer-ended .challenge-feedback {
+  border-left-color: var(--challenge-red);
+  color: color-mix(in srgb, var(--challenge-red) 50%, var(--text) 50%);
+}
+
+@keyframes challenge-black-flash {
+  0% { opacity: 0; filter: blur(10px); }
+  18% { opacity: 1; filter: blur(0); transform: scale(1); }
+  50% { opacity: 0.88; }
+  100% { opacity: 0; filter: blur(8px); transform: scale(1.04); }
+}
+
+@keyframes challenge-hard-black {
+  0%, 99% { opacity: 1; filter: none; transform: none; }
+  100% { opacity: 0; filter: none; transform: none; }
+}
+
+@keyframes challenge-black-flash-long {
+  0% { opacity: 0; filter: blur(14px); transform: scale(1.03); }
+  7% { opacity: 1; filter: blur(0); transform: scale(1); }
+  68% { opacity: 1; }
+  100% { opacity: 0; filter: blur(10px); transform: scale(1.05); }
+}
+
+@keyframes challenge-red-flash {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes challenge-hard-red {
+  0%, 99% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes challenge-float-whisper {
+  0% { opacity: 0; transform: translateY(12px) scale(0.98); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-34px) scale(1.04); }
+}
+
+@keyframes challenge-diary-tremble {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(1px, -1px); }
+  50% { transform: translate(-1px, 1px); }
+  75% { transform: translate(1px, 1px); }
+}
+
+@keyframes challenge-possession-shiver {
+  0%, 100% { transform: translate(0, 0); }
+  33% { transform: translate(2px, -1px); }
+  66% { transform: translate(-1px, 1px); }
+}
+
+@keyframes challenge-clock-sick {
+  0%, 100% { transform: translateX(0) scaleX(1); }
+  48% { transform: translateX(-2px) scaleX(1.012); }
+  52% { transform: translateX(2px) scaleX(0.992); }
+}
+
+@keyframes challenge-shell-warp {
+  0%, 100% { transform: translate(0, 0) skewX(-0.35deg); }
+  50% { transform: translate(2px, -1px) skewX(0.42deg); }
+}
+
+@keyframes challenge-terminal-countdown {
+  0%,
+  100% {
+    transform: translate(0, 0) skewX(0deg);
+    filter: none;
+  }
+
+  34% {
+    transform: translate(-2px, 1px) skewX(-4deg);
+    filter: blur(0.8px);
+  }
+
+  66% {
+    transform: translate(3px, -1px) skewX(5deg);
+    filter: contrast(1.25);
+  }
+}
+
+@media (max-width: 980px) {
+  body.modern-setting-page.challenge-mode-page .config-shell.compact.challenge-shell,
+  .challenge-case-grid,
+  .challenge-diary-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .challenge-status-panel,
+  .challenge-corridor-panel {
+    grid-row: auto;
+  }
+
+  body.modern-setting-page.challenge-mode-page .challenge-status-panel,
+  body.modern-setting-page.challenge-mode-page .challenge-diary-panel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .challenge-brief-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .challenge-password-row {
+    grid-template-columns: 1fr;
+  }
+
+  .challenge-password-row .primary-btn {
+    width: 100%;
+  }
 }

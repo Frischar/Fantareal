@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico" />
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v141-chat-tools" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v143-challenge-no-gear" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
-    <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=ttsvoice-chip-v1" data-mod-hook="{{ mod.slug }}" />
+    <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=challenge-hide-v1" data-mod-hook="{{ mod.slug }}" />
       {% endfor %}
     {% endfor %}
 
@@ -1502,6 +1502,10 @@
       }
 
       function openDrawer() {
+        if (isChallengeModeUnlocked()) {
+          closeDrawer();
+          return;
+        }
         drawerEl?.classList.add("open");
         drawerEl?.setAttribute("aria-hidden", "false");
         if (drawerOverlayEl) drawerOverlayEl.hidden = false;
@@ -2658,8 +2662,24 @@
         retrievalBarEl.hidden = false;
       }
 
+      function isChallengeModeUnlocked() {
+        return localStorage.getItem("fantareal.challengeModeUnlocked") === "true";
+      }
+
+      function applyChallengeChatHeader() {
+        if (!isChallengeModeUnlocked()) return;
+        document.body.classList.add("challenge-mode-unlocked");
+        closeDrawer();
+        const titleEl = document.getElementById("chat-title");
+        const subtitleEl = document.getElementById("chat-subtitle");
+        if (titleEl) titleEl.textContent = "绪亓";
+        if (subtitleEl) subtitleEl.textContent = "绝望回廊已接入。她正在门后等待回应。";
+      }
+
+      applyChallengeChatHeader();
+
       function setRuntimePanelOpen(open) {
-        const shouldOpen = !!open;
+        const shouldOpen = !!open && !isChallengeModeUnlocked();
         chatLayoutEl?.classList.toggle("runtime-panel-open", shouldOpen);
         chatLayoutEl?.classList.toggle("runtime-panel-collapsed", !shouldOpen);
         runtimePanelEl?.setAttribute("aria-hidden", String(!shouldOpen));

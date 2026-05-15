@@ -1935,6 +1935,7 @@ body.chat-page #message-input:hover::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--muted) 52%, transparent);
   background-clip: content-box;
 }
+
 body.chat-page.chat-clear-mode {
   --chat-reading-mask-alpha: 0 !important;
   --chat-reading-mask-blur: 0px !important;
@@ -2331,4 +2332,21 @@ body.chat-page .chat-layout.runtime-panel-open .runtime-panel-handle:focus-visib
 :root[data-theme="dark"] .chat-page .message-edit-panel,
 :root[data-theme="dark"] .chat-page .message-edit-textarea {
   background: color-mix(in srgb, var(--panel-strong) 88%, #101827 12%);
+}
+
+/* Challenge mode keeps the chat surface alone. */
+body.chat-page.challenge-mode-unlocked .runtime-panel,
+body.chat-page.challenge-mode-unlocked .runtime-panel-handle,
+body.chat-page.challenge-mode-unlocked .runtime-panel-open-button,
+body.chat-page.challenge-mode-unlocked .config-gear-button,
+body.chat-page.challenge-mode-unlocked #config-drawer,
+body.chat-page.challenge-mode-unlocked #drawer-overlay {
+  display: none !important;
+}
+
+body.chat-page.challenge-mode-unlocked .chat-layout,
+body.chat-page.challenge-mode-unlocked .chat-layout.runtime-panel-open,
+body.chat-page.challenge-mode-unlocked .chat-layout.runtime-panel-collapsed {
+  grid-template-columns: minmax(0, 1fr) 0 !important;
+  gap: 0 !important;
 }

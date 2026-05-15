@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -6,6 +8,45 @@ from starlette.requests import Request
 
 
 def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
+    challenge_cards_dir = Path(__file__).resolve().parent.parent / "challenge_cards"
+
+    def _read_challenge_card_json(filename: str) -> dict[str, Any]:
+        target = challenge_cards_dir / filename
+        try:
+            with target.open("r", encoding="utf-8-sig") as handle:
+                payload = json.load(handle)
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"挑战模式四卡缺失：{filename}") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=500, detail=f"挑战模式四卡 JSON 解析失败：{filename}") from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=500, detail=f"挑战模式四卡格式错误：{filename}")
+        return payload
+
+    def _apply_challenge_four_cards() -> None:
+        active_slot = ctx.get_active_slot_id()
+        card_filename = "绪亓的人设.json"
+        card = _read_challenge_card_json(card_filename)
+        memories = _read_challenge_card_json("绪亓的记忆.json")
+        worldbook = _read_challenge_card_json("绪亓的世界书.json")
+        preset = _read_challenge_card_json("绪亓的预设.json")
+
+        try:
+            ctx.CARDS_DIR.mkdir(parents=True, exist_ok=True)
+            ctx.persist_json(
+                ctx.CARDS_DIR / card_filename,
+                ctx.normalize_role_card(card),
+                detail="挑战模式人设卡保存失败。",
+            )
+            ctx.apply_role_card(card, source_name=card_filename, slot_id=active_slot)
+            ctx.save_memories(memories.get("items", []), active_slot)
+            ctx.save_worldbook_store(worldbook, active_slot)
+            ctx.save_preset_store(preset, active_slot)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"挑战模式四卡加载失败：{exc}") from exc
+
     def _opening_message_from_persona(persona: dict[str, Any]) -> str:
         if not isinstance(persona, dict):
             return ""
@@ -292,6 +333,32 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "settings": ctx.get_settings(),
             },
         )
+
+    @app.get("/mods/challenge-mode", response_class=HTMLResponse)
+    async def challenge_mode_page(request: Request) -> HTMLResponse:
+        _apply_challenge_four_cards()
+        return templates.TemplateResponse(
+            request,
+            "challenge_mode.html",
+            {
+                "settings": ctx.get_settings(),
+            },
+        )
+
+    @app.post("/api/challenge-mode/clear")
+    async def clear_challenge_mode_cards() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        try:
+            ctx.apply_role_card({}, source_name="", slot_id=active_slot)
+            ctx.save_memories([], active_slot)
+            ctx.save_worldbook_store({}, active_slot)
+            ctx.save_preset_store(ctx.sanitize_preset_store({}), active_slot)
+            ctx.reset_workshop_state(active_slot)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"挑战模式四卡清空失败：{exc}") from exc
+        return {"ok": True}
 
     @app.get("/mods/{mod_slug}", response_class=HTMLResponse)
     async def mod_host_page(request: Request, mod_slug: str) -> HTMLResponse:

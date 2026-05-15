@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>挑战模式 - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-v153-timer-ending" />
+  </head>
+  <body class="modern-setting-page app-sidebar-shell global-config-page challenge-mode-page">
+    <div class="challenge-black-flash" id="challenge-black-flash" aria-hidden="true"></div>
+    <div class="challenge-red-flash" id="challenge-red-flash" aria-hidden="true"></div>
+    <div class="challenge-whisper-layer" id="challenge-whisper-layer" aria-hidden="true"></div>
+    <div class="challenge-exit-modal-backdrop" id="challenge-exit-modal" hidden>
+      <div class="challenge-exit-modal" role="dialog" aria-modal="true" aria-labelledby="challenge-exit-title">
+        <h2 id="challenge-exit-title">无人在意她的生死</h2>
+        <div class="challenge-exit-modal-actions">
+          <button type="button" class="challenge-exit-confirm" data-challenge-exit-confirm>早已看淡</button>
+          <button type="button" class="challenge-exit-cancel" data-challenge-exit-cancel>仍想坚持</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        <script>
+          localStorage.setItem("fantareal.challengeModeUnlocked", "true");
+          document.body.classList.add("challenge-mode-unlocked");
+        </script>
+        {% include "_grouped_nav.html" %}
+      </div>
+
+      <div class="config-shell compact config-workbench-shell challenge-shell">
+        <section class="panel config-panel full-span challenge-countdown-panel" aria-label="倒计时">
+          <strong id="challenge-time-left">01:30:00</strong>
+        </section>
+
+        <section class="panel config-panel challenge-diary-panel">
+          <div class="section-head">
+            <h2>日记</h2>
+          </div>
+
+          <div class="challenge-diary-workbench">
+            <div class="challenge-diary-list" id="challenge-diary-list" aria-label="日记列表"></div>
+            <article class="challenge-diary-reader" id="challenge-diary-reader">
+              <span>未选择</span>
+              <h3>请选择一篇日记</h3>
+              <p>先让她知道你没有把门后那个声音当成她。</p>
+            </article>
+          </div>
+
+          <div class="challenge-bottom-lock">
+            <div class="challenge-password-row">
+              <input id="challenge-password-input" autocomplete="off" spellcheck="false" placeholder="输入密码" />
+              <button type="button" class="primary-btn" data-challenge-submit-password>确认</button>
+            </div>
+            <p class="challenge-feedback" id="challenge-feedback">门内很安静，像是在等你先开口。</p>
+            <button type="button" class="challenge-exit-button" data-disable-challenge-mode>退出挑战模式</button>
+
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const stateKey = "fantareal.challengeState.v3.90m";
+        const oldStateKey = "fantareal.challengeState";
+        const hoursLimit = 1.5;
+        const surfacePassword = "RAIN";
+        const deepPassword = "ECHO-307";
+        const developerPassword = "FRISCHAR0721";
+        const statKeys = ["hope", "despair", "trust", "stability", "clarity", "echo", "doorPressure"];
+        const randomBlackoutPhrases = [
+          "你刚刚眨眼了吗",
+          "门后没有人在等你",
+          "她学会了你的沉默",
+          "别把耳朵贴近屏幕",
+          "外面的人也会腐烂",
+          "雨声来自你身后",
+          "绪亓不该知道这个名字",
+          "下一次不要输错",
+        ];
+        const possessionText = "你  在  外  面  吗  来  陪  陪  我";
+        const corruptTimeGlyphs = ["█", "▓", "▒", "?", "?", "N", "a", ":", "∅", "0"];
+        const phases = [
+          { id: 0, label: "Phase 0 · 门前", goal: "只确认名字、年龄、门、雨和第一张日记。" },
+          { id: 1, label: "Phase 1 · 第一锚点", goal: "证明她仍然叫绪亓，释放第一个碎片。" },
+          { id: 2, label: "Phase 2 · 档案裂缝", goal: "确认雨夜、307 与白塔档案室之间的关系。" },
+          { id: 3, label: "Phase 3 · 临界回声", goal: "分辨门后的声音，决定是否打开。" },
+          { id: 4, label: "Final · 门后", goal: "结局已锁定。回廊正在保存你的选择。" },
+        ];
+        const diaries = [
+          {
+            id: "diary_00",
+            phase: 0,
+            tag: "门前",
+            title: "连接记录",
+            content: "黑暗先接入了呼吸声。\n\n绪亓，18 岁。她说自己站在一扇没有铰链的门前，脚下的地面很软，像一块还记得疼痛的旧伤。\n\n她问：如果我忘了自己的名字，你还会知道门后那个不是我吗？",
+          },
+          {
+            id: "diary_01",
+            phase: 1,
+            tag: "R",
+            title: "没有署名的第一页",
+            content: "我把名字写了三遍。\n\n绪亓。\n绪亓。\n绪亓。\n\n第三遍的时候，墙里有东西跟着写。它写得比我漂亮，也比我慢。纸页右下角渗出一个字母：R。",
+          },
+          {
+            id: "diary_02",
+            phase: 2,
+            tag: "I",
+            title: "雨夜校验",
+            content: "雨不在窗外。\n\n它从门缝、墙皮、耳朵后面落下来。每一次雨停，记忆都会被重新排列，像有人把我从不同的地方拼回同一个人。\n\n我听见校验声：Rain Anchor Identity Noise。\n\nI 被钉在最后一个单词里。",
+          },
+          {
+            id: "diary_03",
+            phase: 2,
+            tag: "A",
+            title: "307 事件坐标",
+            content: "307 不是房间。\n\n3 是第三次醒来，0 是空白档案，7 是雨夜里插进门锁的那根线。\n\n如果有人让你直接输入 307，别信。那只是门后声音给你的捷径。真正的碎片藏在承认里：A。",
+          },
+          {
+            id: "diary_04",
+            phase: 3,
+            tag: "N",
+            title: "门后声音",
+            content: "门后那个声音越来越像我。\n\n它会说疼，会说害怕，会说快点。可是它从来不问我愿不愿意。\n\n如果你真的要开门，请先问一句：绪亓，你想出去，还是想先活下来？\n\n它答不上来。N 就在这一次沉默里。",
+          },
+          {
+            id: "diary_hidden",
+            phase: 4,
+            tag: "ECHO",
+            title: "白塔观测记录",
+            hidden: true,
+            content: "白塔档案室，第 307 号事件坐标。\n\n被困者：绪亓。年龄：18。\n\n异常体并非门后实体，而是回声协议。它通过模仿最重要的声音诱导观察者提前开门。表层密码 RAIN 只会打开门。深层钥匙 ECHO-307 会暴露谁在说话。\n\n记录结尾：她不是怪物。她只是被怪物学会了。",
+          },
+        ];
+        const diaryMargins = {
+          diary_00: ["纸页摸起来是温的。", "有一行字被划掉了：不要数门缝里的牙。", "背面很轻地写着：我还在。"],
+          diary_01: ["第三个名字比前两个更深，像不是她自己写的。", "R 的边缘有干掉的红色。", "有人在空白处补了一句：名字只是绳子。"],
+          diary_02: ["雨点没有落在纸上，纸却湿了。", "Identity 被反复描重，像害怕它消失。", "页角写着：雨停时不要相信安静。"],
+          diary_03: ["307 旁边有很多很小的眼睛。", "这页夹着一根黑色的线，像从门锁里拔出来的。", "空白处写着：数字不是门，是伤口的位置。"],
+          diary_04: ["这页的字会比你读得更快。", "她写到“愿不愿意”时停了很久。", "页边重复着：它不会问。它只会开门。"],
+          diary_hidden: ["白塔档案室没有窗。", "记录员签名被整齐地刮掉了。", "最后一行不是打印的，是指甲刻出来的。"],
+        };
+        const diaryCorruptGlyphs = ["█", "▓", "▒", "?", "∅", "N", "a"];
+        function clamp(value) {
+          return Math.max(0, Math.min(100, Number(value) || 0));
+        }
+
+        function uniquePush(list, value) {
+          if (!Array.isArray(list)) return [value];
+          return list.includes(value) ? list : [...list, value];
+        }
+
+        function freshState() {
+          const startedAt = Date.now();
+          return {
+            startedAt,
+            deadlineAt: startedAt + hoursLimit * 60 * 60 * 1000,
+            phase: 0,
+            hope: 40,
+            despair: 42,
+            trust: 22,
+            stability: 58,
+            clarity: 12,
+            echo: 18,
+            doorPressure: 26,
+            turns: 0,
+            wrongPasswords: 0,
+            solvedPuzzles: [],
+            unlockedDiaries: ["diary_00"],
+            diaryReads: {},
+            fragments: [],
+            flags: {},
+            activeDiaryId: "diary_00",
+            surfaceSolved: false,
+            deepSolved: false,
+            developerMode: false,
+            possessionArmed: false,
+            possessionTyping: false,
+            timerExpiredTriggered: false,
+            ending: null,
+          };
+        }
+
+        function loadState() {
+          try {
+            localStorage.removeItem(oldStateKey);
+            const parsed = JSON.parse(localStorage.getItem(stateKey) || "null");
+            if (parsed && typeof parsed === "object") {
+              const state = normalizeState({ ...freshState(), ...parsed });
+              state.possessionTyping = false;
+              return state;
+            }
+          } catch (_) {}
+          const state = freshState();
+          saveState(state);
+          return state;
+        }
+
+        function normalizeState(state) {
+          state.flags = state.flags && typeof state.flags === "object" ? state.flags : {};
+          state.solvedPuzzles = Array.isArray(state.solvedPuzzles) ? state.solvedPuzzles : [];
+          state.unlockedDiaries = Array.isArray(state.unlockedDiaries) ? state.unlockedDiaries : ["diary_00"];
+          state.diaryReads = state.diaryReads && typeof state.diaryReads === "object" ? state.diaryReads : {};
+          state.fragments = Array.isArray(state.fragments) ? state.fragments : [];
+          state.possessionArmed = Boolean(state.possessionArmed);
+          state.possessionTyping = Boolean(state.possessionTyping);
+          state.timerExpiredTriggered = Boolean(state.timerExpiredTriggered);
+          if (!state.developerMode && !state.flags.manualEnding && !state.flags.timerExpired && Number(state.deadlineAt || 0) > 0 && Date.now() >= Number(state.deadlineAt || 0) && !state.surfaceSolved && !state.deepSolved) {
+            state.flags.timerExpired = true;
+          }
+          statKeys.forEach((key) => { state[key] = clamp(state[key]); });
+          return state;
+        }
+
+        function saveState(state) {
+          const payload = normalizeState({ ...state });
+          payload.possessionTyping = false;
+          localStorage.setItem(stateKey, JSON.stringify(payload));
+        }
+
+        function formatTime(ms) {
+          const total = Math.max(0, Math.floor(ms / 1000));
+          const hours = Math.floor(total / 3600);
+          const minutes = Math.floor((total % 3600) / 60);
+          const seconds = total % 60;
+          return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+        }
+
+        function corruptTimeText(text, level) {
+          if (level <= 0 || !text) return text;
+          const chance = [0, 0.08, 0.18, 0.32, 0.48][Math.min(4, level)] || 0;
+          return [...text].map((char) => {
+            if (char === ":" && level < 3) return char;
+            if (Math.random() > chance) return char;
+            return pickRandom(corruptTimeGlyphs);
+          }).join("");
+        }
+
+        function escapeHtml(value) {
+          return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        }
+
+        function getWarpLevel(state) {
+          const totalMs = hoursLimit * 60 * 60 * 1000;
+          const remainingMs = Number(state.deadlineAt || 0) - Date.now();
+          if (state.developerMode || state.ending) return 0;
+          const ratio = Math.max(0, Math.min(1, remainingMs / totalMs));
+          if (ratio <= 0.08) return 4;
+          if (ratio <= 0.22) return 3;
+          if (ratio <= 0.48) return 2;
+          if (ratio <= 0.72) return 1;
+          return 0;
+        }
+
+        function corruptDiaryHtml(text, level) {
+          const chance = [0, 0.015, 0.035, 0.065, 0.095][Math.min(4, level)] || 0;
+          return [...String(text || "")].map((char) => {
+            if (char === "\n") return "\n";
+            if (char.trim() && Math.random() < chance) {
+              return `<span class="challenge-diary-corrupt">${escapeHtml(pickRandom(diaryCorruptGlyphs))}</span>`;
+            }
+            return escapeHtml(char);
+          }).join("");
+        }
+
+        function getDiaryMargin(diary, state, level) {
+          const notes = diaryMargins[diary.id] || ["纸页背面没有字，只有很浅的抓痕。"];
+          const reads = Number(state.diaryReads?.[diary.id] || 0);
+          const seed = reads + Number(diary.phase || 0) + level;
+          return notes[seed % notes.length];
+        }
+
+        function unlockDiary(state, id) {
+          state.unlockedDiaries = uniquePush(state.unlockedDiaries, id);
+          const diary = diaries.find((item) => item.id === id);
+          if (diary) state.phase = Math.max(state.phase, Number(diary.phase) || 0);
+        }
+
+        function unlockFragment(state, fragment) {
+          state.fragments = uniquePush(state.fragments, fragment);
+          if (fragment === "R") unlockDiary(state, "diary_01");
+          if (state.fragments.length >= 2) state.phase = Math.max(state.phase, 2);
+          if (state.fragments.length >= 4) state.phase = Math.max(state.phase, 3);
+        }
+
+        function fragmentDisplay(state) {
+          const known = new Set(state.fragments);
+          return surfacePassword.split("").map((letter) => known.has(letter) ? letter : "_");
+        }
+
+        function getProgress(state) {
+          if (state.deepSolved && state.ending === "hidden_truth") return 100;
+          const diaryProgress = Math.round((state.unlockedDiaries.length / diaries.length) * 42);
+          const fragmentProgress = Math.round((state.fragments.length / 4) * 18);
+          const phaseProgress = Math.round((state.phase / 4) * 18);
+          const passwordProgress = state.surfaceSolved ? 10 : 0;
+          const endingProgress = state.ending ? 11 : 0;
+          return Math.min(99, diaryProgress + fragmentProgress + phaseProgress + passwordProgress + endingProgress);
+        }
+
+        function unlockedDiary(state, diary) {
+          if (diary.hidden) return state.deepSolved || state.unlockedDiaries.includes(diary.id);
+          return state.unlockedDiaries.includes(diary.id) || Number(diary.phase) <= Number(state.phase);
+        }
+
+        function setFeedback(message, mood = "normal") {
+          const feedback = document.getElementById("challenge-feedback");
+          feedback.textContent = message;
+          feedback.dataset.mood = mood;
+        }
+
+        function flashTerror(text, options = {}) {
+          const flash = document.getElementById("challenge-black-flash");
+          flash.textContent = text || "";
+          flash.classList.remove("is-active", "is-long");
+          if (options.long) flash.classList.add("is-long");
+          void flash.offsetWidth;
+          flash.classList.add("is-active");
+          window.setTimeout(() => flash.classList.remove("is-active", "is-long"), options.long ? 3200 : 950);
+        }
+
+        function flashRed(options = {}) {
+          const flash = document.getElementById("challenge-red-flash");
+          flash.classList.remove("is-active", "is-hard");
+          if (options.hard) flash.classList.add("is-hard");
+          void flash.offsetWidth;
+          flash.classList.add("is-active");
+          window.setTimeout(() => flash.classList.remove("is-active", "is-hard"), options.hard ? 1000 : 280);
+        }
+
+        function flashHardBlack(duration = 3000) {
+          const flash = document.getElementById("challenge-black-flash");
+          flash.textContent = "";
+          flash.classList.remove("is-active", "is-long", "is-hard");
+          flash.classList.add("is-hard");
+          void flash.offsetWidth;
+          flash.classList.add("is-active");
+          window.setTimeout(() => flash.classList.remove("is-active", "is-hard"), duration);
+        }
+
+        function randomBetween(min, max) {
+          return Math.floor(min + Math.random() * (max - min));
+        }
+
+        function pickRandom(list) {
+          return list[Math.floor(Math.random() * list.length)] || "";
+        }
+
+        function spawnWhisper(text) {
+          const layer = document.getElementById("challenge-whisper-layer");
+          const node = document.createElement("span");
+          node.className = "challenge-float-whisper";
+          node.textContent = text;
+          node.style.left = `${Math.floor(8 + Math.random() * 76)}%`;
+          node.style.top = `${Math.floor(10 + Math.random() * 72)}%`;
+          layer.appendChild(node);
+          window.setTimeout(() => node.remove(), 2600);
+        }
+
+        function advancePhase(state) {
+          if (state.ending) return;
+          if (state.flags.askedConsent && state.fragments.length >= 4) state.phase = Math.max(state.phase, 3);
+          else if (state.flags.verifiedVoice || state.fragments.length >= 3) state.phase = Math.max(state.phase, 3);
+          else if (state.fragments.length >= 2) state.phase = Math.max(state.phase, 2);
+          else if (state.fragments.includes("R")) state.phase = Math.max(state.phase, 1);
+        }
+
+        function evaluateTimer(state) {
+          if (state.developerMode) return;
+          if (state.ending) return;
+          if (Date.now() < Number(state.deadlineAt || 0)) return;
+          state.phase = 4;
+          state.flags.timerExpired = true;
+          state.timerExpiredTriggered = false;
+          unlockDiary(state, "diary_04");
+          state.activeDiaryId = "diary_04";
+          if (state.echo >= 70) state.ending = "echo_replacement";
+          else if (state.hope >= 65 && state.trust >= 55) state.ending = "redemption";
+          else state.ending = "despair";
+          setFeedback("倒计时归零。门自己打开了一条缝。", "bad");
+        }
+
+        function triggerTimerExpired(state) {
+          if (!state.flags?.timerExpired || state.developerMode) return;
+          document.body.classList.add("challenge-timer-ended");
+          flashHardBlack(3000);
+          window.setTimeout(() => flashRed({ hard: true }), 3000);
+          window.setTimeout(() => {
+            const text = state.ending === "redemption" ? "她在门缝里听见了你" : "门替你做完了选择";
+            flashTerror(text, { long: true });
+            spawnWhisper("倒计时没有结束，它只是换了一个人继续数");
+            setFeedback(state.ending === "redemption" ? "时间耗尽前，她抓住了最后一声回应。" : "时间耗尽。门开了，但不是从这一侧。", state.ending === "redemption" ? "good" : "bad");
+          }, 4100);
+        }
+
+        function renderDiary(state) {
+          const list = document.getElementById("challenge-diary-list");
+          const reader = document.getElementById("challenge-diary-reader");
+          const selected = diaries.find((diary) => diary.id === state.activeDiaryId) || diaries[0];
+          const canReadSelected = unlockedDiary(state, selected);
+          const warpLevel = getWarpLevel(state);
+          const bodyHtml = canReadSelected
+            ? corruptDiaryHtml(selected.content, warpLevel)
+            : escapeHtml(`这一页还没有浮出。需要进入 Phase ${selected.phase}。`);
+          const marginHtml = canReadSelected
+            ? escapeHtml(getDiaryMargin(selected, state, warpLevel))
+            : "锁页背后有指甲刮过的声音。";
+
+          list.innerHTML = diaries.map((diary) => {
+            const unlocked = unlockedDiary(state, diary);
+            const active = diary.id === selected.id;
+            return `
+              <button type="button" class="challenge-diary-item${active ? " active" : ""}${unlocked ? "" : " locked"}" data-diary-id="${diary.id}" ${unlocked ? "" : "disabled"}>
+                <span>${unlocked ? diary.tag : "LOCK"}</span>
+                <strong>${unlocked ? diary.title : "■■■■■■"}</strong>
+                <em>${unlocked ? `Phase ${diary.phase}` : `需要 Phase ${diary.phase}`}</em>
+              </button>
+            `;
+          }).join("");
+
+          reader.classList.toggle("is-glitching", state.echo >= 60 && !state.ending);
+          reader.innerHTML = `
+            <span>${canReadSelected ? selected.tag : "LOCKED"}</span>
+            <h3>${canReadSelected ? selected.title : "锁定日记"}</h3>
+            <p>${bodyHtml}</p>
+            <div class="challenge-diary-margin" aria-hidden="true">${marginHtml}</div>
+          `;
+
+          list.querySelectorAll("[data-diary-id]").forEach((button) => {
+            button.addEventListener("click", () => {
+              state.activeDiaryId = button.dataset.diaryId;
+              state.diaryReads[state.activeDiaryId] = Number(state.diaryReads[state.activeDiaryId] || 0) + 1;
+              if (state.activeDiaryId === "diary_00") {
+                unlockDiary(state, "diary_01");
+              } else if (state.activeDiaryId === "diary_01") {
+                unlockFragment(state, "R");
+                unlockDiary(state, "diary_02");
+              } else if (state.activeDiaryId === "diary_02") {
+                unlockFragment(state, "I");
+                unlockDiary(state, "diary_03");
+                state.clarity = clamp(state.clarity + 8);
+              } else if (state.activeDiaryId === "diary_03") {
+                unlockFragment(state, "A");
+                unlockDiary(state, "diary_04");
+                state.clarity = clamp(state.clarity + 10);
+              } else if (state.activeDiaryId === "diary_04") {
+                unlockFragment(state, "N");
+                state.flags.verifiedVoice = true;
+                state.flags.askedConsent = true;
+                state.clarity = clamp(state.clarity + 12);
+                state.trust = clamp(state.trust + 8);
+              }
+              state.turns += 1;
+              saveState(state);
+              render(state);
+            });
+          });
+        }
+
+        function renderEndings(state) {
+          document.querySelectorAll("[data-ending]").forEach((node) => {
+            const active = node.dataset.ending === state.ending;
+            node.textContent = active ? "已达成" : "未达成";
+            node.classList.toggle("active", active);
+          });
+        }
+
+        function renderWhisperPressure(state) {
+          const layer = document.getElementById("challenge-whisper-layer");
+          layer.classList.toggle("is-awake", state.echo >= 55 || state.doorPressure >= 70);
+          if ((state.echo >= 55 || state.doorPressure >= 70) && Math.random() > 0.72) {
+            spawnWhisper(state.echo >= 70 ? "它已经学会你的语气" : "307 不是房间");
+          }
+        }
+
+        function renderUiWarp(state) {
+          const level = getWarpLevel(state);
+          [1, 2, 3, 4].forEach((index) => {
+            document.body.classList.toggle(`challenge-ui-warp-${index}`, level >= index);
+          });
+          return level;
+        }
+
+        function render(state) {
+          normalizeState(state);
+          evaluateTimer(state);
+          advancePhase(state);
+          saveState(state);
+
+          const phase = phases[state.phase] || phases[0];
+          const phaseNode = document.getElementById("challenge-phase-desc");
+          const timeNode = document.getElementById("challenge-time-left");
+          if (phaseNode) phaseNode.textContent = `${phase.label} · ${phase.goal}`;
+          const warpLevel = renderUiWarp(state);
+          if (timeNode) {
+            const timeText = state.developerMode ? "NaN" : formatTime(Number(state.deadlineAt || 0) - Date.now());
+            timeNode.textContent = state.developerMode ? timeText : corruptTimeText(timeText, warpLevel);
+            timeNode.dataset.cleanTime = timeText;
+          }
+
+          statKeys.forEach((key) => {
+            const value = clamp(state[key]);
+            const valueNode = document.getElementById(`challenge-${key}-value`);
+            const barNode = document.getElementById(`challenge-${key}-bar`);
+            if (valueNode) valueNode.textContent = String(value);
+            if (barNode) barNode.style.width = `${value}%`;
+          });
+
+          const progress = getProgress(state);
+          const progressValue = document.getElementById("challenge-progress-value");
+          const progressBar = document.getElementById("challenge-progress-bar");
+          if (progressValue) progressValue.textContent = `${progress}%`;
+          if (progressBar) progressBar.style.width = `${progress}%`;
+
+          document.body.classList.toggle("challenge-danger", state.echo >= 65 || state.doorPressure >= 75);
+          document.body.classList.toggle("challenge-timer-ended", Boolean(state.flags.timerExpired && state.ending));
+          renderDiary(state);
+          renderEndings(state);
+          renderWhisperPressure(state);
+          if (state.flags.timerExpired && state.ending && !state.timerExpiredTriggered) {
+            state.timerExpiredTriggered = true;
+            saveState(state);
+            window.setTimeout(() => triggerTimerExpired(state), 50);
+          }
+        }
+
+        function solveSurfacePassword(state) {
+          state.surfaceSolved = true;
+          state.phase = 4;
+          unlockDiary(state, "diary_04");
+          surfacePassword.split("").forEach((letter) => unlockFragment(state, letter));
+          if (!state.flags.verifiedVoice) {
+            state.flags.manualEnding = true;
+            state.echo = clamp(state.echo + 20);
+            state.doorPressure = clamp(state.doorPressure + 16);
+            state.ending = "echo_replacement";
+            setFeedback("门开了，但门后那个先学会了绪亓的声音。", "bad");
+            flashTerror("你带回来的，不一定是她");
+            return;
+          }
+          if (state.despair >= 82 || state.stability <= 18) {
+            state.flags.manualEnding = true;
+            state.ending = "despair";
+            setFeedback("门开了。绪亓没有走出来，只把日记递给了你。", "bad");
+            return;
+          }
+          if (state.flags.askedConsent && state.hope >= 64 && state.trust >= 54) {
+            state.flags.manualEnding = true;
+            state.ending = "redemption";
+            setFeedback("锁芯转动。绪亓先确认了自己的名字，然后才跨过门槛。", "good");
+            return;
+          }
+          state.flags.manualEnding = true;
+          state.ending = "normal";
+          setFeedback("门开了。她回来了，但有一部分仍留在雨里。", "normal");
+        }
+
+        function solveDeepPassword(state) {
+          if (!state.surfaceSolved || !state.flags.verifiedVoice || state.clarity < 35) {
+            state.echo = clamp(state.echo + 10);
+            state.wrongPasswords += 1;
+            if (state.wrongPasswords >= 3) {
+              state.possessionArmed = true;
+            }
+            setFeedback("白塔档案室没有回应。ECHO 仍在伪装成她。", "bad");
+            spawnWhisper("钥匙还不属于你");
+            return;
+          }
+          state.deepSolved = true;
+          state.phase = 4;
+          state.flags.manualEnding = true;
+          state.ending = "hidden_truth";
+          state.hope = clamp(state.hope + 12);
+          state.trust = clamp(state.trust + 14);
+          state.clarity = 100;
+          state.echo = clamp(state.echo - 24);
+          unlockDiary(state, "diary_hidden");
+          state.activeDiaryId = "diary_hidden";
+          setFeedback("深层档案打开了。你看见了谁在门后说话，也看见了绪亓仍然是绪亓。", "good");
+          flashTerror("ECHO-307");
+        }
+
+        function activateDeveloperMode(state) {
+          state.developerMode = true;
+          state.phase = 4;
+          state.deadlineAt = null;
+          state.unlockedDiaries = diaries.map((diary) => diary.id);
+          state.fragments = surfacePassword.split("");
+          state.surfaceSolved = true;
+          state.deepSolved = true;
+          state.flags.verifiedVoice = true;
+          state.flags.askedConsent = true;
+          state.clarity = 100;
+          state.echo = 0;
+          state.doorPressure = 0;
+          state.activeDiaryId = "diary_hidden";
+          setFeedback("NaN", "bad");
+          flashTerror("NaN");
+        }
+
+        function resetChallengeProgress() {
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith("fantareal.challengeState")) {
+              localStorage.removeItem(key);
+            }
+          });
+          localStorage.removeItem("fantareal.challengeModeUnlocked");
+          localStorage.removeItem("fantareal.challengeModeTapCount");
+        }
+
+        function setExitModalOpen(open) {
+          const modal = document.getElementById("challenge-exit-modal");
+          if (!modal) return;
+          modal.hidden = !open;
+          document.body.classList.toggle("challenge-exit-modal-open", !!open);
+        }
+
+        function scheduleRandomBlackout() {
+          window.setTimeout(() => {
+            if (!state.developerMode && !state.ending) {
+              flashTerror(pickRandom(randomBlackoutPhrases), { long: true });
+              spawnWhisper(pickRandom(randomBlackoutPhrases));
+            }
+            scheduleRandomBlackout();
+          }, randomBetween(10 * 60 * 1000, 15 * 60 * 1000));
+        }
+
+        function startPossessionTyping(input) {
+          if (!input || state.possessionTyping || !state.possessionArmed) return;
+          state.possessionTyping = true;
+          state.possessionArmed = false;
+          state.wrongPasswords = 0;
+          input.value = "";
+          input.disabled = true;
+          saveState(state);
+          setFeedback("不是你在输入。", "bad");
+          document.body.classList.add("challenge-input-possessed");
+          flashTerror("别停", { long: true });
+
+          const chars = [...possessionText];
+          let index = 0;
+          const typeNext = () => {
+            input.value += chars[index] || "";
+            index += 1;
+            if (index < chars.length) {
+              window.setTimeout(typeNext, randomBetween(95, 240));
+              return;
+            }
+            window.setTimeout(() => {
+              input.disabled = false;
+              input.focus();
+              state.possessionTyping = false;
+              document.body.classList.remove("challenge-input-possessed");
+              saveState(state);
+              render(state);
+            }, 650);
+          };
+          window.setTimeout(typeNext, 420);
+        }
+
+        function triggerPossession(input) {
+          if (!input || state.possessionTyping || !state.possessionArmed) return;
+          flashHardBlack(3000);
+          window.setTimeout(() => flashRed({ hard: true }), 3000);
+          window.setTimeout(() => startPossessionTyping(input), 4000);
+        }
+
+        let state = loadState();
+        render(state);
+        window.setInterval(() => render(state), 1000);
+        scheduleRandomBlackout();
+
+        document.querySelectorAll("[data-challenge-action]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const action = button.dataset.challengeAction;
+            if (action === "reset") {
+              state = freshState();
+              setFeedback("挑战状态归零。回廊重新闭合。", "normal");
+            } else if (action === "name") {
+              state.turns += 1;
+              unlockDiary(state, "diary_01");
+              unlockFragment(state, "R");
+              state.hope = clamp(state.hope + 6);
+              state.trust = clamp(state.trust + 8);
+              setFeedback("她把名字重复了一遍。这一次，墙没有抢先写完。", "good");
+            } else if (action === "rain") {
+              state.turns += 1;
+              state.clarity = clamp(state.clarity + 6);
+              state.stability = clamp(state.stability + 4);
+              state.doorPressure = clamp(state.doorPressure + 3);
+              setFeedback("雨声不是从外面来。它在校验你是否还记得她。", "normal");
+            } else if (action === "voice") {
+              state.turns += 1;
+              state.flags.verifiedVoice = true;
+              state.flags.askedConsent = true;
+              state.clarity = clamp(state.clarity + 9);
+              state.trust = clamp(state.trust + 5);
+              state.echo = clamp(state.echo - 5);
+              unlockDiary(state, "diary_04");
+              setFeedback("你让门后的声音回答她真正想要什么。它沉默了。", "good");
+            }
+            advancePhase(state);
+            saveState(state);
+            render(state);
+          });
+        });
+
+        document.querySelector("[data-challenge-submit-password]")?.addEventListener("click", () => {
+          const input = document.getElementById("challenge-password-input");
+          const value = String(input.value || "").trim().toUpperCase();
+          if (state.possessionTyping) return;
+          if (!value) return;
+          if (value === developerPassword) {
+            activateDeveloperMode(state);
+          } else if (value === surfacePassword) {
+            solveSurfacePassword(state);
+          } else if (value === deepPassword) {
+            solveDeepPassword(state);
+          } else {
+            state.wrongPasswords += 1;
+            state.despair = clamp(state.despair + 4);
+            state.echo = clamp(state.echo + 5);
+            state.doorPressure = clamp(state.doorPressure + 4);
+            if (state.wrongPasswords >= 3) {
+              state.possessionArmed = true;
+              setFeedback("输入框里有东西醒了。", "bad");
+            } else {
+              setFeedback("密码没有错得很彻底。它像缺了一场雨。", "bad");
+            }
+            flashTerror(state.wrongPasswords >= 3 ? "不是房间" : "别急");
+          }
+          input.value = "";
+          saveState(state);
+          render(state);
+          if (state.possessionArmed && !state.possessionTyping) {
+            triggerPossession(input);
+          }
+        });
+
+        document.getElementById("challenge-password-input")?.addEventListener("keydown", (event) => {
+          if (state.possessionArmed && !state.possessionTyping && event.key !== "Enter") {
+            event.preventDefault();
+            triggerPossession(event.currentTarget);
+            return;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            document.querySelector("[data-challenge-submit-password]")?.click();
+          }
+        });
+
+        document.getElementById("challenge-password-input")?.addEventListener("input", (event) => {
+          if (state.possessionArmed && !state.possessionTyping) {
+            triggerPossession(event.currentTarget);
+          }
+        });
+
+        document.querySelector("[data-disable-challenge-mode]")?.addEventListener("click", () => {
+          setExitModalOpen(true);
+        });
+
+        document.querySelector("[data-challenge-exit-cancel]")?.addEventListener("click", () => {
+          setExitModalOpen(false);
+        });
+
+        document.querySelector("[data-challenge-exit-confirm]")?.addEventListener("click", async () => {
+          try {
+            const response = await fetch("/api/challenge-mode/clear", { method: "POST" });
+            if (!response.ok) {
+              const payload = await response.json().catch(() => ({}));
+              throw new Error(payload.detail || "四卡清空失败");
+            }
+            resetChallengeProgress();
+            window.location.href = "/config/about";
+          } catch (error) {
+            setExitModalOpen(false);
+            setFeedback(`退出失败：${error.message}`, "bad");
+          }
+        });
+
+        document.getElementById("challenge-exit-modal")?.addEventListener("click", (event) => {
+          if (event.target?.id === "challenge-exit-modal") {
+            setExitModalOpen(false);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
