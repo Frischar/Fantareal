@@ -210,6 +210,9 @@
 
         <label for="background-url">背景图 URL</label>
         <input id="background-url" value="{{ settings.background_image_url }}" placeholder="可填写远程地址或上传后生成的本地地址" />
+        <div class="button-row background-preset-row" aria-label="背景预设">
+          <button type="button" id="use-default-background" class="secondary compact">使用默认背景</button>
+        </div>
 
         <label for="background-overlay">背景遮罩强度</label>
         <input id="background-overlay" type="range" min="0" max="0.85" step="0.01" value="{{ settings.background_overlay }}" />
@@ -330,6 +333,12 @@
       const resultModalBodyEl = document.getElementById("result-modal-body");
       const presetHelperEl = document.getElementById("preset-helper");
       const toastHostEl = document.getElementById("config-toast-host");
+      const DEFAULT_BACKGROUND_PRESET = {
+        label: "默认背景",
+        url: "/assets/default.jpg",
+        theme: "dark",
+        overlay: 0.42,
+      };
 
       const LLM_PRESETS = {
         custom: {
@@ -684,6 +693,16 @@
         await saveSettings("背景图已上传并自动保存");
       }
 
+      async function useDefaultBackgroundPreset() {
+        themeSelectEl.value = DEFAULT_BACKGROUND_PRESET.theme;
+        backgroundUrlEl.value = DEFAULT_BACKGROUND_PRESET.url;
+        backgroundOverlayEl.value = DEFAULT_BACKGROUND_PRESET.overlay;
+        backgroundOverlayValueEl.textContent = Number(DEFAULT_BACKGROUND_PRESET.overlay).toFixed(2);
+        applyTheme(DEFAULT_BACKGROUND_PRESET.theme);
+        applyBackground(DEFAULT_BACKGROUND_PRESET.url, DEFAULT_BACKGROUND_PRESET.overlay);
+        await saveSettings("默认背景预设已应用并自动保存");
+      }
+
       document.getElementById("save-settings").addEventListener("click", async () => {
         try {
           await saveSettings("聊天模型配置已保存，正在测试连接...");
@@ -823,6 +842,21 @@
           setButtonState(button, "error", "上传失败");
           setStatus(`上传失败：${error.message}`, "error");
           showToast(`上传失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("use-default-background")?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "应用中…");
+        setStatus("正在应用默认背景预设…", "busy");
+        try {
+          await useDefaultBackgroundPreset();
+          setButtonState(button, "success", "已应用 ✓");
+          showToast("默认背景预设已应用", "success");
+        } catch (error) {
+          setButtonState(button, "error", "应用失败");
+          setStatus(`应用失败：${error.message}`, "error");
+          showToast(`应用失败：${error.message}`, "error");
         }
       });
 

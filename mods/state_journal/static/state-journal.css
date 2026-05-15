@@ -13,6 +13,15 @@
   --xj-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
   color-scheme: dark;
 }
+:root[data-xj-ui-sync="global"] {
+  --xj-card: rgba(var(--panel-rgb, 38, 34, 29), var(--panel-alpha, 0.82));
+  --xj-card-strong: rgba(var(--panel-strong-rgb, 47, 42, 35), var(--panel-strong-alpha, 0.94));
+  --xj-card-soft: rgba(var(--input-rgb, 255, 255, 255), var(--input-alpha, 0.045));
+  --xj-border: var(--border, rgba(226, 204, 170, 0.17));
+  --xj-text: var(--text, #f1e7d6);
+  --xj-muted: var(--muted, rgba(241, 231, 214, 0.62));
+  --xj-accent: var(--accent, #e8b974);
+}
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
 body {

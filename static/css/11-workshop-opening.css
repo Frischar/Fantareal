@@ -1,5 +1,5 @@
 /* Fantareal Workshop Opening v1.0 · ui-v140 module
-   Scope: 创意工坊开场演出配置区 + Chat 全屏开场遮罩。 */
+   Scope: 演出工坊开场演出配置区 + Chat 全屏开场遮罩。 */
 
 
 .chat-page .workshop-opening-audio-toggle {
@@ -45,9 +45,9 @@ body.workshop-config-page .workshop-opening-config-block {
   border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
   border-radius: 24px;
   background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 12%, transparent), transparent 38%),
     linear-gradient(180deg,
-      color-mix(in srgb, var(--panel-strong) 86%, transparent),
+      color-mix(in srgb, var(--panel-strong) 82%, transparent),
       color-mix(in srgb, var(--panel) 92%, transparent));
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.08);
   backdrop-filter: var(--ui-glass-blur-soft);

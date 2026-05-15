@@ -201,6 +201,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "enabled": True,
     "auto_update": False,
     "notify_in_chat": True,
+    "ui_sync_global": False,
     "input_turn_count": 3,
     "api_type": "openai_compatible",
     "api_base_url": "",
@@ -671,7 +672,7 @@ def normalize_config(config: Any) -> dict[str, Any]:
         merged["temperature"] = max(0, min(2, float(merged.get("temperature", 0) or 0)))
     except (TypeError, ValueError):
         merged["temperature"] = 0
-    for key in ["enabled", "auto_update", "notify_in_chat", "strict_mode", "debug_enabled", "mujian_enabled", "mujian_title_card", "mujian_turn_note", "mujian_default_collapsed", "mujian_protagonist_card_enabled", "mujian_worker_custom_prompt_enabled"]:
+    for key in ["enabled", "auto_update", "notify_in_chat", "ui_sync_global", "strict_mode", "debug_enabled", "mujian_enabled", "mujian_title_card", "mujian_turn_note", "mujian_default_collapsed", "mujian_protagonist_card_enabled", "mujian_worker_custom_prompt_enabled"]:
         merged[key] = bool(merged.get(key))
     for key in ["api_type", "api_base_url", "api_key", "model", "mujian_style", "mujian_title_style", "mujian_note_style", "mujian_expand_level", "mujian_note_density", "mujian_chat_display_mode", "mujian_character_filter", "mujian_character_names", "mujian_protagonist_card_mode", "mujian_protagonist_name", "mujian_protagonist_aliases", "mujian_worker_style_prompt", "mujian_worker_protagonist_prompt", "mujian_template_id", "mujian_theme_id"]:
         merged[key] = str(merged.get(key) or "").strip()
@@ -1260,12 +1261,53 @@ def auth_headers(api_key: str = "") -> dict[str, str]:
     return headers
 
 
+def read_route_forwarding_p1_config() -> dict[str, Any]:
+    candidates = [
+        PROJECT_ROOT / "data" / "route_forwarding.json",
+        DATA_DIR.parent / "route_forwarding.json",
+    ]
+    source = ""
+    route_config: dict[str, Any] = {}
+    for path in candidates:
+        if path.exists():
+            payload = read_json(path, {})
+            if isinstance(payload, dict):
+                route_config = payload
+                source = str(path)
+                break
+    if not route_config.get("enabled"):
+        return {"api_base_url": "", "api_key": "", "model": "", "source": ""}
+    providers = [
+        item
+        for item in route_config.get("providers", [])
+        if isinstance(item, dict) and item.get("enabled", True) and str(item.get("base_url", "") or "").strip()
+    ]
+    providers.sort(key=lambda item: (int(item.get("priority") or 999), str(item.get("name", ""))))
+    if not providers:
+        return {"api_base_url": "", "api_key": "", "model": "", "source": ""}
+    provider = providers[0]
+    keys = provider.get("keys") if isinstance(provider.get("keys"), list) else []
+    return {
+        "api_base_url": str(provider.get("base_url", "") or "").strip(),
+        "api_key": str(keys[0] if keys else "").strip(),
+        "model": str(provider.get("model", "") or "").strip(),
+        "source": source,
+    }
+
+
 def read_main_llm_config() -> dict[str, Any]:
     """Best-effort read of Fantareal's main model config.
 
     心笺作为独立 mod，不能直接 import 主 app 的运行状态；这里读取项目 data/settings.json。
     当前源码中 settings_path() 实际也指向 data/settings.json。
     """
+    route_p1 = read_route_forwarding_p1_config()
+    if route_p1.get("api_base_url"):
+        return {
+            **route_p1,
+            "request_timeout": 120,
+            "source": str(route_p1.get("source", "")),
+        }
     candidates = [
         PROJECT_ROOT / "data" / "settings.json",
         DATA_DIR.parent / "settings.json",
@@ -1286,6 +1328,21 @@ def read_main_llm_config() -> dict[str, Any]:
         "request_timeout": int(settings.get("request_timeout", 120) or 120) if str(settings.get("request_timeout", "")).strip() else 120,
         "source": source,
     }
+
+
+def merge_config_with_main_llm(config: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(config)
+    main_config = read_main_llm_config()
+    if not str(merged.get("api_base_url", "") or "").strip():
+        merged["api_base_url"] = main_config.get("api_base_url", "")
+    if not str(merged.get("api_key", "") or "").strip():
+        merged["api_key"] = main_config.get("api_key", "")
+    if not str(merged.get("model", "") or "").strip():
+        merged["model"] = main_config.get("model", "")
+    if not str(merged.get("request_timeout", "") or "").strip():
+        merged["request_timeout"] = main_config.get("request_timeout", 120)
+    merged["_inherited_model_source"] = main_config.get("source", "")
+    return merged
 
 
 async def fetch_model_list(base_url: str, api_key: str = "", timeout: int | float = 30) -> list[str]:
@@ -2779,7 +2836,7 @@ async def index(request: Request) -> HTMLResponse:
 
 @app.get("/api/config")
 async def api_get_config() -> dict[str, Any]:
-    config = get_config()
+    config = merge_config_with_main_llm(get_config())
     safe_config = {**config, "api_key": config.get("api_key", "")}
     return {"config": safe_config, "version": VERSION, "storage_engine": "sqlite"}
 
@@ -2803,7 +2860,7 @@ async def api_main_config() -> dict[str, Any]:
             "request_timeout": config.get("request_timeout", 120),
         },
         "source": config.get("source", ""),
-        "message": "已读取 Fantareal 本体模型配置。" if config.get("source") else "未找到本体模型配置文件。",
+        "message": "已读取 Fantareal 路由转发 P1 / 本体模型配置。" if config.get("source") else "未找到本体模型配置文件。",
     }
 
 
@@ -2956,7 +3013,7 @@ async def api_state() -> dict[str, Any]:
             rows = get_table_rows_from_db(conn, schema)
             tables.append({"schema": schema, "rows": rows, "row_count": len(rows)})
         metrics = get_metric_snapshot(conn)
-    return {"version": VERSION, "storage_engine": "sqlite", "config": get_config(), "tables": tables, "metrics": metrics}
+    return {"version": VERSION, "storage_engine": "sqlite", "config": merge_config_with_main_llm(get_config()), "tables": tables, "metrics": metrics}
 
 
 @app.get("/api/metrics")
@@ -3183,7 +3240,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     payload = await request.json()
     if not isinstance(payload, dict):
         payload = {}
-    config = get_config()
+    config = merge_config_with_main_llm(get_config())
     if payload.get("manual") is not True and not config.get("enabled", True):
         return {"ok": True, "skipped": True, "status": "skipped", "message": "心笺已关闭。", "reason": "心笺已关闭。"}
     with connect_db() as conn:

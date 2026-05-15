@@ -779,7 +779,7 @@
             <label>图片说明</label>
             <input class="workshop-rule-image-alt" data-workshop-rule-image-alt="${index}" value="${escapeAttr(item.imageAlt || "")}" placeholder="弹窗里的说明文字" />
             <div class="workshop-image-preview-wrap">
-              <img class="workshop-rule-image-preview" loading="lazy" decoding="async" src="${escapeAttr(item.imageUrl || "")}" alt="${escapeAttr(item.imageAlt || item.name || "创意工坊图片")}" ${item.imageUrl ? "" : "hidden"} />
+              <img class="workshop-rule-image-preview" loading="lazy" decoding="async" src="${escapeAttr(item.imageUrl || "")}" alt="${escapeAttr(item.imageAlt || item.name || "演出工坊图片")}" ${item.imageUrl ? "" : "hidden"} />
             </div>
           </div>
         `;
@@ -798,9 +798,9 @@
         }
         if (summarySnippet) {
           const snippet = actionType === "image"
-            ? (card.querySelector(".workshop-rule-image-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条创意工坊规则")
-            : (card.querySelector(".workshop-rule-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条创意工坊规则");
-          summarySnippet.textContent = String(snippet).replace(/\s+/g, " ").trim().slice(0, 56) || "点击展开编辑这条创意工坊规则";
+            ? (card.querySelector(".workshop-rule-image-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条演出工坊规则")
+            : (card.querySelector(".workshop-rule-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条演出工坊规则");
+          summarySnippet.textContent = String(snippet).replace(/\s+/g, " ").trim().slice(0, 56) || "点击展开编辑这条演出工坊规则";
         }
 
         setWorkshopPanelState(musicBlock, actionType === "music");
@@ -809,7 +809,7 @@
         const imageUrl = card.querySelector(".workshop-rule-image-url")?.value || "";
         if (preview) {
           preview.src = imageUrl;
-          preview.alt = card.querySelector(".workshop-rule-image-alt")?.value || card.querySelector(".workshop-rule-name")?.value || "创意工坊图片";
+          preview.alt = card.querySelector(".workshop-rule-image-alt")?.value || card.querySelector(".workshop-rule-name")?.value || "演出工坊图片";
           preview.hidden = !imageUrl;
         }
       }
@@ -861,7 +861,7 @@
             }
             const altInput = card.querySelector(".workshop-rule-image-alt");
             if (altInput && !String(altInput.value || "").trim()) {
-              altInput.value = stripFileExtension(file.name) || "创意工坊图片";
+              altInput.value = stripFileExtension(file.name) || "演出工坊图片";
               altInput.dispatchEvent(new Event("input", { bubbles: true }));
             }
           } else {
@@ -891,8 +891,8 @@
         const summaryTitle = item.name || `规则 ${index + 1}`;
         const isCoreStage = String(item.id || "").startsWith("workshop_stage_") && ["A", "B", "C"].includes(item.triggerStage);
         const summarySource = item.actionType === "image"
-          ? (item.imageUrl || item.note || "点击展开编辑这条创意工坊规则")
-          : (item.musicUrl || item.musicPreset || item.note || "点击展开编辑这条创意工坊规则");
+          ? (item.imageUrl || item.note || "点击展开编辑这条演出工坊规则")
+          : (item.musicUrl || item.musicPreset || item.note || "点击展开编辑这条演出工坊规则");
         const summarySnippet = String(summarySource).replace(/\s+/g, " ").trim().slice(0, 56);
         node.innerHTML = `
           <div class="workshop-rule-shell" data-collapsed="false">
@@ -902,7 +902,7 @@
                 <span class="workshop-rule-summary-meta">
                   <span class="workshop-rule-action-label">${escapeHtml(getWorkshopActionLabel(item.actionType))}</span>
                   ·
-                  <span class="workshop-rule-summary-text">${escapeHtml(summarySnippet || "点击展开编辑这条创意工坊规则")}</span>
+                  <span class="workshop-rule-summary-text">${escapeHtml(summarySnippet || "点击展开编辑这条演出工坊规则")}</span>
                 </span>
               </div>
               <div class="button-row">
@@ -1002,7 +1002,7 @@
         if (lastCard && typeof lastCard.scrollIntoView === "function") {
           lastCard.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-        setStatus("已新增创意工坊规则。");
+        setStatus("已新增演出工坊规则。");
       }
 
       function applyWorkshopRuleSearch() {
@@ -1016,7 +1016,7 @@
           if (matched) visibleCount += 1;
         });
         if (keyword) {
-          setStatus(`创意工坊搜索完成：找到 ${visibleCount} 条匹配规则。`);
+          setStatus(`演出工坊搜索完成：找到 ${visibleCount} 条匹配规则。`);
         }
       }
 
@@ -1269,7 +1269,7 @@
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
-          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 创意工坊已进入 ${data.workshop.stage_label}。`
+          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
           : `角色卡已保存并加载：${data.filename}。${slotSummary}`);
       }
 
@@ -1286,7 +1286,7 @@
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
-          ? `角色卡已加载：${data.filename}。${slotSummary} 创意工坊已进入 ${data.workshop.stage_label}。`
+          ? `角色卡已加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
           : `角色卡已加载：${data.filename}。${slotSummary}`);
       }
 
@@ -1313,7 +1313,7 @@
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
-          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 创意工坊已进入 ${data.workshop.stage_label}。`
+          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
           : `本地角色卡已导入：${data.filename || file.name}。${slotSummary}`);
         return data;
       }
@@ -1381,12 +1381,12 @@
 
       document.getElementById("collapse-workshop-rules")?.addEventListener("click", () => {
         setAllWorkshopRulesCollapsed(true);
-        setStatus("已折叠全部创意工坊规则。");
+        setStatus("已折叠全部演出工坊规则。");
       });
 
       document.getElementById("expand-workshop-rules")?.addEventListener("click", () => {
         setAllWorkshopRulesCollapsed(false);
-        setStatus("已展开全部创意工坊规则。");
+        setStatus("已展开全部演出工坊规则。");
       });
 
       workshopEnabledEl?.addEventListener("change", () => {
@@ -1450,7 +1450,7 @@
           }
           if (Number.isFinite(targetIndex)) {
             card.remove();
-            setStatus("创意工坊规则已删除。");
+            setStatus("演出工坊规则已删除。");
             applyWorkshopRuleSearch();
           }
           return;

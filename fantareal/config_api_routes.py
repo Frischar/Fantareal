@@ -8,7 +8,7 @@ from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
 import shutil
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from .memory_merge_logic import (
@@ -401,7 +401,36 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             settings,
             detail="Settings save failed. Please check disk space or file permissions.",
         )
-        return {"ok": True, "settings": settings, "active_slot": active_slot}
+        return {"ok": True, "settings": ctx.get_settings(active_slot), "active_slot": active_slot}
+
+    @app.get("/api/route-forwarding")
+    async def api_get_route_forwarding() -> dict[str, Any]:
+        return {
+            "ok": True,
+            "config": ctx.get_route_forwarding_config(),
+            "stats": ctx.get_route_forwarding_runtime_stats(),
+        }
+
+    @app.post("/api/route-forwarding")
+    async def api_save_route_forwarding(payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
+        config = ctx.save_route_forwarding_config(payload)
+        return {
+            "ok": True,
+            "config": config,
+            "stats": ctx.get_route_forwarding_runtime_stats(),
+        }
+
+    @app.post("/api/route-forwarding/test-provider")
+    async def api_test_route_forwarding_provider(payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
+        provider_id = str(payload.get("provider_id", "") or "").strip()
+        if not provider_id:
+            raise HTTPException(status_code=400, detail="Provider id is required.")
+        result = await ctx.test_route_forwarding_provider(provider_id)
+        return {
+            "ok": bool(result.get("ok")),
+            "result": result,
+            "stats": ctx.get_route_forwarding_runtime_stats(),
+        }
 
     @app.get("/api/memories")
     async def api_get_memories() -> list[dict[str, Any]]:

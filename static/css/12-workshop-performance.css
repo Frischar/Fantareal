@@ -1,4 +1,4 @@
-/* Fantareal 创意工坊 · 前端演出层 v1.0 · 基于 ui-v140
+/* Fantareal 演出工坊 · 前端演出层 v1.0 · 基于 ui-v140
    入场演出扩展 / 常驻氛围 / 动态演出 */
 
 .workshop-ambience-config-block,
@@ -191,4 +191,134 @@ body.workshop-dynamic-background-active::before {
 @keyframes workshopDynamicOut {
   from { opacity: 1; transform: translateY(0) scale(1); }
   to { opacity: 0; transform: translateY(8px) scale(0.99); }
+}
+
+/* Keep the 演出工坊 editor on the same live glass opacity as the main app. */
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .workshop-empty-note,
+body.workshop-config-page .dynamic-scene-card {
+  backdrop-filter: var(--ui-glass-blur-soft);
+}
+
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 10%, transparent), transparent 38%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 76%, transparent),
+      color-mix(in srgb, var(--panel) 94%, transparent)) !important;
+}
+
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-scene-card,
+body.workshop-config-page .workshop-empty-note {
+  background: color-mix(in srgb, var(--input-bg) 72%, transparent) !important;
+}
+
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip {
+  background: color-mix(in srgb, var(--panel-strong) 72%, transparent) !important;
+}
+
+body.workshop-config-page .panel.config-panel,
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--panel-strong-rgb), var(--panel-strong-alpha)),
+      rgba(var(--panel-rgb), var(--panel-alpha))
+    ) !important;
+}
+
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-scene-card,
+body.workshop-config-page .workshop-summary-item,
+body.workshop-config-page .workshop-runtime-panel-side,
+body.workshop-config-page .workshop-empty-note,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .task-status {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+body.workshop-config-page input,
+body.workshop-config-page select,
+body.workshop-config-page textarea,
+body.workshop-config-page .checkbox-row {
+  background-color: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+/* Final opacity sync: avoid older color-mix rules making the workshop look denser than global UI opacity. */
+body.workshop-config-page .slot-toolbar,
+body.workshop-config-page .panel.config-panel,
+body.workshop-config-page .workshop-main-card,
+body.workshop-config-page .workshop-control-panel,
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block {
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+  backdrop-filter: var(--ui-glass-blur);
+  -webkit-backdrop-filter: var(--ui-glass-blur);
+}
+
+body.workshop-config-page .workshop-panel-block,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .workshop-runtime-panel-side,
+body.workshop-config-page .workshop-side-summary,
+body.workshop-config-page .workshop-summary-item,
+body.workshop-config-page .dynamic-trigger-panel,
+body.workshop-config-page .dynamic-content-panel,
+body.workshop-config-page .dynamic-scene-card,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .workshop-empty-note,
+body.workshop-config-page .task-status {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+  backdrop-filter: var(--ui-glass-blur-soft);
+  -webkit-backdrop-filter: var(--ui-glass-blur-soft);
+}
+
+body.workshop-config-page input,
+body.workshop-config-page select,
+body.workshop-config-page textarea,
+body.workshop-config-page .checkbox-row,
+body.workshop-config-page .workshop-panel-actions button.secondary,
+body.workshop-config-page .workshop-panel-actions .button-link {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+/* Ambience editor polish: avoid the blurred page background reading as dirty vertical shadows. */
+body.workshop-config-page .workshop-ambience-config-block {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0 20px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent) !important;
+  border-radius: 24px !important;
+  background: rgba(var(--panel-rgb), clamp(0.34, calc(var(--panel-alpha) + 0.08), 0.88)) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card {
+  border-color: color-mix(in srgb, var(--border) 88%, transparent) !important;
+  background: rgba(var(--input-rgb), clamp(0.36, calc(var(--input-alpha) + 0.14), 0.82)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(255, 255, 255, 0.015) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card input,
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card select {
+  background: rgba(var(--input-rgb), clamp(0.42, calc(var(--input-alpha) + 0.18), 0.86)) !important;
 }
