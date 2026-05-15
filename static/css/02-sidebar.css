@@ -407,6 +407,50 @@ body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .navlink.active {
   background: var(--accent);
 }
 
+body.chat-page .challenge-mode-navlink,
+body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .challenge-mode-navlink {
+  color: color-mix(in srgb, #7fb9ff 72%, var(--muted) 28%);
+}
+
+body.chat-page .challenge-mode-navlink:hover,
+body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .challenge-mode-navlink:hover {
+  color: #b7d7ff;
+  background: color-mix(in srgb, #2f8cff 12%, transparent 88%);
+}
+
+body.challenge-mode-unlocked .topnav-grouped > .nav-group:not([data-challenge-nav="keep"]) {
+  display: none !important;
+}
+
+body.challenge-mode-unlocked .standalone-about {
+  display: none !important;
+}
+
+body.challenge-mode-unlocked .topnav-grouped {
+  gap: 12px !important;
+  padding-bottom: 14px !important;
+}
+
+body.chat-page .topbar > .standalone-challenge,
+body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar > .standalone-challenge {
+  width: 100%;
+  margin-top: 0;
+  position: relative;
+  z-index: 2;
+}
+
+body.chat-page .topbar > .standalone-challenge .nav-group-summary,
+body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar > .standalone-challenge .nav-group-summary {
+  color: color-mix(in srgb, #7fb9ff 74%, var(--text) 26%);
+  background: color-mix(in srgb, #2f8cff 8%, transparent 92%);
+}
+
+body.chat-page .topbar > .standalone-challenge .nav-group-summary.active,
+body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar > .standalone-challenge .nav-group-summary.active {
+  color: var(--text);
+  background: color-mix(in srgb, #2f8cff 16%, transparent 84%);
+}
+
 body.chat-page .topbar > .standalone-about,
 body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar > .standalone-about {
   position: absolute;

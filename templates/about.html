@@ -93,7 +93,7 @@
           <div class="about-thanks">
             <dl class="about-thanks-list">
               <dt>前后端开发</dt>
-              <dd>绪亓 & 苏打 & 爱好摸鱼真君</dd>
+              <dd><button type="button" class="about-secret-trigger" data-secret-trigger>绪亓</button> & 苏打 & 爱好摸鱼真君</dd>
               <dt>UI 设计</dt>
               <dd>蓝桉</dd>
               <dt>测试人员</dt>
@@ -107,6 +107,15 @@
           </div>
         </section>
 
+      </div>
+    </div>
+
+    <div class="abyss-modal-backdrop" data-abyss-modal hidden>
+      <div class="abyss-modal" role="dialog" aria-modal="true" aria-labelledby="abyss-modal-title">
+        <p class="eyebrow">Fantareal</p>
+        <h2 id="abyss-modal-title">你在尝试唤醒来自深渊的大门</h2>
+        <p data-abyss-modal-text>门后传来很轻的回声。它还没有完全听见你。</p>
+        <button type="button" class="abyss-modal-close" data-abyss-modal-close>我知道了</button>
       </div>
     </div>
 
@@ -145,6 +154,81 @@
       applyTheme(themeVal);
       applyUiOpacity(uiOpacity);
       applyBackground(bgUrl, bgOverlay);
+
+      (() => {
+        const trigger = document.querySelector("[data-secret-trigger]");
+        if (!trigger) return;
+
+        const unlockKey = "fantareal.challengeModeUnlocked";
+        const countKey = "fantareal.challengeModeTapCount";
+        const modal = document.querySelector("[data-abyss-modal]");
+        const modalText = document.querySelector("[data-abyss-modal-text]");
+        const modalClose = document.querySelector("[data-abyss-modal-close]");
+        const unlockTarget = 10;
+
+        const messages = {
+          3: "门后传来很轻的回声。它还没有完全听见你。",
+          6: "墙缝里有冷光漏出，像某个久睡的名字正在翻身。",
+          9: "只差一次。请确认你真的想让它醒来。"
+        };
+
+        function revealChallengeLink() {
+          document.querySelectorAll("[data-challenge-mode-link], [data-challenge-mode-entry]").forEach((link) => {
+            link.hidden = false;
+            link.closest("[data-plugin-nav-group]")?.setAttribute("open", "");
+          });
+        }
+
+        if (localStorage.getItem(unlockKey) === "true") {
+          trigger.classList.add("unlocked");
+          revealChallengeLink();
+          localStorage.removeItem(countKey);
+        }
+
+        function showAbyssModal(message) {
+          if (!modal) return;
+          if (modalText) {
+            modalText.textContent = message;
+          }
+          modal.hidden = false;
+        }
+
+        modalClose?.addEventListener("click", () => {
+          if (modal) {
+            modal.hidden = true;
+          }
+        });
+
+        modal?.addEventListener("click", (event) => {
+          if (event.target === modal) {
+            modal.hidden = true;
+          }
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && modal && !modal.hidden) {
+            modal.hidden = true;
+          }
+        });
+
+        trigger.addEventListener("click", () => {
+          const nextCount = Math.min(Number(localStorage.getItem(countKey) || "0") + 1, unlockTarget);
+          localStorage.setItem(countKey, String(nextCount));
+          trigger.style.setProperty("--secret-progress", String(nextCount / unlockTarget));
+
+          if (messages[nextCount]) {
+            showAbyssModal(messages[nextCount]);
+          }
+
+          if (nextCount >= unlockTarget) {
+            localStorage.setItem(unlockKey, "true");
+            localStorage.removeItem(countKey);
+            trigger.classList.add("unlocked");
+            revealChallengeLink();
+            window.location.reload();
+          }
+        });
+      })();
     </script>
   </body>
 </html>
