@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" viewBox="0 0 900 620">
+  <rect width="900" height="620" fill="#e8ecef"/>
+  <g stroke="#b9c1c8" stroke-width="1">
+    <path d="M80 90h740M80 160h740M80 230h740M80 300h740M80 370h740M80 440h740M80 510h740"/>
+    <path d="M190 70v470M520 70v470"/>
+  </g>
+  <g fill="#343a42" font-family="Consolas, monospace" font-size="28">
+    <text x="110" y="135">NAME: XUQI</text>
+    <text x="110" y="205">BIRTH: NULL</text>
+    <text x="110" y="275">STUDENT_ID: NONE</text>
+    <text x="110" y="345">PHOTO: MISSING</text>
+    <text x="110" y="415">CHAT_LOG: NOT FOUND</text>
+  </g>
+  <text x="450" y="565" text-anchor="middle" fill="#7b838a" font-size="24" font-family="Microsoft YaHei, sans-serif">未登记 / 未开始</text>
+</svg>

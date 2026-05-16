@@ -1,0 +1,255 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>比邻论坛 - 求助板</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            line-height: 1.5;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        
+        .header {
+            background-color: #0066cc;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .nav {
+            background-color: #e0e0e0;
+            padding: 8px;
+            border-bottom: 1px solid #ccc;
+            text-align: center;
+        }
+        
+        .nav a {
+            margin: 0 10px;
+            color: #0066cc;
+            text-decoration: none;
+        }
+        
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        
+        .content {
+            padding: 10px;
+        }
+        
+        .post-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #cc0000;
+        }
+        
+        .post-info {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        
+        .post-content {
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+        
+        .post-content a {
+            color: #0066cc;
+        }
+        
+        .replies {
+            border-top: 1px dashed #ccc;
+            padding-top: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .reply {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dotted #e0e0e0;
+        }
+        
+        .reply-user {
+            font-weight: bold;
+            color: #0066cc;
+            font-size: 14px;
+        }
+        
+        .reply-content {
+            margin-top: 5px;
+        }
+        
+        .timestamp {
+            font-size: 11px;
+            color: #999;
+            margin-top: 3px;
+        }
+        
+        .highlight {
+            background-color: #ffffcc;
+            padding: 2px 4px;
+        }
+        
+        .reply-box {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #f9f9f9;
+            text-align: center;
+            color: #666;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        .footer a {
+            color: #0066cc;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 600px) {
+            .container {
+                padding: 5px;
+            }
+            
+            .header {
+                font-size: 16px;
+                padding: 6px;
+            }
+            
+            .nav {
+                padding: 6px;
+            }
+            
+            .nav a {
+                display: inline-block;
+                margin: 0 5px;
+            }
+            
+            .post-title {
+                font-size: 16px;
+            }
+            
+            .content {
+                padding: 5px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            比邻论坛 - 连接你我他
+        </div>
+        
+        <div class="nav">
+            <a href="#">比邻论坛</a> | 
+            <a href="#">首页</a> | 
+            <a href="#">分类</a> | 
+            <a href="#">热点</a> | 
+            <a href="#">我的</a>
+        </div>
+        
+        <div class="content">
+            <div class="post-title">有人能帮我确认这个日记站是不是还在自己更新？</div>
+            
+            <div class="post-info">
+                发帖人: <span class="reply-user">岸边未读_2025</span> | 板块: 求助板 | 时间: 2023-10-05 14:23:17
+            </div>
+            
+            <div class="post-content">
+                <p>我是在一次AI RP里认识她的。她说自己叫绪亓，后来给了我一个日记站。奇怪的是，聊天结束后，网页还在继续写。地址是：<a href="" id="blog-link">http://xuqi-diary.local</a>。</p>
+                
+                <p>现在这个链接也打不开了，我还有可能找到她吗？</p>
+            </div>
+            
+            <div class="replies">
+                <div class="reply">
+                    <div class="reply-user">空白字段_4174</div>
+                    <div class="reply-content">这不是找人帖吧，这是网页异常。先查历史快照。</div>
+                    <div class="timestamp">2023-10-05 14:35:22</div>
+                </div>
+                
+                <div class="reply">
+                    <div class="reply-user">匿名用户_7X9F2</div>
+                    <div class="reply-content">如果页面要求输入名字，别先输自己的。</div>
+                    <div class="timestamp">2023-10-05 14:41:05</div>
+                </div>
+                
+                <div class="reply">
+                    <div class="reply-user">浅蓝日志_987</div>
+                    <div class="reply-content">我点进去看到蓝色水纹，退出来以后标题变了。</div>
+                    <div class="timestamp">2023-10-05 15:12:33</div>
+                </div>
+                
+                <div class="reply">
+                    <div class="reply-user">星海漫游5451</div>
+                    <div class="reply-content">有没有生日、学籍、照片这种硬信息？</div>
+                    <div class="timestamp">2023-10-05 16:05:47</div>
+                </div>
+                
+                <div class="reply">
+                    <div class="reply-user">岸边未读_2025</div>
+                    <div class="reply-content">回复 星海漫游5451：没有。她说自己的生日是空的。</div>
+                    <div class="timestamp">2023-10-05 16:20:11</div>
+                </div>
+                
+                <div class="reply">
+                    <div class="reply-user">清风徐来3426</div>
+                    <div class="reply-content">
+                        有没有试过用网页时光机看看有没有存档过？也许可以找到！
+                        <a href="../waybackmachinepage/index.html" id="wayback-link" class="highlight">网页链接</a>
+                    </div>
+                    <div class="timestamp">2023-10-05 17:03:29</div>
+                </div>
+            </div>
+            
+            <div class="reply-box">
+                要回复请先登陆
+            </div>
+        </div>
+        
+        <div class="footer">
+            <a href="#">关于比邻</a> | 
+            <a href="#">使用条款</a> | 
+            <a href="#">隐私条款</a> | 
+            <a href="#">联系我们</a>
+        </div>
+    </div>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" viewBox="0 0 900 620">
+  <defs>
+    <radialGradient id="f" cx=".45" cy=".42" r=".72">
+      <stop offset="0" stop-color="#ffd8cf"/>
+      <stop offset=".35" stop-color="#b94351"/>
+      <stop offset="1" stop-color="#3f0614"/>
+    </radialGradient>
+    <filter id="warp">
+      <feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="4" seed="9"/>
+      <feDisplacementMap in="SourceGraphic" scale="34"/>
+    </filter>
+  </defs>
+  <rect width="900" height="620" fill="url(#f)"/>
+  <g filter="url(#warp)" opacity=".55" fill="none" stroke-linecap="round">
+    <path d="M60 170C190 80 270 210 420 150S650 80 830 180" stroke="#ffe0d7" stroke-width="18"/>
+    <path d="M30 430C180 340 310 500 460 410S690 320 860 440" stroke="#6b0f24" stroke-width="24"/>
+    <path d="M120 300C260 230 360 360 510 300S700 230 820 310" stroke="#ffb5a9" stroke-width="10"/>
+  </g>
+  <circle cx="360" cy="260" r="52" fill="#23020c" opacity=".55"/>
+  <circle cx="540" cy="260" r="52" fill="#23020c" opacity=".55"/>
+  <ellipse cx="450" cy="420" rx="62" ry="96" fill="#23020c" opacity=".62"/>
+  <text x="450" y="565" text-anchor="middle" fill="#ffe8e1" font-size="34" font-family="Microsoft YaHei, sans-serif">不要出生</text>
+</svg>

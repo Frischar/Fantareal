@@ -1,0 +1,176 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ghufzyxy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-image: url('http://dl3.glitter-graphics.net/pub/670/670413sd6ctp84mc.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+        
+        .top-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            position: relative;
+            width: 100%;
+        }
+        
+        .left-sticker {
+            position: absolute;
+            left: 10%;
+            cursor: default; /* 修改为默认光标，表示不可点击 */
+        }
+        
+        .top-sticker {
+            cursor: pointer;
+            text-align: center;
+        }
+        
+        .top-sticker img {
+            width: 145px; /* 原434px的三分之一 */
+            height: 81px; /* 原244px的三分之一 */
+        }
+        
+        .options-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        .option {
+            text-align: center;
+            cursor: pointer;
+        }
+        
+        .option img {
+            width: 100%;
+            max-width: 177px;
+            height: auto;
+        }
+        
+        /* 确保在移动端也能水平排列 */
+        @media (max-width: 768px) {
+            .options-container {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                justify-content: flex-start;
+                padding: 10px 0;
+            }
+            
+            .option {
+                flex: 0 0 auto;
+            }
+            
+            .option img {
+                width: 120px; /* 在移动端稍微缩小以保持平行排列 */
+                height: auto;
+            }
+            
+            .left-sticker {
+                left: 5%;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <!-- 顶部容器 -->
+    <div class="top-container">
+        <!-- 左侧贴纸 -->
+        <div class="left-sticker">
+            <img src="http://dl10.glitter-graphics.net/pub/1402/1402690fr8tuaxtvu.gif" width=80 height=105 border=0>
+        </div>
+        
+        <!-- 顶部贴纸 -->
+        <div class="top-sticker" id="top-sticker">
+            <img src="http://dl4.glitter-graphics.net/pub/1034/1034604o4pj7o4fip.gif" border="0" alt="闪烁贴纸">
+        </div>
+    </div>
+    
+    <!-- 选项容器 -->
+    <div class="options-container">
+        <!-- 左侧选项 -->
+        <div class="option" id="left-option">
+            <img src="http://dl10.glitter-graphics.net/pub/1171/1171000uwkbtr42gq.gif" border="0" alt="选项1">
+        </div>
+        
+        <!-- 中间选项 -->
+        <div class="option">
+            <img src="http://dl6.glitter-graphics.net/pub/1170/1170996f7m7kfxlrh.gif" border="0" alt="选项2">
+        </div>
+        
+        <!-- 右侧选项 -->
+        <div class="option">
+            <img src="http://dl8.glitter-graphics.net/pub/1170/1170998hj4ihka50f.gif" border="0" alt="选项3">
+        </div>
+    </div>
+    
+    <!-- 音频元素 -->
+    <audio id="audio-player" preload="auto">
+        <!-- 请将下面的src替换为您的本地音频文件路径 -->
+        <source src="audio.mp3" type="audio/mpeg">
+        您的浏览器不支持音频元素。
+    </audio>
+
+    <script>
+        // 初始化变量
+        let clickCount = 0;
+        const audioPlayer = document.getElementById('audio-player');
+        const topSticker = document.getElementById('top-sticker');
+        const leftOption = document.getElementById('left-option');
+        
+        // 顶部贴纸点击事件 - 播放音频
+        topSticker.addEventListener('click', function() {
+            // 如果音频正在播放，先暂停并重置
+            if (!audioPlayer.paused) {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+            }
+            
+            // 播放音频
+            audioPlayer.play().catch(e => {
+                console.error("音频播放失败:", e);
+                alert("无法播放音频，请确保音频文件 'audio.mp3' 存在。");
+            });
+        });
+        
+        // 左侧选项点击事件 - 计数并跳转
+        leftOption.addEventListener('click', function() {
+            clickCount++;
+            
+            // 添加点击反馈效果
+            this.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                this.style.transform = 'scale(1)';
+            }, 200);
+            
+            // 达到3次点击后跳转
+            if (clickCount >= 3) {
+                // 跳转到下一个页面
+                window.location.href = "../ear5hfydhd/index.html";
+            }
+        });
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

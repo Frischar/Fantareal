@@ -1,0 +1,208 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游戏提示</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: linear-gradient(135deg, #e0f0ff 0%, #c0d8f0 100%);
+            margin: 0;
+            padding: 0;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .top-bar {
+            background: linear-gradient(to bottom, #2c5aa0, #1e3a8a);
+            color: white;
+            padding: 12px 0;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            box-shadow: 0 3px 5px rgba(0,0,0,0.2);
+            border-bottom: 2px solid #4a7bc8;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: white;
+            border: 1px solid #a0c0f0;
+            border-radius: 8px;
+            box-shadow: 
+                0 4px 8px rgba(0,0,0,0.15),
+                inset 0 1px 0 rgba(255,255,255,0.8);
+            padding: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .container:before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.9), transparent);
+            border-radius: 8px 8px 0 0;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c5aa0;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+            font-size: 22px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #a0c0f0;
+        }
+        
+        .warning {
+            background: linear-gradient(to bottom, #fff8f8, #ffeaea);
+            border: 1px solid #ffaaaa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            font-weight: bold;
+            color: #b30000;
+        }
+        
+        .reminder-section {
+            background: linear-gradient(to bottom, #f8fbff, #e8f0ff);
+            border: 1px solid #a0c0f0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .requirements {
+            background: linear-gradient(to bottom, #f0f8ff, #e0f0ff);
+            border: 1px solid #90b0e0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .highlight {
+            font-weight: bold;
+            color: #d32f2f;
+        }
+        
+        .start-button {
+            display: block;
+            width: 200px;
+            margin: 30px auto;
+            padding: 12px 20px;
+            background: linear-gradient(to bottom, #4a7bc8, #2c5aa0);
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            font-weight: bold;
+            border-radius: 25px;
+            border: 1px solid #1e3a8a;
+            box-shadow: 
+                0 4px 0 #1e3a8a,
+                0 6px 8px rgba(0,0,0,0.2);
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            font-size: 16px;
+        }
+        
+        .start-button:hover {
+            transform: translateY(2px);
+            box-shadow: 
+                0 2px 0 #1e3a8a,
+                0 4px 6px rgba(0,0,0,0.2);
+        }
+        
+        .start-button:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #1e3a8a;
+        }
+        
+        .url-box {
+            background: #f0f8ff;
+            border: 1px solid #a0c0f0;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 20px 0;
+            font-family: Consolas, monospace;
+            text-align: center;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            color: #2c5aa0;
+        }
+        
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            margin-top: 20px;
+            border-top: 1px dashed #a0c0f0;
+            padding-top: 10px;
+        }
+        
+        .glossy-effect {
+            height: 5px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent);
+            margin: 10px 0;
+        }
+        
+        .note {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <div class="top-bar">公告</div>
+    
+    <div class="container">
+        <h1>游戏提示与免责声明</h1>
+        
+        <div class="warning">
+            <strong>本游戏内容纯属虚构，游戏内人物行动仅为情节服务请勿模仿。心理承受能力低者和未成年人请在监护人陪护下游玩。</strong>
+        </div>
+        
+        <div class="glossy-effect"></div>
+        
+        <div class="reminder-section">
+            <h2>游玩前提醒：</h2>
+            <p>本游戏是一个ARG类型的游戏，在这里你不扮演任何游戏角色，<span class="highlight">你只扮演你自己</span></p>
+            <p>游戏中包含一些需要在现实的社交媒体上寻找的内容，在必要时请离开游戏寻找！</p>
+            <p>游戏中的代码部分因为作者还是学生没有太多时间，为了节省学习成本使用了ai辅助生成，博客当中的真实图片为了沉浸感使用了ai生图（不支持使用ai生图，游戏中使用是为了高效出效果节省时间成本，如果后续有机会也会慢慢替换成人工图片），病历部分文本因为作者不懂医疗相关专业知识使用了ai生成，以上即为游戏中所有涉及到ai的内容。界面设计、装饰素材、除病历外的所有文本以及剧情，整体立意和玩法等皆为人工搜寻或设计制作。作者不支持任何使用ai生成盈利的行为，也不支持任何用ai生成假装人工作品的行为，游戏中使用的ai部分模型来源为deepseek，claude，gemini，图片为豆包ai生成。本游戏不进行任何盈利，没有参与任何有奖金的活动，游戏发布至今都是0收入，为了推广游戏买了一个35块的薯条加热（这部分也是我自己的钱，并且也没啥效果，不推荐购买可以避雷）。发布游戏的初心仅为游戏制作分享，代码已上传github开源，可以随意学习模仿，我的小红书@榾木骨上有游戏制作心得。因为游戏中的ai生成部分，我不会自称为自己是一个"独立游戏作者"，我仅仅是一个使用了ai把自己想法实现的使用者，也希望我能够在后续的创作里真正达到零ai使用，由我一个人全部包揽所有工作。以上则是对于游戏中ai生成和我个人对于ai生成的看法，感谢你看到这里，也请雷者自避。</p>
+        </div>
+        
+        <div class="requirements">
+            <h2>游玩要求：</h2>
+            <p>游玩游戏时<span class="highlight">必须佩戴耳机</span>，注意不要佩戴反，保证左右声道的正确。</p>
+            <p>推荐使用电脑游玩，使用Chrome浏览器。</p>
+            <p>为保证使用体验，推荐使用网络加速工具。</p>
+        </div>
+        
+        <div class="glossy-effect"></div>
+        
+        <p class="note">在保证所有提示阅读完后，点此处开始游戏：</p>
+        
+        <div class="url-box">
+            ../new/index.html
+        </div>
+        
+        <a href="../new/index.html" class="start-button">开始游戏</a>
+        
+        <div class="footer">
+            
+        </div>
+    </div>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>页面未找到 - 404错误</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #ffffff;
+            color: #000000;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .error-code {
+            font-size: 8rem;
+            font-weight: 700;
+            letter-spacing: -5px;
+            margin-bottom: 1rem;
+            line-height: 1;
+            animation: fadeIn 1s ease-out;
+        }
+        
+        .error-title {
+            font-size: 1.8rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            letter-spacing: 1px;
+        }
+        
+        .error-description {
+            font-size: 1.1rem;
+            margin-bottom: 2.5rem;
+            color: #333333;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .navigation {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 1.8rem;
+            background-color: #000000;
+            color: #ffffff;
+            text-decoration: none;
+            border: 2px solid #000000;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .btn:hover {
+            background-color: #ffffff;
+            color: #000000;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            color: #000000;
+        }
+        
+        .btn-outline:hover {
+            background-color: #000000;
+            color: #ffffff;
+        }
+        
+        .divider {
+            width: 80px;
+            height: 2px;
+            background-color: #000000;
+            margin: 2rem auto;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @media (max-width: 768px) {
+            .error-code {
+                font-size: 6rem;
+            }
+            
+            .error-title {
+                font-size: 1.5rem;
+            }
+            
+            .navigation {
+                flex-direction: column;
+                align-items: center;
+                gap: 1rem;
+            }
+            
+            .btn {
+                width: 200px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="error-code">404</h1>
+        <div class="divider"></div>
+        <h2 class="error-title">页面未找到</h2>
+        <p class="error-description">
+            抱歉，您要查找的页面不存在。它可能已被移动、删除或您输入了错误的URL。
+        </p>
+        <div class="divider"></div>
+        <div class="navigation">
+            <a href="../new/index.html" class="btn">返回首页</a>
+            <a href="../waybackmachinepage/index.html" class="btn btn-outline">搜索存档</a>
+        </div>
+    </div>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

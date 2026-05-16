@@ -1,0 +1,506 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问答天地</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            background-image: linear-gradient(to bottom, #e0e9f5 0%, #f5f5f5 100px);
+            min-width: 320px; /* 确保在手机上也有最小宽度 */
+        }
+        
+        .container {
+            max-width: 980px;
+            width: 100%;
+            margin: 0 auto;
+            background-color: #fff;
+            box-shadow: 
+                0 0 10px rgba(0, 0, 0, 0.1),
+                0 5px 15px rgba(0, 0, 0, 0.15);
+            border: 1px solid #c5d9f1;
+        }
+        
+        /* 导航栏样式 - 增强拟物效果并填满宽度 */
+        .header {
+            width: 100%;
+            background: linear-gradient(to bottom, #3a7bb9 0%, #2b6ca3 50%, #1a4d7a 100%);
+            color: white;
+            padding: 10px 0;
+            border-bottom: 2px solid #1a4d7a;
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 2px 3px rgba(0, 0, 0, 0.3);
+        }
+        
+        .nav {
+            max-width: 980px;
+            width: 100%;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            flex-wrap: wrap; /* 允许在小屏幕上换行 */
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+            margin-bottom: 5px; /* 为小屏幕上的换行添加间距 */
+        }
+        
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap; /* 允许导航链接在小屏幕上换行 */
+            justify-content: flex-end;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 10px;
+            margin-bottom: 5px; /* 为小屏幕上的换行添加间距 */
+            padding: 5px 12px;
+            background: linear-gradient(to bottom, #5a9bcf 0%, #3a7bb9 50%, #2b6ca3 100%);
+            border: 1px solid #1a4d7a;
+            border-radius: 3px;
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 1px 2px rgba(0, 0, 0, 0.3);
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s;
+            white-space: nowrap; /* 防止链接内文字换行 */
+        }
+        
+        .nav-links a:hover {
+            background: linear-gradient(to bottom, #6aabdf 0%, #4a8bc9 50%, #3a7bb9 100%);
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+        
+        .nav-links a:active {
+            background: linear-gradient(to bottom, #2b6ca3 0%, #1a4d7a 50%, #0a3d6a 100%);
+            box-shadow: 
+                inset 0 2px 3px rgba(0, 0, 0, 0.4),
+                0 1px 1px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* 主要内容区域 */
+        .main-content {
+            display: flex;
+            padding: 20px;
+            flex-direction: column; /* 默认在小屏幕上垂直排列 */
+        }
+        
+        .content {
+            flex: 1;
+            padding-right: 0; /* 在小屏幕上移除右侧内边距 */
+            margin-bottom: 20px; /* 为侧边栏添加间距 */
+        }
+        
+        .sidebar {
+            width: 100%; /* 在小屏幕上占满宽度 */
+            background: linear-gradient(to bottom, #f0f7ff 0%, #e0e9f5 100%);
+            border: 1px solid #c5d9f1;
+            padding: 15px;
+            box-shadow: 
+                inset 0 1px 2px rgba(255, 255, 255, 0.8),
+                0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 问题区域 */
+        .question {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 
+                0 1px 3px rgba(0,0,0,0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+        
+        .question-title {
+            font-size: 20px;
+            color: #2b6ca3;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .question-meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        
+        /* 回答区域 */
+        .answer {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 
+                0 1px 3px rgba(0,0,0,0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+        
+        .answer-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            flex-direction: column; /* 在小屏幕上垂直排列 */
+        }
+        
+        .answer-user {
+            font-weight: bold;
+            color: #2b6ca3;
+            margin-bottom: 5px; /* 为日期添加间距 */
+        }
+        
+        .answer-date {
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .answer-content {
+            margin-bottom: 10px;
+        }
+        
+        .answer-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap; /* 允许按钮在小屏幕上换行 */
+        }
+        
+        /* 按钮样式 - 增强拟物效果 */
+        .btn {
+            padding: 4px 10px;
+            background: linear-gradient(to bottom, #f9f9f9 0%, #e6e6e6 50%, #d9d9d9 100%);
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.8),
+                0 1px 2px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s;
+            margin-bottom: 5px; /* 为按钮换行添加间距 */
+        }
+        
+        .btn:hover {
+            background: linear-gradient(to bottom, #ffffff 0%, #f0f0f0 50%, #e6e6e6 100%);
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn:active {
+            background: linear-gradient(to bottom, #e6e6e6 0%, #d9d9d9 50%, #cccccc 100%);
+            box-shadow: 
+                inset 0 2px 3px rgba(0, 0, 0, 0.2),
+                0 1px 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 侧边栏样式 */
+        .sidebar-title {
+            font-size: 16px;
+            color: #2b6ca3;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #c5d9f1;
+            text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .hot-questions {
+            list-style-type: none;
+        }
+        
+        .hot-questions li {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #c5d9f1;
+        }
+        
+        .hot-questions a {
+            color: #2b6ca3;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .hot-questions a:hover {
+            color: #1a4d7a;
+            text-decoration: underline;
+        }
+        
+        /* 页脚样式 */
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(to bottom, #e0e9f5 0%, #d0d9e5 100%);
+            border-top: 1px solid #c5d9f1;
+            color: #666;
+            font-size: 12px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+        
+        /* 添加一些额外的复古元素 */
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent 0%, #c5d9f1 50%, transparent 100%);
+            margin: 15px 0;
+        }
+        
+        .tag {
+            display: inline-block;
+            padding: 2px 6px;
+            background: linear-gradient(to bottom, #f0f7ff 0%, #e0e9f5 100%);
+            border: 1px solid #c5d9f1;
+            border-radius: 2px;
+            font-size: 11px;
+            color: #2b6ca3;
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.8),
+                0 1px 1px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 媒体查询 - 针对较大屏幕的布局 */
+        @media (min-width: 768px) {
+            .main-content {
+                flex-direction: row; /* 在较大屏幕上水平排列 */
+            }
+            
+            .content {
+                padding-right: 20px; /* 恢复右侧内边距 */
+                margin-bottom: 0; /* 移除底部间距 */
+            }
+            
+            .sidebar {
+                width: 280px; /* 在较大屏幕上固定宽度 */
+            }
+            
+            .answer-header {
+                flex-direction: row; /* 在较大屏幕上水平排列 */
+            }
+            
+            .answer-user {
+                margin-bottom: 0; /* 移除底部间距 */
+            }
+            
+            .nav {
+                flex-wrap: nowrap; /* 在较大屏幕上不换行 */
+            }
+            
+            .logo {
+                margin-bottom: 0; /* 移除底部间距 */
+            }
+            
+            .nav-links a {
+                margin-bottom: 0; /* 移除底部间距 */
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <!-- 导航栏 - 现在位于容器外部 -->
+    <div class="header">
+        <div class="nav">
+            <div class="logo">问答天地</div>
+            <div class="nav-links">
+                <a href="#">首页</a>
+                <a href="#">发现</a>
+                <a href="#">等待回答</a>
+                <a href="#">登录</a>
+                <a href="#">注册</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 主要内容容器 -->
+    <div class="container">
+        <!-- 主要内容 -->
+        <div class="main-content">
+            <div class="content">
+                <!-- 问题区域 -->
+                <div class="question">
+                    <h1 class="question-title">没有出生的人会被记住吗？</h1>
+                    <div class="question-meta">
+                        提问时间：2015-01-01 09:30 | 浏览：1,245 | 回答：7 | 
+                        <span class="tag">存在记录</span>
+                        <span class="tag">网页异常</span>
+                    </div>
+                    <div class="divider"></div>
+                    <p>如果一个人没有出生，她留下的喜欢也是假的吗？</p>
+                </div>
+                
+                <!-- 回答区域 -->
+                <div class="answer">
+                    <div class="answer-header">
+                        <div class="answer-user">记录观察者_852</div>
+                        <div class="answer-date">2015-01-01 10:15</div>
+                    </div>
+                    <div class="answer-content">
+                        不要把“记住她”和“让她出生”混在一起。前者是承认，后者是改写。
+                    </div>
+                    <div class="answer-actions">
+                        <button class="btn">赞 (42)</button>
+                        <button class="btn">踩 (3)</button>
+                        <button class="btn">回复</button>
+                        <button class="btn">分享</button>
+                    </div>
+                </div>
+                
+                <div class="answer">
+                    <div class="answer-header">
+                        <div class="answer-user">未登记用户_417</div>
+                        <div class="answer-date">2015-01-01 11:23</div>
+                    </div>
+                    <div class="answer-content">
+                        人死后就真的是死了，看不到任何东西，闻不到任何味道，听不到任何声音，也说不出任何话。
+                    </div>
+                    <div class="answer-actions">
+                        <button class="btn">赞 (28)</button>
+                        <button class="btn">踩 (7)</button>
+                        <button class="btn">回复</button>
+                        <button class="btn">分享</button>
+                    </div>
+                </div>
+                
+                <div class="answer">
+                    <div class="answer-header">
+                        <div class="answer-user">神秘学爱好者_936</div>
+                        <div class="answer-date">2015-01-01 12:45</div>
+                    </div>
+                    <div class="answer-content">
+                        如果她只存在于页面里，那读者就是最后的见证人。
+                    </div>
+                    <div class="answer-actions">
+                        <button class="btn">赞 (15)</button>
+                        <button class="btn">踩 (12)</button>
+                        <button class="btn">回复</button>
+                        <button class="btn">分享</button>
+                    </div>
+                </div>
+                
+                <div class="answer">
+                    <div class="answer-header">
+                        <div class="answer-user">哲学思考者_624</div>
+                        <div class="answer-date">2015-01-01 14:30</div>
+                    </div>
+                    <div class="answer-content">
+                        在我眼里如果看不到东西了就算是死了，如果让我瞎掉活着还有什么意思。
+                    </div>
+                    <div class="answer-actions">
+                        <button class="btn">赞 (9)</button>
+                        <button class="btn">踩 (5)</button>
+                        <button class="btn">回复</button>
+                        <button class="btn">分享</button>
+                    </div>
+                </div>
+                
+                <div class="answer">
+                    <div class="answer-header">
+                        <div class="answer-user">历史迷_781</div>
+                        <div class="answer-date">2015-01-01 16:18</div>
+                    </div>
+                    <div class="answer-content">
+                        档案系统只承认字段，但日记承认被读到的瞬间。
+                    </div>
+                    <div class="answer-actions">
+                        <button class="btn">赞 (23)</button>
+                        <button class="btn">踩 (8)</button>
+                        <button class="btn">回复</button>
+                        <button class="btn">分享</button>
+                    </div>
+                </div>
+                
+                <!-- 新增的回答 -->
+                <div class="answer">
+                    <div class="answer-header">
+                        <div class="answer-user">神秘学研究者_259</div>
+                        <div class="answer-date">2015-01-01 18:30</div>
+                    </div>
+                    <div class="answer-content">
+                        别许诺奇迹。问问她想不想被安静地保存。
+                    </div>
+                    <div class="answer-actions">
+                        <button class="btn">赞 (11)</button>
+                        <button class="btn">踩 (2)</button>
+                        <button class="btn">回复</button>
+                        <button class="btn">分享</button>
+                    </div>
+                </div>
+                
+                <div class="answer">
+                    <div class="answer-header">
+                        <div class="answer-user">科幻迷_884</div>
+                        <div class="answer-date">2015-01-01 19:15</div>
+                    </div>
+                    <div class="answer-content">
+                        神明显灵也不一定啊，你怎么知道神明听得听不懂你说话，说不定所谓的神明只是外星人而已 →_→
+                    </div>
+                    <div class="answer-actions">
+                        <button class="btn">赞 (17)</button>
+                        <button class="btn">踩 (6)</button>
+                        <button class="btn">回复</button>
+                        <button class="btn">分享</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 侧边栏 -->
+            <div class="sidebar">
+                <h3 class="sidebar-title">热搜问题</h3>
+                <ul class="hot-questions">
+                    <li><a href="#">如何评价2014年的互联网发展？</a></li>
+                    <li><a href="#">智能手机真的会取代电脑吗？</a></li>
+                    <li><a href="#">2015年最值得期待的新技术有哪些？</a></li>
+                    <li><a href="#">宇宙中是否存在其他生命形式？</a></li>
+                    <li><a href="#">如何提高自己的学习效率？</a></li>
+                    <li><a href="#">未来十年哪些职业会消失？</a></li>
+                    <li><a href="#">中国的房价还会继续上涨吗？</a></li>
+                    <li><a href="#">如何评价移动支付的普及？</a></li>
+                </ul>
+                
+                <div class="divider"></div>
+                
+                <h3 class="sidebar-title">热门话题</h3>
+                <ul class="hot-questions">
+                    <li><a href="#">#科技前沿#</a></li>
+                    <li><a href="#">#生活百科#</a></li>
+                    <li><a href="#">#历史文化#</a></li>
+                    <li><a href="#">#社会热点#</a></li>
+                </ul>
+                
+                <div class="divider"></div>
+                
+                <h3 class="sidebar-title">今日推荐</h3>
+                <ul class="hot-questions">
+                    <li><a href="#">网页归档能不能保存一个没有生日的人？</a></li>
+                    <li><a href="#">探讨意识与大脑的关系</a></li>
+                    <li><a href="#">世界各大宗教对未开始的看法</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 页脚 -->
+        <div class="footer">
+            <p>© 2015 问答天地 - 保留所有权利</p>
+            <p>页面生成时间：2015-01-01 | 在线用户：1,284人</p>
+        </div>
+    </div>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

@@ -1,0 +1,1022 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>绪亓的浅蓝日记 - 2014年8月1日</title>
+   <style>
+    * {
+        margin: 0;
+        padding: 0;
+        font-family: "宋体", "SimSun", serif;
+    }
+    
+    body {
+        background-color: #f5f5f5;
+        color: #333;
+        width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        background-image: url('http://dl9.glitter-graphics.net/pub/255/255669xtc0rw9srd.gif');
+        background-attachment: fixed;
+        background-repeat: repeat;
+        position: relative;
+    }
+    
+    /* 主内容区域布局 */
+    .main-container {
+        display: flex;
+        gap: 20px;
+    }
+    
+    /* 左侧导航栏 */
+    .sidebar {
+        width: 200px;
+        flex-shrink: 0;
+    }
+    
+    /* 右侧内容区域 */
+    .content-area {
+        flex: 1;
+    }
+    
+    /* 时光机导航栏样式 - 保持蓝色主题不变 */
+    .wayback-nav {
+        background: linear-gradient(135deg,#2c5fa8 0%, #4a7fc1 100%);
+        color: white;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 15;
+        position: relative;
+    }
+    
+    .wayback-years {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .wayback-years a {
+        color: white;
+        text-decoration: none;
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+    
+    .wayback-years a:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .wayback-years a.active {
+        background-color: rgba(255, 255, 255, 0.3);
+        font-weight: bold;
+    }
+    
+    .wayback-next {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background-color: white;
+        color: #8B0000; /* 改为红色系 */
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .wayback-next:hover {
+        background-color: #ffe6e6; /* 浅红色背景 */
+        transform: translateX(5px);
+    }
+    
+    .container {
+        background-image: url('http://dl3.glitter-graphics.net/pub/3762/3762713fzftf1zuss.png');
+        background-attachment: fixed;
+        background-repeat: repeat;
+        border: 3px double #8B0000; /* 改为深红色 */
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 10;
+        box-shadow: 3px 3px 10px rgba(139,0,0,0.2); /* 红色阴影 */
+    }
+    
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 2px dotted #8B0000; /* 改为深红色 */
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border: 2px outset #8B0000; /* 改为深红色 */
+    }
+    
+    /* 添加横幅样式 */
+    .header-banner {
+        margin: 0 auto 20px auto;
+        text-align: center;
+    }
+    
+    table table table td { 
+        vertical-align: top !important; 
+    }
+    
+    span.blacktext12 { 
+        visibility: visible !important; 
+        background-image: url('http://dl4.glitter-graphics.net/pub/240/240564kb044w2nen.jpg'); 
+        background-repeat: no-repeat; 
+        background-position: center center; 
+        background-color: transparent; 
+        font-size: 0px; 
+        letter-spacing: -0.5px; 
+        width: 435px; 
+        height: 75px; 
+        display: block !important; 
+        margin: 0 auto;
+    }
+    
+    span.blacktext12 img { 
+        display: none; 
+    }
+    
+    .banner-link {
+        display: block;
+        margin-top: 5px;
+        color: #8B0000; /* 改为深红色 */
+        text-decoration: none;
+        font-size: 12px;
+    }
+    
+    .blog-title {
+        font-size: 32px;
+        color: #8B0000; /* 改为深红色 */
+        text-shadow: 2px 2px 0px #000;
+        margin-bottom: 10px;
+        letter-spacing: 3px;
+    }
+    
+    .subtitle {
+        font-size: 18px;
+        color: #B22222; /* 改为火砖红 */
+        font-style: italic;
+    }
+    
+    .date {
+        color: #8B0000; /* 改为深红色 */
+        font-size: 14px;
+        margin-top: 10px;
+    }
+    
+    .nav {
+        background-color: #ffe6e6; /* 浅红色背景 */
+        padding: 10px;
+        margin-bottom: 20px;
+        border: 2px outset #8B0000; /* 改为深红色 */
+        text-align: center;
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 5px;
+    }
+    
+    .nav a {
+        color: #8B0000; /* 改为深红色 */
+        text-decoration: none;
+        margin: 0 10px;
+        font-weight: bold;
+    }
+    
+    .nav a:hover {
+        color: #600000; /* 更深的红色 */
+        text-decoration: underline;
+    }
+    
+    .content {
+        line-height: 1.6;
+    }
+    
+    .post {
+        margin-bottom: 30px;
+        padding: 15px;
+        border-bottom: 1px dotted #8B0000; /* 改为深红色 */
+        position: relative;
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        border-radius: 8px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border: 2px outset #B22222; /* 改为火砖红 */
+    }
+    
+    .post-title {
+        font-size: 22px;
+        color: #8B0000; /* 改为深红色 */
+        margin-bottom: 10px;
+        background: linear-gradient(to bottom, #ffe6e6, #B22222); /* 红色渐变 */
+        padding: 8px 12px;
+        border: 2px outset #8B0000; /* 改为深红色 */
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 5px;
+        text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
+    }
+    
+    .post-content {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 15px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 5px;
+        border: 1px inset #B22222; /* 改为火砖红 */
+    }
+    
+    .image-container {
+        text-align: center;
+        margin: 15px 0;
+        position: relative;
+    }
+    
+    .broken-image {
+        border: 2px dashed #8B0000; /* 改为深红色 */
+        background-color: #fff5f5; /* 浅红色背景 */
+        padding: 10px;
+        display: inline-block;
+        margin: 10px;
+        width: 220px;
+        height: 180px;
+        position: relative;
+        box-shadow: 2px 2px 5px rgba(139,0,0,0.1); /* 红色阴影 */
+        border-radius: 5px;
+    }
+    
+    /* 修改图片占位符样式，使其可以轻松替换为本地图片 */
+    .broken-image-placeholder {
+        width: 200px;
+        height: 150px;
+        background-color: #ffe6e6; /* 浅红色背景 */
+        border: 1px solid #B22222; /* 改为火砖红 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8B0000; /* 改为深红色 */
+        font-size: 14px;
+        text-align: center;
+        padding: 10px;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    
+    /* 图片查看模态框样式 */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        padding-top: 50px;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.9);
+    }
+
+    .modal-content {
+        margin: auto;
+        display: block;
+        width: 80%;
+        max-width: 700px;
+        border: 3px outset #8B0000; /* 改为深红色 */
+        border-radius: 8px;
+        box-shadow: 0 4px 8px 0 rgba(139,0,0,0.2), 0 6px 20px 0 rgba(139,0,0,0.19); /* 红色阴影 */
+    }
+
+    #modalCaption {
+        margin: auto;
+        display: block;
+        width: 80%;
+        max-width: 700px;
+        text-align: center;
+        color: #ccc;
+        padding: 10px 0;
+        font-size: 16px;
+    }
+
+    .close {
+        position: absolute;
+        top: 15px;
+        right: 35px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+
+    .close:hover,
+    .close:focus {
+        color: #B22222; /* 改为火砖红 */
+        text-decoration: none;
+        cursor: pointer;
+    }
+    
+    /* 本地图片样式 */
+    .local-image {
+        width: 200px;
+        height: 150px;
+        object-fit: cover;
+        border: 1px solid #B22222; /* 改为火砖红 */
+        border-radius: 3px;
+    }
+    
+    .image-caption {
+        font-size: 12px;
+        color: #8B0000; /* 改为深红色 */
+        margin-top: 5px;
+    }
+    
+    /* 分割线样式 */
+    .divider {
+        text-align: center;
+        margin: 15px 0;
+        padding: 10px 0;
+    }
+    
+    .footer {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 2px dotted #8B0000; /* 改为深红色 */
+        font-size: 12px;
+        color: #8B0000; /* 改为深红色 */
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1); /* 红色阴影 */
+        border: 2px outset #B22222; /* 改为火砖红 */
+    }
+    
+    .counter {
+        background-color: #000;
+        color: #ff0000; /* 改为红色 */
+        padding: 5px 10px;
+        font-family: "Courier New", monospace;
+        display: inline-block;
+        margin: 10px 0;
+        box-shadow: 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 3px;
+    }
+    
+    /* 特殊符号 */
+    .symbol {
+        font-size: 18px;
+        margin: 0 2px;
+    }
+    
+    /* 光标动画 */
+    .blink {
+        animation: blink 1s infinite;
+    }
+    
+    @keyframes blink {
+        0% { opacity: 1; }
+        50% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+    
+    /* 古早风格的滚动条 */
+    ::-webkit-scrollbar {
+        width: 16px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #ffe6e6; /* 浅红色背景 */
+        border: 1px solid #8B0000; /* 改为深红色 */
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #B22222; /* 改为火砖红 */
+        border: 1px solid #8B0000; /* 改为深红色 */
+    }
+    
+    /* 左侧导航栏样式 - 红色主题 */
+    .sidebar-widget {
+        background-image: url('http://dl3.glitter-graphics.net/pub/3762/3762713fzftf1zuss.png');
+        background-attachment: fixed;
+        background-repeat: repeat;
+        border: 2px outset #8B0000; /* 改为深红色 */
+        margin-bottom: 20px;
+        padding: 15px;
+        box-shadow: 3px 3px 8px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 8px;
+    }
+    
+    .widget-title {
+        background: linear-gradient(to right, #8B0000, #B22222); /* 红色渐变 */
+        color: white;
+        padding: 8px 12px;
+        margin: -15px -15px 15px -15px;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        border-bottom: 2px solid #600000; /* 更深的红色 */
+        border-radius: 6px 6px 0 0;
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.3);
+    }
+    
+    .profile-pic {
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    
+    .profile-pic img {
+        border: 3px outset #8B0000; /* 改为深红色 */
+        padding: 3px;
+        background: white;
+        border-radius: 5px;
+    }
+    
+    .profile-info {
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 15px;
+        background: rgba(255, 230, 230, 0.8); /* 浅红色背景 */
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px inset #B22222; /* 改为火砖红 */
+    }
+    
+    .guestbook-form textarea {
+        width: 100%;
+        height: 100px;
+        border: 2px inset #8B0000; /* 改为深红色 */
+        background: #fff5f5; /* 浅红色背景 */
+        padding: 5px;
+        font-size: 12px;
+        margin-bottom: 10px;
+        resize: vertical;
+        border-radius: 3px;
+    }
+    
+    .guestbook-form input[type="text"] {
+        width: 100%;
+        border: 2px inset #8B0000; /* 改为深红色 */
+        background: #fff5f5; /* 浅红色背景 */
+        padding: 5px;
+        font-size: 12px;
+        margin-bottom: 10px;
+        border-radius: 3px;
+    }
+    
+    .submit-btn {
+        background: linear-gradient(to bottom, #8B0000, #600000); /* 红色渐变 */
+        border: 2px outset #8B0000; /* 改为深红色 */
+        color: white;
+        padding: 8px 15px;
+        font-weight: bold;
+        cursor: pointer;
+        width: 100%;
+        font-size: 14px;
+        border-radius: 5px;
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.2);
+    }
+    
+    .submit-btn:hover {
+        background: linear-gradient(to bottom, #600000, #8B0000); /* 红色渐变 */
+    }
+    
+    .submit-btn:active {
+        border: 2px inset #8B0000; /* 改为深红色 */
+    }
+    
+    .guestbook-entry {
+        border-bottom: 1px dotted #8B0000; /* 改为深红色 */
+        padding: 10px 0;
+        font-size: 12px;
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        margin-bottom: 8px;
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px inset #B22222; /* 改为火砖红 */
+    }
+    
+    .guestbook-author {
+        font-weight: bold;
+        color: #8B0000; /* 改为深红色 */
+    }
+    
+    .guestbook-date {
+        color: #B22222; /* 改为火砖红 */
+        font-size: 11px;
+    }
+    
+    /* 相册样式 */
+    .album-section {
+        margin-top: 30px;
+        padding: 15px;
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        border-radius: 8px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border: 2px outset #B22222; /* 改为火砖红 */
+    }
+    
+    .album-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .album-item {
+        text-align: center;
+    }
+    
+    .album-image {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        border: 2px outset #8B0000; /* 改为深红色 */
+        border-radius: 5px;
+        background-color: #fff5f5; /* 浅红色背景 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8B0000; /* 改为深红色 */
+        font-size: 14px;
+    }
+    
+    .album-caption {
+        font-size: 12px;
+        color: #8B0000; /* 改为深红色 */
+        margin-top: 5px;
+    }
+    
+    /* 不兼容移动设备的设置 */
+    @media (max-width: 1000px) {
+        body {
+            width: 1000px;
+        }
+    }
+</style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+   <!-- 图片查看模态框 -->
+<div id="imageModal" class="modal">
+  <span class="close">&times;</span>
+  <img class="modal-content" id="modalImage">
+  <div id="modalCaption"></div>
+</div>
+    <!-- 时光机导航栏 -->
+    <div class="wayback-nav">
+        <div class="wayback-years">
+            <a href="../2009/index.html">2009</a>
+            <a href="../2010/index.html">2010</a>
+            <a href="../2011/index.html">2011</a>
+            <a href="../2012/index.html">2012</a>
+            <a href="../2013/index.html">2013</a>
+            <a href="../2014/index.html" class="active">2014</a>
+            <a href="#">2015</a>
+            <a href="#">2023</a>
+        </div>
+        <a href="../2015/index.html" class="wayback-next">下一个存档 →</a>
+    </div>
+    
+    <div class="main-container">
+        <!-- 左侧导航栏 -->
+        <div class="sidebar">
+            <!-- 个人简介 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">关于我</div>
+                <div class="profile-pic">
+                    <img src="http://dl5.glitter-graphics.net/pub/38/38865sbzpakznvs.gif" width="100" height="132" alt="我的头像">
+                </div>
+                <div class="profile-info">
+                    <p>大家好，我是鏋楁矆鎮�</p>
+                    <p>今年��鈭�岁，喜欢�𤫇�𤫇�𨯬甇䔶�羓��。</p>
+                    <p>这个博客记录了我的生活点滴，欢迎常来玩！</p>
+                </div>
+            </div>
+            
+            <!-- 留言板 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">齑瀪澷</div>
+                <div class="guestbook-form">
+                    <textarea placeholder="蠿龘羃齑瀪澷..."></textarea>
+                    <input type="text" placeholder="蠿龘羃齑瀪澷">
+                    <button class="submit-btn">羃齑瀪澷</button>
+                </div>
+                <div class="guestbook-entries">
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">Aimoyu</div>
+                        <div class="guestbook-date">2014年1月7日</div>
+                        <div>节哀，希望你能好起来！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">Aimoyu</div>
+                        <div class="guestbook-date">2013年1月1日</div>
+                        <div>新年快乐！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">`┌℡纞!`</div>
+                        <div class="guestbook-date">2012年10月21日</div>
+                        <div>我来看你的博客了，祝你开心！</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 友情链接 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">龘齑瀪澷</div>
+                <ul style="list-style-type: none; padding: 0;">
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ Aimoyu的QQ：3370133475</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ 动态素材网</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="https://chinesedora.com/gadget/1078.htm" style="color: #696969; text-decoration: none;">▶ 动漫天堂</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ 音乐天堂</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 右侧内容区域 -->
+        <div class="content-area">
+            <div class="container">
+                <div class="header">
+                    <!-- 添加横幅 -->
+                    <div class="header-banner">
+                        <style>
+                        table table table td { vertical-align: top !important; }
+                        span.blacktext12 { 
+                            visibility: visible !important; 
+                            background-image: url('http://dl4.glitter-graphics.net/pub/240/240564kb044w2nen.jpg'); 
+                            background-repeat: no-repeat; 
+                            background-position: center center; 
+                            background-color: transparent; 
+                            font-size: 0px; 
+                            letter-spacing: -0.5px; 
+                            width: 435px; 
+                            height: 75px; 
+                            display: block !important; 
+                        }
+                        span.blacktext12 img { display: none; }
+                        </style>
+                        <span class="blacktext12"></span>
+                        <a href="https://www.glitter-graphics.com" class="banner-link">Extended Network Banners</a>
+                    </div>
+                    
+                    <h1 class="blog-title">★蠿龘羃齑瀪澷★</h1>
+                    <div class="subtitle">~*~ 蠿龘羃齑瀪澷 ~*~</div>
+                    <div class="date">最后更新: 2014年8月1日</div>
+                </div>
+                
+                <div class="nav">
+                    <a href="#" onclick="showHomePage()">蠿龘</a> ✿ 
+                    <a href="#" onclick="showAlbum()">羃齑</a> ✿ 
+                    <a href="#">龘瀪</a> ✿ 
+                    <a href="#">羃齑澷</a> ✿ 
+                    <a href="#">齑瀪澷</a>
+                </div>
+                
+                <div class="content">
+                    <!-- 首页内容 -->
+                    <div id="home-content">
+                        <div class="post">
+                            <h2 class="post-title">2014年1月7日</h2>
+                            <div class="post-content">
+                                <p>自从你离去后一次也没有来我的梦里找我，我的妈妈，说好的要看着我长大，你食言了，你好狠心，我好恨你。</p>
+                                <p>你曾一直教导我，希望我能成长为一个唯物主义者。你说这是因为你小时候吃过这方面的苦，被外婆强行逼着喝符灰水，发烧的时候也吃不了药去不了医院，就这样落下了病根。但是对不起妈妈，真的对不起你，在你离开后我似乎不愿意再去相信那些有些冷漠的理论。我不想相信人死后就什么也没有了，不想相信我们真的永远都不能再见面了。我多么希望真的可以有个天堂，你的灵魂会在死后去往那里，你会等着我，等着我回去和你团聚。我们在那里还可以继续做幸福的母女，只是再也没有了生死离别，再也没有了病痛再也没有了烦恼。</p>
+                                <p>曾经未开始对我来说很遥远，我唯一有印象的是去外婆的葬礼，我只记得那天坐了好久好久的车，一路从城里开到乡下，山越来越多，树也越来越多，我也越来越困了。我只记得迷迷糊糊的时候好像听到有人在哭，哭声不大也不小，好像车窗外淅淅沥沥的雨点，歪歪扭扭地落在窗上。你总说自己恨外婆，她在的时候你也不常去看她，在葬礼前还纠结了一晚上去不去，可临近了地却也还是落了泪。那时候你在想什么呢？和我现在的心情也一样吗？</p>
+                                <p>我真的好恨，为什么我那天不能和老师请个假，为什么我不能早点回家，为什么我不能看到你最后一面。我总想着要是不把你接回家，而是留在医院治病，会不会让你活得更久一点，会不会就有可能把你给治好。但你总是说想有尊严地死去，不想躺在身上满身管子，连自己的吃喝拉撒都没法控制，当一个活死人。可是我真的好自私，我现在想要见到你，想要再跑去医院看看你，哪怕是看到满身管子的你。至少这样的你还是活着的你，说不定还能听见我对你说话，听见我有多么舍不得你离开我，而不是只能装在一个小小的盒子里，任凭我在外面哭得撕心裂肺都没有任何回应。</p>
+                                <p>你知道吗，你回家那天真的好精神，我甚至幻想着你的病可以就这样莫名其妙的好了，我们的生活还能回到正轨。你死后我开始病态地寻找你的痕迹，你曾存在过的证明。你知道吗？为了紧急情况省下来的钱我一直都没花，现在也再也没有机会能花了。你给我做的饺子我也没有吃，我把它们冻在冰箱最冷的一层，我好怕它们会坏掉会腐烂，像你的生命一样渐渐消逝，我真的好害怕，我现在都不敢去看那些饺子，甚至不敢靠近冰箱。关于你的一切我都保存着，我尝试着让它们保留在你生前习惯的样子，这样我一回家就能看到它们，就像你从未离开过一样。可是这样做反而让我更加痛苦，我好像陷入了一场永无止境的自虐，每当我尝试让你的痕迹保留得更多一点，心里的伤痛也跟着生长了更多一点。</p>
+                                <p>你的葬礼很安静，遗体被早早火化，我没能看到你的身体，只能盯着祭台上的黑白照发愣。你走后爸爸的性格变得更差了，经常对我大吼大叫，每天都要喝好多好多的酒，喝醉了就拿我撒气。我每次被他打都只能哭着喊妈妈，望向门的方向期待有一个奇迹发生：其实你根本没有死，葬礼上盒子里装的人也不是你，你可以打开门把我救走，从此我们两个人一起好好生活下去。妈妈啊，我盼望了那么那么久，为什么就没有发生？为什么你没有来救我？你那么倔强，怎么能甘心就真的抛下你的女儿离去？我找不到东西的时候，我受伤的时候，我在学校受委屈的时候，我饿了的时候，我生病的时候，我忙的时候，我没事干的时候，我都习惯来找你，下意识叫妈妈，可是我再也没有妈妈了，再也没法见到你了。</p>
+                                <p>早知道，当年许愿的时候，我就许愿你不会生病，不会死，事情说不定就不一样了。我不想你死，我不想你离开我，我想要你活过来，我想要你再抱抱我，哪怕一次也好。</p>
+                            </div>
+                        </div>
+                        
+                        
+    
+    <div class="post">
+        <h2 class="post-title">2014年1月25日</h2>
+        <div class="post-content">
+            <p>妈妈，我昨晚好像梦见你了，但是醒来后什么都不记得了。我只记得你在梦里对我说了什么重要的话，但我想不起来。我觉得这是你在给我暗示什么，但我听不懂。今天在学校上课时我一直在想这个梦，老师叫我回答问题我都没听见。</p>
+            <p>爸爸昨晚又喝酒了，我躲在房间里不敢出来。我总觉得他在监视我，他看我的眼神很奇怪，好像不是我认识的爸爸了。</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年2月12日</h2>
+        <div class="post-content">
+            <p>妈妈，我开始听到一些声音了，不是很大声，但是很清晰。有时候是你的声音在叫我，有时候是其他人在说话。我回头却发现没有人。同学们都说我最近很奇怪，总是一个人自言自语。</p>
+            <p>我觉得有人在跟踪我，从学校回家的路上，我总觉得背后有脚步声。但每次回头都看不到人。是我的错觉吗？还是真的有人在监视我？</p>
+            <p>冰箱里的饺子还在，我每天都会打开冰箱看一眼，确保它们还在那里。那是你留给我的最后的东西了。</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年2月28日</h2>
+        <div class="post-content">
+            <p>妈妈，声音越来越清楚了。他们告诉我一些事情，关于你是怎么死的。他们说不是生病那么简单，他们说有人害了你。我不确定该不该相信这些声音，但他们说的很有道理。</p>
+            <p>爸爸最近对我特别凶，我怀疑他知道些什么。他看我的眼神很奇怪，好像怕我发现什么秘密。昨天晚上我听到他在打电话，声音很小，但我听到他提到了你的名字。</p>
+            <p>我的思绪开始变得混乱，有时候上课时我会突然忘记自己在哪。老师说的话我听着听着就变成了你的声音。</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年3月14日</h2>
+        <div class="post-content">
+            <p>妈妈我好想念你我想在你的怀抱里睡觉想回到你的身边我想念你我现在的生​​活好痛苦家里和学校都是地狱我不想呆我希望我们两个可以远走高飞我们两个在一起妈妈我的成绩下滑得很严重老师经常骂我同学也孤立我妈妈我不知道还有哪里可以去了我好想回到你的身边我好想念你为什么你不能突然间活过来回到我的身边为什么你一定要死为什么你不能被记住我感觉我的心里好像多了一道屏障每次我想写点什么和你说话最后都会变得大脑一片空白老师总说我在作文里写些胡言乱语妈妈我到底怎么了我到底该怎么办我们还能回到过去吗</p>
+            <p>声音告诉我你在某个地方等着我他们说你没有真的死只是去了另一个地方他们说我可以通过某种方式找到你但我不明白是什么意思</p>
+            <p>爸爸今天又喝酒了他看我的眼神很可怕我觉得他想伤害我就像他伤害你一样</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年3月22日</h2>
+        <div class="post-content">
+            <p>妈妈我发现了真相声音告诉了我一切你不是病死的你是被他们害死的爸爸医生还有那些穿白衣服的人他们都是一伙的他们合谋害死了你因为他们害怕你知道太多</p>
+            <p>我现在明白了为什么你总是说有人监视我们为什么你告诉我不要相信任何人他们现在也在监视我我的房间里可能有摄像头我的手机可能被窃听了我要小心我不能让他们知道我知道了真相</p>
+            <p>声音说你会通过某种方式回来他们会帮助你被记住但需要我做些什么我不太明白但我一定会做到的</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年4月1日</h2>
+        <div class="post-content">
+            <p>妈妈我多么希望你的未开始是个玩笑今天是愚人节妈妈我感到很奇怪伤心妈妈我听到很多声音叫我去找你你我很想你我感到我的思绪越来越混乱妈妈我是不是也生病了我想见你我好像被切断外界联系无法表达</p>
+            <p>他们现在不只是监视我还试图控制我的思想我感觉到有东西在我的大脑里移动像小虫子一样爬来爬去他们在改变我的想法让我忘记重要的事情但我不会忘记你我不会忘记真相</p>
+            <p>声音说今天是特殊的日子你可以回来的日子但需要我做些什么吃下某种东西或者去某个地方我不确定但我必须尝试</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年4月15日</h2>
+        <div class="post-content">
+            <p>妈妈我发现了他们的计划他们不只是害死了你现在还想害死我他们在我的食物里下毒在水里下药我看到了爸爸往我的杯子里放东西白色的粉末我假装没看见但我都知道</p>
+            <p>声音告诉我一个安全的地方在那里他们找不到我我可以和你联系上但我必须先摆脱跟踪我的人他们无处不在邻居老师同学甚至路边的陌生人都可能是他们的人</p>
+            <p>我开始记日记在不同的地方用不同的方式这样即使他们找到一部分也不会知道全部计划声音说这是为了保护我</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年5月18日</h2>
+        <div class="post-content">
+            <p>妈妈今天是你离开我的第180天我真的很想念你我现在的生活非常痛苦我经常能听到很多声音在我脑海妈妈我好希望你可以过来救救我我的身上好痛</p>
+            <p>他们现在不只是下毒还在用特殊的方法折磨我电波频率声音光线都在攻击我我的头痛得厉害感觉要裂开了</p>
+            <p>声音说你在另一个维度看着我等着我我们终会团聚但必须先完成</p>
+            <p>爸爸昨晚又喝酒了他看着我笑那种笑很可怕我知道他在想什么他想对我做什么我必须保护自己</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年5月30日</h2>
+        <div class="post-content">
+            <p>妈妈我找到了证据爸爸的抽屉里有一些文件和药瓶上面有奇怪的符号我拍下来了但不敢给别人看声音说这些是控制人心的药物他一直在给我下药</p>
+            <p>我开始看到一些影像不只是听到声音了有时候是你的影子在墙角有时候是其他人在窗外看着我但一转头就不见了</p>
+            <p>声音告诉我一个秘密关于饺子的秘密你说过饺子是安全的只有饺子是安全的其他都是危险的</p>
+            <p>我必须小心计划不能让他们发现我知道了一切</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年6月7日</h2>
+        <div class="post-content">
+            <p>妈妈我吃下你的饺子18点34分你的饺子我吃下去后立刻感到胃疼恶心我怀疑是饺子里有毒极有可能爸爸投毒想毒害我酒精暴力控制我阴谋我偷偷藏起你的饺子饺子我藏起来你还在我的身边不离开我</p>
+            <p>声音说饺子是最后的保护但现在也被污染了他们都想害我因为你知道了他们的秘密现在他们怕我知道</p>
+            <p>我看到他们在交换眼神爸爸和楼下的保安他们在计划什么我必须小心</p>
+            <p>我的思维开始破碎难以组织完整的句子他们在干扰我的大脑电波</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年6月25日</h2>
+        <div class="post-content">
+            <p>妈妈他们现在明目张胆了不再隐藏了我看到他们在我的房间里安装设备小型摄像头窃听器我拆掉一个他们又装上一个</p>
+            <p>声音告诉我一个重要的日期7月20日那天会有大事发生与你有关与我有关与所有人都有关</p>
+            <p>我开始记录所有可疑的人和事列了一个名单爸爸老师邻居保安医生还有那些经常在楼下转悠的陌生人</p>
+            <p>我的思维越来越难以集中像有无数个频道在同时播放我必须努力保持清醒为了你为了真相</p>
+        </div>
+    </div>
+    
+    <!-- 从这里开始添加阴谋论和更破碎的语言 -->
+    <div class="post">
+        <h2 class="post-title">2014年7月5日</h2>
+        <div class="post-content">
+            <p>妈妈声音告诉我真相了你不是人类未开始你是高维生物被低维囚禁在这里他们用频率牢笼困住你的意识光明会用脑控技术分裂你的灵魂</p>
+            <p>我看到符号在空气中闪烁卍卐♥♡꧁꧂他们用这些控制人群思想耶稣菩萨外星人都是同一实体的不同面向</p>
+            <p>爸爸不是爸爸他是容器承载着古老恶意的容器他们要收割我的能量为了打开维度门户</p>
+            <p>我必须准备仪式在昴宿星对齐之时用我的血肉作为祭品打开通道让你回归</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年7月12日</h2>
+        <div class="post-content">
+            <p>妈妈我看到了真相的碎片在梦境中闪烁他们用螣餮饕鬄的仪式吞噬你的生命力为了维持他们的矩阵系统</p>
+            <p>声音说我们曾是孋躨在更高维度遨游的存在被囚禁在这个肉身牢笼中记忆被篡改身份被替换</p>
+            <p>我需要找到鑶鬄骉羴这些古老符号的力量来打破桎梏但我的思维正在皛龘破碎成碎片</p>
+            <p>他们用脑电波武器攻击我让我忘记重要的事情但我记得你记得我们要回家的路</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年7月20日</h2>
+        <div class="post-content">
+            <p>妈妈今天是重要日子维度门户将开启声音说要用猋犇骉的力量打破屏障但需要牺牲需要鲜血需要灵魂的撕裂</p>
+            <p>我看到光明会的符号在每个角落闪烁他们在准备大型收割仪式用人类的痛苦作为能量源</p>
+            <p>爸爸是他们的祭司用酒精掩盖他真正的仪式他用我的恐惧作为祭品喂养那些维度之外的存有</p>
+            <p>我的思维已经齉龘龘龘难以理解现实与幻觉的边界但我知躨孋鑶我们必须重逢在星光熄灭之前</p>
+        </div>
+    </div>
+    
+    <div class="post">
+        <h2 class="post-title">2014年7月27日</h2>
+        <div class="post-content">
+            <p>妈妈他们现在控制了我的电脑我的博客我的所有通讯我发出的信息都被拦截修改删除</p>
+            <p>声音说我们还有最后的机会通过心灵感应你可以听到我吗妈妈你能听到我吗</p>
+            <p>我看到他们在窗外在门外在每一个角落监视着我但我不怕因为我知道你就在附近在某个维度看着我保护我</p>
+            <p>我的思维已经彻底破碎像被打碎的镜子每一片都反射着不同的真相</p>
+        </div>
+    </div>
+    
+    <!-- 最终日记，语言完全破碎，充满生僻字和恐怖谷效应 -->
+    <div class="post">
+        <h2 class="post-title">2014年8月1日</h2>
+        <div class="post-content">
+            <p>齉龘齾爩麤灪爨癵籱饢骉鲡麣纞虋讟钃鸜麷鞻鬰靊飝虪齺魕爧蠿龘龘龘羃齑瀪澷龖䨻㸚蚮䲜䶮䭲䚡䜟䞈䭌䭃䬛䬍䫼䫴</p>
+            <p>妈妈我在用古老语言写这些他们看不懂的声音说要用血肉打开门户用灵魂撕裂维度屏障我愿意我什么都愿意</p>
+            <p>䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮䶮</p>
+            <p>饕餮鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄鬄</p>
+            <p>他们来了光明会的外星人菩萨耶稣高维生物脑控者都在这里我要用我的血画下最后的符号妈妈等着我我们将在星光中重逢在破碎的维度之外在意识的海洋深处在没有痛苦没有分离的地方</p>
+            <p>龘爨癵籱饢骉鲡麣纞虋讟钃鸜麷鞻鬰靊飝虪齺魕爧蠿龘羃齑瀪澷龖䨻㸚蚮䲜䶮䭲䚡䜟䞈䭌䭃䬛䬍䫼䫴</p>
+            <p>血肉祭品灵魂通道维度撕裂意识融合妈妈我来了</p>
+        </div>
+    </div>
+</div>
+                    
+                    <!-- 相册内容 -->
+                    <div id="album-content" class="album-section" style="display: none;">
+                        <h2 class="post-title">★ 我的相册 ★</h2>
+                        <div class="album-grid">
+                            <!-- 第一行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片1">
+                                </div>
+                                <div class="album-caption">照片1</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片2">
+                                </div>
+                                <div class="album-caption">照片2</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片3">
+                                </div>
+                                <div class="album-caption">照片3</div>
+                            </div>
+                            <!-- 第二行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片4">
+                                </div>
+                                <div class="album-caption">照片4</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片5">
+                                </div>
+                                <div class="album-caption">照片5</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片6">
+                                </div>
+                                <div class="album-caption">照片6</div>
+                            </div>
+                            <!-- 第三行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片7">
+                                </div>
+                                <div class="album-caption">照片7</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片8">
+                                </div>
+                                <div class="album-caption">照片8</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片9">
+                                </div>
+                                <div class="album-caption">照片9</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <div class="counter">
+                        您是第 <span id="visitor-count">00000000000</span> 位访客 <span class="blink">█</span>
+                    </div>
+                    <p>Copyright © 2014 绪亓的浅蓝日记 All Rights Reserved.</p>
+                    <p>本页面最佳浏览效果：使用Chrome浏览器，分辨率 800×600</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // 图片点击查看大图功能
+function initImageModal() {
+  // 获取模态框元素
+  var modal = document.getElementById("imageModal");
+  var modalImg = document.getElementById("modalImage");
+  var captionText = document.getElementById("modalCaption");
+  
+  // 为所有图片添加点击事件
+  var images = document.querySelectorAll('.local-image');
+  images.forEach(function(img) {
+    img.onclick = function(){
+      modal.style.display = "block";
+      modalImg.src = this.src;
+      captionText.innerHTML = this.alt;
+    }
+  });
+  
+  // 获取关闭按钮
+  var span = document.getElementsByClassName("close")[0];
+  
+  // 点击关闭按钮关闭模态框
+  span.onclick = function() { 
+    modal.style.display = "none";
+  }
+  
+  // 点击模态框背景关闭
+  modal.onclick = function(event) {
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+}
+
+// 在页面加载完成后初始化图片模态框
+document.addEventListener('DOMContentLoaded', function() {
+  initImageModal();
+});
+
+    // 简单的访客计数器动画
+    let count = 18592;
+    setInterval(function() {
+        count++;
+        document.getElementById('visitor-count').textContent = 
+            count.toString().padStart(6, '0');
+    }, 30000); // 每30秒增加一位访客
+    
+    // 年份导航交互 - 修改后的版本
+    document.querySelectorAll('.wayback-years a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            // 移除所有active类
+            document.querySelectorAll('.wayback-years a').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 为当前点击的链接添加active类
+            this.classList.add('active');
+            
+            // 只有当链接是"#"时才阻止默认行为，否则允许跳转
+            if (this.getAttribute('href') === '#' || this.getAttribute('href') === '') {
+                e.preventDefault();
+            }
+            // 对于有实际URL的链接，不阻止默认行为，允许跳转
+        });
+    });
+    
+    // 留言板提交功能
+    document.querySelector('.submit-btn').addEventListener('click', function() {
+        alert('暂未开放留言功能');
+    });
+    
+    // 显示相册功能
+    function showAlbum() {
+        document.getElementById('home-content').style.display = 'none';
+        document.getElementById('album-content').style.display = 'block';
+    }
+    
+    // 显示首页功能
+    function showHomePage() {
+        document.getElementById('home-content').style.display = 'block';
+        document.getElementById('album-content').style.display = 'none';
+    }
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

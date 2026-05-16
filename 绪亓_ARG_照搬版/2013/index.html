@@ -1,0 +1,896 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>绪亓的浅蓝日记 - 2013年9月10日</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            font-family: "宋体", "SimSun", serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-image: url('http://dl3.glitter-graphics.net/pub/1964/1964223mnrwrjcff2.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            position: relative;
+        }
+        
+        /* 主内容区域布局 */
+        .main-container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        /* 左侧导航栏 */
+        .sidebar {
+            width: 200px;
+            flex-shrink: 0;
+        }
+        
+        /* 右侧内容区域 */
+        .content-area {
+            flex: 1;
+        }
+        
+        /* 时光机导航栏样式 - 灰色主题 */
+       .wayback-nav {
+           background: linear-gradient(135deg,#2c5fa8 0%, #4a7fc1 100%);
+           color: white;
+           padding: 12px 20px;
+           margin-bottom: 20px;
+           border-radius: 8px;
+           box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+           display: flex;
+           justify-content: space-between;
+           align-items: center;
+           z-index: 15;
+           position: relative;
+        }
+        
+        .wayback-years {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .wayback-years a {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .wayback-years a:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .wayback-years a.active {
+            background-color: rgba(255, 255, 255, 0.3);
+            font-weight: bold;
+        }
+        
+        .wayback-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: white;
+    color: #696969;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+        
+        .wayback-next:hover {
+    background-color: #e3f2fd;
+    transform: translateX(5px);
+}
+        
+        .container {
+            background-image: url('http://dl6.glitter-graphics.net/pub/1715/1715996jhyvnqtahs.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            border: 3px double #8a8a8a;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 10;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px dotted #8a8a8a;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #8a8a8a;
+        }
+        
+        /* 添加横幅样式 */
+        .header-banner {
+            margin: 0 auto 20px auto;
+            text-align: center;
+        }
+        
+        table table table td { 
+            vertical-align: top !important; 
+        }
+        
+        span.blacktext12 { 
+            visibility: visible !important; 
+            background-image: url('http://dl4.glitter-graphics.net/pub/436/436374h0ljf2l40j.jpg'); 
+            background-repeat: no-repeat; 
+            background-position: center center; 
+            background-color: transparent; 
+            font-size: 0px; 
+            letter-spacing: -0.5px; 
+            width: 435px; 
+            height: 75px; 
+            display: block !important; 
+            margin: 0 auto;
+        }
+        
+        span.blacktext12 img { 
+            display: none; 
+        }
+        
+        .banner-link {
+            display: block;
+            margin-top: 5px;
+            color: #696969;
+            text-decoration: none;
+            font-size: 12px;
+        }
+        
+        .blog-title {
+            font-size: 32px;
+            color: #696969;
+            text-shadow: 2px 2px 0px #000;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #8a8a8a;
+            font-style: italic;
+        }
+        
+        .date {
+            color: #696969;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .nav {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 2px outset #8a8a8a;
+            text-align: center;
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        
+        .nav a {
+            color: #696969;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        
+        .nav a:hover {
+            color: #4a4a4a;
+            text-decoration: underline;
+        }
+        
+        .content {
+            line-height: 1.6;
+        }
+        
+        .post {
+            margin-bottom: 30px;
+            padding: 15px;
+            border-bottom: 1px dotted #8a8a8a;
+            position: relative;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #a9a9a9;
+        }
+        
+        .post-title {
+            font-size: 22px;
+            color: #696969;
+            margin-bottom: 10px;
+            background: linear-gradient(to bottom, #f0f0f0, #a9a9a9);
+            padding: 8px 12px;
+            border: 2px outset #8a8a8a;
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
+        }
+        
+        .post-content {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            border: 1px inset #a9a9a9;
+        }
+        
+        .image-container {
+            text-align: center;
+            margin: 15px 0;
+            position: relative;
+        }
+        
+        .broken-image {
+            border: 2px dashed #8a8a8a;
+            background-color: #f5f5f5;
+            padding: 10px;
+            display: inline-block;
+            margin: 10px;
+            width: 220px;
+            height: 180px;
+            position: relative;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+        
+        /* 修改图片占位符样式，使其可以轻松替换为本地图片 */
+        .broken-image-placeholder {
+            width: 200px;
+            height: 150px;
+            background-color: #cccccc;
+            border: 1px solid #999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #696969;
+            font-size: 14px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        /* 图片查看模态框样式 */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  padding-top: 50px;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.9);
+}
+
+.modal-content {
+  margin: auto;
+  display: block;
+  width: 80%;
+  max-width: 700px;
+  border: 3px outset #8a8a8a;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+}
+
+#modalCaption {
+  margin: auto;
+  display: block;
+  width: 80%;
+  max-width: 700px;
+  text-align: center;
+  color: #ccc;
+  padding: 10px 0;
+  font-size: 16px;
+}
+
+.close {
+  position: absolute;
+  top: 15px;
+  right: 35px;
+  color: #f1f1f1;
+  font-size: 40px;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.close:hover,
+.close:focus {
+  color: #8a8a8a;
+  text-decoration: none;
+  cursor: pointer;
+}
+        
+        /* 本地图片样式 */
+        .local-image {
+            width: 200px;
+            height: 150px;
+            object-fit: cover;
+            border: 1px solid #999999;
+            border-radius: 3px;
+        }
+        
+        .image-caption {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* 分割线样式 */
+        .divider {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px 0;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px dotted #8a8a8a;
+            font-size: 12px;
+            color: #666;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1);
+            border: 2px outset #a9a9a9;
+        }
+        
+        .counter {
+            background-color: #000;
+            color: #0f0;
+            padding: 5px 10px;
+            font-family: "Courier New", monospace;
+            display: inline-block;
+            margin: 10px 0;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            border-radius: 3px;
+        }
+        
+        /* 特殊符号 */
+        .symbol {
+            font-size: 18px;
+            margin: 0 2px;
+        }
+        
+        /* 光标动画 */
+        .blink {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        /* 古早风格的滚动条 */
+        ::-webkit-scrollbar {
+            width: 16px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f0f0f0;
+            border: 1px solid #8a8a8a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #8a8a8a;
+            border: 1px solid #696969;
+        }
+        
+        /* 左侧导航栏样式 - 灰色主题 */
+        .sidebar-widget {
+            background-image: url('http://dl6.glitter-graphics.net/pub/1715/1715996jhyvnqtahs.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            border: 2px outset #8a8a8a;
+            margin-bottom: 20px;
+            padding: 15px;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+        
+        .widget-title {
+            background: linear-gradient(to right, #696969, #8a8a8a);
+            color: white;
+            padding: 8px 12px;
+            margin: -15px -15px 15px -15px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 2px solid #4a4a4a;
+            border-radius: 6px 6px 0 0;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.3);
+        }
+        
+        .profile-pic {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .profile-pic img {
+            border: 3px outset #8a8a8a;
+            padding: 3px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .profile-info {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px inset #a9a9a9;
+        }
+        
+        .guestbook-form textarea {
+            width: 100%;
+            height: 100px;
+            border: 2px inset #8a8a8a;
+            background: #f9f9f9;
+            padding: 5px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            resize: vertical;
+            border-radius: 3px;
+        }
+        
+        .guestbook-form input[type="text"] {
+            width: 100%;
+            border: 2px inset #8a8a8a;
+            background: #f9f9f9;
+            padding: 5px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(to bottom, #696969, #4a4a4a);
+            border: 2px outset #696969;
+            color: white;
+            padding: 8px 15px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+            border-radius: 5px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.2);
+        }
+        
+        .submit-btn:hover {
+            background: linear-gradient(to bottom, #4a4a4a, #696969);
+        }
+        
+        .submit-btn:active {
+            border: 2px inset #696969;
+        }
+        
+        .guestbook-entry {
+            border-bottom: 1px dotted #8a8a8a;
+            padding: 10px 0;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px inset #a9a9a9;
+        }
+        
+        .guestbook-author {
+            font-weight: bold;
+            color: #696969;
+        }
+        
+        .guestbook-date {
+            color: #666;
+            font-size: 11px;
+        }
+        
+        /* 备忘录样式 */
+        .memo-section {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #a9a9a9;
+        }
+        
+        .memo-content {
+            font-family: "Courier New", monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px inset #a9a9a9;
+        }
+        
+        .memo-link {
+            color: #696969;
+            text-decoration: underline;
+        }
+        
+        /* 相册样式 */
+        .album-section {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #a9a9a9;
+        }
+        
+        .album-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .album-item {
+            text-align: center;
+        }
+        
+        .album-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border: 2px outset #8a8a8a;
+            border-radius: 5px;
+            background-color: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #696969;
+            font-size: 14px;
+        }
+        
+        .album-caption {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* 不兼容移动设备的设置 */
+        @media (max-width: 1000px) {
+            body {
+                width: 1000px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+   <!-- 图片查看模态框 -->
+<div id="imageModal" class="modal">
+  <span class="close">&times;</span>
+  <img class="modal-content" id="modalImage">
+  <div id="modalCaption"></div>
+</div>
+    <!-- 时光机导航栏 -->
+    <div class="wayback-nav">
+        <div class="wayback-years">
+            <a href="../2009/index.html">2009</a>
+            <a href="../2010/index.html">2010</a>
+            <a href="../2011/index.html">2011</a>
+            <a href="../2012/index.html">2012</a>
+            <a href="../2013/index.html" class="active">2013</a>
+            <a href="#">2014</a>
+            <a href="#">2015</a>
+            <a href="#">2023</a>
+        </div>
+        <a href="../2014/index.html" class="wayback-next">下一个存档 →</a>
+    </div>
+    
+    <div class="main-container">
+        <!-- 左侧导航栏 -->
+        <div class="sidebar">
+            <!-- 个人简介 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">关于我</div>
+                <div class="profile-pic">
+                    <img src="http://dl4.glitter-graphics.net/pub/799/799934qo2hys2hvo.jpg" width="100" height="132" alt="我的头像">
+                </div>
+                <div class="profile-info">
+                    <p>大家好，我是鏋楁矆鎮�</p>
+                    <p>今年��鈭�岁，喜欢�𤫇�𤫇�𨯬甇䔶�羓��。</p>
+                    <p>这个博客记录了我的生活点滴，欢迎常来玩！</p>
+                </div>
+            </div>
+            
+            <!-- 留言板 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">留言板</div>
+                <div class="guestbook-form">
+                    <textarea placeholder="在这里给我留言吧..."></textarea>
+                    <input type="text" placeholder="你的名字">
+                    <button class="submit-btn">提交留言</button>
+                </div>
+                <div class="guestbook-entries">
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">Aimoyu</div>
+                        <div class="guestbook-date">2013-1-1</div>
+                        <div>新年快乐！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">`┌℡纞!`</div>
+                        <div class="guestbook-date">2012-10-21</div>
+                        <div>我来看你的博客了，祝你开心！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">破碎的心</div>
+                        <div class="guestbook-date">2012-5-1</div>
+                        <div>你放假了吗？记得来找我玩！</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 友情链接 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">友情链接</div>
+                <ul style="list-style-type: none; padding: 0;">
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ Aimoyu的QQ：3370133475</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ 动态素材网</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="https://chinesedora.com/gadget/1078.htm" style="color: #696969; text-decoration: none;">▶ 动漫天堂</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ 音乐天堂</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 右侧内容区域 -->
+        <div class="content-area">
+            <div class="container">
+                <div class="header">
+                    <!-- 添加横幅 -->
+                    <div class="header-banner">
+                        <style>
+                        table table table td { vertical-align: top !important; }
+                        span.blacktext12 { 
+                            visibility: visible !important; 
+                            background-image: url('http://dl4.glitter-graphics.net/pub/436/436374h0ljf2l40j.jpg'); 
+                            background-repeat: no-repeat; 
+                            background-position: center center; 
+                            background-color: transparent; 
+                            font-size: 0px; 
+                            letter-spacing: -0.5px; 
+                            width: 435px; 
+                            height: 75px; 
+                            display: block !important; 
+                        }
+                        span.blacktext12 img { display: none; }
+                        </style>
+                        <span class="blacktext12"></span>
+                        <a href="https://www.glitter-graphics.com" class="banner-link">Extended Network Banners</a>
+                    </div>
+                    
+                    <h1 class="blog-title">★绪亓的浅蓝日记★</h1>
+                    <div class="subtitle">~*~ 欢迎来到我的小天地 ~*~</div>
+                    <div class="date">最后更新: 2013年9月10日</div>
+                </div>
+                
+                <div class="nav">
+                    <a href="#" onclick="showHomePage()">首页</a> ✿ 
+                    <a href="#" onclick="showAlbum()">相册</a> ✿ 
+                    <a href="#">日记</a> ✿ 
+                    <a href="#">留言板</a> ✿ 
+                    <a href="#">关于我</a>
+                </div>
+                
+                <div class="content">
+                    <!-- 首页内容 -->
+                    <div id="home-content">
+                        <div class="post">
+                            <h2 class="post-title">近期状况</h2>
+                            <div class="post-content">
+                                <p>今天妈妈又住院了，自从上次出院后她的情况急转直下，我们家的经济也越来越差了。爸爸的公司破产了，现在的爸爸像变了个人，天天都在喝酒抽烟，妈妈一去劝他他就吼人。我们一家搬到了一个很小的房子里，离开多年居住的小家真的很不舍，但为了给妈妈治病，为了活下去，总得忍着点。</p>
+                                <p>妈妈告诉了我病情相关的事情，她说她相信老天保佑，一定能够治好的，命运不会把我们逼到绝路，她还要看着我长大呢。我也希望如此，但我真的很迷茫，自从上了初中我一直没有再找到新的朋友，看到班级里的同学都能成双成对结伴而行，而我自己一个人形单影只，只能自己偷偷溜出去上厕所，自己一个人在食堂吃饭，在体育课自由活动的时候自己跑到教室写作业。我怕让我的同学知道我没有朋友，怕他们认为我是个不善交际的怪人，但是不是这样的，我在小学的时候有很多朋友，也有过知心朋友，只是现在到了初中没有话题渐行渐远了而已。我现在每天都盼着回家，盼着见到妈妈，可是现在妈妈也住院了，我想去医院看妈妈，却又不忍心看到她现在虚弱的样子，但如果不去又怕她出什么事，怕上一次去看她就是最后一面。我不敢告诉妈妈因为这些导致我的成绩下滑，我怕她知道了会生气或者担心我。我感觉自己好像一夜之间长大了，好像突然间有铺天盖地的压力飞向我，我到底该怎么办？</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 备忘录 -->
+<div class="memo-section">
+    <h2 class="post-title">备忘录</h2>
+    <div class="memo-content">
+        <p><strong>南城市第一医院电子病历：</strong></p>
+        <p><a href="../hospitallogin/index.html" class="memo-link">[电子病历链接]</a></p>
+        <p>家属探望时间是8:30～20:00</p>
+        <p>放学后在校门口坐819路到幸福家园站下车，转134路到第一医院</p>
+        <p>这个月生活费50元，打车到医院要花14元，早餐都不吃了，留着紧急情况打车用</p>
+        <p>下一次月考是10月10日</p>
+    </div>
+                    </div>
+                    
+                    <!-- 相册内容 -->
+                    <div id="album-content" class="album-section" style="display: none;">
+                        <h2 class="post-title">★ 我的相册 ★</h2>
+                        <div class="album-grid">
+                            <!-- 第一行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片1">
+                                </div>
+                                <div class="album-caption">照片1</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片2">
+                                </div>
+                                <div class="album-caption">照片2</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片3">
+                                </div>
+                                <div class="album-caption">照片3</div>
+                            </div>
+                            <!-- 第二行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片4">
+                                </div>
+                                <div class="album-caption">照片4</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片5">
+                                </div>
+                                <div class="album-caption">照片5</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片6">
+                                </div>
+                                <div class="album-caption">照片6</div>
+                            </div>
+                            <!-- 第三行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片7">
+                                </div>
+                                <div class="album-caption">照片7</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片8">
+                                </div>
+                                <div class="album-caption">照片8</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片9">
+                                </div>
+                                <div class="album-caption">照片9</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <div class="counter">
+                        您是第 <span id="visitor-count">015832</span> 位访客 <span class="blink">█</span>
+                    </div>
+                    <p>Copyright © 2013 绪亓的浅蓝日记 All Rights Reserved.</p>
+                    <p>本页面最佳浏览效果：使用Chrome浏览器，分辨率 800×600</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // 图片点击查看大图功能
+function initImageModal() {
+  // 获取模态框元素
+  var modal = document.getElementById("imageModal");
+  var modalImg = document.getElementById("modalImage");
+  var captionText = document.getElementById("modalCaption");
+  
+  // 为所有图片添加点击事件
+  var images = document.querySelectorAll('.local-image');
+  images.forEach(function(img) {
+    img.onclick = function(){
+      modal.style.display = "block";
+      modalImg.src = this.src;
+      captionText.innerHTML = this.alt;
+    }
+  });
+  
+  // 获取关闭按钮
+  var span = document.getElementsByClassName("close")[0];
+  
+  // 点击关闭按钮关闭模态框
+  span.onclick = function() { 
+    modal.style.display = "none";
+  }
+  
+  // 点击模态框背景关闭
+  modal.onclick = function(event) {
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+}
+
+// 在页面加载完成后初始化图片模态框
+document.addEventListener('DOMContentLoaded', function() {
+  initImageModal();
+});
+
+    // 简单的访客计数器动画
+    let count = 15832;
+    setInterval(function() {
+        count++;
+        document.getElementById('visitor-count').textContent = 
+            count.toString().padStart(6, '0');
+    }, 30000); // 每30秒增加一位访客
+    
+    // 年份导航交互 - 修改后的版本
+    document.querySelectorAll('.wayback-years a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            // 移除所有active类
+            document.querySelectorAll('.wayback-years a').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 为当前点击的链接添加active类
+            this.classList.add('active');
+            
+            // 只有当链接是"#"时才阻止默认行为，否则允许跳转
+            if (this.getAttribute('href') === '#' || this.getAttribute('href') === '') {
+                e.preventDefault();
+            }
+            // 对于有实际URL的链接，不阻止默认行为，允许跳转
+        });
+    });
+    
+    // 留言板提交功能
+    document.querySelector('.submit-btn').addEventListener('click', function() {
+        alert('暂未开放留言功能');
+    });
+    
+    // 显示相册功能
+    function showAlbum() {
+        document.getElementById('home-content').style.display = 'none';
+        document.getElementById('album-content').style.display = 'block';
+    }
+    
+    // 显示首页功能
+    function showHomePage() {
+        document.getElementById('home-content').style.display = 'block';
+        document.getElementById('album-content').style.display = 'none';
+    }
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

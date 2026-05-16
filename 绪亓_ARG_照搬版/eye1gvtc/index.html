@@ -1,0 +1,147 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>vyvyb</title>
+    <style>
+        /* -------------------------- 1. 页面背景和内容样式 (默认/桌面样式) -------------------------- */
+        body {
+            /* 页面背景样式 */
+            background-image: url('http://dl.glitter-graphics.net/pub/276/276641bo1jln0l84.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+
+            /* **修复：解决手机端点击变蓝/高亮的问题** */
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        /* 被遮罩的页面内容 */
+        .content {
+            position: relative;
+            height: 100vh;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 20px;
+            box-sizing: border-box;
+            color: white; /* 示例文字为白色 */
+            font-size: 24px; /* **默认文字大小** */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 示例文字的样式和随机定位 */
+        .text-box {
+            position: absolute;
+            width: 200px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        /* -------------------------- 2. 黑色遮罩层样式 -------------------------- */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 100;
+            
+            /* 光斑尺寸 */
+            background-image: radial-gradient(
+                circle at var(--x, 80%) var(--y, 80%),
+                transparent 1px,
+                rgba(0, 0, 0, 0) 10px,
+                rgba(0, 0, 0, 1) 100px
+            );
+
+            background-color: black;
+            transition: background-color 0.5s ease-out;
+        }
+
+        /* ========================== 3. 手机屏幕适配 (Media Query) ========================== */
+        @media (max-width: 600px) {
+            .content {
+                font-size: 12px;
+                flex-direction: column;
+                justify-content: space-evenly;
+                align-items: center;
+                text-align: center;
+            }
+            .text-box {
+                position: relative; 
+                top: auto !important;
+                left: auto !important;
+                width: 90%;
+                margin: 10px 0;
+                padding: 5px;
+            }
+            
+            .overlay {
+                 background-image: radial-gradient(
+                    circle at var(--x, 50%) var(--y, 50%),
+                    transparent 1px,
+                    rgba(0, 0, 0, 0) 5px,
+                    rgba(0, 0, 0, 1) 50px
+                );
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+
+    <div class="content">
+        <div class="text-box" style="top: 10%; left: 10%;">眼睛开启心https://灵开启眼界涅槃重生</div>
+        <div class="text-box" style="top: 60%; left: 75%;">耶稣菩萨大anninganya-帝上天高维眷顾被记住万物复苏</div>
+        <div class="text-box" style="top: 25%; left: 45%;">看见心灵刺透glitch.github.io/思想涅槃因果循环</div>
+        <div class="text-box" style="top: 85%; left: 30%;">神明天使保佑报eye2ryxtvcr应反噬吞噬轮回</div>
+    </div>
+
+    <div id="overlay" class="overlay"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const overlay = document.getElementById('overlay');
+
+            // 首次点击或移动时，启用透光效果并移除纯黑背景
+            const enableLight = (event) => {
+                // 对于触摸屏，event.touches[0] 可以获取触摸点
+                const clientX = event.clientX || (event.touches && event.touches[0] ? event.touches[0].clientX : 0);
+                const clientY = event.clientY || (event.touches && event.touches[0] ? event.touches[0].clientY : 0);
+                
+                if (clientX === 0 && clientY === 0) return; // 避免无效事件触发
+
+                const xPos = clientX + 'px';
+                const yPos = clientY + 'px';
+
+                // 1. 更新 CSS 变量
+                overlay.style.setProperty('--x', xPos);
+                overlay.style.setProperty('--y', yPos);
+
+                // 2. 移除纯黑色背景，让 radial-gradient 的黑色部分作为唯一的遮罩
+                setTimeout(() => {
+                    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+                }, 10);
+            };
+
+            // 监听鼠标/触摸事件 (首次点击/触摸启用透光)
+            overlay.addEventListener('click', enableLight);
+            overlay.addEventListener('touchstart', enableLight);
+
+            // 监听鼠标移动/触摸移动，实现“手电筒”效果
+            overlay.addEventListener('mousemove', enableLight);
+            overlay.addEventListener('touchmove', enableLight);
+        });
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

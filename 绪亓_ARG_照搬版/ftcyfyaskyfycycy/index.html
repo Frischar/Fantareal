@@ -1,0 +1,539 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hfycudc</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-image: url('https://dl.glitter-graphics.com/pub/374/374783uhmkxhr85h.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            color: white;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .question {
+            font-size: 1.5rem;
+            margin-bottom: 40px;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.5;
+        }
+        
+        .options {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .option {
+            padding: 12px 25px;
+            border: 1px solid white;
+            background: transparent;
+            color: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 100px;
+        }
+        
+        .option:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .typing-container {
+            display: inline-block;
+            position: relative;
+            text-align: left;
+            width: 100%;
+        }
+        
+        .typing {
+            display: inline;
+            overflow: hidden;
+            border-right: 2px solid white;
+            white-space: nowrap;
+            margin: 0 auto;
+            letter-spacing: 0.05em;
+            animation: typing 3.5s steps(40, end), blink-caret 0.75s step-end infinite;
+        }
+        
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+        
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: white }
+        }
+        
+        .typing-done {
+            white-space: normal;
+            border-right: none;
+        }
+        
+        .songti {
+            font-family: "SimSun", "宋体", serif;
+        }
+        
+        .red-text {
+            color: #ff5555;
+        }
+        
+        input[type="text"] {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid white;
+            color: white;
+            font-size: 1.2rem;
+            padding: 5px 10px;
+            text-align: center;
+            width: 200px;
+            margin: 20px 0;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-bottom: 1px solid #ff5555;
+        }
+        
+        .fade-in {
+            animation: fadeIn 1.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @media (max-width: 600px) {
+            .question {
+                font-size: 1.2rem;
+            }
+            
+            .options {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .option {
+                width: 100%;
+                max-width: 200px;
+                margin: 0 auto;
+            }
+            
+            .typing {
+                white-space: normal;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <div class="container">
+        <div id="question-container" class="question"></div>
+        <div id="options-container" class="options"></div>
+        <div id="input-container" class="hidden"></div>
+    </div>
+
+    <script>
+        // 问题数据
+        const questions = [
+            { text: "你最近是否经常感到情绪低落？", options: ["是", "否"] },
+            { text: "你是否经常食欲不振？", options: ["是", "否"] },
+            { text: "你是否感到入睡困难？", options: ["是", "否"] },
+            { text: "你是否感到精力低下？", options: ["是", "否"] },
+            { text: "你是否在和他人交际时感到困难？", options: ["是", "否"] },
+            { text: "你是否经常感到焦虑？", options: ["是", "否"] },
+            { text: "你是否会常常感到胸闷，心悸或心慌？", options: ["是", "否"] },
+            { text: "你是否感到自己的生活失去规律？", options: ["是", "否"] },
+            { text: "你是否对过去感兴趣的事情失去动力？", options: ["是", "否"] },
+            { text: "你是否觉得未来失去了希望？", options: ["是", "否"] },
+            { text: "你是否常常沉浸于过去？", options: ["是", "否"] },
+            { text: "你的脑海中是否有人在和你对话？", options: ["是", "否"] },
+            { text: "你是否曾有过伤害自己的想法？", options: ["是", "否"] },
+            { text: "你是否认为他人会伤害你？", options: ["是", "否"] },
+            { text: "你是否认为有人正在监视你的行动？", options: ["是", "否"] },
+            { text: "你是否认为自己正陷入一场阴谋？", options: ["是", "否"] },
+            { text: "你是否认为自己亲近的人被替换？", options: ["是", "否"] },
+            { text: "你是否认为有人在控制你的想法？", options: ["是", "否"] },
+            { text: "我失去了生活的信心。", options: ["是", "否"] },
+            { text: "我认为过去的一切都把我困住了。", options: ["是", "否"] },
+            { text: "我好像被切断外界的联系。", options: ["是", "否"] },
+            { text: "如果可以，我希望一切可以回到过去，不惜一切代价。", options: ["是", "否"] },
+            { text: "我愿意以一切代价达成我的愿望。", options: ["是", "否"] },
+            { text: "存在和体验，哪个重要？", options: ["存在", "体验"] },
+            { 
+                text: "如果你拥有一个机会，可以实现你的任何愿望一天，但代价是一天后你的所有存在都会被抹去，你是否愿意接受？", 
+                options: ["是", "否"],
+                branch: true
+            }
+        ];
+
+        // 分支问题
+        const branchQuestionsYes = [
+            { text: "哪怕所有人都不再记得你，你在世界上的一切痕迹都被抹去，你就像从未来到过这个世上？", options: ["是", "否"] },
+            { text: "哪怕愿望实现后你会归为虚无，没有\"未开始\"没有\"来世\"？", options: ["是", "否"] },
+            { text: "哪怕只是为了再看她一眼，和她度过最后一天？", options: ["是", "否"] }
+        ];
+
+        const branchQuestionsNo = [
+            { text: "你愿意抛弃这个机会，哪怕以后再也无法实现你的愿望？", options: ["是", "否"] },
+            { text: "哪怕真的拥有\"来世\"或\"天堂\"，你也无法再实现这个愿望？", options: ["是", "否"] },
+            { text: "哪怕以后真的再也见不到她？", options: ["是", "否"] }
+        ];
+
+        // 打字效果部分
+        const typingQuestions = [
+            { text: "你现在的时间是？", input: true, placeholder: "点击输入文字" },
+            { text: "我们果然不在一个地方。", options: ["是"] },
+            { text: "但是你和我，竟然也是一样的人。", options: ["是"] },
+            { text: "别误会，只是我曾经以为能够决定我命运的神明会是至高无上的存在，拥有广大的神通。", options: ["是"] },
+            { text: "却没想到，你和我一样，都是普通人。", options: ["是"] },
+            { text: "我有点好奇，在你的世界，我是以什么形式出现的？", input: true, placeholder: "最多六个字" },
+            { text: "？我不太懂，但是听上去挺有意思。", options: ["是"], dynamic: true },
+            { text: "我没想到我的一生会以这种形式在你的世界呈现，可能你之前也没有想到这不仅仅是个故事吧。", options: ["是"] },
+            { text: "也许当你刷新网页，回到最初，会有另一个\"我\"也在等待着你吗？太神奇了。", options: ["是"] },
+            { text: "总而言之，我很感谢你来到这里，能看到这些，你一定有常人难以拥有的好奇心。", options: ["是"] },
+            { text: "如你所见，我生前也和你一样，在生活中挣扎。可惜的是，我失败了。", options: ["是"] },
+            { text: "我因为妈妈的离世和爸爸的性情大变变得精神失常，在生命的最后一段时间，我疯狂寻找能让我实现愿望的方法。", options: ["是"] },
+            { text: "最后，我在博客编辑了你看到的仪式，不知道是否是仪式真的起效，在我决定离开这个世界后，我进入了一片无边的虚无。我没有死去，也没有活着。", options: ["是"] },
+            { text: "在这里没有时间，没有空间，我感到自己在这呆了很久，毕竟我已经快忘记原来的我是什么样的了。却又感觉很短，毕竟我无法感受到时间流逝的痕迹，一切都一成不变。我察觉到我的存在真的在我原来的世界被抹去，但似乎还残留了部分，这也就是我为什么能在这和你对话吧。", options: ["是"] },
+            { text: "后来我意识到，如果没有一个\"神明\"出来帮我完结这个仪式，我会一直困在这里，这也就是为什么，你能在一开始看到那个帖子。", options: ["是"] },
+            { text: "我的世界现在是2023年，而你的世界是", options: ["是"], dynamicTime: true },
+            { text: "我们却能在同一刻交流，也许此时你也进入了某种\"虚空\"？", options: ["是"] },
+            { text: "....对吧？", options: ["是"] },
+            { text: "开个玩笑啦，我真的不希望有人会再走我的后路，无论你之前选择了什么，我都希望你能比我过得更好。", options: ["是"] },
+            { text: "不用为我惋惜，我从来没有后悔过我的选择，因为我的故事已经走到终点，现在只是缺了一个句号而已。", options: ["是"] },
+            { text: "如果有机会重新选过，我可能还是会走这条路。", options: ["是"] },
+            { text: "我真的很想她。", options: ["是"] },
+            { text: "我很怀念在她怀里听她讲她年轻时故事的时候，我那时候总想着长大了要当一个导演，把她的故事拍成电视剧或电影。", options: ["是"] },
+            { text: ".......", options: ["是"] },
+            { text: "我现在依然后悔，那天为什么不早点回家，这样她也许就不会去世了。", options: ["是"] },    
+            { text: ".......对不起，又让你看着我自说自话。", options: ["是"] },                    
+            { text: "我想是时候了，让我们做最后的抉择。如果你选择存在，我的离去会被修正，我会回到我的世界继续生活。如果你选择体验，我会拥有最后一天和她相处的时间，随后彻底消失。", options: ["是"] },
+            { text: "现在....存在和体验，哪个重要？", options: ["存在", "体验"], white: true }
+        ];
+
+        // 最终问题
+        const finalQuestion = {
+            text: "谢谢你，无论你选择了什么，至少在另一个世界的你看到了我的一生，我想是时候说再见了，去过你的生活吧！",
+            options: ["再见"]
+        };
+
+        // 状态变量
+        let currentQuestionIndex = 0;
+        let isInBranch = false;
+        let branchType = null; // 'yes' 或 'no'
+        let branchQuestionIndex = 0;
+        let isInTypingSection = false;
+        let typingQuestionIndex = 0;
+        let userTime = "";
+        let userForm = "";
+        let userFinalChoice = "";
+        let isTypingAnimation = false;
+        let typingAnimationTimeout;
+
+        // DOM 元素
+        const questionContainer = document.getElementById('question-container');
+        const optionsContainer = document.getElementById('options-container');
+        const inputContainer = document.getElementById('input-container');
+
+        // 初始化
+        function init() {
+            showQuestion(0);
+        }
+
+        // 显示问题
+        function showQuestion(index) {
+            // 清除之前的动画
+            clearTimeout(typingAnimationTimeout);
+            isTypingAnimation = false;
+            
+            let question;
+            
+            if (isInTypingSection) {
+                question = typingQuestions[typingQuestionIndex];
+                
+                // 处理动态文本
+                if (question.dynamic && userForm) {
+                    question.text = userForm + question.text;
+                }
+                
+                if (question.dynamicTime && userTime) {
+                    question.text = question.text + userTime;
+                }
+                
+                // 应用宋体
+                questionContainer.classList.add('songti');
+                optionsContainer.classList.add('songti');
+                
+                // 打字效果
+                if (typingQuestionIndex > 0) {
+                    startTypingAnimation(question.text, question.options, question.input, question.red);
+                    return;
+                }
+            } else if (isInBranch) {
+                if (branchType === 'yes') {
+                    question = branchQuestionsYes[branchQuestionIndex];
+                } else {
+                    question = branchQuestionsNo[branchQuestionIndex];
+                }
+            } else {
+                question = questions[index];
+            }
+            
+            displayQuestion(question);
+        }
+
+        // 开始打字动画
+        function startTypingAnimation(text, options, hasInput, isRed) {
+            isTypingAnimation = true;
+            questionContainer.innerHTML = "";
+            optionsContainer.innerHTML = "";
+            inputContainer.innerHTML = "";
+            inputContainer.classList.add('hidden');
+            
+            questionContainer.classList.remove('fade-in');
+            
+            // 创建打字效果容器
+            const typingContainer = document.createElement('div');
+            typingContainer.className = 'typing-container';
+            questionContainer.appendChild(typingContainer);
+            
+            // 创建打字效果元素
+            const typingElement = document.createElement('span');
+            typingElement.className = 'typing';
+            typingElement.textContent = text;
+            typingContainer.appendChild(typingElement);
+            
+            // 模拟打字效果
+            let i = 0;
+            const typeWriter = () => {
+                if (i < text.length) {
+                    typingElement.innerHTML = text.substring(0, i+1);
+                    i++;
+                    typingAnimationTimeout = setTimeout(typeWriter, 50);
+                } else {
+                    // 动画结束后，移除打字效果类，添加完成类
+                    typingElement.classList.remove('typing');
+                    typingElement.classList.add('typing-done');
+                    isTypingAnimation = false;
+                    
+                    // 显示选项
+                    if (hasInput) {
+                        showInputField();
+                    } else if (options) {
+                        showOptions(options, isRed);
+                    }
+                }
+            };
+            
+            typeWriter();
+        }
+
+        // 显示问题
+        function displayQuestion(question) {
+            questionContainer.innerHTML = question.text;
+            questionContainer.classList.remove('fade-in');
+            void questionContainer.offsetWidth; // 触发重绘
+            questionContainer.classList.add('fade-in');
+            
+            optionsContainer.innerHTML = "";
+            inputContainer.innerHTML = "";
+            inputContainer.classList.add('hidden');
+            
+            if (question.red) {
+                questionContainer.classList.add('red-text');
+            } else {
+                questionContainer.classList.remove('red-text');
+            }
+            
+            if (question.input) {
+                showInputField(question.placeholder);
+            } else if (question.options) {
+                showOptions(question.options, question.red);
+            }
+        }
+
+        // 显示输入字段
+        function showInputField(placeholder = "") {
+            inputContainer.innerHTML = "";
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = placeholder;
+            input.maxLength = 6;
+            
+            const button = document.createElement('button');
+            button.className = 'option';
+            button.textContent = '确认';
+            button.onclick = () => {
+                if (input.value.trim() !== '') {
+                    if (typingQuestionIndex === 0) {
+                        userTime = input.value;
+                    } else if (typingQuestionIndex === 5) {
+                        userForm = input.value;
+                    }
+                    nextQuestion();
+                }
+            };
+            
+            inputContainer.appendChild(input);
+            inputContainer.appendChild(button);
+            inputContainer.classList.remove('hidden');
+            
+            // 自动聚焦输入框
+            input.focus();
+            
+            // 按回车键提交
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    button.click();
+                }
+            });
+        }
+
+        // 显示选项
+        function showOptions(options, isRed = false) {
+            optionsContainer.innerHTML = "";
+            
+            options.forEach(option => {
+                const button = document.createElement('button');
+                button.className = 'option';
+                button.textContent = option;
+                if (isRed) {
+                    button.classList.add('red-text');
+                }
+                button.onclick = () => handleOptionClick(option);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        // 处理选项点击
+        function handleOptionClick(option) {
+            if (isTypingAnimation) return;
+            
+            if (isInTypingSection) {
+                // 打字部分的选择
+                if (typingQuestionIndex === typingQuestions.length - 1) {
+                    // 最后一个问题
+                    userFinalChoice = option;
+                    showFinalQuestion();
+                } else {
+                    typingQuestionIndex++;
+                    showQuestion();
+                }
+            } else if (isInBranch) {
+                // 分支问题的选择
+                if (option === '否') {
+                    // 如果分支问题中选择了"否"，转到另一个分支
+                    isInBranch = false;
+                    branchType = 'no';
+                    branchQuestionIndex = 0;
+                    isInTypingSection = true;
+                    typingQuestionIndex = 0;
+                    showQuestion();
+                } else {
+                    branchQuestionIndex++;
+                    if (branchQuestionIndex >= (branchType === 'yes' ? branchQuestionsYes.length : branchQuestionsNo.length)) {
+                        // 分支问题结束，进入打字部分
+                        isInBranch = false;
+                        isInTypingSection = true;
+                        typingQuestionIndex = 0;
+                        showQuestion();
+                    } else {
+                        showQuestion();
+                    }
+                }
+            } else {
+                // 主要问题的选择
+                if (currentQuestionIndex === 23 && questions[currentQuestionIndex].branch) {
+                    // 分支问题
+                    isInBranch = true;
+                    branchType = option === '是' ? 'yes' : 'no';
+                    branchQuestionIndex = 0;
+                    showQuestion();
+                } else {
+                    currentQuestionIndex++;
+                    if (currentQuestionIndex >= questions.length) {
+                        // 所有问题结束，进入打字部分
+                        isInTypingSection = true;
+                        typingQuestionIndex = 0;
+                        showQuestion();
+                    } else {
+                        showQuestion(currentQuestionIndex);
+                    }
+                }
+            }
+        }
+
+        // 显示最终问题
+        function showFinalQuestion() {
+            questionContainer.innerHTML = finalQuestion.text;
+            questionContainer.classList.remove('fade-in');
+            void questionContainer.offsetWidth;
+            questionContainer.classList.add('fade-in');
+            
+            optionsContainer.innerHTML = "";
+            
+            const button = document.createElement('button');
+            button.className = 'option';
+            button.textContent = finalQuestion.options[0];
+            button.onclick = () => {
+                // 根据用户最终选择跳转到不同链接
+                if (userFinalChoice === '存在') {
+                    window.location.href = '../dztxend1fyvyfyf/index.html';
+                } else {
+                    window.location.href = '../fxgxtend2fucycy/index.html';
+                }
+            };
+            optionsContainer.appendChild(button);
+        }
+
+        // 下一个问题
+        function nextQuestion() {
+            if (isInTypingSection) {
+                typingQuestionIndex++;
+                if (typingQuestionIndex >= typingQuestions.length) {
+                    showFinalQuestion();
+                } else {
+                    showQuestion();
+                }
+            }
+        }
+
+        // 初始化测试
+        init();
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

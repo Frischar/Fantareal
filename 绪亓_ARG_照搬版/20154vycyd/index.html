@@ -1,0 +1,958 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>绪亓的浅蓝日记 - 2015年7月15日</title>
+   <style>
+    * {
+        margin: 0;
+        padding: 0;
+        font-family: "宋体", "SimSun", serif;
+    }
+    
+    body {
+        background-color: #f5f5f5;
+        color: #333;
+        width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        background-image: url('http://dl9.glitter-graphics.net/pub/255/255669xtc0rw9srd.gif');
+        background-attachment: fixed;
+        background-repeat: repeat;
+        position: relative;
+    }
+    
+    /* 主内容区域布局 */
+    .main-container {
+        display: flex;
+        gap: 20px;
+    }
+    
+    /* 左侧导航栏 */
+    .sidebar {
+        width: 200px;
+        flex-shrink: 0;
+    }
+    
+    /* 右侧内容区域 */
+    .content-area {
+        flex: 1;
+    }
+    
+    /* 时光机导航栏样式 - 保持蓝色主题不变 */
+    .wayback-nav {
+        background: linear-gradient(135deg,#2c5fa8 0%, #4a7fc1 100%);
+        color: white;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 15;
+        position: relative;
+    }
+    
+    .wayback-years {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .wayback-years a {
+        color: white;
+        text-decoration: none;
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+    
+    .wayback-years a:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .wayback-years a.active {
+        background-color: rgba(255, 255, 255, 0.3);
+        font-weight: bold;
+    }
+    
+    .wayback-next {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background-color: white;
+        color: #8B0000; /* 改为红色系 */
+        text-decoration: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .wayback-next:hover {
+        background-color: #ffe6e6; /* 浅红色背景 */
+        transform: translateX(5px);
+    }
+    
+    .container {
+        background-image: url('http://dl3.glitter-graphics.net/pub/3762/3762713fzftf1zuss.png');
+        background-attachment: fixed;
+        background-repeat: repeat;
+        border: 3px double #8B0000; /* 改为深红色 */
+        padding: 20px;
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 10;
+        box-shadow: 3px 3px 10px rgba(139,0,0,0.2); /* 红色阴影 */
+    }
+    
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 15px;
+        border-bottom: 2px dotted #8B0000; /* 改为深红色 */
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border: 2px outset #8B0000; /* 改为深红色 */
+    }
+    
+    /* 添加横幅样式 */
+    .header-banner {
+        margin: 0 auto 20px auto;
+        text-align: center;
+    }
+    
+    table table table td { 
+        vertical-align: top !important; 
+    }
+    
+    span.blacktext12 { 
+        visibility: visible !important; 
+        background-image: url('http://dl4.glitter-graphics.net/pub/240/240564kb044w2nen.jpg'); 
+        background-repeat: no-repeat; 
+        background-position: center center; 
+        background-color: transparent; 
+        font-size: 0px; 
+        letter-spacing: -0.5px; 
+        width: 435px; 
+        height: 75px; 
+        display: block !important; 
+        margin: 0 auto;
+    }
+    
+    span.blacktext12 img { 
+        display: none; 
+    }
+    
+    .banner-link {
+        display: block;
+        margin-top: 5px;
+        color: #8B0000; /* 改为深红色 */
+        text-decoration: none;
+        font-size: 12px;
+    }
+    
+    .blog-title {
+        font-size: 32px;
+        color: #8B0000; /* 改为深红色 */
+        text-shadow: 2px 2px 0px #000;
+        margin-bottom: 10px;
+        letter-spacing: 3px;
+    }
+    
+    .subtitle {
+        font-size: 18px;
+        color: #B22222; /* 改为火砖红 */
+        font-style: italic;
+    }
+    
+    .date {
+        color: #8B0000; /* 改为深红色 */
+        font-size: 14px;
+        margin-top: 10px;
+    }
+    
+    .nav {
+        background-color: #ffe6e6; /* 浅红色背景 */
+        padding: 10px;
+        margin-bottom: 20px;
+        border: 2px outset #8B0000; /* 改为深红色 */
+        text-align: center;
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 5px;
+    }
+    
+    .nav a {
+        color: #8B0000; /* 改为深红色 */
+        text-decoration: none;
+        margin: 0 10px;
+        font-weight: bold;
+    }
+    
+    .nav a:hover {
+        color: #600000; /* 更深的红色 */
+        text-decoration: underline;
+    }
+    
+    .content {
+        line-height: 1.6;
+    }
+    
+    .post {
+        margin-bottom: 30px;
+        padding: 15px;
+        border-bottom: 1px dotted #8B0000; /* 改为深红色 */
+        position: relative;
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        border-radius: 8px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border: 2px outset #B22222; /* 改为火砖红 */
+    }
+    
+    .post-title {
+        font-size: 22px;
+        color: #8B0000; /* 改为深红色 */
+        margin-bottom: 10px;
+        background: linear-gradient(to bottom, #ffe6e6, #B22222); /* 红色渐变 */
+        padding: 8px 12px;
+        border: 2px outset #8B0000; /* 改为深红色 */
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 5px;
+        text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
+    }
+    
+    .post-content {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 15px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 5px;
+        border: 1px inset #B22222; /* 改为火砖红 */
+    }
+    
+    .image-container {
+        text-align: center;
+        margin: 15px 0;
+        position: relative;
+    }
+    
+    .broken-image {
+        border: 2px dashed #8B0000; /* 改为深红色 */
+        background-color: #fff5f5; /* 浅红色背景 */
+        padding: 10px;
+        display: inline-block;
+        margin: 10px;
+        width: 220px;
+        height: 180px;
+        position: relative;
+        box-shadow: 2px 2px 5px rgba(139,0,0,0.1); /* 红色阴影 */
+        border-radius: 5px;
+    }
+    
+    /* 修改图片占位符样式，使其可以轻松替换为本地图片 */
+    .broken-image-placeholder {
+        width: 200px;
+        height: 150px;
+        background-color: #ffe6e6; /* 浅红色背景 */
+        border: 1px solid #B22222; /* 改为火砖红 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8B0000; /* 改为深红色 */
+        font-size: 14px;
+        text-align: center;
+        padding: 10px;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    
+    /* 图片查看模态框样式 */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        padding-top: 50px;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.9);
+    }
+
+    .modal-content {
+        margin: auto;
+        display: block;
+        width: 80%;
+        max-width: 700px;
+        border: 3px outset #8B0000; /* 改为深红色 */
+        border-radius: 8px;
+        box-shadow: 0 4px 8px 0 rgba(139,0,0,0.2), 0 6px 20px 0 rgba(139,0,0,0.19); /* 红色阴影 */
+    }
+
+    #modalCaption {
+        margin: auto;
+        display: block;
+        width: 80%;
+        max-width: 700px;
+        text-align: center;
+        color: #ccc;
+        padding: 10px 0;
+        font-size: 16px;
+    }
+
+    .close {
+        position: absolute;
+        top: 15px;
+        right: 35px;
+        color: #f1f1f1;
+        font-size: 40px;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+
+    .close:hover,
+    .close:focus {
+        color: #B22222; /* 改为火砖红 */
+        text-decoration: none;
+        cursor: pointer;
+    }
+    
+    /* 本地图片样式 - 确保填充其 4:3 容器 */
+    .local-image {
+        width: 100%; /* 更改为 100% */
+        height: 100%; /* 更改为 100% */
+        object-fit: cover;
+        border: 1px solid #B22222; /* 改为火砖红 */
+        border-radius: 3px;
+    }
+    
+    .image-caption {
+        font-size: 12px;
+        color: #8B0000; /* 改为深红色 */
+        margin-top: 5px;
+    }
+    
+    /* 分割线样式 */
+    .divider {
+        text-align: center;
+        margin: 15px 0;
+        padding: 10px 0;
+    }
+    
+    .footer {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 2px dotted #8B0000; /* 改为深红色 */
+        font-size: 12px;
+        color: #8B0000; /* 改为深红色 */
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1); /* 红色阴影 */
+        border: 2px outset #B22222; /* 改为火砖红 */
+    }
+    
+    .counter {
+        background-color: #000;
+        color: #ff0000; /* 改为红色 */
+        padding: 5px 10px;
+        font-family: "Courier New", monospace;
+        display: inline-block;
+        margin: 10px 0;
+        box-shadow: 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 3px;
+    }
+    
+    /* 特殊符号 */
+    .symbol {
+        font-size: 18px;
+        margin: 0 2px;
+    }
+    
+    /* 光标动画 */
+    .blink {
+        animation: blink 1s infinite;
+    }
+    
+    @keyframes blink {
+        0% { opacity: 1; }
+        50% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+    
+    /* 古早风格的滚动条 */
+    ::-webkit-scrollbar {
+        width: 16px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #ffe6e6; /* 浅红色背景 */
+        border: 1px solid #8B0000; /* 改为深红色 */
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #B22222; /* 改为火砖红 */
+        border: 1px solid #8B0000; /* 改为深红色 */
+    }
+    
+    /* 左侧导航栏样式 - 红色主题 */
+    .sidebar-widget {
+        background-image: url('http://dl3.glitter-graphics.net/pub/3762/3762713fzftf1zuss.png');
+        background-attachment: fixed;
+        background-repeat: repeat;
+        border: 2px outset #8B0000; /* 改为深红色 */
+        margin-bottom: 20px;
+        padding: 15px;
+        box-shadow: 3px 3px 8px rgba(139,0,0,0.2); /* 红色阴影 */
+        border-radius: 8px;
+    }
+    
+    .widget-title {
+        background: linear-gradient(to right, #8B0000, #B22222); /* 红色渐变 */
+        color: white;
+        padding: 8px 12px;
+        margin: -15px -15px 15px -15px;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        border-bottom: 2px solid #600000; /* 更深的红色 */
+        border-radius: 6px 6px 0 0;
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.3);
+    }
+    
+    .profile-pic {
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    
+    .profile-pic img {
+        border: 3px outset #8B0000; /* 改为深红色 */
+        padding: 3px;
+        background: white;
+        border-radius: 5px;
+    }
+    
+    .profile-info {
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 15px;
+        background: rgba(255, 230, 230, 0.8); /* 浅红色背景 */
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px inset #B22222; /* 改为火砖红 */
+    }
+    
+    .guestbook-form textarea {
+        width: 100%;
+        height: 100px;
+        border: 2px inset #8B0000; /* 改为深红色 */
+        background: #fff5f5; /* 浅红色背景 */
+        padding: 5px;
+        font-size: 12px;
+        margin-bottom: 10px;
+        resize: vertical;
+        border-radius: 3px;
+    }
+    
+    .guestbook-form input[type="text"] {
+        width: 100%;
+        border: 2px inset #8B0000; /* 改为深红色 */
+        background: #fff5f5; /* 浅红色背景 */
+        padding: 5px;
+        font-size: 12px;
+        margin-bottom: 10px;
+        border-radius: 3px;
+    }
+    
+    .submit-btn {
+        background: linear-gradient(to bottom, #8B0000, #600000); /* 红色渐变 */
+        border: 2px outset #8B0000; /* 改为深红色 */
+        color: white;
+        padding: 8px 15px;
+        font-weight: bold;
+        cursor: pointer;
+        width: 100%;
+        font-size: 14px;
+        border-radius: 5px;
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+        box-shadow: inset 1px 1px 3px rgba(255,255,255,0.2);
+    }
+    
+    .submit-btn:hover {
+        background: linear-gradient(to bottom, #600000, #8B0000); /* 红色渐变 */
+    }
+    
+    .submit-btn:active {
+        border: 2px inset #8B0000; /* 改为深红色 */
+    }
+    
+    .guestbook-entry {
+        border-bottom: 1px dotted #8B0000; /* 改为深红色 */
+        padding: 10px 0;
+        font-size: 12px;
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        margin-bottom: 8px;
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px inset #B22222; /* 改为火砖红 */
+    }
+    
+    .guestbook-author {
+        font-weight: bold;
+        color: #8B0000; /* 改为深红色 */
+    }
+    
+    .guestbook-date {
+        color: #B22222; /* 改为火砖红 */
+        font-size: 11px;
+    }
+    
+    /* 相册样式 */
+    .album-section {
+        margin-top: 30px;
+        padding: 15px;
+        background: rgba(255, 230, 230, 0.9); /* 浅红色背景 */
+        border-radius: 8px;
+        box-shadow: inset 2px 2px 5px rgba(139,0,0,0.1), 2px 2px 5px rgba(139,0,0,0.2); /* 红色阴影 */
+        border: 2px outset #B22222; /* 改为火砖红 */
+    }
+    
+    .album-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0; /* 设置为0, 消除间隙 */
+        margin-top: 15px;
+    }
+    
+    .album-item {
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .album-image {
+        width: 100%;
+        aspect-ratio: 4 / 3; /* 改为 4:3 比例 */
+        /* height: 150px; 已移除 */
+        /* object-fit: cover; 已移除 */
+        border: 2px outset #8B0000; /* 改为深红色 */
+        border-radius: 0; /* 取消圆角, 使图片之间无缝连接 */
+        background-color: #fff5f5; /* 浅红色背景 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8B0000; /* 改为深红色 */
+        font-size: 14px;
+    }
+    
+    .album-caption {
+        font-size: 12px;
+        color: #8B0000; /* 改为深红色 */
+        margin-top: 5px;
+    }
+    
+    /* 图片上传区域样式 */
+    .upload-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0; /* 设置为0, 消除间隙 */
+        margin-top: 15px;
+    }
+    
+    .upload-item {
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .upload-box {
+        width: 100%;
+        aspect-ratio: 4 / 3; /* 改为 4:3 比例 */
+        /* height: 150px; 已移除 */
+        border: 2px outset #8B0000; /* 改为深红色 */
+        border-radius: 0; /* 取消圆角, 使图片之间无缝连接 */
+        background-color: #fff5f5; /* 浅红色背景 */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #8B0000; /* 改为深红色 */
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        position: relative; /* 添加相对定位, 用于绝对定位预览图 */
+    }
+    
+    .upload-box:hover {
+        background-color: #ffe6e6; /* 浅红色背景 */
+    }
+    
+    .upload-icon {
+        font-size: 24px;
+        margin-bottom: 5px;
+        position: relative; /* 确保图标和文字显示在预览图之上 */
+        z-index: 2;
+    }
+    
+    .upload-input {
+        display: none; /* 隐藏默认的文件输入框 */
+    }
+    
+    .upload-preview {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: none; /* 初始隐藏预览图 */
+        position: absolute; /* 绝对定位, 确保图片完全覆盖 upload-box */
+        top: 0;
+        left: 0;
+        z-index: 1; /* 确保在上传提示文字之下 */
+    }
+    
+    /* 不兼容移动设备的设置 */
+    @media (max-width: 1000px) {
+        body {
+            width: 1000px;
+        }
+    }
+</style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+   <div id="imageModal" class="modal">
+  <span class="close">&times;</span>
+  <img class="modal-content" id="modalImage">
+  <div id="modalCaption"></div>
+</div>
+    <div class="wayback-nav">
+        <div class="wayback-years">
+            <a href="../2009/index.html">2009</a>
+            <a href="../2010/index.html">2010</a>
+            <a href="../2011/index.html">2011</a>
+            <a href="../2012/index.html">2012</a>
+            <a href="../2013/index.html">2013</a>
+            <a href="../2014/index.html">2014</a>
+            <a href="../2015/index.html" class="active">2015</a>
+            <a href="#">2023</a>
+        </div>
+        <a href="#" class="wayback-next">下一个存档 →</a>
+    </div>
+    
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-widget">
+                <div class="widget-title">关于我</div>
+                <div class="profile-pic">
+                    <img src="http://dl5.glitter-graphics.net/pub/38/38865sbzpakznvs.gif" width="100" height="132" alt="我的头像">
+                </div>
+                <div class="profile-info">
+                    <p>大家好，我是鏋楁矆鎮</p>
+                    <p>今年鈭岁，喜欢𤫇𤫇𨯬甇䔶羓。</p>
+                    <p>这个博客记录了我的生活点滴，欢迎常来玩！</p>
+                </div>
+            </div>
+            
+            <div class="sidebar-widget">
+                <div class="widget-title">齑瀪澷</div>
+                <div class="guestbook-form">
+                    <textarea id="guestbook-message" placeholder="蠿龘羃齑瀪澷..."></textarea>
+                    <input type="text" id="guestbook-author" placeholder="我的名字">
+                    <button class="submit-btn">羃齑瀪澷</button>
+                </div>
+                <div class="guestbook-entries">
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">Aimoyu</div>
+                        <div class="guestbook-date">2014年1月7日</div>
+                        <div>节哀，希望你能好起来！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">Aimoyu</div>
+                        <div class="guestbook-date">2013年1月1日</div>
+                        <div>新年快乐！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">`┌℡纞!`</div>
+                        <div class="guestbook-date">2012年10月21日</div>
+                        <div>我来看你的博客了，祝你开心！</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-widget">
+                <div class="widget-title">龘齑瀪澷</div>
+                <ul style="list-style-type: none; padding: 0;">
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ Aimoyu的QQ：3370133475</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ 动态素材网</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="https://chinesedora.com/gadget/1078.htm" style="color: #696969; text-decoration: none;">▶ 动漫天堂</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 3px; border: 1px inset #a9a9a9;"><a href="#" style="color: #696969; text-decoration: none;">▶ 音乐天堂</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="content-area">
+            <div class="container">
+                <div class="header">
+                    <div class="header-banner">
+                        <style>
+                        table table table td { vertical-align: top !important; }
+                        span.blacktext12 { 
+                            visibility: visible !important; 
+                            background-image: url('http://dl4.glitter-graphics.net/pub/240/240564kb044w2nen.jpg'); 
+                            background-repeat: no-repeat; 
+                            background-position: center center; 
+                            background-color: transparent; 
+                            font-size: 0px; 
+                            letter-spacing: -0.5px; 
+                            width: 435px; 
+                            height: 75px; 
+                            display: block !important; 
+                        }
+                        span.blacktext12 img { display: none; }
+                        </style>
+                        <span class="blacktext12"></span>
+                        <a href="https://www.glitter-graphics.com" class="banner-link">Extended Network Banners</a>
+                    </div>
+                    
+                    <h1 class="blog-title">★绪亓的浅蓝日记★</h1>
+                    <div class="subtitle">~*~ 记录生活的点点滴滴 ~*~</div>
+                    <div class="date">最后更新: 2015年7月15日</div>
+                </div>
+                
+                <div class="nav">
+                    <a href="#" onclick="showHomePage()">首页</a> ✿ 
+                    <a href="#" onclick="showAlbum()">相册</a> ✿ 
+                    <a href="#">日记</a> ✿ 
+                    <a href="#">音乐</a> ✿ 
+                    <a href="#">留言</a>
+                </div>
+                
+                <div id="home-content">
+    <!-- 第一篇日记：问答 -->
+    <div class="post">
+        <h2 class="post-title">问答</h2>
+        <div class="post-content">
+            <p>：</p>
+            <p><a href="../ask/index.html" style="color: #8B0000; text-decoration: underline; font-weight: bold;">进入问答页面 →</a></p>
+        </div>
+    </div>
+    
+    <!-- 第二篇日记：眼 -->
+    <div class="post">
+        <h2 class="post-title">眼</h2>
+        <div class="post-content">
+            <p>蠿龘羃齑瀪澷：</p>
+            <p><a href="../eye1gvtc/index.html" style="color: #8B0000; text-decoration: underline; font-weight: bold;">眼→</a></p>
+        </div>
+    </div>
+    
+    <!-- 第三篇日记：耳 -->
+    <div class="post">
+        <h2 class="post-title">耳</h2>
+        <div class="post-content">
+            <p>蠿龘羃齑瀪澷：</p>
+            <p><a href="../ear1vrdtcr/index.html" style="color: #8B0000; text-decoration: underline; font-weight: bold;">耳→</a></p>
+        </div>
+    </div>
+    
+        <!-- 第四篇日记：口 -->
+    <div class="post">
+        <h2 class="post-title">口</h2>
+        <div class="post-content">
+            <p>蠿龘羃齑瀪澷：</p>
+            <p><a href="../ftcyfyaskyfycycy/index.html" style="color: #8B0000; text-decoration: underline; font-weight: bold;">口→</a></p>
+        </div>
+    </div>
+</div>
+                    <div id="album-content" class="album-section" style="display: none;">
+                        <h2 class="post-title">★ 我的相册 ★</h2>
+                        <div class="album-grid">
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片1">
+                                </div>
+                                <div class="album-caption">照片1</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片2">
+                                </div>
+                                <div class="album-caption">照片2</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片3">
+                                </div>
+                                <div class="album-caption">照片3</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片4">
+                                </div>
+                                <div class="album-caption">照片4</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片5">
+                                </div>
+                                <div class="album-caption">照片5</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片6">
+                                </div>
+                                <div class="album-caption">照片6</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片7">
+                                </div>
+                                <div class="album-caption">照片7</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片8">
+                                </div>
+                                <div class="album-caption">照片8</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片9">
+                                </div>
+                                <div class="album-caption">照片9</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <div class="counter">
+                        您是第 <span id="visitor-count">00000000000</span> 位访客 <span class="blink">█</span>
+                    </div>
+                    <p>Copyright © 2015 绪亓的浅蓝日记 All Rights Reserved.</p>
+                    <p>本页面最佳浏览效果：使用Chrome浏览器，分辨率 800×600</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // 图片点击查看大图功能
+    function initImageModal() {
+      // 获取模态框元素
+      var modal = document.getElementById("imageModal");
+      var modalImg = document.getElementById("modalImage");
+      var captionText = document.getElementById("modalCaption");
+      
+      // 为所有图片添加点击事件
+      var images = document.querySelectorAll('.local-image');
+      images.forEach(function(img) {
+        img.onclick = function(){
+          modal.style.display = "block";
+          modalImg.src = this.src;
+          captionText.innerHTML = this.alt;
+        }
+      });
+      
+      // 获取关闭按钮
+      var span = document.getElementsByClassName("close")[0];
+      
+      // 点击关闭按钮关闭模态框
+      span.onclick = function() { 
+        modal.style.display = "none";
+      }
+      
+      // 点击模态框背景关闭
+      modal.onclick = function(event) {
+        if (event.target == modal) {
+          modal.style.display = "none";
+        }
+      }
+    }
+
+    // 在页面加载完成后初始化图片模态框
+    document.addEventListener('DOMContentLoaded', function() {
+      initImageModal();
+    });
+
+    // 简单的访客计数器动画
+    let count = 18592;
+    setInterval(function() {
+        count++;
+        document.getElementById('visitor-count').textContent = 
+            count.toString().padStart(6, '0');
+    }, 30000); // 每30秒增加一位访客
+    
+    // 年份导航交互 - 修改后的版本
+    document.querySelectorAll('.wayback-years a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            // 移除所有active类
+            document.querySelectorAll('.wayback-years a').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 为当前点击的链接添加active类
+            this.classList.add('active');
+            
+            // 只有当链接是"#"时才阻止默认行为，否则允许跳转
+            if (this.getAttribute('href') === '#' || this.getAttribute('href') === '') {
+                e.preventDefault();
+            }
+            // 对于有实际URL的链接，不阻止默认行为，允许跳转
+        });
+    });
+    
+    // 留言板提交功能 - 修改为跳转和验证逻辑
+    document.querySelector('.submit-btn').addEventListener('click', function() {
+        // 获取留言内容和作者输入框
+        const messageInput = document.getElementById('guestbook-message');
+        const authorInput = document.getElementById('guestbook-author');
+        
+        // 清除输入内容的首尾空格
+        const message = messageInput.value.trim();
+        const author = authorInput.value.trim();
+        
+        // 定义跳转链接
+        const secretLink = 'https://www.google.com'; // 请将此链接替换为您要跳转的实际链接
+        
+        if (message === '9917') {
+            if (author === '林沈悦') {
+                // 输入内容为 9917 且姓名为"林沈悦"，允许跳转
+                alert(`这是新的开始`);
+                window.location.href = secretLink; // 执行跳转
+            } else {
+                // 输入内容为 9917 但姓名不是"林沈悦"
+                alert('你不认识我，你是谁？');
+            }
+        } else if (message) {
+            // 输入了其他内容，阻止进入
+            alert('内容有误或为空');
+        } else {
+            // 如果留言内容为空，则提示输入
+            alert('请输入留言内容。');
+        }
+    });
+    
+    // 显示相册功能
+    function showAlbum() {
+        document.getElementById('home-content').style.display = 'none';
+        document.getElementById('album-content').style.display = 'block';
+    }
+    
+    // 显示首页功能
+    function showHomePage() {
+        document.getElementById('home-content').style.display = 'block';
+        document.getElementById('album-content').style.display = 'none';
+    }
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

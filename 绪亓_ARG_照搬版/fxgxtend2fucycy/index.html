@@ -1,0 +1,302 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>绪亓的浅蓝日记 - 今天</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            font-family: "宋体", "SimSun", serif;
+        }
+        
+        body {
+            background-color: #e0f0e0;
+            color: #000;
+            width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-image: url('http://dl2.glitter-graphics.net/pub/1011/1011682lx1qh28bcd.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            position: relative;
+        }
+
+        /* 图片查看模态框样式 */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  padding-top: 50px;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.9);
+}
+
+.modal-content {
+  margin: auto;
+  display: block;
+  width: 80%;
+  max-width: 700px;
+  border: 3px outset #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+}
+
+#modalCaption {
+  margin: auto;
+  display: block;
+  width: 80%;
+  max-width: 700px;
+  text-align: center;
+  color: #ccc;
+  padding: 10px 0;
+  font-size: 16px;
+}
+
+.close {
+  position: absolute;
+  top: 15px;
+  right: 35px;
+  color: #f1f1f1;
+  font-size: 40px;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.close:hover,
+.close:focus {
+  color: #ff66b2;
+  text-decoration: none;
+  cursor: pointer;
+}
+        
+        .container {
+            background-color: rgba(245, 255, 245, 0.85);
+            border: 3px double #66aa66;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px dotted #88cc88;
+        }
+        
+        .blog-title {
+            font-size: 32px;
+            color: #ff6699;
+            text-shadow: 2px 2px 0px #ffccdd;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #6699ff;
+            font-style: italic;
+        }
+        
+        .date {
+            color: #9966cc;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .nav {
+            background-color: #ccffcc;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px dashed #88aa88;
+            text-align: center;
+        }
+        
+        .nav a {
+            color: #ff3366;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        
+        .nav a:hover {
+            color: #ff0066;
+            text-decoration: underline;
+        }
+        
+        .content {
+            line-height: 1.6;
+        }
+        
+        .post {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px dotted #aaddaa;
+            position: relative;
+        }
+        
+        .post-title {
+            font-size: 22px;
+            color: #ff9933;
+            margin-bottom: 10px;
+            background-color: #ffffcc;
+            padding: 5px 10px;
+            border-left: 5px solid #ffcc66;
+        }
+        
+        .post-content {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px dotted #88cc88;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .counter {
+            background-color: #000;
+            color: #0f0;
+            padding: 5px 10px;
+            font-family: "Courier New", monospace;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        
+        /* 特殊文字样式 */
+        .pink-text { color: #ff66aa; }
+        .blue-text { color: #3366ff; }
+        .purple-text { color: #9966cc; }
+        .orange-text { color: #ff9933; }
+        .green-text { color: #339966; }
+        
+        /* 特殊符号 */
+        .symbol {
+            font-size: 18px;
+            margin: 0 2px;
+        }
+        
+        /* 光标动画 */
+        .blink {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        /* 古早风格的滚动条 */
+        ::-webkit-scrollbar {
+            width: 16px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #ccffcc;
+            border: 1px solid #88aa88;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #88cc88;
+            border: 1px solid #669966;
+        }
+        
+        /* 段落分割线样式 */
+        .divider {
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        /* 不兼容移动设备的设置 */
+        @media (max-width: 800px) {
+            body {
+                width: 800px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <!-- 图片查看模态框 -->
+<div id="imageModal" class="modal">
+  <span class="close">&times;</span>
+  <img class="modal-content" id="modalImage">
+  <div id="modalCaption"></div>
+</div>
+    
+    <div class="container">
+        <div class="header">
+            <h1 class="blog-title">★绪亓的浅蓝日记★</h1>
+            <div class="subtitle">~*~ 欢迎来到我的小天地 ~*~</div>
+            <div class="date">最后更新: 今天</div>
+        </div>
+        
+        <div class="nav">
+            <a href="#">首页</a> ✿ 
+            <a href="#">日记</a> ✿ 
+            <a href="#">相册</a> ✿ 
+            <a href="#">留言板</a> ✿ 
+            <a href="#">关于我</a>
+        </div>
+        
+        <div class="content">
+            <div class="post">
+                <h2 class="post-title">我的一天</h2>
+                <div class="post-content">
+                    <p>今天可能是我人生中最开心的一天，一觉睡醒妈妈还在我的身边。她的身上没有伤，也没有得病。家里面静悄悄的，我们都还住在原来的小家没有搬走。妈妈说她好像睡了好久好久，问我现在是什么时候了，我没有回答她，她也没有追问。</p>
+                    
+                    <p>今天是只属于我们两个人的一天，没有爸爸，没有经济压力，没有病痛，没有任何烦恼。我们在家里面做小蛋糕，玩捉迷藏，我给她讲了我的故事，只是没有说得太明白，骗她这是我的一场梦，不然她会被吓到的。妈妈听完后特别心疼我，把我搂在怀里，说我们永远不分开。</p>
+                    
+                    <p>我在写这篇日记的时候妈妈问我在写给谁呀，我说我在写给一个重要的朋友，妈妈问我是不是Aimoyu？我说不是，但ta也同样是我生命里重要的人。</p>
+                    
+                    <p>好啦！妈妈要喊我去睡觉了，她又要和我唠叨她年轻时打拼的故事了，我们下次再见吧！</p>
+                </div>
+                <div class="divider">
+                    <a href="https://www.glitter-graphics.com"><img src="http://dl7.glitter-graphics.net/pub/68/68547cwg98wmzcn.gif" width=293 height=27 border=0></a><br><a href="https://www.glitter-graphics.com" target=_blank></a>
+                </div>
+            </div>
+            
+            <div class="post">
+                <h2 class="post-title">结语</h2>
+                <div class="post-content">
+                    <p>感谢你游玩这个游戏，可以的话请将它分享出去，拯救更多世界的■■吧！</p>
+                </div>
+                <div class="divider">
+                    <a href="https://www.glitter-graphics.com"><img src="http://dl7.glitter-graphics.net/pub/68/68547cwg98wmzcn.gif" width=293 height=27 border=0></a><br><a href="https://www.glitter-graphics.com" target=_blank></a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="counter">
+                您是第 <span id="visitor-count">008642</span> 位访客 <span class="blink">█</span>
+            </div>
+            <p>Copyright © 绪亓的浅蓝日记 All Rights Reserved.</p>
+            <p>本页面最佳浏览效果：使用Chrome浏览器，分辨率 800×600</p>
+        </div>
+    </div>
+    
+    <script>
+        // 简单的访客计数器动画
+        let count = 8642;
+        setInterval(function() {
+            count++;
+            document.getElementById('visitor-count').textContent = 
+                count.toString().padStart(6, '0');
+        }, 30000); // 每30秒增加一位访客
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

@@ -1,0 +1,1107 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>绪亓的浅蓝日记 - 2011年6月13日</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            font-family: "宋体", "SimSun", serif;
+        }
+        
+        body {
+            background-color: #ffe6f2;
+            color: #000;
+            width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-image: url('http://dl.glitter-graphics.net/pub/3017/3017841r0c9le9msc.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            position: relative;
+        }
+        
+        /* 主内容区域布局 */
+        .main-container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        /* 左侧导航栏 */
+        .sidebar {
+            width: 200px;
+            flex-shrink: 0;
+        }
+        
+        /* 右侧内容区域 */
+        .content-area {
+            flex: 1;
+        }
+        
+        /* 时光机导航栏样式 */
+       .wayback-nav {
+           background: linear-gradient(135deg,#2c5fa8 0%, #4a7fc1 100%);
+           color: white;
+           padding: 12px 20px;
+           margin-bottom: 20px;
+           border-radius: 8px;
+           box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+           display: flex;
+           justify-content: space-between;
+           align-items: center;
+           z-index: 15;
+           position: relative;
+        }
+        
+        .wayback-years {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .wayback-years a {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .wayback-years a:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .wayback-years a.active {
+            background-color: rgba(255, 255, 255, 0.3);
+            font-weight: bold;
+        }
+        
+        .wayback-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: white;
+    color: #2c5fa8;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+        
+        .wayback-next:hover {
+    background-color: #e3f2fd;
+    transform: translateX(5px);
+}
+        
+        .container {
+            background-image: url('http://dl7.glitter-graphics.net/pub/590/590887lcmcr28xa3.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            border: 3px double #ff66b2;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 10;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px dotted #ff66b2;
+            background: rgba(255, 255, 204, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #ff66b2;
+        }
+        
+        /* 添加横幅样式 */
+        .header-banner {
+            margin: 0 auto 20px auto;
+            text-align: center;
+        }
+        
+        table table table td { 
+            vertical-align: top !important; 
+        }
+        
+        span.blacktext12 { 
+            visibility: visible !important; 
+            background-image: url('http://dl9.glitter-graphics.net/pub/1550/1550209pb7qlemgs8.gif'); 
+            background-repeat: no-repeat; 
+            background-position: center center; 
+            background-color: transparent; 
+            font-size: 0px; 
+            letter-spacing: -0.5px; 
+            width: 435px; 
+            height: 75px; 
+            display: block !important; 
+            margin: 0 auto;
+        }
+        
+        span.blacktext12 img { 
+            display: none; 
+        }
+        
+        .banner-link {
+            display: block;
+            margin-top: 5px;
+            color: #ff3399;
+            text-decoration: none;
+            font-size: 12px;
+        }
+        
+        .blog-title {
+            font-size: 32px;
+            color: #ff3399;
+            text-shadow: 2px 2px 0px #000;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #ff66b2;
+            font-style: italic;
+        }
+        
+        .date {
+            color: #ff3399;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .nav {
+            background-color: #ffccdd;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 2px outset #ff66b2;
+            text-align: center;
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        
+        .nav a {
+            color: #ff3399;
+            text-decoration: none;
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        
+        .nav a:hover {
+            color: #cc0066;
+            text-decoration: underline;
+        }
+        
+        .content {
+            line-height: 1.6;
+        }
+        
+        .post {
+            margin-bottom: 30px;
+            padding: 15px;
+            border-bottom: 1px dotted #ff66b2;
+            position: relative;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #ff99cc;
+        }
+        
+        .post-title {
+            font-size: 22px;
+            color: #ff3399;
+            margin-bottom: 10px;
+            background: linear-gradient(to bottom, #ffccdd, #ff99cc);
+            padding: 8px 12px;
+            border: 2px outset #ff66b2;
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.5), 2px 2px 5px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
+        }
+        
+        .post-content {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            border: 1px inset #ff99cc;
+        }
+        
+        .image-container {
+            text-align: center;
+            margin: 15px 0;
+            position: relative;
+        }
+        
+        .broken-image {
+            border: 2px dashed #ff66b2;
+            background-color: #ffe6f2;
+            padding: 10px;
+            display: inline-block;
+            margin: 10px;
+            width: 220px;
+            height: 180px;
+            position: relative;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+        
+        /* 修改图片占位符样式，使其可以轻松替换为本地图片 */
+        .broken-image-placeholder {
+            width: 200px;
+            height: 150px;
+            background-color: #cccccc;
+            border: 1px solid #999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ff3399;
+            font-size: 14px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        /* 图片查看模态框样式 */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  padding-top: 50px;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.9);
+}
+
+.modal-content {
+  margin: auto;
+  display: block;
+  width: 80%;
+  max-width: 700px;
+  border: 3px outset #ff66b2;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+}
+
+#modalCaption {
+  margin: auto;
+  display: block;
+  width: 80%;
+  max-width: 700px;
+  text-align: center;
+  color: #ccc;
+  padding: 10px 0;
+  font-size: 16px;
+}
+
+.close {
+  position: absolute;
+  top: 15px;
+  right: 35px;
+  color: #f1f1f1;
+  font-size: 40px;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.close:hover,
+.close:focus {
+  color: #ff66b2;
+  text-decoration: none;
+  cursor: pointer;
+}
+        
+        /* 本地图片样式 */
+        .local-image {
+            width: 200px;
+            height: 150px;
+            object-fit: cover;
+            border: 1px solid #999999;
+            border-radius: 3px;
+        }
+        
+        .image-caption {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* 分割线样式 */
+        .divider {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px 0;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px dotted #ff66b2;
+            font-size: 12px;
+            color: #666;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1);
+            border: 2px outset #ff99cc;
+        }
+        
+        .counter {
+            background-color: #000;
+            color: #0f0;
+            padding: 5px 10px;
+            font-family: "Courier New", monospace;
+            display: inline-block;
+            margin: 10px 0;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            border-radius: 3px;
+        }
+        
+        /* 特殊文字样式 - 修改为黄蓝红三色 */
+        .yellow-text { color: #ffcc00; }
+        .blue-text { color: #3366ff; }
+        .red-text { color: #ff3399; }
+        
+        /* 特殊符号 */
+        .symbol {
+            font-size: 18px;
+            margin: 0 2px;
+        }
+        
+        /* 光标动画 */
+        .blink {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        
+        /* 古早风格的滚动条 */
+        ::-webkit-scrollbar {
+            width: 16px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #ffccdd;
+            border: 1px solid #ff66b2;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #ff66b2;
+            border: 1px solid #cc0066;
+        }
+        
+        /* 贴纸样式 - 修改为绝对定位 */
+        .sticker {
+            position: absolute;
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        /* 左侧导航栏样式 - 改为粉色主题 */
+        .sidebar-widget {
+            background-image: url('http://dl7.glitter-graphics.net/pub/590/590887lcmcr28xa3.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            border: 2px outset #ff66b2;
+            margin-bottom: 20px;
+            padding: 15px;
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+        
+        .widget-title {
+            background: linear-gradient(to right, #ff3399, #ff66b2);
+            color: white;
+            padding: 8px 12px;
+            margin: -15px -15px 15px -15px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 2px solid #cc0066;
+            border-radius: 6px 6px 0 0;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.3);
+        }
+        
+        .profile-pic {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .profile-pic img {
+            border: 3px outset #ff66b2;
+            padding: 3px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .profile-info {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px inset #ff99cc;
+        }
+        
+        .guestbook-form textarea {
+            width: 100%;
+            height: 100px;
+            border: 2px inset #ff66b2;
+            background: #fff9f9;
+            padding: 5px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            resize: vertical;
+            border-radius: 3px;
+        }
+        
+        .guestbook-form input[type="text"] {
+            width: 100%;
+            border: 2px inset #ff66b2;
+            background: #fff9f9;
+            padding: 5px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+        }
+        
+        .submit-btn {
+            background: linear-gradient(to bottom, #ff3399, #cc0066);
+            border: 2px outset #ff3399;
+            color: white;
+            padding: 8px 15px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            font-size: 14px;
+            border-radius: 5px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+            box-shadow: inset 1px 1px 3px rgba(255,255,255,0.2);
+        }
+        
+        .submit-btn:hover {
+            background: linear-gradient(to bottom, #cc0066, #ff3399);
+        }
+        
+        .submit-btn:active {
+            border: 2px inset #ff3399;
+        }
+        
+        .guestbook-entry {
+            border-bottom: 1px dotted #ff66b2;
+            padding: 10px 0;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px inset #ff99cc;
+        }
+        
+        .guestbook-author {
+            font-weight: bold;
+            color: #ff3399;
+        }
+        
+        .guestbook-date {
+            color: #666;
+            font-size: 11px;
+        }
+        
+        /* 秘密日记样式 */
+        .secret-diary {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #ff99cc;
+        }
+        
+        .diary-lock {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .diary-lock input {
+            padding: 5px 10px;
+            border: 2px inset #ff66b2;
+            background: #fff9f9;
+            border-radius: 3px;
+            margin-right: 10px;
+        }
+        
+        .diary-content {
+            display: none;
+        }
+        
+        .diary-entry {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px dotted #ff66b2;
+        }
+        
+        .diary-date {
+            font-weight: bold;
+            color: #ff3399;
+            margin-bottom: 5px;
+        }
+        
+        /* 相册样式 */
+        .album-section {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            border: 2px outset #ff99cc;
+        }
+        
+        .album-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .album-item {
+            text-align: center;
+        }
+        
+        .album-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border: 2px outset #ff66b2;
+            border-radius: 5px;
+            background-color: #ffe6f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ff3399;
+            font-size: 14px;
+        }
+        
+        .album-caption {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* 不兼容移动设备的设置 */
+        @media (max-width: 1000px) {
+            body {
+                width: 1000px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+   <!-- 图片查看模态框 -->
+<div id="imageModal" class="modal">
+  <span class="close">&times;</span>
+  <img class="modal-content" id="modalImage">
+  <div id="modalCaption"></div>
+</div>
+    <!-- 时光机导航栏 -->
+    <div class="wayback-nav">
+        <div class="wayback-years">
+            <a href="../2009/index.html">2009</a>
+            <a href="../2010/index.html">2010</a>
+            <a href="../2011/index.html" class="active">2011</a>
+            <a href="#">2012</a>
+            <a href="#">2013</a>
+            <a href="#">2014</a>
+            <a href="#">2015</a>
+            <a href="#">2023</a>
+        </div>
+        <a href="../2012/index.html" class="wayback-next">下一个存档 →</a>
+    </div>
+    
+    <div class="main-container">
+        <!-- 左侧导航栏 -->
+        <div class="sidebar">
+            <!-- 个人简介 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">关于我</div>
+                <div class="profile-pic">
+                    <img src="http://dl10.glitter-graphics.net/pub/660/660090rdmeoftc33.gif" width="100" height="192" alt="我的头像">
+                </div>
+                <div class="profile-info">
+                    <p>大家好，我是��穃銁��讠�雿�</p>
+                    <p>今年��鈭�岁，喜欢�𤫇�𤫇�𨯬甇䔶�羓��。</p>
+                    <p>这个博客记录了我的成长点滴，欢迎常来玩！</p>
+                </div>
+            </div>
+            
+            <!-- 留言板 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">留言板</div>
+                <div class="guestbook-form">
+                    <textarea placeholder="在这里给我留言吧..."></textarea>
+                    <input type="text" placeholder="你的名字">
+                    <button class="submit-btn">提交留言</button>
+                </div>
+                <div class="guestbook-entries">
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">海是倒过来的天</div>
+                        <div class="guestbook-date">2011-6-12</div>
+                        <div>我来看你的博客了！也来踩踩我的吧！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">Aimoyu</div>
+                        <div class="guestbook-date">2011-6-1</div>
+                        <div>祝我的好闺蜜儿童节快乐！</div>
+                    </div>
+                    <div class="guestbook-entry">
+                        <div class="guestbook-author">亲嘴嘴╰つ</div>
+                        <div class="guestbook-date">2011-5-23</div>
+                        <div>你什么时候上线摩尔庄园呀。</div>
+                    </div>
+b                </div>
+            </div>
+            
+            <!-- 友情链接 -->
+            <div class="sidebar-widget">
+                <div class="widget-title">友情链接</div>
+                <ul style="list-style-type: none; padding: 0;">
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.7); padding: 5px; border-radius: 3px; border: 1px inset #ff99cc;"><a href="#" style="color: #ff3399; text-decoration: none;">▶ Aimoyu的博客</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.7); padding: 5px; border-radius: 3px; border: 1px inset #ff99cc;"><a href="#" style="color: #ff3399; text-decoration: none;">▶ 动态素材网</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.7); padding: 5px; border-radius: 3px; border: 1px inset #ff99cc;"><a href="#" style="color: #ff3399; text-decoration: none;">▶ 动画世界</a></li>
+                    <li style="margin-bottom: 5px; background: rgba(255,255,255,0.7); padding: 5px; border-radius: 3px; border: 1px inset #ff99cc;"><a href="#" style="color: #ff3399; text-decoration: none;">▶ 音乐天堂</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- 右侧内容区域 -->
+        <div class="content-area">
+            <div class="container">
+                <div class="header">
+                    <!-- 添加横幅 -->
+                    <div class="header-banner">
+                        <style>
+                        table table table td { vertical-align: top !important; }
+                        span.blacktext12 { 
+                            visibility: visible !important; 
+                            background-image: url('http://dl9.glitter-graphics.net/pub/1550/1550209pb7qlemgs8.gif'); 
+                            background-repeat: no-repeat; 
+                            background-position: center center; 
+                            background-color: transparent; 
+                            font-size: 0px; 
+                            letter-spacing: -0.5px; 
+                            width: 435px; 
+                            height: 75px; 
+                            display: block !important; 
+                        }
+                        span.blacktext12 img { display: none; }
+                        </style>
+                        <span class="blacktext12"></span>
+                        <a href="https://www.glitter-graphics.com" class="banner-link">Extended Network Banners</a>
+                    </div>
+                    
+                    <h1 class="blog-title">★绪亓的浅蓝日记★</h1>
+                    <div class="subtitle">~*~ 欢迎来到我的小天地 ~*~</div>
+                    <div class="date">最后更新: 2011年6月13日</div>
+                </div>
+                
+                <div class="nav">
+                    <a href="#" onclick="showHomePage()">首页</a> ✿ 
+                    <a href="#" onclick="showAlbum()">相册</a> ✿ 
+                    <a href="#">日记</a> ✿ 
+                    <a href="#">留言板</a> ✿ 
+                    <a href="#">关于我</a>
+                </div>
+                
+                <div class="content">
+                    <!-- 首页内容 -->
+                    <div id="home-content">
+                        <div class="post">
+                            <h2 class="post-title">♫ 和爸爸学习编辑网页 ♫</h2>
+                            <div class="post-content">
+                                <p>我让爸爸教我怎么写网页，<span class="blue-text">我想要一个秘密日记版块，</span>只给我亲近的人看。爸爸提议可以把密码设置成<span class="red-text">我的生日</span>，这样就只有熟悉我的人才能看到了<span class="yellow-text">我觉得这个提议不错</span>。就在爸爸的帮助下完成了这个秘密日记，<span class="blue-text">这样我的家人朋友</span>就能看到我的心里话了，<span class="red-text">我真厉害呀！</p
+                                </div>
+        
+                        </div>
+                        <div class="post">
+                            <h2 class="post-title">♪ 学校的作文 ♪</h2>
+                            <div class="post-content">
+                                <p>今天学校要求我们写一篇关于<span class="blue-text">自己名字</span>的作文做小比赛，我特意去问了<span class="red-text">妈妈</span>。<span class="blue-text">妈妈</span>告诉我，我的<span class="yellow-text">名字</span>是由<span class="red-text">爸爸</span>和<span class="red-text">妈妈</span>两人的<span class="blue-text">姓氏</span>和他们<span class="yellow-text">对我的期望</span>组成的。我的<span class="red-text">存在</span>就是我们<span class="blue-text">家庭幸福美满</span>的<span class="yellow-text">象征</span>。我听了之后很<span class="red-text">感动</span>，把<span class="blue-text">寓意</span>写到了我的<span class="yellow-text">作文</span>里，竟然拿了<span class="red-text">全班最高分</span>！<span class="blue-text">老师</span>还给了我一个<span class="yellow-text">奖状</span>，我要把它贴到我的<span class="red-text">卧室墙上</span>！</p>
+                                
+                                <div class="image-container">
+                                    <!-- 图片左侧的贴纸 -->
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="left: -1px; top: 10px;">
+                                        <img src="http://dl9.glitter-graphics.net/pub/830/830089ew0r4hg5kr.gif" width=100 height=100 border=0>
+                                    </a>
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="left: -1px; top: 120px;">
+                                        <img src="http://dl3.glitter-graphics.net/pub/1090/1090533ssf1wub5i3.gif" width=122 height=168 border=0>
+                                    </a>
+                                    
+                                    <div class="broken-image" style="background-color: #ffccdd;">
+                                        <!-- 可替换的本地图片 -->
+                                        <!-- 替换说明：将下面的img标签的src属性改为您的本地图片路径 -->
+                                        <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="我的作文奖状">
+                                        <!-- 如果图片加载失败，将显示下面的占位符 -->
+                                        <!-- <div class="broken-image-placeholder">
+                                            图片加载失败<br>composition_award.jpg
+                                        </div> -->
+                                        <div class="image-caption">我的作文奖状<span class="symbol">♬</span></div>
+                                    </div>
+                                    
+                                    <!-- 图片右侧的贴纸 -->
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="right: -10px; top: 30px;">
+                                        <img src="http://dl6.glitter-graphics.net/pub/680/680016i176o71zgg.gif" width=91 height=124 border=0>
+                                    </a>
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="right: -10px; top: 150px;">
+                                        <img src="http://dl8.glitter-graphics.net/pub/1259/1259748urg54w8hhf.gif" width=160 height=155 border=0>
+                                    </a>
+                                </div>
+                                
+                                <!-- 添加分割线 -->
+                                <div class="divider">
+                                    <a href="https://www.glitter-graphics.com"><img src="http://dl2.glitter-graphics.net/pub/439/439872zev6untzyt.gif" width=495 height=48 border=0></a><br>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="post">
+                            <h2 class="post-title">♫ 和Aimoyu的约定 ♫</h2>
+                            <div class="post-content">
+                                <p>我今天在学校和<span class="blue-text">Aimoyu</span>约好了，等我们<span class="red-text">小学毕业</span>了也要继续做<span class="yellow-text">一辈子的好朋友</span>。我们还做了<span class="blue-text">好朋友测试</span>，发现我们两个的<span class="red-text">手</span>做完测试后<span class="yellow-text">解不开</span>，这说明我们<span class="blue-text">有缘分</span>，我非常<span class="red-text">开心</span>。我们还互相给对方画了<span class="yellow-text">长大后的样子</span>，好想和<span class="blue-text">Aimoyu</span>一起长大后像那些<span class="red-text">时尚姐姐</span>一样逛街呀！</p>
+                                
+                                <div class="image-container">
+                                    <!-- 新添加的贴纸 - 左侧 -->
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="left: -20px; top: 10px;">
+                                        <img src="http://dl2.glitter-graphics.net/pub/549/549062c91it46lgr.gif" width=115 height=115 border=0>
+                                    </a>
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="left: -15px; top: 140px;">
+                                        <img src="http://dl3.glitter-graphics.net/pub/1053/1053333jqgjkz21t7.gif" width=113 height=118 border=0>
+                                    </a>
+                                    
+                                    <div class="broken-image" style="background-color: #ccffcc;">
+                                        <!-- 可替换的本地图片 -->
+                                        <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="我画的Aimoyu">
+                                        <div class="image-caption">和Aimoyu的约定<span class="symbol">♩</span></div>
+                                    </div>
+                                    
+                                    <!-- 新添加的贴纸 - 右侧 -->
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="right: -15px; top: 10px;">
+                                        <img src="http://dl2.glitter-graphics.net/pub/469/469672fxonm3f2tl.gif" width=69 height=73 border=0>
+                                    </a>
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="right: -20px; top: 140px;">
+                                        <img src="http://dl5.glitter-graphics.net/pub/672/672915axn8bqz1k0.gif" width=100 height=120 border=0>
+                                    </a>
+                                </div>
+                                
+                                <!-- 添加分割线 -->
+                                <div class="divider">
+                                    <a href="https://www.glitter-graphics.com"><img src="http://dl2.glitter-graphics.net/pub/439/439872zev6untzyt.gif" width=495 height=48 border=0></a><br>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="post">
+                            <h2 class="post-title">☆ 喜欢的男生 ☆</h2>
+                            <div class="post-content">
+                                <p><span class="blue-text">Aimoyu</span>问我在学校有没有<span class="red-text">喜欢的男生</span>，她说她对隔壁的<span class="yellow-text">班长</span>有点感觉。我告诉她我现在<span class="blue-text">还没有喜欢的男生</span>呢，我觉得学校里面的<span class="red-text">男生</span>都像<span class="yellow-text">猴子</span>。<span class="blue-text">Aimoyu</span>说我真是<span class="red-text">不懂欣赏</span>，明明有那么多<span class="yellow-text">帅哥</span>等着我<span class="blue-text">挖掘</span>呢却看不见。我有时候真是<span class="red-text">搞不懂她</span>，但是还是不影响她是我<span class="yellow-text">最好的朋友</span>，这是我们<span class="blue-text">放学后</span>去<span class="red-text">小卖部</span>买的<span class="yellow-text">闺蜜挂件</span>。</p>
+                                
+                                <div class="image-container">
+                                    <!-- 新添加的贴纸 - 左侧 -->
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="left: -25px; top: 10px;">
+                                        <img src="http://dl5.glitter-graphics.net/pub/969/969655voosav3ffl.gif" width=160 height=156 border=0>
+                                    </a>
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="left: -15px; top: 140px;">
+                                        <img src="http://dl8.glitter-graphics.net/pub/669/669138jd5pwxzwpn.gif" width=85 height=111 border=0>
+                                    </a>
+                                    
+                                    <div class="broken-image" style="background-color: #ccccff;">
+                                        <!-- 可替换的本地图片 -->
+                                        <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="闺蜜挂件">
+                                        <div class="image-caption">闺蜜挂件<span class="symbol">♫</span></div>
+                                    </div>
+                                    
+                                    <!-- 新添加的贴纸 - 右侧 -->
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="right: -15px; top: 10px;">
+                                        <img src="http://dl4.glitter-graphics.net/pub/1305/1305234lgc1r95yr7.gif" width=100 height=100 border=0>
+                                    </a>
+                                    <a href="https://www.glitter-graphics.com" class="sticker" style="right: -25px; top: 140px;">
+                                        <img src="http://dl5.glitter-graphics.net/pub/918/918115nn89odh9zr.gif" width=100 height=120 border=0>
+                                    </a>
+                                </div>
+                                
+                                <!-- 添加分割线 -->
+                                <div class="divider">
+                                    <a href="https://www.glitter-graphics.com"><img src="http://dl2.glitter-graphics.net/pub/439/439872zev6untzyt.gif" width=495 height=48 border=0></a><br>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 相册内容 -->
+                    <div id="album-content" class="album-section" style="display: none;">
+                        <h2 class="post-title">★ 我的相册 ★</h2>
+                        <div class="album-grid">
+                            <!-- 第一行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片1">
+                                </div>
+                                <div class="album-caption">照片1</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片2">
+                                </div>
+                                <div class="album-caption">照片2</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片3">
+                                </div>
+                                <div class="album-caption">照片3</div>
+                            </div>
+                            <!-- 第二行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片4">
+                                </div>
+                                <div class="album-caption">照片4</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片5">
+                                </div>
+                                <div class="album-caption">照片5</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片6">
+                                </div>
+                                <div class="album-caption">照片6</div>
+                            </div>
+                            <!-- 第三行 -->
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片7">
+                                </div>
+                                <div class="album-caption">照片7</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片8">
+                                </div>
+                                <div class="album-caption">照片8</div>
+                            </div>
+                            <div class="album-item">
+                                <div class="album-image">
+                                    <img class="local-image" src="../assets/xuqi-dream-photo.svg" alt="照片9">
+                                </div>
+                                <div class="album-caption">照片9</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 秘密日记 -->
+                    <div class="secret-diary">
+                        <h2 class="post-title">☆ 秘密日记 ☆</h2>
+                        <div class="diary-lock">
+                            <input type="password" id="diary-password" placeholder="请输入八位数密码">
+                            <button class="submit-btn" onclick="unlockDiary()">解锁日记</button>
+                        </div>
+                        <div class="diary-content" id="diary-content">
+                            <div class="diary-entry">
+                                <div class="diary-date">2011年6月7日</div>
+                                <div class="post-content">
+                                    <p>妈妈今天去医院检查了，她最近总是说身体不舒服，特别是最近经常咳嗽，不知道是不是哮喘严重了，我也经常咳嗽，小时候总是因为喉咙发炎还发烧，去医院就要连着打好几天的针，因为喉咙痛还吃不了我喜欢的东西。我最害怕打针了，妈妈告诉我打针的时候只需要和护士说一声："阿姨轻一点！"打针就不疼了，我试了之后感觉好像真的有用，但是我上周去打疫苗的时候也说了这句话，一抬头才发现护士竟然是男的！让我感到有点尴尬。(ー_ー)!!</p>
+                                </div>
+                            </div>
+                            <div class="diary-entry">
+                                <div class="diary-date">2011年6月10日</div>
+                                <div class="post-content">
+                                    <p>自从上次检查回来后，爸爸最近一直变得沉默寡言，还总是偷偷喝酒。爸爸告诉我，他喝酒的事情可千万不要告诉妈妈，妈妈知道了肯定会生气的，他已经戒酒好久了，答应了妈妈不会再喝酒。我会帮他保守这个秘密的，但是我也很担心他。</p>
+                                </div>
+                            </div>
+                            <div class="diary-entry">
+                                <div class="diary-date">2010年6月11日</div>
+                                <div class="post-content">
+                                    <p>妈妈说爸爸最近的工作不顺，生活要变得紧巴巴了。我问妈妈什么是紧巴巴，妈妈说就是不能像以前一样经常带我吃外面的快餐，买芭比娃娃了。我听完后觉得有点伤心，希望爸爸能好起来。</p>
+                                </div>
+                            </div>
+                            <div class="diary-entry">
+                                <div class="diary-date">2010年6月13日</div>
+                                <div class="post-content">
+                                    <p>妈妈桌子上的漂亮罐子越来越少了，明明我最近都没有偷偷用妈妈的化妆品，却用得比以前都快了好多。妈妈说是最近遮瑕用了很多，因为年纪大了脸上都长斑和皱纹了。我好希望妈妈可以老得慢一点，这样我就可以和妈妈呆久一点了。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <div class="counter">
+                        您是第 <span id="visitor-count">012547</span> 位访客 <span class="blink">█</span>
+                    </div>
+                    <p>Copyright © 2011 绪亓的浅蓝日记 All Rights Reserved.</p>
+                    <p>本页面最佳浏览效果：使用Chrome浏览器，分辨率 800×600</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 散布的小贴纸 -->
+    <a href="https://www.glitter-graphics.com" class="sticker" style="left: 50px; top: 200px;">
+        <img src="http://dl2.glitter-graphics.net/pub/439/439702yc1s6yyoii.gif" width=20 height=20 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="left: 150px; top: 400px;">
+        <img src="http://dl2.glitter-graphics.net/pub/439/439702yc1s6yyoii.gif" width=20 height=20 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="left: 300px; top: 500px;">
+        <img src="http://dl2.glitter-graphics.net/pub/439/439702yc1s6yyoii.gif" width=20 height=20 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="left: 700px; top: 300px;">
+        <img src="http://dl2.glitter-graphics.net/pub/439/439702yc1s6yyoii.gif" width=20 height=20 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="left: 850px; top: 600px;">
+        <img src="http://dl2.glitter-graphics.net/pub/439/439702yc1s6yyoii.gif" width=20 height=20 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="right: 100px; top: 250px;">
+        <img src="http://dl4.glitter-graphics.net/pub/300/300744zu7hd5lg4s.gif" width=160 height=126 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="left: 100px; top: 700px;">
+        <img src="http://dl10.glitter-graphics.net/pub/130/130810o1unb02826.gif" width=100 height=120 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="right: 150px; top: 650px;">
+        <img src="http://dl4.glitter-graphics.net/pub/493/493954v5pge1abf1.gif" width=260 height=265 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="left: 200px; top: 800px;">
+        <img src="http://dl3.glitter-graphics.net/pub/1505/1505343osha6iwdhm.gif" width=145 height=82 border=0>
+    </a>
+    <a href="https://www.glitter-graphics.com" class="sticker" style="right: 200px; top: 450px;">
+        <img src="http://dl5.glitter-graphics.net/pub/1295/1295335bgma5fa4kz.gif" width=140 height=147 border=0>
+    </a>
+    
+    <script>
+    // 图片点击查看大图功能
+function initImageModal() {
+  // 获取模态框元素
+  var modal = document.getElementById("imageModal");
+  var modalImg = document.getElementById("modalImage");
+  var captionText = document.getElementById("modalCaption");
+  
+  // 为所有图片添加点击事件
+  var images = document.querySelectorAll('.local-image');
+  images.forEach(function(img) {
+    img.onclick = function(){
+      modal.style.display = "block";
+      modalImg.src = this.src;
+      captionText.innerHTML = this.alt;
+    }
+  });
+  
+  // 获取关闭按钮
+  var span = document.getElementsByClassName("close")[0];
+  
+  // 点击关闭按钮关闭模态框
+  span.onclick = function() { 
+    modal.style.display = "none";
+  }
+  
+  // 点击模态框背景关闭
+  modal.onclick = function(event) {
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+}
+
+// 在页面加载完成后初始化图片模态框
+document.addEventListener('DOMContentLoaded', function() {
+  initImageModal();
+});
+
+    // 简单的访客计数器动画
+    let count = 12547;
+    setInterval(function() {
+        count++;
+        document.getElementById('visitor-count').textContent = 
+            count.toString().padStart(6, '0');
+    }, 30000); // 每30秒增加一位访客
+    
+    // 添加一些随机文字颜色变化效果
+    document.querySelectorAll('.post-content p').forEach(p => {
+        p.innerHTML = p.innerHTML.replace(/妈妈/g, '<span class="red-text">妈妈</span>');
+        p.innerHTML = p.innerHTML.replace(/爸爸/g, '<span class="blue-text">爸爸</span>');
+        p.innerHTML = p.innerHTML.replace(/老师/g, '<span class="yellow-text">老师</span>');
+        p.innerHTML = p.innerHTML.replace(/Aimoyu/g, '<span class="red-text">Aimoyu</span>');
+    });
+    
+    // 年份导航交互 - 修改后的版本
+    document.querySelectorAll('.wayback-years a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            // 移除所有active类
+            document.querySelectorAll('.wayback-years a').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 为当前点击的链接添加active类
+            this.classList.add('active');
+            
+            // 只有当链接是"#"时才阻止默认行为，否则允许跳转
+            if (this.getAttribute('href') === '#' || this.getAttribute('href') === '') {
+                e.preventDefault();
+            }
+            // 对于有实际URL的链接，不阻止默认行为，允许跳转
+        });
+    });
+    
+    // 留言板提交功能
+    document.querySelector('.submit-btn').addEventListener('click', function() {
+        alert('暂未开放留言功能');
+    });
+    
+    // 秘密日记解锁功能
+    function unlockDiary() {
+        const password = document.getElementById('diary-password').value;
+        if (password === '20000308') {
+            document.getElementById('diary-content').style.display = 'block';
+            document.querySelector('.diary-lock').style.display = 'none';
+        } else {
+            alert('密码错误！');
+        }
+    }
+    
+    // 显示相册功能
+    function showAlbum() {
+        document.getElementById('home-content').style.display = 'none';
+        document.getElementById('album-content').style.display = 'block';
+    }
+    
+    // 显示首页功能
+    function showHomePage() {
+        document.getElementById('home-content').style.display = 'block';
+        document.getElementById('album-content').style.display = 'none';
+    }
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>诉求</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-image: url('http://dl3.glitter-graphics.net/pub/374/374783uhmkxhr85h.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            font-family: "SimSun", "宋体", serif;
+            color: #ff0000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 600px;
+            width: 100%;
+            padding: 30px 20px;
+            margin: 20px 0;
+        }
+        
+        #text-content {
+            font-size: 18px;
+            margin-bottom: 30px;
+            white-space: pre-line;
+            min-height: 300px;
+        }
+        
+        #back-link {
+            display: none;
+            color: blue; /* 蓝色文字 */
+            font-size: 16px;
+            text-decoration: underline; /* 添加下划线 */
+            margin-top: 20px;
+            /* 移除了边框、内边距和圆角 */
+        }
+        
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 18px;
+            background-color: #ff0000;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        /* 手机适配 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px 15px;
+            }
+            
+            #text-content {
+                font-size: 16px;
+                min-height: 250px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #text-content {
+                font-size: 14px;
+                min-height: 200px;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <div class="container">
+        <div id="text-content"></div>
+    </div>
+    <a id="back-link" href="../20154vycyd/index.html">back</a>
+
+    <script>
+        // 初始文本
+        const initialText = `你在那，回答我，听到一切。
+听到，
+听到我的愿望，
+愿望，愿望，愿望，
+听到我的心愿，
+你在听吗？你能听到吗？
+你来到这里。回应我的诉求。
+你的力量，高维的力量。
+求你，现在。
+你听到了，听到了。
+你过来，来到这里。
+我会让你听到更多，回应我的愿望。
+让我回去，带她回来。
+所以会实现，
+我撕碎我的余生，
+我遗忘，
+我愿意付出，
+你听到，
+听到一切。`;
+        
+        // 打字文本
+        const typeText = "现在回到你来的地方、！愿望让你回应我的诉求实现愿望让你回应我的诉求";
+        
+        const textElement = document.getElementById('text-content');
+        const backLink = document.getElementById('back-link');
+        
+        // 显示初始文本
+        textElement.textContent = initialText;
+        
+        // 20秒后开始删除动画
+        setTimeout(() => {
+            let currentText = textElement.textContent;
+            const deleteInterval = setInterval(() => {
+                if (currentText.length > 0) {
+                    // 随机删除字符，增加动画效果
+                    const charsToDelete = Math.min(2, currentText.length);
+                    currentText = currentText.slice(0, -charsToDelete);
+                    textElement.textContent = currentText;
+                } else {
+                    clearInterval(deleteInterval);
+                    // 添加光标
+                    textElement.innerHTML = '<span class="cursor"></span>';
+                    // 开始打字动画
+                    startTypingAnimation();
+                }
+            }, 80); // 调整删除速度
+        }, 20000); // 20秒后开始
+        
+        function startTypingAnimation() {
+            let index = 0;
+            textElement.textContent = '';
+            
+            const typeInterval = setInterval(() => {
+                if (index < typeText.length) {
+                    textElement.textContent += typeText[index];
+                    index++;
+                } else {
+                    clearInterval(typeInterval);
+                    // 添加闪烁光标
+                    textElement.innerHTML = textElement.textContent + '<span class="cursor"></span>';
+                    // 显示返回链接
+                    setTimeout(() => {
+                        backLink.style.display = 'block';
+                    }, 1000);
+                }
+            }, 100); // 调整打字速度
+        }
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

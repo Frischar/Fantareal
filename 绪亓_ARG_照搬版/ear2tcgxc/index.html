@@ -1,0 +1,201 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hxyxhc</title>
+    <style>
+        body {
+            background-image: url('http://dl7.glitter-graphics.net/pub/436/436157irljz6939b.gif');
+            background-attachment: fixed;
+            background-repeat: repeat;
+            font-family: "宋体", SimSun, serif;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .guidance-text {
+            font-size: 20px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+            max-width: 800px;
+        }
+        
+        .alphabet-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            max-width: 800px;
+        }
+        
+        .letter {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: rgba(0,0,0,0.3);
+            font-weight: bold;
+        }
+        
+        .letter:hover {
+            background-color: rgba(255,255,255,0.2);
+            transform: scale(1.1);
+        }
+        
+        .letter.correct {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .morse-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            max-width: 800px;
+            margin-bottom: 30px;
+        }
+        
+        .morse-item {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            border: 1px solid rgba(255,255,255,0.3);
+            background-color: rgba(0,0,0,0.3);
+        }
+        
+        .footer {
+            margin-top: 20px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <div class="guidance-text">
+        听到指引领导你的意志在文字中选择在声音里转化听见我听见声音指引你回归让你听见让你实现<br>
+        耳朵 听见 转化 心安之地
+    </div>
+    
+    <div class="alphabet-container" id="alphabet"></div>
+    
+    <div class="morse-container" id="morse"></div>
+    
+    <div class="footer"></div>
+    
+    <audio id="bgAudio">
+        <source src="./cpni5c.wav" type="audio/wav">
+        您的浏览器不支持音频元素。
+    </audio>
+
+    <script>
+        // 摩斯密码映射表
+        const morseCode = {
+            'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 
+            'F': '..-.', 'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 
+            'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 
+            'P': '.--.', 'Q': '--.-', 'R': '.-.', 'S': '...', 'T': '-', 
+            'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-', 'Y': '-.--', 
+            'Z': '--..'
+        };
+        
+        // 创建字母表
+        const alphabetContainer = document.getElementById('alphabet');
+        const morseContainer = document.getElementById('morse');
+        
+        for (let i = 65; i <= 90; i++) {
+            const letter = String.fromCharCode(i);
+            
+            // 创建字母元素
+            const letterElement = document.createElement('div');
+            letterElement.className = 'letter';
+            letterElement.textContent = letter;
+            letterElement.dataset.letter = letter;
+            alphabetContainer.appendChild(letterElement);
+            
+            // 创建摩斯密码元素
+            const morseElement = document.createElement('div');
+            morseElement.className = 'morse-item';
+            morseElement.textContent = morseCode[letter];
+            morseContainer.appendChild(morseElement);
+        }
+        
+        // 解锁逻辑
+        const expectedSequence = ['B', 'A', 'C', 'K'];
+        let currentStep = 0;
+        
+        // 为字母添加点击事件
+        document.querySelectorAll('.letter').forEach(letter => {
+            letter.addEventListener('click', function() {
+                const clickedLetter = this.dataset.letter;
+                
+                // 检查是否是期望的字母
+                if (clickedLetter === expectedSequence[currentStep]) {
+                    this.classList.add('correct');
+                    currentStep++;
+                    
+                    if (currentStep === expectedSequence.length) {
+                        // 完成序列，直接跳转
+                        setTimeout(() => {
+                            window.location.href = "../ear3ctcyx/index.html"; // 替换为您要跳转的网址
+                        }, 500);
+                    }
+                } else {
+                    // 错误的字母，重置
+                    this.classList.add('correct');
+                    setTimeout(() => {
+                        this.classList.remove('correct');
+                    }, 500);
+                    
+                    // 重置进度
+                    currentStep = 0;
+                    
+                    // 清除所有正确标记
+                    document.querySelectorAll('.letter.correct').forEach(el => {
+                        el.classList.remove('correct');
+                    });
+                }
+            });
+        });
+        
+        // 音频循环播放逻辑
+        const audio = document.getElementById('bgAudio');
+        
+        // 音频播放结束后的处理
+        audio.addEventListener('ended', function() {
+            // 暂停2秒后重新播放
+            setTimeout(() => {
+                audio.play();
+            }, 2000);
+        });
+        
+        // 尝试播放背景音频
+        window.addEventListener('click', function() {
+            audio.play().catch(e => {
+                console.log("音频播放需要用户交互:", e);
+            });
+        }, { once: true });
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

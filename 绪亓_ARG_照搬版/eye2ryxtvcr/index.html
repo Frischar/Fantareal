@@ -1,0 +1,126 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>眼</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .hidden-text {
+            color: #000;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 18px;
+            line-height: 1.5;
+        }
+        
+        .pyramid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 5px;
+        }
+        
+        .triangle {
+            color: gold;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s;
+            margin: 0 2px;
+        }
+        
+        .triangle:hover {
+            color: #ffd700;
+            text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <div class="hidden-text">
+        金字塔是人类古埃及被记住装置是为了被记住建造的建筑我看到金字塔通天地灵魂从超度中被记住。<br>眼睛 链接 心灵 知识 接收<br>
+        六度地狱<br>
+        四为复生<br>
+        之五为门<br>
+        九次叩问<br>
+        方得复明
+    </div>
+    
+    <div class="pyramid" id="pyramid"></div>
+
+    <script>
+        // 创建金字塔
+        const pyramid = document.getElementById('pyramid');
+        const rows = 6;
+        
+        for (let i = 0; i < rows; i++) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            
+            // 每行的三角形数量
+            const trianglesInRow = 1 + i * 2;
+            
+            for (let j = 0; j < trianglesInRow; j++) {
+                const triangle = document.createElement('span');
+                triangle.className = 'triangle';
+                triangle.textContent = '▲';
+                
+                // 设置数据属性记录行和列
+                triangle.dataset.row = i + 1;
+                triangle.dataset.col = j + 1;
+                
+                // 添加点击事件
+                triangle.addEventListener('click', handleTriangleClick);
+                
+                row.appendChild(triangle);
+            }
+            
+            pyramid.appendChild(row);
+        }
+        
+        // 点击计数
+        let correctClickCount = 0;
+        
+        function handleTriangleClick(event) {
+            const triangle = event.target;
+            const row = parseInt(triangle.dataset.row);
+            const col = parseInt(triangle.dataset.col);
+            
+            // 检查是否是第四行第五个三角形
+            if (row === 4 && col === 5) {
+                correctClickCount++;
+                
+                // 点击9次后跳转
+                if (correctClickCount === 9) {
+                    // 跳转到下一个页面
+                    window.location.href = "../eye3tgyd/index.html"; // 替换为实际链接
+                }
+            }
+        }
+    </script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>

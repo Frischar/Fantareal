@@ -1,0 +1,808 @@
+/* Xuqi ARG identity layer: inherited old-web bones, new archive skin. */
+:root {
+  --xuqi-blue: #75c9ef;
+  --xuqi-blue-deep: #245f87;
+  --xuqi-pink: #ffd2df;
+  --xuqi-red: #8f1429;
+  --xuqi-red-hot: #d60832;
+  --xuqi-ink: #1d2b3d;
+  --xuqi-paper: rgba(250, 253, 255, .78);
+  --xuqi-glass: rgba(235, 249, 255, .62);
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  background-color: #eaf8ff !important;
+  background-image:
+    radial-gradient(circle at 16% 18%, rgba(255, 210, 223, .46), transparent 23rem),
+    linear-gradient(rgba(255,255,255,.72), rgba(230,248,255,.48)),
+    url("./xuqi-blue-photo.svg") !important;
+  background-size: auto, auto, cover !important;
+  background-attachment: fixed !important;
+  color: var(--xuqi-ink);
+  text-rendering: geometricPrecision;
+}
+
+body:not(.xuqi-stage-flesh):not(.xuqi-stage-terminal) {
+  background-blend-mode: normal, normal, soft-light;
+}
+
+body > .container,
+body > .main-container,
+body > .content,
+.main-content,
+.page-header-content,
+.header-content,
+.navbar-content {
+  position: relative;
+  z-index: 2;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9994;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(18, 51, 71, .045) 0,
+      rgba(18, 51, 71, .045) 1px,
+      transparent 1px,
+      transparent 5px
+    );
+  mix-blend-mode: multiply;
+  opacity: .55;
+}
+
+::selection {
+  color: #fff;
+  background: var(--xuqi-red);
+}
+
+.blog-title,
+.hospital-name,
+.logo,
+.post-title,
+h1,
+h2 {
+  letter-spacing: 0 !important;
+}
+
+.blog-title,
+.logo {
+  color: var(--xuqi-blue-deep) !important;
+  text-shadow:
+    2px 2px 0 #fff,
+    -1px 0 0 rgba(214, 8, 50, .22),
+    0 0 18px rgba(117,201,239,.58) !important;
+}
+
+a {
+  color: #156f9e !important;
+  text-decoration-color: rgba(214, 8, 50, .32) !important;
+}
+
+a:hover {
+  color: var(--xuqi-red) !important;
+  text-shadow: 0 0 8px rgba(214, 8, 50, .24);
+}
+
+header,
+.header,
+.navbar,
+.wayback-nav,
+.nav,
+.top-nav,
+.page-header {
+  border: 1px solid rgba(117, 201, 239, .22) !important;
+  background:
+    linear-gradient(135deg, rgba(250,253,255,.86), rgba(227,246,255,.66)) !important;
+  color: var(--xuqi-ink) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.72) inset,
+    0 18px 48px rgba(31,84,112,.12) !important;
+  backdrop-filter: blur(18px);
+}
+
+.navbar,
+header {
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.page-header {
+  background:
+    radial-gradient(circle at 80% 24%, rgba(255,210,223,.38), transparent 22rem),
+    linear-gradient(135deg, rgba(30,69,94,.96), rgba(37,106,143,.86) 54%, rgba(143,20,41,.76)) !important;
+  color: #fff !important;
+}
+
+.page-header h1,
+.page-header p,
+.page-header .searched-url {
+  color: #fff !important;
+}
+
+.logo,
+.hospital-name,
+.blog-title,
+.header h1,
+.header,
+.navbar .hospital-name {
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif !important;
+  font-weight: 760 !important;
+}
+
+.nav a,
+nav a,
+.wayback-years a,
+.footer a,
+.nav-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 11px !important;
+  border: 1px solid rgba(117, 201, 239, .2) !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.44) !important;
+  color: rgba(29,43,61,.78) !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+  text-shadow: none !important;
+}
+
+.nav a:hover,
+nav a:hover,
+.wayback-years a:hover,
+.footer a:hover,
+.nav-links a:hover,
+.wayback-years a.active {
+  background: rgba(255,255,255,.82) !important;
+  color: var(--xuqi-red) !important;
+  border-color: rgba(143,20,41,.24) !important;
+}
+
+.header,
+.container,
+.main-container,
+.sidebar-widget,
+.post,
+.question,
+.answer,
+.record-detail,
+.record-item,
+.content,
+.box,
+.login-box,
+.sidebar,
+.reply-box,
+.reply,
+.archive-info,
+.timeline-container,
+.stat-card,
+.campus-option,
+.message,
+.guestbook,
+.comment-form,
+.letters-section,
+.diary-section,
+.upload-box,
+.image-slot {
+  border-color: rgba(92, 155, 196, .48) !important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.35) inset,
+    0 12px 30px rgba(31, 84, 112, .12) !important;
+}
+
+.post,
+.question,
+.answer,
+.record-detail,
+.record-item,
+.sidebar-widget,
+.login-box,
+.sidebar,
+.reply-box,
+.reply,
+.archive-info,
+.timeline-container,
+.stat-card,
+.campus-option,
+.message,
+.guestbook,
+.comment-form,
+.letters-section,
+.diary-section {
+  position: relative;
+  background-color: var(--xuqi-paper) !important;
+  backdrop-filter: blur(2px);
+}
+
+.container,
+.main-container,
+.content,
+.box,
+.archive-info,
+.timeline-container,
+.sidebar,
+.sidebar-widget,
+.post,
+.reply,
+.reply-box,
+.question,
+.answer,
+.record-detail,
+.record-item,
+.login-box,
+.campus-option,
+.stat-card,
+.guestbook,
+.comment-form,
+.letters-section,
+.diary-section {
+  border-radius: 16px !important;
+}
+
+.container,
+.main-container {
+  overflow: visible;
+}
+
+.post,
+.reply,
+.question,
+.answer,
+.record-item,
+.campus-option,
+.stat-card {
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.post:hover,
+.reply:hover,
+.question:hover,
+.answer:hover,
+.record-item:hover,
+.campus-option:hover,
+.stat-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(143,20,41,.28) !important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.46) inset,
+    0 18px 38px rgba(31,84,112,.16) !important;
+}
+
+.post::before,
+.question::before,
+.answer::before,
+.record-item::before,
+.reply::before {
+  content: attr(data-xuqi-entry);
+  display: block;
+  margin: -2px 0 8px;
+  color: rgba(143, 20, 41, .74);
+  font: 11px/1.35 Consolas, "Microsoft YaHei", monospace;
+  letter-spacing: 0;
+}
+
+.post-title,
+.question-title,
+.timeline-header h2,
+.archive-info h2,
+.record-title,
+h1,
+h2,
+h3 {
+  color: var(--xuqi-ink) !important;
+  text-shadow: none !important;
+}
+
+.post-info,
+.post-meta,
+.question-meta,
+.answer-date,
+.timestamp,
+.record-date,
+.stat-label,
+.campus-address,
+.footer,
+footer,
+.subtitle {
+  color: rgba(29,43,61,.58) !important;
+}
+
+button,
+.btn,
+.submit-btn,
+#searchBtn,
+.wayback-next,
+input[type="button"],
+input[type="submit"] {
+  min-height: 38px;
+  padding: 8px 14px !important;
+  border: 1px solid rgba(117,201,239,.36) !important;
+  border-radius: 12px !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.96), rgba(230,248,255,.9)) !important;
+  color: var(--xuqi-ink) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.7) inset,
+    0 10px 24px rgba(31,84,112,.14) !important;
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif !important;
+  font-weight: 700 !important;
+  text-shadow: none !important;
+  cursor: pointer;
+}
+
+button:hover,
+.btn:hover,
+.submit-btn:hover,
+#searchBtn:hover,
+.wayback-next:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover {
+  border-color: rgba(143,20,41,.34) !important;
+  color: var(--xuqi-red) !important;
+  transform: translateY(-1px);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="search"],
+input[type="email"],
+textarea,
+select {
+  border: 1px solid rgba(36,95,135,.2) !important;
+  border-radius: 12px !important;
+  background: rgba(255,255,255,.78) !important;
+  color: var(--xuqi-ink) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.7) inset,
+    0 8px 18px rgba(31,84,112,.08) !important;
+  outline: none !important;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="email"]:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(117,201,239,.78) !important;
+  box-shadow:
+    0 0 0 4px rgba(117,201,239,.2),
+    0 10px 24px rgba(31,84,112,.1) !important;
+}
+
+table,
+.archive-table {
+  width: 100%;
+  overflow: hidden;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border: 1px solid rgba(36,95,135,.16) !important;
+  border-radius: 16px !important;
+  background: rgba(255,255,255,.72) !important;
+  box-shadow: 0 18px 38px rgba(31,84,112,.1);
+}
+
+th,
+td {
+  border-color: rgba(36,95,135,.12) !important;
+}
+
+th {
+  background: rgba(230,248,255,.78) !important;
+  color: var(--xuqi-ink) !important;
+}
+
+tr:hover td {
+  background: rgba(255,210,223,.16) !important;
+}
+
+.searched-url,
+.archive-count,
+.highlight,
+.tag,
+.badge {
+  border: 1px solid rgba(117,201,239,.26) !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.42) !important;
+  color: var(--xuqi-blue-deep) !important;
+  box-shadow: none !important;
+}
+
+.wayback-nav {
+  gap: 12px;
+}
+
+.wayback-next {
+  white-space: nowrap;
+}
+
+.profile-pic,
+.broken-image,
+.upload-box,
+.image-container {
+  background-image: url("./xuqi-dream-photo.svg") !important;
+  background-size: cover !important;
+  background-position: center !important;
+}
+
+.local-image,
+.upload-preview,
+.center-image,
+img {
+  filter: saturate(.58) contrast(.92) brightness(1.04) hue-rotate(174deg);
+}
+
+img:hover,
+.local-image:hover,
+.center-image:hover {
+  filter: saturate(.88) contrast(1.08) brightness(.94) hue-rotate(154deg);
+}
+
+.hospital-name::after {
+  content: " / 未登记对象查询";
+  opacity: .72;
+}
+
+.record-title,
+.record-date,
+.record-summary {
+  font-family: "Microsoft YaHei", Consolas, sans-serif;
+}
+
+.record-detail-area,
+#record-detail-area {
+  background-image: url("./xuqi-gray-record.svg");
+  background-size: cover;
+  background-blend-mode: screen;
+}
+
+.blink,
+.glitch,
+.blacktext12,
+.error,
+.warning {
+  color: var(--xuqi-red) !important;
+}
+
+body.xuqi-stage-gray,
+body.xuqi-stage-gray .record-detail,
+body.xuqi-stage-gray .record-item,
+body.xuqi-stage-gray .login-box {
+  background-image:
+    linear-gradient(rgba(244, 248, 249, .75), rgba(224, 231, 234, .64)),
+    url("./xuqi-gray-record.svg") !important;
+}
+
+body.xuqi-stage-flesh {
+  background-color: #190407 !important;
+  background-image:
+    radial-gradient(circle at 47% 42%, rgba(255, 0, 58, .36), transparent 19rem),
+    linear-gradient(rgba(0,0,0,.1), rgba(49,0,7,.34)),
+    url("./xuqi-flesh-photo.svg") !important;
+  color: #ffe7ed;
+}
+
+body.xuqi-stage-flesh .post,
+body.xuqi-stage-flesh .question,
+body.xuqi-stage-flesh .answer,
+body.xuqi-stage-flesh .sidebar-widget,
+body.xuqi-stage-flesh .container,
+body.xuqi-stage-flesh .main-container,
+body.xuqi-stage-flesh .reply,
+body.xuqi-stage-flesh .reply-box,
+body.xuqi-stage-flesh .sidebar,
+body.xuqi-stage-flesh .archive-info,
+body.xuqi-stage-flesh .timeline-container,
+body.xuqi-stage-flesh .stat-card,
+body.xuqi-stage-flesh .campus-option,
+body.xuqi-stage-flesh .guestbook,
+body.xuqi-stage-flesh .comment-form,
+body.xuqi-stage-flesh .letters-section,
+body.xuqi-stage-flesh .diary-section {
+  color: #ffe7ed !important;
+  background: rgba(30, 0, 8, .72) !important;
+  border-color: rgba(255, 38, 81, .58) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 146, 166, .18) inset,
+    0 0 34px rgba(143, 20, 41, .22) !important;
+}
+
+body.xuqi-stage-flesh a {
+  color: #ff96aa !important;
+}
+
+body.xuqi-stage-flesh header,
+body.xuqi-stage-flesh .header,
+body.xuqi-stage-flesh .navbar,
+body.xuqi-stage-flesh .wayback-nav,
+body.xuqi-stage-flesh .nav,
+body.xuqi-stage-flesh .page-header,
+body.xuqi-stage-terminal header,
+body.xuqi-stage-terminal .header,
+body.xuqi-stage-terminal .navbar,
+body.xuqi-stage-terminal .wayback-nav,
+body.xuqi-stage-terminal .nav,
+body.xuqi-stage-terminal .page-header {
+  background:
+    linear-gradient(135deg, rgba(31,0,8,.9), rgba(88,0,19,.72)) !important;
+  color: #ffe7ed !important;
+  border-color: rgba(255,38,81,.36) !important;
+}
+
+body.xuqi-stage-flesh .post-title,
+body.xuqi-stage-flesh .question-title,
+body.xuqi-stage-flesh .timeline-header h2,
+body.xuqi-stage-flesh .archive-info h2,
+body.xuqi-stage-flesh .record-title,
+body.xuqi-stage-flesh h1,
+body.xuqi-stage-flesh h2,
+body.xuqi-stage-flesh h3,
+body.xuqi-stage-terminal .post-title,
+body.xuqi-stage-terminal .question-title,
+body.xuqi-stage-terminal h1,
+body.xuqi-stage-terminal h2,
+body.xuqi-stage-terminal h3 {
+  color: #ffe7ed !important;
+}
+
+body.xuqi-stage-flesh button,
+body.xuqi-stage-flesh .btn,
+body.xuqi-stage-flesh .submit-btn,
+body.xuqi-stage-flesh .wayback-next,
+body.xuqi-stage-terminal button,
+body.xuqi-stage-terminal .btn,
+body.xuqi-stage-terminal .submit-btn,
+body.xuqi-stage-terminal .wayback-next {
+  background:
+    linear-gradient(180deg, rgba(80,0,17,.92), rgba(26,0,7,.92)) !important;
+  color: #ffe7ed !important;
+  border-color: rgba(255,38,81,.42) !important;
+  box-shadow:
+    0 1px 0 rgba(255,160,178,.14) inset,
+    0 12px 30px rgba(214,8,50,.18) !important;
+}
+
+body.xuqi-stage-flesh input[type="text"],
+body.xuqi-stage-flesh input[type="password"],
+body.xuqi-stage-flesh textarea,
+body.xuqi-stage-flesh select,
+body.xuqi-stage-terminal input[type="text"],
+body.xuqi-stage-terminal input[type="password"],
+body.xuqi-stage-terminal textarea,
+body.xuqi-stage-terminal select {
+  background: rgba(21,0,6,.76) !important;
+  color: #ffe7ed !important;
+  border-color: rgba(255,38,81,.34) !important;
+}
+
+body.xuqi-stage-flesh table,
+body.xuqi-stage-flesh .archive-table,
+body.xuqi-stage-terminal table,
+body.xuqi-stage-terminal .archive-table {
+  background: rgba(21,0,6,.76) !important;
+  border-color: rgba(255,38,81,.34) !important;
+}
+
+body.xuqi-stage-flesh th,
+body.xuqi-stage-terminal th {
+  background: rgba(80,0,17,.82) !important;
+  color: #ffe7ed !important;
+}
+
+body.xuqi-stage-flesh td,
+body.xuqi-stage-terminal td {
+  color: #ffe7ed !important;
+}
+
+body.xuqi-stage-terminal {
+  background-color: #020304 !important;
+  background-image:
+    linear-gradient(rgba(0,0,0,.16), rgba(0,0,0,.88)),
+    url("./xuqi-flesh-photo.svg") !important;
+  color: #f4f7f8;
+}
+
+.xuqi-mark,
+.xuqi-rail,
+.xuqi-waterline,
+.xuqi-drift,
+.xuqi-meter,
+.xuqi-cut {
+  pointer-events: none;
+}
+
+.xuqi-mark {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  z-index: 9998;
+  padding: 5px 8px;
+  color: rgba(29, 43, 61, .62);
+  background: rgba(255,255,255,.62);
+  border: 1px solid rgba(117,201,239,.34);
+  font: 12px Consolas, "Microsoft YaHei", monospace;
+}
+
+body.xuqi-stage-flesh .xuqi-mark,
+body.xuqi-stage-terminal .xuqi-mark {
+  color: rgba(255, 231, 237, .72);
+  background: rgba(45,0,10,.72);
+  border-color: rgba(214,8,50,.48);
+}
+
+.xuqi-rail {
+  position: fixed;
+  left: 14px;
+  top: 16px;
+  z-index: 9996;
+  width: 150px;
+  padding: 10px 10px 9px;
+  color: rgba(24, 48, 66, .82);
+  background: rgba(244, 252, 255, .72);
+  border-left: 3px solid var(--xuqi-blue);
+  box-shadow: 0 12px 32px rgba(31, 84, 112, .14);
+  font: 12px/1.45 Consolas, "Microsoft YaHei", monospace;
+}
+
+.xuqi-rail strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--xuqi-red);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.xuqi-rail span {
+  display: block;
+  opacity: .8;
+}
+
+body.xuqi-stage-flesh .xuqi-rail,
+body.xuqi-stage-terminal .xuqi-rail {
+  color: rgba(255, 231, 237, .82);
+  background: rgba(23,0,6,.78);
+  border-left-color: var(--xuqi-red-hot);
+}
+
+.xuqi-waterline {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9995;
+  height: 42px;
+  background:
+    linear-gradient(to top, rgba(78, 177, 220, .25), transparent),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.16) 0 7px, transparent 7px 18px);
+  opacity: .74;
+  transform-origin: bottom;
+  animation: xuqiWater 8s ease-in-out infinite;
+}
+
+body.xuqi-stage-flesh .xuqi-waterline,
+body.xuqi-stage-terminal .xuqi-waterline {
+  background:
+    linear-gradient(to top, rgba(214,8,50,.38), transparent),
+    repeating-linear-gradient(90deg, rgba(255,190,202,.14) 0 5px, transparent 5px 16px);
+}
+
+.xuqi-drift {
+  position: fixed;
+  inset: 0;
+  z-index: 9993;
+  overflow: hidden;
+}
+
+.xuqi-drift span {
+  position: absolute;
+  color: rgba(35, 95, 135, .18);
+  font: 700 22px/1 "Microsoft YaHei", sans-serif;
+  transform: translateY(0);
+  animation: xuqiDrift 16s linear infinite;
+}
+
+.xuqi-drift span:nth-child(1) { left: 8%; top: 14%; animation-delay: -2s; }
+.xuqi-drift span:nth-child(2) { left: 78%; top: 11%; animation-delay: -7s; }
+.xuqi-drift span:nth-child(3) { left: 18%; top: 72%; animation-delay: -5s; }
+.xuqi-drift span:nth-child(4) { left: 62%; top: 64%; animation-delay: -10s; }
+.xuqi-drift span:nth-child(5) { left: 43%; top: 31%; animation-delay: -13s; }
+.xuqi-drift span:nth-child(6) { left: 89%; top: 82%; animation-delay: -1s; }
+
+body.xuqi-stage-flesh .xuqi-drift span,
+body.xuqi-stage-terminal .xuqi-drift span {
+  color: rgba(255, 41, 80, .22);
+  text-shadow: 0 0 12px rgba(214, 8, 50, .22);
+}
+
+.xuqi-meter {
+  position: fixed;
+  right: 12px;
+  top: 14px;
+  z-index: 9996;
+  width: 5px;
+  height: 120px;
+  background: linear-gradient(to top, var(--xuqi-red) var(--xuqi-contam, 18%), rgba(255,255,255,.5) var(--xuqi-contam, 18%));
+  border: 1px solid rgba(35, 95, 135, .22);
+  box-shadow: 0 0 16px rgba(117, 201, 239, .32);
+}
+
+body.xuqi-stage-flesh .xuqi-meter,
+body.xuqi-stage-terminal .xuqi-meter {
+  --xuqi-contam: 86%;
+  border-color: rgba(255, 38, 81, .36);
+  box-shadow: 0 0 20px rgba(214, 8, 50, .36);
+}
+
+body.xuqi-red-pulse::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  pointer-events: none;
+  animation: xuqiPulse 1.2s steps(2,end) 1;
+}
+
+body.xuqi-cutting .xuqi-cut {
+  opacity: 1;
+}
+
+.xuqi-cut {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #000;
+  opacity: 0;
+  font: 700 15vw/1 Consolas, "Microsoft YaHei", monospace;
+  letter-spacing: 0;
+  transition: opacity 70ms linear;
+}
+
+@keyframes xuqiPulse {
+  0%,100% { background: transparent; }
+  18% { background: #000; }
+  36% { background: rgba(166,0,38,.92); }
+  54% { background: #000; }
+}
+
+@keyframes xuqiWater {
+  0%, 100% { transform: scaleY(.72) translateY(4px); opacity: .55; }
+  50% { transform: scaleY(1) translateY(0); opacity: .86; }
+}
+
+@keyframes xuqiDrift {
+  0% { transform: translateY(0) translateX(0); opacity: .04; }
+  18% { opacity: .22; }
+  58% { opacity: .12; }
+  100% { transform: translateY(-46px) translateX(18px); opacity: .03; }
+}
+
+@media (max-width: 760px) {
+  .xuqi-rail {
+    left: 8px;
+    top: 8px;
+    width: 120px;
+    padding: 8px;
+    font-size: 10px;
+  }
+
+  .xuqi-meter {
+    height: 86px;
+  }
+
+  .xuqi-mark {
+    font-size: 10px;
+  }
+}

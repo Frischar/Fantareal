@@ -1,0 +1,441 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蓝湾市档案医院电子病历系统</title>
+    <style>
+        /* 全局样式 */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
+            line-height: 1.6;
+            min-width: 850px;
+            /* 背景图片设置 */
+            background-image: url('./hospital-background.png'); /* 替换为您的本地图片路径 */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            position: relative;
+        }
+        
+        /* 添加半透明遮罩层，提高文字可读性 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(230, 233, 237, 0.85);
+            z-index: -1;
+        }
+        
+        /* 顶部导航栏 - 修复版 */
+        .navbar {
+            background: linear-gradient(to bottom, #003366, #002244);
+            color: white;
+            padding: 12px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border-bottom: 1px solid #001122;
+            width: 100%;
+        }
+        
+        .navbar-content {
+            width: 850px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+        
+        .hospital-name {
+            font-size: 24px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        
+        .hospital-subtitle {
+            font-size: 14px;
+            opacity: 0.8;
+            white-space: nowrap;
+        }
+        
+        .contact-info {
+            text-align: right;
+            white-space: nowrap;
+        }
+        
+        .container {
+            width: 850px;
+            margin: 30px auto;
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1px solid #b8c2cc;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            padding: 25px;
+            position: relative;
+        }
+        
+        h1 {
+            color: #003366;
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        
+        /* 按钮样式 - 拟物设计 */
+        .btn {
+            display: inline-block;
+            background: linear-gradient(to bottom, #4a6ea9, #3a5a8a);
+            color: white;
+            padding: 10px 20px;
+            border: 1px solid #2a4a7a;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            text-decoration: none;
+            font-size: 14px;
+            box-shadow: 
+                inset 0 1px 0 rgba(255,255,255,0.3),
+                0 2px 3px rgba(0,0,0,0.3);
+            text-shadow: 0 -1px 1px rgba(0,0,0,0.4);
+            transition: all 0.2s;
+            margin: 0 5px;
+        }
+        
+        .btn:hover {
+            background: linear-gradient(to bottom, #5a7eb9, #4a6a9a);
+            box-shadow: 
+                inset 0 1px 0 rgba(255,255,255,0.3),
+                0 2px 5px rgba(0,0,0,0.4);
+        }
+        
+        .btn:active {
+            background: linear-gradient(to bottom, #3a5a8a, #2a4a7a);
+            box-shadow: 
+                inset 0 2px 3px rgba(0,0,0,0.3),
+                0 1px 1px rgba(0,0,0,0.2);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(to bottom, #003366, #002244);
+            border: 1px solid #001122;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(to bottom, #004488, #003366);
+        }
+        
+        .btn-primary:active {
+            background: linear-gradient(to bottom, #002244, #001122);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(to bottom, #6c757d, #5a6268);
+            border: 1px solid #545b62;
+        }
+        
+        .btn-secondary:hover {
+            background: linear-gradient(to bottom, #7a8288, #686f76);
+        }
+        
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #003366;
+        }
+        
+        input[type="text"],
+        input[type="password"],
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #b8c2cc;
+            box-sizing: border-box;
+            font-size: 14px;
+            background: #f8f9fa;
+            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* 院区选择样式 - 拟物设计 */
+        .campus-option {
+            background: linear-gradient(to bottom, #e8edf5, #d0d9e8);
+            border: 1px solid #b8c2cc;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .campus-option:hover {
+            background: linear-gradient(to bottom, #f0f5fd, #d8e1f0);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        
+        .campus-option.selected {
+            background: linear-gradient(to bottom, #d0d9e8, #b8c2cc);
+            border-color: #8a9bb2;
+            box-shadow: 
+                inset 0 1px 3px rgba(0,0,0,0.2),
+                0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .campus-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #003366;
+        }
+        
+        .campus-address {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        /* 消息提示样式 */
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid;
+            border-radius: 3px;
+        }
+        
+        .error {
+            background-color: #ffe6e6;
+            border-color: #ff9999;
+            color: #cc0000;
+        }
+        
+        .success {
+            background-color: #e6ffe6;
+            border-color: #99cc99;
+            color: #006600;
+        }
+        
+        /* 页脚样式 */
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        
+        /* 系统信息样式 */
+        .system-info {
+            background: #f0f5fd;
+            border: 1px solid #d0d9e8;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        /* 按钮容器 */
+        .button-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        /* 背景图片说明 */
+        .bg-note {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 10px;
+            color: #888;
+            background: rgba(255,255,255,0.7);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="navbar">
+        <div class="navbar-content">
+            <div>
+                <div class="hospital-name">蓝湾市档案医院</div>
+                <div class="hospital-subtitle">住院病人电子病历管理系统</div>
+            </div>
+            <div class="contact-info">
+                <div>服务热线: 0123-12345678</div>
+                <div style="font-size: 12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 院区选择页面 -->
+    <div id="campus-selection" class="container">
+        <h1>请选择档案来源</h1>
+        
+        <div class="system-info">
+            提示：请根据您的就诊信息选择正确的院区，系统将根据院区提供相应的病历服务。
+        </div>
+        
+        <div class="campus-option" data-campus="jiangshan">
+            <div class="campus-name">蓝湾校档</div>
+            <div class="campus-address">学生基础信息 / 2025</div>
+        </div>
+        
+        <div class="campus-option" data-campus="jingzhou">
+            <div class="campus-name">家庭记录</div>
+            <div class="campus-address">不可公开 / 缺失</div>
+        </div>
+        
+        <div class="campus-option" data-campus="nanshan">
+            <div class="campus-name">未登记库</div>
+            <div class="campus-address">空白出生字段</div>
+        </div>
+        
+        <div class="button-container">
+            <button id="enter-btn" class="btn btn-primary">进入系统</button>
+        </div>
+        
+        <div class="footer">
+            蓝湾市档案医院 © 2012 版权所有 | 技术支持: 信息科
+        </div>
+        
+        <div class="bg-note">背景图片路径: ./hospital-background.png</div>
+    </div>
+    
+    <!-- 登录页面 -->
+    <div id="login-page" class="container" style="display: none;">
+        <h1>电子病历系统登录</h1>
+        <div id="selected-campus" style="margin-bottom: 15px; color: #003366; font-weight: bold;"></div>
+        
+        <div class="system-info">
+            请输入您的就诊信息进行登录。如遇问题，请联系所在科室护士站。
+        </div>
+        
+        <form id="login-form">
+            <div class="form-group">
+                <label for="patient-name">对象名称：</label>
+                <input type="text" id="patient-name" name="patient-name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="department">记录类型：</label>
+                <input type="text" id="department" name="department" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="bed-number">编号：</label>
+                <input type="text" id="bed-number" name="bed-number" required>
+            </div>
+            
+            <div class="button-container">
+                <button type="submit" class="btn btn-primary">登录</button>
+                <button type="button" id="back-btn" class="btn btn-secondary">返回选择院区</button>
+            </div>
+        </form>
+        
+        <div class="footer">
+            蓝湾市档案医院 © 2013 版权所有 | 技术支持: 信息科
+        </div>
+        
+        <div class="bg-note">背景图片路径</div>
+    </div>
+
+    <script>
+    // 页面元素
+    const campusSelection = document.getElementById('campus-selection');
+    const loginPage = document.getElementById('login-page');
+    const campusOptions = document.querySelectorAll('.campus-option');
+    const enterBtn = document.getElementById('enter-btn');
+    const backBtn = document.getElementById('back-btn');
+    const selectedCampus = document.getElementById('selected-campus');
+    const loginForm = document.getElementById('login-form');
+    
+    let currentCampus = '';
+    
+    // 院区选择逻辑
+    campusOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            campusOptions.forEach(opt => opt.classList.remove('selected'));
+            this.classList.add('selected');
+            currentCampus = this.getAttribute('data-campus');
+        });
+    });
+    
+    // 进入系统按钮点击事件
+    enterBtn.addEventListener('click', function() {
+        if (!currentCampus) {
+            alert('请先选择院区！');
+            return;
+        }
+        
+        // 显示登录页面，隐藏院区选择页面
+        campusSelection.style.display = 'none';
+        loginPage.style.display = 'block';
+        
+        // 显示所选院区
+        const campusNames = {
+            'jiangshan': '蓝湾校档',
+            'jingzhou': '家庭记录',
+            'nanshan': '未登记库'
+        };
+        selectedCampus.textContent = `当前院区：${campusNames[currentCampus]}`;
+    });
+    
+    // 返回按钮点击事件
+    backBtn.addEventListener('click', function() {
+        loginPage.style.display = 'none';
+        campusSelection.style.display = 'block';
+    });
+    
+    // 登录表单提交事件
+    loginForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const patientName = document.getElementById('patient-name').value;
+        const department = document.getElementById('department').value;
+        const bedNumber = document.getElementById('bed-number').value;
+        
+        // 验证逻辑
+        if (currentCampus === 'jiangshan' && 
+            patientName === '绪亓' && 
+            department === '未登记' && 
+            (bedNumber === '0000' || bedNumber === '空')) {
+            
+            // 登录成功
+            alert('查询成功。正在打开缺失记录...');
+            // 跳转到指定的病历系统页面
+            window.location.href = '../hospitalhistory/index.html';
+            
+        } else {
+            // 登录失败
+            if (currentCampus !== 'jiangshan') {
+                alert('未查询到相应信息，请检查信息是否输入正确，或是否院区选择错误。');
+            } else {
+                alert('未查询到相应信息，请检查就诊人名称、住院科室和床号是否正确。');
+            }
+        }
+    });
+    
+    // 默认选择蓝湾校档
+    document.querySelector('.campus-option[data-campus="jiangshan"]').click();
+</script>
+    <script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>
