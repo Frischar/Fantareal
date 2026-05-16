@@ -403,6 +403,8 @@
     [/安宁/g, "绪亓"],
     [/我的秘密花园/g, "绪亓的浅蓝日记"],
     [/南城市第一人民医院/g, "蓝湾市档案医院"],
+    [/南城市第一医院/g, "蓝湾市档案医院"],
+    [/第一医院/g, "蓝湾市档案医院"],
     [/死人可以复活吗？/g, "没有出生的人会被记住吗？"]
   ];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
