@@ -19,7 +19,9 @@
         "role_id": "role_a",
         "role_name": "Role A",
         "aliases": [
-          "1"
+          "1",
+          "role_a",
+          "Role A"
         ],
         "enabled": true,
         "use_default_variables": false,
@@ -37,7 +39,9 @@
         "role_id": "role_b",
         "role_name": "Role B",
         "aliases": [
-          "2"
+          "2",
+          "role_b",
+          "Role B"
         ],
         "enabled": true,
         "use_default_variables": false,
@@ -55,7 +59,9 @@
         "role_id": "role_c",
         "role_name": "Role C",
         "aliases": [
-          "3"
+          "3",
+          "role_c",
+          "Role C"
         ],
         "enabled": true,
         "use_default_variables": false,

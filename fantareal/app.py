@@ -2334,9 +2334,12 @@ def save_workshop_card(workshop: dict[str, Any], *, slot_id: str | None = None) 
     updated_raw = json.loads(json.dumps(current_raw, ensure_ascii=False))
     updated_raw["creativeWorkshop"] = sanitize_creative_workshop(workshop)
     normalized_card = normalize_role_card(updated_raw)
-    source_name = str(current_card.get("source_name", "")).strip()
+    source_name = Path(str(current_card.get("source_name", "")).strip()).name
     if not source_name:
-        source_name = "role_card.json"
+        card_name = str(normalized_card.get("name", "")).strip() or "role_card"
+        source_name = re.sub(r'[\\/:*?"<>|]+', "_", card_name).strip(" ._") or "role_card"
+    if not source_name.lower().endswith(tuple(ROLE_CARD_EXTENSIONS)):
+        source_name = f"{source_name}.json"
     source_path = CARDS_DIR / Path(source_name).name
 
     persist_json(

@@ -1008,45 +1008,141 @@
       }
 
 
-      /* v1.19.8 · 标准样式低透明度可读性增强；仅作用于 theme-standard，不影响其他外观包。 */
-      .state-journal-turn-note.theme-standard,
-      .state-journal-turn-note-compact.theme-standard {
+      /* v2.0.3 · 标准样式浅/暗色可读性作用域收口。
+       * 只作用于 theme-standard：
+       * - light：恢复标准浅色深色字，并覆盖 global-ui-sync 的浅色误污染。
+       * - dark：保留标准暗色白字。
+       * 其他内置/外置美化包不受影响。
+       */
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard {
         --xj-standard-readable-text: #2b211a;
         --xj-standard-readable-muted: #5a5048;
         --xj-standard-readable-soft: #756a61;
         --xj-standard-readable-accent: color-mix(in srgb, var(--accent, #b46a3e) 58%, #7d3f22 42%);
         color: var(--xj-standard-readable-text) !important;
       }
-      .state-journal-turn-note.theme-standard .state-journal-note-section,
-      .state-journal-turn-note.theme-standard .state-journal-note-field,
-      .state-journal-turn-note.theme-standard .state-journal-metric-chip,
-      .state-journal-turn-note.theme-standard .state-journal-metric-diary-row {
-        background: color-mix(in srgb, rgba(var(--input-rgb, 255,255,255), max(var(--input-alpha, .09), .18)) 76%, rgba(255,255,255,.28)) !important;
-      }
-      .state-journal-turn-note.theme-standard .state-journal-note-section h4,
-      .state-journal-turn-note.theme-standard .state-journal-note-field strong,
-      .state-journal-turn-note.theme-standard .state-journal-relation-list strong,
-      .state-journal-turn-note.theme-standard .state-journal-metric-diary-row strong,
-      .state-journal-turn-note-compact.theme-standard {
+
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-title,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-event,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-section h4,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field strong,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field p,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field div,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-relation-list,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-relation-list strong,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-relation-list p,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row strong,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row span,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip i,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard span {
         color: var(--xj-standard-readable-text) !important;
       }
-      .state-journal-turn-note.theme-standard summary,
-      .state-journal-turn-note.theme-standard .state-journal-note-toolbar,
-      .state-journal-turn-note.theme-standard .state-journal-relation-list,
-      .state-journal-turn-note.theme-standard .state-journal-note-empty,
-      .state-journal-turn-note.theme-standard .state-journal-scene-subtitle,
-      .state-journal-turn-note-compact.theme-standard span {
+
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard summary,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-subtitle,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-toggle,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip span,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard summary,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-empty,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar small {
         color: var(--xj-standard-readable-muted) !important;
       }
-      .state-journal-turn-note.theme-standard .state-journal-note-field span,
-      .state-journal-turn-note.theme-standard .state-journal-metric-chip b,
-      .state-journal-turn-note.theme-standard .state-journal-scene-chip b,
-      .state-journal-turn-note-compact.theme-standard strong {
+
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-kicker,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip b,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field span,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip b,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard strong {
         color: var(--xj-standard-readable-accent) !important;
       }
-      .state-journal-turn-note.theme-standard .state-journal-note-field em,
-      .state-journal-turn-note.theme-standard .state-journal-note-toolbar small {
+
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field em {
         color: var(--xj-standard-readable-soft) !important;
+      }
+
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row {
+        background: color-mix(in srgb, rgba(var(--input-rgb, 255,255,255), max(var(--input-alpha, .09), .18)) 76%, rgba(255,255,255,.28)) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard {
+        --xj-standard-dark-text: rgba(255,255,255,.95);
+        --xj-standard-dark-muted: rgba(255,255,255,.84);
+        --xj-standard-dark-soft: rgba(255,255,255,.70);
+        --xj-standard-dark-accent: color-mix(in srgb, var(--accent, #8fc7ff) 68%, #ffffff 32%);
+        color: var(--xj-standard-dark-text) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-title,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-event,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-section h4,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field strong,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field p,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field div,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-relation-list,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-relation-list strong,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-relation-list p,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row strong,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row span,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip i,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard span {
+        color: var(--xj-standard-dark-text) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard summary,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-subtitle,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-toggle,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip span,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard summary,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-empty,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar small {
+        color: var(--xj-standard-dark-muted) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-kicker,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip b,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field span,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip b,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard strong {
+        color: var(--xj-standard-dark-accent) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field em {
+        color: var(--xj-standard-dark-soft) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row {
+        background: color-mix(in srgb, var(--input-bg, rgba(8,14,20,.42)) 82%, rgba(0,0,0,.18)) !important;
+        border-color: color-mix(in srgb, var(--border, rgba(255,255,255,.16)) 72%, rgba(255,255,255,.22)) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip {
+        background: rgba(255,255,255,.08) !important;
+        border-color: rgba(255,255,255,.18) !important;
       }
 
       @keyframes state-journal-spin { to { transform: rotate(360deg); } }
@@ -2450,10 +2546,47 @@
     }
   }
 
+  function parseColorLuminance(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    let parts = null;
+    const rgbMatch = raw.match(/rgba?\(([^)]+)\)/i);
+    if (rgbMatch) {
+      parts = rgbMatch[1].split(",").slice(0, 3).map((item) => Number.parseFloat(item));
+    } else if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) {
+      const hex = raw.slice(1);
+      const full = hex.length === 3 ? hex.split("").map((ch) => ch + ch).join("") : hex;
+      parts = [0, 2, 4].map((idx) => Number.parseInt(full.slice(idx, idx + 2), 16));
+    } else if (/^\d+\s*,/.test(raw)) {
+      parts = raw.split(",").slice(0, 3).map((item) => Number.parseFloat(item));
+    }
+    if (!parts || parts.length < 3 || parts.some((num) => !Number.isFinite(num))) return null;
+    const [r, g, b] = parts.map((num) => Math.max(0, Math.min(255, num)) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  function isMainUiLightMode() {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const bodyStyle = getComputedStyle(document.body || document.documentElement);
+    const inputRgb = rootStyle.getPropertyValue("--input-rgb") || bodyStyle.getPropertyValue("--input-rgb");
+    const panel = rootStyle.getPropertyValue("--panel") || bodyStyle.getPropertyValue("--panel");
+    const bg = rootStyle.getPropertyValue("--background") || bodyStyle.getPropertyValue("--background");
+    const text = rootStyle.getPropertyValue("--text") || bodyStyle.getPropertyValue("--text");
+    const candidates = [inputRgb, panel, bg].map(parseColorLuminance).filter((item) => item !== null);
+    if (candidates.length) return Math.max(...candidates) > 0.58;
+    const textLum = parseColorLuminance(text);
+    if (textLum !== null) return textLum < 0.45;
+    return window.matchMedia?.("(prefers-color-scheme: light)")?.matches === true;
+  }
+
   function applyChatUiSyncMode(config = configCache || {}) {
     // v1.19.2：只让“标准样式”跟随 Fantareal 主程序浅/暗色与透明度；外置美化包保留自身风格。
     const activeId = String(config?.turn_note_theme_id || "standard").trim() || "standard";
-    document.body?.classList.toggle("state-journal-global-ui-sync", activeId === "standard");
+    const isStandard = activeId === "standard";
+    const isLight = isStandard && isMainUiLightMode();
+    document.body?.classList.toggle("state-journal-global-ui-sync", isStandard);
+    document.body?.classList.toggle("state-journal-standard-light-readability", isLight);
+    document.body?.classList.toggle("state-journal-standard-dark-readability", isStandard && !isLight);
   }
 
   async function loadConfig() {

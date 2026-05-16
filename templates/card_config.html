@@ -2026,6 +2026,19 @@
         }
       }
 
+      function notifyWorkshopRoleCardChanged(reason, data = {}) {
+        try {
+          const payload = {
+            type: "role_card_loaded",
+            reason: reason || "card_config",
+            filename: data.filename || "",
+            workshop_preserved: Boolean(data.workshop_preserved),
+            at: Date.now(),
+          };
+          localStorage.setItem("fantareal:role_card_loaded", JSON.stringify(payload));
+        } catch (_) {}
+      }
+
       async function saveCard() {
         const filename = value("card-filename") || "role_card.json";
         const card = buildCardPayload();
@@ -2039,10 +2052,12 @@
         document.getElementById("card-filename").value = data.filename || filename;
         await refreshCardList(data.filename || filename);
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("save", data);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
         setStatus(data.workshop?.triggered
-          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
-          : `角色卡已保存并加载：${data.filename}。${slotSummary}`);
+          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`
+          : `角色卡已保存并加载：${data.filename}。${slotSummary}${preserveNote}`);
       }
 
       async function loadCard() {
@@ -2056,6 +2071,7 @@
         fillCardForm(loadedCard);
         await refreshCardList(data.filename || filename);
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("load", data);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
           ? `角色卡已加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
@@ -2083,10 +2099,12 @@
         document.getElementById("card-filename").value = data.filename || file.name || "imported_role_card.json";
         await refreshCardList(data.filename || file.name || "");
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("import", data);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
         setStatus(data.workshop?.triggered
-          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
-          : `本地角色卡已导入：${data.filename || file.name}。${slotSummary}`);
+          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`
+          : `本地角色卡已导入：${data.filename || file.name}。${slotSummary}${preserveNote}`);
         return data;
       }
 

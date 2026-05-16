@@ -984,13 +984,77 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             "workshop_state": ctx.get_workshop_state(active_slot),
         }
 
+    def workshop_has_effective_binding(raw: Any) -> bool:
+        workshop = ctx.sanitize_creative_workshop(raw)
+        opening = workshop.get("opening", {}) if isinstance(workshop, dict) else {}
+        ambience = workshop.get("ambience", {}) if isinstance(workshop, dict) else {}
+        scenes = workshop.get("dynamicScenes", []) if isinstance(workshop, dict) else []
+
+        opening_bound = bool(
+            isinstance(opening, dict)
+            and opening.get("enabled") is True
+            and any(str(opening.get(key, "")).strip() for key in ["title", "subtitle", "coverImage", "musicUrl"])
+        )
+        ambience_background = ambience.get("background", {}) if isinstance(ambience, dict) else {}
+        ambience_music = ambience.get("music", {}) if isinstance(ambience, dict) else {}
+        ambience_ambient = ambience.get("ambient", {}) if isinstance(ambience, dict) else {}
+        ambience_bound = bool(
+            isinstance(ambience, dict)
+            and ambience.get("enabled") is True
+            and (
+                (isinstance(ambience_background, dict) and ambience_background.get("enabled") is True and str(ambience_background.get("imageUrl", "")).strip())
+                or (isinstance(ambience_music, dict) and ambience_music.get("enabled") is True and (str(ambience_music.get("url", "")).strip() or str(ambience_music.get("preset", "off")).strip().lower() not in {"", "off"}))
+                or (isinstance(ambience_ambient, dict) and ambience_ambient.get("enabled") is True and (str(ambience_ambient.get("url", "")).strip() or str(ambience_ambient.get("preset", "off")).strip().lower() not in {"", "off"}))
+            )
+        )
+        return bool(opening_bound or ambience_bound or (isinstance(scenes, list) and len(scenes) > 0))
+
+    def normalize_card_filename(filename: str, fallback_name: str = "role_card") -> str:
+        name = Path(str(filename or "").strip() or f"{fallback_name}.json").name
+        if not name.lower().endswith(tuple(ctx.ROLE_CARD_EXTENSIONS)):
+            name += ".json"
+        return name
+
+    def read_existing_role_card_for_workshop(filename: str) -> dict[str, Any] | None:
+        target = ctx.CARDS_DIR / Path(filename).name
+        if not target.exists() or target.suffix.lower() not in ctx.ROLE_CARD_EXTENSIONS:
+            return None
+        try:
+            return ctx.parse_role_card_json(ctx.read_role_card_text(target))
+        except Exception:
+            return None
+
+    def preserve_existing_workshop_when_importing(card: dict[str, Any], filename: str) -> tuple[dict[str, Any], bool]:
+        if workshop_has_effective_binding(card.get("creativeWorkshop", {})):
+            return card, False
+
+        existing = read_existing_role_card_for_workshop(filename)
+        if isinstance(existing, dict) and workshop_has_effective_binding(existing.get("creativeWorkshop", {})):
+            merged = dict(card)
+            merged["creativeWorkshop"] = existing.get("creativeWorkshop", {})
+            return merged, True
+
+        current_card = ctx.get_current_card(ctx.get_active_slot_id())
+        current_raw = current_card.get("raw", {}) if isinstance(current_card, dict) else {}
+        current_source = Path(str(current_card.get("source_name", "")).strip()).name if isinstance(current_card, dict) else ""
+        if (
+            isinstance(current_raw, dict)
+            and current_source
+            and current_source == Path(filename).name
+            and workshop_has_effective_binding(current_raw.get("creativeWorkshop", {}))
+        ):
+            merged = dict(card)
+            merged["creativeWorkshop"] = current_raw.get("creativeWorkshop", {})
+            return merged, True
+
+        return card, False
+
     @app.post("/api/cards/import")
     async def api_import_card(payload: RoleCardPayload) -> dict[str, Any]:
         active_slot = ctx.get_active_slot_id()
         card = ctx.parse_role_card_json(payload.raw_json)
-        filename = Path(payload.filename.strip() or f"{card.get('name', 'role_card')}.json").name
-        if not filename.lower().endswith(".json"):
-            filename += ".json"
+        filename = normalize_card_filename(payload.filename.strip() or f"{card.get('name', 'role_card')}.json")
+        card, workshop_preserved = preserve_existing_workshop_when_importing(card, filename)
 
         ctx.persist_json(
             ctx.CARDS_DIR / filename,
@@ -998,7 +1062,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             detail="Card save failed: could not write to the cards directory.",
         )
 
-        result: dict[str, Any] = {"ok": True, "filename": filename}
+        result: dict[str, Any] = {"ok": True, "filename": filename, "workshop_preserved": workshop_preserved}
         if payload.apply_now:
             result.update(ctx.apply_role_card(card, source_name=filename, slot_id=active_slot))
             result["workshop"] = ctx.evaluate_creative_workshop(slot_id=active_slot, reason="load")
@@ -1155,16 +1219,17 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 if isinstance(preset, dict):
                     ctx.save_preset_store(preset, active_slot)
 
-                card_to_apply = role_card
-                source_name = "imported_bundle"
+                source_name = "imported_bundle.json"
                 for name in namelist:
                     if name.endswith(".json") and "人设卡" in name:
-                        source_name = name.replace(".json", "")
+                        source_name = normalize_card_filename(Path(name).name)
                         break
+                card_to_apply, workshop_preserved = preserve_existing_workshop_when_importing(role_card, source_name)
 
                 result = ctx.apply_role_card(card_to_apply, source_name=source_name, slot_id=active_slot)
                 result["workshop"] = ctx.evaluate_creative_workshop(slot_id=active_slot, reason="import")
                 result["ok"] = True
+                result["workshop_preserved"] = workshop_preserved
                 result["imported_files"] = {
                     "role_card": source_name,
                     "memories": bool(memories),
@@ -1200,9 +1265,33 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
         return FileResponse(path=export_path, filename=filename, media_type="text/plain")
 
-    @app.get("/api/workshop/status")
-    async def api_get_workshop_status() -> dict[str, Any]:
-        active_slot = ctx.get_active_slot_id()
+    def workshop_card_binding_summary(workshop: dict[str, Any], current_card: dict[str, Any] | None = None) -> dict[str, Any]:
+        opening = workshop.get("opening", {}) if isinstance(workshop, dict) else {}
+        ambience = workshop.get("ambience", {}) if isinstance(workshop, dict) else {}
+        scenes = workshop.get("dynamicScenes", []) if isinstance(workshop, dict) else []
+        opening_bound = bool(isinstance(opening, dict) and opening.get("enabled"))
+        ambience_bound = bool(isinstance(ambience, dict) and ambience.get("enabled"))
+        dynamic_count = len(scenes) if isinstance(scenes, list) else 0
+        card_name = ""
+        if isinstance(current_card, dict):
+            card_name = str(current_card.get("source_name") or current_card.get("name") or "").strip()
+        return {
+            "source": "current_card",
+            "card_name": card_name,
+            "has_binding": bool(opening_bound or ambience_bound or dynamic_count > 0),
+            "bound_parts": {
+                "opening": opening_bound,
+                "ambience": ambience_bound,
+                "dynamic": dynamic_count > 0,
+            },
+            "dynamic_count": dynamic_count,
+            "scope": ["opening", "ambience", "dynamicScenes"],
+            "resource_mode": "reference_only",
+        }
+
+    def workshop_status_payload(active_slot: str | None = None) -> dict[str, Any]:
+        if active_slot is None:
+            active_slot = ctx.get_active_slot_id()
         current_card = ctx.get_current_card(active_slot)
         workshop = ctx.sanitize_creative_workshop(current_card.get("raw", {}).get("creativeWorkshop", {}))
         state = ctx.get_workshop_state(active_slot)
@@ -1216,7 +1305,12 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             "stage": stage,
             "stage_label": ctx.get_workshop_stage_label(stage),
             "signature": ctx.workshop_signature(current_card, workshop, stage),
+            "binding": workshop_card_binding_summary(workshop, current_card),
         }
+
+    @app.get("/api/workshop/status")
+    async def api_get_workshop_status() -> dict[str, Any]:
+        return workshop_status_payload()
 
     @app.post("/api/workshop/save")
     async def api_save_workshop(payload: WorkshopSavePayload) -> dict[str, Any]:
@@ -1229,6 +1323,21 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             "card": result["card"],
             "workshop": result["workshop"],
             "state": result["workshop_state"],
+            "binding": workshop_card_binding_summary(result["workshop"], result["current_card"]),
+        }
+
+    @app.post("/api/workshop/clear-card-binding")
+    async def api_clear_workshop_card_binding() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        result = ctx.save_workshop_card(ctx.sanitize_creative_workshop({}), slot_id=active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "current_card": result["current_card"],
+            "card": result["card"],
+            "workshop": result["workshop"],
+            "state": result["workshop_state"],
+            "binding": workshop_card_binding_summary(result["workshop"], result["current_card"]),
         }
 
     @app.post("/api/workshop/evaluate")

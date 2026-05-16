@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 
-VERSION = "2.0.0-state-journal-stable"
+VERSION = "2.0.5-workshop-apply-hotfix"
 
 
 def get_resource_dir() -> Path:

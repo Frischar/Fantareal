@@ -1,10 +1,10 @@
 {
   "label": "心笺",
-  "description": "AI 结构化状态记录与幕笺展示工具。v2.0.0 稳定整合角色配置、世界书阶段标签、外观包系统与幕笺 worker 状态兜底。",
+  "description": "AI 结构化状态记录与幕笺展示工具。v2.0.5 保留稳定整合功能，回退 Chat 自动重刷，并配合演出工坊角色卡应用修复。",
   "hooks": {
     "chat_scripts": [
-      "/static/state-journal-chat.js?v=state-journal-v200-state-journal-stable"
+      "/static/state-journal-chat.js?v=state-journal-v205-workshop-apply-hotfix"
     ]
   },
-  "version": "2.0.0-state-journal-stable"
+  "version": "2.0.5-workshop-apply-hotfix"
 }
