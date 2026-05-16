@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蓝湾市档案医院 - 电子病历系统</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background-color: #e6e9ed;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .navbar {
+            background: linear-gradient(to bottom, #003366, #002244);
+            color: white;
+            padding: 12px 0;
+            width: 100%;
+        }
+        .navbar-content {
+            max-width: 850px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+        .hospital-name { font-size: 20px; font-weight: bold; }
+        .hospital-subtitle { font-size: 13px; opacity: .7; }
+        .patient-info { text-align: right; font-size: 14px; }
+
+        .container {
+            max-width: 850px;
+            margin: 24px auto;
+            background: #fff;
+            border: 1px solid #b8c2cc;
+            padding: 24px;
+        }
+
+        h1 {
+            color: #003366;
+            text-align: center;
+            font-size: 22px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        .record-list { margin: 16px 0; }
+        .record-item {
+            background: #e8edf5;
+            border: 1px solid #b8c2cc;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+        .record-item:hover { background: #f0f5fd; }
+        .record-item.active {
+            background: #d0d9e8;
+            border-color: #8a9bb2;
+        }
+        .record-title { font-size: 16px; font-weight: bold; color: #003366; }
+        .record-date { font-size: 13px; color: #666; margin-top: 4px; }
+        .record-summary {
+            font-size: 13px; color: #555; margin-top: 8px;
+            display: none;
+        }
+        .record-item.active .record-summary { display: block; }
+
+        .record-detail {
+            background: #f8f9fa;
+            border: 1px solid #d0d9e8;
+            padding: 20px;
+            margin-top: 16px;
+            display: none;
+        }
+        .record-detail.active { display: block; }
+
+        .record-detail h2 {
+            color: #003366;
+            font-size: 17px;
+            margin-bottom: 16px;
+            border-left: 3px solid #003366;
+            padding-left: 10px;
+        }
+        .field { margin-bottom: 12px; }
+        .field-label { font-weight: bold; color: #333; }
+        .field-empty { color: #999; }
+        .field-note {
+            color: #999;
+            font-style: italic;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 11px;
+            color: #888;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/xuqi-overrides.css">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="navbar-content">
+        <div>
+            <div class="hospital-name">蓝湾市档案医院</div>
+            <div class="hospital-subtitle">电子病历管理系统</div>
+        </div>
+        <div class="patient-info">
+            查询对象：绪亓 | 科室：未登记 | 编号：0000
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <h1>档案查询结果</h1>
+
+    <div class="record-list">
+        <div class="record-item" data-record="school">
+            <div class="record-title">蓝湾校档 — 学生基础信息</div>
+            <div class="record-date">查询日期：2025年</div>
+            <div class="record-summary">未查询到该对象的学籍登记信息。姓名字段存在，但学籍号、入学日期、班级信息均为空。</div>
+        </div>
+        <div class="record-item" data-record="family">
+            <div class="record-title">家庭记录 — 母亲关联档案</div>
+            <div class="record-date">档案来源：不可公开 / 部分缺失</div>
+            <div class="record-summary">母亲姓名字段存在，但子女登记栏为空。产检记录显示一次妊娠终止，日期模糊。其余字段不可读取。</div>
+        </div>
+        <div class="record-item" data-record="unregistered">
+            <div class="record-title">未登记库 — 空白出生字段</div>
+            <div class="record-date">档案来源：未登记库</div>
+            <div class="record-summary">对象名称「绪亓」存在于系统索引中，但所有出生相关字段均为空。</div>
+        </div>
+    </div>
+
+    <div id="record-detail-area">
+        <!-- 蓝湾校档 -->
+        <div class="record-detail" id="school-detail">
+            <h2>蓝湾校档 — 学生基础信息</h2>
+            <div class="field"><span class="field-label">姓名：</span> 绪亓</div>
+            <div class="field"><span class="field-label">学号：</span> <span class="field-empty">[ 未分配 ]</span></div>
+            <div class="field"><span class="field-label">入学年份：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">班级：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">学籍状态：</span> 未登记</div>
+            <div class="field-note">该查询对象不存在于当前学籍数据库中。</div>
+        </div>
+
+        <!-- 家庭记录 -->
+        <div class="record-detail" id="family-detail">
+            <h2>家庭记录 — 母亲关联档案</h2>
+            <div class="field"><span class="field-label">母亲姓名：</span> [已录入]</div>
+            <div class="field"><span class="field-label">子女姓名：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">子女出生日期：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">关联编号：</span> ——</div>
+            <div class="field-note">妊娠终止。日期模糊。胎儿未获得出生证明。其余字段不可读取。</div>
+        </div>
+
+        <!-- 未登记库 -->
+        <div class="record-detail" id="unregistered-detail">
+            <h2>未登记库 — 空白出生字段</h2>
+            <div class="field"><span class="field-label">索引名称：</span> 绪亓</div>
+            <div class="field"><span class="field-label">性别：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">出生日期：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">出生地点：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">出生证明编号：</span> <span class="field-empty">[ 空 ]</span></div>
+            <div class="field"><span class="field-label">登记状态：</span> 未登记</div>
+            <div class="field-note">「该索引条目无对应实体记录。」</div>
+        </div>
+    </div>
+
+    <div class="footer">蓝湾市档案医院 © 2013 版权所有 | 技术支持: 信息科</div>
+</div>
+
+<script>
+    const items = document.querySelectorAll('.record-item');
+    const details = document.querySelectorAll('.record-detail');
+    items.forEach(item => {
+        item.addEventListener('click', function () {
+            items.forEach(i => i.classList.remove('active'));
+            details.forEach(d => d.classList.remove('active'));
+            this.classList.add('active');
+            const el = document.getElementById(this.dataset.record + '-detail');
+            if (el) el.classList.add('active');
+        });
+    });
+    if (items[0]) items[0].click();
+</script>
+<script src="../assets/xuqi-overrides.js"></script>
+</body>
+</html>
