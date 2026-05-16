@@ -794,10 +794,19 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             row = item.model_dump(exclude_unset=True)
             trigger = str(row.get("trigger", "") or "").strip()
             content = str(row.get("content", "") or "").strip()
-            previous = next((entry for entry in existing_entries if str(entry.get("trigger", "")).strip() == trigger), {})
+            entry_type = str(row.get("entry_type", "") or "").strip() or "keyword"
+            row_id = str(row.get("id", "") or "").strip()
+            previous = next((entry for entry in existing_entries if row_id and str(entry.get("id", "")).strip() == row_id), None)
+            if previous is None:
+                previous = next((entry for entry in existing_entries if trigger and str(entry.get("trigger", "")).strip() == trigger), {})
             effective_trigger = trigger or str(previous.get("trigger", "")).strip()
             effective_content = content or str(previous.get("content", "")).strip()
-            if not effective_trigger or not effective_content:
+            activation_tags = row.get("activation_tags") if isinstance(row.get("activation_tags"), list) else previous.get("activation_tags", [])
+            if entry_type == "external_tag":
+                has_external_ref = isinstance(row.get("external_ref"), dict) and bool(row.get("external_ref"))
+                if not effective_content or (not activation_tags and not has_external_ref):
+                    continue
+            elif not effective_trigger or not effective_content:
                 continue
 
             merged = dict(previous)
@@ -830,8 +839,12 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 "injection_depth",
                 "injection_role",
                 "injection_order",
+                "prompt_layer",
                 "recursive_enabled",
                 "prevent_further_recursion",
+                "external_source",
+                "external_ref",
+                "activation_tags",
             ]:
                 if key in row:
                     merged[key] = row[key]

@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
 import sqlite3
 import sys
 from datetime import datetime
@@ -17,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 
-VERSION = "1.0.0-stable"
+VERSION = "2.0.0-state-journal-stable"
 
 
 def get_resource_dir() -> Path:
@@ -32,8 +31,6 @@ RESOURCE_DIR = get_resource_dir()
 PROJECT_ROOT = APP_DIR.parent.parent if APP_DIR.parent.name.lower() == "mods" else APP_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data" / "mods" / "state_journal"
 DB_PATH = DATA_DIR / "state_journal.db"
-LEGACY_DATA_DIR = PROJECT_ROOT / "data" / "xinjian"
-LEGACY_DB_PATH = LEGACY_DATA_DIR / "xinjian.db"
 EXPORTS_DIR = DATA_DIR / "exports"
 BACKUPS_DIR = DATA_DIR / "backups"
 LOGS_DIR = DATA_DIR / "logs"
@@ -44,7 +41,7 @@ BUILTIN_TEMPLATES_DIR = RESOURCE_DIR / "templates_builtin"
 
 
 
-DEFAULT_MUJIAN_TEMPLATES: list[dict[str, Any]] = [
+DEFAULT_TURN_NOTE_TEMPLATES: list[dict[str, Any]] = [
     {
         "id": "standard_metrics",
         "name": "标准状态模板",
@@ -122,7 +119,7 @@ DEFAULT_MUJIAN_TEMPLATES: list[dict[str, Any]] = [
 
 
 
-DEFAULT_MUJIAN_THEME_PACKS: list[dict[str, Any]] = [
+DEFAULT_TURN_NOTE_THEME_PACKS: list[dict[str, Any]] = [
     {
         "id": "standard",
         "name": "标准样式",
@@ -192,10 +189,11 @@ DEFAULT_MUJIAN_THEME_PACKS: list[dict[str, Any]] = [
     {"id": "moon_white_letter", "name": "月白冷笺", "version": "1.0.0", "author": "Fantareal", "description": "月白、冷灰、留白与细线，适合清冷女主、病弱感和含蓄情绪。", "style": {"class_name": "theme-moon-white", "accent": "#7e9bb8", "layout": {"title_card": "gufeng_chapter", "scene_card": "paper_chips", "character_card": "paper_fields", "relationship_card": "side_note", "status_bar": "seal"}, "tokens": {"emotion": "月", "clothing": "衣", "posture": "影", "scene": "境", "sensory_field": "息", "body_temperature": "温", "body_motion": "动", "micro_reaction": "微", "visual_focus": "眸", "interaction": "缘", "summary": "记"}, "title_card": {"background": "moon_paper", "border": "thin", "radius": "soft", "shadow": "mist"}, "character_card": {"background": "moon_paper", "field_style": "thin_note", "spacing": "comfortable"}, "relationship_card": {"style": "side_note"}}},
     {"id": "cinnabar_dossier", "name": "朱砂密卷", "version": "1.0.0", "author": "Fantareal", "description": "朱砂、黑墨、卷宗和批注感，适合权谋、杀伐、旧债和档案叙事。", "style": {"class_name": "theme-cinnabar-dossier", "accent": "#b8322a", "layout": {"title_card": "dossier", "scene_card": "paper_chips", "character_card": "field_blocks", "relationship_card": "side_note", "status_bar": "seal"}, "tokens": {"emotion": "情录", "clothing": "形录", "posture": "势录", "scene": "地录", "sensory_field": "境录", "body_temperature": "温录", "body_motion": "动录", "micro_reaction": "息录", "visual_focus": "目录", "interaction": "关系", "summary": "案结"}, "title_card": {"background": "dossier", "border": "ink", "radius": "small", "shadow": "paper"}, "character_card": {"background": "dossier", "field_style": "case_row", "spacing": "standard"}, "relationship_card": {"style": "case_note"}}},
     {"id": "jade_slip", "name": "玉简灵纹", "version": "1.0.0", "author": "Fantareal", "description": "玉色、灵纹、玄门与炁息光边，适合仙侠、修真、功法与世界观设定展示。", "style": {"class_name": "theme-jade-slip", "accent": "#47a985", "layout": {"title_card": "gufeng_chapter", "scene_card": "chips", "character_card": "field_blocks", "relationship_card": "side_note", "status_bar": "pill"}, "tokens": {"time": "时", "location": "界", "weather": "象", "atmosphere": "炁", "characters": "众", "emotion": "心息", "clothing": "形衣", "posture": "身法", "scene": "场域", "sensory_field": "灵场", "body_temperature": "温炁", "body_motion": "动势", "micro_reaction": "微息", "visual_focus": "灵眸", "interaction": "缘法", "summary": "简记"}, "title_card": {"background": "jade", "border": "glow", "radius": "large", "shadow": "glow"}, "character_card": {"background": "jade", "field_style": "glyph_block", "spacing": "comfortable"}, "relationship_card": {"style": "aura_note"}}},
-    {"id": "midnight_archive", "name": "暗夜档案", "version": "1.0.0", "author": "Fantareal", "description": "暗色终端、档案编号、警告条与冷光边框，适合悬疑、末世、克系和暗色剧情。", "style": {"class_name": "theme-midnight-archive", "accent": "#62d6ff", "layout": {"title_card": "time_card", "scene_card": "time_panel", "character_card": "info_rows", "relationship_card": "status_strip", "status_bar": "pill"}, "tokens": {"time": "TIME", "location": "LOC", "weather": "ENV", "atmosphere": "MOOD", "characters": "SUBJ", "emotion": "PSY", "clothing": "GEAR", "posture": "POSE", "scene": "AREA", "sensory_field": "SENS", "body_temperature": "TEMP", "body_motion": "MOVE", "micro_reaction": "BIO", "visual_focus": "FOCUS", "interaction": "LINK", "summary": "NOTE"}, "title_card": {"background": "terminal", "border": "neon", "radius": "medium", "shadow": "neon"}, "character_card": {"background": "terminal", "field_style": "archive_row", "spacing": "compact"}, "relationship_card": {"style": "warning_strip"}}},
-    {"id": "storyboard_frame", "name": "剧本分镜", "version": "1.0.1", "author": "Fantareal", "description": "镜头、场记、分镜格与动作记录，适合演出感、动画感和剧情截图式展示。", "style": {"class_name": "theme-storyboard", "accent": "#f59e0b", "layout": {"layout_type": "storyboard", "title_card": "storyboard", "scene_card": "storyboard", "character_card": "storyboard", "relationship_card": "status_strip", "status_bar": "compact"}, "tokens": {"time": "🎬", "location": "📍", "weather": "🌫", "atmosphere": "🎞", "characters": "👥", "emotion": "表情", "clothing": "服装", "posture": "动作", "scene": "镜头", "sensory_field": "音画", "body_temperature": "体感", "body_motion": "运动", "micro_reaction": "细节", "visual_focus": "焦点", "interaction": "调度", "summary": "镜头记"}, "title_card": {"background": "storyboard", "border": "frame", "radius": "small", "shadow": "soft"}, "character_card": {"background": "storyboard", "field_style": "shot_row", "spacing": "compact"}, "relationship_card": {"style": "cut_note"}}},
     {"id": "status_panel_pro", "name": "状态面板 Pro", "version": "1.0.1", "author": "Fantareal", "description": "深色半透明游戏 UI、状态条、字段编号和高亮标签，适合 RPG、战斗、属性与状态栏联动预备。", "style": {"class_name": "theme-status-pro", "accent": "#7c3aed", "layout": {"layout_type": "status_panel_pro", "title_card": "status_panel", "scene_card": "status_panel", "character_card": "status_panel_pro", "relationship_card": "status_strip", "status_bar": "pill"}, "tokens": {"time": "T", "location": "POS", "weather": "ENV", "atmosphere": "MODE", "characters": "UNIT", "emotion": "MIND", "clothing": "EQUIP", "posture": "POSE", "scene": "AREA", "sensory_field": "SENS", "body_temperature": "TEMP", "body_motion": "ACT", "micro_reaction": "BIO", "visual_focus": "LOCK", "interaction": "LINK", "summary": "SUM"}, "title_card": {"background": "hud", "border": "glow", "radius": "medium", "shadow": "hud"}, "character_card": {"background": "hud", "field_style": "stat_row", "spacing": "compact"}, "relationship_card": {"style": "status_strip"}}},
 ]
+
+
+DEPRECATED_BUILTIN_THEME_PACK_IDS = {"midnight_archive", "storyboard_frame"}
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "enabled": True,
@@ -211,29 +209,29 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "request_timeout": 120,
     "strict_mode": True,
     "debug_enabled": True,
-    "mujian_enabled": True,
-    "mujian_title_card": True,
-    "mujian_turn_note": True,
-    "mujian_default_collapsed": True,
-    "mujian_chat_display_mode": "collapsed",
-    "mujian_style": "classic",
-    "mujian_title_style": "classic",
-    "mujian_note_style": "classic",
-    "mujian_expand_level": "standard",
-    "mujian_note_density": "standard",
-    "mujian_character_filter": "turn",
-    "mujian_character_names": "",
-    "mujian_protagonist_card_enabled": False,
-    "mujian_protagonist_card_mode": "when_relevant",
-    "mujian_protagonist_name": "",
-    "mujian_protagonist_aliases": "",
-    "mujian_worker_custom_prompt_enabled": False,
-    "mujian_worker_style_prompt": "",
-    "mujian_worker_protagonist_prompt": "",
-    "mujian_template_id": "standard_metrics",
-    "mujian_templates": DEFAULT_MUJIAN_TEMPLATES,
-    "mujian_theme_id": "standard",
-    "mujian_theme_packs": DEFAULT_MUJIAN_THEME_PACKS,
+    "turn_note_enabled": True,
+    "turn_note_title_card": True,
+    "turn_note_card": True,
+    "turn_note_default_collapsed": True,
+    "turn_note_chat_display_mode": "collapsed",
+    "turn_note_style": "classic",
+    "turn_note_title_style": "classic",
+    "turn_note_card_style": "classic",
+    "turn_note_expand_level": "standard",
+    "turn_note_density": "standard",
+    "turn_note_character_filter": "turn",
+    "turn_note_character_names": "",
+    "turn_note_protagonist_card_enabled": False,
+    "turn_note_protagonist_card_mode": "when_relevant",
+    "turn_note_protagonist_name": "",
+    "turn_note_protagonist_aliases": "",
+    "turn_note_worker_custom_prompt_enabled": False,
+    "turn_note_worker_style_prompt": "",
+    "turn_note_worker_protagonist_prompt": "",
+    "turn_note_template_id": "standard_metrics",
+    "turn_note_templates": DEFAULT_TURN_NOTE_TEMPLATES,
+    "turn_note_theme_id": "standard",
+    "turn_note_theme_packs": DEFAULT_TURN_NOTE_THEME_PACKS,
 }
 
 FIELD_TYPES = {"text", "textarea", "number", "enum", "boolean"}
@@ -306,7 +304,7 @@ def qident(identifier: str) -> str:
 
 
 def data_table_name(table_id: str) -> str:
-    return f"xj_data_{safe_id(table_id)}"
+    return f"state_journal_data_{safe_id(table_id)}"
 
 
 def sqlite_type(field_type: str) -> str:
@@ -317,20 +315,7 @@ def sqlite_type(field_type: str) -> str:
     return "TEXT"
 
 
-def migrate_legacy_data_dir() -> None:
-    """Copy pre-release data/xinjian runtime files to data/mods/state_journal once."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if not DB_PATH.exists() and LEGACY_DB_PATH.exists():
-        shutil.copy2(LEGACY_DB_PATH, DB_PATH)
-    for folder_name in ("exports", "backups", "logs"):
-        legacy_folder = LEGACY_DATA_DIR / folder_name
-        target_folder = DATA_DIR / folder_name
-        if legacy_folder.exists() and not target_folder.exists():
-            shutil.copytree(legacy_folder, target_folder)
-
-
 def connect_db() -> sqlite3.Connection:
-    migrate_legacy_data_dir()
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -462,7 +447,7 @@ def build_template_character_schema(fields: list[dict[str, Any]]) -> dict[str, s
         schema["summary"] = "一句话角色状态摘要；如果模板没有摘要字段，可以简短生成。"
     return schema
 
-def normalize_mujian_template(template: Any, fallback_id: str = "custom") -> dict[str, Any] | None:
+def normalize_turn_note_template(template: Any, fallback_id: str = "custom") -> dict[str, Any] | None:
     if not isinstance(template, dict):
         return None
     template_id = safe_id(template.get("id"), fallback_id)
@@ -474,7 +459,7 @@ def normalize_mujian_template(template: Any, fallback_id: str = "custom") -> dic
             fields.append(normalized)
             seen.add(normalized["key"])
     if not fields:
-        fields = clone_json(DEFAULT_MUJIAN_TEMPLATES[0]["fields"])
+        fields = clone_json(DEFAULT_TURN_NOTE_TEMPLATES[0]["fields"])
     note_style = str(template.get("note_style") or template.get("style") or "classic").strip()
     if note_style not in {"classic", "gufeng", "sensory"}:
         note_style = "classic"
@@ -491,12 +476,12 @@ def normalize_mujian_template(template: Any, fallback_id: str = "custom") -> dic
 
 
 
-def refresh_builtin_mujian_template(template: dict[str, Any]) -> dict[str, Any]:
+def refresh_builtin_turn_note_template(template: dict[str, Any]) -> dict[str, Any]:
     """让旧配置中的内置标准模板跟随新版说明更新，同时不影响用户自定义模板。"""
     if not isinstance(template, dict):
         return template
     template_id = str(template.get("id") or "")
-    builtin = next((item for item in DEFAULT_MUJIAN_TEMPLATES if item.get("id") == template_id), None)
+    builtin = next((item for item in DEFAULT_TURN_NOTE_TEMPLATES if item.get("id") == template_id), None)
     if not builtin:
         return template
     refreshed = clone_json(template)
@@ -516,49 +501,49 @@ def refresh_builtin_mujian_template(template: dict[str, Any]) -> dict[str, Any]:
     return refreshed
 
 
-def refresh_builtin_mujian_theme_pack(pack: dict[str, Any]) -> dict[str, Any]:
+def refresh_builtin_turn_note_theme_pack(pack: dict[str, Any]) -> dict[str, Any]:
     """刷新内置外观包定义，保留用户导入包与自定义包。"""
     if not isinstance(pack, dict):
         return pack
     theme_id = str(pack.get("id") or "")
-    builtin = next((item for item in DEFAULT_MUJIAN_THEME_PACKS if item.get("id") == theme_id), None)
+    builtin = next((item for item in DEFAULT_TURN_NOTE_THEME_PACKS if item.get("id") == theme_id), None)
     if not builtin:
         return pack
-    return normalize_mujian_theme_pack(builtin, theme_id) or clone_json(pack)
+    return normalize_turn_note_theme_pack(builtin, theme_id) or clone_json(pack)
 
 
 def refresh_builtin_assets(config: dict[str, Any]) -> dict[str, Any]:
     """正式版配置收口：刷新内置模板/美化包，不覆盖用户自定义项目。"""
     refreshed = clone_json(config)
-    refreshed["mujian_templates"] = normalize_mujian_templates(refreshed.get("mujian_templates"))
-    refreshed["mujian_theme_packs"] = normalize_mujian_theme_packs(refreshed.get("mujian_theme_packs"))
+    refreshed["turn_note_templates"] = normalize_turn_note_templates(refreshed.get("turn_note_templates"))
+    refreshed["turn_note_theme_packs"] = normalize_turn_note_theme_packs(refreshed.get("turn_note_theme_packs"))
     return refreshed
 
-def normalize_mujian_templates(value: Any) -> list[dict[str, Any]]:
+def normalize_turn_note_templates(value: Any) -> list[dict[str, Any]]:
     source = value if isinstance(value, list) else []
     templates_out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for idx, item in enumerate(source):
-        normalized = normalize_mujian_template(item, f"template_{idx + 1}")
-        normalized = refresh_builtin_mujian_template(normalized) if normalized else normalized
+        normalized = normalize_turn_note_template(item, f"template_{idx + 1}")
+        normalized = refresh_builtin_turn_note_template(normalized) if normalized else normalized
         if normalized and normalized["id"] not in seen:
             templates_out.append(normalized)
             seen.add(normalized["id"])
-    for item in DEFAULT_MUJIAN_TEMPLATES:
-        normalized = normalize_mujian_template(item, item["id"])
+    for item in DEFAULT_TURN_NOTE_TEMPLATES:
+        normalized = normalize_turn_note_template(item, item["id"])
         if normalized and normalized["id"] not in seen:
             templates_out.append(normalized)
             seen.add(normalized["id"])
-    return templates_out or clone_json(DEFAULT_MUJIAN_TEMPLATES)
+    return templates_out or clone_json(DEFAULT_TURN_NOTE_TEMPLATES)
 
 
-def active_mujian_template(config: dict[str, Any]) -> dict[str, Any]:
-    templates_list = normalize_mujian_templates(config.get("mujian_templates"))
-    active_id = safe_id(config.get("mujian_template_id"), "")
+def active_turn_note_template(config: dict[str, Any]) -> dict[str, Any]:
+    templates_list = normalize_turn_note_templates(config.get("turn_note_templates"))
+    active_id = safe_id(config.get("turn_note_template_id"), "")
     for template in templates_list:
         if template.get("id") == active_id:
             return template
-    note_style = str(config.get("mujian_note_style") or config.get("mujian_style") or "").strip()
+    note_style = str(config.get("turn_note_card_style") or config.get("turn_note_style") or "").strip()
     for template in templates_list:
         if template.get("id") == note_style or template.get("note_style") == note_style:
             return template
@@ -566,9 +551,21 @@ def active_mujian_template(config: dict[str, Any]) -> dict[str, Any]:
 
 
 
-def normalize_mujian_theme_pack(pack: Any, fallback_id: str = "theme") -> dict[str, Any] | None:
+THEME_PACK_KIND = "state_journal_theme_pack"
+THEME_PACK_SCHEMA_VERSION = 1
+
+
+def normalize_turn_note_theme_pack(pack: Any, fallback_id: str = "theme") -> dict[str, Any] | None:
     if not isinstance(pack, dict):
         return None
+    kind = str(pack.get("kind") or pack.get("type") or THEME_PACK_KIND).strip() or THEME_PACK_KIND
+    if kind not in {THEME_PACK_KIND, "xinjian_theme_pack", "turn_note_theme_pack"}:
+        return None
+    try:
+        schema_version = int(pack.get("schema_version") or pack.get("schemaVersion") or THEME_PACK_SCHEMA_VERSION)
+    except (TypeError, ValueError):
+        schema_version = THEME_PACK_SCHEMA_VERSION
+    schema_version = max(1, min(THEME_PACK_SCHEMA_VERSION, schema_version))
     theme_id = safe_id(pack.get("id"), fallback_id)
     raw_style = pack.get("style") if isinstance(pack.get("style"), dict) else None
     if raw_style is None and isinstance(pack.get("theme"), dict):
@@ -616,6 +613,8 @@ def normalize_mujian_theme_pack(pack: Any, fallback_id: str = "theme") -> dict[s
             safe_style[extra_key] = json_copy(style.get(extra_key))
 
     normalized = {
+        "kind": THEME_PACK_KIND,
+        "schema_version": schema_version,
         "id": theme_id,
         "name": str(pack.get("name") or theme_id).strip()[:60] or theme_id,
         "version": str(pack.get("version") or "1.0.0").strip()[:32] or "1.0.0",
@@ -631,27 +630,29 @@ def normalize_mujian_theme_pack(pack: Any, fallback_id: str = "theme") -> dict[s
     return normalized
 
 
-def normalize_mujian_theme_packs(value: Any) -> list[dict[str, Any]]:
+def normalize_turn_note_theme_packs(value: Any) -> list[dict[str, Any]]:
     source = value if isinstance(value, list) else []
     packs_out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for idx, item in enumerate(source):
-        normalized = normalize_mujian_theme_pack(item, f"theme_{idx + 1}")
-        normalized = refresh_builtin_mujian_theme_pack(normalized) if normalized else normalized
+        normalized = normalize_turn_note_theme_pack(item, f"theme_{idx + 1}")
+        normalized = refresh_builtin_turn_note_theme_pack(normalized) if normalized else normalized
+        if normalized and normalized["id"] in DEPRECATED_BUILTIN_THEME_PACK_IDS:
+            continue
         if normalized and normalized["id"] not in seen:
             packs_out.append(normalized)
             seen.add(normalized["id"])
-    for item in DEFAULT_MUJIAN_THEME_PACKS:
-        normalized = normalize_mujian_theme_pack(item, item["id"])
+    for item in DEFAULT_TURN_NOTE_THEME_PACKS:
+        normalized = normalize_turn_note_theme_pack(item, item["id"])
         if normalized and normalized["id"] not in seen:
             packs_out.append(normalized)
             seen.add(normalized["id"])
-    return packs_out or clone_json(DEFAULT_MUJIAN_THEME_PACKS)
+    return packs_out or clone_json(DEFAULT_TURN_NOTE_THEME_PACKS)
 
 
-def active_mujian_theme_pack(config: dict[str, Any]) -> dict[str, Any]:
-    packs = normalize_mujian_theme_packs(config.get("mujian_theme_packs"))
-    active_id = safe_id(config.get("mujian_theme_id"), "")
+def active_turn_note_theme_pack(config: dict[str, Any]) -> dict[str, Any]:
+    packs = normalize_turn_note_theme_packs(config.get("turn_note_theme_packs"))
+    active_id = safe_id(config.get("turn_note_theme_id"), "")
     for pack in packs:
         if pack.get("id") == active_id:
             return pack
@@ -672,46 +673,46 @@ def normalize_config(config: Any) -> dict[str, Any]:
         merged["temperature"] = max(0, min(2, float(merged.get("temperature", 0) or 0)))
     except (TypeError, ValueError):
         merged["temperature"] = 0
-    for key in ["enabled", "auto_update", "notify_in_chat", "ui_sync_global", "strict_mode", "debug_enabled", "mujian_enabled", "mujian_title_card", "mujian_turn_note", "mujian_default_collapsed", "mujian_protagonist_card_enabled", "mujian_worker_custom_prompt_enabled"]:
+    for key in ["enabled", "auto_update", "notify_in_chat", "ui_sync_global", "strict_mode", "debug_enabled", "turn_note_enabled", "turn_note_title_card", "turn_note_card", "turn_note_default_collapsed", "turn_note_protagonist_card_enabled", "turn_note_worker_custom_prompt_enabled"]:
         merged[key] = bool(merged.get(key))
-    for key in ["api_type", "api_base_url", "api_key", "model", "mujian_style", "mujian_title_style", "mujian_note_style", "mujian_expand_level", "mujian_note_density", "mujian_chat_display_mode", "mujian_character_filter", "mujian_character_names", "mujian_protagonist_card_mode", "mujian_protagonist_name", "mujian_protagonist_aliases", "mujian_worker_style_prompt", "mujian_worker_protagonist_prompt", "mujian_template_id", "mujian_theme_id"]:
+    for key in ["api_type", "api_base_url", "api_key", "model", "turn_note_style", "turn_note_title_style", "turn_note_card_style", "turn_note_expand_level", "turn_note_density", "turn_note_chat_display_mode", "turn_note_character_filter", "turn_note_character_names", "turn_note_protagonist_card_mode", "turn_note_protagonist_name", "turn_note_protagonist_aliases", "turn_note_worker_style_prompt", "turn_note_worker_protagonist_prompt", "turn_note_template_id", "turn_note_theme_id"]:
         merged[key] = str(merged.get(key) or "").strip()
-    legacy_style = merged.get("mujian_style") or "classic"
-    if merged.get("mujian_title_style") not in {"classic", "gufeng", "chapter"}:
-        merged["mujian_title_style"] = legacy_style if legacy_style in {"classic", "gufeng"} else "classic"
-    if merged.get("mujian_note_style") not in {"classic", "gufeng", "sensory"}:
-        merged["mujian_note_style"] = legacy_style if legacy_style in {"classic", "gufeng", "sensory"} else "classic"
+    legacy_style = merged.get("turn_note_style") or "classic"
+    if merged.get("turn_note_title_style") not in {"classic", "gufeng", "chapter"}:
+        merged["turn_note_title_style"] = legacy_style if legacy_style in {"classic", "gufeng"} else "classic"
+    if merged.get("turn_note_card_style") not in {"classic", "gufeng", "sensory"}:
+        merged["turn_note_card_style"] = legacy_style if legacy_style in {"classic", "gufeng", "sensory"} else "classic"
     # 保留给旧前端读取。
-    merged["mujian_style"] = merged.get("mujian_note_style") or legacy_style
-    if merged.get("mujian_note_density") not in {"compact", "standard", "detailed"}:
-        merged["mujian_note_density"] = "standard"
-    if merged.get("mujian_chat_display_mode") not in {"collapsed", "expanded", "compact", "hidden"}:
+    merged["turn_note_style"] = merged.get("turn_note_card_style") or legacy_style
+    if merged.get("turn_note_density") not in {"compact", "standard", "detailed"}:
+        merged["turn_note_density"] = "standard"
+    if merged.get("turn_note_chat_display_mode") not in {"collapsed", "expanded", "compact", "hidden"}:
         # 兼容 v0.3.x 的“附笺默认折叠”布尔配置。
-        merged["mujian_chat_display_mode"] = "collapsed" if merged.get("mujian_default_collapsed", True) else "expanded"
-    merged["mujian_default_collapsed"] = merged.get("mujian_chat_display_mode") == "collapsed"
-    if merged.get("mujian_character_filter") not in {"turn", "heroine", "protagonist", "custom", "all"}:
-        merged["mujian_character_filter"] = "turn"
-    if merged.get("mujian_protagonist_card_mode") not in {"when_relevant", "always"}:
-        merged["mujian_protagonist_card_mode"] = "when_relevant"
-    merged["mujian_templates"] = normalize_mujian_templates(merged.get("mujian_templates"))
-    merged["mujian_theme_packs"] = normalize_mujian_theme_packs(merged.get("mujian_theme_packs"))
-    active_theme = active_mujian_theme_pack(merged)
-    merged["mujian_theme_id"] = active_theme.get("id") or "standard"
-    active_template = active_mujian_template(merged)
-    merged["mujian_template_id"] = active_template.get("id") or "classic"
-    merged["mujian_note_style"] = active_template.get("note_style") or merged.get("mujian_note_style") or "classic"
-    merged["mujian_style"] = merged["mujian_note_style"]
+        merged["turn_note_chat_display_mode"] = "collapsed" if merged.get("turn_note_default_collapsed", True) else "expanded"
+    merged["turn_note_default_collapsed"] = merged.get("turn_note_chat_display_mode") == "collapsed"
+    if merged.get("turn_note_character_filter") not in {"turn", "heroine", "protagonist", "custom", "all"}:
+        merged["turn_note_character_filter"] = "turn"
+    if merged.get("turn_note_protagonist_card_mode") not in {"when_relevant", "always"}:
+        merged["turn_note_protagonist_card_mode"] = "when_relevant"
+    merged["turn_note_templates"] = normalize_turn_note_templates(merged.get("turn_note_templates"))
+    merged["turn_note_theme_packs"] = normalize_turn_note_theme_packs(merged.get("turn_note_theme_packs"))
+    active_theme = active_turn_note_theme_pack(merged)
+    merged["turn_note_theme_id"] = active_theme.get("id") or "standard"
+    active_template = active_turn_note_template(merged)
+    merged["turn_note_template_id"] = active_template.get("id") or "classic"
+    merged["turn_note_card_style"] = active_template.get("note_style") or merged.get("turn_note_card_style") or "classic"
+    merged["turn_note_style"] = merged["turn_note_card_style"]
     return merged
 
 
 def init_meta_tables(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
-        CREATE TABLE IF NOT EXISTS xj_config (
+        CREATE TABLE IF NOT EXISTS state_journal_config (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS xj_tables (
+        CREATE TABLE IF NOT EXISTS state_journal_tables (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT '',
@@ -719,7 +720,7 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             rules_json TEXT NOT NULL DEFAULT '{}',
             updated_at TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS xj_columns (
+        CREATE TABLE IF NOT EXISTS state_journal_columns (
             table_id TEXT NOT NULL,
             key TEXT NOT NULL,
             label TEXT NOT NULL,
@@ -729,22 +730,23 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             note TEXT NOT NULL DEFAULT '',
             position INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (table_id, key),
-            FOREIGN KEY (table_id) REFERENCES xj_tables(id) ON DELETE CASCADE
+            FOREIGN KEY (table_id) REFERENCES state_journal_tables(id) ON DELETE CASCADE
         );
-        CREATE TABLE IF NOT EXISTS xj_update_logs (
+        CREATE TABLE IF NOT EXISTS state_journal_update_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             created_at TEXT NOT NULL,
             payload_json TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS xj_snapshots (
+        CREATE TABLE IF NOT EXISTS state_journal_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             created_at TEXT NOT NULL,
             table_id TEXT NOT NULL,
             rows_json TEXT NOT NULL,
             reason TEXT NOT NULL DEFAULT ''
         );
-        CREATE TABLE IF NOT EXISTS xj_turn_displays (
+        CREATE TABLE IF NOT EXISTS state_journal_turn_displays (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_uid TEXT NOT NULL DEFAULT 'global',
             turn_id TEXT NOT NULL,
             message_id TEXT NOT NULL DEFAULT '',
             content_hash TEXT NOT NULL DEFAULT '',
@@ -758,7 +760,7 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             relationships_json TEXT NOT NULL DEFAULT '[]',
             raw_json TEXT NOT NULL DEFAULT '{}'
         );
-        CREATE TABLE IF NOT EXISTS xj_scene_state (
+        CREATE TABLE IF NOT EXISTS state_journal_scene_state (
             id TEXT PRIMARY KEY,
             updated_at TEXT NOT NULL,
             title TEXT NOT NULL DEFAULT '',
@@ -766,7 +768,7 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             scene_json TEXT NOT NULL DEFAULT '{}',
             raw_json TEXT NOT NULL DEFAULT '{}'
         );
-        CREATE TABLE IF NOT EXISTS xj_turn_records (
+        CREATE TABLE IF NOT EXISTS state_journal_turn_records (
             turn_id TEXT PRIMARY KEY,
             message_id TEXT NOT NULL DEFAULT '',
             turn_index INTEGER NOT NULL DEFAULT 0,
@@ -783,13 +785,14 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS xj_turn_effects (
+        CREATE TABLE IF NOT EXISTS state_journal_turn_effects (
             turn_id TEXT PRIMARY KEY,
             created_at TEXT NOT NULL,
             effects_json TEXT NOT NULL DEFAULT '{}',
-            FOREIGN KEY (turn_id) REFERENCES xj_turn_records(turn_id) ON DELETE CASCADE
+            FOREIGN KEY (turn_id) REFERENCES state_journal_turn_records(turn_id) ON DELETE CASCADE
         );
-        CREATE TABLE IF NOT EXISTS xj_metric_states (
+        CREATE TABLE IF NOT EXISTS state_journal_metric_states (
+            card_uid TEXT NOT NULL DEFAULT 'global',
             character_name TEXT NOT NULL,
             metric_key TEXT NOT NULL,
             label TEXT NOT NULL DEFAULT '',
@@ -799,10 +802,11 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             raw_value TEXT NOT NULL DEFAULT '',
             source_turn_id TEXT NOT NULL DEFAULT '',
             updated_at TEXT NOT NULL,
-            PRIMARY KEY (character_name, metric_key)
+            PRIMARY KEY (card_uid, character_name, metric_key)
         );
-        CREATE TABLE IF NOT EXISTS xj_metric_history (
+        CREATE TABLE IF NOT EXISTS state_journal_metric_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_uid TEXT NOT NULL DEFAULT 'global',
             turn_id TEXT NOT NULL,
             character_name TEXT NOT NULL,
             metric_key TEXT NOT NULL,
@@ -814,7 +818,55 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             raw_value TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS xj_hook_events (
+        CREATE TABLE IF NOT EXISTS state_journal_role_state_configs (
+            card_uid TEXT NOT NULL DEFAULT 'global',
+            role_id TEXT NOT NULL,
+            role_name TEXT NOT NULL DEFAULT '',
+            aliases_json TEXT NOT NULL DEFAULT '[]',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            mode TEXT NOT NULL DEFAULT 'default',
+            use_default_variables INTEGER NOT NULL DEFAULT 0,
+            initial_stage TEXT NOT NULL DEFAULT 'stage_a',
+            variables_json TEXT NOT NULL DEFAULT '[]',
+            stages_json TEXT NOT NULL DEFAULT '[]',
+            snapshot_fields_json TEXT NOT NULL DEFAULT '[]',
+            settings_json TEXT NOT NULL DEFAULT '{}',
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (card_uid, role_id)
+        );
+        CREATE TABLE IF NOT EXISTS state_journal_stage_states (
+            card_uid TEXT NOT NULL DEFAULT 'global',
+            role_id TEXT NOT NULL,
+            role_name TEXT NOT NULL DEFAULT '',
+            current_stage_key TEXT NOT NULL DEFAULT '',
+            current_stage_name TEXT NOT NULL DEFAULT '',
+            previous_stage_key TEXT NOT NULL DEFAULT '',
+            previous_stage_name TEXT NOT NULL DEFAULT '',
+            stage_changed INTEGER NOT NULL DEFAULT 0,
+            active_tag TEXT NOT NULL DEFAULT '',
+            changed_at_turn INTEGER NOT NULL DEFAULT 0,
+            cooldown_until_turn INTEGER NOT NULL DEFAULT 0,
+            source_turn_id TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (card_uid, role_id)
+        );
+        CREATE TABLE IF NOT EXISTS state_journal_stage_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_uid TEXT NOT NULL DEFAULT 'global',
+            turn_id TEXT NOT NULL,
+            turn_index INTEGER NOT NULL DEFAULT 0,
+            role_id TEXT NOT NULL DEFAULT '',
+            role_name TEXT NOT NULL DEFAULT '',
+            from_stage_key TEXT NOT NULL DEFAULT '',
+            from_stage_name TEXT NOT NULL DEFAULT '',
+            to_stage_key TEXT NOT NULL DEFAULT '',
+            to_stage_name TEXT NOT NULL DEFAULT '',
+            trigger_values_json TEXT NOT NULL DEFAULT '{}',
+            reason TEXT NOT NULL DEFAULT '',
+            active_tag TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS state_journal_hook_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             created_at TEXT NOT NULL,
             event TEXT NOT NULL DEFAULT '',
@@ -824,50 +876,142 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    turn_cols = {row["name"] for row in conn.execute("PRAGMA table_info(xj_turn_records)").fetchall()}
-    if "xinjian_status" in turn_cols and "state_journal_status" not in turn_cols:
-        conn.execute("ALTER TABLE xj_turn_records RENAME COLUMN xinjian_status TO state_journal_status")
-        turn_cols = {row["name"] for row in conn.execute("PRAGMA table_info(xj_turn_records)").fetchall()}
+    turn_cols = {row["name"] for row in conn.execute("PRAGMA table_info(state_journal_turn_records)").fetchall()}
     if "state_journal_status" not in turn_cols:
-        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN state_journal_status TEXT NOT NULL DEFAULT 'pending'")
+        conn.execute("ALTER TABLE state_journal_turn_records ADD COLUMN state_journal_status TEXT NOT NULL DEFAULT 'pending'")
         turn_cols.add("state_journal_status")
     if "seq_no" not in turn_cols:
-        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN seq_no INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE state_journal_turn_records ADD COLUMN seq_no INTEGER NOT NULL DEFAULT 0")
     if "revision" not in turn_cols:
-        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE state_journal_turn_records ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
         turn_cols.add("revision")
     if "message_id" not in turn_cols:
-        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN message_id TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE state_journal_turn_records ADD COLUMN message_id TEXT NOT NULL DEFAULT ''")
         turn_cols.add("message_id")
     if "turn_index" not in turn_cols:
-        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE state_journal_turn_records ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 0")
         turn_cols.add("turn_index")
     if "trigger_source" not in turn_cols:
-        conn.execute("ALTER TABLE xj_turn_records ADD COLUMN trigger_source TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE state_journal_turn_records ADD COLUMN trigger_source TEXT NOT NULL DEFAULT ''")
         turn_cols.add("trigger_source")
 
-    display_cols = {row["name"] for row in conn.execute("PRAGMA table_info(xj_turn_displays)").fetchall()}
+    role_config_cols = {row["name"] for row in conn.execute("PRAGMA table_info(state_journal_role_state_configs)").fetchall()}
+    if "mode" not in role_config_cols:
+        conn.execute("ALTER TABLE state_journal_role_state_configs ADD COLUMN mode TEXT NOT NULL DEFAULT 'default'")
+        role_config_cols.add("mode")
+    if "snapshot_fields_json" not in role_config_cols:
+        conn.execute("ALTER TABLE state_journal_role_state_configs ADD COLUMN snapshot_fields_json TEXT NOT NULL DEFAULT '[]'")
+
+    display_cols = {row["name"] for row in conn.execute("PRAGMA table_info(state_journal_turn_displays)").fetchall()}
     if "message_id" not in display_cols:
-        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN message_id TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE state_journal_turn_displays ADD COLUMN message_id TEXT NOT NULL DEFAULT ''")
     if "content_hash" not in display_cols:
-        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE state_journal_turn_displays ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''")
     if "turn_index" not in display_cols:
-        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE state_journal_turn_displays ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 0")
         display_cols.add("turn_index")
     if "trigger_source" not in display_cols:
-        conn.execute("ALTER TABLE xj_turn_displays ADD COLUMN trigger_source TEXT NOT NULL DEFAULT ''")
+        conn.execute("ALTER TABLE state_journal_turn_displays ADD COLUMN trigger_source TEXT NOT NULL DEFAULT ''")
         display_cols.add("trigger_source")
-    rows = conn.execute("SELECT turn_id FROM xj_turn_records WHERE seq_no IS NULL OR seq_no<=0 ORDER BY created_at, rowid").fetchall()
+    if "card_uid" not in display_cols:
+        conn.execute("ALTER TABLE state_journal_turn_displays ADD COLUMN card_uid TEXT NOT NULL DEFAULT 'global'")
+        display_cols.add("card_uid")
+
+    def rebuild_card_scoped_table(table: str, create_sql: str, copy_columns: list[str]) -> None:
+        cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        pk_cols = [row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall() if int(row["pk"] or 0) > 0]
+        if "card_uid" in cols and (not pk_cols or pk_cols[0] == "card_uid"):
+            return
+        backup = f"{table}_legacy_card_scope"
+        conn.execute(f"ALTER TABLE {table} RENAME TO {backup}")
+        conn.execute(create_sql)
+        existing = [col for col in copy_columns if col in cols]
+        if existing:
+            dest_cols = ["card_uid", *existing]
+            migration_card_uid = current_card_uid().replace("'", "''")
+            source_cols = [f"'{migration_card_uid}'", *existing]
+            conn.execute(f"INSERT OR IGNORE INTO {table} ({', '.join(dest_cols)}) SELECT {', '.join(source_cols)} FROM {backup}")
+        conn.execute(f"DROP TABLE {backup}")
+
+    rebuild_card_scoped_table(
+        "state_journal_role_state_configs",
+        """
+        CREATE TABLE state_journal_role_state_configs (
+            card_uid TEXT NOT NULL DEFAULT 'global',
+            role_id TEXT NOT NULL,
+            role_name TEXT NOT NULL DEFAULT '',
+            aliases_json TEXT NOT NULL DEFAULT '[]',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            mode TEXT NOT NULL DEFAULT 'default',
+            use_default_variables INTEGER NOT NULL DEFAULT 0,
+            initial_stage TEXT NOT NULL DEFAULT 'stage_a',
+            variables_json TEXT NOT NULL DEFAULT '[]',
+            stages_json TEXT NOT NULL DEFAULT '[]',
+            snapshot_fields_json TEXT NOT NULL DEFAULT '[]',
+            settings_json TEXT NOT NULL DEFAULT '{}',
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (card_uid, role_id)
+        )
+        """,
+        ["role_id", "role_name", "aliases_json", "enabled", "mode", "use_default_variables", "initial_stage", "variables_json", "stages_json", "snapshot_fields_json", "settings_json", "updated_at"],
+    )
+    rebuild_card_scoped_table(
+        "state_journal_metric_states",
+        """
+        CREATE TABLE state_journal_metric_states (
+            card_uid TEXT NOT NULL DEFAULT 'global',
+            character_name TEXT NOT NULL,
+            metric_key TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            current_value REAL NOT NULL DEFAULT 0,
+            delta_value REAL NOT NULL DEFAULT 0,
+            max_value REAL NOT NULL DEFAULT 100,
+            raw_value TEXT NOT NULL DEFAULT '',
+            source_turn_id TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (card_uid, character_name, metric_key)
+        )
+        """,
+        ["character_name", "metric_key", "label", "current_value", "delta_value", "max_value", "raw_value", "source_turn_id", "updated_at"],
+    )
+    rebuild_card_scoped_table(
+        "state_journal_stage_states",
+        """
+        CREATE TABLE state_journal_stage_states (
+            card_uid TEXT NOT NULL DEFAULT 'global',
+            role_id TEXT NOT NULL,
+            role_name TEXT NOT NULL DEFAULT '',
+            current_stage_key TEXT NOT NULL DEFAULT '',
+            current_stage_name TEXT NOT NULL DEFAULT '',
+            previous_stage_key TEXT NOT NULL DEFAULT '',
+            previous_stage_name TEXT NOT NULL DEFAULT '',
+            stage_changed INTEGER NOT NULL DEFAULT 0,
+            active_tag TEXT NOT NULL DEFAULT '',
+            changed_at_turn INTEGER NOT NULL DEFAULT 0,
+            cooldown_until_turn INTEGER NOT NULL DEFAULT 0,
+            source_turn_id TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (card_uid, role_id)
+        )
+        """,
+        ["role_id", "role_name", "current_stage_key", "current_stage_name", "previous_stage_key", "previous_stage_name", "stage_changed", "active_tag", "changed_at_turn", "cooldown_until_turn", "source_turn_id", "updated_at"],
+    )
+    for table in ("state_journal_metric_history", "state_journal_stage_history"):
+        cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if "card_uid" not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN card_uid TEXT NOT NULL DEFAULT 'global'")
+
+    rows = conn.execute("SELECT turn_id FROM state_journal_turn_records WHERE seq_no IS NULL OR seq_no<=0 ORDER BY created_at, rowid").fetchall()
     if rows:
-        max_row = conn.execute("SELECT COALESCE(MAX(seq_no), 0) AS max_seq FROM xj_turn_records").fetchone()
+        max_row = conn.execute("SELECT COALESCE(MAX(seq_no), 0) AS max_seq FROM state_journal_turn_records").fetchone()
         next_seq = int(max_row["max_seq"] or 0) + 1
         for row in rows:
-            conn.execute("UPDATE xj_turn_records SET seq_no=? WHERE turn_id=?", (next_seq, row["turn_id"]))
+            conn.execute("UPDATE state_journal_turn_records SET seq_no=? WHERE turn_id=?", (next_seq, row["turn_id"]))
             next_seq += 1
 
-    exists = conn.execute("SELECT value FROM xj_config WHERE key = 'runtime'").fetchone()
+    exists = conn.execute("SELECT value FROM state_journal_config WHERE key = 'runtime'").fetchone()
     if not exists:
-        conn.execute("INSERT INTO xj_config(key, value) VALUES('runtime', ?)", (json.dumps(DEFAULT_CONFIG, ensure_ascii=False),))
+        conn.execute("INSERT INTO state_journal_config(key, value) VALUES('runtime', ?)", (json.dumps(DEFAULT_CONFIG, ensure_ascii=False),))
 
 
 def table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -949,7 +1093,7 @@ def save_schema_to_db(conn: sqlite3.Connection, schema: dict[str, Any]) -> dict[
     payload["updated_at"] = now_string()
     conn.execute(
         """
-        INSERT INTO xj_tables(id, name, description, primary_key, rules_json, updated_at)
+        INSERT INTO state_journal_tables(id, name, description, primary_key, rules_json, updated_at)
         VALUES(?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             name=excluded.name,
@@ -960,11 +1104,11 @@ def save_schema_to_db(conn: sqlite3.Connection, schema: dict[str, Any]) -> dict[
         """,
         (payload["id"], payload["name"], payload["description"], payload["primary_key"], json.dumps(payload["rules"], ensure_ascii=False), payload["updated_at"]),
     )
-    conn.execute("DELETE FROM xj_columns WHERE table_id=?", (payload["id"],))
+    conn.execute("DELETE FROM state_journal_columns WHERE table_id=?", (payload["id"],))
     for index, field in enumerate(payload["fields"]):
         conn.execute(
             """
-            INSERT INTO xj_columns(table_id, key, label, type, required, options_json, note, position)
+            INSERT INTO state_journal_columns(table_id, key, label, type, required, options_json, note, position)
             VALUES(?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -985,7 +1129,7 @@ def save_schema_to_db(conn: sqlite3.Connection, schema: dict[str, Any]) -> dict[
 def load_schema_from_row(conn: sqlite3.Connection, table_row: sqlite3.Row) -> dict[str, Any]:
     table_id = str(table_row["id"])
     columns = conn.execute(
-        "SELECT key, label, type, required, options_json, note FROM xj_columns WHERE table_id=? ORDER BY position ASC, key ASC",
+        "SELECT key, label, type, required, options_json, note FROM state_journal_columns WHERE table_id=? ORDER BY position ASC, key ASC",
         (table_id,),
     ).fetchall()
     fields: list[dict[str, Any]] = []
@@ -1022,7 +1166,7 @@ def load_schema_from_row(conn: sqlite3.Connection, table_row: sqlite3.Row) -> di
 
 
 def list_schemas_from_db(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    rows = conn.execute("SELECT * FROM xj_tables ORDER BY id ASC").fetchall()
+    rows = conn.execute("SELECT * FROM state_journal_tables ORDER BY id ASC").fetchall()
     return [load_schema_from_row(conn, row) for row in rows]
 
 
@@ -1030,7 +1174,7 @@ def get_schema_from_db(conn: sqlite3.Connection, table_id: str) -> dict[str, Any
     safe_table_id = safe_id(table_id, "")
     if not safe_table_id:
         raise HTTPException(status_code=400, detail="表 ID 不能为空。")
-    row = conn.execute("SELECT * FROM xj_tables WHERE id=?", (safe_table_id,)).fetchone()
+    row = conn.execute("SELECT * FROM state_journal_tables WHERE id=?", (safe_table_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="找不到这张表的结构。")
     return load_schema_from_row(conn, row)
@@ -1151,8 +1295,8 @@ def delete_table_from_db(conn: sqlite3.Connection, table_id: str) -> None:
     if not safe_table_id:
         raise HTTPException(status_code=400, detail="表 ID 不能为空。")
     conn.execute(f"DROP TABLE IF EXISTS {qident(data_table_name(safe_table_id))}")
-    conn.execute("DELETE FROM xj_columns WHERE table_id=?", (safe_table_id,))
-    conn.execute("DELETE FROM xj_tables WHERE id=?", (safe_table_id,))
+    conn.execute("DELETE FROM state_journal_columns WHERE table_id=?", (safe_table_id,))
+    conn.execute("DELETE FROM state_journal_tables WHERE id=?", (safe_table_id,))
 
 
 def build_table_snapshot(conn: sqlite3.Connection, table_ids: list[str] | None = None) -> list[dict[str, Any]]:
@@ -1171,7 +1315,7 @@ def save_snapshot(conn: sqlite3.Connection, table_id: str, reason: str = "update
         schema = get_schema_from_db(conn, table_id)
         rows = get_table_rows_from_db(conn, schema)
         conn.execute(
-            "INSERT INTO xj_snapshots(created_at, table_id, rows_json, reason) VALUES(?, ?, ?, ?)",
+            "INSERT INTO state_journal_snapshots(created_at, table_id, rows_json, reason) VALUES(?, ?, ?, ?)",
             (now_string(), table_id, json.dumps(rows, ensure_ascii=False), reason),
         )
     except Exception:
@@ -1182,7 +1326,7 @@ def save_snapshot(conn: sqlite3.Connection, table_id: str, reason: str = "update
 def ensure_runtime_data() -> None:
     with connect_db() as conn:
         init_meta_tables(conn)
-        count = conn.execute("SELECT COUNT(*) AS count FROM xj_tables").fetchone()["count"]
+        count = conn.execute("SELECT COUNT(*) AS count FROM state_journal_tables").fetchone()["count"]
         if count == 0 and BUILTIN_TEMPLATES_DIR.exists():
             for template_path in sorted(BUILTIN_TEMPLATES_DIR.glob("*.json")):
                 payload = read_json(template_path, {})
@@ -1197,7 +1341,7 @@ def ensure_runtime_data() -> None:
 def get_config() -> dict[str, Any]:
     ensure_runtime_data()
     with connect_db() as conn:
-        row = conn.execute("SELECT value FROM xj_config WHERE key='runtime'").fetchone()
+        row = conn.execute("SELECT value FROM state_journal_config WHERE key='runtime'").fetchone()
     if not row:
         return clone_json(DEFAULT_CONFIG)
     try:
@@ -1212,7 +1356,7 @@ def save_config(config: dict[str, Any]) -> dict[str, Any]:
     with connect_db() as conn:
         init_meta_tables(conn)
         conn.execute(
-            "INSERT INTO xj_config(key, value) VALUES('runtime', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            "INSERT INTO state_journal_config(key, value) VALUES('runtime', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (json.dumps(payload, ensure_ascii=False),),
         )
         conn.commit()
@@ -1223,7 +1367,7 @@ def get_config_value(key: str, default: Any = None) -> Any:
     ensure_runtime_data()
     with connect_db() as conn:
         init_meta_tables(conn)
-        row = conn.execute("SELECT value FROM xj_config WHERE key=?", (key,)).fetchone()
+        row = conn.execute("SELECT value FROM state_journal_config WHERE key=?", (key,)).fetchone()
     if not row:
         return clone_json(default)
     try:
@@ -1236,7 +1380,7 @@ def set_config_value(key: str, value: Any) -> Any:
     with connect_db() as conn:
         init_meta_tables(conn)
         conn.execute(
-            "INSERT INTO xj_config(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            "INSERT INTO state_journal_config(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (key, json.dumps(value, ensure_ascii=False)),
         )
         conn.commit()
@@ -1646,9 +1790,9 @@ def upsert_full_row(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[
 
 def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = "reroll") -> int:
     safe_turn = normalize_turn_id(turn_id)
-    row = conn.execute("SELECT effects_json FROM xj_turn_effects WHERE turn_id=?", (safe_turn,)).fetchone()
+    row = conn.execute("SELECT effects_json FROM state_journal_turn_effects WHERE turn_id=?", (safe_turn,)).fetchone()
     if not row:
-        conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (safe_turn,))
+        conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (safe_turn,))
         return 0
     try:
         payload = json.loads(row["effects_json"] or "{}")
@@ -1684,10 +1828,10 @@ def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = 
             upsert_full_row(conn, schema, old_row)
             count += 1
     count += rollback_metric_effects(conn, safe_turn, payload.get("metrics") if isinstance(payload, dict) else [])
-    conn.execute("DELETE FROM xj_turn_effects WHERE turn_id=?", (safe_turn,))
-    conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (safe_turn,))
+    conn.execute("DELETE FROM state_journal_turn_effects WHERE turn_id=?", (safe_turn,))
+    conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (safe_turn,))
     conn.execute(
-        "UPDATE xj_turn_records SET state_journal_status='rolled_back', stale_reason=?, updated_at=? WHERE turn_id=?",
+        "UPDATE state_journal_turn_records SET state_journal_status='rolled_back', stale_reason=?, updated_at=? WHERE turn_id=?",
         (reason, now_string(), safe_turn),
     )
     return count
@@ -1701,7 +1845,7 @@ def save_turn_record(conn: sqlite3.Connection, *, turn_id: str, user_text: str =
     safe_message_id = normalize_turn_id(message_id) if message_id else ""
     safe_turn_index = int(turn_index or 0) if str(turn_index or "").strip() else 0
     safe_trigger_source = str(trigger_source or "").strip()[:80]
-    existing = conn.execute("SELECT * FROM xj_turn_records WHERE turn_id=?", (safe_turn,)).fetchone()
+    existing = conn.execute("SELECT * FROM state_journal_turn_records WHERE turn_id=?", (safe_turn,)).fetchone()
     if existing:
         user_text = user_text or str(existing["user_text"] or "")
         assistant_text = assistant_text or str(existing["assistant_text"] or "")
@@ -1719,7 +1863,7 @@ def save_turn_record(conn: sqlite3.Connection, *, turn_id: str, user_text: str =
             revision += 1
         conn.execute(
             """
-            UPDATE xj_turn_records
+            UPDATE state_journal_turn_records
             SET user_text=?, user_hash=?, assistant_text=?, assistant_hash=?, status=?, state_journal_status=?, stale_reason='', seq_no=?, revision=?, message_id=?, turn_index=?, trigger_source=?, updated_at=?
             WHERE turn_id=?
             """,
@@ -1727,12 +1871,12 @@ def save_turn_record(conn: sqlite3.Connection, *, turn_id: str, user_text: str =
         )
         created_at = str(existing["created_at"] or now)
     else:
-        max_row = conn.execute("SELECT COALESCE(MAX(seq_no), 0) AS max_seq FROM xj_turn_records").fetchone()
+        max_row = conn.execute("SELECT COALESCE(MAX(seq_no), 0) AS max_seq FROM state_journal_turn_records").fetchone()
         seq_no = int(max_row["max_seq"] or 0) + 1
         revision = 0
         conn.execute(
             """
-            INSERT INTO xj_turn_records(turn_id, message_id, turn_index, user_hash, user_text, assistant_hash, assistant_text, status, state_journal_status, stale_reason, seq_no, revision, created_at, updated_at)
+            INSERT INTO state_journal_turn_records(turn_id, message_id, turn_index, user_hash, user_text, assistant_hash, assistant_text, status, state_journal_status, stale_reason, seq_no, revision, created_at, updated_at)
             VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
             """,
             (safe_turn, safe_message_id, safe_turn_index, user_hash, user_text, assistant_hash, assistant_text, status, state_journal_status, seq_no, revision, now, now),
@@ -1757,20 +1901,20 @@ def mark_turns_stale(conn: sqlite3.Connection, from_turn_id: str | None = None, 
     init_meta_tables(conn)
     now = now_string()
     if from_turn_id:
-        row = conn.execute("SELECT created_at FROM xj_turn_records WHERE turn_id=?", (normalize_turn_id(from_turn_id),)).fetchone()
+        row = conn.execute("SELECT created_at FROM state_journal_turn_records WHERE turn_id=?", (normalize_turn_id(from_turn_id),)).fetchone()
         if row:
             created_at = row["created_at"]
             affected = conn.execute(
-                "UPDATE xj_turn_records SET status='stale', state_journal_status='stale', stale_reason=?, updated_at=? WHERE created_at>=?",
+                "UPDATE state_journal_turn_records SET status='stale', state_journal_status='stale', stale_reason=?, updated_at=? WHERE created_at>=?",
                 (reason, now, created_at),
             ).rowcount
-            conn.execute("DELETE FROM xj_turn_displays WHERE turn_id IN (SELECT turn_id FROM xj_turn_records WHERE created_at>=?)", (created_at,))
+            conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id IN (SELECT turn_id FROM state_journal_turn_records WHERE created_at>=?)", (created_at,))
             return {"affected": affected, "from_turn_id": normalize_turn_id(from_turn_id), "reason": reason}
     affected = conn.execute(
-        "UPDATE xj_turn_records SET status='stale', state_journal_status='stale', stale_reason=?, updated_at=?",
+        "UPDATE state_journal_turn_records SET status='stale', state_journal_status='stale', stale_reason=?, updated_at=?",
         (reason, now),
     ).rowcount
-    conn.execute("DELETE FROM xj_turn_displays")
+    conn.execute("DELETE FROM state_journal_turn_displays")
     return {"affected": affected, "from_turn_id": from_turn_id or "", "reason": reason}
 
 
@@ -1783,7 +1927,7 @@ def save_turn_effects(conn: sqlite3.Connection, turn_id: str, result: dict[str, 
         "metrics": result.get("metrics") or [],
     }
     conn.execute(
-        "INSERT INTO xj_turn_effects(turn_id, created_at, effects_json) VALUES(?, ?, ?) ON CONFLICT(turn_id) DO UPDATE SET created_at=excluded.created_at, effects_json=excluded.effects_json",
+        "INSERT INTO state_journal_turn_effects(turn_id, created_at, effects_json) VALUES(?, ?, ?) ON CONFLICT(turn_id) DO UPDATE SET created_at=excluded.created_at, effects_json=excluded.effects_json",
         (safe_turn, now_string(), json.dumps(payload, ensure_ascii=False)),
     )
 
@@ -1792,10 +1936,29 @@ def record_hook_event(conn: sqlite3.Connection, *, event: str, page: str = "chat
     init_meta_tables(conn)
     safe_payload = payload if isinstance(payload, dict) else {}
     conn.execute(
-        "INSERT INTO xj_hook_events(created_at, event, page, turn_id, payload_json) VALUES(?, ?, ?, ?, ?)",
+        "INSERT INTO state_journal_hook_events(created_at, event, page, turn_id, payload_json) VALUES(?, ?, ?, ?, ?)",
         (now_string(), str(event or ""), str(page or ""), normalize_turn_id(turn_id) if turn_id else "", json.dumps(safe_payload, ensure_ascii=False)),
     )
-    conn.execute("DELETE FROM xj_hook_events WHERE id NOT IN (SELECT id FROM xj_hook_events ORDER BY id DESC LIMIT 200)")
+    conn.execute("DELETE FROM state_journal_hook_events WHERE id NOT IN (SELECT id FROM state_journal_hook_events ORDER BY id DESC LIMIT 200)")
+
+
+def save_worker_turn_state(*, turn_id: str, user_text: str = "", assistant_text: str = "", status: str = "assistant_ready", state_journal_status: str = "running", message_id: str = "", turn_index: int | None = None, trigger_source: str = "chat_hook", stale_reason: str = "") -> None:
+    """Persist worker lifecycle status so reroll / timeout states never remain invisible pending rows."""
+    if not str(turn_id or "").strip():
+        return
+    try:
+        with connect_db() as conn:
+            init_meta_tables(conn)
+            save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status=status, state_journal_status=state_journal_status, message_id=message_id, turn_index=turn_index, trigger_source=trigger_source)
+            if stale_reason:
+                conn.execute(
+                    "UPDATE state_journal_turn_records SET stale_reason=?, updated_at=? WHERE turn_id=?",
+                    (clean_display_text(stale_reason, 240), now_string(), normalize_turn_id(turn_id)),
+                )
+            conn.commit()
+    except Exception:
+        # Status writes must never break the main worker response path.
+        pass
 
 
 def strip_title_sequence(value: Any) -> str:
@@ -1827,6 +1990,587 @@ METRIC_DEFINITIONS: list[dict[str, Any]] = [
 
 METRIC_DEFINITION_BY_KEY: dict[str, dict[str, Any]] = {str(item["key"]): item for item in METRIC_DEFINITIONS}
 
+
+
+ROLE_STATE_CONFIG_KEY = "role_state_config"
+STAGE_OPERATORS = {">", ">=", "<", "<=", "=", "!="}
+ROLE_STATE_MODES = {"default", "snapshot_only", "full", "disabled"}
+ROLE_SOURCE_MODES = {"auto", "main_card", "personas_only"}
+
+
+def normalize_role_source_mode(value: Any) -> str:
+    raw = str(value or "").strip().lower().replace("-", "_")
+    aliases = {
+        "main": "main_card",
+        "single": "main_card",
+        "single_role": "main_card",
+        "card": "main_card",
+        "persona": "personas_only",
+        "personas": "personas_only",
+        "multi": "personas_only",
+        "multi_role": "personas_only",
+        "narrator": "personas_only",
+        "旁白": "personas_only",
+        "主卡": "main_card",
+    }
+    mode = aliases.get(raw, raw)
+    return mode if mode in ROLE_SOURCE_MODES else "auto"
+
+
+def role_source_mode_label(mode: str) -> str:
+    return {
+        "auto": "自动识别",
+        "main_card": "主卡就是角色",
+        "personas_only": "主卡是旁白，只读取多角色",
+    }.get(normalize_role_source_mode(mode), "自动识别")
+
+
+def normalize_role_state_mode(value: Any, *, enabled: bool = True, has_variables: bool = False, has_stages: bool = False, has_snapshot: bool = False) -> str:
+    raw = str(value or "").strip().lower().replace("-", "_")
+    aliases = {
+        "default_template": "default",
+        "turn_note_default": "default",
+        "snapshot": "snapshot_only",
+        "snapshotfields": "snapshot_only",
+        "snapshot_fields": "snapshot_only",
+        "note_only": "snapshot_only",
+        "full_stage": "full",
+        "variables": "full",
+        "stage": "full",
+        "off": "disabled",
+        "disable": "disabled",
+        "none": "disabled",
+    }
+    mode = aliases.get(raw, raw)
+    if mode in ROLE_STATE_MODES:
+        return mode
+    if not enabled:
+        return "disabled"
+    if has_variables and has_stages:
+        return "full"
+    if has_snapshot:
+        return "snapshot_only"
+    return "default"
+
+
+def role_state_mode(role: dict[str, Any] | None) -> str:
+    if not isinstance(role, dict):
+        return "default"
+    return normalize_role_state_mode(
+        role.get("mode") or role.get("stateJournalMode"),
+        enabled=role.get("enabled") is not False,
+        has_variables=bool(role.get("variables")),
+        has_stages=bool(role.get("stages")),
+        has_snapshot=bool(role.get("snapshotFields")),
+    )
+
+
+def role_state_mode_uses_snapshot(role: dict[str, Any] | None) -> bool:
+    return role_state_mode(role) in {"snapshot_only", "full"}
+
+
+def role_state_mode_uses_variables(role: dict[str, Any] | None) -> bool:
+    return role_state_mode(role) == "full"
+
+
+def role_state_mode_uses_stages(role: dict[str, Any] | None) -> bool:
+    return role_state_mode(role) == "full"
+
+
+def role_state_current_card_path() -> Path:
+    return PROJECT_ROOT / "data" / "current_role_card.json"
+
+
+def current_role_card_payload() -> dict[str, Any]:
+    path = role_state_current_card_path()
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    raw = data.get("raw") if isinstance(data, dict) else {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def current_card_uid() -> str:
+    raw = current_role_card_payload()
+    if not raw:
+        return "global"
+    state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
+    for value in (state_journal.get("card_uid"), raw.get("card_uid"), raw.get("uid"), raw.get("id")):
+        text = str(value or "").strip()
+        if text:
+            return normalize_role_state_key(text, "global")
+    # 只用角色卡本体信息生成兜底指纹，不能把 stateJournal.roles 放进去。
+    # 否则用户一编辑变量/阶段配置，card_uid 就会变化，导致同一张卡的运行状态、阶段历史和幕笺记录被隔离到新卡槽。
+    fingerprint_payload = {
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
+
+
+def current_card_summary() -> dict[str, Any]:
+    raw = current_role_card_payload()
+    return {
+        "card_uid": current_card_uid(),
+        "card_name": str(raw.get("name") or raw.get("role_name") or "当前角色卡").strip() if raw else "未绑定角色卡",
+    }
+
+
+def normalize_role_state_key(value: Any, fallback: str = "") -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = fallback
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+
+def stage_letter(index: int) -> str:
+    index = max(1, int(index or 1))
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    if index <= len(letters):
+        return letters[index - 1]
+    return f"{letters[(index - 1) % len(letters)]}{(index - 1) // len(letters) + 1}"
+
+
+def default_stage_key(index: int) -> str:
+    return f"stage_{stage_letter(index)}"
+
+
+def default_stage_name(index: int) -> str:
+    return f"{stage_letter(index).upper()}阶段"
+
+
+def role_state_number(value: Any, default: float = 0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    return number
+
+
+def role_state_int(value: Any, default: int = 0, minimum: int | None = None) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = int(default)
+    if minimum is not None:
+        number = max(minimum, number)
+    return number
+
+
+def normalize_role_state_variable(raw: Any, index: int = 1) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    var_key = normalize_role_state_key(raw.get("var_key") or raw.get("key"), f"var_{index}")
+    min_value = role_state_number(raw.get("min_value"), 0)
+    max_value = role_state_number(raw.get("max_value"), 100)
+    if max_value <= min_value:
+        max_value = min_value + 100
+    default_value = min(max(role_state_number(raw.get("default_value"), min_value), min_value), max_value)
+    delta_min = role_state_number(raw.get("delta_min"), -2)
+    delta_max = role_state_number(raw.get("delta_max"), 2)
+    if delta_max < delta_min:
+        delta_min, delta_max = delta_max, delta_min
+    return {
+        "var_key": var_key,
+        "var_name": str(raw.get("var_name") or raw.get("label") or var_key).strip() or var_key,
+        "enabled": raw.get("enabled") is not False,
+        "default_value": default_value,
+        "min_value": min_value,
+        "max_value": max_value,
+        "delta_min": delta_min,
+        "delta_max": delta_max,
+        "display": raw.get("display") is not False,
+        "stage_relevant": raw.get("stage_relevant") is not False,
+        "instruction": str(raw.get("instruction") or "").strip(),
+    }
+
+
+
+def normalize_snapshot_field(raw: Any, index: int = 1) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    key = normalize_role_state_key(raw.get("key") or raw.get("field_key"), f"snapshot_{index}")
+    if not key:
+        return None
+    return {
+        "key": key,
+        "label": str(raw.get("label") or raw.get("name") or key).strip() or key,
+        "enabled": raw.get("enabled") is not False,
+        "display": raw.get("display") is not False,
+        "instruction": str(raw.get("instruction") or raw.get("note") or "根据本轮上下文生成该状态快照字段。{}").strip(),
+    }
+
+def normalize_role_state_stage(raw: Any, role_id: str = "", index: int = 1) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    stage_key = normalize_role_state_key(raw.get("stage_key") or raw.get("key"), default_stage_key(index))
+    stage_name = str(raw.get("stage_name") or raw.get("name") or default_stage_name(index)).strip() or default_stage_name(index)
+    conditions: list[dict[str, Any]] = []
+    raw_conditions = raw.get("conditions", [])
+    if isinstance(raw_conditions, list):
+        for item in raw_conditions:
+            if not isinstance(item, dict):
+                continue
+            var_key = normalize_role_state_key(item.get("var") or item.get("field"), "")
+            if not var_key:
+                continue
+            op = str(item.get("op") or ">=").strip()
+            if op not in STAGE_OPERATORS:
+                op = ">="
+            conditions.append({"var": var_key, "op": op, "value": role_state_number(item.get("value"), 0)})
+    return {
+        "stage_key": stage_key,
+        "stage_name": stage_name,
+        "enabled": raw.get("enabled") is not False,
+        "priority": role_state_int(raw.get("priority"), index * 10),
+        "condition_mode": "any" if str(raw.get("condition_mode") or "all").lower() == "any" else "all",
+        "conditions": conditions,
+        "allow_regression": bool(raw.get("allow_regression", False)),
+        "confirm_turns": role_state_int(raw.get("confirm_turns"), 1, 1),
+        "cooldown_turns": role_state_int(raw.get("cooldown_turns"), 0, 0),
+        "activation_tag": f"state_journal.stage.{role_id}.{stage_key}" if role_id and stage_key else str(raw.get("activation_tag") or ""),
+    }
+
+
+def normalize_role_state_role(raw: Any, index: int = 1) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    role_name = str(raw.get("role_name") or raw.get("name") or f"角色{index}").strip()
+    role_id = normalize_role_state_key(raw.get("role_id") or raw.get("id") or role_name, f"role_{index}")
+    aliases_raw = raw.get("aliases", [])
+    if isinstance(aliases_raw, str):
+        aliases = [item.strip() for item in re.split(r"[,，]", aliases_raw) if item.strip()]
+    elif isinstance(aliases_raw, list):
+        aliases = [str(item).strip() for item in aliases_raw if str(item).strip()]
+    else:
+        aliases = []
+    variables: list[dict[str, Any]] = []
+    seen_vars: set[str] = set()
+    raw_variables = raw.get("variables", [])
+    if isinstance(raw_variables, dict):
+        raw_variables = list(raw_variables.values())
+    if isinstance(raw_variables, list):
+        for var_index, item in enumerate(raw_variables, start=1):
+            variable = normalize_role_state_variable(item, var_index)
+            if not variable or variable["var_key"] in seen_vars:
+                continue
+            seen_vars.add(variable["var_key"])
+            variables.append(variable)
+    snapshot_fields: list[dict[str, Any]] = []
+    seen_snapshot_fields: set[str] = set()
+    raw_snapshot_fields = raw.get("snapshotFields") or raw.get("snapshot_fields") or []
+    # Compatibility for early drafts: text fields from fields[] become snapshotFields.
+    if not raw_snapshot_fields and isinstance(raw.get("fields"), list):
+        raw_snapshot_fields = [item for item in raw.get("fields") or [] if isinstance(item, dict) and str(item.get("type") or "text").lower() != "metric"]
+    if isinstance(raw_snapshot_fields, dict):
+        raw_snapshot_fields = list(raw_snapshot_fields.values())
+    if isinstance(raw_snapshot_fields, list):
+        for field_index, item in enumerate(raw_snapshot_fields, start=1):
+            field = normalize_snapshot_field(item, field_index)
+            if not field or field["key"] in seen_snapshot_fields:
+                continue
+            seen_snapshot_fields.add(field["key"])
+            snapshot_fields.append(field)
+
+    stages: list[dict[str, Any]] = []
+    seen_stages: set[str] = set()
+    raw_stages = raw.get("stages", [])
+    if isinstance(raw_stages, dict):
+        raw_stages = list(raw_stages.values())
+    if isinstance(raw_stages, list):
+        for stage_index, item in enumerate(raw_stages, start=1):
+            stage = normalize_role_state_stage(item, role_id, stage_index)
+            if not stage or stage["stage_key"] in seen_stages:
+                continue
+            seen_stages.add(stage["stage_key"])
+            stages.append(stage)
+    settings = raw.get("settings") if isinstance(raw.get("settings"), dict) else {}
+    initial_stage = normalize_role_state_key(raw.get("initial_stage") or settings.get("initial_stage"), stages[0]["stage_key"] if stages else "stage_a")
+    enabled = raw.get("enabled") is not False
+    mode = normalize_role_state_mode(raw.get("mode") or raw.get("stateJournalMode"), enabled=enabled, has_variables=bool(variables), has_stages=bool(stages), has_snapshot=bool(snapshot_fields))
+    if mode == "disabled":
+        enabled = False
+    return {
+        "role_id": role_id,
+        "role_name": role_name or role_id,
+        "aliases": aliases,
+        "enabled": enabled,
+        "mode": mode,
+        "stateJournalMode": mode,
+        "use_default_variables": bool(raw.get("use_default_variables", False)),
+        "initial_stage": initial_stage,
+        "variables": variables,
+        "stages": stages,
+        "snapshotFields": snapshot_fields,
+        "source": str(raw.get("source") or raw.get("role_source") or "").strip(),
+        "settings": {
+            "allow_regression": bool(settings.get("allow_regression", False)),
+            "confirm_turns": role_state_int(settings.get("confirm_turns"), 1, 1),
+            "cooldown_turns": role_state_int(settings.get("cooldown_turns"), 1, 0),
+        },
+    }
+
+
+def role_state_role_tokens(role: dict[str, Any]) -> set[str]:
+    tokens: set[str] = set()
+    for value in [role.get("role_id"), role.get("role_name"), role.get("name")]:
+        text = str(value or "").strip()
+        if text:
+            tokens.add(text.lower())
+    for alias in role.get("aliases") or []:
+        text = str(alias or "").strip()
+        if text:
+            tokens.add(text.lower())
+    return tokens
+
+
+def role_state_role_score(role: dict[str, Any]) -> int:
+    return len(role.get("variables") or []) * 10 + len(role.get("stages") or []) * 10 + len(role.get("snapshotFields") or []) * 6 + len(role.get("aliases") or [])
+
+
+def merge_role_state_role(base: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    # 保留配置更完整的一方作为主体，另一方只补缺失项，避免 persona 自动补角色生成空重复项。
+    primary, secondary = (incoming, base) if role_state_role_score(incoming) > role_state_role_score(base) else (base, incoming)
+    merged = json.loads(json.dumps(primary, ensure_ascii=False))
+    if not merged.get("role_id"):
+        merged["role_id"] = secondary.get("role_id") or ""
+    if not merged.get("role_name"):
+        merged["role_name"] = secondary.get("role_name") or secondary.get("name") or merged.get("role_id") or ""
+    alias_set: list[str] = []
+    for value in [*(merged.get("aliases") or []), secondary.get("role_id"), secondary.get("role_name"), *(secondary.get("aliases") or [])]:
+        text = str(value or "").strip()
+        if text and text != merged.get("role_name") and text not in alias_set:
+            alias_set.append(text)
+    merged["aliases"] = alias_set
+    for key in ("variables", "stages", "snapshotFields"):
+        if not merged.get(key) and secondary.get(key):
+            merged[key] = secondary.get(key)
+    if not merged.get("initial_stage"):
+        merged["initial_stage"] = secondary.get("initial_stage") or "stage_a"
+    settings = merged.get("settings") if isinstance(merged.get("settings"), dict) else {}
+    other_settings = secondary.get("settings") if isinstance(secondary.get("settings"), dict) else {}
+    merged["settings"] = {**other_settings, **settings}
+    merged["enabled"] = merged.get("enabled") is not False and secondary.get("enabled") is not False
+    # 优先保留显式模式；未设置时由变量/阶段/快照数量推断。
+    merged["mode"] = merged.get("mode") or merged.get("stateJournalMode") or secondary.get("mode") or secondary.get("stateJournalMode") or ""
+    merged["stateJournalMode"] = merged["mode"]
+    return normalize_role_state_role(merged, 1) or merged
+
+
+def normalize_role_state_config(raw: Any) -> dict[str, Any]:
+    config = {"version": 1, "enabled": True, "role_source_mode": "auto", "roles": []}
+    if not isinstance(raw, dict):
+        return config
+    config["enabled"] = raw.get("enabled") is not False
+    config["role_source_mode"] = normalize_role_source_mode(raw.get("role_source_mode") or raw.get("roleSourceMode"))
+    try:
+        config["version"] = max(1, int(raw.get("version", 1) or 1))
+    except (TypeError, ValueError):
+        config["version"] = 1
+    raw_roles = raw.get("roles", [])
+    if isinstance(raw_roles, dict):
+        raw_roles = list(raw_roles.values())
+    roles: list[dict[str, Any]] = []
+    if isinstance(raw_roles, list):
+        for index, item in enumerate(raw_roles, start=1):
+            role = normalize_role_state_role(item, index)
+            if not role:
+                continue
+            tokens = role_state_role_tokens(role)
+            existing_index = -1
+            for i, existing in enumerate(roles):
+                if tokens and tokens.intersection(role_state_role_tokens(existing)):
+                    existing_index = i
+                    break
+            if existing_index >= 0:
+                roles[existing_index] = merge_role_state_role(roles[existing_index], role)
+            else:
+                roles.append(role)
+    config["roles"] = roles
+    return config
+
+
+def default_variable_configs() -> list[dict[str, Any]]:
+    variables: list[dict[str, Any]] = []
+    for index, metric in enumerate(METRIC_DEFINITIONS, start=1):
+        key = str(metric.get("key") or f"var_{index}")
+        variables.append({
+            "var_key": key,
+            "var_name": str(metric.get("label") or key),
+            "enabled": True,
+            "default_value": 0,
+            "min_value": 0,
+            "max_value": float(metric.get("max") or 100),
+            "delta_min": -10 if key == "pulse_level" else -5,
+            "delta_max": 10 if key == "pulse_level" else 5,
+            "display": True,
+            "stage_relevant": True,
+            "instruction": "",
+        })
+    return variables
+
+
+def role_state_main_card_role(raw_card: dict[str, Any]) -> dict[str, Any] | None:
+    name = str(raw_card.get("name") or raw_card.get("role_name") or raw_card.get("char_name") or "").strip()
+    if not name:
+        return None
+    role_id = normalize_role_state_key(raw_card.get("role_id") or raw_card.get("id") or name, "main_card")
+    aliases: list[str] = []
+    for value in [raw_card.get("role_name"), raw_card.get("char_name"), raw_card.get("nickname")]:
+        text = str(value or "").strip()
+        if text and text != name and text not in aliases:
+            aliases.append(text)
+    return {
+        "role_id": role_id,
+        "role_name": name,
+        "aliases": aliases,
+        "enabled": True,
+        "mode": "default",
+        "stateJournalMode": "default",
+        "use_default_variables": True,
+        "variables": [],
+        "stages": [],
+        "snapshotFields": [],
+        "initial_stage": "stage_a",
+        "source": "main_card",
+    }
+
+
+def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
+    personas = raw_card.get("personas") if isinstance(raw_card.get("personas"), dict) else {}
+    roles: list[dict[str, Any]] = []
+    for index, (persona_key, persona) in enumerate(personas.items(), start=1):
+        if not isinstance(persona, dict):
+            continue
+        name = str(persona.get("name") or f"角色{index}").strip()
+        role_id = normalize_role_state_key(persona.get("role_id") or persona.get("id") or name or persona_key, f"role_{index}")
+        aliases: list[str] = []
+        key_text = str(persona_key or "").strip()
+        if key_text and key_text != role_id:
+            aliases.append(key_text)
+        roles.append({"role_id": role_id, "role_name": name, "aliases": aliases, "enabled": True, "mode": "default", "stateJournalMode": "default", "use_default_variables": True, "variables": [], "stages": [], "snapshotFields": [], "initial_stage": "stage_a", "source": "persona"})
+    return roles
+
+
+def role_source_summary(mode: str, detected: str, roles: list[dict[str, Any]], has_personas: bool, main_role_name: str = "") -> dict[str, Any]:
+    safe_mode = normalize_role_source_mode(mode)
+    safe_detected = normalize_role_source_mode(detected)
+    if safe_detected == "main_card":
+        message = f"未检测到多角色，已将主卡「{main_role_name or '主卡角色'}」作为唯一心笺角色。"
+    elif safe_detected == "personas_only":
+        message = f"已识别 {len(roles)} 个多角色，主卡未作为心笺角色参与记录。"
+    else:
+        message = "尚未识别到可用心笺角色。"
+    if safe_mode == "main_card":
+        message = f"当前设置为“主卡就是角色”，心笺会把主卡「{main_role_name or '主卡角色'}」作为角色。"
+    elif safe_mode == "personas_only" and not has_personas:
+        message = "当前设置为“只读取多角色”，但这张卡没有多角色。可在角色卡页面改为“主卡就是角色”。"
+    return {
+        "mode": safe_mode,
+        "mode_label": role_source_mode_label(safe_mode),
+        "detected_mode": safe_detected,
+        "detected_label": role_source_mode_label(safe_detected),
+        "role_count": len(roles),
+        "has_personas": has_personas,
+        "main_card_role_name": main_role_name,
+        "message": message,
+    }
+
+
+def role_state_config_from_current_card() -> dict[str, Any]:
+    path = role_state_current_card_path()
+    if not path.exists():
+        return normalize_role_state_config({})
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return normalize_role_state_config({})
+    raw_card = data.get("raw") if isinstance(data, dict) else {}
+    if not isinstance(raw_card, dict):
+        raw_card = {}
+    card_uid = current_card_uid()
+    raw_state_journal = raw_card.get("stateJournal") if isinstance(raw_card.get("stateJournal"), dict) else {}
+    source_mode = normalize_role_source_mode(raw_state_journal.get("role_source_mode") or raw_state_journal.get("roleSourceMode"))
+    config = normalize_role_state_config(raw_state_journal or {})
+    config["role_source_mode"] = source_mode
+    config["card_uid"] = card_uid
+    config["card"] = current_card_summary()
+    personas = raw_card.get("personas") if isinstance(raw_card.get("personas"), dict) else {}
+    has_personas = bool(personas)
+    main_role = role_state_main_card_role(raw_card)
+    main_role_name = str((main_role or {}).get("role_name") or raw_card.get("name") or "").strip()
+    if config.get("roles"):
+        detected = "personas_only" if has_personas else "main_card"
+        config["role_source_summary"] = role_source_summary(source_mode, detected, config.get("roles") or [], has_personas, main_role_name)
+        return config
+    persona_roles = role_state_persona_roles(raw_card)
+    roles: list[dict[str, Any]] = []
+    detected_mode = "auto"
+    if source_mode == "main_card":
+        roles = [main_role] if main_role else []
+        detected_mode = "main_card"
+    elif source_mode == "personas_only":
+        roles = persona_roles
+        detected_mode = "personas_only"
+    elif persona_roles:
+        roles = persona_roles
+        detected_mode = "personas_only"
+    elif main_role:
+        roles = [main_role]
+        detected_mode = "main_card"
+    config = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": source_mode, "roles": roles})
+    config["card_uid"] = current_card_uid()
+    config["card"] = current_card_summary()
+    config["role_source_summary"] = role_source_summary(source_mode, detected_mode, config.get("roles") or [], has_personas, main_role_name)
+    return config
+
+def sync_role_state_config_to_current_card(config: dict[str, Any]) -> bool:
+    path = role_state_current_card_path()
+    if not path.exists():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    raw_card = data.get("raw")
+    if not isinstance(raw_card, dict):
+        raw_card = {}
+    normalized = normalize_role_state_config(config)
+    existing_state_journal = raw_card.get("stateJournal") if isinstance(raw_card.get("stateJournal"), dict) else {}
+    normalized["role_source_mode"] = normalize_role_source_mode(normalized.get("role_source_mode") or existing_state_journal.get("role_source_mode") or existing_state_journal.get("roleSourceMode"))
+    normalized["card_uid"] = current_card_uid()
+    raw_card["stateJournal"] = normalized
+    data["raw"] = raw_card
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return True
+
+
+def role_config_names(role: dict[str, Any]) -> set[str]:
+    names = {str(role.get("role_name") or "").strip(), str(role.get("role_id") or "").strip()}
+    for alias in role.get("aliases") or []:
+        names.add(str(alias).strip())
+    return {item for item in names if item}
+
+
+def find_role_config(config: dict[str, Any], character_name: str) -> dict[str, Any] | None:
+    target = str(character_name or "").strip()
+    if not target:
+        return None
+    for role in config.get("roles") or []:
+        if not isinstance(role, dict) or role.get("enabled") is False:
+            continue
+        if target in role_config_names(role):
+            return role
+    return None
 
 def clamp_number(value: Any, minimum: float = 0, maximum: float = 100) -> float:
     try:
@@ -1885,14 +2629,140 @@ def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
     return {key: row[key] for key in row.keys()}
 
 
+
+def load_role_state_config(conn: sqlite3.Connection, card_uid: str | None = None) -> dict[str, Any]:
+    init_meta_tables(conn)
+    safe_card_uid = normalize_role_state_key(card_uid or current_card_uid(), "global")
+    rows = conn.execute(
+        """
+        SELECT role_id, role_name, aliases_json, enabled, mode, use_default_variables, initial_stage, variables_json, stages_json, snapshot_fields_json, settings_json
+        FROM state_journal_role_state_configs
+        WHERE card_uid=?
+        ORDER BY rowid ASC
+        """,
+        (safe_card_uid,),
+    ).fetchall()
+    roles: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            aliases = json.loads(row["aliases_json"] or "[]")
+        except Exception:
+            aliases = []
+        try:
+            variables = json.loads(row["variables_json"] or "[]")
+        except Exception:
+            variables = []
+        try:
+            stages = json.loads(row["stages_json"] or "[]")
+        except Exception:
+            stages = []
+        try:
+            snapshot_fields = json.loads(row["snapshot_fields_json"] or "[]")
+        except Exception:
+            snapshot_fields = []
+        try:
+            settings = json.loads(row["settings_json"] or "{}")
+        except Exception:
+            settings = {}
+        roles.append({
+            "role_id": row["role_id"],
+            "role_name": row["role_name"],
+            "aliases": aliases,
+            "enabled": bool(row["enabled"]),
+            "mode": row["mode"] or "default",
+            "stateJournalMode": row["mode"] or "default",
+            "use_default_variables": bool(row["use_default_variables"]),
+            "initial_stage": row["initial_stage"] or "stage_a",
+            "variables": variables,
+            "stages": stages,
+            "snapshotFields": snapshot_fields,
+            "settings": settings,
+        })
+    raw_card = current_role_card_payload()
+    raw_state_journal = raw_card.get("stateJournal") if isinstance(raw_card.get("stateJournal"), dict) else {}
+    normalized = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": raw_state_journal.get("role_source_mode") or raw_state_journal.get("roleSourceMode"), "roles": roles})
+    normalized["card_uid"] = safe_card_uid
+    normalized["card"] = current_card_summary()
+    personas = raw_card.get("personas") if isinstance(raw_card.get("personas"), dict) else {}
+    main_role_name = str(raw_card.get("name") or raw_card.get("role_name") or "").strip()
+    detected_mode = "personas_only" if personas else "main_card"
+    normalized["role_source_summary"] = role_source_summary(normalized.get("role_source_mode"), detected_mode, normalized.get("roles") or [], bool(personas), main_role_name)
+    return normalized
+
+
+def save_role_state_config(conn: sqlite3.Connection, config: dict[str, Any], card_uid: str | None = None) -> dict[str, Any]:
+    init_meta_tables(conn)
+    safe_card_uid = normalize_role_state_key(card_uid or (config or {}).get("card_uid") or current_card_uid(), "global")
+    normalized = normalize_role_state_config(config)
+    normalized["card_uid"] = safe_card_uid
+    normalized["card"] = current_card_summary()
+    now = now_string()
+    conn.execute("DELETE FROM state_journal_role_state_configs WHERE card_uid=?", (safe_card_uid,))
+    for role in normalized.get("roles") or []:
+        conn.execute(
+            """
+            INSERT INTO state_journal_role_state_configs(card_uid, role_id, role_name, aliases_json, enabled, mode, use_default_variables, initial_stage, variables_json, stages_json, snapshot_fields_json, settings_json, updated_at)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                safe_card_uid,
+                role.get("role_id") or "",
+                role.get("role_name") or "",
+                json.dumps(role.get("aliases") or [], ensure_ascii=False),
+                1 if role.get("enabled") is not False else 0,
+                role_state_mode(role),
+                1 if role.get("use_default_variables") else 0,
+                role.get("initial_stage") or "stage_a",
+                json.dumps(role.get("variables") or [], ensure_ascii=False),
+                json.dumps(role.get("stages") or [], ensure_ascii=False),
+                json.dumps(role.get("snapshotFields") or [], ensure_ascii=False),
+                json.dumps(role.get("settings") or {}, ensure_ascii=False),
+                now,
+            ),
+        )
+    return normalized
+
+
+def role_snapshot_fields_for_character(config: dict[str, Any], character_name: str) -> list[dict[str, Any]]:
+    role = find_role_config(config, character_name)
+    if not role or not role_state_mode_uses_snapshot(role):
+        return []
+    fields = []
+    for item in role.get("snapshotFields") or []:
+        if not isinstance(item, dict) or item.get("enabled") is False or item.get("display") is False:
+            continue
+        key = normalize_role_state_key(item.get("key"), "")
+        if not key:
+            continue
+        fields.append({"key": key, "label": str(item.get("label") or key).strip() or key, "instruction": str(item.get("instruction") or "").strip()})
+    return fields
+
+
+def role_variables_for_character(conn: sqlite3.Connection, character_name: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    config = load_role_state_config(conn)
+    role = find_role_config(config, character_name)
+    if role:
+        mode = role_state_mode(role)
+        if mode == "disabled":
+            return role, []
+        if mode == "snapshot_only":
+            return role, []
+        if mode == "full" and not role.get("use_default_variables") and role.get("variables"):
+            variables = [item for item in role.get("variables") or [] if isinstance(item, dict) and item.get("enabled") is not False]
+            return role, variables
+    return role, default_variable_configs()
+
 def get_metric_snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     init_meta_tables(conn)
+    safe_card_uid = current_card_uid()
     rows = conn.execute(
         """
         SELECT character_name, metric_key, label, current_value, delta_value, max_value, raw_value, source_turn_id, updated_at
-        FROM xj_metric_states
+        FROM state_journal_metric_states
+        WHERE card_uid=?
         ORDER BY character_name ASC, metric_key ASC
-        """
+        """,
+        (safe_card_uid,),
     ).fetchall()
     by_character: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -1916,88 +2786,607 @@ def normalize_metric_display_value(parsed: dict[str, Any]) -> str:
     return format_metric_value(parsed.get("value", 0), parsed.get("max", 100), parsed.get("delta", 0))
 
 
+def metric_entry_matches(entry: dict[str, Any], key: str, label: str) -> bool:
+    candidates = [
+        entry.get("key"), entry.get("metric_key"), entry.get("var_key"), entry.get("field_key"), entry.get("id"),
+        entry.get("label"), entry.get("name"), entry.get("metric_label"), entry.get("var_name"),
+    ]
+    normalized_key = str(key or "").strip().lower()
+    normalized_label = str(label or "").strip().lower()
+    for value in candidates:
+        text = str(value or "").strip().lower()
+        if text and (text == normalized_key or text == normalized_label):
+            return True
+    return False
+
+
+def parse_explicit_metric_entry(entry: dict[str, Any], *, default_max: float = 100) -> dict[str, Any] | None:
+    raw_value = entry.get("raw") or entry.get("raw_value") or entry.get("display") or entry.get("value_text")
+    parsed = parse_metric_value(raw_value, default_max) if raw_value is not None else None
+    value_present = entry.get("value") is not None or entry.get("current_value") is not None or entry.get("new_value") is not None
+    delta_present = entry.get("delta") is not None or entry.get("delta_value") is not None or entry.get("change") is not None
+    if parsed is None and not value_present and not delta_present:
+        return None
+    value = role_state_number(entry.get("value", entry.get("current_value", entry.get("new_value", parsed.get("value") if parsed else 0))), parsed.get("value") if parsed else 0)
+    max_value = max(1.0, role_state_number(entry.get("max", entry.get("max_value", parsed.get("max") if parsed else default_max)), default_max))
+    delta_raw = entry.get("delta", entry.get("delta_value", entry.get("change", parsed.get("delta") if parsed else 0)))
+    delta = role_state_number(delta_raw, parsed.get("delta") if parsed else 0)
+    return {"value": clamp_number(value, 0, max_value), "delta": delta, "max": max_value, "raw": raw_value or format_metric_value(value, max_value, delta)}
+
+
+def character_metric_payload(character: dict[str, Any], key: str, label: str, default_max: float) -> dict[str, Any] | None:
+    raw_value = character.get(key)
+    if raw_value is None and label in character:
+        raw_value = character.get(label)
+    if raw_value is None:
+        for bucket_key in ("metrics", "variables", "metric_updates", "state_metrics"):
+            bucket = character.get(bucket_key)
+            if isinstance(bucket, dict):
+                bucket = list(bucket.values())
+            if not isinstance(bucket, list):
+                continue
+            for entry in bucket:
+                if isinstance(entry, dict) and metric_entry_matches(entry, key, label):
+                    parsed_entry = parse_explicit_metric_entry(entry, default_max=default_max)
+                    if parsed_entry:
+                        return parsed_entry
+    if raw_value is None and key in METRIC_DEFINITION_BY_KEY:
+        metric = METRIC_DEFINITION_BY_KEY.get(key) or {}
+        for alias in [metric.get("label"), *(metric.get("aliases") or [])]:
+            if alias and alias in character:
+                raw_value = character.get(alias)
+                break
+    return parse_metric_value(raw_value, default_max) if raw_value is not None else None
+
+
+def apply_role_metric_state(conn: sqlite3.Connection, *, turn_id: str, character_name: str, role_config: dict[str, Any] | None, variable: dict[str, Any], parsed: dict[str, Any]) -> dict[str, Any] | None:
+    safe_turn = normalize_turn_id(turn_id)
+    name = clean_display_text(character_name, 80)
+    if not name:
+        return None
+    key = str(variable.get("var_key") or variable.get("key") or "").strip()
+    if not key:
+        return None
+    label = str(variable.get("var_name") or variable.get("label") or key).strip() or key
+    min_value = float(variable.get("min_value") if variable.get("min_value") is not None else 0)
+    max_value = float(variable.get("max_value") if variable.get("max_value") is not None else parsed.get("max") or 100)
+    if max_value <= min_value:
+        max_value = min_value + 100
+    delta_min = float(variable.get("delta_min") if variable.get("delta_min") is not None else -5)
+    delta_max = float(variable.get("delta_max") if variable.get("delta_max") is not None else 5)
+    if delta_max < delta_min:
+        delta_min, delta_max = delta_max, delta_min
+    raw_delta = float(parsed.get("delta") or 0)
+    delta_value = max(delta_min, min(delta_max, raw_delta))
+    safe_card_uid = current_card_uid()
+    old = row_to_dict(conn.execute(
+        "SELECT * FROM state_journal_metric_states WHERE card_uid=? AND character_name=? AND metric_key=?",
+        (safe_card_uid, name, key),
+    ).fetchone())
+    if old and str(old.get("source_turn_id") or "") == safe_turn and safe_turn not in {"", "init_current"}:
+        return None
+    if old:
+        base_value = float(old.get("current_value") or 0)
+        current_value = max(min_value, min(max_value, base_value + delta_value))
+    else:
+        default_value = float(variable.get("default_value") if variable.get("default_value") is not None else min_value)
+        if abs(raw_delta) < 1e-9 and parsed.get("raw") is not None:
+            current_value = float(parsed.get("value") or default_value)
+        else:
+            current_value = default_value + delta_value
+        current_value = max(min_value, min(max_value, current_value))
+    normalized_raw = format_metric_value(current_value, max_value, delta_value)
+    now = now_string()
+    conn.execute(
+        """
+        INSERT INTO state_journal_metric_states(card_uid, character_name, metric_key, label, current_value, delta_value, max_value, raw_value, source_turn_id, updated_at)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(card_uid, character_name, metric_key) DO UPDATE SET
+            label=excluded.label,
+            current_value=excluded.current_value,
+            delta_value=excluded.delta_value,
+            max_value=excluded.max_value,
+            raw_value=excluded.raw_value,
+            source_turn_id=excluded.source_turn_id,
+            updated_at=excluded.updated_at
+        """,
+        (safe_card_uid, name, key, label, current_value, delta_value, max_value, normalized_raw, safe_turn, now),
+    )
+    conn.execute(
+        """
+        INSERT INTO state_journal_metric_history(card_uid, turn_id, character_name, metric_key, label, old_value, delta_value, new_value, max_value, raw_value, created_at)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (safe_card_uid, safe_turn, name, key, label, old.get("current_value") if old else None, delta_value, current_value, max_value, normalized_raw, now),
+    )
+    return {
+        "character_name": name,
+        "role_id": role_config.get("role_id") if role_config else "",
+        "metric_key": key,
+        "label": label,
+        "old_state": old,
+        "new_state": {
+            "character_name": name,
+            "metric_key": key,
+            "label": label,
+            "current_value": current_value,
+            "delta_value": delta_value,
+            "max_value": max_value,
+            "raw_value": normalized_raw,
+            "source_turn_id": safe_turn,
+            "updated_at": now,
+        },
+        "old_value": old.get("current_value") if old else None,
+        "delta_value": delta_value,
+        "new_value": current_value,
+        "max_value": max_value,
+        "raw_value": normalized_raw,
+    }
+
+
 def apply_display_metrics(conn: sqlite3.Connection, turn_id: str, display_payload: dict[str, Any]) -> list[dict[str, Any]]:
     init_meta_tables(conn)
-    safe_turn = normalize_turn_id(turn_id)
     characters = display_payload.get("characters") if isinstance(display_payload, dict) else []
     if not isinstance(characters, list):
         return []
     applied: list[dict[str, Any]] = []
-    now = now_string()
     for character in characters:
         if not isinstance(character, dict):
             continue
         name = clean_display_text(character.get("name") or character.get("角色") or "", 80)
         if not name:
             continue
-        for metric in METRIC_DEFINITIONS:
-            key = str(metric.get("key") or "")
-            raw_value = character.get(key)
-            if raw_value is None:
-                for alias in [metric.get("label"), *(metric.get("aliases") or [])]:
-                    if alias and alias in character:
-                        raw_value = character.get(alias)
-                        break
-            parsed = parse_metric_value(raw_value, float(metric.get("max") or 100))
+        role_config, variable_configs = role_variables_for_character(conn, name)
+        for variable in variable_configs:
+            key = str(variable.get("var_key") or variable.get("key") or "").strip()
+            if not key:
+                continue
+            label = str(variable.get("var_name") or variable.get("label") or key).strip() or key
+            parsed = character_metric_payload(character, key, label, float(variable.get("max_value") or 100))
             if not parsed:
                 continue
-            label = str(metric.get("label") or key)
-            current_value = float(parsed["value"])
-            delta_value = float(parsed.get("delta") or 0)
-            max_value = float(parsed.get("max") or metric.get("max") or 100)
-            normalized_raw = normalize_metric_display_value(parsed)
-            old = row_to_dict(conn.execute(
-                "SELECT * FROM xj_metric_states WHERE character_name=? AND metric_key=?",
-                (name, key),
-            ).fetchone())
-            conn.execute(
-                """
-                INSERT INTO xj_metric_states(character_name, metric_key, label, current_value, delta_value, max_value, raw_value, source_turn_id, updated_at)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(character_name, metric_key) DO UPDATE SET
-                    label=excluded.label,
-                    current_value=excluded.current_value,
-                    delta_value=excluded.delta_value,
-                    max_value=excluded.max_value,
-                    raw_value=excluded.raw_value,
-                    source_turn_id=excluded.source_turn_id,
-                    updated_at=excluded.updated_at
-                """,
-                (name, key, label, current_value, delta_value, max_value, normalized_raw, safe_turn, now),
-            )
-            conn.execute(
-                """
-                INSERT INTO xj_metric_history(turn_id, character_name, metric_key, label, old_value, delta_value, new_value, max_value, raw_value, created_at)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (safe_turn, name, key, label, old.get("current_value") if old else None, delta_value, current_value, max_value, normalized_raw, now),
-            )
-            character[key] = normalized_raw
-            applied.append({
-                "character_name": name,
-                "metric_key": key,
-                "label": label,
-                "old_state": old,
-                "new_state": {
-                    "character_name": name,
-                    "metric_key": key,
-                    "label": label,
-                    "current_value": current_value,
-                    "delta_value": delta_value,
-                    "max_value": max_value,
-                    "raw_value": normalized_raw,
-                    "source_turn_id": safe_turn,
-                    "updated_at": now,
-                },
-                "old_value": old.get("current_value") if old else None,
-                "delta_value": delta_value,
-                "new_value": current_value,
-                "max_value": max_value,
-                "raw_value": normalized_raw,
-            })
+            result = apply_role_metric_state(conn, turn_id=turn_id, character_name=name, role_config=role_config, variable=variable, parsed=parsed)
+            if result:
+                character[key] = result["raw_value"]
+                applied.append(result)
     if applied:
         sync_visible_metric_tables(conn)
     return applied
+
+
+def parse_metric_summary_items(summary: Any) -> list[dict[str, Any]]:
+    text = str(summary or "")
+    if not text.strip():
+        return []
+    normalized = text.replace("（", "(").replace("）", ")").replace("，", ",").replace("；", ";")
+    items: list[dict[str, Any]] = []
+    pattern = re.compile(r"([A-Za-z_][A-Za-z0-9_\-]*|[\u4e00-\u9fff]{1,12})\s*[:：]?\s*(\d{1,3}(?:\.\d+)?)\s*/\s*(\d{1,3}(?:\.\d+)?)\s*\(\s*([+\-]?\s*\d{1,3}(?:\.\d+)?)\s*\)")
+    for match in pattern.finditer(normalized):
+        key_or_label = match.group(1).strip()
+        value = role_state_number(match.group(2), 0)
+        max_value = role_state_number(match.group(3), 100)
+        delta = role_state_number(match.group(4).replace(" ", ""), 0)
+        items.append({"key": key_or_label, "label": key_or_label, "value": value, "max": max_value, "delta": delta, "raw": match.group(0)})
+    return items
+
+
+def apply_update_metric_summaries(conn: sqlite3.Connection, turn_id: str, updates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not isinstance(updates, list):
+        return []
+    applied: list[dict[str, Any]] = []
+    for update in updates:
+        if not isinstance(update, dict):
+            continue
+        table_id = str(update.get("table") or update.get("table_id") or "")
+        set_values = update.get("set") if isinstance(update.get("set"), dict) else {}
+        summary = set_values.get("metrics_summary")
+        if not summary:
+            continue
+        key_payload = update.get("key") if isinstance(update.get("key"), dict) else {}
+        candidate_names = [key_payload.get("name"), set_values.get("name"), key_payload.get("from"), set_values.get("from")]
+        # relationship 的 pair_id 可能是“角色-主角”。只取前半段作为变量归属角色。
+        pair_id = str(key_payload.get("pair_id") or set_values.get("pair_id") or "")
+        if pair_id and "-" in pair_id:
+            candidate_names.append(pair_id.split("-", 1)[0])
+        name = next((clean_display_text(item, 80) for item in candidate_names if clean_display_text(item, 80)), "")
+        if not name:
+            continue
+        role_config, variable_configs = role_variables_for_character(conn, name)
+        if not variable_configs:
+            continue
+        summary_items = parse_metric_summary_items(summary)
+        if not summary_items:
+            continue
+        for variable in variable_configs:
+            key = str(variable.get("var_key") or variable.get("key") or "").strip()
+            label = str(variable.get("var_name") or variable.get("label") or key).strip() or key
+            matched = next((item for item in summary_items if metric_entry_matches(item, key, label)), None)
+            if not matched:
+                continue
+            parsed = parse_explicit_metric_entry(matched, default_max=float(variable.get("max_value") or 100))
+            if not parsed:
+                continue
+            result = apply_role_metric_state(conn, turn_id=turn_id, character_name=name, role_config=role_config, variable=variable, parsed=parsed)
+            if result:
+                applied.append(result)
+    if applied:
+        sync_visible_metric_tables(conn)
+    return applied
+
+
+def compare_stage_condition(current_value: float | None, op: str, target_value: float) -> bool:
+    if current_value is None:
+        return False
+    if op == ">":
+        return current_value > target_value
+    if op == ">=":
+        return current_value >= target_value
+    if op == "<":
+        return current_value < target_value
+    if op == "<=":
+        return current_value <= target_value
+    if op == "!=":
+        return current_value != target_value
+    return current_value == target_value
+
+
+def stage_by_key(role: dict[str, Any], key: str) -> dict[str, Any] | None:
+    for stage in role.get("stages") or []:
+        if isinstance(stage, dict) and str(stage.get("stage_key") or "") == str(key or ""):
+            return stage
+    return None
+
+
+def stage_label_by_key(role: dict[str, Any], key: str) -> str:
+    stage = stage_by_key(role, key)
+    return str(stage.get("stage_name") or key).strip() if stage else str(key or "").strip()
+
+
+def role_metric_values(conn: sqlite3.Connection, role: dict[str, Any]) -> tuple[str, dict[str, float]]:
+    names = list(role_config_names(role))
+    for name in names:
+        rows = conn.execute("SELECT metric_key, current_value FROM state_journal_metric_states WHERE card_uid=? AND character_name=?", (current_card_uid(), name)).fetchall()
+        if rows:
+            return name, {str(row["metric_key"]): float(row["current_value"] or 0) for row in rows}
+    return str(role.get("role_name") or role.get("role_id") or ""), {}
+
+
+def evaluate_stage_conditions(stage: dict[str, Any], values: dict[str, float]) -> tuple[bool, dict[str, Any]]:
+    conditions = stage.get("conditions") if isinstance(stage.get("conditions"), list) else []
+    if not conditions:
+        return False, {}
+    results: list[bool] = []
+    trigger_values: dict[str, Any] = {}
+    for condition in conditions:
+        if not isinstance(condition, dict):
+            continue
+        var_key = str(condition.get("var") or condition.get("field") or "").strip()
+        op = str(condition.get("op") or ">=").strip()
+        if op not in STAGE_OPERATORS:
+            op = ">="
+        target = role_state_number(condition.get("value"), 0)
+        current = values.get(var_key)
+        trigger_values[var_key] = current
+        results.append(compare_stage_condition(current, op, target))
+    if not results:
+        return False, trigger_values
+    mode = "any" if str(stage.get("condition_mode") or "all") == "any" else "all"
+    return (any(results) if mode == "any" else all(results)), trigger_values
+
+
+def choose_stage_for_role(role: dict[str, Any], values: dict[str, float]) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    enabled_stages = [stage for stage in (role.get("stages") or []) if isinstance(stage, dict) and stage.get("enabled") is not False]
+    enabled_stages.sort(key=lambda item: role_state_int(item.get("priority"), 0), reverse=True)
+    best_trigger_values: dict[str, Any] = {}
+    for stage in enabled_stages:
+        matched, trigger_values = evaluate_stage_conditions(stage, values)
+        if matched:
+            return stage, trigger_values
+    initial_key = str(role.get("initial_stage") or "stage_a")
+    initial_stage = stage_by_key(role, initial_key)
+    return initial_stage, {}
+
+
+def build_stage_active_tag(role_id: str, stage_key: str) -> str:
+    role_id = normalize_role_state_key(role_id, "")
+    stage_key = normalize_role_state_key(stage_key, "")
+    return f"state_journal.stage.{role_id}.{stage_key}" if role_id and stage_key else ""
+
+
+def append_stage_relationships(display_payload: dict[str, Any], stage_rows: list[dict[str, Any]]) -> None:
+    if not isinstance(display_payload, dict):
+        return
+    display = display_payload.setdefault("relationships", [])
+    if not isinstance(display, list):
+        display_payload["relationships"] = display = []
+    for row in stage_rows:
+        role_name = str(row.get("role_name") or row.get("role_id") or "角色").strip()
+        current_stage = str(row.get("current_stage_name") or "未进入阶段").strip()
+        previous_stage = str(row.get("previous_stage_name") or "").strip()
+        changed = bool(row.get("stage_changed"))
+        if changed and previous_stage:
+            stage_text = f"{previous_stage} → {current_stage}"
+            change_text = str(row.get("reason") or "阶段条件已满足。")
+        else:
+            stage_text = f"当前阶段 · {current_stage}"
+            change_text = "本轮阶段保持稳定。"
+        display.append({"pair": role_name, "stage": stage_text, "change": change_text, "type": "state_journal_stage", "active_tag": row.get("active_tag") or ""})
+
+
+def evaluate_stage_rules(conn: sqlite3.Connection, turn_id: str, display_payload: dict[str, Any] | None = None, turn_index: int = 0) -> list[dict[str, Any]]:
+    init_meta_tables(conn)
+    config = load_role_state_config(conn)
+    safe_turn = normalize_turn_id(turn_id)
+    now = now_string()
+    stage_rows: list[dict[str, Any]] = []
+    for role in config.get("roles") or []:
+        if not isinstance(role, dict) or role.get("enabled") is False or not role_state_mode_uses_stages(role) or not role.get("stages"):
+            continue
+        role_id = str(role.get("role_id") or "").strip()
+        role_name = str(role.get("role_name") or role_id).strip()
+        character_name, values = role_metric_values(conn, role)
+        target_stage, trigger_values = choose_stage_for_role(role, values)
+        if not target_stage:
+            continue
+        target_key = str(target_stage.get("stage_key") or "").strip()
+        target_name = str(target_stage.get("stage_name") or target_key).strip() or target_key
+        target_priority = role_state_int(target_stage.get("priority"), 0)
+        safe_card_uid = current_card_uid()
+        old = row_to_dict(conn.execute("SELECT * FROM state_journal_stage_states WHERE card_uid=? AND role_id=?", (safe_card_uid, role_id)).fetchone())
+        current_key = str(old.get("current_stage_key") or "") if old else ""
+        current_name = str(old.get("current_stage_name") or "") if old else ""
+        current_stage = stage_by_key(role, current_key)
+        current_priority = role_state_int(current_stage.get("priority"), 0) if current_stage else -10_000
+        cooldown_until = role_state_int(old.get("cooldown_until_turn"), 0) if old else 0
+        allow_regression = bool(target_stage.get("allow_regression") or role.get("settings", {}).get("allow_regression", False))
+        should_change = target_key and target_key != current_key
+        if should_change and current_key and target_priority < current_priority and not allow_regression:
+            target_key, target_name, target_stage = current_key, current_name, current_stage or target_stage
+            should_change = False
+        if should_change and cooldown_until and turn_index and turn_index < cooldown_until:
+            target_key, target_name, target_stage = current_key, current_name, current_stage or target_stage
+            should_change = False
+        active_tag = build_stage_active_tag(role_id, target_key)
+        cooldown_turns = role_state_int(target_stage.get("cooldown_turns"), role.get("settings", {}).get("cooldown_turns", 0), 0) if target_stage else 0
+        next_cooldown = (turn_index + cooldown_turns) if should_change and turn_index else cooldown_until
+        reason_parts = []
+        for var_key, value in trigger_values.items():
+            if value is None:
+                continue
+            var_label = var_key
+            for var in role.get("variables") or []:
+                if isinstance(var, dict) and var.get("var_key") == var_key:
+                    var_label = str(var.get("var_name") or var_key)
+                    break
+            reason_parts.append(f"{var_label} {format_metric_number(value)}")
+        reason = f"触发依据：{'，'.join(reason_parts)}，满足阶段条件。" if reason_parts else "使用初始阶段或阶段条件已满足。"
+        conn.execute(
+            """
+            INSERT INTO state_journal_stage_states(card_uid, role_id, role_name, current_stage_key, current_stage_name, previous_stage_key, previous_stage_name, stage_changed, active_tag, changed_at_turn, cooldown_until_turn, source_turn_id, updated_at)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(card_uid, role_id) DO UPDATE SET
+                role_name=excluded.role_name,
+                current_stage_key=excluded.current_stage_key,
+                current_stage_name=excluded.current_stage_name,
+                previous_stage_key=excluded.previous_stage_key,
+                previous_stage_name=excluded.previous_stage_name,
+                stage_changed=excluded.stage_changed,
+                active_tag=excluded.active_tag,
+                changed_at_turn=excluded.changed_at_turn,
+                cooldown_until_turn=excluded.cooldown_until_turn,
+                source_turn_id=excluded.source_turn_id,
+                updated_at=excluded.updated_at
+            """,
+            (safe_card_uid, role_id, role_name, target_key, target_name, current_key, current_name, 1 if should_change else 0, active_tag, turn_index if should_change else role_state_int(old.get("changed_at_turn"), 0) if old else turn_index, next_cooldown, safe_turn, now),
+        )
+        if should_change:
+            conn.execute(
+                """
+                INSERT INTO state_journal_stage_history(card_uid, turn_id, turn_index, role_id, role_name, from_stage_key, from_stage_name, to_stage_key, to_stage_name, trigger_values_json, reason, active_tag, created_at)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (safe_card_uid, safe_turn, int(turn_index or 0), role_id, role_name, current_key, current_name, target_key, target_name, json.dumps(trigger_values, ensure_ascii=False), reason, active_tag, now),
+            )
+        stage_rows.append({
+            "role_id": role_id,
+            "role_name": role_name,
+            "character_name": character_name,
+            "current_stage_key": target_key,
+            "current_stage_name": target_name,
+            "previous_stage_key": current_key,
+            "previous_stage_name": current_name,
+            "stage_changed": should_change,
+            "active_tag": active_tag,
+            "reason": reason,
+            "trigger_values": trigger_values,
+        })
+    if display_payload is not None and stage_rows:
+        append_stage_relationships(display_payload, stage_rows)
+    return stage_rows
+
+
+def get_active_stage_tags_from_db() -> dict[str, Any]:
+    with connect_db() as conn:
+        init_meta_tables(conn)
+        rows = conn.execute(
+            """
+            SELECT role_id, role_name, current_stage_key, current_stage_name, active_tag, updated_at
+            FROM state_journal_stage_states
+            WHERE card_uid=? AND active_tag!=''
+            ORDER BY role_name ASC
+            """
+        , (current_card_uid(),)).fetchall()
+    stages = []
+    tags = []
+    for row in rows:
+        tag = str(row["active_tag"] or "").strip()
+        if not tag:
+            continue
+        tags.append(tag)
+        stages.append({
+            "role_id": row["role_id"],
+            "role_name": row["role_name"],
+            "stage_key": row["current_stage_key"],
+            "stage_name": row["current_stage_name"],
+            "tag": tag,
+            "updated_at": row["updated_at"],
+        })
+    return {"active_stage_tags": tags, "stages": stages}
+
+
+
+
+def stage_activation_tag(role_id: Any, stage_key: Any, explicit: Any = "") -> str:
+    """Return the canonical active tag used by worldbook external_tag entries."""
+    explicit_text = str(explicit or "").strip()
+    if explicit_text:
+        return explicit_text
+    safe_role = normalize_role_state_key(role_id, "")
+    safe_stage = normalize_role_state_key(stage_key, "")
+    return f"state_journal.stage.{safe_role}.{safe_stage}" if safe_role and safe_stage else ""
+
+
+def role_state_stage_catalog(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Expose configured role stages in a UI-friendly shape for worldbook binding."""
+    if config is None:
+        with connect_db() as conn:
+            config = load_role_state_config(conn)
+    active_payload = get_active_stage_tags_from_db()
+    active_tag_set = {str(tag).strip() for tag in active_payload.get("active_stage_tags") or [] if str(tag).strip()}
+    roles: list[dict[str, Any]] = []
+    flat_tags: list[dict[str, Any]] = []
+    for role in config.get("roles") or []:
+        if not isinstance(role, dict) or role.get("enabled") is False:
+            continue
+        role_id = normalize_role_state_key(role.get("role_id"), "")
+        role_name = str(role.get("role_name") or role_id or "未命名角色").strip()
+        if not role_id:
+            continue
+        stage_rows: list[dict[str, Any]] = []
+        for stage in role.get("stages") or []:
+            if not isinstance(stage, dict) or stage.get("enabled") is False:
+                continue
+            stage_key = normalize_role_state_key(stage.get("stage_key"), "")
+            stage_name = str(stage.get("stage_name") or stage_key or "未命名阶段").strip()
+            if not stage_key:
+                continue
+            tag = stage_activation_tag(role_id, stage_key, stage.get("activation_tag"))
+            row = {
+                "role_id": role_id,
+                "role_name": role_name,
+                "stage_key": stage_key,
+                "stage_name": stage_name,
+                "activation_tag": tag,
+                "tag": tag,
+                "priority": role_state_int(stage.get("priority"), 0),
+                "is_active": tag in active_tag_set,
+            }
+            stage_rows.append(row)
+            flat_tags.append(row)
+        if stage_rows:
+            roles.append({"role_id": role_id, "role_name": role_name, "stages": stage_rows})
+    return {"roles": roles, "tags": flat_tags, **active_payload}
+
+
+def worldbook_store_path() -> Path:
+    return PROJECT_ROOT / "data" / "worldbook.json"
+
+
+def read_worldbook_store_for_stage_tags() -> dict[str, Any]:
+    path = worldbook_store_path()
+    if not path.exists():
+        return {"settings": {}, "entries": []}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"settings": {}, "entries": []}
+    if isinstance(data, dict) and ("settings" in data or "entries" in data):
+        entries = data.get("entries") if isinstance(data.get("entries"), list) else []
+        settings = data.get("settings") if isinstance(data.get("settings"), dict) else {}
+        return {"settings": settings, "entries": entries}
+    if isinstance(data, dict) and "items" in data:
+        return {"settings": data.get("settings") if isinstance(data.get("settings"), dict) else {}, "entries": data.get("items") if isinstance(data.get("items"), list) else []}
+    if isinstance(data, list):
+        return {"settings": {}, "entries": data}
+    return {"settings": {}, "entries": []}
+
+
+def write_worldbook_store_for_stage_tags(store: dict[str, Any]) -> None:
+    path = worldbook_store_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "settings": store.get("settings") if isinstance(store.get("settings"), dict) else {},
+        "entries": store.get("entries") if isinstance(store.get("entries"), list) else [],
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def find_stage_catalog_item(role_id: str, stage_key: str) -> dict[str, Any] | None:
+    safe_role = normalize_role_state_key(role_id, "")
+    safe_stage = normalize_role_state_key(stage_key, "")
+    if not safe_role or not safe_stage:
+        return None
+    catalog = role_state_stage_catalog()
+    for item in catalog.get("tags") or []:
+        if item.get("role_id") == safe_role and item.get("stage_key") == safe_stage:
+            return item
+    return None
+
+
+def default_stage_worldbook_content(item: dict[str, Any]) -> str:
+    role_name = str(item.get("role_name") or item.get("role_id") or "该角色").strip()
+    stage_name = str(item.get("stage_name") or item.get("stage_key") or "该阶段").strip()
+    return (
+        f"【心笺阶段｜{role_name} · {stage_name}】\n"
+        f"当「{role_name}」处于「{stage_name}」时，表示她/他与用户的关系或状态已经进入该阶段。\n"
+        "表现要求：在保持原有人设、世界观和当前剧情连续性的前提下，体现该阶段带来的语气、距离感、信任程度、主动性或戒备变化。\n"
+        "不要突然越过角色边界；如果当前剧情不适合明显表现，只需含蓄体现。"
+    )
+
+
+def build_stage_worldbook_entry(item: dict[str, Any]) -> dict[str, Any]:
+    role_id = normalize_role_state_key(item.get("role_id"), "role")
+    stage_key = normalize_role_state_key(item.get("stage_key"), "stage")
+    role_name = str(item.get("role_name") or role_id).strip()
+    stage_name = str(item.get("stage_name") or stage_key).strip()
+    tag = stage_activation_tag(role_id, stage_key, item.get("activation_tag") or item.get("tag"))
+    return {
+        "id": f"state-journal-stage-{role_id}-{stage_key}",
+        "title": f"{role_name} · {stage_name}表现",
+        "trigger": "",
+        "secondary_trigger": "",
+        "entry_type": "external_tag",
+        "group_operator": "and",
+        "match_mode": "any",
+        "secondary_mode": "all",
+        "content": default_stage_worldbook_content(item),
+        "group": "心笺阶段",
+        "chance": 100,
+        "sticky_turns": 0,
+        "cooldown_turns": 0,
+        "order": int(item.get("priority") or 50),
+        "priority": int(item.get("priority") or 50),
+        "insertion_position": "after_char_defs",
+        "injection_depth": 0,
+        "injection_role": "system",
+        "injection_order": int(item.get("priority") or 50),
+        "prompt_layer": "current_state",
+        "recursive_enabled": False,
+        "prevent_further_recursion": True,
+        "external_source": "state_journal",
+        "external_ref": {
+            "type": "stage",
+            "role_id": role_id,
+            "role_name": role_name,
+            "stage_key": stage_key,
+            "stage_name": stage_name,
+        },
+        "activation_tags": [tag] if tag else [],
+        "enabled": True,
+        "case_sensitive": False,
+        "whole_word": False,
+        "comment": "由心笺角色阶段一键创建；用于 active_stage_tags → 世界书 external_tag → prompt 注入链路。",
+    }
 
 
 def rollback_metric_effects(conn: sqlite3.Connection, turn_id: str, metrics: list[dict[str, Any]]) -> int:
@@ -2014,9 +3403,9 @@ def rollback_metric_effects(conn: sqlite3.Connection, turn_id: str, metrics: lis
         if old_state:
             conn.execute(
                 """
-                INSERT INTO xj_metric_states(character_name, metric_key, label, current_value, delta_value, max_value, raw_value, source_turn_id, updated_at)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(character_name, metric_key) DO UPDATE SET
+                INSERT INTO state_journal_metric_states(card_uid, character_name, metric_key, label, current_value, delta_value, max_value, raw_value, source_turn_id, updated_at)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(card_uid, character_name, metric_key) DO UPDATE SET
                     label=excluded.label,
                     current_value=excluded.current_value,
                     delta_value=excluded.delta_value,
@@ -2026,6 +3415,7 @@ def rollback_metric_effects(conn: sqlite3.Connection, turn_id: str, metrics: lis
                     updated_at=excluded.updated_at
                 """,
                 (
+                    current_card_uid(),
                     old_state.get("character_name") or name,
                     old_state.get("metric_key") or key,
                     old_state.get("label") or "",
@@ -2038,10 +3428,10 @@ def rollback_metric_effects(conn: sqlite3.Connection, turn_id: str, metrics: lis
                 ),
             )
         else:
-            conn.execute("DELETE FROM xj_metric_states WHERE character_name=? AND metric_key=?", (name, key))
+            conn.execute("DELETE FROM state_journal_metric_states WHERE card_uid=? AND character_name=? AND metric_key=?", (current_card_uid(), name, key))
         count += 1
 
-    conn.execute("DELETE FROM xj_metric_history WHERE turn_id=?", (safe_turn,))
+    conn.execute("DELETE FROM state_journal_metric_history WHERE card_uid=? AND turn_id=?", (current_card_uid(), safe_turn))
     sync_visible_metric_tables(conn)
     return count
 
@@ -2057,7 +3447,7 @@ def ensure_schema_extra_field(conn: sqlite3.Connection, table_id: str, field_def
     table_id = safe_id(table_id, "")
     if not table_id:
         return
-    row = conn.execute("SELECT * FROM xj_tables WHERE id=?", (table_id,)).fetchone()
+    row = conn.execute("SELECT * FROM state_journal_tables WHERE id=?", (table_id,)).fetchone()
     if not row:
         return
     schema = load_schema_from_row(conn, row)
@@ -2093,7 +3483,7 @@ def ensure_metric_history_schema(conn: sqlite3.Connection) -> None:
             "ignore": "用户无需手动维护。",
         },
     }
-    row = conn.execute("SELECT * FROM xj_tables WHERE id='metric_history'").fetchone()
+    row = conn.execute("SELECT * FROM state_journal_tables WHERE id='metric_history'").fetchone()
     if not row:
         save_schema_to_db(conn, schema)
     else:
@@ -2119,10 +3509,12 @@ def sync_metric_history_table(conn: sqlite3.Connection) -> None:
     history_rows = conn.execute(
         """
         SELECT id, turn_id, character_name, metric_key, label, old_value, delta_value, new_value, max_value, raw_value, created_at
-        FROM xj_metric_history
+        FROM state_journal_metric_history
+        WHERE card_uid=?
         ORDER BY id DESC
         LIMIT 300
-        """
+        """,
+        (current_card_uid(),),
     ).fetchall()
     for row in reversed(history_rows):
         record_id = f"{row['turn_id']}:{row['character_name']}:{row['metric_key']}:{row['id']}"
@@ -2148,9 +3540,11 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
     rows = conn.execute(
         """
         SELECT character_name, metric_key, label, current_value, delta_value, max_value, raw_value
-        FROM xj_metric_states
+        FROM state_journal_metric_states
+        WHERE card_uid=?
         ORDER BY character_name ASC, metric_key ASC
-        """
+        """,
+        (current_card_uid(),),
     ).fetchall()
     by_character: dict[str, list[sqlite3.Row]] = {}
     for row in rows:
@@ -2203,6 +3597,70 @@ def sync_visible_metric_tables(conn: sqlite3.Connection) -> None:
     sync_metric_summary_tables(conn)
 
 
+
+def normalize_metric_display_records(metrics: Any) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for item in metrics if isinstance(metrics, list) else []:
+        if not isinstance(item, dict):
+            continue
+        new_state = item.get("new_state") if isinstance(item.get("new_state"), dict) else {}
+        old_state = item.get("old_state") if isinstance(item.get("old_state"), dict) else {}
+        label = str(item.get("label") or new_state.get("label") or item.get("metric_label") or item.get("metric_key") or item.get("key") or "数值").strip()
+        key = safe_id(item.get("metric_key") or item.get("key") or new_state.get("metric_key") or label, "metric")
+        character_name = str(item.get("character_name") or new_state.get("character_name") or item.get("name") or "").strip()
+        role_id = safe_id(item.get("role_id") or new_state.get("role_id") or "", "")
+        value = new_state.get("current_value", item.get("current_value", item.get("value")))
+        delta = new_state.get("delta_value", item.get("delta_value", item.get("delta")))
+        max_value = new_state.get("max_value", item.get("max_value", item.get("max", 100)))
+        raw_value = str(new_state.get("raw_value") or item.get("raw_value") or "").strip()
+        try:
+            safe_value = int(round(float(value)))
+        except Exception:
+            safe_value = 0
+        try:
+            safe_delta = int(round(float(delta)))
+        except Exception:
+            safe_delta = 0
+        try:
+            safe_max = max(1, int(round(float(max_value))))
+        except Exception:
+            safe_max = 100
+        if not raw_value:
+            sign = f"+{safe_delta}" if safe_delta >= 0 else str(safe_delta)
+            raw_value = f"{safe_value}/{safe_max}（{sign}）"
+        records.append({
+            "character_name": character_name,
+            "role_id": role_id,
+            "key": key,
+            "label": label,
+            "value": safe_value,
+            "delta": safe_delta,
+            "max": safe_max,
+            "raw_value": raw_value,
+            "reason": clean_display_text(item.get("reason") or item.get("summary") or "", 160),
+        })
+    return records
+
+
+def attach_metrics_to_display(display: dict[str, Any], metrics: Any) -> dict[str, Any]:
+    if not isinstance(display, dict):
+        display = {}
+    metric_records = normalize_metric_display_records(metrics)
+    if not metric_records:
+        return display
+    display = dict(display)
+    display["metrics"] = metric_records
+    characters = display.get("characters") if isinstance(display.get("characters"), list) else []
+    for character in characters:
+        if not isinstance(character, dict):
+            continue
+        names = {str(character.get("name") or "").strip(), safe_id(character.get("role_id") or "", "")}
+        names = {item for item in names if item}
+        matched = [item for item in metric_records if (item.get("character_name") and item.get("character_name") in names) or (item.get("role_id") and item.get("role_id") in names)]
+        if matched:
+            character["metrics"] = matched
+    return display
+
 def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | None = None, tables: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Normalize the assistant-generated front-end display payload.
 
@@ -2210,7 +3668,7 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
     """
     display: Any = None
     if isinstance(payload, dict):
-        display = payload.get("display") or payload.get("mujian") or payload.get("turn_display")
+        display = payload.get("display") or payload.get("turnNote") or payload.get("turn_display")
     if not isinstance(display, dict):
         return build_fallback_display(latest_turn=latest_turn, tables=tables)
 
@@ -2241,9 +3699,14 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
         template_config = get_config()
     except Exception:
         template_config = DEFAULT_CONFIG
-    display_template = active_mujian_template(template_config)
+    display_template = active_turn_note_template(template_config)
     display_fields = display.get("template_fields") if isinstance(display.get("template_fields"), list) else display_template.get("fields", [])
     output_template = str(display.get("output_template") or display_template.get("output_template") or "")
+    try:
+        with connect_db() as role_conn:
+            role_state_config = load_role_state_config(role_conn)
+    except Exception:
+        role_state_config = {"version": 1, "enabled": True, "role_source_mode": "auto", "roles": []}
 
     normalized_characters: list[dict[str, Any]] = []
     for item in characters[:8]:
@@ -2252,8 +3715,10 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
         name = clean_display_text(item.get("name") or item.get("角色") or "", 40)
         if not name:
             continue
+        effective_fields = role_snapshot_fields_for_character(role_state_config, name) or display_fields
         normalized_item = {
             "name": name,
+            "snapshot_fields": effective_fields,
             "emotion": clean_display_text(item.get("emotion") or item.get("mood") or item.get("情绪") or "", 220),
             "clothing": clean_display_text(item.get("clothing") or item.get("衣着") or "", 260),
             "posture": clean_display_text(item.get("posture") or item.get("pose") or item.get("角色神态") or "", 260),
@@ -2266,7 +3731,10 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
             "interaction": clean_display_text(item.get("interaction") or item.get("角色互动") or "", 320),
             "summary": clean_display_text(item.get("summary") or item.get("状态摘要") or "", 320),
         }
-        for field in display_fields:
+        item_metrics = normalize_metric_display_records(item.get("metrics") or item.get("variables") or [])
+        if item_metrics:
+            normalized_item["metrics"] = item_metrics
+        for field in effective_fields:
             if not isinstance(field, dict):
                 continue
             key = safe_id(field.get("key"), "")
@@ -2294,13 +3762,14 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
         template_config = get_config()
     except Exception:
         template_config = DEFAULT_CONFIG
-    display_template = active_mujian_template(template_config)
+    display_template = active_turn_note_template(template_config)
     return {
         "title": title,
         "subtitle": subtitle,
         "scene": normalized_scene,
         "characters": normalized_characters,
         "relationships": normalized_relationships,
+        "metrics": normalize_metric_display_records(display.get("metrics") or display.get("metric_changes") or []),
         "style": clean_display_text(display.get("style") or display.get("note_style") or "classic", 40),
         "title_style": clean_display_text(display.get("title_style") or display.get("title_generation_style") or "classic", 40),
         "note_style": clean_display_text(display.get("note_style") or display.get("note_generation_style") or display.get("style") or display_template.get("note_style") or "classic", 40),
@@ -2346,7 +3815,7 @@ def build_fallback_display(*, latest_turn: dict[str, Any] | None = None, tables:
         template_config = get_config()
     except Exception:
         template_config = DEFAULT_CONFIG
-    display_template = active_mujian_template(template_config)
+    display_template = active_turn_note_template(template_config)
     return {
         "title": title,
         "subtitle": subtitle,
@@ -2366,13 +3835,13 @@ def build_fallback_display(*, latest_turn: dict[str, Any] | None = None, tables:
 
 def allocate_turn_sequence(conn: sqlite3.Connection, turn_id: str) -> int:
     safe_turn = normalize_turn_id(turn_id)
-    row = conn.execute("SELECT seq_no FROM xj_turn_records WHERE turn_id=?", (safe_turn,)).fetchone()
+    row = conn.execute("SELECT seq_no FROM state_journal_turn_records WHERE turn_id=?", (safe_turn,)).fetchone()
     if row and int(row["seq_no"] or 0) > 0:
         return int(row["seq_no"] or 0)
-    max_row = conn.execute("SELECT COALESCE(MAX(seq_no), 0) AS max_seq FROM xj_turn_records").fetchone()
+    max_row = conn.execute("SELECT COALESCE(MAX(seq_no), 0) AS max_seq FROM state_journal_turn_records").fetchone()
     next_seq = int(max_row["max_seq"] or 0) + 1
     if row:
-        conn.execute("UPDATE xj_turn_records SET seq_no=? WHERE turn_id=?", (next_seq, safe_turn))
+        conn.execute("UPDATE state_journal_turn_records SET seq_no=? WHERE turn_id=?", (next_seq, safe_turn))
     return max(1, next_seq)
 
 
@@ -2392,7 +3861,7 @@ def save_turn_display(display: dict[str, Any], *, turn_id: str | None = None, me
         init_meta_tables(conn)
         db_sequence = get_turn_sequence(conn, safe_turn_id)
         if not safe_turn_index:
-            row = conn.execute("SELECT turn_index FROM xj_turn_records WHERE turn_id=?", (safe_turn_id,)).fetchone()
+            row = conn.execute("SELECT turn_index FROM state_journal_turn_records WHERE turn_id=?", (safe_turn_id,)).fetchone()
             safe_turn_index = int(row["turn_index"] or 0) if row else 0
         sequence = safe_turn_index or db_sequence
         payload["sequence"] = sequence
@@ -2401,16 +3870,18 @@ def save_turn_display(display: dict[str, Any], *, turn_id: str | None = None, me
         payload["content_hash"] = safe_content_hash
         payload["turn_index"] = safe_turn_index
         payload["trigger_source"] = safe_trigger_source
+        safe_card_uid = current_card_uid()
         if safe_message_id:
-            conn.execute("DELETE FROM xj_turn_displays WHERE message_id=? OR turn_id=?", (safe_message_id, safe_turn_id))
+            conn.execute("DELETE FROM state_journal_turn_displays WHERE card_uid=? AND (message_id=? OR turn_id=?)", (safe_card_uid, safe_message_id, safe_turn_id))
         else:
-            conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (safe_turn_id,))
+            conn.execute("DELETE FROM state_journal_turn_displays WHERE card_uid=? AND turn_id=?", (safe_card_uid, safe_turn_id))
         conn.execute(
             """
-            INSERT INTO xj_turn_displays(turn_id, message_id, content_hash, turn_index, trigger_source, created_at, title, subtitle, scene_json, characters_json, relationships_json, raw_json)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO state_journal_turn_displays(card_uid, turn_id, message_id, content_hash, turn_index, trigger_source, created_at, title, subtitle, scene_json, characters_json, relationships_json, raw_json)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                safe_card_uid,
                 safe_turn_id,
                 safe_message_id,
                 safe_content_hash,
@@ -2427,7 +3898,7 @@ def save_turn_display(display: dict[str, Any], *, turn_id: str | None = None, me
         )
         conn.execute(
             """
-            INSERT INTO xj_scene_state(id, updated_at, title, subtitle, scene_json, raw_json)
+            INSERT INTO state_journal_scene_state(id, updated_at, title, subtitle, scene_json, raw_json)
             VALUES('current', ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 updated_at=excluded.updated_at,
@@ -2453,7 +3924,7 @@ def latest_turn_display() -> dict[str, Any]:
     ensure_runtime_data()
     with connect_db() as conn:
         init_meta_tables(conn)
-        row = conn.execute("SELECT raw_json FROM xj_turn_displays ORDER BY id DESC LIMIT 1").fetchone()
+        row = conn.execute("SELECT raw_json FROM state_journal_turn_displays WHERE card_uid=? ORDER BY id DESC LIMIT 1", (current_card_uid(),)).fetchone()
     if not row:
         return {}
     try:
@@ -2533,11 +4004,11 @@ def split_prompt_names(value: object) -> list[str]:
     return [item.strip() for item in re.split(r"[，,、;；\n]+", str(value or "")) if item.strip()]
 
 def build_protagonist_prompt_rule(config: dict[str, Any]) -> str:
-    if not config.get("mujian_protagonist_card_enabled"):
+    if not config.get("turn_note_protagonist_card_enabled"):
         return ""
-    name = str(config.get("mujian_protagonist_name") or "").strip()
-    aliases = split_prompt_names(config.get("mujian_protagonist_aliases"))
-    mode = str(config.get("mujian_protagonist_card_mode") or "when_relevant")
+    name = str(config.get("turn_note_protagonist_name") or "").strip()
+    aliases = split_prompt_names(config.get("turn_note_protagonist_aliases"))
+    mode = str(config.get("turn_note_protagonist_card_mode") or "when_relevant")
     name_line = f"主角名称：{name}。" if name else "主角名称未填写；如果无法稳定识别主角，不要凭空猜测具体姓名。"
     alias_line = f"主角别名：{'、'.join(aliases)}。" if aliases else "主角别名：无。"
     if mode == "always":
@@ -2547,11 +4018,11 @@ def build_protagonist_prompt_rule(config: dict[str, Any]) -> str:
     return "\n20. 当前设置启用主角状态卡。" + name_line + alias_line + mode_line + "主角状态卡只记录可观察状态、身体状态、衣着、姿态、位置、气息与互动关系；不得替用户决定未发生的行动、台词、心理活动和选择。"
 
 def build_worker_custom_prompt_rule(config: dict[str, Any]) -> str:
-    if not config.get("mujian_worker_custom_prompt_enabled"):
+    if not config.get("turn_note_worker_custom_prompt_enabled"):
         return ""
     parts: list[str] = []
-    style_prompt = str(config.get("mujian_worker_style_prompt") or "").strip()
-    protagonist_prompt = str(config.get("mujian_worker_protagonist_prompt") or "").strip()
+    style_prompt = str(config.get("turn_note_worker_style_prompt") or "").strip()
+    protagonist_prompt = str(config.get("turn_note_worker_protagonist_prompt") or "").strip()
     if style_prompt:
         parts.append("用户自定义幕笺语言风格补充：" + style_prompt)
     if protagonist_prompt:
@@ -2561,11 +4032,11 @@ def build_worker_custom_prompt_rule(config: dict[str, Any]) -> str:
     return "\n21. 以下是用户提供的安全附加提示词，只影响幕笺表达和主角状态卡取舍，不得覆盖 JSON 输出协议、updates 协议、SQLite 写入规则、字段 key 或禁止替用户行动的硬性规则：" + "\n".join(parts)
 
 def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, Any] | None, history: list[dict[str, str]], config: dict[str, Any], metric_states: dict[str, Any] | None = None) -> tuple[str, str]:
-    mujian_enabled = bool(config.get("mujian_enabled", True))
-    expand_level = str(config.get("mujian_expand_level") or "standard")
-    title_style = str(config.get("mujian_title_style") or "classic")
-    active_template = active_mujian_template(config)
-    note_style = str(active_template.get("note_style") or config.get("mujian_note_style") or config.get("mujian_style") or "classic")
+    turn_note_enabled = bool(config.get("turn_note_enabled", True))
+    expand_level = str(config.get("turn_note_expand_level") or "standard")
+    title_style = str(config.get("turn_note_title_style") or "classic")
+    active_template = active_turn_note_template(config)
+    note_style = str(active_template.get("note_style") or config.get("turn_note_card_style") or config.get("turn_note_style") or "classic")
     title_style_rule = TITLE_STYLE_RULES.get(title_style, TITLE_STYLE_RULES["classic"])
     note_style_rule = NOTE_STYLE_RULES.get(note_style, NOTE_STYLE_RULES["classic"])
     template_fields = active_template.get("fields") or []
@@ -2573,11 +4044,43 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
     character_schema = build_template_character_schema(template_fields)
     metric_field_keys = {"favor_level", "trust_level", "bond_level", "guard_level", "pulse_level", "tension_level", "fatigue_level", "injury_level", "intimacy_level", "stress_level"}
     has_metric_fields = any(str(item.get("key") or "") in metric_field_keys for item in template_fields if isinstance(item, dict))
+    try:
+        with connect_db() as role_conn:
+            role_state_config = load_role_state_config(role_conn)
+    except Exception:
+        role_state_config = {"version": 1, "enabled": True, "role_source_mode": "auto", "roles": []}
+    custom_roles = [role for role in role_state_config.get("roles", []) if isinstance(role, dict) and role.get("enabled") is not False and role_state_mode_uses_variables(role) and role.get("variables") and not role.get("use_default_variables")]
+    snapshot_roles = [role for role in role_state_config.get("roles", []) if isinstance(role, dict) and role.get("enabled") is not False and role_state_mode_uses_snapshot(role) and role.get("snapshotFields")]
+    role_display_schemas: list[dict[str, Any]] = []
+    for role in role_state_config.get("roles") or []:
+        if not isinstance(role, dict) or role.get("enabled") is False or role_state_mode(role) == "disabled":
+            continue
+        role_fields = [field for field in (role.get("snapshotFields") or []) if role_state_mode_uses_snapshot(role) and isinstance(field, dict) and field.get("enabled") is not False and field.get("display") is not False]
+        role_variables = [var for var in (role.get("variables") or []) if role_state_mode_uses_variables(role) and isinstance(var, dict) and var.get("enabled") is not False]
+        if not role_fields and not role_variables:
+            continue
+        role_schema = {"name": role.get("role_name") or role.get("role_id") or "角色名"}
+        for field in role_fields:
+            key = safe_id(field.get("key"), "")
+            if key:
+                role_schema[key] = f"{field.get('label') or key}。{field.get('instruction') or '根据本轮上下文生成该状态快照字段。'}"
+        if role_variables:
+            role_schema["metrics"] = [
+                {
+                    "key": var.get("var_key"),
+                    "label": var.get("var_name"),
+                    "delta": "本轮变化数字，例如 +2 或 -1；后端会裁剪。",
+                    "reason": var.get("instruction") or "本轮变量变化原因。",
+                }
+                for var in role_variables
+                if var.get("var_key")
+            ]
+        role_display_schemas.append({"role_id": role.get("role_id"), "role_name": role.get("role_name"), "character_schema": role_schema})
     system_prompt = """你是 Fantareal 的“心笺”结构化记录与幕笺展示助手。你的任务不是继续剧情，也不是扮演角色，而是根据聊天内容维护结构化表格，并生成正文之外给用户看的幕笺展示。\n\n硬性规则：\n1. 只输出一个合法 JSON 对象，不要输出 Markdown、解释、寒暄或代码块。\n2. JSON 根结构必须是 {\"updates\": [], \"display\": {}}。\n3. updates 用于写入事实表；没有明确事实变化时，updates 可以为空数组。\n4. display 是给用户看的幕笺展示，每轮都要生成，除非输入为空。\n5. 不要输出 SQL，心笺后端会把 JSON 更新安全写入 SQLite。\n6. 不要新增重大剧情事实，不要替用户行动，不要改变主模型正文已经确定的结果。\n7. 幕笺可以对情绪、衣着、姿态、感官、互动潜台词做合理扩写，但只能基于正文、上下文、角色状态与氛围自然延展。\n8. 事实表要保守，幕笺可以写意；不要把展示扩写当成长期事实强行写入 updates。\n9. updates 只能更新表结构中已经存在的字段，不得新增未知字段。\n10. operation 只能使用 upsert、update、delete。
 11. JSON 字符串内容中不要使用英文双引号；如需引用台词，请使用中文引号“……”或单引号，避免破坏 JSON。"""
     if config.get("strict_mode"):
         system_prompt += "\n12. 严格模式：updates 的字段类型、枚举范围、主键必须完全符合表结构。"
-    if not mujian_enabled:
+    if not turn_note_enabled:
         system_prompt += "\n13. 当前幕笺关闭：display 可返回空对象，但 updates 仍按事实变化处理。"
     else:
         system_prompt += f"\n13. 当前幕笺扩写强度：{expand_level}。保守=少量推断；standard=自然细化；rich=更丰富的氛围与感官，但仍不得新增重大事件。"
@@ -2591,6 +4094,10 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
             if has_metric_fields:
                 system_prompt += "\n19. 当前模板包含关系/状态数值字段：这类字段必须使用固定格式 `当前值/100（本轮变化）`，例如 `65/100（+2）`、`72/100（+0）`、`18/100（-1）`。当前值限制在 0-100；变化值只表示本轮变化，不要写成长句解释。"
                 system_prompt += "\n20. 如果 current_metrics 提供了该角色上一轮数值，必须以上一轮数值为基准，根据本轮剧情判断 delta，再输出新当前值；不要每回合机械 +1 或凭空重置。"
+            if custom_roles:
+                system_prompt += "\n21. 当前启用了角色专属变量：display.characters 中对应角色必须输出 metrics 数组。每项格式为 {key, label, delta, reason}；key 必须使用 role_state_config.variables[].var_key。后端只以 delta 更新变量并按 delta_min/delta_max 裁剪。"
+            if snapshot_roles:
+                system_prompt += "\n22. 当前启用了角色专属 snapshotFields：对应角色的 display.characters 必须优先按 snapshotFields 输出字段；不要再强制补全全局模板里的衣着、躯体温差、微生理反应等字段。snapshotFields 只用于幕笺展示，不参与阶段判断，不发给世界书。"
         system_prompt += build_protagonist_prompt_rule(config)
         system_prompt += build_worker_custom_prompt_rule(config)
 
@@ -2602,8 +4109,8 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
         "template_name": active_template.get("name"),
         "template_fields": template_fields,
         "output_template": active_template.get("output_template") or "",
-        "theme_id": active_mujian_theme_pack(config).get("id"),
-        "theme_name": active_mujian_theme_pack(config).get("name"),
+        "theme_id": active_turn_note_theme_pack(config).get("id"),
+        "theme_name": active_turn_note_theme_pack(config).get("name"),
         "title": "本轮小说式标题，短而有画面感；不要包含第几幕/第几章/第几笺等序号",
         "subtitle": "一句引语或副标题，用来给本轮定调",
         "scene": {
@@ -2615,6 +4122,7 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
             "characters": "在场人物，字符串即可"
         },
         "characters": [character_schema],
+        "role_specific_characters": role_display_schemas,
         "relationships": [
             {"pair": "角色A-角色B", "stage": "关系阶段", "change": "本轮关系变化，没有就少写或留空"}
         ]
@@ -2625,19 +4133,37 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
         "tables": tables,
         "latest_turn": latest_turn or {},
         "recent_history": history,
-        "mujian_display_required": mujian_enabled,
+        "turnNote_display_required": turn_note_enabled,
         "title_generation_style": title_style,
         "title_generation_rule": title_style_rule,
         "note_generation_style": note_style,
         "note_generation_rule": note_style_rule,
         "active_note_template": active_template,
         "current_metrics": metric_states or {},
+        "role_state_config": role_state_config,
+        "role_display_schemas": role_display_schemas,
+        "role_variable_rules": {
+            "key_rule": "变量 Key 使用 var_key；手动新增变量默认 var_1/var_2，不自动拼音。",
+            "delta_rule": "输出本轮变化 delta；后端以 delta 为准更新当前值，并按 delta_min/delta_max 裁剪。",
+            "missing_variable": "本轮没有明显变化的变量可不输出；不输出代表保持不变。",
+        },
+        "snapshot_field_rules": {
+            "scope": "snapshotFields 只用于心笺 worker 生成角色当前状态快照和幕笺展示。",
+            "not_for_stage": "snapshotFields 不参与变量判断、阶段判断或世界书触发。",
+            "not_for_main_prompt": "snapshotFields 不进入主聊天 prompt_builder。",
+        },
+        "role_state_mode_rules": {
+            "default": "该角色使用全局默认幕笺模板，不使用角色卡专属 snapshotFields / variables / stages。",
+            "snapshot_only": "只使用角色专属 snapshotFields，不更新变量，不判断阶段，不触发世界书 external_tag。",
+            "full": "使用 snapshotFields + variables + stages，更新变量、判断阶段并生成 active_stage_tags。",
+            "disabled": "该角色不参与心笺运行。",
+        },
         "protagonist_card": {
-            "enabled": bool(config.get("mujian_protagonist_card_enabled")),
-            "mode": config.get("mujian_protagonist_card_mode"),
-            "name": config.get("mujian_protagonist_name"),
-            "aliases": split_prompt_names(config.get("mujian_protagonist_aliases")),
-            "custom_rule_enabled": bool(config.get("mujian_worker_custom_prompt_enabled")),
+            "enabled": bool(config.get("turn_note_protagonist_card_enabled")),
+            "mode": config.get("turn_note_protagonist_card_mode"),
+            "name": config.get("turn_note_protagonist_name"),
+            "aliases": split_prompt_names(config.get("turn_note_protagonist_aliases")),
+            "custom_rule_enabled": bool(config.get("turn_note_worker_custom_prompt_enabled")),
         },
         "metric_rules": {
             "range": "0-100",
@@ -2802,12 +4328,12 @@ def save_worker_log(payload: dict[str, Any]) -> None:
     with connect_db() as conn:
         init_meta_tables(conn)
         conn.execute(
-            "INSERT INTO xj_update_logs(created_at, payload_json) VALUES(?, ?)",
+            "INSERT INTO state_journal_update_logs(created_at, payload_json) VALUES(?, ?)",
             (payload.get("created_at") or now_string(), json.dumps(payload, ensure_ascii=False)),
         )
         # Keep the SQLite log table bounded for long-running playthroughs.
         conn.execute(
-            "DELETE FROM xj_update_logs WHERE id NOT IN (SELECT id FROM xj_update_logs ORDER BY id DESC LIMIT 50)"
+            "DELETE FROM state_journal_update_logs WHERE id NOT IN (SELECT id FROM state_journal_update_logs ORDER BY id DESC LIMIT 50)"
         )
         conn.commit()
 
@@ -2818,7 +4344,7 @@ def latest_worker_log() -> dict[str, Any]:
         return json_log
     with connect_db() as conn:
         init_meta_tables(conn)
-        row = conn.execute("SELECT payload_json FROM xj_update_logs ORDER BY id DESC LIMIT 1").fetchone()
+        row = conn.execute("SELECT payload_json FROM state_journal_update_logs ORDER BY id DESC LIMIT 1").fetchone()
     if not row:
         return {}
     try:
@@ -2845,7 +4371,7 @@ async def api_get_config() -> dict[str, Any]:
 async def api_save_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
     config = save_config(payload.get("config", payload) if isinstance(payload, dict) else {})
-    return {"ok": True, "config": config}
+    return {"ok": True, "config": config, "card": current_card_summary()}
 
 
 @app.get("/api/main-config")
@@ -2862,6 +4388,216 @@ async def api_main_config() -> dict[str, Any]:
         "source": config.get("source", ""),
         "message": "已读取 Fantareal 路由转发 P1 / 本体模型配置。" if config.get("source") else "未找到本体模型配置文件。",
     }
+
+
+
+@app.get("/api/role-state/config")
+async def api_role_state_config() -> dict[str, Any]:
+    ensure_runtime_data()
+    with connect_db() as conn:
+        config = load_role_state_config(conn)
+        active = get_active_stage_tags_from_db()
+    return {"ok": True, "config": config, "card": current_card_summary(), **active}
+
+
+@app.post("/api/role-state/config")
+async def api_save_role_state_config(request: Request) -> dict[str, Any]:
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    config_payload = payload.get("config") if isinstance(payload.get("config"), dict) else payload
+    with connect_db() as conn:
+        config = save_role_state_config(conn, config_payload)
+        conn.commit()
+    return {"ok": True, "config": config}
+
+
+@app.post("/api/role-state/from-card")
+async def api_role_state_from_card() -> dict[str, Any]:
+    config = role_state_config_from_current_card()
+    with connect_db() as conn:
+        saved = save_role_state_config(conn, config)
+        conn.commit()
+    summary = config.get("role_source_summary") if isinstance(config.get("role_source_summary"), dict) else {}
+    return {"ok": True, "config": saved, "card": current_card_summary(), "role_source_summary": summary, "message": summary.get("message") or "已从当前角色卡读取配置。"}
+
+
+@app.post("/api/role-state/sync-to-card")
+async def api_role_state_sync_to_card(request: Request) -> dict[str, Any]:
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    config_payload = payload.get("config") if isinstance(payload.get("config"), dict) else None
+    with connect_db() as conn:
+        config = save_role_state_config(conn, config_payload) if config_payload else load_role_state_config(conn)
+        conn.commit()
+    ok = sync_role_state_config_to_current_card(config)
+    if not ok:
+        raise HTTPException(status_code=404, detail="未找到当前角色卡，无法同步 stateJournal。")
+    return {"ok": True, "config": config, "card": current_card_summary(), "message": "已同步角色配置至当前角色卡。"}
+
+
+@app.post("/api/role-state/init-current")
+async def api_role_state_init_current() -> dict[str, Any]:
+    ensure_runtime_data()
+    with connect_db() as conn:
+        init_meta_tables(conn)
+        config = load_role_state_config(conn)
+        now = now_string()
+        for role in config.get("roles") or []:
+            if not isinstance(role, dict) or role.get("enabled") is False or not role_state_mode_uses_variables(role):
+                continue
+            role_name = str(role.get("role_name") or role.get("role_id") or "").strip()
+            for variable in role.get("variables") or []:
+                if not isinstance(variable, dict) or variable.get("enabled") is False:
+                    continue
+                key = str(variable.get("var_key") or "").strip()
+                if not key:
+                    continue
+                value = float(variable.get("default_value") or 0)
+                max_value = float(variable.get("max_value") or 100)
+                label = str(variable.get("var_name") or key)
+                raw_value = format_metric_value(value, max_value, 0)
+                conn.execute(
+                    """
+                    INSERT INTO state_journal_metric_states(card_uid, character_name, metric_key, label, current_value, delta_value, max_value, raw_value, source_turn_id, updated_at)
+                    VALUES(?, ?, ?, ?, ?, 0, ?, ?, 'init_current', ?)
+                    ON CONFLICT(card_uid, character_name, metric_key) DO UPDATE SET
+                        label=excluded.label,
+                        current_value=excluded.current_value,
+                        delta_value=0,
+                        max_value=excluded.max_value,
+                        raw_value=excluded.raw_value,
+                        source_turn_id=excluded.source_turn_id,
+                        updated_at=excluded.updated_at
+                    """,
+                    (current_card_uid(), role_name, key, label, value, max_value, raw_value, now),
+                )
+        stage_rows = evaluate_stage_rules(conn, "init_current", {}, 0)
+        conn.commit()
+    return {"ok": True, "card": current_card_summary(), "stages": stage_rows, "message": "已按当前角色卡初始化变量与阶段。"}
+
+
+@app.get("/api/role-state/active-tags")
+async def api_role_state_active_tags() -> dict[str, Any]:
+    ensure_runtime_data()
+    return {"ok": True, "card": current_card_summary(), **get_active_stage_tags_from_db()}
+
+
+
+
+@app.get("/api/stage-tags/active")
+async def api_stage_tags_active() -> dict[str, Any]:
+    ensure_runtime_data()
+    return {"ok": True, "card": current_card_summary(), **get_active_stage_tags_from_db()}
+
+
+@app.get("/api/stage-tags/catalog")
+async def api_stage_tags_catalog() -> dict[str, Any]:
+    ensure_runtime_data()
+    with connect_db() as conn:
+        config = load_role_state_config(conn)
+    return {"ok": True, "card": current_card_summary(), **role_state_stage_catalog(config)}
+
+
+@app.post("/api/stage-tags/create-worldbook-entry")
+async def api_stage_tags_create_worldbook_entry(request: Request) -> dict[str, Any]:
+    ensure_runtime_data()
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    role_id = normalize_role_state_key(payload.get("role_id"), "")
+    stage_key = normalize_role_state_key(payload.get("stage_key"), "")
+    item = find_stage_catalog_item(role_id, stage_key)
+    if not item:
+        raise HTTPException(status_code=404, detail="未在当前心笺角色配置中找到该角色阶段。")
+    entry = build_stage_worldbook_entry(item)
+    tag = (entry.get("activation_tags") or [""])[0]
+    if not tag:
+        raise HTTPException(status_code=400, detail="该阶段缺少可用 activation_tag。")
+    store = read_worldbook_store_for_stage_tags()
+    entries = store.get("entries") if isinstance(store.get("entries"), list) else []
+    for existing in entries:
+        if not isinstance(existing, dict):
+            continue
+        existing_tags = {str(value or "").strip() for value in (existing.get("activation_tags") or []) if str(value or "").strip()}
+        if tag in existing_tags:
+            return {"ok": True, "created": False, "duplicate": True, "tag": tag, "entry": existing, "message": "该阶段已存在世界书条目。"}
+    entries.append(entry)
+    store["entries"] = entries
+    write_worldbook_store_for_stage_tags(store)
+    return {"ok": True, "created": True, "duplicate": False, "tag": tag, "entry": entry, "message": "已创建心笺阶段世界书条目。"}
+
+
+@app.post("/api/role-state/debug-advance-stage")
+async def api_role_state_debug_advance_stage(request: Request) -> dict[str, Any]:
+    ensure_runtime_data()
+    if not get_config().get("debug_enabled", True):
+        raise HTTPException(status_code=403, detail="调试模式关闭，不能直接推进阶段。")
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    target_role_id = normalize_role_state_key(payload.get("role_id") or payload.get("role"), "")
+    with connect_db() as conn:
+        init_meta_tables(conn)
+        config = load_role_state_config(conn)
+        role = None
+        for item in config.get("roles") or []:
+            if not isinstance(item, dict) or item.get("enabled") is False or not role_state_mode_uses_stages(item):
+                continue
+            if target_role_id and normalize_role_state_key(item.get("role_id"), "") == target_role_id:
+                role = item
+                break
+        if role is None:
+            for item in config.get("roles") or []:
+                if isinstance(item, dict) and item.get("enabled") is not False and role_state_mode_uses_stages(item):
+                    role = item
+                    break
+        if not role:
+            raise HTTPException(status_code=404, detail="没有可推进的角色配置。")
+        stages = [stage for stage in (role.get("stages") or []) if isinstance(stage, dict) and stage.get("enabled") is not False]
+        stages.sort(key=lambda item: role_state_int(item.get("priority"), 0))
+        if not stages:
+            raise HTTPException(status_code=400, detail="当前角色没有阶段规则。")
+        role_id = str(role.get("role_id") or "").strip()
+        role_name = str(role.get("role_name") or role_id).strip()
+        safe_card_uid = current_card_uid()
+        old = row_to_dict(conn.execute("SELECT * FROM state_journal_stage_states WHERE card_uid=? AND role_id=?", (safe_card_uid, role_id)).fetchone())
+        current_key = str(old.get("current_stage_key") or role.get("initial_stage") or stages[0].get("stage_key") or "") if old else str(role.get("initial_stage") or stages[0].get("stage_key") or "")
+        current_index = next((idx for idx, stage in enumerate(stages) if str(stage.get("stage_key") or "") == current_key), -1)
+        next_stage = stages[min(current_index + 1, len(stages) - 1)] if current_index >= 0 else stages[0]
+        next_key = str(next_stage.get("stage_key") or "").strip()
+        next_name = str(next_stage.get("stage_name") or next_key).strip() or next_key
+        previous_name = stage_label_by_key(role, current_key) if current_key else ""
+        active_tag = build_stage_active_tag(role_id, next_key)
+        now = now_string()
+        conn.execute(
+            """
+            INSERT INTO state_journal_stage_states(card_uid, role_id, role_name, current_stage_key, current_stage_name, previous_stage_key, previous_stage_name, stage_changed, active_tag, changed_at_turn, cooldown_until_turn, source_turn_id, updated_at)
+            VALUES(?, ?, ?, ?, ?, ?, ?, 1, ?, 0, 0, 'debug_advance_stage', ?)
+            ON CONFLICT(card_uid, role_id) DO UPDATE SET
+                role_name=excluded.role_name,
+                current_stage_key=excluded.current_stage_key,
+                current_stage_name=excluded.current_stage_name,
+                previous_stage_key=excluded.previous_stage_key,
+                previous_stage_name=excluded.previous_stage_name,
+                stage_changed=1,
+                active_tag=excluded.active_tag,
+                source_turn_id=excluded.source_turn_id,
+                updated_at=excluded.updated_at
+            """,
+            (safe_card_uid, role_id, role_name, next_key, next_name, current_key, previous_name, active_tag, now),
+        )
+        conn.execute(
+            """
+            INSERT INTO state_journal_stage_history(card_uid, turn_id, turn_index, role_id, role_name, from_stage_key, from_stage_name, to_stage_key, to_stage_name, trigger_values_json, reason, active_tag, created_at)
+            VALUES(?, 'debug_advance_stage', 0, ?, ?, ?, ?, ?, ?, '{}', '调试推进阶段', ?, ?)
+            """,
+            (safe_card_uid, role_id, role_name, current_key, previous_name, next_key, next_name, active_tag, now),
+        )
+        conn.commit()
+    active = get_active_stage_tags_from_db()
+    return {"ok": True, **active, "message": f"{role_name} 已推进到 {next_name}。"}
 
 
 @app.post("/api/models")
@@ -2981,7 +4717,7 @@ async def api_turn_invalidate(request: Request) -> dict[str, Any]:
         if turn_id:
             rollback_count = rollback_turn_effects(conn, turn_id, reason=reason)
             try:
-                deleted_displays = conn.execute("DELETE FROM xj_turn_displays WHERE turn_id=?", (turn_id,)).rowcount or 0
+                deleted_displays = conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (turn_id,)).rowcount or 0
             except Exception:
                 deleted_displays = 0
         stale = mark_turns_stale(conn, turn_id or None, reason=reason)
@@ -2995,7 +4731,7 @@ async def api_recent_turns(limit: int = 30) -> dict[str, Any]:
     ensure_runtime_data()
     with connect_db() as conn:
         init_meta_tables(conn)
-        rows = conn.execute("SELECT * FROM xj_turn_records ORDER BY created_at DESC LIMIT ?", (safe_limit,)).fetchall()
+        rows = conn.execute("SELECT * FROM state_journal_turn_records ORDER BY created_at DESC LIMIT ?", (safe_limit,)).fetchall()
     turns = []
     for row in rows:
         turns.append({key: row[key] for key in row.keys()})
@@ -3116,8 +4852,8 @@ def recent_turn_displays(limit: int = 20) -> list[dict[str, Any]]:
     with connect_db() as conn:
         init_meta_tables(conn)
         rows = conn.execute(
-            "SELECT turn_id, message_id, content_hash, turn_index, trigger_source, created_at, raw_json FROM xj_turn_displays ORDER BY id DESC LIMIT ?",
-            (safe_limit,),
+            "SELECT turn_id, message_id, content_hash, turn_index, trigger_source, created_at, raw_json FROM state_journal_turn_displays WHERE card_uid=? ORDER BY id DESC LIMIT ?",
+            (current_card_uid(), safe_limit),
         ).fetchall()
     items: list[dict[str, Any]] = []
     for row in reversed(rows):
@@ -3187,30 +4923,30 @@ async def api_export_debug_log(limit: int = 80) -> JSONResponse:
         init_meta_tables(conn)
         config = get_config()
         safe_config = {**config, "api_key": redact_secret(config.get("api_key"))}
-        turn_records = [{key: row[key] for key in row.keys()} for row in conn.execute("SELECT * FROM xj_turn_records ORDER BY created_at DESC LIMIT ?", (safe_limit,)).fetchall()]
+        turn_records = [{key: row[key] for key in row.keys()} for row in conn.execute("SELECT * FROM state_journal_turn_records ORDER BY created_at DESC LIMIT ?", (safe_limit,)).fetchall()]
         turn_effects = [
             {"turn_id": row["turn_id"], "created_at": row["created_at"], "effects": load_json_row(row["effects_json"], {})}
-            for row in conn.execute("SELECT * FROM xj_turn_effects ORDER BY created_at DESC LIMIT ?", (safe_limit,)).fetchall()
+            for row in conn.execute("SELECT * FROM state_journal_turn_effects ORDER BY created_at DESC LIMIT ?", (safe_limit,)).fetchall()
         ]
         turn_displays = [
             {"turn_id": row["turn_id"], "message_id": row["message_id"], "content_hash": row["content_hash"], "turn_index": row["turn_index"], "trigger_source": row["trigger_source"], "created_at": row["created_at"], "display": load_json_row(row["raw_json"], {})}
-            for row in conn.execute("SELECT turn_id, message_id, content_hash, turn_index, trigger_source, created_at, raw_json FROM xj_turn_displays ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
+            for row in conn.execute("SELECT turn_id, message_id, content_hash, turn_index, trigger_source, created_at, raw_json FROM state_journal_turn_displays ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
         ]
         hook_events = [
             {"id": row["id"], "created_at": row["created_at"], "event": row["event"], "page": row["page"], "turn_id": row["turn_id"], "payload": load_json_row(row["payload_json"], {})}
-            for row in conn.execute("SELECT * FROM xj_hook_events ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
+            for row in conn.execute("SELECT * FROM state_journal_hook_events ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
         ]
         update_logs = [
             {"id": row["id"], "created_at": row["created_at"], "payload": load_json_row(row["payload_json"], {})}
-            for row in conn.execute("SELECT * FROM xj_update_logs ORDER BY id DESC LIMIT ?", (min(30, safe_limit),)).fetchall()
+            for row in conn.execute("SELECT * FROM state_journal_update_logs ORDER BY id DESC LIMIT ?", (min(30, safe_limit),)).fetchall()
         ]
         metric_states = [
             {key: row[key] for key in row.keys()}
-            for row in conn.execute("SELECT * FROM xj_metric_states ORDER BY character_name ASC, metric_key ASC").fetchall()
+            for row in conn.execute("SELECT * FROM state_journal_metric_states ORDER BY character_name ASC, metric_key ASC").fetchall()
         ]
         metric_history = [
             {key: row[key] for key in row.keys()}
-            for row in conn.execute("SELECT * FROM xj_metric_history ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
+            for row in conn.execute("SELECT * FROM state_journal_metric_history ORDER BY id DESC LIMIT ?", (safe_limit,)).fetchall()
         ]
     payload = {
         "version": VERSION,
@@ -3278,6 +5014,18 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     safe_turn_index = int(turn_index or 0) if str(turn_index or "").strip() else 0
     user_text = str((latest_turn or {}).get("user") or (latest_turn or {}).get("userText") or "")
     assistant_text = str((latest_turn or {}).get("assistant") or (latest_turn or {}).get("assistantText") or "")
+    if not payload.get("dry_run", False) and assistant_text.strip():
+        save_worker_turn_state(
+            turn_id=turn_id,
+            user_text=user_text,
+            assistant_text=assistant_text,
+            status="assistant_ready",
+            state_journal_status="running",
+            message_id=message_id,
+            turn_index=safe_turn_index,
+            trigger_source=trigger_source,
+            stale_reason="worker_running",
+        )
     if trigger_source in {"chat_hook", "dom_fallback"} and not assistant_text.strip():
         result = {"applied": [], "errors": ["心笺未检测到可绑定的 assistant 正文，本轮未生成幕笺。"], "touched_tables": []}
         log_payload = {
@@ -3294,6 +5042,18 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             "result": result,
             "error_type": "empty_context",
         }
+        if not payload.get("dry_run", False):
+            save_worker_turn_state(
+                turn_id=turn_id,
+                user_text=user_text,
+                assistant_text=assistant_text,
+                status="completed",
+                state_journal_status="error",
+                message_id=message_id,
+                turn_index=safe_turn_index,
+                trigger_source=trigger_source,
+                stale_reason="empty_context",
+            )
         if config.get("debug_enabled", True):
             save_worker_log(log_payload)
         return {"ok": False, "status": "error", "error_type": "empty_context", "message": result["errors"][0], "summary": build_update_summary(result, tables), "updates": [], "turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "display": {}, "result": result, "raw_output": ""}
@@ -3318,6 +5078,18 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             "error_type": exc.error_type,
             "error_detail": exc.detail,
         }
+        if not payload.get("dry_run", False):
+            save_worker_turn_state(
+                turn_id=turn_id,
+                user_text=user_text,
+                assistant_text=assistant_text,
+                status="completed",
+                state_journal_status="error",
+                message_id=message_id,
+                turn_index=safe_turn_index,
+                trigger_source=trigger_source,
+                stale_reason=exc.error_type or "worker_error",
+            )
         if config.get("debug_enabled", True):
             save_worker_log(log_payload)
         summary = build_update_summary(result, tables)
@@ -3346,7 +5118,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     try:
         parsed = extract_json_from_text(raw_output)
         updates = normalize_updates(parsed)
-        if config.get("mujian_enabled", True):
+        if config.get("turn_note_enabled", True):
             display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
     except Exception as exc:
         parse_error = str(exc)
@@ -3354,7 +5126,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             repair_output = await repair_worker_json(config=config, raw_output=raw_output, parse_error=parse_error)
             parsed = extract_json_from_text(repair_output)
             updates = normalize_updates(parsed)
-            if config.get("mujian_enabled", True):
+            if config.get("turn_note_enabled", True):
                 display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
             repair_used = True
             parse_error = ""
@@ -3365,6 +5137,18 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         worker_error_type = "invalid_json"
         detail = parse_error + (f"；JSON 修复失败：{repair_error}" if repair_error else "")
         result = {"applied": [], "errors": [f"心笺解析失败：模型返回内容不是合法 JSON。本轮没有写入新数据。详情：{detail}"], "touched_tables": []}
+        if not payload.get("dry_run", False):
+            save_worker_turn_state(
+                turn_id=turn_id,
+                user_text=user_text,
+                assistant_text=assistant_text,
+                status="completed",
+                state_journal_status="error",
+                message_id=message_id,
+                turn_index=safe_turn_index,
+                trigger_source=trigger_source,
+                stale_reason="invalid_json",
+            )
     else:
         if not payload.get("dry_run", False):
             with connect_db() as conn:
@@ -3373,13 +5157,19 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                 save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="assistant_ready", state_journal_status="running", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
         result = apply_updates(updates, dry_run=bool(payload.get("dry_run", False)))
-        if config.get("mujian_enabled", True) and not payload.get("dry_run", False):
+        if config.get("turn_note_enabled", True) and not payload.get("dry_run", False):
             with connect_db() as conn:
                 init_meta_tables(conn)
-                metric_applied = apply_display_metrics(conn, turn_id, display_payload)
+                metric_applied = []
+                metric_applied.extend(apply_display_metrics(conn, turn_id, display_payload))
+                metric_applied.extend(apply_update_metric_summaries(conn, turn_id, updates))
                 if metric_applied:
                     result["metrics"] = metric_applied
                     result["metric_count"] = len(metric_applied)
+                stage_applied = evaluate_stage_rules(conn, turn_id, display_payload, safe_turn_index)
+                if stage_applied:
+                    result["stages"] = stage_applied
+                    result["stage_count"] = len(stage_applied)
                 save_turn_effects(conn, turn_id, result)
                 save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
@@ -3389,7 +5179,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                 save_turn_effects(conn, turn_id, result)
                 save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
-        if config.get("mujian_enabled", True) and not payload.get("dry_run", False):
+        if config.get("turn_note_enabled", True) and not payload.get("dry_run", False):
             try:
                 # Refresh snapshots after fact updates so fallback display can read fresh state.
                 with connect_db() as conn:
@@ -3397,9 +5187,22 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                     refreshed_tables = build_table_snapshot(conn, table_ids)
                 if not display_payload:
                     display_payload = build_fallback_display(latest_turn=latest_turn, tables=refreshed_tables)
+                if result.get("metrics"):
+                    display_payload = attach_metrics_to_display(display_payload, result.get("metrics"))
                 display_payload = save_turn_display(display_payload, turn_id=turn_id, message_id=message_id, content_hash=payload.get("assistant_hash") or payload.get("content_hash") or payload.get("contentHash") or hash_text(assistant_text), turn_index=safe_turn_index, trigger_source=trigger_source)
             except Exception as exc:
                 result.setdefault("errors", []).append(f"幕笺保存失败：{exc}")
+                save_worker_turn_state(
+                    turn_id=turn_id,
+                    user_text=user_text,
+                    assistant_text=assistant_text,
+                    status="completed",
+                    state_journal_status="error",
+                    message_id=message_id,
+                    turn_index=safe_turn_index,
+                    trigger_source=trigger_source,
+                    stale_reason="display_save_error",
+                )
     log_payload = {
         "created_at": now_string(),
         "storage_engine": "sqlite",
@@ -3435,7 +5238,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         "turn_index": safe_turn_index,
         "trigger_source": trigger_source,
         "repair_used": repair_used,
-        "display": display_payload if config.get("mujian_enabled", True) and ok else {},
+        "display": display_payload if config.get("turn_note_enabled", True) and ok else {},
         "result": result,
         "raw_output": raw_output if config.get("debug_enabled") else "",
     }

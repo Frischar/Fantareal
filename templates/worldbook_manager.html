@@ -185,6 +185,38 @@
         line-height: 1.65;
       }
 
+
+      .worldbook-manager-page .wb-stage-select-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .worldbook-manager-page .wb-external-status-chip {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        min-height: 30px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(125, 211, 252, 0.28);
+        background: rgba(125, 211, 252, 0.12);
+        color: var(--accent, #7dd3fc);
+        font-size: 0.82rem;
+      }
+
+      .worldbook-manager-page .wb-external-status-chip.is-active {
+        border-color: rgba(74, 222, 128, 0.35);
+        background: rgba(74, 222, 128, 0.12);
+        color: #86efac;
+      }
+
+      .worldbook-manager-page .wb-external-status-chip.is-missing {
+        border-color: rgba(251, 191, 36, 0.35);
+        background: rgba(251, 191, 36, 0.1);
+        color: #facc15;
+      }
+
       @media (max-width: 1180px) {
         .worldbook-manager-page .worldbook-selection-panel {
           right: 12px;
@@ -346,6 +378,27 @@
                   <input class="wb-secondary-trigger" value="{{ item.secondary_trigger }}" placeholder="可留空；例如：婚后, 成亲" />
                 </div>
               </div>
+              <div class="wb-external-tag-panel" hidden>
+                <div class="grid-two wb-wide-grid">
+                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if item.external_source == 'state_journal' %}selected{% endif %}>心笺 · 角色阶段</option></select></div>
+                  <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+                </div>
+                <div class="wb-stage-select-row">
+                  <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
+                  <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
+                </div>
+                <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
+                  <div class="grid-two wb-wide-grid">
+                    <div><label>角色名</label><input class="wb-external-role-name" value="{{ (item.external_ref or {}).get('role_name', '') }}" placeholder="例如：苏怜烟" /></div>
+                    <div><label>角色 ID</label><input class="wb-external-role-id" value="{{ (item.external_ref or {}).get('role_id', '') }}" placeholder="su_lianyan" /></div>
+                  </div>
+                  <div class="grid-two wb-wide-grid">
+                    <div><label>阶段名</label><input class="wb-external-stage-name" value="{{ (item.external_ref or {}).get('stage_name', '') }}" placeholder="例如：情愫初生" /></div>
+                    <div><label>阶段 Key</label><input class="wb-external-stage-key" value="{{ (item.external_ref or {}).get('stage_key', '') }}" placeholder="qingsu_chusheng" /></div>
+                  </div>
+                </details>
+                <p class="muted wb-external-preview">选择外部标签触发后，本词条会在对应 active_tag 生效时注入。</p>
+              </div>
 
               <div class="grid-two wb-compact-grid wb-trigger-rule-grid" data-section-title="触发规则">
                 <div>
@@ -353,6 +406,7 @@
                   <select class="wb-entry-type">
                     <option value="keyword" {% if (item.entry_type or 'keyword') == 'keyword' %}selected{% endif %}>关键词触发</option>
                     <option value="constant" {% if item.entry_type == 'constant' %}selected{% endif %}>常驻</option>
+                    <option value="external_tag" {% if item.entry_type == 'external_tag' %}selected{% endif %}>外部标签触发</option>
                   </select>
                 </div>
                 <div>
@@ -650,6 +704,27 @@
               <input class="wb-secondary-trigger" placeholder="可留空；例如：婚后, 成亲" />
             </div>
           </div>
+          <div class="wb-external-tag-panel" hidden>
+            <div class="grid-two wb-wide-grid">
+              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">心笺 · 角色阶段</option></select></div>
+              <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+            </div>
+            <div class="wb-stage-select-row">
+              <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
+              <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
+            </div>
+            <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
+              <div class="grid-two wb-wide-grid">
+                <div><label>角色名</label><input class="wb-external-role-name" placeholder="例如：苏怜烟" /></div>
+                <div><label>角色 ID</label><input class="wb-external-role-id" placeholder="su_lianyan" /></div>
+              </div>
+              <div class="grid-two wb-wide-grid">
+                <div><label>阶段名</label><input class="wb-external-stage-name" placeholder="例如：情愫初生" /></div>
+                <div><label>阶段 Key</label><input class="wb-external-stage-key" placeholder="qingsu_chusheng" /></div>
+              </div>
+            </details>
+            <p class="muted wb-external-preview">选择外部标签触发后，本词条会在对应 active_tag 生效时注入。</p>
+          </div>
 
           <div class="grid-two wb-compact-grid wb-trigger-rule-grid" data-section-title="触发规则">
             <div>
@@ -657,6 +732,7 @@
               <select class="wb-entry-type">
                 <option value="keyword" selected>关键词触发</option>
                 <option value="constant">常驻</option>
+                <option value="external_tag">外部标签触发</option>
               </select>
             </div>
             <div>
@@ -875,6 +951,97 @@
         setStatus(message);
       }
 
+
+
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      let stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [] };
+
+      function optionHtml(value, label, selected = false) {
+        return `<option value="${escapeHtml(value)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+      }
+
+      function findStageCatalogRole(roleId) {
+        const safeRole = String(roleId || "").trim();
+        return (stateJournalStageCatalog.roles || []).find((role) => String(role.role_id || "") === safeRole) || null;
+      }
+
+      function findStageCatalogItem(roleId, stageKey) {
+        const role = findStageCatalogRole(roleId);
+        if (!role) return null;
+        return (role.stages || []).find((stage) => String(stage.stage_key || "") === String(stageKey || "")) || null;
+      }
+
+      async function loadStateJournalStageCatalog() {
+        try {
+          const response = await fetch("/mods/state-journal/app/api/stage-tags/catalog");
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          stateJournalStageCatalog = {
+            roles: Array.isArray(payload.roles) ? payload.roles : [],
+            tags: Array.isArray(payload.tags) ? payload.tags : [],
+            active_stage_tags: Array.isArray(payload.active_stage_tags) ? payload.active_stage_tags : [],
+          };
+        } catch (error) {
+          stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [] };
+        }
+      }
+
+      function applyExternalStageSelection(card, roleId, stageKey) {
+        const role = findStageCatalogRole(roleId);
+        const stage = findStageCatalogItem(roleId, stageKey);
+        if (role && card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = role.role_name || role.role_id || "";
+        if (role && card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = role.role_id || "";
+        if (stage && card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = stage.stage_name || stage.stage_key || "";
+        if (stage && card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = stage.stage_key || "";
+        updateExternalTagPreview(card);
+        updateCardTitle(card);
+        applyWorldbookSearch();
+      }
+
+      function populateExternalStageSelectors(card) {
+        const roleSelect = card.querySelector(".wb-external-role-select");
+        const stageSelect = card.querySelector(".wb-external-stage-select");
+        if (!roleSelect || !stageSelect) return;
+        const currentRoleId = card.querySelector(".wb-external-role-id")?.value.trim() || "";
+        const currentStageKey = card.querySelector(".wb-external-stage-key")?.value.trim() || "";
+        const roles = stateJournalStageCatalog.roles || [];
+        roleSelect.innerHTML = roles.length
+          ? optionHtml("", "请选择心笺角色", !currentRoleId) + roles.map((role) => optionHtml(role.role_id || "", role.role_name || role.role_id || "未命名角色", String(role.role_id || "") === currentRoleId)).join("")
+          : optionHtml("", "未读取到心笺阶段", true);
+        const selectedRole = findStageCatalogRole(currentRoleId) || null;
+        const stages = selectedRole?.stages || [];
+        stageSelect.innerHTML = stages.length
+          ? optionHtml("", "请选择阶段", !currentStageKey) + stages.map((stage) => optionHtml(stage.stage_key || "", stage.stage_name || stage.stage_key || "未命名阶段", String(stage.stage_key || "") === currentStageKey)).join("")
+          : optionHtml("", selectedRole ? "该角色暂无阶段" : "请先选择角色", true);
+        roleSelect.onchange = () => {
+          const role = findStageCatalogRole(roleSelect.value);
+          const firstStage = role?.stages?.[0] || null;
+          if (card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = role?.role_id || "";
+          if (card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = firstStage?.stage_key || "";
+          if (role && card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = role.role_name || role.role_id || "";
+          if (firstStage && card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = firstStage.stage_name || firstStage.stage_key || "";
+          populateExternalStageSelectors(card);
+          updateExternalTagPreview(card);
+          updateCardTitle(card);
+          applyWorldbookSearch();
+          markWorldbookDirty("已选择心笺角色阶段，记得保存世界书。");
+        };
+        stageSelect.onchange = () => {
+          applyExternalStageSelection(card, roleSelect.value, stageSelect.value);
+          markWorldbookDirty("已选择心笺阶段，记得保存世界书。");
+        };
+        updateExternalTagPreview(card);
+      }
+
       function applyTheme(theme) {
         rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
       }
@@ -950,7 +1117,9 @@
       }
 
       function getEntryTypeLabel(value) {
-        return value === "constant" ? "常驻" : "关键词";
+        if (value === "constant") return "常驻";
+        if (value === "external_tag") return "外部标签";
+        return "关键词";
       }
 
       function getInsertionPositionLabel(value) {
@@ -1102,6 +1271,10 @@
           card.querySelector(".wb-trigger")?.value || "",
           card.querySelector(".wb-secondary-trigger")?.value || "",
           card.querySelector(".wb-entry-type")?.value || "",
+          card.querySelector(".wb-external-role-name")?.value || "",
+          card.querySelector(".wb-external-stage-name")?.value || "",
+          card.querySelector(".wb-external-role-id")?.value || "",
+          card.querySelector(".wb-external-stage-key")?.value || "",
           card.querySelector(".wb-prompt-layer")?.value || "",
           getPromptLayerLabel(card.querySelector(".wb-prompt-layer")?.value || "follow_position"),
           card.querySelector(".wb-insertion-position")?.value || "",
@@ -1486,6 +1659,46 @@
         }
       }
 
+
+      function buildExternalTag(roleId, stageKey) {
+        const safeRole = String(roleId || "").trim();
+        const safeStage = String(stageKey || "").trim();
+        return safeRole && safeStage ? `state_journal.stage.${safeRole}.${safeStage}` : "";
+      }
+
+      function updateExternalTagPreview(card) {
+        const type = card.querySelector(".wb-entry-type")?.value || "keyword";
+        const keywordGrid = card.querySelector(".wb-keyword-grid");
+        const externalPanel = card.querySelector(".wb-external-tag-panel");
+        if (keywordGrid) keywordGrid.hidden = type === "external_tag";
+        if (externalPanel) externalPanel.hidden = type !== "external_tag";
+        const roleName = card.querySelector(".wb-external-role-name")?.value.trim() || "未选择角色";
+        const roleId = card.querySelector(".wb-external-role-id")?.value.trim();
+        const stageName = card.querySelector(".wb-external-stage-name")?.value.trim() || "未选择阶段";
+        const stageKey = card.querySelector(".wb-external-stage-key")?.value.trim();
+        const tag = buildExternalTag(roleId, stageKey);
+        const preview = card.querySelector(".wb-external-preview");
+        const status = card.querySelector(".wb-external-status");
+        const activeTags = new Set((stateJournalStageCatalog.active_stage_tags || []).map((item) => String(item || "").trim()).filter(Boolean));
+        const inCatalog = Boolean(findStageCatalogItem(roleId, stageKey));
+        if (preview) preview.textContent = tag ? `当「${roleName}」处于「${stageName}」阶段时触发。高级标签：${tag}` : "请选择心笺角色与阶段；机器标签会自动生成。";
+        if (status) {
+          status.classList.remove("is-active", "is-missing");
+          if (!tag) {
+            status.textContent = "未绑定阶段";
+            status.classList.add("is-missing");
+          } else if (activeTags.has(tag)) {
+            status.textContent = "当前命中";
+            status.classList.add("is-active");
+          } else if (!inCatalog && (stateJournalStageCatalog.roles || []).length) {
+            status.textContent = "当前卡未找到该阶段";
+            status.classList.add("is-missing");
+          } else {
+            status.textContent = "等待阶段";
+          }
+        }
+      }
+
       function createEntryCard(item = {}, options = {}) {
         const fragment = templateEl.content.cloneNode(true);
         const card = fragment.querySelector(".worldbook-entry-card");
@@ -1497,6 +1710,16 @@
         card.querySelector(".wb-content").value = item.content || "";
         card.querySelector(".wb-comment").value = item.comment || "";
         card.querySelector(".wb-entry-type").value = item.entry_type || "keyword";
+        const externalRef = item.external_ref || {};
+        if (card.querySelector(".wb-external-source")) card.querySelector(".wb-external-source").value = item.external_source || "state_journal";
+        if (card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = externalRef.role_name || "";
+        if (card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = externalRef.role_id || "";
+        if (card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = externalRef.stage_name || "";
+        if (card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = externalRef.stage_key || "";
+        card.querySelector(".wb-entry-type")?.addEventListener("change", () => { updateExternalTagPreview(card); updateCardTitle(card); });
+        card.querySelectorAll(".wb-external-tag-panel input, .wb-external-tag-panel select").forEach((input) => input.addEventListener("input", () => updateExternalTagPreview(card)));
+        populateExternalStageSelectors(card);
+        updateExternalTagPreview(card);
         card.querySelector(".wb-prompt-layer").value = item.prompt_layer || "follow_position";
         card.querySelector(".wb-group-operator").value = item.group_operator || "and";
         card.querySelector(".wb-match-mode").value = item.match_mode || "any";
@@ -1546,6 +1769,15 @@
             injection_order: Number(card.querySelector(".wb-injection-order").value || order),
             recursive_enabled: card.querySelector(".wb-recursive-enabled").checked,
             prevent_further_recursion: card.querySelector(".wb-prevent-further-recursion").checked,
+            external_source: card.querySelector(".wb-external-source")?.value || "",
+            external_ref: {
+              type: "stage",
+              role_id: card.querySelector(".wb-external-role-id")?.value.trim() || "",
+              role_name: card.querySelector(".wb-external-role-name")?.value.trim() || "",
+              stage_key: card.querySelector(".wb-external-stage-key")?.value.trim() || "",
+              stage_name: card.querySelector(".wb-external-stage-name")?.value.trim() || "",
+            },
+            activation_tags: [buildExternalTag(card.querySelector(".wb-external-role-id")?.value.trim(), card.querySelector(".wb-external-stage-key")?.value.trim())].filter(Boolean),
             content: card.querySelector(".wb-content").value.trim(),
             comment: card.querySelector(".wb-comment").value.trim(),
             enabled: card.querySelector(".wb-enabled").checked,
@@ -1580,6 +1812,7 @@
       }
 
       async function reloadEntries() {
+        await loadStateJournalStageCatalog();
         const data = await fetch("/api/worldbook/entries").then((response) => response.json());
         worldbookListEl.innerHTML = "";
         for (const item of data.items || []) {
@@ -1807,6 +2040,11 @@
       worldbookListEl.addEventListener("change", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
+        if (event.target.classList.contains("wb-entry-type") || event.target.closest(".wb-external-tag-panel")) {
+          updateExternalTagPreview(card);
+          updateCardTitle(card);
+          applyWorldbookSearch();
+        }
         if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
           syncInjectionUi(card);
           updateCardTitle(card);
@@ -1814,9 +2052,18 @@
         }
       });
 
+      loadStateJournalStageCatalog().then(() => {
+        document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
+          populateExternalStageSelectors(card);
+          updateExternalTagPreview(card);
+        });
+      });
+
       document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
         attachRemoveHandler(card);
         syncInjectionUi(card);
+        populateExternalStageSelectors(card);
+        updateExternalTagPreview(card);
         updateCardTitle(card);
         setEntryCollapsed(card, true);
       });

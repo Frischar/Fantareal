@@ -1,9 +1,10 @@
 {
   "label": "心笺",
-  "description": "AI 结构化状态记录与幕笺展示工具。v1.0.0 正式稳定版。",
+  "description": "AI 结构化状态记录与幕笺展示工具。v2.0.0 稳定整合角色配置、世界书阶段标签、外观包系统与幕笺 worker 状态兜底。",
   "hooks": {
     "chat_scripts": [
-      "/static/state-journal-chat.js?v=state-journal-ui-sync-toggle-v1"
+      "/static/state-journal-chat.js?v=state-journal-v200-state-journal-stable"
     ]
-  }
+  },
+  "version": "2.0.0-state-journal-stable"
 }

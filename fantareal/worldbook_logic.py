@@ -11,7 +11,7 @@ DEFAULT_WORLDBOOK_SETTINGS = {
     "default_whole_word": False,
     "default_match_mode": "any",
     "default_secondary_mode": "all",
-    "default_entry_type": "keyword",         # keyword / constant
+    "default_entry_type": "keyword",         # keyword / constant / external_tag
     "default_group_operator": "and",         # and / or
     "default_chance": 100,                   # 0 ~ 100
     "default_sticky_turns": 0,               # >= 0
@@ -65,7 +65,34 @@ def _normalize_match_mode(value: Any, default: str) -> str:
 
 def _normalize_entry_type(value: Any, default: str = "keyword") -> str:
     text = str(value or "").strip().lower()
-    return text if text in {"keyword", "constant"} else default
+    return text if text in {"keyword", "constant", "external_tag"} else default
+
+
+def _normalize_activation_tags(value: Any) -> list[str]:
+    if isinstance(value, str):
+        candidates = [value]
+    elif isinstance(value, list):
+        candidates = value
+    else:
+        candidates = []
+    tags: list[str] = []
+    for item in candidates:
+        text = str(item or "").strip()
+        if text and text not in tags:
+            tags.append(text[:160])
+    return tags
+
+
+def _sanitize_external_ref(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "type": str(value.get("type") or "stage").strip()[:40],
+        "role_id": str(value.get("role_id") or "").strip()[:80],
+        "role_name": str(value.get("role_name") or "").strip()[:80],
+        "stage_key": str(value.get("stage_key") or "").strip()[:80],
+        "stage_name": str(value.get("stage_name") or "").strip()[:80],
+    }
 
 
 def _normalize_group_operator(value: Any, default: str = "and") -> str:
@@ -285,6 +312,12 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
         bool(settings.get("default_whole_word", False)),
     )
 
+    external_source = str(raw.get("external_source", "")).strip()[:80]
+    external_ref = _sanitize_external_ref(raw.get("external_ref"))
+    activation_tags = _normalize_activation_tags(raw.get("activation_tags"))
+    if entry_type == "external_tag" and not activation_tags and external_ref.get("role_id") and external_ref.get("stage_key"):
+        activation_tags = [f"state_journal.stage.{external_ref['role_id']}.{external_ref['stage_key']}"]
+
     return {
         "id": entry_id,
         "title": title[:80],
@@ -308,6 +341,9 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
         "prompt_layer": prompt_layer,
         "recursive_enabled": recursive_enabled,
         "prevent_further_recursion": prevent_further_recursion,
+        "external_source": external_source,
+        "external_ref": external_ref,
+        "activation_tags": activation_tags,
         "enabled": enabled,
         "case_sensitive": case_sensitive,
         "whole_word": whole_word,

@@ -1,11 +1,13 @@
 import asyncio
 import json
+import hashlib
 import logging
 from logging.handlers import RotatingFileHandler
 import os
 import random
 import re
 import shutil
+import sqlite3
 import sys
 import time
 import unicodedata
@@ -467,6 +469,233 @@ def list_sprite_assets(slot_id: str | None = None) -> list[dict[str, Any]]:
     return items
 
 
+def default_state_journal_config() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "enabled": True,
+        "roles": [],
+    }
+
+
+def _normalize_state_journal_key(value: Any, fallback: str = "") -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = fallback
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+
+
+def _state_journal_stage_letter(index: int) -> str:
+    index = max(1, int(index or 1))
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    if index <= len(letters):
+        return letters[index - 1]
+    return f"{letters[(index - 1) % len(letters)]}{(index - 1) // len(letters) + 1}"
+
+
+def _state_journal_default_stage_key(index: int) -> str:
+    return f"stage_{_state_journal_stage_letter(index)}"
+
+
+def _state_journal_default_stage_name(index: int) -> str:
+    return f"{_state_journal_stage_letter(index).upper()}阶段"
+
+
+def _state_journal_int(value: Any, default: int, minimum: int | None = None) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = default
+    if minimum is not None:
+        number = max(minimum, number)
+    return number
+
+
+def sanitize_state_journal_config(raw: Any) -> dict[str, Any]:
+    config = default_state_journal_config()
+    if not isinstance(raw, dict):
+        return config
+
+    try:
+        config["version"] = max(1, int(raw.get("version", 1) or 1))
+    except (TypeError, ValueError):
+        config["version"] = 1
+    config["enabled"] = raw.get("enabled") is not False
+
+    roles: list[dict[str, Any]] = []
+    raw_roles = raw.get("roles", [])
+    if isinstance(raw_roles, dict):
+        role_items = list(raw_roles.values())
+    elif isinstance(raw_roles, list):
+        role_items = raw_roles
+    else:
+        role_items = []
+
+    for index, role in enumerate(role_items, start=1):
+        if not isinstance(role, dict):
+            continue
+        role_name = str(role.get("role_name") or role.get("name") or "").strip()
+        role_id = _normalize_state_journal_key(role.get("role_id") or role.get("id"), f"role_{index}")
+        aliases_raw = role.get("aliases", [])
+        if isinstance(aliases_raw, str):
+            aliases = [item.strip() for item in re.split(r"[,，]", aliases_raw) if item.strip()]
+        elif isinstance(aliases_raw, list):
+            aliases = [str(item).strip() for item in aliases_raw if str(item).strip()]
+        else:
+            aliases = []
+
+        variables: list[dict[str, Any]] = []
+        raw_variables = role.get("variables", [])
+        if isinstance(raw_variables, dict):
+            variable_items = list(raw_variables.values())
+        elif isinstance(raw_variables, list):
+            variable_items = raw_variables
+        else:
+            variable_items = []
+        seen_vars: set[str] = set()
+        for var_index, variable in enumerate(variable_items, start=1):
+            if not isinstance(variable, dict):
+                continue
+            var_key = _normalize_state_journal_key(variable.get("var_key") or variable.get("key"), f"var_{var_index}")
+            if not var_key or var_key in seen_vars:
+                continue
+            seen_vars.add(var_key)
+            def _num(field: str, default: float) -> float:
+                try:
+                    return float(variable.get(field, default))
+                except (TypeError, ValueError):
+                    return default
+            min_value = _num("min_value", 0)
+            max_value = _num("max_value", 100)
+            if max_value <= min_value:
+                min_value, max_value = 0, 100
+            default_value = min(max(_num("default_value", min_value), min_value), max_value)
+            delta_min = _num("delta_min", -5)
+            delta_max = _num("delta_max", 5)
+            if delta_max < delta_min:
+                delta_min, delta_max = delta_max, delta_min
+            variables.append({
+                "var_key": var_key,
+                "var_name": str(variable.get("var_name") or variable.get("label") or var_key).strip() or var_key,
+                "enabled": variable.get("enabled") is not False,
+                "default_value": default_value,
+                "min_value": min_value,
+                "max_value": max_value,
+                "delta_min": delta_min,
+                "delta_max": delta_max,
+                "display": variable.get("display") is not False,
+                "stage_relevant": variable.get("stage_relevant") is not False,
+                "instruction": str(variable.get("instruction", "")).strip(),
+            })
+
+
+        snapshot_fields: list[dict[str, Any]] = []
+        raw_snapshot_fields = role.get("snapshotFields") or role.get("snapshot_fields") or []
+        if not raw_snapshot_fields and isinstance(role.get("fields"), list):
+            raw_snapshot_fields = [item for item in role.get("fields") or [] if isinstance(item, dict) and str(item.get("type") or "text").lower() != "metric"]
+        if isinstance(raw_snapshot_fields, dict):
+            snapshot_items = list(raw_snapshot_fields.values())
+        elif isinstance(raw_snapshot_fields, list):
+            snapshot_items = raw_snapshot_fields
+        else:
+            snapshot_items = []
+        seen_snapshot_fields: set[str] = set()
+        for field_index, field in enumerate(snapshot_items, start=1):
+            if not isinstance(field, dict):
+                continue
+            field_key = _normalize_state_journal_key(field.get("key") or field.get("field_key"), f"snapshot_{field_index}")
+            if not field_key or field_key in seen_snapshot_fields:
+                continue
+            seen_snapshot_fields.add(field_key)
+            snapshot_fields.append({
+                "key": field_key,
+                "label": str(field.get("label") or field.get("name") or field_key).strip() or field_key,
+                "enabled": field.get("enabled") is not False,
+                "display": field.get("display") is not False,
+                "instruction": str(field.get("instruction") or field.get("note") or "根据本轮上下文生成该状态快照字段。{}").strip(),
+            })
+        stages: list[dict[str, Any]] = []
+        raw_stages = role.get("stages", [])
+        if isinstance(raw_stages, dict):
+            stage_items = list(raw_stages.values())
+        elif isinstance(raw_stages, list):
+            stage_items = raw_stages
+        else:
+            stage_items = []
+        seen_stages: set[str] = set()
+        valid_ops = {">", ">=", "<", "<=", "=", "!=", "=="}
+        variable_keys = {item["var_key"] for item in variables}
+        for stage_index, stage in enumerate(stage_items, start=1):
+            if not isinstance(stage, dict):
+                continue
+            stage_key = _normalize_state_journal_key(stage.get("stage_key") or stage.get("key"), _state_journal_default_stage_key(stage_index))
+            if not stage_key or stage_key in seen_stages:
+                continue
+            seen_stages.add(stage_key)
+            conditions: list[dict[str, Any]] = []
+            raw_conditions = stage.get("conditions", [])
+            if isinstance(raw_conditions, list):
+                for condition in raw_conditions:
+                    if not isinstance(condition, dict):
+                        continue
+                    var_key = _normalize_state_journal_key(condition.get("var") or condition.get("field"), "")
+                    if variable_keys and var_key not in variable_keys:
+                        continue
+                    op = str(condition.get("op") or ">=").strip()
+                    if op == "==":
+                        op = "="
+                    if op not in valid_ops:
+                        op = ">="
+                    try:
+                        value = float(condition.get("value", 0))
+                    except (TypeError, ValueError):
+                        value = 0
+                    conditions.append({"var": var_key, "op": op, "value": value})
+            try:
+                priority = int(stage.get("priority", stage_index * 10) or stage_index * 10)
+            except (TypeError, ValueError):
+                priority = stage_index * 10
+            mode = str(stage.get("condition_mode") or "all").strip().lower()
+            if mode not in {"all", "any"}:
+                mode = "all"
+            stages.append({
+                "stage_key": stage_key,
+                "stage_name": str(stage.get("stage_name") or stage.get("name") or _state_journal_default_stage_name(stage_index)).strip() or _state_journal_default_stage_name(stage_index),
+                "enabled": stage.get("enabled") is not False,
+                "priority": priority,
+                "condition_mode": mode,
+                "conditions": conditions,
+                "allow_regression": bool(stage.get("allow_regression", role.get("settings", {}).get("allow_regression", False) if isinstance(role.get("settings"), dict) else False)),
+                "confirm_turns": _state_journal_int(stage.get("confirm_turns", 1), 1, 1),
+                "cooldown_turns": _state_journal_int(stage.get("cooldown_turns", 0), 0, 0),
+                "activation_tag": f"state_journal.stage.{role_id}.{stage_key}",
+            })
+
+        settings = role.get("settings") if isinstance(role.get("settings"), dict) else {}
+        roles.append({
+            "role_id": role_id,
+            "role_name": role_name or role_id,
+            "aliases": aliases,
+            "enabled": role.get("enabled") is not False,
+            "use_default_variables": bool(role.get("use_default_variables", False)),
+            "initial_stage": _normalize_state_journal_key(role.get("initial_stage") or settings.get("initial_stage"), stages[0]["stage_key"] if stages else "stage_a"),
+            "variables": variables,
+            "stages": stages,
+            "snapshotFields": snapshot_fields,
+            "settings": {
+                "allow_regression": bool(settings.get("allow_regression", False)),
+                "confirm_turns": _state_journal_int(settings.get("confirm_turns", 1), 1, 1),
+                "cooldown_turns": _state_journal_int(settings.get("cooldown_turns", 0), 0, 0),
+            },
+        })
+
+    config["roles"] = roles
+    return config
+
+
 def default_role_card() -> dict[str, Any]:
     return {
         "name": "",
@@ -477,6 +706,7 @@ def default_role_card() -> dict[str, Any]:
         "scenario": "",
         "creator_notes": "",
         "tags": [],
+        "stateJournal": default_state_journal_config(),
         "creativeWorkshop": {
             "enabled": True,
             "opening": {
@@ -1150,6 +1380,7 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
         card[key] = str(raw.get(key, "")).strip()
 
     card["tags"] = sanitize_tags(raw.get("tags", []))
+    card["stateJournal"] = sanitize_state_journal_config(raw.get("stateJournal", {}))
     card["creativeWorkshop"] = sanitize_creative_workshop(raw.get("creativeWorkshop", {}))
 
     # Preserve every imported plot stage instead of only the built-in A/B/C slots.
@@ -1869,7 +2100,7 @@ def extract_role_card_payload(data: Any) -> dict[str, Any]:
         return {}
 
     merged = dict(candidate)
-    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "creativeWorkshop", "plotStages", "personas"]:
+    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "stateJournal", "creativeWorkshop", "plotStages", "personas"]:
         if not merged.get(key) and data.get(key):
             merged[key] = data.get(key)
 
@@ -2647,7 +2878,7 @@ def _worldbook_position_priority(item: dict[str, Any]) -> int:
 
 def _worldbook_global_selection_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
     order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
-    source_rank_map = {"constant": 0, "sticky": 1, "keyword": 2}
+    source_rank_map = {"constant": 0, "external_tag": 1, "sticky": 2, "keyword": 3}
     source_rank = source_rank_map.get(str(item.get("source", "keyword")), 2)
     title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
     return (order, source_rank, title)
@@ -2697,7 +2928,7 @@ def bucket_worldbook_matches(matches: list[dict[str, Any]] | None) -> dict[str, 
 def _worldbook_entry_sort_key(item: dict[str, Any]) -> tuple[int, int, int, str]:
     position_rank = _worldbook_position_priority(item)
     order = clamp_int(item.get("order", item.get("priority", 100)), 0, 999999, 100)
-    source_rank_map = {"constant": 0, "sticky": 1, "keyword": 2}
+    source_rank_map = {"constant": 0, "external_tag": 1, "sticky": 2, "keyword": 3}
     source_rank = source_rank_map.get(str(item.get("source", "keyword")), 2)
     title = str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip()
     return (position_rank, order, source_rank, title)
@@ -2855,6 +3086,9 @@ def _worldbook_match_payload(
         "prompt_layer": _normalize_worldbook_prompt_layer(item.get("prompt_layer", "follow_position"), "follow_position"),
         "recursive_enabled": bool(item.get("recursive_enabled", True)),
         "prevent_further_recursion": bool(item.get("prevent_further_recursion", False)),
+        "external_source": str(item.get("external_source", "")).strip(),
+        "external_ref": item.get("external_ref", {}) if isinstance(item.get("external_ref"), dict) else {},
+        "activation_tags": item.get("activation_tags", []) if isinstance(item.get("activation_tags"), list) else [],
         "matched_depth": clamp_int(matched_depth, 0, 5, 0),
         "matched_from": str(matched_from or "").strip(),
         "selected_for_prompt": False,
@@ -2896,11 +3130,78 @@ def _worldbook_debug_display_sort_key(item: dict[str, Any]) -> tuple[int, int, i
     )
 
 
-def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
+
+def _normalize_state_journal_card_key(value: Any, fallback: str = "") -> str:
+    text = str(value or "").strip() or fallback
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+
+def get_state_journal_current_card_uid() -> str:
+    raw = get_current_card().get("raw", {})
+    if not isinstance(raw, dict) or not raw:
+        return "global"
+    state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
+    for value in (state_journal.get("card_uid"), raw.get("card_uid"), raw.get("uid"), raw.get("id")):
+        text = str(value or "").strip()
+        if text:
+            return _normalize_state_journal_card_key(text, "global")
+    fingerprint_payload = {
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
+
+
+def get_state_journal_active_stage_rows() -> list[dict[str, Any]]:
+    db_path = BASE_DIR / "data" / "mods" / "state_journal" / "state_journal.db"
+    if not db_path.exists():
+        return []
+    card_uid = get_state_journal_current_card_uid()
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT role_id, role_name, current_stage_key, current_stage_name, active_tag, updated_at
+                FROM state_journal_stage_states
+                WHERE card_uid=? AND active_tag!=''
+                ORDER BY role_name ASC
+                """,
+                (card_uid,),
+            ).fetchall()
+    except Exception:
+        return []
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        tag = str(row["active_tag"] or "").strip()
+        if not tag:
+            continue
+        result.append({
+            "role_id": str(row["role_id"] or "").strip(),
+            "role_name": str(row["role_name"] or "").strip(),
+            "stage_key": str(row["current_stage_key"] or "").strip(),
+            "stage_name": str(row["current_stage_name"] or "").strip(),
+            "activation_tag": tag,
+            "tag": tag,
+            "updated_at": str(row["updated_at"] or "").strip(),
+        })
+    return result
+
+
+def get_state_journal_active_stage_tags() -> list[str]:
+    return [row["activation_tag"] for row in get_state_journal_active_stage_rows() if row.get("activation_tag")]
+
+
+def match_worldbook_entries(query: str, external_active_tags: list[str] | None = None) -> list[dict[str, Any]]:
     global _LAST_WORLDBOOK_DEBUG_SNAPSHOT
 
     text = str(query or "").strip()
-    if not text:
+    active_tag_set = {str(tag).strip() for tag in (external_active_tags or []) if str(tag).strip()}
+    if not text and not active_tag_set:
         _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
         return []
 
@@ -2931,7 +3232,7 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             continue
 
         entry_type = str(item.get("entry_type", settings.get("default_entry_type", "keyword"))).strip().lower()
-        if entry_type not in {"keyword", "constant"}:
+        if entry_type not in {"keyword", "constant", "external_tag"}:
             entry_type = "keyword"
 
         runtime = runtime_entries.get(entry_id, {}) if isinstance(runtime_entries.get(entry_id), dict) else {}
@@ -2955,6 +3256,23 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
             hit = _worldbook_match_payload(item=item, source="constant", matched_text="常驻", matched_depth=0, matched_from="")
             hits.append(hit)
             hits_by_id[entry_id] = hit
+            continue
+
+        if entry_type == "external_tag":
+            activation_tags = {str(tag).strip() for tag in (item.get("activation_tags") or []) if str(tag).strip()}
+            matched_tags = sorted(activation_tags & active_tag_set)
+            if matched_tags:
+                state_row["last_result"] = "triggered"
+                state_row["last_reason"] = "external_tag"
+                state_row["matched_text"] = ", ".join(matched_tags)[:240]
+                clean_runtime_entries[entry_id] = state_row
+                hit = _worldbook_match_payload(item=item, source="external_tag", matched_text=state_row["matched_text"], matched_depth=0, matched_from="state_journal")
+                hits.append(hit)
+                hits_by_id[entry_id] = hit
+            else:
+                state_row["last_result"] = "miss"
+                state_row["last_reason"] = "external_tag"
+                clean_runtime_entries[entry_id] = state_row
             continue
 
         if state_row["active_until_turn"] >= current_turn and state_row["last_trigger_turn"] < current_turn:
@@ -3094,6 +3412,7 @@ def match_worldbook_entries(query: str) -> list[dict[str, Any]]:
 
     _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {
         "query": text,
+        "external_active_tags": sorted(active_tag_set),
         "all_matches": all_matches_sorted,
         "selected_ids": list(selected_ids),
         "dropped_ids": dropped_ids,
@@ -3662,7 +3981,8 @@ async def generate_reply(
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]], dict[str, Any], dict[str, Any]]:
     llm_config = get_runtime_chat_config(runtime_overrides)
     retrieved = await retrieve_memories(user_message, runtime_overrides)
-    worldbook_matches = match_worldbook_entries(user_message)
+    active_stage_tags = get_state_journal_active_stage_tags()
+    worldbook_matches = match_worldbook_entries(user_message, external_active_tags=active_stage_tags)
     worldbook_debug_snapshot = get_worldbook_debug_snapshot()
     prompt_package = build_prompt_package(
         user_message,
@@ -4126,6 +4446,7 @@ route_ctx = SimpleNamespace(
     get_worldbook_debug_snapshot=get_worldbook_debug_snapshot,
     get_worldbook_settings=get_worldbook_settings,
     get_worldbook_store=get_worldbook_store,
+    get_state_journal_active_stage_tags=get_state_journal_active_stage_tags,
     list_mods=lambda: [mod.to_dict() for mod in registered_mods],
     list_role_card_files=list_role_card_files,
     list_sprite_assets=list_sprite_assets,
