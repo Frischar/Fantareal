@@ -1,4 +1,7 @@
+import importlib.util
 import json
+import sys
+import types
 from pathlib import Path
 from typing import Any
 
@@ -359,6 +362,244 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"挑战模式四卡清空失败：{exc}") from exc
         return {"ok": True}
+
+    # ═══════════════════════════════════════════
+    # 茶会派对 游戏
+    # ═══════════════════════════════════════════
+
+    _game_dir = Path(__file__).resolve().parent.parent / "game" / "Tea Party"
+
+    def _setup_tea_party() -> types.ModuleType:
+        """动态加载 game/Tea Party/ 包（路径含空格，无法用 import 语句）。"""
+        if "tea_party" in sys.modules:
+            return sys.modules["tea_party"]
+
+        tp = types.ModuleType("tea_party")
+        tp.__path__ = [str(_game_dir)]
+        tp.__package__ = "tea_party"
+        sys.modules["tea_party"] = tp
+
+        for mod_name, filename in [
+            ("tea_party.models", "models.py"),
+            ("tea_party.engine", "engine.py"),
+            ("tea_party.ai_instructions", "ai_instructions.py"),
+            ("tea_party.ai_opponent", "ai_opponent.py"),
+        ]:
+            spec = importlib.util.spec_from_file_location(mod_name, _game_dir / filename)
+            mod = importlib.util.module_from_spec(spec)
+            mod.__package__ = "tea_party"
+            sys.modules[mod_name] = mod
+            spec.loader.exec_module(mod)
+
+        for mn in ["tea_party.models", "tea_party.engine"]:
+            m = sys.modules[mn]
+            for attr in dir(m):
+                if not attr.startswith("_"):
+                    setattr(tp, attr, getattr(m, attr))
+        return tp
+
+    # 挂载游戏图片
+    from fastapi.staticfiles import StaticFiles
+    _pictures_dir = _game_dir / "pictures"
+    if _pictures_dir.is_dir():
+        app.mount("/game/pictures", StaticFiles(directory=str(_pictures_dir)), name="game_pictures")
+    _sounds_dir = _game_dir / "sounds"
+    if _sounds_dir.is_dir():
+        app.mount("/game/Tea Party/sounds", StaticFiles(directory=str(_sounds_dir)), name="game_sounds")
+
+    @app.get("/game", response_class=HTMLResponse)
+    async def game_page(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "game.html",
+            {
+                "settings": ctx.get_settings(),
+                "role_avatar_url": ctx.get_role_avatar_url(),
+            },
+        )
+
+    @app.get("/api/game/state")
+    async def game_state() -> dict[str, Any]:
+        tp = _setup_tea_party()
+        game = tp.get_session()
+        if game is None:
+            return {"phase": "none"}
+        return game.get_state()
+
+    @app.post("/api/game/new")
+    async def game_new(request: Request) -> dict[str, Any]:
+        tp = _setup_tea_party()
+        body = await request.json()
+        mode = body.get("mode", "classic")
+        difficulty = body.get("difficulty", "normal")
+        p1_name = body.get("p1_name", "你")
+
+        persona = ctx.get_persona()
+        p2_name = persona.get("name", "对手") if persona else "对手"
+
+        game = tp.reset_session(mode=mode, difficulty=difficulty, p1_name=p1_name, p2_name=p2_name)
+        return game.get_state()
+
+    @app.post("/api/game/shoot")
+    async def game_shoot(request: Request) -> dict[str, Any]:
+        tp = _setup_tea_party()
+        game = tp.get_session()
+        body = await request.json()
+        result = game.shoot(body["player_index"], body["target"])
+        d = result.to_dict()
+        if result.success and result.phase != tp.GamePhase.GAME_OVER:
+            d["ai_extra_turn"] = False
+        return d
+
+    @app.post("/api/game/skip-turn")
+    async def game_skip_turn(request: Request) -> dict[str, Any]:
+        tp = _setup_tea_party()
+        game = tp.get_session()
+        body = await request.json()
+        result = game.skip_turn(body["player_index"])
+        return result.to_dict()
+
+    @app.post("/api/game/use-item")
+    async def game_use_item(request: Request) -> dict[str, Any]:
+        tp = _setup_tea_party()
+        game = tp.get_session()
+        body = await request.json()
+        target = body.get("target_item_type", None)
+        result = game.use_item(body["player_index"], body["item_type"], target)
+        return result.to_dict()
+
+    @app.post("/api/game/discard-item")
+    async def game_discard_item(request: Request) -> dict[str, Any]:
+        tp = _setup_tea_party()
+        game = tp.get_session()
+        body = await request.json()
+        result = game.discard_item(body["player_index"], body["item_type"])
+        return result.to_dict()
+
+    @app.get("/api/game/check-ready")
+    async def game_check_ready() -> dict[str, Any]:
+        llm_config = ctx.get_runtime_chat_config()
+        persona = ctx.get_persona()
+        model_ok = bool(llm_config.get("model", ""))
+        persona_ok = bool(persona and persona.get("system_prompt", ""))
+        return {
+            "model_ready": model_ok,
+            "persona_ready": persona_ok,
+            "model_name": llm_config.get("model", ""),
+            "persona_name": persona.get("name", "") if persona else "",
+        }
+
+    @app.post("/api/game/reset")
+    async def game_reset() -> dict[str, Any]:
+        tp = _setup_tea_party()
+        tp.reset_session(mode="classic", difficulty="normal", p1_name="玩家", p2_name="对手")
+        # Immediately clear so next loadState returns phase:none
+        import sys
+        engine_mod = sys.modules.get("tea_party.engine")
+        if engine_mod:
+            engine_mod._active_game = None  # type: ignore
+        return {"ok": True}
+
+    @app.post("/api/game/no-ai-turn")
+    async def game_no_ai_turn(request: Request) -> dict[str, Any]:
+        try:
+            tp = _setup_tea_party()
+            game = tp.get_session()
+            if game is None:
+                return {"success": False, "message": "没有活跃的游戏"}
+            if game.phase == tp.GamePhase.GAME_OVER:
+                return {"success": False, "message": "游戏已结束"}
+            if game.current_player != 1:
+                return {"success": False, "message": "不是对手的回合"}
+
+            sanitized = game.get_sanitized_state()
+            decision = tp.no_ai_decision(sanitized)
+
+            events: list[dict] = []
+            for item_name in decision.get("items_to_use", []):
+                result = game.use_item(1, item_name)
+                if result.success:
+                    events.extend([{"type": e.event_type, **e.data} for e in result.events])
+
+            target = decision.get("target", "opponent")
+            shoot_result = game.shoot(1, target)
+            if shoot_result.success:
+                events.extend([{"type": e.event_type, **e.data} for e in shoot_result.events])
+
+            ai_extra_turn = (game.phase == tp.GamePhase.PLAYING and game.current_player == 1)
+
+            return {
+                "success": True,
+                "message": f"对手向{'自己' if target == 'self' else '对方'}开火",
+                "events": events,
+                "dialogue": decision.get("dialogue", ""),
+                "ai_extra_turn": ai_extra_turn,
+                "phase": game.phase.value,
+                "winner": game.winner,
+                "state": game.get_state(),
+            }
+        except Exception as e:
+            return {"success": False, "message": f"服务器错误: {e}"}
+
+    @app.post("/api/game/ai-turn")
+    async def game_ai_turn(request: Request) -> dict[str, Any]:
+        tp = _setup_tea_party()
+        game = tp.get_session()
+
+        if game.phase == tp.GamePhase.GAME_OVER:
+            return {"success": False, "message": "游戏已结束"}
+        if game.current_player != 1:
+            return {"success": False, "message": "不是 AI 的回合"}
+
+        # 解析请求
+        body = await request.json() if await request.body() else {}
+        party_chat_message = body.get("message", "")  # 派对模式下的聊天消息（暂未使用）
+
+        # 获取 LLM 配置和角色信息
+        llm_config = ctx.get_runtime_chat_config()
+        persona = ctx.get_persona() or {"name": "对手", "system_prompt": "", "greeting": ""}
+
+        sanitized = game.get_sanitized_state()
+
+        ai_mod = sys.modules.get("tea_party.ai_opponent")
+        if ai_mod is None:
+            return {"success": False, "message": "AI 模块未加载"}
+
+        # 延迟导入，避免模块级循环引用
+        from fantareal.app import request_json as _request_json
+
+        decision = await ai_mod.request_ai_action(
+            sanitized_state=sanitized,
+            persona=persona,
+            llm_config=llm_config,
+            request_json_func=_request_json,
+        )
+
+        # 执行 AI 的道具使用
+        events: list[dict] = []
+        for item_name in decision.get("items_to_use", []):
+            result = game.use_item(1, item_name)
+            if result.success:
+                events.extend([{"type": e.event_type, **e.data} for e in result.events])
+
+        # 执行 AI 的开火
+        target = decision.get("target", "opponent")
+        shoot_result = game.shoot(1, target)
+        if shoot_result.success:
+            events.extend([{"type": e.event_type, **e.data} for e in shoot_result.events])
+
+        ai_extra_turn = (game.phase == tp.GamePhase.PLAYING and game.current_player == 1)
+
+        return {
+            "success": True,
+            "message": f"AI 向{'自己' if target == 'self' else '对方'}开火",
+            "events": events,
+            "dialogue": decision.get("dialogue", ""),
+            "ai_extra_turn": ai_extra_turn,
+            "phase": game.phase.value,
+            "winner": game.winner,
+            "state": game.get_state(),
+        }
 
     @app.get("/mods/{mod_slug}", response_class=HTMLResponse)
     async def mod_host_page(request: Request, mod_slug: str) -> HTMLResponse:
