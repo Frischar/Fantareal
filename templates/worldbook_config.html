@@ -509,8 +509,9 @@
                   <select id="wb-default-entry-type">
                     <option value="keyword" {% if (worldbook_settings.default_entry_type or 'keyword') == 'keyword' %}selected{% endif %}>关键词触发</option>
                     <option value="constant" {% if worldbook_settings.default_entry_type == 'constant' %}selected{% endif %}>常驻</option>
+                    <option value="external_tag" {% if worldbook_settings.default_entry_type == 'external_tag' %}selected{% endif %}>外部标签触发</option>
                   </select>
-                  <p class="muted helper-text">常驻词条默认不依赖关键词；关键词触发词条仍依赖主关键词。</p>
+                  <p class="muted helper-text">常驻词条默认不依赖关键词；关键词触发词条仍依赖主关键词；外部标签触发用于接收心笺阶段等外部 active_tag。</p>
                 </div>
 
                 <div class="field-row">

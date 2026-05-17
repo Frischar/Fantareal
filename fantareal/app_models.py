@@ -158,6 +158,11 @@ class WorldbookEntryPayload(BaseModel):
     recursive_enabled: bool = True
     prevent_further_recursion: bool = False
 
+    # 外部标签触发：例如心笺阶段 active_tag
+    external_source: str = ""
+    external_ref: dict[str, Any] = Field(default_factory=dict)
+    activation_tags: list[str] = Field(default_factory=list)
+
 
 class WorldbookSettingsPayload(BaseModel):
     enabled: bool = True

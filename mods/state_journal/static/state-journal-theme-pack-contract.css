@@ -1,0 +1,311 @@
+/* v1.19 · 外观模板包契约与预览信息 */
+.theme-pack-meta-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(232, 194, 122, .18);
+  background: rgba(0, 0, 0, .12);
+}
+.theme-pack-meta-panel p {
+  margin: 0;
+  color: var(--xj-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.theme-pack-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.theme-pack-chip-row span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 194, 122, .22);
+  background: rgba(232, 194, 122, .09);
+  color: var(--xj-text);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.theme-pack-warning {
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 183, 91, .28);
+  background: rgba(239, 183, 91, .10);
+  color: #f3cf91;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.theme-preview-metrics {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+.theme-preview-metrics.compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.theme-preview-metrics.compact span {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(232, 194, 122, .10);
+  border: 1px solid rgba(232, 194, 122, .16);
+  font-size: 12px;
+}
+.theme-preview-metric {
+  display: grid;
+  grid-template-columns: minmax(64px, .7fr) minmax(92px, auto) minmax(96px, 1.2fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.theme-preview-metric span { opacity: .86; }
+.theme-preview-metric b { font-weight: 850; }
+.theme-preview-metric i {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.10);
+}
+.theme-preview-metric i::before {
+  content: "";
+  display: block;
+  width: var(--xj-preview-value, 50%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--xj-beauty-accent, var(--xj-accent));
+}
+.theme-preview-card.theme-status-panel-advanced .theme-preview-metric i,
+.theme-preview-card.theme-status-pro .theme-preview-metric i,
+.theme-preview-card.theme-midnight-archive .theme-preview-metric i {
+  background: rgba(255,255,255,.08);
+}
+@media (max-width: 860px) {
+  .theme-preview-metric {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* v1.19.2 · 预览兜底：token 只做装饰，不再替代字段名。 */
+.theme-preview-role b {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+.theme-preview-field-token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.22rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--xj-beauty-accent, var(--xj-accent)) 28%, transparent);
+  background: color-mix(in srgb, var(--xj-beauty-accent, var(--xj-accent)) 10%, transparent);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+.theme-preview-field-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.theme-preview-role p,
+.theme-preview-relation {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* v1.19.2 · 标准样式预览跟随 Fantareal 主 UI 变量；仅作用于标准样式。 */
+.theme-preview-card.theme-standard {
+  background: linear-gradient(
+    180deg,
+    rgba(var(--panel-strong-rgb, 38, 34, 29), var(--panel-strong-alpha, .88)),
+    rgba(var(--panel-rgb, 35, 31, 27), var(--panel-alpha, .76))
+  );
+  color: var(--text, var(--xj-text));
+  border-color: var(--border, rgba(232, 194, 122, .18));
+  backdrop-filter: var(--ui-glass-blur-soft, blur(14px) saturate(1.04));
+  -webkit-backdrop-filter: var(--ui-glass-blur-soft, blur(14px) saturate(1.04));
+}
+.theme-preview-card.theme-standard .theme-preview-title,
+.theme-preview-card.theme-standard .theme-preview-role,
+.theme-preview-card.theme-standard .theme-preview-relation {
+  background: rgba(var(--input-rgb, 255, 255, 255), var(--input-alpha, .055));
+  border-color: var(--border, rgba(232, 194, 122, .14));
+}
+.theme-preview-card.theme-standard .theme-preview-title span,
+.theme-preview-card.theme-standard .theme-preview-role b,
+.theme-preview-card.theme-standard .theme-preview-relation b {
+  color: var(--accent, var(--xj-accent));
+}
+.theme-preview-card.theme-standard .theme-preview-title em {
+  color: var(--muted, var(--xj-muted));
+}
+
+/* v1.19.3 · 外置美化包预览兜底：保留特色布局，但不让字段、数值条和长文本被截断。 */
+.theme-preview-card .theme-preview-title,
+.theme-preview-card .theme-preview-role,
+.theme-preview-card .theme-preview-relation {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.theme-preview-card .theme-preview-role p {
+  display: block;
+  min-width: 0;
+  line-height: 1.75;
+}
+.theme-preview-card .theme-preview-field-token + .theme-preview-field-name {
+  min-width: 0;
+}
+.theme-preview-card.theme-status-panel-advanced .theme-preview-metrics,
+.theme-preview-card.theme-status-pro .theme-preview-metrics,
+.theme-preview-card.theme-storyboard-illustrated .theme-preview-metrics,
+.theme-preview-card.theme-paper-time-advanced .theme-preview-metrics {
+  min-width: 0;
+}
+.theme-preview-card.theme-status-panel-advanced .theme-preview-metric,
+.theme-preview-card.theme-status-pro .theme-preview-metric {
+  grid-template-columns: minmax(3.2rem, .42fr) minmax(5.4rem, .5fr) minmax(8rem, 1.2fr);
+}
+.theme-preview-card.theme-storyboard-illustrated .theme-preview-metric,
+.theme-preview-card.theme-paper-time-advanced .theme-preview-metric {
+  grid-template-columns: minmax(3.2rem, .4fr) minmax(5.2rem, .45fr) minmax(8rem, 1fr);
+}
+.theme-preview-card .theme-preview-metric span,
+.theme-preview-card .theme-preview-metric b {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+
+/* v1.19.4 · 进度条作用域收窄：非 HUD 外观包的预览恢复胶囊数值显示。 */
+.theme-preview-metrics.is-chip-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.theme-preview-metric-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--xj-beauty-accent, var(--xj-accent)) 18%, transparent);
+  background: color-mix(in srgb, var(--xj-beauty-accent, var(--xj-accent)) 7%, transparent);
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.theme-preview-metric-chip b {
+  color: var(--xj-beauty-accent, var(--xj-accent));
+  font-weight: 900;
+}
+.theme-preview-card.theme-cinnabar-dossier .theme-preview-metrics.is-chip-preview,
+.theme-preview-card.theme-gufeng-paper .theme-preview-metrics.is-chip-preview,
+.theme-preview-card.theme-moon-white .theme-preview-metrics.is-chip-preview,
+.theme-preview-card.theme-jade-slip .theme-preview-metrics.is-chip-preview,
+.theme-preview-card.theme-time-card .theme-preview-metrics.is-chip-preview,
+.theme-preview-card.theme-standard .theme-preview-metrics.is-chip-preview {
+  margin-top: 10px;
+}
+.theme-preview-card.theme-status-panel-advanced .theme-preview-metrics.is-meter-preview,
+.theme-preview-card.theme-status-pro .theme-preview-metrics.is-meter-preview {
+  display: grid;
+}
+
+/* v1.19.5 · 外观包管理与预览数据切换 */
+.theme-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.theme-preview-mode {
+  display: inline-flex;
+  align-items: center;
+  grid-template-columns: none;
+  gap: 8px;
+  margin: 0;
+  color: var(--xj-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.theme-preview-mode select {
+  min-height: 30px;
+  padding: 4px 28px 4px 10px;
+  font-size: 12px;
+}
+
+/* v1.19.5 · 标准样式低透明度可读性增强；仅作用于标准外观包预览。 */
+.theme-preview-card.theme-standard {
+  --xj-standard-readable-text: color-mix(in srgb, var(--text, var(--xj-text)) 92%, #10100e 8%);
+  --xj-standard-readable-muted: color-mix(in srgb, var(--text, var(--xj-text)) 72%, #6b6258 28%);
+  color: var(--xj-standard-readable-text) !important;
+}
+.theme-preview-card.theme-standard .theme-preview-title,
+.theme-preview-card.theme-standard .theme-preview-role,
+.theme-preview-card.theme-standard .theme-preview-relation {
+  background: color-mix(in srgb, rgba(var(--input-rgb, 255,255,255), var(--input-alpha, .09)) 76%, rgba(var(--panel-rgb, 35,31,27), .18));
+}
+.theme-preview-card.theme-standard .theme-preview-title strong,
+.theme-preview-card.theme-standard .theme-preview-role h4,
+.theme-preview-card.theme-standard .theme-preview-role p,
+.theme-preview-card.theme-standard .theme-preview-relation {
+  color: var(--xj-standard-readable-text) !important;
+}
+.theme-preview-card.theme-standard .theme-preview-title em,
+.theme-preview-card.theme-standard .theme-preview-metric-chip,
+.theme-preview-card.theme-standard .theme-preview-field-name {
+  color: var(--xj-standard-readable-muted) !important;
+}
+.theme-preview-card.theme-standard .theme-preview-metric-chip b,
+.theme-preview-card.theme-standard .theme-preview-title span,
+.theme-preview-card.theme-standard .theme-preview-role b,
+.theme-preview-card.theme-standard .theme-preview-relation b {
+  color: color-mix(in srgb, var(--accent, var(--xj-accent)) 78%, var(--xj-standard-readable-text) 22%) !important;
+}
+
+/* v1.19.7 · 外观包操作区最终收口：按钮缩短为导入/导出/删除/保存。 */
+.theme-pack-toolbar-row {
+  align-items: flex-end;
+  gap: 10px;
+}
+.theme-pack-toolbar-row > label {
+  min-width: min(420px, 48vw);
+  flex: 1 1 420px;
+}
+.theme-pack-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.theme-pack-actions .file-btn {
+  overflow: hidden;
+}
+.theme-pack-actions .ghost-btn,
+.theme-pack-actions .primary-btn {
+  min-height: 34px;
+  padding: 6px 14px;
+  min-width: 64px;
+  white-space: nowrap;
+}
+@media (max-width: 980px) {
+  .theme-pack-toolbar-row { align-items: stretch; }
+  .theme-pack-toolbar-row > label { min-width: 100%; flex-basis: 100%; }
+  .theme-pack-actions { justify-content: flex-start; }
+}

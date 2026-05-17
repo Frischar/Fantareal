@@ -13,7 +13,7 @@
   --xj-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
   color-scheme: dark;
 }
-:root[data-xj-ui-sync="global"] {
+:root[data-state-journal-ui-sync="global"] {
   --xj-card: rgba(var(--panel-rgb, 38, 34, 29), var(--panel-alpha, 0.82));
   --xj-card-strong: rgba(var(--panel-strong-rgb, 47, 42, 35), var(--panel-strong-alpha, 0.94));
   --xj-card-soft: rgba(var(--input-rgb, 255, 255, 255), var(--input-alpha, 0.045));
@@ -228,7 +228,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(232,185,116,.55);
 @media (max-width: 840px) { .state-journal-shell { width: min(100% - 16px, 100%); } .state-journal-hero, .panel-head.split { flex-direction: column; align-items: stretch; } .state-journal-grid { grid-template-columns: 1fr; } .table-list-panel { position: static; } .grid-two, .preset-row, .field-grid { grid-template-columns: 1fr; } .rows-editor, .rows-table-wrap { max-height: none; } }
 
 /* 心笺 v0.2：幕笺模式设置 */
-.mujian-config-card {
+.turn-note-config-card {
   border: 1px solid var(--xj-border);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.045);
@@ -250,7 +250,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(232,185,116,.55);
 }
 
 /* v0.2.3：幕笺风格说明与预览 */
-.mujian-style-help {
+.turn-note-style-help {
   display: grid;
   gap: 8px;
   padding: 12px 13px;
@@ -258,9 +258,9 @@ input:focus, textarea:focus, select:focus { border-color: rgba(232,185,116,.55);
   border: 1px solid var(--xj-border);
   background: rgba(255,255,255,.045);
 }
-.mujian-style-help strong { font-size: .9rem; }
-.mujian-style-help p { margin: 0; color: var(--xj-muted); font-size: .8rem; line-height: 1.55; }
-.mujian-style-preview {
+.turn-note-style-help strong { font-size: .9rem; }
+.turn-note-style-help p { margin: 0; color: var(--xj-muted); font-size: .8rem; line-height: 1.55; }
+.turn-note-style-preview {
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.55;
@@ -727,7 +727,7 @@ select option:disabled {
   margin-bottom: 16px;
 }
 .config-workspace-panel[data-active-workspace="journal"] [data-tab-scope="journal"],
-.config-workspace-panel[data-active-workspace="mujian"] [data-tab-scope="mujian"],
+.config-workspace-panel[data-active-workspace="turnNote"] [data-tab-scope="turnNote"],
 .config-workspace-panel[data-active-workspace="generate"] [data-tab-scope="generate"],
 .config-workspace-panel[data-active-workspace="beauty"] [data-tab-scope="beauty"],
 .config-workspace-panel[data-active-workspace="settings"] [data-tab-scope="settings"] {
@@ -736,8 +736,8 @@ select option:disabled {
 .config-workspace-panel .tab-page.active {
   max-width: 980px;
 }
-.config-workspace-panel .mujian-config-card.standalone,
-.config-workspace-panel .tab-page > .mujian-config-card.standalone,
+.config-workspace-panel .turn-note-config-card.standalone,
+.config-workspace-panel .tab-page > .turn-note-config-card.standalone,
 .config-workspace-panel .tab-page > .model-status-card,
 .config-workspace-panel .tab-page > .panel-actions,
 .config-workspace-panel .tab-page > label,
@@ -864,8 +864,8 @@ select option:disabled {
 .config-workspace-panel .tab-page.active {
   justify-self: center;
 }
-.config-workspace-panel .mujian-config-card.standalone,
-.config-workspace-panel .tab-page > .mujian-config-card.standalone,
+.config-workspace-panel .turn-note-config-card.standalone,
+.config-workspace-panel .tab-page > .turn-note-config-card.standalone,
 .config-workspace-panel .tab-page > .model-status-card,
 .config-workspace-panel .tab-page > .panel-actions,
 .config-workspace-panel .tab-page > label,
@@ -1158,7 +1158,7 @@ select option:disabled {
 .data-panel[data-table-kind="metric_history"] .view-switch { display: none; }
 
 /* 心笺后台 UI 重构 v0.1.3-rework：单页 tab 精简 + 数据卡片可读性修正 */
-.config-workspace-panel[data-active-workspace="mujian"] .drawer-tabs,
+.config-workspace-panel[data-active-workspace="turnNote"] .drawer-tabs,
 .config-workspace-panel[data-active-workspace="generate"] .drawer-tabs {
   display: none !important;
 }
@@ -1320,3 +1320,1085 @@ select option:disabled {
 }
 .state-journal-source-badge.is-hook { border-color: rgba(106, 196, 134, .38); background: rgba(106, 196, 134, .10); }
 .state-journal-source-badge.is-dom { border-color: rgba(255, 178, 96, .42); background: rgba(255, 178, 96, .12); }
+
+/* v1.1.2 · 变量、阶段与状态快照 UI */
+.role-state-workspace { display: grid; gap: 16px; min-width: 0; max-width: 100%; }
+.role-state-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; min-width: 0; max-width: 100%; }
+.role-state-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.role-state-actions button[disabled] { opacity: 0.46; cursor: not-allowed; }
+.role-state-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; min-width: 0; max-width: 100%; }
+.role-state-sidebar, .role-state-detail { min-height: 360px; min-width: 0; }
+.role-state-detail { overflow: hidden; }
+.role-state-role-card { display: grid; gap: 5px; padding: 13px 14px; border: 1px solid var(--xj-border); border-radius: 18px; background: var(--xj-card-soft); }
+.role-state-role-card.active { border-color: color-mix(in srgb, var(--xj-accent) 52%, var(--xj-border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--xj-accent) 10%, transparent); }
+.role-state-role-card span, .role-state-role-card small { color: var(--xj-muted); }
+.role-state-tabs { display: inline-flex; width: fit-content; max-width: 100%; align-items: center; gap: 8px; margin: 10px 0 14px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.role-state-tab { min-height: 34px; padding: 0 15px; border: 1px solid var(--xj-border); border-radius: 999px; background: var(--xj-card-soft); color: var(--xj-muted); font-weight: 800; cursor: pointer; transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease; }
+.role-state-tab.active { color: var(--xj-text); border-color: color-mix(in srgb, var(--xj-accent) 54%, var(--xj-border)); background: color-mix(in srgb, var(--xj-accent) 18%, var(--xj-card-soft)); }
+.role-state-placeholder { padding: 22px; border: 1px dashed var(--xj-border); border-radius: 18px; color: var(--xj-muted); background: var(--xj-card-soft); }
+.role-state-placeholder strong { display: block; color: var(--xj-text); margin-bottom: 8px; }
+@media (max-width: 900px) { .role-state-toolbar { flex-direction: column; } .role-state-layout { grid-template-columns: 1fr; } .role-state-actions { justify-content: flex-start; } }
+
+.role-state-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+}
+.role-state-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--xj-border);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+}
+.role-state-table {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  border-collapse: collapse;
+  color: var(--xj-text);
+  font-size: 13px;
+  table-layout: fixed;
+}
+.role-state-table th,
+.role-state-table td {
+  border-bottom: 1px solid var(--xj-line);
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+.role-state-table th {
+  color: var(--xj-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.role-state-table input {
+  width: 100%;
+  min-width: 82px;
+  box-sizing: border-box;
+  border: 1px solid var(--xj-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--xj-text);
+  padding: 8px 10px;
+}
+.role-state-table input[type="checkbox"] {
+  width: auto;
+  min-width: 0;
+  accent-color: var(--xj-accent);
+}
+.role-state-table input.mini {
+  width: 70px;
+  min-width: 70px;
+}
+.role-state-table code {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+  color: var(--xj-accent);
+}
+
+.role-state-variable-table { min-width: 760px; }
+.role-state-variable-table th:nth-child(1),
+.role-state-variable-table td:nth-child(1) { width: 46px; text-align: center; }
+.role-state-variable-table th:nth-child(2),
+.role-state-variable-table td:nth-child(2) { width: 112px; }
+.role-state-variable-table th:nth-child(3),
+.role-state-variable-table td:nth-child(3) { width: 112px; }
+.role-state-variable-table th:nth-child(4),
+.role-state-variable-table td:nth-child(4) { width: 86px; }
+.role-state-variable-table th:nth-child(5),
+.role-state-variable-table td:nth-child(5),
+.role-state-variable-table th:nth-child(6),
+.role-state-variable-table td:nth-child(6) { width: 138px; white-space: nowrap; }
+.role-state-variable-table th:nth-child(7),
+.role-state-variable-table td:nth-child(7),
+.role-state-variable-table th:nth-child(8),
+.role-state-variable-table td:nth-child(8) { width: 50px; text-align: center; }
+.role-state-variable-table th:nth-child(9),
+.role-state-variable-table td:nth-child(9) { width: 70px; text-align: center; }
+.role-state-variable-table input.mini { width: 54px; min-width: 54px; padding-left: 8px; padding-right: 8px; }
+
+.role-state-snapshot-table { min-width: 720px; }
+.role-state-snapshot-table th:nth-child(1),
+.role-state-snapshot-table td:nth-child(1),
+.role-state-snapshot-table th:nth-child(4),
+.role-state-snapshot-table td:nth-child(4) { width: 50px; text-align: center; }
+.role-state-snapshot-table th:nth-child(2),
+.role-state-snapshot-table td:nth-child(2),
+.role-state-snapshot-table th:nth-child(3),
+.role-state-snapshot-table td:nth-child(3) { width: 120px; }
+.role-state-snapshot-table th:nth-child(5),
+.role-state-snapshot-table td:nth-child(5) { width: 300px; }
+.role-state-snapshot-table th:nth-child(6),
+.role-state-snapshot-table td:nth-child(6) { width: 70px; text-align: center; }
+.role-state-table .ghost-btn { white-space: nowrap; padding-inline: 10px; }
+
+.role-state-stage-table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+.role-state-stage-table th:nth-child(1),
+.role-state-stage-table td:nth-child(1) { width: 46px; text-align: center; }
+.role-state-stage-table th:nth-child(2),
+.role-state-stage-table td:nth-child(2) { width: 50px; text-align: center; }
+.role-state-stage-table th:nth-child(3),
+.role-state-stage-table td:nth-child(3) { width: 115px; }
+.role-state-stage-table th:nth-child(4),
+.role-state-stage-table td:nth-child(4) { width: 115px; }
+.role-state-stage-table th:nth-child(5),
+.role-state-stage-table td:nth-child(5) { width: 80px; }
+.role-state-stage-table th:nth-child(7),
+.role-state-stage-table td:nth-child(7) { width: 96px; }
+.role-state-stage-table th:nth-child(8),
+.role-state-stage-table td:nth-child(8) { width: 70px; }
+.role-state-stage-table .stage-tag {
+  max-width: 76px;
+}
+.current-stage-row {
+  background: color-mix(in srgb, var(--xj-accent) 8%, transparent);
+}
+.current-stage-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  color: var(--xj-accent);
+  font-weight: 900;
+}
+
+/* v1.1.2-fix3 · 运行状态总览、变量与阶段布局密度、角色卡片胶囊化 */
+.runtime-overview {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 13px 16px;
+  border: 1px solid var(--xj-border);
+  border-radius: 20px;
+  background: var(--xj-card);
+  box-shadow: var(--xj-shadow);
+  backdrop-filter: blur(18px) saturate(1.04);
+}
+.runtime-overview-main { min-width: 0; display: grid; gap: 6px; }
+.runtime-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.runtime-title-row strong { margin-right: 4px; }
+.runtime-badge,
+.role-state-chip,
+.role-stage-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--xj-border);
+  background: rgba(255,255,255,.055);
+  color: var(--xj-muted);
+  font-size: .78rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.runtime-badge.is-on,
+.role-state-chip.is-on { color: #b9f2c9; border-color: rgba(99,211,132,.36); background: rgba(99,211,132,.10); }
+.runtime-badge.is-off,
+.role-state-chip.is-off { color: rgba(240,120,120,.88); border-color: rgba(240,120,120,.34); background: rgba(240,120,120,.10); }
+.runtime-badge.muted { color: var(--xj-muted); }
+.runtime-flow-text { margin: 0; color: var(--xj-muted); font-size: .84rem; line-height: 1.45; }
+.runtime-overview small { color: var(--xj-muted); }
+.runtime-switches { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.runtime-toggle {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--xj-border);
+  border-radius: 999px;
+  background: rgba(255,255,255,.055);
+  color: var(--xj-text);
+  font-size: .83rem;
+  font-weight: 800;
+}
+.runtime-toggle input,
+.role-state-checks input { accent-color: var(--xj-accent); }
+
+.state-journal-workbench { grid-template-columns: 218px minmax(0, 1fr); gap: 12px; }
+.workspace-nav { padding: 12px; gap: 7px; min-height: min(66vh, 690px); }
+.workspace-nav-btn { min-height: 55px; padding: 9px 10px; gap: 10px; border-radius: 16px; }
+.workspace-nav-btn .nav-icon { width: 30px; height: 30px; border-radius: 11px; }
+.workspace-nav-btn strong { font-size: .92rem; }
+.workspace-nav-btn small { font-size: .74rem; }
+.workspace-nav::before { font-size: .7rem; margin-bottom: 2px; }
+
+.config-workspace-panel[data-active-workspace="roleState"] {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 16px;
+}
+.config-workspace-panel[data-active-workspace="roleState"] .drawer-toolbar,
+.config-workspace-panel[data-active-workspace="roleState"] .drawer-tabs,
+.config-workspace-panel[data-active-workspace="roleState"] .tab-page.active {
+  width: 100%;
+  max-width: none;
+}
+.config-workspace-panel[data-active-workspace="roleState"] .drawer-toolbar {
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+.role-state-workspace { gap: 12px; }
+.role-state-toolbar { padding: 13px 14px; align-items: center; }
+.role-state-toolbar .microcopy { margin-bottom: 0; }
+.role-state-actions { gap: 7px; }
+.role-state-actions .ghost-btn,
+.role-state-actions .primary-btn { min-height: 34px; padding: 6px 12px; }
+.role-state-layout { grid-template-columns: 260px minmax(0, 1fr); gap: 12px; }
+.role-state-sidebar,
+.role-state-detail { min-height: 330px; }
+.role-state-detail { overflow: visible; }
+.role-state-role-card {
+  gap: 8px;
+  padding: 13px 13px 12px;
+  text-align: left;
+  justify-items: stretch;
+}
+.role-state-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.role-state-card-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-stage-pill {
+  color: #2b2118;
+  border-color: rgba(232,185,116,.72);
+  background: linear-gradient(180deg, #f1c17e, #dfaa61);
+  box-shadow: 0 8px 18px rgba(232,185,116,.12);
+}
+.role-state-chip-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.role-state-chip-row.muted-row { opacity: .95; }
+.role-state-chip.is-key { max-width: 110px; overflow: hidden; text-overflow: ellipsis; justify-content: flex-start; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-weight: 700; }
+.role-state-tabs { margin: 8px 0 12px; }
+.role-state-tab { min-height: 32px; padding: 0 13px; }
+.role-state-table-actions { margin-bottom: 8px; }
+.role-state-table-wrap { overflow-x: auto; overflow-y: visible; }
+.role-state-table { font-size: 12.5px; }
+.role-state-table th,
+.role-state-table td { padding: 8px 8px; }
+.role-state-table input { min-width: 0; padding: 7px 8px; border-radius: 10px; }
+.role-state-stack { display: grid; gap: 6px; min-width: 0; }
+.role-state-stack input + input { color: var(--xj-accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.role-state-range { display: inline-grid; grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr); align-items: center; gap: 5px; min-width: 0; }
+.role-state-range span { color: var(--xj-muted); }
+.role-state-checks { display: grid; gap: 5px; min-width: 78px; }
+.role-state-checks label { display: inline-flex; align-items: center; gap: 5px; color: var(--xj-muted); font-size: .78rem; }
+.role-state-variable-table { min-width: 650px; table-layout: fixed; }
+.role-state-variable-table th:nth-child(1),
+.role-state-variable-table td:nth-child(1) { width: 46px; text-align: center; }
+.role-state-variable-table th:nth-child(2),
+.role-state-variable-table td:nth-child(2) { width: 150px; }
+.role-state-variable-table th:nth-child(3),
+.role-state-variable-table td:nth-child(3) { width: 80px; }
+.role-state-variable-table th:nth-child(4),
+.role-state-variable-table td:nth-child(4),
+.role-state-variable-table th:nth-child(5),
+.role-state-variable-table td:nth-child(5) { width: 128px; white-space: nowrap; }
+.role-state-variable-table th:nth-child(6),
+.role-state-variable-table td:nth-child(6) { width: 86px; }
+.role-state-variable-table th:nth-child(7),
+.role-state-variable-table td:nth-child(7) { width: 64px; text-align: center; }
+.role-state-variable-table input.mini { width: 100%; min-width: 0; padding-left: 7px; padding-right: 7px; }
+.role-state-snapshot-table { min-width: 680px; }
+.role-state-stage-table { min-width: 720px; }
+
+@media (max-width: 1100px) {
+  .runtime-overview { grid-template-columns: 1fr; }
+  .runtime-switches { justify-content: flex-start; }
+  .state-journal-workbench { grid-template-columns: 1fr; }
+}
+
+/* v1.1.2-fix4 · 恢复变量名/Key 分列，运行状态开关改为小拨钮 */
+.runtime-switches {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.runtime-toggle {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--xj-muted);
+  font-size: .82rem;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+.runtime-toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 38px;
+  height: 20px;
+  min-width: 38px;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--xj-border) 72%, transparent);
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.25);
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.runtime-toggle input::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xj-muted) 78%, white);
+  box-shadow: 0 2px 5px rgba(0,0,0,.28);
+  transition: transform .18s ease, background .18s ease;
+}
+.runtime-toggle input:checked {
+  border-color: color-mix(in srgb, var(--xj-accent) 70%, var(--xj-border));
+  background: color-mix(in srgb, var(--xj-accent) 42%, rgba(255,255,255,.08));
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.18), 0 0 0 2px color-mix(in srgb, var(--xj-accent) 10%, transparent);
+}
+.runtime-toggle input:checked::before {
+  transform: translateX(18px);
+  background: #fff4d9;
+}
+.runtime-toggle input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--xj-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.role-state-variable-table { min-width: 760px; table-layout: fixed; }
+.role-state-variable-table th:nth-child(1),
+.role-state-variable-table td:nth-child(1) { width: 46px; text-align: center; }
+.role-state-variable-table th:nth-child(2),
+.role-state-variable-table td:nth-child(2) { width: 108px; }
+.role-state-variable-table th:nth-child(3),
+.role-state-variable-table td:nth-child(3) { width: 108px; }
+.role-state-variable-table th:nth-child(4),
+.role-state-variable-table td:nth-child(4) { width: 78px; }
+.role-state-variable-table th:nth-child(5),
+.role-state-variable-table td:nth-child(5),
+.role-state-variable-table th:nth-child(6),
+.role-state-variable-table td:nth-child(6) { width: 128px; white-space: nowrap; }
+.role-state-variable-table th:nth-child(7),
+.role-state-variable-table td:nth-child(7),
+.role-state-variable-table th:nth-child(8),
+.role-state-variable-table td:nth-child(8) { width: 48px; text-align: center; }
+.role-state-variable-table th:nth-child(9),
+.role-state-variable-table td:nth-child(9) { width: 64px; text-align: center; }
+.role-state-variable-table td:nth-child(2) input,
+.role-state-variable-table td:nth-child(3) input {
+  font-weight: 700;
+}
+.role-state-variable-table td:nth-child(3) input {
+  color: var(--xj-accent);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.role-state-variable-table input.mini { width: 100%; min-width: 0; padding-left: 7px; padding-right: 7px; }
+
+
+/* v1.1.2-fix5 · 角色心笺模式、确认弹窗与阶段条件编辑器 */
+.role-state-mode-panel {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 320px) minmax(260px, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--xj-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--xj-card-soft) 86%, transparent);
+}
+.role-state-mode-panel strong { white-space: nowrap; }
+.role-state-mode-panel select {
+  min-height: 34px;
+  border: 1px solid var(--xj-border);
+  border-radius: 999px;
+  background: rgba(0,0,0,.16);
+  color: var(--xj-text);
+  padding: 0 12px;
+  font-weight: 800;
+}
+.role-state-mode-panel small { color: var(--xj-muted); line-height: 1.45; }
+.role-stage-pill.muted {
+  color: var(--xj-muted);
+  border-color: var(--xj-border);
+  background: rgba(255,255,255,.06);
+  box-shadow: none;
+}
+.state-journal-confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0,0,0,.42);
+  backdrop-filter: blur(10px);
+}
+.state-journal-confirm-modal.show { display: grid; }
+.state-journal-confirm-card {
+  width: min(520px, calc(100vw - 32px));
+  border: 1px solid color-mix(in srgb, var(--xj-accent) 28%, var(--xj-border));
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--xj-panel) 94%, #000);
+  box-shadow: 0 28px 84px rgba(0,0,0,.38);
+  padding: 20px;
+}
+.state-journal-confirm-card h3 { margin: 0 0 10px; }
+.state-journal-confirm-body { color: var(--xj-muted); line-height: 1.65; }
+.state-journal-confirm-body p { margin: 8px 0; }
+.state-journal-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.state-journal-confirm-actions .danger { border-color: rgba(240,120,120,.45); background: rgba(185,64,64,.22); color: #ffd6d6; }
+.danger-text { color: #ffb7b7; }
+.stage-condition-summary { color: var(--xj-text); font-weight: 800; margin-bottom: 8px; white-space: normal; min-width: 240px; }
+.stage-condition-builder { display: grid; gap: 6px; min-width: 360px; }
+.stage-condition-row { display: grid; grid-template-columns: minmax(98px, 1.2fr) 64px 76px 28px; gap: 6px; align-items: center; }
+.stage-condition-row select,
+.stage-condition-row input {
+  min-height: 32px;
+  border: 1px solid var(--xj-border);
+  border-radius: 10px;
+  background: rgba(0,0,0,.18);
+  color: var(--xj-text);
+  padding: 0 8px;
+}
+.tiny-btn, .ghost-btn.tiny {
+  min-height: 28px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.role-state-stage-table { min-width: 980px; table-layout: auto; }
+.role-state-stage-table th:nth-child(6),
+.role-state-stage-table td:nth-child(6) { min-width: 390px; }
+.role-state-variable-table { min-width: 940px; table-layout: auto; }
+.role-state-variable-table input { min-width: 86px; }
+.role-state-variable-table input.mini { width: 64px; min-width: 64px; }
+.role-state-variable-table th:nth-child(5),
+.role-state-variable-table td:nth-child(5),
+.role-state-variable-table th:nth-child(6),
+.role-state-variable-table td:nth-child(6) { min-width: 150px; }
+
+@media (max-width: 900px) {
+  .role-state-mode-panel { grid-template-columns: 1fr; }
+}
+
+/* v1.1.2-fix6: hide machine identifiers from the default role-state UI. */
+.role-state-advanced {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--muted, rgba(255,255,255,0.62));
+}
+.role-state-advanced summary {
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.72;
+}
+.role-state-advanced label {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+.role-state-advanced input {
+  min-height: 30px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.role-state-advanced code {
+  display: block;
+  margin-top: 6px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--accent, #d8b56d) 78%, var(--text, #fff));
+}
+.role-state-stage-table { min-width: 860px; }
+.role-state-stage-table th:nth-child(5),
+.role-state-stage-table td:nth-child(5) { min-width: 430px; }
+.role-state-variable-table { min-width: 900px; }
+.role-state-snapshot-table { min-width: 780px; }
+
+/* v1.1.2-fix8: stage rule table rollback + safer editor modal */
+.role-state-stage-table { min-width: 720px !important; table-layout: fixed !important; }
+.role-state-stage-table th:nth-child(1),
+.role-state-stage-table td:nth-child(1) { width: 46px; text-align: center; }
+.role-state-stage-table th:nth-child(2),
+.role-state-stage-table td:nth-child(2) { width: 54px; text-align: center; }
+.role-state-stage-table th:nth-child(3),
+.role-state-stage-table td:nth-child(3) { width: 130px; }
+.role-state-stage-table th:nth-child(4),
+.role-state-stage-table td:nth-child(4) { width: 86px; }
+.role-state-stage-table th:nth-child(5),
+.role-state-stage-table td:nth-child(5) { min-width: 260px !important; width: auto; }
+.role-state-stage-table th:nth-child(6),
+.role-state-stage-table td:nth-child(6) { width: 155px; }
+.stage-condition-summary.is-compact { margin: 0; min-width: 0; font-weight: 800; white-space: normal; line-height: 1.45; }
+.role-state-stage-table .ghost-btn { margin-right: 6px; }
+.role-state-stage-table .danger-soft { color: rgba(255,210,210,.92); border-color: rgba(240,120,120,.28); }
+.role-state-modal { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 24px; }
+.role-state-modal-mask { position: absolute; inset: 0; background: rgba(0,0,0,.46); backdrop-filter: blur(7px); }
+.role-state-modal-card { position: relative; width: min(760px, calc(100vw - 48px)); max-height: min(760px, calc(100vh - 48px)); overflow: auto; border: 1px solid var(--xj-border); border-radius: 22px; background: color-mix(in srgb, var(--xj-bg) 94%, #000 6%); box-shadow: 0 24px 80px rgba(0,0,0,.45); padding: 18px; }
+.role-state-modal-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.role-state-modal-card header strong { display: block; font-size: 1.05rem; }
+.role-state-modal-card header small { display: block; margin-top: 4px; color: var(--xj-muted); }
+.role-state-stage-form { display: grid; gap: 12px; }
+.role-state-stage-form > label { display: grid; gap: 6px; color: var(--xj-muted); font-weight: 800; }
+.role-state-stage-form input,
+.role-state-stage-form select { min-height: 38px; border: 1px solid var(--xj-border); border-radius: 12px; background: var(--xj-card-soft); color: var(--xj-text); padding: 8px 10px; }
+.role-state-condition-editor { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--xj-border); border-radius: 16px; background: var(--xj-card-soft); }
+.role-state-condition-list { display: grid; gap: 8px; }
+.role-state-condition-line { display: grid; grid-template-columns: minmax(160px, 1fr) 90px 110px 34px; gap: 8px; align-items: center; }
+.role-state-condition-line .tiny-btn { min-height: 34px; border-radius: 999px; }
+.role-state-empty-line { color: var(--xj-muted); padding: 8px 0; }
+.state-journal-metric-diary { margin-top: 12px; }
+.state-journal-metric-diary-list { display: grid; gap: 8px; }
+.state-journal-metric-diary-row { padding: 10px 12px; border: 1px solid var(--sj-note-line, rgba(120,140,170,.22)); border-radius: 12px; background: rgba(120,140,170,.08); }
+.state-journal-metric-diary-row strong { display: block; margin-bottom: 6px; }
+.state-journal-metric-diary-row p { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.state-journal-metric-diary-row span { display: inline-flex; gap: 5px; align-items: center; border: 1px solid rgba(120,140,170,.22); border-radius: 999px; padding: 4px 8px; background: rgba(255,255,255,.06); }
+@media (max-width: 760px) { .role-state-condition-line { grid-template-columns: 1fr; } }
+
+/* v1.1.2-fix9 · 表格列宽重排：隐藏机器 Key 后释放空间，变量/快照表不再留大空白 */
+.role-state-table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+.role-state-variable-table,
+.role-state-snapshot-table,
+.role-state-stage-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.role-state-variable-table {
+  min-width: 860px;
+}
+.role-state-variable-table th:nth-child(1),
+.role-state-variable-table td:nth-child(1) { width: 48px; text-align: center; }
+.role-state-variable-table th:nth-child(2),
+.role-state-variable-table td:nth-child(2) { width: 170px; }
+.role-state-variable-table th:nth-child(3),
+.role-state-variable-table td:nth-child(3) { width: 110px; }
+.role-state-variable-table th:nth-child(4),
+.role-state-variable-table td:nth-child(4) { width: 170px; }
+.role-state-variable-table th:nth-child(5),
+.role-state-variable-table td:nth-child(5) { width: 190px; }
+.role-state-variable-table th:nth-child(6),
+.role-state-variable-table td:nth-child(6),
+.role-state-variable-table th:nth-child(7),
+.role-state-variable-table td:nth-child(7) { width: 68px; text-align: center; }
+.role-state-variable-table th:nth-child(8),
+.role-state-variable-table td:nth-child(8) { width: 92px; text-align: center; }
+.role-state-variable-table .role-state-range {
+  grid-template-columns: minmax(64px, 1fr) auto minmax(64px, 1fr);
+  gap: 8px;
+}
+.role-state-variable-table input.mini {
+  width: 100%;
+  min-width: 64px;
+}
+.role-state-snapshot-table {
+  min-width: 820px;
+}
+.role-state-snapshot-table th:nth-child(1),
+.role-state-snapshot-table td:nth-child(1) { width: 48px; text-align: center; }
+.role-state-snapshot-table th:nth-child(2),
+.role-state-snapshot-table td:nth-child(2) { width: 180px; }
+.role-state-snapshot-table th:nth-child(3),
+.role-state-snapshot-table td:nth-child(3) { width: 70px; text-align: center; }
+.role-state-snapshot-table th:nth-child(4),
+.role-state-snapshot-table td:nth-child(4) { width: auto; }
+.role-state-snapshot-table th:nth-child(5),
+.role-state-snapshot-table td:nth-child(5) { width: 96px; text-align: center; }
+.role-state-snapshot-table input[data-snapshot-field="instruction"] {
+  min-width: 240px;
+}
+.role-state-stage-table {
+  min-width: 760px;
+}
+.role-state-stage-table th:nth-child(1),
+.role-state-stage-table td:nth-child(1) { width: 46px; text-align: center; }
+.role-state-stage-table th:nth-child(2),
+.role-state-stage-table td:nth-child(2) { width: 52px; text-align: center; }
+.role-state-stage-table th:nth-child(3),
+.role-state-stage-table td:nth-child(3) { width: 160px; }
+.role-state-stage-table th:nth-child(4),
+.role-state-stage-table td:nth-child(4) { width: 90px; }
+.role-state-stage-table th:nth-child(5),
+.role-state-stage-table td:nth-child(5) { width: auto; }
+.role-state-stage-table th:nth-child(6),
+.role-state-stage-table td:nth-child(6) { width: 136px; }
+.role-state-table td:empty::after { content: none; }
+
+/* v1.1.2-fix13: make Variables & Stages look like a real multi-card workspace. */
+.role-state-workspace {
+  max-width: 100%;
+}
+.role-state-toolbar.turn-note-config-card.standalone {
+  padding: 14px 16px;
+  border-radius: 18px;
+}
+.role-state-layout {
+  grid-template-columns: minmax(230px, 290px) minmax(0, 1fr) !important;
+  align-items: start;
+  gap: 14px !important;
+}
+.role-state-sidebar.turn-note-config-card.soft-card {
+  min-height: 520px;
+  padding: 16px;
+}
+.role-state-detail.turn-note-config-card.standalone {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.role-state-detail > .subhead {
+  padding: 0 4px;
+}
+.role-state-detail .role-state-tabs {
+  margin: 0 0 2px;
+  padding: 4px;
+  border: 1px solid var(--xj-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xj-card-soft) 78%, transparent);
+}
+.role-state-overview-card,
+.role-state-editor-card {
+  min-width: 0;
+  border: 1px solid var(--xj-border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--xj-card) 86%, transparent);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .16);
+}
+.role-state-overview-card {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.45fr) minmax(130px, .55fr) minmax(140px, .55fr) minmax(130px, .55fr);
+  gap: 10px;
+  padding: 14px;
+}
+.role-state-overview-main {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 6px;
+}
+.role-state-overview-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.role-state-overview-title strong {
+  font-size: 1.05rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.role-state-overview-main p {
+  margin: 0;
+  color: var(--xj-muted);
+  line-height: 1.55;
+}
+.role-state-overview-card .role-state-mode-panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  grid-template-columns: auto minmax(220px, 360px);
+  justify-content: start;
+}
+.role-state-overview-card .role-state-mode-panel small {
+  display: none;
+}
+.role-state-stat-card {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--xj-border) 78%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--xj-card-soft) 76%, transparent);
+}
+.role-state-stat-card span,
+.role-state-stat-card small {
+  color: var(--xj-muted);
+  font-size: .78rem;
+  line-height: 1.35;
+}
+.role-state-stat-card strong {
+  color: var(--xj-text);
+  font-size: 1rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.role-state-stat-card.primary {
+  border-color: color-mix(in srgb, var(--xj-accent) 42%, var(--xj-border));
+  background: color-mix(in srgb, var(--xj-accent) 13%, var(--xj-card-soft));
+}
+.role-state-editor-card {
+  padding: 14px;
+}
+.role-state-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.role-state-editor-head strong {
+  display: block;
+  color: var(--xj-text);
+  font-size: 1rem;
+}
+.role-state-editor-head small {
+  display: block;
+  margin-top: 3px;
+  color: var(--xj-muted);
+  line-height: 1.45;
+}
+.role-state-editor-head > .ghost-btn {
+  flex: 0 0 auto;
+}
+.role-state-editor-card .role-state-table-wrap {
+  margin: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--xj-card-soft) 60%, transparent);
+}
+.role-state-role-card {
+  text-align: left;
+}
+@media (max-width: 1120px) {
+  .role-state-overview-card {
+    grid-template-columns: 1fr 1fr;
+  }
+  .role-state-overview-main {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 900px) {
+  .role-state-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .role-state-overview-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* v1.1.3 · UI 收口：角色配置页去重复、按钮分组、生成规则并入设置 */
+.config-workspace-panel[data-active-workspace="generate"] .drawer-tabs { display: none; }
+.config-workspace-panel[data-active-workspace="settings"] [data-tab-scope="settings"] { display: flex !important; }
+.config-workspace-panel[data-active-workspace="turnNote"] .drawer-tabs { display: none !important; }
+
+.role-state-toolbar {
+  align-items: center;
+  padding: 12px 14px;
+}
+.role-state-toolbar .subhead {
+  margin-bottom: 4px;
+}
+.role-state-toolbar .microcopy {
+  max-width: 520px;
+  line-height: 1.55;
+}
+.grouped-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 10px;
+}
+.action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--xj-border) 72%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xj-card-soft) 76%, transparent);
+}
+.action-group > span {
+  padding: 0 6px;
+  color: var(--xj-muted);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.action-group .ghost-btn,
+.action-group .primary-btn {
+  min-height: 31px;
+  padding: 5px 11px;
+  white-space: nowrap;
+}
+.action-group.debug-group {
+  opacity: .9;
+}
+
+.role-state-layout {
+  grid-template-columns: 248px minmax(0, 1fr);
+  align-items: start;
+}
+.role-state-sidebar {
+  min-height: 0;
+  padding-top: 12px;
+}
+.role-state-sidebar .subhead.compact {
+  margin-bottom: 8px;
+}
+.role-state-sidebar .micro-badge {
+  display: none;
+}
+.role-state-role-card {
+  gap: 8px;
+  padding: 12px 13px;
+}
+.role-state-card-head strong {
+  font-size: .96rem;
+}
+.role-state-chip-row.muted-row .role-state-chip {
+  max-width: none;
+  font-family: inherit;
+}
+.role-state-chip.is-key {
+  display: none;
+}
+.role-state-overview-card.compact-overview-card {
+  grid-template-columns: 1fr;
+  padding: 16px 18px;
+  min-height: auto;
+}
+.role-state-overview-card.compact-overview-card .role-state-overview-main {
+  display: grid;
+  gap: 10px;
+}
+.role-state-overview-card.compact-overview-card .role-state-overview-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.role-state-overview-card.compact-overview-card .role-state-mode-panel {
+  grid-template-columns: auto minmax(260px, 420px);
+  width: fit-content;
+  max-width: 100%;
+}
+.role-state-overview-card.compact-overview-card p {
+  margin: 0;
+  max-width: 720px;
+  color: var(--xj-muted);
+}
+.role-state-stat-card {
+  display: none;
+}
+.role-state-editor-card {
+  margin-top: 12px;
+}
+
+.role-state-variable-table { min-width: 850px; table-layout: fixed; }
+.role-state-variable-table th:nth-child(1),
+.role-state-variable-table td:nth-child(1) { width: 48px; text-align: center; }
+.role-state-variable-table th:nth-child(2),
+.role-state-variable-table td:nth-child(2) { width: 170px; }
+.role-state-variable-table th:nth-child(3),
+.role-state-variable-table td:nth-child(3) { width: 95px; }
+.role-state-variable-table th:nth-child(4),
+.role-state-variable-table td:nth-child(4),
+.role-state-variable-table th:nth-child(5),
+.role-state-variable-table td:nth-child(5) { width: 160px; }
+.role-state-variable-table th:nth-child(6),
+.role-state-variable-table td:nth-child(6),
+.role-state-variable-table th:nth-child(7),
+.role-state-variable-table td:nth-child(7) { width: 62px; text-align: center; }
+.role-state-variable-table th:nth-child(8),
+.role-state-variable-table td:nth-child(8) { width: 84px; text-align: center; }
+.role-state-variable-table input.mini { width: 70px; min-width: 70px; }
+
+.role-state-snapshot-table { min-width: 760px; table-layout: fixed; }
+.role-state-snapshot-table th:nth-child(1),
+.role-state-snapshot-table td:nth-child(1),
+.role-state-snapshot-table th:nth-child(3),
+.role-state-snapshot-table td:nth-child(3) { width: 56px; text-align: center; }
+.role-state-snapshot-table th:nth-child(2),
+.role-state-snapshot-table td:nth-child(2) { width: 170px; }
+.role-state-snapshot-table th:nth-child(4),
+.role-state-snapshot-table td:nth-child(4) { width: auto; }
+.role-state-snapshot-table th:nth-child(5),
+.role-state-snapshot-table td:nth-child(5) { width: 92px; text-align: center; }
+.role-state-snapshot-table td:nth-child(4) input { width: 100%; }
+
+@media (max-width: 980px) {
+  .role-state-overview-card.compact-overview-card .role-state-mode-panel { grid-template-columns: 1fr; width: 100%; }
+  .grouped-actions { justify-content: flex-start; }
+}
+
+/* v1.1.5 · 角色配置页 UI 收口：角色卡减重、概览胶囊化、移除大面积空白 */
+.config-workspace-panel[data-active-workspace="roleState"] .drawer-toolbar {
+  margin-bottom: 10px;
+}
+.role-state-workspace {
+  gap: 10px;
+}
+.role-state-toolbar.turn-note-config-card.standalone {
+  padding: 12px 14px;
+}
+.role-state-toolbar .microcopy {
+  max-width: 480px;
+}
+.role-state-layout {
+  grid-template-columns: 246px minmax(0, 1fr) !important;
+  gap: 12px !important;
+}
+.role-state-sidebar.turn-note-config-card.soft-card {
+  min-height: 0;
+  align-self: start;
+  padding: 14px;
+}
+#roleStateRoleList {
+  display: grid;
+  gap: 9px;
+}
+.role-state-role-card.role-state-role-card-v115,
+.role-state-empty-role-card {
+  gap: 8px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+.role-state-role-card-v115 .role-state-card-head {
+  gap: 8px;
+}
+.role-state-role-card-v115 .role-state-card-head strong {
+  font-size: .94rem;
+}
+.role-state-card-meta,
+.role-state-overview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.role-state-mode-badge,
+.role-state-overview-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 23px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--xj-border);
+  background: rgba(255,255,255,.052);
+  color: var(--xj-muted);
+  font-size: .76rem;
+  font-weight: 850;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.role-state-mode-badge.is-on,
+.role-state-overview-chip.is-on {
+  color: #b9f2c9;
+  border-color: rgba(99,211,132,.32);
+  background: rgba(99,211,132,.085);
+}
+.role-state-mode-badge.is-off,
+.role-state-overview-chip.is-off {
+  color: rgba(240,120,120,.88);
+  border-color: rgba(240,120,120,.30);
+  background: rgba(240,120,120,.085);
+}
+.role-state-overview-chip.primary {
+  color: var(--xj-text);
+  border-color: color-mix(in srgb, var(--xj-accent) 38%, var(--xj-border));
+  background: color-mix(in srgb, var(--xj-accent) 12%, rgba(255,255,255,.04));
+}
+.role-state-role-card-v115 .role-state-chip {
+  min-height: 22px;
+  padding: 3px 8px;
+  font-size: .75rem;
+  background: rgba(255,255,255,.045);
+}
+.role-state-role-card-v115 .role-stage-pill {
+  min-height: 23px;
+  padding: 3px 9px;
+  font-size: .75rem;
+}
+.role-state-detail.turn-note-config-card.standalone {
+  gap: 10px;
+}
+.role-state-detail > .subhead.compact {
+  display: none;
+}
+.role-state-detail .role-state-tabs {
+  margin: 0;
+  width: fit-content;
+}
+.role-state-overview-card.compact-overview-card.role-state-overview-card-v115 {
+  padding: 13px 15px;
+  border-radius: 18px;
+}
+.role-state-overview-card-v115 .role-state-overview-main {
+  gap: 9px;
+}
+.role-state-overview-card-v115 .role-state-mode-panel {
+  margin-top: 2px;
+  padding: 0;
+}
+.role-state-overview-card-v115 .role-state-mode-panel select {
+  min-height: 33px;
+}
+.role-state-overview-card-v115 p {
+  max-width: 760px;
+  line-height: 1.5;
+}
+.role-state-editor-card {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 18px;
+}
+.role-state-editor-head {
+  margin-bottom: 8px;
+}
+.role-state-placeholder {
+  padding: 16px 18px;
+  border-radius: 16px;
+}
+@media (max-width: 980px) {
+  .role-state-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .role-state-detail .role-state-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+}

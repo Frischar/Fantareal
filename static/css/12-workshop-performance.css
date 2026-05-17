@@ -322,3 +322,39 @@ body.workshop-config-page .workshop-ambience-config-block .workshop-opening-medi
 body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card select {
   background: rgba(var(--input-rgb), clamp(0.42, calc(var(--input-alpha) + 0.18), 0.86)) !important;
 }
+
+/* 演出工坊 v0.1：角色卡演出绑定提示卡。 */
+body.workshop-config-page .workshop-card-binding-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)) !important;
+}
+body.workshop-config-page .workshop-binding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+body.workshop-config-page .workshop-binding-head strong {
+  color: var(--text);
+  font-size: .96rem;
+}
+body.workshop-config-page .workshop-binding-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+body.workshop-config-page .workshop-binding-pills .micro-badge {
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: rgba(var(--input-rgb), var(--input-alpha));
+  font-size: .76rem;
+  font-weight: 820;
+}
+body.workshop-config-page .workshop-binding-pills .micro-badge.active {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, rgba(var(--input-rgb), var(--input-alpha)));
+}

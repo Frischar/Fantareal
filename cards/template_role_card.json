@@ -11,6 +11,72 @@
     "template",
     "companion-chat"
   ],
+  "stateJournal": {
+    "version": 1,
+    "enabled": true,
+    "roles": [
+      {
+        "role_id": "role_a",
+        "role_name": "Role A",
+        "aliases": [
+          "1",
+          "role_a",
+          "Role A"
+        ],
+        "enabled": true,
+        "use_default_variables": false,
+        "initial_stage": "stage_a",
+        "variables": [],
+        "stages": [],
+        "snapshotFields": [],
+        "settings": {
+          "allow_regression": false,
+          "confirm_turns": 1,
+          "cooldown_turns": 2
+        }
+      },
+      {
+        "role_id": "role_b",
+        "role_name": "Role B",
+        "aliases": [
+          "2",
+          "role_b",
+          "Role B"
+        ],
+        "enabled": true,
+        "use_default_variables": false,
+        "initial_stage": "stage_a",
+        "variables": [],
+        "stages": [],
+        "snapshotFields": [],
+        "settings": {
+          "allow_regression": false,
+          "confirm_turns": 1,
+          "cooldown_turns": 2
+        }
+      },
+      {
+        "role_id": "role_c",
+        "role_name": "Role C",
+        "aliases": [
+          "3",
+          "role_c",
+          "Role C"
+        ],
+        "enabled": true,
+        "use_default_variables": false,
+        "initial_stage": "stage_a",
+        "variables": [],
+        "stages": [],
+        "snapshotFields": [],
+        "settings": {
+          "allow_regression": false,
+          "confirm_turns": 1,
+          "cooldown_turns": 2
+        }
+      }
+    ]
+  },
   "creativeWorkshop": {
     "version": 2,
     "enabled": true,
@@ -56,66 +122,7 @@
         "loop": true
       }
     },
-    "dynamicScenes": [],
-    "items": [
-      {
-        "id": "workshop_stage_a",
-        "name": "A阶段规则",
-        "enabled": false,
-        "triggerMode": "stage",
-        "triggerStage": "A",
-        "triggerTempMin": 0,
-        "triggerTempMax": 0,
-        "actionType": "music",
-        "popupTitle": "",
-        "musicPreset": "off",
-        "musicUrl": "",
-        "autoplay": true,
-        "loop": true,
-        "volume": 0.85,
-        "imageUrl": "",
-        "imageAlt": "",
-        "note": ""
-      },
-      {
-        "id": "workshop_stage_b",
-        "name": "B阶段规则",
-        "enabled": false,
-        "triggerMode": "stage",
-        "triggerStage": "B",
-        "triggerTempMin": 0,
-        "triggerTempMax": 0,
-        "actionType": "music",
-        "popupTitle": "",
-        "musicPreset": "off",
-        "musicUrl": "",
-        "autoplay": true,
-        "loop": true,
-        "volume": 0.85,
-        "imageUrl": "",
-        "imageAlt": "",
-        "note": ""
-      },
-      {
-        "id": "workshop_stage_c",
-        "name": "C阶段规则",
-        "enabled": false,
-        "triggerMode": "stage",
-        "triggerStage": "C",
-        "triggerTempMin": 0,
-        "triggerTempMax": 0,
-        "actionType": "music",
-        "popupTitle": "",
-        "musicPreset": "off",
-        "musicUrl": "",
-        "autoplay": true,
-        "loop": true,
-        "volume": 0.85,
-        "imageUrl": "",
-        "imageAlt": "",
-        "note": ""
-      }
-    ]
+    "dynamicScenes": []
   },
   "plotStages": {
     "A": {

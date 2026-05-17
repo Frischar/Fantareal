@@ -243,7 +243,8 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
         runtime_overrides = payload.runtime_config or {}
         retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
-        worldbook_matches = ctx.match_worldbook_entries(message)
+        active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
+        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_stage_tags)
         worldbook_debug_snapshot = ctx.get_worldbook_debug_snapshot()
         prompt_package = ctx.build_prompt_package(
             message,
@@ -272,7 +273,8 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         runtime_overrides = payload.runtime_config or {}
         llm_config = ctx.get_runtime_chat_config(runtime_overrides)
         retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
-        worldbook_matches = ctx.match_worldbook_entries(message)
+        active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
+        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_stage_tags)
         worldbook_debug_snapshot = ctx.get_worldbook_debug_snapshot()
         worldbook_debug = ctx.build_worldbook_debug_payload(
             message,
