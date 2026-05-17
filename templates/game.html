@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>茶会派对 — Fantareal</title>
+  <link rel="stylesheet" href="/static/styles.css?v=20260517">
+  <link rel="icon" href="/static/fantareal_icon.ico">
+</head>
+<body class="modern-setting-page app-sidebar-shell game-page" data-theme="{{ settings.theme }}">
+<div class="topbar-stack">
+  <div class="topbar">
+    <div class="topbar-left"><a class="brand chat-brand" href="/chat">Fantareal</a></div>
+    {% include "_grouped_nav.html" %}
+  </div>
+
+  <div id="game-shell" class="game-shell">
+
+    <!-- ═══════ 剧情界面 ═══════ -->
+    <div id="view-story" class="game-view game-story" style="display:none;">
+      <div class="game-story-card">
+        <div class="game-story-icon">🫖</div>
+        <div id="story-text" class="game-story-text"></div>
+        <button id="story-continue" class="game-btn game-btn-primary" style="display:none;">继续</button>
+      </div>
+    </div>
+
+    <!-- ═══════ 主菜单 ═══════ -->
+    <div id="view-menu" class="game-view game-menu" style="display:none;">
+      <div class="game-menu-card">
+        <div class="game-menu-noai"><button class="game-btn-noai" data-action="start-noai">无AI模式</button></div>
+        <div class="game-menu-top-left"><button class="game-icon-btn" id="btn-volume-menu" title="音量设置">🔊</button></div>
+        <div class="game-menu-icon">🎀</div>
+        <h1 class="game-menu-title">派对彩带大对决</h1>
+        <p class="game-menu-subtitle">Tea Party Confetti Showdown</p>
+        <div class="game-menu-buttons">
+          <button class="game-btn game-btn-primary" data-action="start-classic">⚔️ 经典模式</button>
+          <p class="game-mode-desc">和角色实时对战，来一场可爱轻松的轮盘赌吧</p>
+          <button class="game-btn game-btn-party" data-action="start-party">💬 派对模式</button>
+          <p class="game-mode-desc">边玩边聊，无时间限制</p>
+          <button class="game-btn game-btn-secondary" data-action="show-rules">📖 规则介绍</button>
+          <button class="game-btn game-btn-secondary" id="btn-replay-story">📜 回顾剧情</button>
+        </div>
+        <div class="game-upload-area">
+          <button class="game-upload-btn" id="btn-upload-self">📷 上传我方立绘</button>
+          <button class="game-upload-btn" id="btn-upload-opponent">📷 上传对方立绘</button>
+          <span class="game-upload-label">按扑克牌比例自动裁剪</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ 对战界面 ═══════ -->
+    <div id="view-arena" class="game-view game-arena" style="display:none;">
+      <div class="game-topbar">
+        <div class="game-topbar-left" style="position:relative;">
+          <button id="btn-menu-dropdown" class="game-icon-btn" title="菜单">⚙️</button>
+          <button id="btn-volume-arena" class="game-icon-btn" title="音量设置">🔊</button>
+          <div id="menu-dropdown" class="game-dropdown" style="display:none;">
+            <button data-action="restart">🔄 重新开始</button>
+            <button data-action="back-to-menu">🏠 回到主菜单</button>
+          </div>
+        </div>
+        <div class="game-topbar-center">
+          <span class="game-title">🎀 茶会派对</span>
+          <span class="game-level-badge" id="level-badge">第 1 局</span>
+        </div>
+        <div class="game-topbar-right">
+          <button id="btn-rules" class="game-icon-btn" title="规则书">📖</button>
+        </div>
+      </div>
+
+      <div class="game-arena-layout" id="arena-layout">
+        <div class="game-player-zone" id="opponent-zone">
+          <div class="game-items-left" id="opponent-items-left"></div>
+          <div class="game-portrait-area" id="opponent-portrait-area">
+            <div class="game-balloons" id="opponent-balloons"></div>
+            <div class="game-portrait-card" id="opponent-portrait-card" data-target="opponent">
+              <img id="opponent-portrait-img" src="" alt="" style="display:none;">
+              <span class="avatar-placeholder" id="opponent-portrait-fb">👤</span>
+            </div>
+            <div class="game-portrait-name" id="opponent-name">对手</div>
+            <div class="game-ai-bubble" id="ai-bubble" style="display:none;">
+              <div class="game-ai-bubble-text" id="ai-bubble-text"></div>
+            </div>
+          </div>
+          <div class="game-items-right" id="opponent-items-right"></div>
+        </div>
+
+        <div class="game-cannon-zone">
+          <div class="game-bullet-circle" id="bullet-circle"></div>
+          <div class="game-cannon-card" id="cannon-card" data-target="cannon">
+            <img src="/game/pictures/12.png" alt="礼炮">
+          </div>
+          <div class="game-cannon-buffs" id="cannon-buffs"></div>
+        </div>
+
+        <div class="game-player-zone" id="self-zone">
+          <div class="game-items-left" id="self-items-left"></div>
+          <div class="game-portrait-area" id="self-portrait-area">
+            <div class="game-balloons" id="self-balloons"></div>
+            <div class="game-portrait-card" id="self-portrait-card" data-target="self">
+              <img id="self-portrait-img" src="" alt="" style="display:none;">
+              <span class="avatar-placeholder" id="self-portrait-fb">👤</span>
+            </div>
+            <div class="game-portrait-name" id="self-name">你</div>
+          </div>
+          <div class="game-items-right" id="self-items-right"></div>
+        </div>
+
+        <div class="game-preview-area" id="preview-area">
+          <img class="game-preview-card" id="preview-img" src="" alt="">
+          <span class="game-preview-label" id="preview-label"></span>
+        </div>
+      </div>
+
+      <div class="game-toast-area" id="toast-area"></div>
+      <div class="game-round-popup" id="round-popup" style="display:none;">
+        <span id="round-popup-text"></span>
+      </div>
+
+      <div class="game-action-bar">
+        <span class="game-turn-indicator" id="turn-indicator">⏳ 等待开始</span>
+        <span class="game-timer" id="timer-display" style="display:none;"></span>
+      </div>
+
+      <div class="game-chat-bar" id="party-chat-bar" style="display:none;">
+        <input type="text" class="game-chat-input" id="party-chat-input" placeholder="和对手聊天...">
+        <button class="game-chat-send-btn" id="party-chat-send">发送</button>
+      </div>
+    </div>
+
+    <div class="game-deck" id="game-deck" style="display:none;">
+      <div class="deck-card"><img src="/game/pictures/11.png" alt=""></div>
+      <div class="deck-card"><img src="/game/pictures/11.png" alt=""></div>
+      <div class="deck-card"><img src="/game/pictures/11.png" alt=""></div>
+    </div>
+  </div>
+</div>
+
+<div id="modal-rules" class="game-modal" style="display:none;">
+  <div class="game-modal-backdrop" data-close-modal></div>
+  <div class="game-modal-content game-modal-rules">
+    <h2>📖 派对道具大全 & 操作说明</h2>
+    <div style="text-align:left;margin-bottom:16px;font-size:13px;color:var(--muted);line-height:1.8;">
+      <b>基本操作：</b><br>
+      🖱 <b>左键点击</b>道具卡 → 选中（粉光）→ 合法目标发橙光 → 左键橙光目标使用道具<br>
+      🖱 <b>右键点击</b>道具卡 → 弹出确认框丢弃<br>
+      🖱 <b>左键点击</b>空白处 → 取消选中<br>
+      🔫 用户回合时，<b>左键点击</b>我方/对方立绘 → 开火
+    </div>
+    <div id="rules-list" class="game-rules-list"></div>
+    <button class="game-btn game-btn-primary" data-close-modal>知道了</button>
+  </div>
+</div>
+
+<div id="modal-confirm-discard" class="game-modal" style="display:none;">
+  <div class="game-modal-backdrop" data-close-modal></div>
+  <div class="game-modal-content game-modal-confirm">
+    <p id="discard-confirm-text">确定要丢弃「XX」吗？</p>
+    <button class="game-btn game-btn-danger" id="btn-confirm-discard">确定丢弃</button>
+    <button class="game-btn game-btn-secondary" data-close-modal>取消</button>
+  </div>
+</div>
+
+<div id="modal-game-over" class="game-modal" style="display:none;">
+  <div class="game-modal-backdrop"></div>
+  <div class="game-modal-content game-modal-gameover">
+    <h2 id="gameover-title"></h2>
+    <p id="gameover-message"></p>
+    <button class="game-btn game-btn-primary" data-action="back-to-menu">回到主菜单</button>
+    <button class="game-btn game-btn-secondary" data-action="restart">再来一局</button>
+  </div>
+</div>
+
+<div id="modal-volume" class="game-modal" style="display:none;">
+  <div class="game-modal-backdrop" data-close-modal></div>
+  <div class="game-modal-content">
+    <h2>🔊 音量设置</h2>
+    <div style="display:flex;flex-direction:column;gap:12px;text-align:left;padding:8px 0;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);">🎵 音乐 <input type="range" id="vol-bgm" min="0" max="100" value="50" style="flex:1;"></label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);">🔊 音效 <input type="range" id="vol-sfx" min="0" max="100" value="50" style="flex:1;"></label>
+    </div>
+    <button class="game-btn game-btn-primary" data-close-modal>关闭</button>
+  </div>
+</div>
+
+<div id="modal-portrait-upload" class="game-modal" style="display:none;">
+  <div class="game-modal-backdrop" data-close-modal></div>
+  <div class="game-modal-content">
+    <h2 id="portrait-upload-title">上传立绘</h2>
+    <div class="game-crop-preview"><img id="portrait-crop-preview" src="" alt="预览"></div>
+    <input type="file" id="portrait-file-input" accept="image/*" style="display:none;">
+    <button class="game-btn game-btn-primary" id="btn-confirm-portrait">确认使用</button>
+    <button class="game-btn game-btn-secondary" data-close-modal>取消</button>
+    <span class="game-upload-label">按扑克牌比例（2.5:3.5）自动裁剪</span>
+  </div>
+</div>
+
+<div id="game-drawer-handle" class="game-drawer-handle" title="对战日志" style="display:none;"><span id="game-drawer-icon">«</span></div>
+<div id="game-drawer" class="game-drawer" aria-hidden="true">
+  <div class="game-drawer-head">📋 对战日志</div>
+  <div class="game-drawer-body" id="battle-log-list"><p class="game-drawer-empty">暂无对战记录</p></div>
+</div>
+
+<script>
+(function(){'use strict';
+
+const TURN_TIME=60,STORY_KEY='tea_party_story_seen',SELF_PORTRAIT_KEY='tea_party_self_portrait',OPP_PORTRAIT_KEY='tea_party_opponent_portrait';
+const STORY_TEXT=['有一天，你和伙伴发现了一张藏在阁楼里的魔法茶桌…','桌上刻着精致的花纹，中央放着一把闪闪发光的派对礼炮，','旁边还有一张泛黄的字条：','『欢迎来到茶会派对！在这里，没有危险的子弹，','只有缤纷的彩带和柔软的棉花。','和你的伙伴一起，用智慧和勇气一决胜负吧！』'];
+const ITEM_LABELS={candy_lens:'透视糖果',bubble_soda:'气泡汽水',cat_paw_ribbon:'猫爪丝带',double_glitter:'加倍闪粉管',strawberry_cake:'草莓蛋糕',whisper_conch:'悄悄话海螺',miracle_wand:'奇迹魔法棒',phantom_cat_gloves:'怪盗猫爪手套',kiwi_juice:'浓缩猕猴桃汁'};
+const ITEM_DESCS={candy_lens:'看清礼炮内部，确认当前弹药是彩带还是棉花',bubble_soda:'将当前弹药无害退膛，直接进入下一发',cat_paw_ribbon:'将对方手腕绑在椅子上，跳过对方下回合',double_glitter:'下一发实弹威力翻倍，击破2个气球',strawberry_cake:'恢复1个心动气球',whisper_conch:'悄悄告诉你礼炮内随机一发弹药的类型',miracle_wand:'强行改变当前弹药的极性（彩带↔棉花）',phantom_cat_gloves:'从对方道具区顺走一个道具并立即使用',kiwi_juice:'50%几率恢复2个气球，50%几率扣除1个气球'};
+const ITEM_TARGETS={candy_lens:['cannon'],bubble_soda:['cannon'],cat_paw_ribbon:['opponent'],double_glitter:['cannon'],strawberry_cake:['self'],whisper_conch:['self'],miracle_wand:['cannon'],phantom_cat_gloves:['opponent_items'],kiwi_juice:['self']};
+const ITEM_IMG={candy_lens:1,bubble_soda:2,cat_paw_ribbon:3,double_glitter:4,strawberry_cake:5,whisper_conch:6,miracle_wand:7,phantom_cat_gloves:8,kiwi_juice:9};
+
+const DEFAULT_ROLE_AVATAR_URL='{{role_avatar_url}}';
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const views={story:$('#view-story'),menu:$('#view-menu'),arena:$('#view-arena')};
+let currentView='story',gameState=null,turnTimer=null,drawerOpen=false,currentMode='classic';
+let selectedItem=null,validTargets=[],toasts=[],toastId=0,pendingPortraitType=null,pendingDiscardItem=null;
+let previewBurnTimer=null;
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function getCardW(){return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--game-card-w'))||120;}
+function getCardH(){return parseInt(getComputedStyle(document.documentElement).getPropertyValue('--game-card-h'))||168;}
+function getErrorMessage(err){return err && typeof err.detail === 'string' ? err.detail : '请求失败';}
+
+function showView(name){
+  Object.values(views).forEach(v=>v.style.display='none');
+  if(views[name])views[name].style.display='';
+  currentView=name;
+  if(name==='arena'){
+    $('#game-deck').style.display='';$('#game-drawer-handle').style.display='';
+    if(gameState&&gameState.phase==='playing'&&sfx.bgm&&sfx.bgm.paused)playBgm();
+  }else{
+    $('#game-deck').style.display='none';$('#game-drawer-handle').style.display='none';
+    $('#game-drawer').classList.remove('open');drawerOpen=false;stopTimer();
+    $('#battle-log-list').innerHTML='<p class="game-drawer-empty">暂无对战记录</p>';
+    hidePreview();
+  }
+}
+
+async function api(endpoint,body){
+  const opts=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{};
+  const resp=await fetch(endpoint,opts);
+  const isJson=(resp.headers.get('content-type')||'').includes('application/json');
+  const data=isJson?await resp.json():null;
+  if(!resp.ok){showToast('❌ '+getErrorMessage(data));return null;}
+  return data;
+}
+async function loadState(){gameState=await api('/api/game/state');}
+async function checkReady(){return api('/api/game/check-ready');}
+
+async function doShoot(target){
+  clearSelection();
+  const targetEl=target==='self'?$('#self-portrait-card'):$('#opponent-portrait-card');
+  const r=await api('/api/game/shoot',{player_index:0,target});
+  if(!r)return;
+  const isLive=r.events&&r.events.some(e=>e.type==='opponent_hit'||e.type==='self_live');
+  playSfx(isLive?'shoot_live':'shoot_blank');
+  playCannonShake(targetEl,isLive);
+  await handleActionResult(r);
+  if(r.success&&r.phase==='playing'&&gameState&&gameState.current_player===1)await callOpponentTurn();
+}
+
+async function callOpponentTurn(){
+  if(!gameState||gameState.phase!=='playing'||gameState.current_player!==1)return;
+  showToast('🤔 对手思考中...');
+  const ep=currentMode==='noai'?'/api/game/no-ai-turn':'/api/game/ai-turn';
+  await sleep(currentMode==='noai'?2500:600);
+  const r=await api(ep,{message:''});
+  dismissToastsByPattern('对手思考中');
+  if(!r)return;
+  gameState=r.state;
+  if(r.dialogue)showAiBubble(r.dialogue);
+  if(r.events)await processEvents(r.events,true);
+  renderArena();
+  if(r.phase==='game_over'){showGameOver(r);return;}
+  if(r.ai_extra_turn&&r.phase==='playing'&&gameState.current_player===1){setTimeout(()=>callOpponentTurn(),900);}
+  else{await sleep(400);startPlayerTurn();}
+}
+
+async function doUseItem(itemType){
+  const itemSlot=document.querySelector('#self-items-left .game-item-slot.has-item[data-item="'+itemType+'"], #self-items-right .game-item-slot.has-item[data-item="'+itemType+'"]');
+  let targetEl=null;
+  if(selectedItem&&validTargets.length>0){
+    const t=validTargets[0];
+    if(t==='self')targetEl=$('#self-portrait-card');
+    else if(t==='opponent')targetEl=$('#opponent-portrait-card');
+    else if(t==='cannon')targetEl=$('#cannon-card');
+  }
+  if(itemSlot&&targetEl)flyCardToTarget(itemSlot,targetEl);
+  playSfx('use_item');
+  const r=await api('/api/game/use-item',{player_index:0,item_type:itemType});
+  if(r)await handleActionResult(r);
+}
+async function doDiscardItem(itemType){
+  const r=await api('/api/game/discard-item',{player_index:0,item_type:itemType});
+  if(r&&r.success){gameState=r.state;renderArena();showToast('🗑 已丢弃');}
+}
+
+async function handleActionResult(result){
+  if(!result.success){showToast('❌ '+result.message);return;}
+  gameState=result.state;
+  if(result.events)await processEvents(result.events,false);
+  renderArena();
+  if(result.phase==='game_over')showGameOver(result);
+}
+
+async function processEvents(events,isOpponent){
+  let hadItemReceived=false;
+  for(const evt of events){
+    const{type,...data}=evt;
+    switch(type){
+      case'shot':
+        showToast(data.round_type==='live'?'💥 闪光彩带！':'☁️ 柔软棉花~');
+        shakeEl($('#cannon-card'));
+        showUsagePreview(12, '礼炮');
+        break;
+      case'self_blank':{
+        const pEl=data.player===0?$('#self-portrait-card'):$('#opponent-portrait-card');
+        showMistOn(pEl);showToast('😮‍💨 '+((data.player===0)?'你':'对方')+'打了自己——棉花！','extra-turn');break;
+      }
+      case'self_live':{
+        const pEl=data.player===0?$('#self-portrait-card'):$('#opponent-portrait-card');
+        hitBurstOn(pEl);shakeHardEl(pEl);showToast('😱 '+((data.player===0)?'你':'对方')+'打中了自己！-'+data.damage+'🎈','hit-self');break;
+      }
+      case'opponent_hit':{
+        const pEl=data.player===0?$('#self-portrait-card'):$('#opponent-portrait-card');
+        hitBurstOn(pEl);shakeHardEl(pEl);showToast('🎯 命中'+((data.player===0)?'你':'对方')+'！-'+data.damage+'🎈'+(data.double?' (加倍!)':''),'hit-opponent');confettiBurst();break;
+      }
+      case'opponent_miss':{
+        const pEl=data.player===0?$('#opponent-portrait-card'):$('#self-portrait-card');
+        showMistOn(pEl);showToast('😅 棉花…'+((data.player===0)?'你':'对方')+'没打中');break;
+      }
+      case'candy_lens':if(!isOpponent)showToast('🔍 透视糖果：第'+data.position+'号弹孔已揭示','reveal');showUsagePreview(1,'透视糖果');break; case'candy_lens_empty':break;
+      case'bubble_soda':showToast('🫧 气泡汽水：退膛「'+data.ejected_label+'」');showUsagePreview(2,'气泡汽水');break;
+      case'cat_paw_ribbon':showToast('🎀 猫爪丝带：对方下回合跳过！');showUsagePreview(3,'猫爪丝带');break;
+      case'double_glitter_active':showToast('✨ 加倍闪粉管激活！');showUsagePreview(4,'加倍闪粉管');break;
+      case'heal':showToast('🍓 恢复 '+data.amount+' 个气球！','heal');showUsagePreview(5,'草莓蛋糕');break;
+      case'whisper_conch':if(!isOpponent)showToast('🐚 悄悄话：第'+data.position+'号弹孔已揭示','reveal');showUsagePreview(6,'悄悄话海螺');break; case'whisper_conch_empty':break;
+      case'miracle_wand':showToast('🪄 弹药已转换！');showUsagePreview(7,'奇迹魔法棒');break; case'miracle_wand_empty':break;
+      case'phantom_cat_gloves_steal':showToast('🐱 偷走对方「'+data.stolen_label+'」！');showUsagePreview(8,'怪盗猫爪手套');break;
+      case'phantom_cat_gloves_no_target':showToast('🐱 对方没有可偷的道具…');break;
+      case'kiwi_juice_heal':showToast('🥝 猕猴桃汁大成功！+2🎈','heal');showUsagePreview(9,'浓缩猕猴桃汁');break;
+      case'kiwi_juice_hurt':showToast('🤢 猕猴桃汁翻车…-1🎈','hurt');showUsagePreview(9,'浓缩猕猴桃汁');break;
+      case'turn_skipped':showToast('⏭ 回合被跳过！');break;
+      case'turn_timeout':showToast('⏰ 时间到！回合跳过');break;
+      case'level_start':showRoundPopup(data.level);showToast('🎬 第'+data.level+'局！'+data.live+'实弹 + '+data.blank+'空弹','level-up');$('#game-deck').style.display='';deckShuffle();break;
+      case'items_received':hadItemReceived=true;await animateCardDeal(data.player,data.items,data.labels);break;
+      case'items_full':showToast('⚠️ '+data.message);break;
+      case'item_discarded':showToast('🗑 丢弃了「'+data.label+'」');break;
+      case'turn_start':break;
+    }
+    await sleep(isOpponent?600:400);
+  }
+  if(hadItemReceived)renderArena();
+}
+
+function showToast(msg,cls){const id=++toastId;toasts.push({id,text:msg,cls:cls||''});renderToasts();setTimeout(()=>{toasts=toasts.filter(t=>t.id!==id);renderToasts();},5000);}
+function dismissToastsByPattern(p){toasts=toasts.filter(t=>!t.text.includes(p));renderToasts();}
+function renderToasts(){const a=$('#toast-area');if(a)a.innerHTML=toasts.map(t=>'<div class="game-toast '+t.cls+'">'+t.text+'</div>').join('');}
+
+function showAiBubble(text){const b=$('#ai-bubble'),bt=$('#ai-bubble-text');if(!b||!bt)return;bt.textContent=text;b.style.display='';b.style.animation='none';b.offsetHeight;b.style.animation='bubble-pop-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275) forwards';clearTimeout(b._hide);b._hide=setTimeout(()=>{b.style.animation='bubble-fade-out 0.6s ease forwards';setTimeout(()=>{b.style.display='none';},600);},4000);}
+
+function confettiBurst(){for(let i=0;i<16;i++){const c=document.createElement('span');c.textContent=['🎀','✨','🌟','💖','🎉'][Math.floor(Math.random()*5)];c.style.cssText='position:fixed;pointer-events:none;z-index:999;left:'+(30+Math.random()*40)+'%;top:'+(20+Math.random()*30)+'%;font-size:'+(14+Math.random()*20)+'px;animation:confetti-fall '+(1+Math.random()*1.5)+'s ease-out forwards;';document.body.appendChild(c);setTimeout(()=>c.remove(),2500);}}
+function shakeEl(el){if(!el)return;el.classList.add('hit-shake');setTimeout(()=>el.classList.remove('hit-shake'),500);}
+function shakeHardEl(el){if(!el)return;el.style.animation='none';el.offsetHeight;el.style.animation='shake-hard 0.5s ease';setTimeout(()=>el.style.animation='',500);}
+function showMistOn(el){if(!el)return;el.classList.add('mist-effect');setTimeout(()=>el.classList.remove('mist-effect'),1200);}
+function hitBurstOn(el){if(!el)return;const r=el.getBoundingClientRect();for(let i=0;i<12;i++){const p=document.createElement('span');p.className='hit-burst-p';p.textContent=['🎀','✨','💥','🌟','🎉'][Math.floor(Math.random()*5)];const ang=Math.random()*Math.PI*2,dist=40+Math.random()*80;p.style.cssText='left:'+(r.left+r.width/2-10)+'px;top:'+(r.top+r.height/2-10)+'px;--dx:'+Math.cos(ang)*dist+'px;--dy:'+Math.sin(ang)*dist+'px;--rot:'+(Math.random()*360-180)+'deg;';document.body.appendChild(p);setTimeout(()=>p.remove(),900);}}
+
+async function flyCardToTarget(itemSlotEl, targetEl){
+  if(!itemSlotEl||!targetEl)return;
+  const sr=itemSlotEl.getBoundingClientRect(), tr=targetEl.getBoundingClientRect();
+  const fly=document.createElement('div');
+  fly.style.cssText='position:fixed;z-index:300;pointer-events:none;width:'+sr.width+'px;height:'+sr.height+'px;left:'+sr.left+'px;top:'+sr.top+'px;transition:left 0.5s cubic-bezier(0.34,1.56,0.64,1),top 0.5s cubic-bezier(0.34,1.56,0.64,1),transform 0.5s cubic-bezier(0.34,1.56,0.64,1);border-radius:8px;overflow:hidden;background:#222;';
+  const srcImg=itemSlotEl.querySelector('img');
+  if(srcImg){const clone=srcImg.cloneNode();clone.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:6px;';fly.appendChild(clone);}
+  document.body.appendChild(fly);
+  itemSlotEl.style.opacity='0';
+  await sleep(50);
+  fly.style.left=(tr.left+tr.width/2-sr.width/2)+'px';
+  fly.style.top=(tr.top+tr.height/2-sr.height/2)+'px';
+  fly.style.transform='scale(0.7)';
+  await sleep(550);
+  targetEl.style.boxShadow='0 0 40px #fff, 0 0 80px rgba(255,255,255,0.8)';
+  setTimeout(()=>targetEl.style.boxShadow='',400);
+  fly.style.transition='opacity 0.4s, filter 0.6s, clip-path 0.6s';
+  fly.style.filter='brightness(1.3) sepia(0.4)';
+  await sleep(200);
+  fly.style.clipPath='inset(0 0 60% 0)';
+  fly.style.filter='brightness(0.5) sepia(1)';
+  fly.style.opacity='0';
+  await sleep(700);
+  fly.remove();itemSlotEl.style.opacity='';
+}
+async function playCannonShake(targetEl,live){
+  const cannon=$('#cannon-card');if(!cannon)return;
+  cannon.style.animation='none';cannon.offsetHeight;
+  cannon.style.animation='shake 0.4s ease';
+  await sleep(400);cannon.style.animation='';
+  if(!live||!targetEl)return;
+  targetEl.style.animation='none';targetEl.offsetHeight;
+  targetEl.style.animation='shake-hard 0.5s ease';
+  hitBurstOn(targetEl);
+  await sleep(500);targetEl.style.animation='';
+}
+
+function showRoundPopup(level){
+  const popup=$('#round-popup'),txt=$('#round-popup-text');
+  if(!popup||!txt)return;
+  txt.textContent='第 '+level+' 回合';
+  popup.style.display='';popup.style.animation='none';popup.offsetHeight;
+  popup.style.animation='round-pop-in 0.4s ease forwards';
+  confettiBurst();
+  setTimeout(()=>{popup.style.animation='round-pop-out 0.5s ease forwards';setTimeout(()=>popup.style.display='none',500);},1200);
+}
+
+function deckShuffle(){$('#game-deck').classList.add('shuffle');setTimeout(()=>$('#game-deck').classList.remove('shuffle'),400);}
+
+async function animateCardDeal(playerIdx,items,labels){
+  if(!items||!items.length)return;
+  const deck=$('#game-deck');if(!deck)return;
+  const deckRect=deck.getBoundingClientRect();
+  const containerSelector=playerIdx===0?'#self-items-left, #self-items-right':'#opponent-items-left, #opponent-items-right';
+  const allSlotEls=[...$$(containerSelector+' .game-item-slot')];
+  const emptySlots=allSlotEls.filter(s=>!s.classList.contains('has-item'));
+  const dealCount=Math.min(items.length,emptySlots.length);
+  if(dealCount<items.length){showToast('卡槽已满，多余的卡牌没有发放喵...');}
+  const flyEls=[];
+  for(let i=0;i<dealCount;i++){
+    const fly=document.createElement('div');fly.className='game-card-flying';
+    fly.innerHTML='<img src="/game/pictures/11.png" alt="">';
+    fly.style.left=(deckRect.left+deckRect.width/2-60)+'px';
+    fly.style.top=(deckRect.top+deckRect.height/2-84)+'px';
+    fly.style.transform='rotate(-5deg) scale(0.8)';
+    document.body.appendChild(fly);
+    flyEls.push({el:fly,slot:emptySlots[i],item:items[i],label:labels?.[i]});
+  }
+  for(let i=0;i<flyEls.length;i++){
+    const{el,slot,item}=flyEls[i];
+    const sr=slot.getBoundingClientRect();
+    await sleep(100);
+    el.style.left=(sr.left+sr.width/2-60)+'px';
+    el.style.top=(sr.top+sr.height/2-84)+'px';
+    el.style.transform='rotate(0deg) scale(1)';
+    await sleep(700);
+    const flip=document.createElement('div');flip.className='game-card-flip';
+    flip.style.cssText='position:fixed;left:'+el.style.left+';top:'+el.style.top+';width:'+getCardW()+'px;height:'+getCardH()+'px;z-index:201;';
+    flip.innerHTML='<div class="game-card-flip-inner"><div class="game-card-face back"><img src="/game/pictures/11.png" alt=""></div><div class="game-card-face front"><img src="/game/pictures/'+(ITEM_IMG[item]||1)+'.png" alt=""></div></div>';
+    document.body.appendChild(flip);el.remove();
+    for(let j=0;j<3;j++){const p=document.createElement('span');p.className='flip-sparkle-particle';p.textContent='✨';p.style.cssText='left:'+(sr.left+sr.width/2+(Math.random()-0.5)*60)+'px;top:'+(sr.top+sr.height/2+(Math.random()-0.5)*40)+'px;font-size:'+(12+Math.random()*14)+'px;';document.body.appendChild(p);setTimeout(()=>p.remove(),700);}
+    await sleep(180);
+    flip.querySelector('.game-card-flip-inner').classList.add('flipped');
+    await sleep(500);flip.remove();
+  }
+  renderArena();
+}
+
+function renderArena(){
+  if(!gameState)return;
+  const s=gameState,p0=s.players[0],p1=s.players[1];
+  $('#self-name').textContent=p0.name;$('#opponent-name').textContent=p1.name;
+  renderBalloons('self-balloons',p0.balloons);renderBalloons('opponent-balloons',p1.balloons);
+  renderItemSlots('self-items-left',p0.items,0);renderItemSlots('self-items-right',p0.items,4);
+  renderItemSlots('opponent-items-left',p1.items,0);renderItemSlots('opponent-items-right',p1.items,4);
+  renderBulletCircle(s.round_states||[], s.level_live, s.level_total);
+  $('#level-badge').textContent='第 '+(s.turn_number||0)+' 回合';
+  const isMine=s.current_player===0;
+  const ti=$('#turn-indicator');ti.textContent=isMine?'👉 你的回合（点击立绘开火）':'⏳ 对手回合';ti.className='game-turn-indicator '+(isMine?'my-turn':'opponent-turn');
+  $('#self-zone').classList.toggle('active-turn',isMine);$('#opponent-zone').classList.toggle('active-turn',!isMine);
+  const cp=s.current_player;const curPlayer=s.players[cp];
+  const buffs=$('#cannon-buffs');buffs.innerHTML=(curPlayer&&curPlayer.double_damage_active)?'<span class="game-cannon-buff" title="加倍闪粉管生效中">✨x2</span>':'';
+  $('#party-chat-bar').style.display=(s.mode==='party')?'':'none';
+  renderBattleLog(s.battle_log||[]);
+  updatePortraitImage('self','self-portrait-img','self-portrait-fb');
+  updatePortraitImage('opponent','opponent-portrait-img','opponent-portrait-fb');
+  if(selectedItem)startTargetFlash();
+}
+
+function updatePortraitImage(who,imgId,fbId){
+  const img=$('#'+imgId),fb=$('#'+fbId);if(!img||!fb)return;
+  const key=who==='self'?SELF_PORTRAIT_KEY:OPP_PORTRAIT_KEY,stored=localStorage.getItem(key);
+  if(stored){img.src=stored;img.style.display='';fb.style.display='none';}
+  else if(who==='opponent'&&DEFAULT_ROLE_AVATAR_URL){img.src=DEFAULT_ROLE_AVATAR_URL;img.style.display='';fb.style.display='none';}
+  else{img.style.display='none';fb.style.display='';}
+}
+
+function renderBalloons(id,count){const el=$('#'+id);if(!el)return;let h='';for(let i=0;i<count;i++)h+='<span class="game-balloon">🎈</span>';for(let i=count;i<6;i++)h+='<span class="game-balloon game-balloon-lost">💔</span>';el.innerHTML=h;}
+function renderBulletCircle(roundStates,levelLive,levelTotal){
+  const el=$('#bullet-circle');if(!el)return;
+  if(!roundStates||!roundStates.length){el.innerHTML='';return;}
+  const n=roundStates.length, cx=90, cy=90, r=65;
+  const liveCount=levelLive||roundStates.filter(s=>s.status==='fired_live'||s.status==='unknown'||s.status.startsWith('hint_')).length;
+  const totalCount=levelTotal||n;
+  let dots='';
+  for(let i=0;i<n;i++){
+    const angle=(i/n)*2*Math.PI - Math.PI/2;
+    const x=cx+r*Math.cos(angle), y=cy+r*Math.sin(angle);
+    const rs=roundStates[i]; let cls='dot-unknown', txt=rs.index;
+    if(rs.status==='fired_live'){cls='dot-fired-live';}
+    else if(rs.status==='fired_blank'){cls='dot-fired-blank';}
+    else if(rs.status==='ejected'){cls='dot-ejected'; txt='?';}
+    else if(rs.status==='hint_live'){cls='dot-hint-live';}
+    else if(rs.status==='hint_blank'){cls='dot-hint-blank';}
+    const wring=rs.current?' bullet-current':'';
+    dots+='<div class="bullet-dot '+cls+wring+'" style="left:'+(x-11)+'px;top:'+(y-11)+'px;">'+txt+'</div>';
+  }
+  el.innerHTML='<svg width="180" height="180" class="bullet-svg">'+
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>'+
+    '</svg>'+
+    '<div class="bullet-dots">'+dots+'</div>'+
+    '<div class="bullet-center-text">'+liveCount+'实 / '+totalCount+'总</div>';
+}
+function renderItemSlots(id,items,startIdx){
+  const el=$('#'+id);if(!el)return;let h='';
+  for(let i=0;i<4;i++){const idx=startIdx+i;
+    const it=(idx<items.length)?items[idx]:null;
+    if(it){h+='<div class="game-item-slot has-item" data-item="'+it+'" data-player="'+(id.includes('self')?'self':'opponent')+'"><img src="/game/pictures/'+(ITEM_IMG[it]||1)+'.png" alt="'+it+'"></div>';}
+    else h+='<span class="game-item-slot empty"></span>';
+  }el.innerHTML=h;
+}
+function renderBattleLog(entries){const el=$('#battle-log-list');if(!el)return;if(!entries||!entries.length){el.innerHTML='<p class="game-drawer-empty">暂无对战记录</p>';return;}let h='';for(let i=entries.length-1;i>=0;i--){const e=entries[i];h+='<div class="game-log-entry"><span class="game-log-num">#'+e.round_number+'</span><span>'+esc(e.description)+'</span></div>';}el.innerHTML=h;}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+function showPreview(imgNum,label){const area=$('#preview-area'),img=$('#preview-img'),lbl=$('#preview-label');if(!area||!img)return;img.src='/game/pictures/'+imgNum+'.png';if(lbl)lbl.textContent=label||'';img.classList.remove('burning');area.classList.add('active');}
+function hidePreview(){const a=$('#preview-area');if(a)a.classList.remove('active');}
+function showUsagePreview(imgNum,label){showPreview(imgNum,label);if(previewBurnTimer)clearTimeout(previewBurnTimer);previewBurnTimer=setTimeout(()=>{const img=$('#preview-img');if(img)img.classList.add('burning');setTimeout(()=>{const a=$('#preview-area');if(a)a.classList.remove('active');},800);},3000);}
+
+function selectCannon(){clearSelection();selectedItem={itemType:'cannon'};validTargets=['self','opponent'];$('#cannon-card').classList.add('selected');startTargetFlash();showPreview(12,'礼炮');}
+function setSelectedItem(itemType){clearSelection();selectedItem={itemType};validTargets=ITEM_TARGETS[itemType]||[];playSfx('select');$$('#self-items-left .has-item, #self-items-right .has-item').forEach(s=>{if(s.dataset.item===itemType)s.classList.add('selected');});startTargetFlash();showPreview(ITEM_IMG[itemType]||1,ITEM_LABELS[itemType]||'');}
+function selectPortrait(t){clearSelection();selectedItem={itemType:t};validTargets=[];const portEl=t==='self'?$('#self-portrait-card'):$('#opponent-portrait-card');portEl.classList.add('selected');const imgEl=t==='self'?$('#self-portrait-img'):$('#opponent-portrait-img');const label=t==='self'?'自己':(gameState?gameState.players[1].name:'对方');const preview=$('#preview-img'), area=$('#preview-area'), lbl=$('#preview-label');if(imgEl&&imgEl.naturalWidth>0&&imgEl.style.display!=='none'){preview.src=imgEl.src;lbl.textContent=label;preview.classList.remove('burning');area.classList.add('active');}else{hidePreview();}}
+function clearSelection(){selectedItem=null;validTargets=[];stopTargetFlash();$$('.selected,.valid-target').forEach(e=>e.classList.remove('selected','valid-target'));if(previewBurnTimer){clearTimeout(previewBurnTimer);previewBurnTimer=null;}hidePreview();}
+function startTargetFlash(){stopTargetFlash();for(const t of validTargets){switch(t){case'self':$('#self-portrait-card').classList.add('valid-target');break;case'opponent':$('#opponent-portrait-card').classList.add('valid-target');break;case'cannon':$('#cannon-card').classList.add('valid-target');break;case'opponent_items':$$('#opponent-items-left .has-item, #opponent-items-right .has-item').forEach(e=>{if(e.dataset.item!=='phantom_cat_gloves')e.classList.add('valid-target');});break;}}}
+function stopTargetFlash(){$$('.valid-target').forEach(e=>e.classList.remove('valid-target'));}
+
+function onSelfItemClick(itemType,el,evt){if(!gameState)return;evt.preventDefault();if(selectedItem&&selectedItem.itemType===itemType){clearSelection();return;}if(gameState.current_player===0){setSelectedItem(itemType);}else{previewOnlyItem(itemType);}}
+function onSelfItemRightClick(itemType,evt){if(!gameState||gameState.current_player!==0)return;evt.preventDefault();clearSelection();pendingDiscardItem=itemType;$('#discard-confirm-text').textContent='确定要丢弃「'+(ITEM_LABELS[itemType]||itemType)+'」吗？';$('#modal-confirm-discard').style.display='';}
+function previewOnlyItem(itemType){clearSelection();selectedItem={itemType};validTargets=[];$$('#self-items-left .has-item, #self-items-right .has-item').forEach(s=>{if(s.dataset.item===itemType)s.classList.add('selected');});stopTargetFlash();showPreview(ITEM_IMG[itemType]||1,ITEM_LABELS[itemType]||'');}
+function onOpponentItemClick(itemType,evt){if(!gameState)return;if(gameState.current_player===0&&selectedItem&&selectedItem.itemType==='phantom_cat_gloves'&&validTargets.includes('opponent_items')){if(itemType==='phantom_cat_gloves')return;stealSpecificItem(itemType);clearSelection();return;}if(evt)evt.preventDefault();if(selectedItem&&selectedItem.itemType===itemType){clearSelection();return;}clearSelection();selectedItem={itemType};validTargets=[];$$('#opponent-items-left .has-item, #opponent-items-right .has-item').forEach(s=>{if(s.dataset.item===itemType)s.classList.add('selected');});stopTargetFlash();showPreview(ITEM_IMG[itemType]||1,ITEM_LABELS[itemType]||'');}
+async function stealSpecificItem(targetItem){playSfx('use_item');const r=await api('/api/game/use-item',{player_index:0,item_type:'phantom_cat_gloves',target_item_type:targetItem});if(r)await handleActionResult(r);}
+
+function handleTargetClick(targetType){if(!gameState||gameState.current_player!==0)return;if(!selectedItem||!validTargets.includes(targetType))return;if(selectedItem.itemType==='cannon'){clearSelection();doShoot(targetType);}else{doUseItem(selectedItem.itemType);clearSelection();}}
+
+function bindAllEvents(){
+  document.addEventListener('click',function(e){
+    const slot=e.target.closest('#self-items-left .game-item-slot.has-item, #self-items-right .game-item-slot.has-item');
+    if(slot){onSelfItemClick(slot.dataset.item,slot,e);return;}
+    const oppSlot=e.target.closest('#opponent-items-left .game-item-slot.has-item, #opponent-items-right .game-item-slot.has-item');
+    if(oppSlot){onOpponentItemClick(oppSlot.dataset.item,e);return;}
+    const cc=e.target.closest('#cannon-card');
+    if(cc){if(!gameState||gameState.current_player!==0)return;e.preventDefault();if(selectedItem&&validTargets.includes('cannon')){handleTargetClick('cannon');return;}if(selectedItem&&selectedItem.itemType==='cannon'){clearSelection();return;}clearSelection();selectCannon();return;}
+    const pc=e.target.closest('.game-portrait-card');
+    if(pc){const t=pc.dataset.target;if(!t)return;if(!gameState||gameState.current_player!==0)return;e.preventDefault();if(selectedItem&&validTargets.includes(t)){handleTargetClick(t);return;}if(selectedItem&&selectedItem.itemType===t){clearSelection();return;}clearSelection();selectPortrait(t);return;}
+    if(!e.target.closest('.game-modal')&&!e.target.closest('.game-drawer')&&!e.target.closest('.game-drawer-handle')){clearSelection();}
+  });
+  document.addEventListener('contextmenu',function(e){const slot=e.target.closest('#self-items-left .game-item-slot.has-item, #self-items-right .game-item-slot.has-item');if(slot){onSelfItemRightClick(slot.dataset.item,e);return;}const oppSlot=e.target.closest('#opponent-items-left .game-item-slot.has-item, #opponent-items-right .game-item-slot.has-item');if(oppSlot){e.preventDefault();return;}});
+}
+
+function startPlayerTurn(){stopTimer();if(!gameState||gameState.phase!=='playing'||gameState.current_player!==0)return;if(currentMode==='classic')startTimer(TURN_TIME);}
+function startTimer(sec){stopTimer();let remaining=sec;const tel=$('#timer-display');if(!tel)return;tel.style.display='';tel.textContent='⏱ '+remaining+'s';tel.classList.remove('urgent');turnTimer=setInterval(async()=>{remaining--;tel.textContent='⏱ '+remaining+'s';if(remaining<=10)tel.classList.add('urgent');if(remaining<=0){stopTimer();showToast('⏰ 时间到！回合跳过');clearSelection();const r=await api('/api/game/skip-turn',{player_index:0});if(r&&r.success){gameState=r.state;if(r.events)await processEvents(r.events,false);renderArena();if(gameState&&gameState.current_player===1&&gameState.phase==='playing')await callOpponentTurn();}}},1000);}
+function stopTimer(){if(turnTimer){clearInterval(turnTimer);turnTimer=null;}const tel=$('#timer-display');if(tel){tel.style.display='none';tel.classList.remove('urgent');}}
+document.addEventListener('visibilitychange',()=>{if(currentView!=='arena')return;if(document.hidden){stopTimer();}else{loadState().then(()=>{renderArena();if(gameState&&gameState.current_player===0&&gameState.phase==='playing')startPlayerTurn();});}});
+
+function showGameOver(result){stopTimer();clearSelection();stopBgm();playSfx('game_over');const t=$('#gameover-title'),m=$('#gameover-message');if(result.winner===0){t.textContent='🎉 恭喜获胜！';m.textContent='你击破了对方所有心动气球！';confettiBurst();}else{t.textContent='😢 你输了…';m.textContent='对方击破了你的最后一个气球。';}$('#modal-game-over').style.display='';}
+function toggleDrawer(){drawerOpen=!drawerOpen;$('#game-drawer').classList.toggle('open',drawerOpen);$('#game-drawer').setAttribute('aria-hidden',String(!drawerOpen));$('#game-drawer-handle').classList.toggle('open',drawerOpen);$('#game-drawer-icon').textContent=drawerOpen?'»':'«';}
+function showRules(){const list=$('#rules-list');let h='';for(const[k,label]of Object.entries(ITEM_LABELS)){h+='<div class="game-rule-item"><div class="game-rule-icon"><img src="/game/pictures/'+(ITEM_IMG[k]||1)+'.png" alt="'+label+'"></div><div><b>'+label+'</b><br><small>'+ITEM_DESCS[k]+'</small></div></div>';}list.innerHTML=h;$('#modal-rules').style.display='';}
+async function playStory(){showView('story');const textEl=$('#story-text'),btn=$('#story-continue');btn.style.display='none';textEl.textContent='';for(const line of STORY_TEXT){const p=document.createElement('p');p.className='story-line';textEl.appendChild(p);for(let j=0;j<line.length;j++){p.textContent+=line[j];await sleep(40);}await sleep(300);}btn.style.display='';localStorage.setItem(STORY_KEY,'true');}
+function showMainMenu(){showView('menu');stopTimer();clearSelection();stopBgm();api('/api/game/reset',{});}
+
+async function startGame(mode){
+  if(mode==='classic'||mode==='party'){
+    const r=await checkReady();if(r){let missing=[];if(!r.model_ready)missing.push('model');if(!r.persona_ready)missing.push('persona');
+      if(missing.length){let msg=missing.length===2?'AI 模型和角色卡都还没准备好喵…不过没关系！试试右上角的「无AI模式」吧，一样很有趣~':missing[0]==='model'?'没有配置 AI 模型喵…无法启动 AI 对战模式呢！要不要试试右上角的「无AI模式」？那个不需要配置也能玩~':'还没有设置角色卡呢…AI 不知道扮演谁哦！先去「人设」页面导入一个角色吧，或者先玩「无AI模式」~';
+      showToast(msg);alert(msg);return;}}
+  }
+  currentMode=mode;$('#modal-game-over').style.display='none';
+  playBgm();
+  const r=await api('/api/game/new',{mode:mode==='noai'?'classic':mode,difficulty:'normal',p1_name:'你'});
+  if(!r)return;gameState=r;showView('arena');renderArena();$('#game-drawer').classList.remove('open');drawerOpen=false;
+  if(gameState.current_player===0)startPlayerTurn();
+}
+
+function cropToCardRatio(img){const canvas=document.createElement('canvas');const ratio=2.5/3.5;let w=img.naturalWidth,h=img.naturalHeight,cw,ch;if(w/h>ratio){cw=Math.floor(h*ratio);ch=h;}else{cw=w;ch=Math.floor(w/ratio);}const sx=Math.floor((w-cw)/2),sy=Math.floor((h-ch)/2);canvas.width=250;canvas.height=350;const ctx=canvas.getContext('2d');ctx.drawImage(img,sx,sy,cw,ch,0,0,250,350);return canvas.toDataURL('image/png');}
+function setupPortraitUpload(who){pendingPortraitType=who;const input=$('#portrait-file-input');input.value='';input.onchange=(e)=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=(re)=>{const img=new Image();img.onload=()=>{const dataUrl=cropToCardRatio(img);$('#portrait-crop-preview').src=dataUrl;$('#btn-confirm-portrait').onclick=()=>{const key=who==='self'?SELF_PORTRAIT_KEY:OPP_PORTRAIT_KEY;localStorage.setItem(key,dataUrl);$('#modal-portrait-upload').style.display='none';showToast('立绘已保存！');if(currentView==='arena')renderArena();};};img.src=re.target.result;};reader.readAsDataURL(file);};$('#portrait-upload-title').textContent=who==='self'?'上传我方立绘':'上传对方立绘';$('#portrait-crop-preview').src='';input.click();}
+
+const SOUNDS_DIR='/game/Tea Party/sounds/';
+const sfx={bgm:null,select:null,use_item:null,shoot_live:null,shoot_blank:null,hit:null,heal:null,game_over:null};
+function initAudio(){const files={bgm:'bgm.mp3',select:'select.mp3',use_item:'use_item.mp3',shoot_live:'shoot_live.mp3',shoot_blank:'shoot_blank.mp3',hit:'hit.mp3',heal:'heal.mp3',game_over:'game_over.mp3'};for(const[k,f]of Object.entries(files)){const a=new Audio(SOUNDS_DIR+f);a.preload='auto';a.onerror=()=>{};sfx[k]=a;}if(sfx.bgm){sfx.bgm.loop=true;sfx.bgm.volume=parseFloat(localStorage.getItem('tea_party_bgm_volume')||'0.5');}const sv=parseFloat(localStorage.getItem('tea_party_sfx_volume')||'0.5');for(const k of['select','use_item','shoot_live','shoot_blank','hit','heal','game_over']){if(sfx[k])sfx[k].volume=sv;}}
+function playSfx(name){try{const a=sfx[name];if(a){a.currentTime=0;a.play().catch(()=>{});}}catch(e){}}
+function playBgm(){try{if(sfx.bgm)sfx.bgm.play().catch(()=>{});}catch(e){}}
+function stopBgm(){try{if(sfx.bgm){sfx.bgm.pause();sfx.bgm.currentTime=0;}}catch(e){}}
+function setBgmVolume(v){sfx.bgm&&(sfx.bgm.volume=v);localStorage.setItem('tea_party_bgm_volume',v);}
+function setSfxVolume(v){['select','use_item','shoot_live','shoot_blank','hit','heal','game_over'].forEach(k=>{if(sfx[k])sfx[k].volume=v;});localStorage.setItem('tea_party_sfx_volume',v);}
+function setupVolumeSliders(){const bgmSlider=$('#vol-bgm'),sfxSlider=$('#vol-sfx');if(bgmSlider){bgmSlider.value=Math.round((parseFloat(localStorage.getItem('tea_party_bgm_volume')||'0.5'))*100);bgmSlider.addEventListener('input',()=>setBgmVolume(bgmSlider.value/100));}if(sfxSlider){sfxSlider.value=Math.round((parseFloat(localStorage.getItem('tea_party_sfx_volume')||'0.5'))*100);sfxSlider.addEventListener('input',()=>setSfxVolume(sfxSlider.value/100));}}
+
+async function init(){
+  bindAllEvents();
+  $('#story-continue').addEventListener('click',showMainMenu);$('#btn-replay-story').addEventListener('click',playStory);
+  $('#btn-rules').addEventListener('click',showRules);$$('[data-action="show-rules"]').forEach(b=>b.addEventListener('click',showRules));
+  $$('[data-action="start-classic"]').forEach(b=>b.addEventListener('click',()=>startGame('classic')));
+  $$('[data-action="start-party"]').forEach(b=>b.addEventListener('click',()=>startGame('party')));
+  $$('[data-action="start-noai"]').forEach(b=>b.addEventListener('click',()=>startGame('noai')));
+  $('#game-drawer-handle').addEventListener('click',toggleDrawer);
+  $('#btn-menu-dropdown').addEventListener('click',e=>{e.stopPropagation();const d=$('#menu-dropdown');d.style.display=d.style.display==='none'?'':'none';});
+  document.addEventListener('click',()=>{$('#menu-dropdown').style.display='none';});
+  $$('[data-action="restart"]').forEach(b=>b.addEventListener('click',()=>{$('#menu-dropdown').style.display='none';$('#modal-game-over').style.display='none';startGame(currentMode);}));
+  $$('[data-action="back-to-menu"]').forEach(b=>b.addEventListener('click',()=>{$('#menu-dropdown').style.display='none';$('#modal-game-over').style.display='none';showMainMenu();}));
+  $$('[data-close-modal]').forEach(el=>el.addEventListener('click',()=>{el.closest('.game-modal').style.display='none';clearSelection();}));
+  $('#btn-confirm-discard').addEventListener('click',async()=>{$('#modal-confirm-discard').style.display='none';if(pendingDiscardItem){await doDiscardItem(pendingDiscardItem);pendingDiscardItem=null;}});
+  initAudio();setupVolumeSliders();
+  $('#btn-volume-menu').addEventListener('click',()=>$('#modal-volume').style.display='');
+  $('#btn-volume-arena').addEventListener('click',()=>$('#modal-volume').style.display='');
+  $('#btn-upload-self').addEventListener('click',()=>{$('#modal-portrait-upload').style.display='';setupPortraitUpload('self');});
+  $('#btn-upload-opponent').addEventListener('click',()=>{$('#modal-portrait-upload').style.display='';setupPortraitUpload('opponent');});
+  $$('#modal-portrait-upload [data-close-modal]').forEach(el=>el.addEventListener('click',()=>{$('#modal-portrait-upload').style.display='none';}));
+  await loadState();
+  if(gameState&&gameState.phase==='playing'){currentMode=gameState.mode||'classic';showView('arena');renderArena();$('#game-drawer').classList.remove('open');drawerOpen=false;if(gameState.current_player===0)startPlayerTurn();return;}
+  const storySeen=localStorage.getItem(STORY_KEY)==='true';
+  if(!storySeen){await playStory();}else{showMainMenu();}
+}
+
+init().catch(console.error);
+})();
+</script>
+</body>
+</html>
