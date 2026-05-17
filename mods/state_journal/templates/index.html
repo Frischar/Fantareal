@@ -4,7 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>心笺 - Fantareal</title>
-    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-admin-ui-sync-toggle-v1" />
+    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-v207-role-display-backfill" />
+    <link rel="stylesheet" href="./static/state-journal-stage-table-polish.css?v=state-journal-v207-role-display-backfill" />
+    <link rel="stylesheet" href="./static/state-journal-theme-pack-contract.css?v=state-journal-v207-role-display-backfill" />
   </head>
   <body>
     <main class="state-journal-shell" data-version="{{ version }}">
@@ -27,19 +29,38 @@
         <span id="updateSummaryText">暂无填表记录。</span>
       </section>
 
+      <section class="runtime-overview" id="runtimeOverview" aria-label="心笺运行状态总览">
+        <div class="runtime-overview-main">
+          <div class="runtime-title-row">
+            <strong>运行状态</strong>
+            <span id="runtimeEnabledBadge" class="runtime-badge">心笺状态</span>
+            <span id="runtimeAutoBadge" class="runtime-badge">自动填表</span>
+            <span id="runtimeTurnNoteBadge" class="runtime-badge">幕笺展示</span>
+            <span id="runtimeModelBadge" class="runtime-badge muted">模型未配置</span>
+          </div>
+          <p id="runtimeFlowText" class="runtime-flow-text">聊天回复完成 → Hook 直传 → 心笺 worker 填表 → 写入 SQLite → Chat 显示幕笺。</p>
+          <small>最近运行：<span id="runtimeLastRunText">暂无填表记录。</span></small>
+        </div>
+        <div class="runtime-switches">
+          <label class="runtime-toggle"><input id="dashboardEnabled" type="checkbox" /> 心笺启用</label>
+          <label class="runtime-toggle"><input id="dashboardAutoUpdate" type="checkbox" /> 自动填表</label>
+          <label class="runtime-toggle"><input id="dashboardTurnNote" type="checkbox" /> 幕笺显示</label>
+        </div>
+      </section>
+
       <section class="state-journal-workbench">
         <aside class="panel workspace-nav" aria-label="心笺后台一级导航">
           <button class="workspace-nav-btn active" type="button" data-workspace="journal">
             <span class="nav-icon">✦</span><span><strong>心笺</strong><small>状态记录与填表</small></span>
           </button>
-          <button class="workspace-nav-btn" type="button" data-workspace="mujian" data-default-tab="mujian">
-            <span class="nav-icon">▣</span><span><strong>幕笺</strong><small>展示与附笺</small></span>
+          <button class="workspace-nav-btn" type="button" data-workspace="roleState" data-default-tab="roleState">
+            <span class="nav-icon">◇</span><span><strong>角色配置</strong><small>角色心笺模式</small></span>
           </button>
-          <button class="workspace-nav-btn" type="button" data-workspace="generate" data-default-tab="generate">
-            <span class="nav-icon">☷</span><span><strong>生成规则</strong><small>规则与约束</small></span>
+          <button class="workspace-nav-btn" type="button" data-workspace="turnNote" data-default-tab="turnNote">
+            <span class="nav-icon">▣</span><span><strong>幕笺显示</strong><small>Chat 展示控制</small></span>
           </button>
           <button class="workspace-nav-btn" type="button" data-workspace="beauty" data-default-tab="template">
-            <span class="nav-icon">✧</span><span><strong>美化</strong><small>外观与模板</small></span>
+            <span class="nav-icon">✧</span><span><strong>外观模板</strong><small>模板与外观包</small></span>
           </button>
           <button class="workspace-nav-btn" type="button" data-workspace="settings" data-default-tab="model">
             <span class="nav-icon">⚙</span><span><strong>设置</strong><small>系统与偏好</small></span>
@@ -105,6 +126,7 @@
             </div>
             <div class="tabs drawer-tabs" data-tab-scope="settings">
               <button class="tab-btn" data-tab="model">模型</button>
+              <button class="tab-btn" data-tab="generate">生成规则</button>
               <button class="tab-btn" data-tab="link">联动</button>
               <button class="tab-btn" data-tab="log">调试日志</button>
             </div>
@@ -131,8 +153,49 @@
           <label>Ignore：什么时候不要更新<textarea id="ruleIgnore" rows="3"></textarea></label>
         </section>
 
+
+        <section class="tab-page" data-page="roleState">
+          <div class="role-state-workspace">
+            <div class="role-state-toolbar turn-note-config-card standalone">
+              <div>
+                <div class="subhead"><strong>角色配置</strong></div>
+                <p class="microcopy">配置每个角色的专属幕笺、变量和阶段规则。</p>
+              </div>
+              <div class="role-state-actions grouped-actions">
+                <div class="action-group"><span>配置</span><button id="roleStateReadCardBtn" type="button" class="ghost-btn">读取角色卡</button><button id="roleStateSaveBtn" type="button" class="primary-btn">保存配置</button><button id="roleStateSyncCardBtn" type="button" class="ghost-btn">同步至角色卡</button></div>
+                <div class="action-group"><span>运行</span><button id="roleStateInitBtn" type="button" class="ghost-btn">初始化状态</button></div>
+                <div class="action-group debug-group"><span>调试</span><button id="roleStateDebugNextStageBtn" type="button" class="ghost-btn" title="仅调试模式使用：直接把当前选中角色推进到下一阶段，用于测试世界书 external_tag 和幕笺展示。">推进阶段</button></div>
+              </div>
+            </div>
+            <div class="role-state-layout">
+              <aside class="role-state-sidebar turn-note-config-card soft-card">
+                <div class="subhead compact"><strong>角色列表</strong></div>
+                <div id="roleStateRoleList">
+                  <div class="role-state-role-card active">
+                    <strong>尚未读取角色配置</strong>
+                    <span>变量 0 · 阶段 0</span>
+                    <small>可从当前角色卡读取变量、阶段与状态快照配置。</small>
+                  </div>
+                </div>
+              </aside>
+              <section class="role-state-detail turn-note-config-card standalone">
+                <div class="subhead compact"><strong>当前角色配置</strong></div>
+                <div class="role-state-tabs" role="tablist" aria-label="变量与阶段切换">
+                  <button type="button" class="role-state-tab active" data-role-state-tab="variables">变量表</button>
+                  <button type="button" class="role-state-tab" data-role-state-tab="stages">阶段规则</button>
+                  <button type="button" class="role-state-tab" data-role-state-tab="snapshot">状态快照字段</button>
+                </div>
+                <div id="roleStateDetail" class="role-state-placeholder">
+                  <strong>尚未选择角色</strong>
+                  <p>可从当前角色卡读取变量、阶段与状态快照配置，或保存心笺内部运行配置。</p>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
         <section class="tab-page" data-page="generate">
-          <div class="mujian-config-card standalone">
+          <div class="turn-note-config-card standalone">
             <div class="subhead"><strong>生成规则</strong><span class="micro-badge">worker</span></div>
             <p class="microcopy">这里决定辅助模型怎么读取最近聊天、什么时候写入心笺、是否生成主角状态卡，以及允许用户附加哪些安全提示。</p>
             <div class="model-toggle-grid">
@@ -140,21 +203,21 @@
             </div>
             <label>最近输入轮数<input id="cfgTurns" type="number" min="1" max="10" /></label>
             <p class="microcopy">轮数越高，worker 读取的最近聊天越多；建议默认 3 轮，剧情复杂时可提高到 5。</p>
-            <div class="mujian-config-card soft-card">
+            <div class="turn-note-config-card soft-card">
               <div class="subhead"><strong>主角状态卡</strong><span class="micro-badge">安全生成</span></div>
-              <label class="check-row"><input id="cfgMujianProtagonistEnabled" type="checkbox" /> 生成主角状态卡</label>
+              <label class="check-row"><input id="cfgTurnNoteProtagonistEnabled" type="checkbox" /> 生成主角状态卡</label>
               <div class="grid-two">
-                <label>主角名称<input id="cfgMujianProtagonistName" placeholder="例如：顾知微" /></label>
-                <label>生成方式<select id="cfgMujianProtagonistMode"><option value="when_relevant">明显涉及时生成</option><option value="always">每轮生成</option></select></label>
+                <label>主角名称<input id="cfgTurnNoteProtagonistName" placeholder="例如：顾知微" /></label>
+                <label>生成方式<select id="cfgTurnNoteProtagonistMode"><option value="when_relevant">明显涉及时生成</option><option value="always">每轮生成</option></select></label>
               </div>
-              <label>主角别名<input id="cfgMujianProtagonistAliases" placeholder="用逗号分隔，例如：我，先生，顾先生" /></label>
+              <label>主角别名<input id="cfgTurnNoteProtagonistAliases" placeholder="用逗号分隔，例如：我，先生，顾先生" /></label>
               <p class="microcopy">主角状态卡只写可观察状态、身体状态、伤势、气息、位置与互动关系；不会替用户决定行动、台词或内心。</p>
             </div>
-            <div class="mujian-config-card soft-card">
+            <div class="turn-note-config-card soft-card">
               <div class="subhead"><strong>安全提示词开放</strong><span class="micro-badge">仅附加</span></div>
-              <label class="check-row"><input id="cfgMujianWorkerPromptEnabled" type="checkbox" /> 启用自定义 worker 附加提示词</label>
-              <label>幕笺语言风格补充<textarea id="cfgMujianWorkerStylePrompt" rows="4" placeholder="例如：语言古风、克制、含蓄；多写光影、袖口、呼吸、视线；少用夸张现代词。"></textarea></label>
-              <label>主角状态卡规则<textarea id="cfgMujianWorkerProtagonistPrompt" rows="4" placeholder="例如：主角状态卡重点记录旧伤、调息、气息和与其他角色的距离关系；不要替主角说话或行动。"></textarea></label>
+              <label class="check-row"><input id="cfgTurnNoteWorkerPromptEnabled" type="checkbox" /> 启用自定义 worker 附加提示词</label>
+              <label>幕笺语言风格补充<textarea id="cfgTurnNoteWorkerStylePrompt" rows="4" placeholder="例如：语言古风、克制、含蓄；多写光影、袖口、呼吸、视线；少用夸张现代词。"></textarea></label>
+              <label>主角状态卡规则<textarea id="cfgTurnNoteWorkerProtagonistPrompt" rows="4" placeholder="例如：主角状态卡重点记录旧伤、调息、气息和与其他角色的距离关系；不要替主角说话或行动。"></textarea></label>
               <div class="model-actions"><button id="resetWorkerPromptBtn" type="button" class="ghost-btn">恢复默认附加提示词</button></div>
               <p class="microcopy">这里只会附加到安全区域，不会开放 JSON 根结构、updates 协议、SQLite 写入规则或字段 key。</p>
             </div>
@@ -164,49 +227,50 @@
           </div>
         </section>
 
-        <section class="tab-page" data-page="mujian">
-          <div class="mujian-config-card standalone">
-            <div class="subhead"><strong>幕笺模式</strong><span class="micro-badge">v0.6</span></div>
-            <p class="microcopy">幕笺是正文之外的展示层：本轮标题卡、可折叠角色信息附笺、场景和状态摘要；不进入主聊天 prompt。</p>
+        <section class="tab-page" data-page="turnNote">
+          <div class="turn-note-config-card standalone">
+            <div class="subhead"><strong>幕笺显示</strong></div>
+            <p class="microcopy">控制 Chat 里是否显示幕笺、使用哪个模板和外观包。</p>
             <div class="model-toggle-grid">
-              <label class="check-row"><input id="cfgMujianEnabled" type="checkbox" /> 启用幕笺展示</label>
-              <label class="check-row"><input id="cfgMujianTitle" type="checkbox" /> 显示本轮标题卡</label>
-              <label class="check-row"><input id="cfgMujianNote" type="checkbox" /> 每轮回复下方显示心笺附笺</label>
+              <label class="check-row"><input id="cfgTurnNoteEnabled" type="checkbox" /> 启用幕笺展示</label>
+              <label class="check-row"><input id="cfgTurnNoteTitle" type="checkbox" /> 显示本轮标题卡</label>
+              <label class="check-row"><input id="cfgTurnNoteNote" type="checkbox" /> 每轮回复下方显示心笺附笺</label>
             </div>
             <div class="grid-two">
-              <label>当前附笺模板<select id="cfgMujianTemplateSelect"></select></label>
-              <label>当前美化包<select id="cfgMujianThemeSelect"></select></label>
+              <label>当前附笺模板<select id="cfgTurnNoteTemplateSelect"></select></label>
+              <label>当前美化包<select id="cfgTurnNoteThemeSelect"></select></label>
             </div>
-            <p class="microcopy">模板决定角色状态卡生成哪些字段；美化包决定标题卡、角色卡和关系卡的外观。</p>
-            <label>Chat 状态显示模式<select id="cfgMujianDisplayMode"><option value="collapsed">折叠附笺</option><option value="expanded">默认展开</option><option value="compact">简洁状态条</option><option value="hidden">不显示状态卡</option></select></label>
+            <div class="model-actions inline-actions"><button id="resetDefaultTurnNoteBtn" type="button" class="ghost-btn">恢复默认幕笺</button></div>
+            <p class="microcopy">模板决定角色状态卡生成哪些字段；美化包决定标题卡、角色卡和关系卡的外观。恢复默认会启用 Chat 幕笺，并切回“标准状态模板 + 标准样式”。</p>
+            <label>Chat 状态显示模式<select id="cfgTurnNoteDisplayMode"><option value="collapsed">折叠附笺</option><option value="expanded">默认展开</option><option value="compact">简洁状态条</option><option value="hidden">不显示状态卡</option></select></label>
             <p class="microcopy">折叠适合沉浸阅读；默认展开适合状态栏玩家；简洁状态条只占一行；不显示仅保留后台记录。</p>
             <div class="grid-two">
-              <label>标题生成风格<select id="cfgMujianTitleStyle"><option value="classic">经典标题</option><option value="gufeng">古风标题</option><option value="chapter">章节标题</option></select></label>
-              <label>附笺生成风格<select id="cfgMujianNoteStyle"><option value="classic">经典状态</option><option value="gufeng">古风旁白</option><option value="sensory">感官标签</option></select></label>
+              <label>标题生成风格<select id="cfgTurnNoteTitleStyle"><option value="classic">经典标题</option><option value="gufeng">古风标题</option><option value="chapter">章节标题</option></select></label>
+              <label>附笺生成风格<select id="cfgTurnNoteNoteStyle"><option value="classic">经典状态</option><option value="gufeng">古风旁白</option><option value="sensory">感官标签</option></select></label>
             </div>
             <div class="grid-two">
-              <label>扩写强度<select id="cfgMujianExpand"><option value="conservative">保守</option><option value="standard">标准</option><option value="rich">丰富</option></select></label>
-              <label>附笺密度<select id="cfgMujianDensity"><option value="compact">简洁</option><option value="standard">标准</option><option value="detailed">详细</option></select></label>
+              <label>扩写强度<select id="cfgTurnNoteExpand"><option value="conservative">保守</option><option value="standard">标准</option><option value="rich">丰富</option></select></label>
+              <label>附笺密度<select id="cfgTurnNoteDensity"><option value="compact">简洁</option><option value="standard">标准</option><option value="detailed">详细</option></select></label>
             </div>
-            <div class="mujian-style-help" id="mujianStyleHelp">
+            <div class="turn-note-style-help" id="turnNoteStyleHelp">
               <strong>生成风格影响什么？</strong>
-              <p id="mujianStyleDesc">标题生成风格只控制本轮标题卡；附笺生成风格控制角色状态卡。外观样式仍由卡片模板负责。</p>
-              <div class="mujian-style-preview" id="mujianStylePreview"></div>
+              <p id="turnNoteStyleDesc">标题生成风格只控制本轮标题卡；附笺生成风格控制角色状态卡。外观样式仍由卡片模板负责。</p>
+              <div class="turn-note-style-preview" id="turnNoteStylePreview"></div>
             </div>
             <div class="grid-two">
-              <label>角色显示<select id="cfgMujianCharacterFilter"><option value="turn">本轮生成</option><option value="heroine">双女主</option><option value="protagonist">主角相关</option><option value="custom">自定义名单</option><option value="all">全部角色</option></select></label>
+              <label>角色显示<select id="cfgTurnNoteCharacterFilter"><option value="turn">本轮生成</option><option value="heroine">双女主</option><option value="protagonist">主角相关</option><option value="custom">自定义名单</option><option value="all">全部角色</option></select></label>
             </div>
-            <label>自定义角色名单<input id="cfgMujianCharacterNames" placeholder="用逗号分隔，例如：角色甲，角色乙" /></label>
+            <label>自定义角色名单<input id="cfgTurnNoteCharacterNames" placeholder="用逗号分隔，例如：角色甲，角色乙" /></label>
             <p class="microcopy">附笺会先生成完整数据，再由前端筛选显示。Chat 状态显示模式只影响聊天页展示，不改变 SQLite 后台记录。</p>
           </div>
           <div class="model-tools pinned">
-            <button id="saveMujianConfigBtn" type="button" class="primary-btn">保存幕笺设置</button>
+            <button id="saveTurnNoteConfigBtn" type="button" class="primary-btn">保存幕笺设置</button>
           </div>
         </section>
 
         <section class="tab-page" data-page="template">
-          <div class="mujian-config-card standalone">
-            <div class="subhead"><strong>幕笺模板</strong><span class="micro-badge">v0.5</span></div>
+          <div class="turn-note-config-card standalone">
+            <div class="subhead"><strong>幕笺模板</strong></div>
             <p class="microcopy">模板开放第一版：控制角色附笺“生成哪些字段、每个字段怎么写、最终按什么格式展示”。暂不开放 HTML/CSS/JS 外观。</p>
             <div class="preset-row">
               <label>当前模板<select id="templateSelect"></select></label>
@@ -232,14 +296,16 @@
         </section>
 
         <section class="tab-page" data-page="theme">
-          <div class="mujian-config-card standalone">
-            <div class="subhead"><strong>幕笺外观模板包</strong><span class="micro-badge">v0.7.6.1</span></div>
-            <p class="microcopy">外观模板包控制 Chat 里的标题卡、场景信息卡、角色状态卡和关系变化卡布局；不改变心笺生成内容，也不开放 JS。</p>
-            <div class="preset-row">
+          <div class="turn-note-config-card standalone">
+            <div class="subhead"><strong>幕笺外观模板包</strong></div>
+            <p class="microcopy">外观包只调整 Chat 幕笺展示样式；不影响生成、变量、阶段或世界书。</p>
+            <div class="preset-row theme-pack-toolbar-row">
               <label>当前外观包<select id="themeSelect"></select></label>
-              <div class="inline-action-group">
-                <button id="exportThemeBtn" type="button" class="ghost-btn">导出外观包 JSON</button>
-                <button id="deleteThemeBtn" type="button" class="ghost-btn danger" disabled title="内置外观包不可删除">删除导入包</button>
+              <div class="inline-action-group theme-pack-actions">
+                <label class="ghost-btn file-btn">导入<input id="importThemeInput" type="file" accept="application/json" /></label>
+                <button id="exportThemeBtn" type="button" class="ghost-btn" title="导出外观包 JSON">导出</button>
+                <button id="deleteThemeBtn" type="button" class="ghost-btn danger" disabled title="内置外观包不可删除">删除</button>
+                <button id="saveThemeConfigBtn" type="button" class="primary-btn" title="保存外观设置">保存</button>
               </div>
             </div>
             <div class="grid-two">
@@ -247,19 +313,20 @@
               <label>作者<input id="themeAuthor" readonly /></label>
             </div>
             <label>说明<textarea id="themeDesc" rows="2" readonly></textarea></label>
+            <div id="themeMeta" class="theme-pack-meta-panel" aria-live="polite"></div>
             <div class="theme-preview-wrap">
-              <strong>预览</strong>
+              <div class="theme-preview-head">
+                <strong>预览</strong>
+                <label class="theme-preview-mode">预览数据<select id="themePreviewModeSelect"><option value="role">角色变量</option><option value="standard">标准模板</option></select></label>
+              </div>
               <div id="themePreview" class="theme-preview-card">选择外观包后显示预览。</div>
             </div>
-            <div class="model-tools pinned">
-              <label class="ghost-btn file-btn">导入外观包 JSON<input id="importThemeInput" type="file" accept="application/json" /></label>
-              <button id="saveThemeConfigBtn" type="button" class="primary-btn">保存外观设置</button>
-            </div>
+
           </div>
         </section>
 
         <section class="tab-page" data-page="model">
-          <p class="microcopy">模型页只保存心笺辅助模型 API。生成触发请到「生成规则」，展示样式请到「幕笺」。</p>
+          <p class="microcopy">模型页只保存心笺辅助模型 API。生成触发在「生成规则」，展示样式在「幕笺显示」。</p>
           <div class="preset-row">
             <label>预设服务<select id="servicePresetSelect">
               <option value="custom">自定义</option>
@@ -298,7 +365,7 @@
             <strong>聊天页 Hook</strong>
             <span id="hookStatusText">正在检测……</span>
           </div>
-          <p class="microcopy">这里控制心笺基础启用、聊天页 Hook 和通知。自动填表触发已归入「生成规则」。</p>
+          <p class="microcopy">这里控制心笺基础启用、聊天页 Hook 和通知。自动填表触发在「生成规则」中设置。</p>
           <div class="model-toggle-grid">
             <label class="check-row"><input id="cfgEnabled" type="checkbox" /> 启用心笺</label>
             <label class="check-row"><input id="cfgNotify" type="checkbox" /> 聊天页显示提示</label>
@@ -312,7 +379,7 @@
         </section>
 
         <section class="tab-page" data-page="log">
-          <div class="mujian-config-card standalone log-config-card">
+          <div class="turn-note-config-card standalone log-config-card">
             <div class="subhead"><strong>调试与日志</strong><span class="micro-badge">debug</span></div>
             <p class="microcopy">这里集中放置心笺运行日志、Hook 排查与导出信息。它不属于状态数据库内容，只用于定位生成、重 roll、编辑重算和幕笺恢复问题。</p>
             <div class="panel-actions log-actions">
@@ -344,6 +411,6 @@
       </aside>
       <div id="rowDetailMask" class="drawer-mask" hidden></div>
     </main>
-    <script src="./static/state-journal.js?v=state-journal-admin-ui-sync-toggle-v1"></script>
+    <script src="./static/state-journal.js?v=state-journal-v207-role-display-backfill"></script>
   </body>
 </html>

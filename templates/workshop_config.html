@@ -254,12 +254,27 @@
           <h2>演出工坊面板</h2>
         </div>
 
-        <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存演出工坊。</p>
+        <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存到当前角色卡。</p>
 
         <div class="workshop-panel-actions workshop-panel-actions-top">
-          <button id="save-workshop" type="button">保存演出工坊</button>
+          <button id="save-workshop" type="button">保存到当前角色卡</button>
           <a class="secondary compact button-link workshop-return-link" href="/config/card">返回角色卡</a>
-          <button id="reload-workshop-status" type="button" class="secondary compact">重新读取状态</button>
+          <button id="reload-workshop-status" type="button" class="secondary compact">重新读取角色卡</button>
+          <button id="clear-workshop-binding" type="button" class="secondary compact ghost">清除本卡演出</button>
+        </div>
+
+        <div class="workshop-panel-block workshop-card-binding-panel">
+          <div class="workshop-binding-head">
+            <span class="eyebrow">Card Binding</span>
+            <strong>角色卡演出绑定</strong>
+          </div>
+          <p id="workshop-binding-source" class="muted compact">当前演出设置写入当前角色卡。</p>
+          <div class="workshop-binding-pills" aria-label="角色卡演出绑定范围">
+            <span id="workshop-binding-opening" class="micro-badge muted">开场演出</span>
+            <span id="workshop-binding-ambience" class="micro-badge muted">常驻氛围</span>
+            <span id="workshop-binding-dynamic" class="micro-badge muted">动态演出</span>
+          </div>
+          <p class="muted compact">只保存资源引用，不打包图片、音乐或音效；不绑定主程序 UI、模型、心笺或状态栏设置。</p>
         </div>
 
         <div class="workshop-panel-block workshop-runtime-panel-side">
@@ -310,6 +325,11 @@
       const workshopOpeningStateEl = document.getElementById("workshop-opening-state");
       const workshopAmbienceStateEl = document.getElementById("workshop-ambience-state");
       const workshopDynamicStateEl = document.getElementById("workshop-dynamic-state");
+      const workshopBindingSourceEl = document.getElementById("workshop-binding-source");
+      const workshopBindingOpeningEl = document.getElementById("workshop-binding-opening");
+      const workshopBindingAmbienceEl = document.getElementById("workshop-binding-ambience");
+      const workshopBindingDynamicEl = document.getElementById("workshop-binding-dynamic");
+      const clearWorkshopBindingBtn = document.getElementById("clear-workshop-binding");
       const workshopOpeningEnabledEl = document.getElementById("workshop-opening-enabled");
       const workshopOpeningTitleEl = document.getElementById("workshop-opening-title");
       const workshopOpeningSubtitleEl = document.getElementById("workshop-opening-subtitle");
@@ -429,6 +449,42 @@
         if (workshopOpeningStateEl) workshopOpeningStateEl.textContent = workshopOpeningEnabledEl?.checked ? "已启用" : "未启用";
         if (workshopAmbienceStateEl) workshopAmbienceStateEl.textContent = ambienceEnabled ? "已启用" : "未启用";
         if (workshopDynamicStateEl) workshopDynamicStateEl.textContent = `${dynamicCount} 项`;
+        updateWorkshopBindingPanel();
+      }
+
+      function setBindingPill(element, active, label) {
+        if (!element) return;
+        element.textContent = `${label}${active ? " · 已绑定" : " · 未绑定"}`;
+        element.classList.toggle("muted", !active);
+        element.classList.toggle("active", !!active);
+      }
+
+      function workshopBindingFromData(workshop = currentWorkshop || {}) {
+        const opening = workshop?.opening && typeof workshop.opening === "object" ? workshop.opening : {};
+        const ambience = workshop?.ambience && typeof workshop.ambience === "object" ? workshop.ambience : {};
+        const dynamicScenes = Array.isArray(workshop?.dynamicScenes) ? workshop.dynamicScenes : [];
+        return {
+          has_binding: Boolean(opening.enabled || ambience.enabled || dynamicScenes.length),
+          bound_parts: {
+            opening: Boolean(opening.enabled),
+            ambience: Boolean(ambience.enabled),
+            dynamic: dynamicScenes.length > 0,
+          },
+          dynamic_count: dynamicScenes.length,
+        };
+      }
+
+      function updateWorkshopBindingPanel(binding = null) {
+        const data = binding || workshopBindingFromData();
+        const parts = data.bound_parts || {};
+        setBindingPill(workshopBindingOpeningEl, parts.opening, "开场演出");
+        setBindingPill(workshopBindingAmbienceEl, parts.ambience, "常驻氛围");
+        setBindingPill(workshopBindingDynamicEl, parts.dynamic, `动态演出${Number(data.dynamic_count || 0) > 0 ? ` ${data.dynamic_count} 项` : ""}`);
+        if (workshopBindingSourceEl) {
+          workshopBindingSourceEl.textContent = data.has_binding
+            ? "当前角色卡已绑定演出配置，Chat 会优先读取本卡的开场、氛围与动态演出。"
+            : "当前角色卡未绑定演出配置；保存后会把本页三类演出写入角色卡。";
+        }
       }
 
       function applyTheme(theme) {
@@ -1235,6 +1291,17 @@
         return { creativeWorkshop };
       }
 
+      function notifyWorkshopRuntimeRefresh(reason = "save") {
+        const payload = {
+          type: "workshop_config_saved",
+          reason,
+          at: Date.now(),
+        };
+        try {
+          localStorage.setItem("fantareal:workshop_config_saved", JSON.stringify(payload));
+        } catch (_) {}
+      }
+
       async function refreshWorkshopStatus() {
         const response = await fetch("/api/workshop/status");
         if (!response.ok) {
@@ -1249,6 +1316,7 @@
           currentWorkshop = normalizeCreativeWorkshop(data.workshop);
           renderWorkshopRules(currentWorkshop);
         }
+        updateWorkshopBindingPanel(data.binding || null);
         updateWorkshopPanelStats();
       }
 
@@ -1257,7 +1325,9 @@
         const data = await postJson("/api/workshop/save", payload);
         currentWorkshop = normalizeCreativeWorkshop(data.workshop || payload.creativeWorkshop);
         renderWorkshopRules(currentWorkshop);
-        setStatus(`已完成：演出工坊已保存。新对话开始时会显示封面，点击按钮后播放音乐。`, "success");
+        updateWorkshopBindingPanel(data.binding || null);
+        notifyWorkshopRuntimeRefresh("save");
+        setStatus(`已完成：演出工坊已保存到当前角色卡。`, "success");
         // 保存是否成功只以 /api/workshop/save 为准。
         // 状态刷新放到后台，避免 /api/workshop/status 慢或卡住时把保存按钮锁在“保存中…”。
         void refreshWorkshopStatus().catch((error) => {
@@ -1272,7 +1342,7 @@
 
       workshopOpeningEnabledEl?.addEventListener("change", () => {
         updateWorkshopPanelStats();
-        setStatus(workshopOpeningEnabledEl.checked ? "已启用开场演出，记得保存演出工坊。" : "已关闭开场演出，记得保存演出工坊。", "idle");
+        setStatus(workshopOpeningEnabledEl.checked ? "已启用开场演出，记得保存到当前角色卡。" : "已关闭开场演出，记得保存到当前角色卡。", "idle");
       });
 
       [workshopOpeningTitleEl, workshopOpeningSubtitleEl, workshopOpeningButtonTextEl, workshopOpeningAnimationEl, workshopOpeningMusicUrlEl, workshopOpeningVolumeEl].forEach((element) => {
@@ -1311,33 +1381,56 @@
       workshopEnabledEl?.addEventListener("change", () => {
         if (currentWorkshop) currentWorkshop.enabled = workshopEnabledEl.checked;
         updateWorkshopPanelStats();
-        setStatus(workshopEnabledEl.checked ? "已启用演出工坊，记得保存演出工坊。" : "已关闭演出工坊，记得保存演出工坊。", "idle");
+        setStatus(workshopEnabledEl.checked ? "已启用演出工坊，记得保存到当前角色卡。" : "已关闭演出工坊，记得保存到当前角色卡。", "idle");
       });
 
+      async function clearWorkshopBinding() {
+        const response = await fetch("/api/workshop/clear-card-binding", { method: "POST" });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "清除本卡演出失败");
+        }
+        const data = await response.json();
+        currentWorkshop = normalizeCreativeWorkshop(data.workshop || {});
+        renderWorkshopRules(currentWorkshop);
+        updateWorkshopBindingPanel(data.binding || null);
+        updateWorkshopPanelStats();
+        notifyWorkshopRuntimeRefresh("clear");
+        return data;
+      }
+
       document.getElementById("reload-workshop-status")?.addEventListener("click", async (event) => {
-        const reloadButton = event.currentTarget;
-        if (!reloadButton || reloadButton.dataset.reloading === "true") return;
-        reloadButton.dataset.reloading = "true";
-        setButtonState(reloadButton, "loading", "读取中…");
-        setStatus("正在重新读取演出工坊状态…", "busy");
-        const reloadWatchdog = window.setTimeout(() => {
-          ensureButtonReleased(reloadButton, "重新读取状态");
-        }, 9000);
+        const btn = event.currentTarget;
+        rememberButtonLabel(btn);
+        setButtonState(btn, "loading", "读取中…");
+        setStatus("正在重新读取当前角色卡演出配置…", "busy");
         try {
-          await withTimeout(refreshWorkshopStatus(), 8000, "读取状态超时，请稍后重试。");
-          window.clearTimeout(reloadWatchdog);
-          setButtonState(reloadButton, "success", "已读取 ✓");
-          setStatus("已完成：演出工坊状态已重新读取。", "success");
-          showToast("演出工坊状态已重新读取", "success");
-          window.setTimeout(() => ensureButtonReleased(reloadButton, "重新读取状态"), 1600);
+          await refreshWorkshopStatus();
+          setButtonState(btn, "success", "已读取 ✓");
+          setStatus("已重新读取当前角色卡演出配置。", "success");
         } catch (error) {
-          window.clearTimeout(reloadWatchdog);
-          setButtonState(reloadButton, "error", "读取失败");
-          setStatus(`读取失败：${error.message}`, "error");
-          showToast(`读取失败：${error.message}`, "error");
-        } finally {
-          reloadButton.dataset.reloading = "false";
-          window.setTimeout(() => ensureButtonReleased(reloadButton, "重新读取状态"), 7000);
+          setButtonState(btn, "error", "读取失败");
+          setStatus(error.message || "演出工坊状态读取失败。", "error");
+          showToast(error.message || "演出工坊状态读取失败。", "error");
+        }
+      });
+
+      clearWorkshopBindingBtn?.addEventListener("click", async (event) => {
+        const ok = window.confirm("确认清除当前角色卡的演出绑定？\n\n只会清空开场演出、常驻氛围和动态演出配置，不会删除图片、音乐、聊天记录或其他角色卡内容。");
+        if (!ok) return;
+        const btn = event.currentTarget;
+        rememberButtonLabel(btn);
+        setButtonState(btn, "loading", "清除中…");
+        setStatus("正在清除当前角色卡演出绑定…", "busy");
+        try {
+          await clearWorkshopBinding();
+          setButtonState(btn, "success", "已清除 ✓");
+          setStatus("已清除当前角色卡演出绑定。", "success");
+          showToast("已清除本卡演出", "已恢复为空配置，资源文件不会被删除。", "ok");
+        } catch (error) {
+          setButtonState(btn, "error", "清除失败");
+          setStatus(error.message || "清除本卡演出失败。", "error");
+          showToast(error.message || "清除本卡演出失败。", "error");
         }
       });
 
@@ -1915,7 +2008,7 @@
         scenes.push(createDefaultDynamicScene(scenes.length + 1));
         currentWorkshop = normalizeCreativeWorkshop({ ...(currentWorkshop || {}), dynamicScenes: scenes });
         renderDynamicScenes(currentWorkshop.dynamicScenes);
-        setStatus("已新增动态演出，记得保存演出工坊。", "success");
+        setStatus("已新增动态演出，记得保存到当前角色卡。", "success");
       });
 
       dynamicSceneListEl?.addEventListener("input", (event) => {
@@ -1934,7 +2027,7 @@
         if (!card) return;
         if (event.target.closest(".remove-dynamic-scene")) {
           card.remove();
-          setStatus("已删除动态演出，记得保存演出工坊。", "success");
+          setStatus("已删除动态演出，记得保存到当前角色卡。", "success");
           return;
         }
         if (event.target.closest(".dynamic-image-pick")) card.querySelector(".dynamic-image-file")?.click();

@@ -7,6 +7,8 @@
   const invalidatedTurns = new Set();
   let hideTimer = null;
   const processedTurns = new Set();
+  const workerStatusTimers = new Map();
+  const retryTurnDetails = new Map();
   let pendingTurn = null;
 
   function simpleHash(value) {
@@ -131,6 +133,18 @@
       }
       .state-journal-turn-status.is-error { border-color: color-mix(in srgb, #ff7878 58%, var(--border, rgba(255,255,255,.16)) 42%); color: #ffd5d5; }
       .state-journal-turn-status.is-error::before { content: "!"; display: inline-flex; align-items: center; justify-content: center; border: 0; animation: none; font-weight: 900; }
+      .state-journal-turn-status button {
+        margin-left: .35rem;
+        border: 1px solid color-mix(in srgb, var(--accent, #d8b273) 38%, var(--border, rgba(255,255,255,.16)) 62%);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent, #d8b273) 16%, transparent 84%);
+        color: inherit;
+        font: inherit;
+        font-weight: 850;
+        padding: .18rem .48rem;
+        cursor: pointer;
+      }
+      .state-journal-turn-status button:hover { background: color-mix(in srgb, var(--accent, #d8b273) 26%, transparent 74%); }
 
       .state-journal-inline-scene-card {
         width: 100%;
@@ -856,6 +870,50 @@
       .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row span { color:#d18a38; font-size:.76rem; letter-spacing:.14em; font-weight:900; }
       .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row strong { color:#f6ecd7; font-weight:520; line-height:1.72; }
 
+
+      /* v1.19.2：状态面板类外观包在 Chat 实际幕笺的“本轮数值变化”中也使用进度条。 */
+      .state-journal-metric-diary-row.is-meter-row {
+        border-color: rgba(72,188,255,.18);
+        background: rgba(5,16,30,.42);
+      }
+      .state-journal-metric-diary-row.is-meter-row > strong {
+        color: #82d8ff;
+        letter-spacing: .08em;
+      }
+      .state-journal-metric-diary-row.is-meter-row .state-journal-status-pro-meters {
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+      }
+      .state-journal-metric-diary-row.is-meter-row .state-journal-status-meter span {
+        display: block;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: #7bd8ff;
+        font-size: .64rem;
+        letter-spacing: .08em;
+        text-transform: none;
+      }
+      /* v1.19.3：外置美化包运行时兜底。保留特色布局，但长文本不再溢出，字段名不被符号吞掉。 */
+      .state-journal-status-pro-row strong,
+      .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row strong,
+      .state-journal-paper-note-table.is-literary-note .state-journal-paper-note-row strong {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+      .state-journal-status-pro-row span,
+      .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row span,
+      .state-journal-paper-note-table.is-literary-note .state-journal-paper-note-row span {
+        min-width: 0;
+        white-space: nowrap;
+      }
+      .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row,
+      .state-journal-status-pro-row,
+      .state-journal-paper-note-table.is-literary-note .state-journal-paper-note-row {
+        min-width: 0;
+      }
+
       /* Keep Xinjian chat surfaces in sync with Fantareal global color and opacity settings. */
       body.state-journal-global-ui-sync .state-journal-chat-bubble,
       body.state-journal-global-ui-sync .state-journal-turn-status,
@@ -949,6 +1007,144 @@
         color: var(--accent, #5ca7ff) !important;
       }
 
+
+      /* v2.0.3 · 标准样式浅/暗色可读性作用域收口。
+       * 只作用于 theme-standard：
+       * - light：恢复标准浅色深色字，并覆盖 global-ui-sync 的浅色误污染。
+       * - dark：保留标准暗色白字。
+       * 其他内置/外置美化包不受影响。
+       */
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard {
+        --xj-standard-readable-text: #2b211a;
+        --xj-standard-readable-muted: #5a5048;
+        --xj-standard-readable-soft: #756a61;
+        --xj-standard-readable-accent: color-mix(in srgb, var(--accent, #b46a3e) 58%, #7d3f22 42%);
+        color: var(--xj-standard-readable-text) !important;
+      }
+
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-title,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-event,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-section h4,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field strong,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field p,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field div,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-relation-list,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-relation-list strong,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-relation-list p,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row strong,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row span,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip i,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard span {
+        color: var(--xj-standard-readable-text) !important;
+      }
+
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard summary,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-subtitle,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-toggle,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip span,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard summary,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-empty,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar small {
+        color: var(--xj-standard-readable-muted) !important;
+      }
+
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-kicker,
+      body.state-journal-standard-light-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip b,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field span,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip b,
+      body.state-journal-standard-light-readability .state-journal-turn-note-compact.theme-standard strong {
+        color: var(--xj-standard-readable-accent) !important;
+      }
+
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field em {
+        color: var(--xj-standard-readable-soft) !important;
+      }
+
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip,
+      body.state-journal-standard-light-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row {
+        background: color-mix(in srgb, rgba(var(--input-rgb, 255,255,255), max(var(--input-alpha, .09), .18)) 76%, rgba(255,255,255,.28)) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard {
+        --xj-standard-dark-text: rgba(255,255,255,.95);
+        --xj-standard-dark-muted: rgba(255,255,255,.84);
+        --xj-standard-dark-soft: rgba(255,255,255,.70);
+        --xj-standard-dark-accent: color-mix(in srgb, var(--accent, #8fc7ff) 68%, #ffffff 32%);
+        color: var(--xj-standard-dark-text) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-title,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-event,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-section h4,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field strong,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field p,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field div,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-relation-list,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-relation-list strong,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-relation-list p,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row strong,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row span,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip i,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard span {
+        color: var(--xj-standard-dark-text) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard summary,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-subtitle,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-toggle,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip span,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard summary,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-empty,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-toolbar small {
+        color: var(--xj-standard-dark-muted) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-kicker,
+      body.state-journal-standard-dark-readability .state-journal-inline-scene-card.theme-standard .state-journal-scene-chip b,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field span,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip b,
+      body.state-journal-standard-dark-readability .state-journal-turn-note-compact.theme-standard strong {
+        color: var(--xj-standard-dark-accent) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field em {
+        color: var(--xj-standard-dark-soft) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-section,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-note-field,
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-diary-row {
+        background: color-mix(in srgb, var(--input-bg, rgba(8,14,20,.42)) 82%, rgba(0,0,0,.18)) !important;
+        border-color: color-mix(in srgb, var(--border, rgba(255,255,255,.16)) 72%, rgba(255,255,255,.22)) !important;
+      }
+
+      body.state-journal-standard-dark-readability .state-journal-turn-note.theme-standard .state-journal-metric-chip {
+        background: rgba(255,255,255,.08) !important;
+        border-color: rgba(255,255,255,.18) !important;
+      }
+
       @keyframes state-journal-spin { to { transform: rotate(360deg); } }
       @media (max-width: 900px) { .state-journal-chat-bubble { left: 50%; top: 4.8rem; } }
     `;
@@ -1035,10 +1231,40 @@
     fallbackTimers.clear();
   }
 
+  function clearWorkerStatusTimers(turnId = "") {
+    const key = String(turnId || "").trim();
+    const timers = workerStatusTimers.get(key) || [];
+    timers.forEach((timer) => window.clearTimeout(timer));
+    if (key) workerStatusTimers.delete(key);
+  }
+
+  function scheduleWorkerStatusTimers(targetMessage, turnId, retryDetail = {}, requestTimeoutSeconds = 120) {
+    const key = String(turnId || "").trim();
+    if (!targetMessage || !key) return;
+    clearWorkerStatusTimers(key);
+    retryTurnDetails.set(key, retryDetail || {});
+    const timeoutSeconds = Math.max(30, Number(requestTimeoutSeconds || 120));
+    const slowMs = Math.max(90000, Math.min(timeoutSeconds * 1000, 150000));
+    const timeoutMs = Math.max(slowMs + 60000, Math.min((timeoutSeconds + 75) * 1000, 240000));
+    const slowTimer = window.setTimeout(() => {
+      if (!inFlightTurns.has(key)) return;
+      attachInlineTurnStatus(targetMessage, key, "心笺生成较慢，仍在等待辅助模型返回……", "pending");
+      showBubble("pending", "心笺生成较慢", "辅助模型仍在处理，本轮完成后会自动挂载幕笺。", 5200);
+    }, slowMs);
+    const timeoutTimer = window.setTimeout(() => {
+      if (!inFlightTurns.has(key)) return;
+      attachInlineTurnStatus(targetMessage, key, "心笺生成等待时间过长，可点击重试。", "error", { retryDetail });
+      showBubble("error", "心笺生成较慢", "本轮仍未返回结果，可点击消息下方重试。", 9000);
+    }, timeoutMs);
+    workerStatusTimers.set(key, [slowTimer, timeoutTimer]);
+  }
+
   function forgetTurnRuntime(turnId = "") {
     const key = String(turnId || "").trim();
     if (!key) return;
     clearDomFallback(key);
+    clearWorkerStatusTimers(key);
+    retryTurnDetails.delete(key);
     inFlightTurns.delete(key);
     invalidatedTurns.add(key);
     processedTurns.delete(`fallback:${key}`);
@@ -1230,8 +1456,8 @@
   }
 
   function activeThemePack() {
-    const packs = Array.isArray(configCache?.mujian_theme_packs) ? configCache.mujian_theme_packs : [];
-    const id = String(configCache?.mujian_theme_id || "standard");
+    const packs = Array.isArray(configCache?.turn_note_theme_packs) ? configCache.turn_note_theme_packs : [];
+    const id = String(configCache?.turn_note_theme_id || "standard");
     return packs.find((item) => item && item.id === id) || packs[0] || { id: "standard", style: { class_name: "theme-standard" } };
   }
 
@@ -1355,9 +1581,36 @@
     });
   }
 
+  const COMMON_METRIC_NAME_ALIASES = [
+    ["favor_level", "好感"], ["favor", "好感"], ["好感", "好感"], ["好感值", "好感"],
+    ["trust_level", "信任"], ["trust", "信任"], ["信任", "信任"], ["信任值", "信任"],
+    ["warmth", "亲近"], ["closeness", "亲近"], ["intimacy", "亲近"], ["亲近", "亲近"], ["亲密", "亲近"],
+    ["worry", "担忧"], ["concern", "担忧"], ["担忧", "担忧"], ["忧心", "担忧"], ["牵挂", "担忧"],
+    ["guard_level", "戒备"], ["guard", "戒备"], ["戒备", "戒备"], ["防备", "戒备"],
+    ["respect", "认可"], ["认可", "认可"], ["尊重", "认可"], ["认同", "认可"],
+    ["bond_level", "依赖"], ["bond", "依赖"], ["dependency", "依赖"], ["dependence", "依赖"], ["依赖", "依赖"], ["羁绊", "依赖"],
+    ["pulse_level", "心绪"], ["pulse", "心绪"], ["心绪", "心绪"], ["心绪波动", "心绪"],
+    ["fatigue_level", "疲惫"], ["fatigue", "疲惫"], ["疲惫", "疲惫"],
+    ["injury_level", "伤势"], ["injury", "伤势"], ["伤势", "伤势"],
+    ["stress_level", "压力"], ["stress", "压力"], ["压力", "压力"],
+  ];
+
+  function metricNameFromAlias(value = "") {
+    const target = normalizeFieldName(value);
+    if (!target) return "";
+    for (const [alias, name] of COMMON_METRIC_NAME_ALIASES) {
+      const key = normalizeFieldName(alias);
+      if (target === key || target.includes(key) || key.includes(target)) return name;
+    }
+    return "";
+  }
+
   const DEFAULT_METRIC_DEFS = [
     { key: "favor_level", label: "FAVOR", name: "好感", scope: "relationship", aliases: ["favor_level", "favor", "好感", "好感值"] },
     { key: "trust_level", label: "TRUST", name: "信任", scope: "relationship", aliases: ["trust_level", "trust", "信任", "信任值"] },
+    { key: "warmth", label: "WARMTH", name: "亲近", scope: "relationship", aliases: ["warmth", "closeness", "intimacy", "亲近", "亲密", "温度"] },
+    { key: "worry", label: "WORRY", name: "担忧", scope: "character", aliases: ["worry", "concern", "担忧", "牵挂", "忧心"] },
+    { key: "respect", label: "RESPECT", name: "认可", scope: "relationship", aliases: ["respect", "认可", "尊重", "认同"] },
     { key: "bond_level", label: "BOND", name: "牵系", scope: "relationship", aliases: ["bond_level", "bond", "牵系", "依赖", "羁绊"] },
     { key: "guard_level", label: "GUARD", name: "戒备", scope: "relationship", aliases: ["guard_level", "guard", "戒备", "防备"] },
     { key: "intimacy_level", label: "INTIMACY", name: "亲密", scope: "relationship", aliases: ["intimacy_level", "intimacy", "亲密", "亲密度"] },
@@ -1376,24 +1629,58 @@
     const pack = activeThemePack() || {};
     const style = pack.style || {};
     const raw = Array.isArray(style.progress_bars) ? style.progress_bars : (Array.isArray(pack.progress_bars) ? pack.progress_bars : []);
-    const merged = raw.length ? raw : defaultMetricDefs();
+    // v1.19.3：外置包的 progress_bars 只作为“特殊样式/别名补充”，不能成为白名单。
+    // 这样用户新增的自定义变量仍会走默认进度条与中文名兜底。
+    const merged = [...raw, ...defaultMetricDefs()];
+    const seen = new Set();
     return merged.map((item) => {
       const key = String(item?.key || item?.id || "").trim();
-      const name = String(item?.name || item?.display_name || item?.fallback_label || item?.label_cn || item?.label || key || "数值").trim();
+      const rawName = String(item?.name || item?.display_name || item?.fallback_label || item?.label_cn || item?.cn || item?.title || item?.label || key || "数值").trim();
+      const name = metricNameFromAlias(rawName) || metricNameFromAlias(key) || rawName;
       const label = String(item?.label || item?.code || key || name).trim();
       const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
+      const aliasList = [key, label, name, rawName, ...(aliases || [])].filter(Boolean);
+      const dedupeKey = normalizeFieldName(key || name || aliasList.join("|"));
+      if (dedupeKey && seen.has(dedupeKey)) return null;
+      if (dedupeKey) seen.add(dedupeKey);
       return {
         key,
         label,
         name,
-        aliases: [key, label, name, ...(aliases || [])].filter(Boolean),
+        aliases: aliasList,
         max: Math.max(1, Number(item?.max || 100) || 100),
       };
-    }).filter((item) => item.key || item.aliases.length);
+    }).filter((item) => item && (item.key || item.aliases.length));
+  }
+
+  function readableMetricLabel(value = "", fallback = "") {
+    const raw = String(value || "").trim();
+    const fb = String(fallback || "").trim();
+    const direct = metricNameFromAlias(raw) || metricNameFromAlias(fb);
+    if (direct) return direct;
+    const base = raw || fb;
+    if (!base) return "数值";
+    const normalized = base.replace(/_/g, " ");
+    const englishLike = /^[a-z][a-z0-9_\-\s]*$/i.test(base);
+    if (!englishLike) return base;
+    const hit = defaultMetricDefs().find((def) => fieldMatchesAny([def.name, "", def.key], [base, normalized, ...(def.aliases || [])]));
+    return hit?.name || base;
+  }
+
+  function isMetricLikeValue(value = "") {
+    const raw = String(value || "").trim().replace(/＋/g, "+").replace(/－/g, "-");
+    return /\d{1,3}\s*(?:\/|／)\s*\d{1,3}/.test(raw) || /[（(]\s*[+\-]?\s*\d{1,3}(?:\.\d+)?\s*[）)]/.test(raw);
+  }
+
+  function fallbackMetricDefForField(item) {
+    const label = String(item?.[0] || "").trim();
+    const key = String(item?.[2] || label || "metric").trim();
+    const name = readableMetricLabel(label || key, key);
+    return { key: key || normalizeFieldName(name) || "metric", label: name, name, aliases: [key, label, name].filter(Boolean), max: 100 };
   }
 
   function metricDefForField(item) {
-    return activeMetricDefs().find((def) => fieldMatchesAny(item, def.aliases));
+    return activeMetricDefs().find((def) => fieldMatchesAny(item, def.aliases)) || null;
   }
 
   function parseMetricValue(rawValue, max = 100) {
@@ -1415,12 +1702,16 @@
     const fields = [];
     const seenMetricKeys = new Set();
     for (const item of list) {
-      const def = metricDefForField(item);
+      const matchedDef = metricDefForField(item);
+      const def = matchedDef || (isMetricLikeValue(item?.[1]) ? fallbackMetricDefForField(item) : null);
       const parsed = def ? parseMetricValue(item?.[1], def.max) : null;
       if (def && parsed) {
-        const metricKey = def.key || normalizeFieldName(item?.[0]);
+        const sourceLabel = String(item?.[0] || "").trim();
+        const sourceKey = String(item?.[2] || def.key || sourceLabel).trim();
+        const metricKey = normalizeFieldName(sourceKey || def.key || sourceLabel);
         if (!seenMetricKeys.has(metricKey)) {
-          metrics.push({ ...def, ...parsed, source: item, displayName: def.name || item?.[0] || def.label });
+          const displayName = readableMetricLabel(sourceLabel || def.name || def.label || sourceKey, sourceKey || def.key);
+          metrics.push({ ...def, ...parsed, key: sourceKey || def.key, label: displayName, name: displayName, source: item, displayName });
           seenMetricKeys.add(metricKey);
         }
       } else {
@@ -1457,7 +1748,7 @@
   function renderMetricText(metrics = [], variant = "plain") {
     if (!metrics.length) return "";
     return `<div class="state-journal-metric-strip is-${escapeHtml(variant)}">${metrics.map((metric) => {
-      const label = metric.name || metric.label;
+      const label = readableMetricLabel(metric.name || metric.label || metric.key || "数值", metric.key || "");
       const text = variant === "paper" ? formatMetricPlain(metric, "本轮 ") : formatMetricPlain(metric);
       return `<span class="state-journal-metric-chip"><b>${escapeHtml(label)}</b><i>${escapeHtml(text)}</i></span>`;
     }).join("")}</div>`;
@@ -1470,7 +1761,8 @@
       const value = Math.max(0, Math.min(max, Number(metric.value) || 0));
       const width = Math.max(0, Math.min(100, (value / max) * 100));
       const delta = metricDeltaText(metric.delta, "hud");
-      return `<div class="state-journal-status-meter"><span>${escapeHtml(metric.label || metric.name)}</span><b><em style="width:${width}%"></em></b><i>${escapeHtml(String(Math.round(value)))}${delta ? `<small>${escapeHtml(delta)}</small>` : ""}</i></div>`;
+      const label = readableMetricLabel(metric.displayName || metric.name || metric.label || metric.key || "数值", metric.key || metric.label || "");
+      return `<div class="state-journal-status-meter"><span>${escapeHtml(label)}</span><b><em style="width:${width}%"></em></b><i>${escapeHtml(String(Math.round(value)))}${delta ? `<small>${escapeHtml(delta)}</small>` : ""}</i></div>`;
     }).join("")}</div>`;
   }
 
@@ -1720,19 +2012,39 @@
     wrap.querySelectorAll(".state-journal-inline-scene-card, .state-journal-turn-note, .state-journal-turn-note-compact, .state-journal-turn-status").forEach((node) => node.remove());
   }
 
-  function attachInlineTurnStatus(targetMessage, turnId, text, kind = "pending") {
+  function attachInlineTurnStatus(targetMessage, turnId, text, kind = "pending", options = {}) {
     if (!targetMessage || !turnId) return;
     const wrap = bubbleWrapFor(targetMessage);
     clearInlineTurnStatus(targetMessage, turnId);
     const status = document.createElement("div");
     status.className = `state-journal-turn-status is-${kind}`;
     status.dataset.stateJournalTurn = turnId;
-    status.textContent = text || (kind === "error" ? "心笺生成失败，可稍后重试。" : "心笺正在生成幕笺……");
+    const label = document.createElement("span");
+    label.textContent = text || (kind === "error" ? "心笺生成失败，可稍后重试。" : "心笺正在生成幕笺……");
+    status.appendChild(label);
+    const retryDetail = options.retryDetail || retryTurnDetails.get(turnId);
+    if (kind === "error" && retryDetail) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "重试";
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const detail = { ...(retryDetail || {}), source: "manual_rebuild" };
+        clearWorkerStatusTimers(turnId);
+        inFlightTurns.delete(turnId);
+        for (const sig of Array.from(processedTurns)) {
+          if (String(sig).includes(`:${turnId}:`) || String(sig).startsWith(`${turnId}:`)) processedTurns.delete(sig);
+        }
+        updateFromTurn(detail, "manual_rebuild");
+      });
+      status.appendChild(btn);
+    }
     wrap.appendChild(status);
   }
 
   function attachSceneCard(display, targetMessage, turnId = "") {
-    if (!configCache?.mujian_enabled || !configCache?.mujian_title_card || !display || !targetMessage) return;
+    if (!configCache?.turn_note_enabled || !configCache?.turn_note_title_card || !display || !targetMessage) return;
     const wrap = bubbleWrapFor(targetMessage);
     const normalizedDisplay = displayForMessage(display, targetMessage);
     const key = stableTurnId(normalizedDisplay, turnId);
@@ -1751,7 +2063,7 @@
   }
 
   function configuredCharacterNames() {
-    return String(configCache?.mujian_character_names || "")
+    return String(configCache?.turn_note_character_names || "")
       .split(/[，,、\n]/)
       .map((item) => item.trim())
       .filter(Boolean);
@@ -1759,7 +2071,7 @@
 
   function filterCharacters(characters) {
     const list = Array.isArray(characters) ? characters : [];
-    const mode = configCache?.mujian_character_filter || "turn";
+    const mode = configCache?.turn_note_character_filter || "turn";
     if (mode === "all" || mode === "turn") return list;
     const names = configuredCharacterNames();
     if (!names.length) return list;
@@ -1770,7 +2082,7 @@
   }
 
   function currentNoteStyle(display = null) {
-    return configCache?.mujian_note_style || display?.note_style || display?.style || "classic";
+    return configCache?.turn_note_card_style || display?.note_style || display?.style || "classic";
   }
 
 
@@ -1872,18 +2184,76 @@
     </div>`;
   }
 
+
+  function metricFromRecord(item) {
+    if (!item || typeof item !== "object") return null;
+    const key = String(item.key || item.metric_key || item.var_key || item.id || "").trim();
+    const rawLabel = String(item.var_name || item.label || item.metric_label || item.name || item.display_name || key || "数值").trim();
+    const displayName = readableMetricLabel(rawLabel, key);
+    const max = Math.max(1, Number(item.max || item.max_value || 100) || 100);
+    const raw = item.raw_value || item.raw || "";
+    const parsed = raw ? parseMetricValue(raw, max) : null;
+    const value = parsed ? parsed.value : Math.max(0, Math.min(max, Number(item.value ?? item.current_value ?? 0) || 0));
+    const delta = parsed ? parsed.delta : Number(item.delta ?? item.delta_value ?? 0) || 0;
+    if (!displayName && !key) return null;
+    return { key, label: displayName, name: displayName, displayName, aliases: [key, rawLabel, displayName].filter(Boolean), max, value, delta, raw };
+  }
+
+  function characterMetricNames(character = {}) {
+    return new Set([character.name, character.role_id, character.roleId, character.id].map((item) => String(item || "").trim()).filter(Boolean));
+  }
+
+  function metricsForCharacterFromDisplay(character = {}, display = null) {
+    const names = characterMetricNames(character);
+    const list = Array.isArray(display?.metrics) ? display.metrics : [];
+    const output = [];
+    list.forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      const owner = [item.character_name, item.name, item.role_id, item.roleId].map((value) => String(value || "").trim()).filter(Boolean);
+      if (!owner.some((value) => names.has(value))) return;
+      const metric = metricFromRecord(item);
+      if (metric) output.push(metric);
+    });
+    return output;
+  }
+
+  function mergeMetricLists(...lists) {
+    const merged = [];
+    const seen = new Set();
+    lists.flat().forEach((metric) => {
+      if (!metric) return;
+      const key = normalizeFieldName(metric.key || metric.name || metric.label || "");
+      if (key && seen.has(key)) return;
+      if (key) seen.add(key);
+      merged.push(metric);
+    });
+    return merged;
+  }
+
   function collectCharacterMetrics(character, display = null) {
+    const explicit = Array.isArray(character?.metrics) ? character.metrics.map(metricFromRecord).filter(Boolean) : [];
+    const displayMetrics = metricsForCharacterFromDisplay(character, display);
     const fields = characterFields(character, display);
-    return splitMetricFields(fields).metrics;
+    return mergeMetricLists(displayMetrics, explicit, splitMetricFields(fields).metrics);
   }
 
   function renderTurnMetricSummary(characters = [], display = null) {
     const rows = [];
+    const layout = activeThemeLayout();
+    const layoutType = activeLayoutType();
+    const charLayout = safeLayoutClass(layout.character_card || layoutType || "field_blocks");
+    const useMeters = ["status_panel", "status_panel_pro", "hud_rows", "hud"].includes(layoutType)
+      || ["status_panel", "status_rows", "hud_rows", "status_panel_pro"].includes(charLayout);
     (characters || []).forEach((character) => {
       const metrics = collectCharacterMetrics(character, display);
       if (!metrics.length) return;
+      if (useMeters) {
+        rows.push(`<div class="state-journal-metric-diary-row is-meter-row"><strong>${escapeHtml(character?.name || "角色")}</strong>${renderMetricMeters(metrics)}</div>`);
+        return;
+      }
       const chips = metrics.map((metric) => {
-        return `<span><b>${escapeHtml(metric.name || metric.label)}</b>${escapeHtml(formatMetricPlain(metric))}</span>`;
+        const label = readableMetricLabel(metric.name || metric.label || metric.key || "数值", metric.key || "");
+        return `<span><b>${escapeHtml(label)}</b>${escapeHtml(formatMetricPlain(metric))}</span>`;
       }).join("");
       rows.push(`<div class="state-journal-metric-diary-row"><strong>${escapeHtml(character?.name || "角色")}</strong><p>${chips}</p></div>`);
     });
@@ -1915,7 +2285,14 @@
   }
 
   function characterFields(character, display = null) {
-    const templateFields = displayTemplateFields(display);
+    const roleFields = Array.isArray(character?.snapshot_fields)
+      ? character.snapshot_fields
+          .filter((field) => field && field.key && field.key !== "name")
+          .map((field) => ({ key: String(field.key), label: String(field.label || field.key) }))
+      : [];
+    const templateFieldsRaw = roleFields.length ? roleFields : displayTemplateFields(display);
+    // 数值变量只在“本轮数值变化”集中展示，不再塞进每个角色状态卡。
+    const templateFields = splitMetricFields(templateFieldsRaw).fields;
     const allPairs = templateFields.length
       ? templateFields.map((field) => [field.label, character?.[field.key], field.key])
       : [
@@ -1952,9 +2329,9 @@
   }
 
   function chatDisplayMode() {
-    const explicit = configCache?.mujian_chat_display_mode;
+    const explicit = configCache?.turn_note_chat_display_mode;
     if (["collapsed", "expanded", "compact", "hidden"].includes(explicit)) return explicit;
-    return configCache?.mujian_default_collapsed === false ? "expanded" : "collapsed";
+    return configCache?.turn_note_default_collapsed === false ? "expanded" : "collapsed";
   }
 
   function compactCharacterLine(character) {
@@ -1994,8 +2371,8 @@
     const characters = filterCharacters(allCharacters);
     const relationships = Array.isArray(display.relationships) ? display.relationships : [];
     const changed = payload?.summary?.by_table?.map((item) => `${item.name || item.table} +${item.count || 0}`).join("｜") || "本轮幕笺已生成";
-    const densityLabel = { compact: "简洁", standard: "标准", detailed: "详细" }[configCache?.mujian_note_density || "standard"] || "标准";
-    const filterLabel = { turn: "本轮生成", heroine: "双女主", protagonist: "主角相关", custom: "自定义", all: "全部" }[configCache?.mujian_character_filter || "turn"] || "本轮生成";
+    const densityLabel = { compact: "简洁", standard: "标准", detailed: "详细" }[configCache?.turn_note_density || "standard"] || "标准";
+    const filterLabel = { turn: "本轮生成", heroine: "双女主", protagonist: "主角相关", custom: "自定义", all: "全部" }[configCache?.turn_note_character_filter || "turn"] || "本轮生成";
     const noteStyleLabel = { classic: "经典状态", gufeng: "古风旁白", sensory: "感官标签" }[noteStyle] || "经典状态";
     const source = String(payload?.trigger_source || payload?.triggerSource || display?.trigger_source || display?.triggerSource || "");
     const sourceLabel = configCache?.debug_enabled && source
@@ -2009,7 +2386,8 @@
       <div class="state-journal-note-body">
         <div class="state-journal-note-toolbar"><span>附笺：${escapeHtml(noteStyleLabel)}</span><span>显示：${escapeHtml(filterLabel)}</span><span>密度：${escapeHtml(densityLabel)}</span>${sourceLabel}</div>
         ${characters.length ? characters.map((character, index) => {
-          const renderedTemplate = renderOutputTemplate(display?.output_template, character);
+          const hasRoleSnapshotFields = Array.isArray(character?.snapshot_fields) && character.snapshot_fields.length > 0;
+          const renderedTemplate = hasRoleSnapshotFields ? "" : renderOutputTemplate(display?.output_template, character);
           const characterName = character.name || "角色";
           const sectionTitle = ["storyboard", "storyboard_frame", "scene_board"].includes(layoutType)
             ? `CUT ${String(index + 1).padStart(2, "0")} · ${characterName}`
@@ -2022,7 +2400,7 @@
           <section class="state-journal-note-section state-journal-note-section-${safeLayoutClass(layoutType)}">
             <h4>${escapeHtml(sectionTitle)}</h4>
             ${(() => {
-              const templateFields = parseTemplateRenderedFields(renderedTemplate);
+              const templateFields = splitMetricFields(parseTemplateRenderedFields(renderedTemplate)).fields;
               const baseFields = characterFields(character, display);
               const safeFields = mergeRenderedAndTemplateFields(templateFields, baseFields);
               const html = renderNoteFields(safeFields);
@@ -2038,7 +2416,7 @@
   }
 
   function attachTurnNote(display, payload = {}, targetMessage = null, turnId = "") {
-    if (!configCache?.mujian_enabled || !configCache?.mujian_turn_note || !display) return;
+    if (!configCache?.turn_note_enabled || !configCache?.turn_note_card || !display) return;
     const mode = chatDisplayMode();
     if (mode === "hidden") return;
     const msg = targetMessage || findLatestAssistantMessage();
@@ -2169,8 +2547,47 @@
     }
   }
 
+  function parseColorLuminance(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    let parts = null;
+    const rgbMatch = raw.match(/rgba?\(([^)]+)\)/i);
+    if (rgbMatch) {
+      parts = rgbMatch[1].split(",").slice(0, 3).map((item) => Number.parseFloat(item));
+    } else if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw)) {
+      const hex = raw.slice(1);
+      const full = hex.length === 3 ? hex.split("").map((ch) => ch + ch).join("") : hex;
+      parts = [0, 2, 4].map((idx) => Number.parseInt(full.slice(idx, idx + 2), 16));
+    } else if (/^\d+\s*,/.test(raw)) {
+      parts = raw.split(",").slice(0, 3).map((item) => Number.parseFloat(item));
+    }
+    if (!parts || parts.length < 3 || parts.some((num) => !Number.isFinite(num))) return null;
+    const [r, g, b] = parts.map((num) => Math.max(0, Math.min(255, num)) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  function isMainUiLightMode() {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const bodyStyle = getComputedStyle(document.body || document.documentElement);
+    const inputRgb = rootStyle.getPropertyValue("--input-rgb") || bodyStyle.getPropertyValue("--input-rgb");
+    const panel = rootStyle.getPropertyValue("--panel") || bodyStyle.getPropertyValue("--panel");
+    const bg = rootStyle.getPropertyValue("--background") || bodyStyle.getPropertyValue("--background");
+    const text = rootStyle.getPropertyValue("--text") || bodyStyle.getPropertyValue("--text");
+    const candidates = [inputRgb, panel, bg].map(parseColorLuminance).filter((item) => item !== null);
+    if (candidates.length) return Math.max(...candidates) > 0.58;
+    const textLum = parseColorLuminance(text);
+    if (textLum !== null) return textLum < 0.45;
+    return window.matchMedia?.("(prefers-color-scheme: light)")?.matches === true;
+  }
+
   function applyChatUiSyncMode(config = configCache || {}) {
-    document.body?.classList.toggle("state-journal-global-ui-sync", !!config.ui_sync_global);
+    // v1.19.2：只让“标准样式”跟随 Fantareal 主程序浅/暗色与透明度；外置美化包保留自身风格。
+    const activeId = String(config?.turn_note_theme_id || "standard").trim() || "standard";
+    const isStandard = activeId === "standard";
+    const isLight = isStandard && isMainUiLightMode();
+    document.body?.classList.toggle("state-journal-global-ui-sync", isStandard);
+    document.body?.classList.toggle("state-journal-standard-light-readability", isLight);
+    document.body?.classList.toggle("state-journal-standard-dark-readability", isStandard && !isLight);
   }
 
   async function loadConfig() {
@@ -2307,8 +2724,8 @@
     const isRebuild = ["reroll", "edit", "dom_fallback"].includes(String(normalized.source || triggerSource || ""));
     showBubble(
       "pending",
-      isRebuild ? "心笺正在重新填表……" : (config.mujian_enabled ? "心笺正在生成幕笺……" : "心笺正在填表……"),
-      triggerSource === "dom_fallback" ? "Hook 未触发，已启用 DOM 兜底扫描。" : (config.mujian_enabled ? "已通过 Chat hook 接收本轮正文。" : "已通过 Chat hook 接收本轮正文。")
+      isRebuild ? "心笺正在重新填表……" : (config.turn_note_enabled ? "心笺正在生成幕笺……" : "心笺正在填表……"),
+      triggerSource === "dom_fallback" ? "Hook 未触发，已启用 DOM 兜底扫描。" : (config.turn_note_enabled ? "已通过 Chat hook 接收本轮正文。" : "已通过 Chat hook 接收本轮正文。")
     );
     pingHook(triggerSource === "dom_fallback" ? "dom_fallback_start" : "chat_hook_start", triggerSource === "dom_fallback" ? "DOM 兜底触发心笺生成。" : "Chat hook 触发心笺生成。", turnId);
 
@@ -2317,8 +2734,31 @@
         ? normalized.recentHistory
         : await fetch("/api/history").then((res) => res.json()).catch(() => []);
       const createdAt = String(normalized.createdAt || normalized.created_at || pendingTurn?.createdAt || new Date().toISOString());
+      const retryDetail = {
+        ...normalized,
+        userText,
+        user_text: userText,
+        assistantText: rawAssistantText || assistantText,
+        assistant_text: rawAssistantText || assistantText,
+        assistantCleanText: assistantText,
+        assistant_clean_text: assistantText,
+        turnId,
+        turn_id: turnId,
+        messageId,
+        message_id: messageId,
+        assistantMessageId: messageId,
+        assistant_message_id: messageId,
+        turnIndex,
+        turn_index: turnIndex,
+        contentHash,
+        content_hash: contentHash,
+        createdAt,
+        created_at: createdAt,
+      };
+      retryTurnDetails.set(turnId, retryDetail);
       if (targetMessage) {
-        attachInlineTurnStatus(targetMessage, turnId, config.mujian_enabled ? "心笺正在生成本轮幕笺……" : "心笺正在整理本轮状态……");
+        attachInlineTurnStatus(targetMessage, turnId, config.turn_note_enabled ? "心笺正在生成本轮幕笺……" : "心笺正在整理本轮状态……");
+        scheduleWorkerStatusTimers(targetMessage, turnId, retryDetail, Number(config.request_timeout || 120));
       }
 
       await requestJson(new URL("turn/complete", apiBase).toString(), {
@@ -2361,6 +2801,9 @@
       const errors = payload.result?.errors || [];
       const count = payload.summary?.total ?? payload.result?.applied?.length ?? 0;
       const failedPayload = errors.length || payload.ok === false || payload.status === "error";
+      if (!failedPayload && targetMessage) {
+        clearInlineTurnStatus(targetMessage, turnId);
+      }
       if (!failedPayload && payload.display && targetMessage && isSameMessageTarget(targetMessage, { turnId, messageId, contentHash })) {
         renderTurnDisplay(payload.display, targetMessage, { ...payload, turn_id: payload.display.turn_id || turnId, created_at: createdAt, message_id: messageId, content_hash: contentHash, trigger_source: triggerSource });
       } else if (!failedPayload && payload.display && !targetMessage) {
@@ -2370,7 +2813,7 @@
       if (payload.skipped) {
         showBubble("empty", "心笺未运行", payload.message || payload.reason || "已跳过本轮更新", 2800);
       } else if (failedPayload) {
-        if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, payload.message || errors[0] || "心笺生成失败，本轮未写入新数据。", "error");
+        if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, payload.message || errors[0] || "心笺生成失败，本轮未写入新数据。", "error", { retryDetail });
         showBubble("error", "心笺生成失败", `${payload.message || errors[0] || "辅助模型返回异常"}，点击查看日志`, 9000);
       } else if (count) {
         showBubble("success", isRebuild ? "心笺已重算" : (payload.display ? "心笺已生成幕笺" : "心笺已更新"), `${triggerSource === "dom_fallback" ? "DOM兜底｜" : "Hook｜"}${isRebuild ? "本轮幕笺已替换｜" : ""}${formatSummary(payload)}`, 3600);
@@ -2381,11 +2824,13 @@
       if (pendingTurn?.turnId === turnId) pendingTurn = null;
       window.dispatchEvent(new CustomEvent("state_journal:updated", { detail: { ...payload, trigger_source: triggerSource } }));
     } catch (error) {
-      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, error.message || "心笺生成失败，本轮未写入新数据。", "error");
+      const retryDetail = retryTurnDetails.get(turnId) || normalized;
+      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, error.message || "心笺生成失败，本轮未写入新数据。", "error", { retryDetail });
       showBubble("error", "心笺生成失败", `${error.message || "未知错误"}，点击查看日志`, 9000);
       pingHook("auto_update_error", error.message || "自动填表失败。", turnId);
       console.warn("State Journal auto update failed:", error);
     } finally {
+      clearWorkerStatusTimers(turnId);
       if (targetMessage && !targetMessage.querySelector(`.state-journal-turn-status.is-error[data-state-journal-turn="${CSS.escape(turnId)}"]`)) {
         clearInlineTurnStatus(targetMessage, turnId);
       }

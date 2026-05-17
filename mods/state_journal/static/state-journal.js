@@ -12,6 +12,11 @@
     metricCharacterFilter: localStorage.getItem("state_journal:metricCharacterFilter") || "all",
     metricLabelFilter: localStorage.getItem("state_journal:metricLabelFilter") || "all",
     metricSort: localStorage.getItem("state_journal:metricSort") || "newest",
+    roleStateConfig: { version: 1, enabled: true, roles: [] },
+    activeStageRows: [],
+    currentRoleStateId: "",
+    roleStateTab: "variables",
+    themePreviewMode: localStorage.getItem("state_journal:themePreviewMode") || "role",
   };
 
   const SERVICE_PRESETS = {
@@ -31,14 +36,27 @@
     "moon_white_letter",
     "cinnabar_dossier",
     "jade_slip",
-    "midnight_archive",
-    "storyboard_frame",
     "status_panel_pro",
   ]);
+
+  const THEME_PACK_KIND = "state_journal_theme_pack";
+  const THEME_PACK_SCHEMA_VERSION = 1;
+  const THEME_PACK_MAX_DATA_URI_BYTES = 2 * 1024 * 1024;
+  const THEME_PACK_DANGEROUS_KEYS = new Set(["script", "scripts", "javascript", "js", "html", "onload", "onclick", "onerror"]);
 
   const els = {
     status: $("#statusStrip"),
     updateSummaryText: $("#updateSummaryText"),
+    runtimeOverview: $("#runtimeOverview"),
+    runtimeEnabledBadge: $("#runtimeEnabledBadge"),
+    runtimeAutoBadge: $("#runtimeAutoBadge"),
+    runtimeTurnNoteBadge: $("#runtimeTurnNoteBadge"),
+    runtimeModelBadge: $("#runtimeModelBadge"),
+    runtimeLastRunText: $("#runtimeLastRunText"),
+    runtimeFlowText: $("#runtimeFlowText"),
+    dashboardEnabled: $("#dashboardEnabled"),
+    dashboardAutoUpdate: $("#dashboardAutoUpdate"),
+    dashboardTurnNote: $("#dashboardTurnNote"),
     tableList: $("#tableList"),
     currentTitle: $("#currentTableTitle"),
     currentDesc: $("#currentTableDesc"),
@@ -58,25 +76,25 @@
     cfgAutoUpdate: $("#cfgAutoUpdate"),
     cfgNotify: $("#cfgNotify"),
     cfgUiSyncGlobal: $("#cfgUiSyncGlobal"),
-    cfgMujianEnabled: $("#cfgMujianEnabled"),
-    cfgMujianTitle: $("#cfgMujianTitle"),
-    cfgMujianNote: $("#cfgMujianNote"),
-    cfgMujianCollapsed: $("#cfgMujianCollapsed"),
-    cfgMujianDisplayMode: $("#cfgMujianDisplayMode"),
-    cfgMujianStyle: $("#cfgMujianStyle"),
-    cfgMujianTitleStyle: $("#cfgMujianTitleStyle"),
-    cfgMujianNoteStyle: $("#cfgMujianNoteStyle"),
-    cfgMujianExpand: $("#cfgMujianExpand"),
-    cfgMujianDensity: $("#cfgMujianDensity"),
-    cfgMujianCharacterFilter: $("#cfgMujianCharacterFilter"),
-    cfgMujianCharacterNames: $("#cfgMujianCharacterNames"),
-    cfgMujianProtagonistEnabled: $("#cfgMujianProtagonistEnabled"),
-    cfgMujianProtagonistMode: $("#cfgMujianProtagonistMode"),
-    cfgMujianProtagonistName: $("#cfgMujianProtagonistName"),
-    cfgMujianProtagonistAliases: $("#cfgMujianProtagonistAliases"),
-    cfgMujianWorkerPromptEnabled: $("#cfgMujianWorkerPromptEnabled"),
-    cfgMujianWorkerStylePrompt: $("#cfgMujianWorkerStylePrompt"),
-    cfgMujianWorkerProtagonistPrompt: $("#cfgMujianWorkerProtagonistPrompt"),
+    cfgTurnNoteEnabled: $("#cfgTurnNoteEnabled"),
+    cfgTurnNoteTitle: $("#cfgTurnNoteTitle"),
+    cfgTurnNoteNote: $("#cfgTurnNoteNote"),
+    cfgTurnNoteCollapsed: $("#cfgTurnNoteCollapsed"),
+    cfgTurnNoteDisplayMode: $("#cfgTurnNoteDisplayMode"),
+    cfgTurnNoteStyle: $("#cfgTurnNoteStyle"),
+    cfgTurnNoteTitleStyle: $("#cfgTurnNoteTitleStyle"),
+    cfgTurnNoteNoteStyle: $("#cfgTurnNoteNoteStyle"),
+    cfgTurnNoteExpand: $("#cfgTurnNoteExpand"),
+    cfgTurnNoteDensity: $("#cfgTurnNoteDensity"),
+    cfgTurnNoteCharacterFilter: $("#cfgTurnNoteCharacterFilter"),
+    cfgTurnNoteCharacterNames: $("#cfgTurnNoteCharacterNames"),
+    cfgTurnNoteProtagonistEnabled: $("#cfgTurnNoteProtagonistEnabled"),
+    cfgTurnNoteProtagonistMode: $("#cfgTurnNoteProtagonistMode"),
+    cfgTurnNoteProtagonistName: $("#cfgTurnNoteProtagonistName"),
+    cfgTurnNoteProtagonistAliases: $("#cfgTurnNoteProtagonistAliases"),
+    cfgTurnNoteWorkerPromptEnabled: $("#cfgTurnNoteWorkerPromptEnabled"),
+    cfgTurnNoteWorkerStylePrompt: $("#cfgTurnNoteWorkerStylePrompt"),
+    cfgTurnNoteWorkerProtagonistPrompt: $("#cfgTurnNoteWorkerProtagonistPrompt"),
     resetWorkerPromptBtn: $("#resetWorkerPromptBtn"),
     cfgBaseUrl: $("#cfgBaseUrl"),
     cfgApiKey: $("#cfgApiKey"),
@@ -96,13 +114,15 @@
     rowDetailTitle: $("#rowDetailTitle"),
     rowDetailBody: $("#rowDetailBody"),
     servicePreset: $("#servicePresetSelect"),
-    cfgMujianTemplateSelect: $("#cfgMujianTemplateSelect"),
-    cfgMujianThemeSelect: $("#cfgMujianThemeSelect"),
+    cfgTurnNoteTemplateSelect: $("#cfgTurnNoteTemplateSelect"),
+    cfgTurnNoteThemeSelect: $("#cfgTurnNoteThemeSelect"),
     themeSelect: $("#themeSelect"),
     themeName: $("#themeName"),
     themeDesc: $("#themeDesc"),
     themeAuthor: $("#themeAuthor"),
+    themeMeta: $("#themeMeta"),
     themePreview: $("#themePreview"),
+    themePreviewModeSelect: $("#themePreviewModeSelect"),
     exportThemeBtn: $("#exportThemeBtn"),
     deleteThemeBtn: $("#deleteThemeBtn"),
     importThemeInput: $("#importThemeInput"),
@@ -185,6 +205,133 @@
     return text.length > limit ? `${text.slice(0, limit)}…` : text;
   }
 
+  const ROLE_STATE_MODES = {
+    default: { label: "默认幕笺模板", desc: "使用全局默认幕笺模板，不使用该角色专属变量、阶段或快照字段。" },
+    snapshot_only: { label: "仅专属幕笺", desc: "只使用角色专属状态快照字段，不计算变量，不判断阶段。" },
+    full: { label: "完整心笺：专属幕笺 + 变量阶段", desc: "启用角色专属幕笺、变量更新与阶段判断，并生成世界书 external_tag。" },
+    disabled: { label: "不启用该角色", desc: "该角色不参与心笺记录与幕笺展示。" },
+  };
+
+
+  const ROLE_SOURCE_MODES = {
+    auto: { label: "自动识别", desc: "没有多角色时读取主卡；有多角色时默认读取多角色。" },
+    main_card: { label: "主卡就是角色", desc: "适合普通单角色卡，心笺会把主卡作为唯一角色记录。" },
+    personas_only: { label: "主卡是旁白，只读取多角色", desc: "适合双女主、多角色卡，主卡只作为旁白或总设定。" },
+  };
+
+  function normalizeRoleSourceMode(value) {
+    const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+    const aliases = { main: "main_card", single: "main_card", single_role: "main_card", card: "main_card", persona: "personas_only", personas: "personas_only", multi: "personas_only", multi_role: "personas_only", narrator: "personas_only" };
+    const mode = aliases[raw] || raw;
+    return ROLE_SOURCE_MODES[mode] ? mode : "auto";
+  }
+
+  function roleSourceSummary(config = {}) {
+    const summary = config.role_source_summary || {};
+    const mode = normalizeRoleSourceMode(config.role_source_mode || summary.mode);
+    const label = summary.mode_label || ROLE_SOURCE_MODES[mode]?.label || "自动识别";
+    const detected = summary.detected_label || "";
+    const message = summary.message || (mode === "auto" ? "自动识别角色来源。" : ROLE_SOURCE_MODES[mode]?.desc || "");
+    return { mode, label, detected, message, roleCount: Number(summary.role_count ?? (config.roles || []).length) || 0 };
+  }
+
+  function normalizeRoleStateMode(value, role = {}) {
+    const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+    const aliases = { snapshot: "snapshot_only", snapshotfields: "snapshot_only", snapshot_fields: "snapshot_only", note_only: "snapshot_only", off: "disabled", none: "disabled", disable: "disabled" };
+    const mode = aliases[raw] || raw;
+    if (ROLE_STATE_MODES[mode]) return mode;
+    if (role.enabled === false) return "disabled";
+    if ((role.variables || []).length && (role.stages || []).length) return "full";
+    if ((role.snapshotFields || []).length) return "snapshot_only";
+    return "default";
+  }
+
+  function setRoleStateMode(role, mode) {
+    const safeMode = ROLE_STATE_MODES[mode] ? mode : "default";
+    role.mode = safeMode;
+    role.stateJournalMode = safeMode;
+    role.enabled = safeMode !== "disabled";
+  }
+
+  function roleStateModeLabel(role) {
+    const mode = normalizeRoleStateMode(role?.mode || role?.stateJournalMode, role || {});
+    return ROLE_STATE_MODES[mode]?.label || ROLE_STATE_MODES.default.label;
+  }
+
+  function roleStateModeShortLabel(role) {
+    const mode = normalizeRoleStateMode(role?.mode || role?.stateJournalMode, role || {});
+    const labels = {
+      full: "完整心笺",
+      snapshot_only: "专属幕笺",
+      default: "默认幕笺",
+      disabled: "未启用",
+    };
+    return labels[mode] || ROLE_STATE_MODES.default.label;
+  }
+
+  function roleStateConditionText(role, stage) {
+    const variables = new Map((role?.variables || []).map((item) => [item.var_key, item.var_name || item.var_key]));
+    const parts = (stage?.conditions || []).map((condition) => {
+      const key = condition.var || condition.field || "";
+      const label = variables.get(key) || key || "变量";
+      const op = condition.op === ">=" ? "≥" : condition.op === "<=" ? "≤" : condition.op === "!=" ? "≠" : condition.op === "=" ? "=" : condition.op || "≥";
+      return `${label} ${op} ${condition.value ?? 0}`;
+    }).filter(Boolean);
+    if (!parts.length) return "无条件";
+    return parts.join(stage?.condition_mode === "any" ? " 或 " : " 且 ");
+  }
+
+  function roleStateConditionChips(role, stage) {
+    const variables = new Map((role?.variables || []).map((item) => [item.var_key, item.var_name || item.var_key]));
+    const conditions = Array.isArray(stage?.conditions) ? stage.conditions : [];
+    if (!conditions.length) return `<span class="stage-condition-chip muted">无条件</span>`;
+    const visible = conditions.slice(0, 3).map((condition) => {
+      const key = condition.var || condition.field || "";
+      const label = variables.get(key) || key || "变量";
+      const op = condition.op === ">=" ? "≥" : condition.op === "<=" ? "≤" : condition.op === "!=" ? "≠" : condition.op === "=" ? "=" : condition.op || "≥";
+      return `<span class="stage-condition-chip">${escapeHtml(label)} ${escapeHtml(op)} ${escapeHtml(condition.value ?? 0)}</span>`;
+    });
+    if (conditions.length > visible.length) visible.push(`<span class="stage-condition-chip muted">+${conditions.length - visible.length} 条</span>`);
+    const mode = stage?.condition_mode === "any" ? "任一满足" : "全部满足";
+    return `<span class="stage-condition-mode">${mode}</span>${visible.join("")}`;
+  }
+
+  function roleStateStageTagState(role, stage, isCurrent) {
+    const active = activeStageForRole(role);
+    const tag = stageActivationTag(role, stage);
+    const activeTag = String(active?.active_tag || active?.tag || "").trim();
+    if (isCurrent && activeTag && tag && activeTag === tag) return { label: "当前命中", cls: "is-active" };
+    if (isCurrent) return { label: "当前阶段", cls: "is-current" };
+    return { label: "世界书", cls: "" };
+  }
+
+  function confirmAction({ title, body, confirmText = "确认", danger = false }) {
+    return new Promise((resolve) => {
+      let modal = document.getElementById("state-journal-confirm-modal");
+      if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "state-journal-confirm-modal";
+        modal.className = "state-journal-confirm-modal";
+        modal.innerHTML = `<div class="state-journal-confirm-card"><h3></h3><div class="state-journal-confirm-body"></div><div class="state-journal-confirm-actions"><button type="button" data-confirm-cancel class="ghost-btn">取消</button><button type="button" data-confirm-ok class="primary-btn">确认</button></div></div>`;
+        document.body.appendChild(modal);
+      }
+      modal.querySelector("h3").textContent = title || "确认操作";
+      modal.querySelector(".state-journal-confirm-body").innerHTML = body || "";
+      const ok = modal.querySelector("[data-confirm-ok]");
+      ok.textContent = confirmText;
+      ok.classList.toggle("danger", Boolean(danger));
+      modal.classList.add("show");
+      const cleanup = (value) => {
+        modal.classList.remove("show");
+        modal.querySelector("[data-confirm-cancel]").onclick = null;
+        ok.onclick = null;
+        resolve(value);
+      };
+      modal.querySelector("[data-confirm-cancel]").onclick = () => cleanup(false);
+      ok.onclick = () => cleanup(true);
+    });
+  }
+
 
   function safeTemplateId(value) {
     return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || `template_${Date.now()}`;
@@ -227,17 +374,17 @@
     return sample;
   }
 
-  function mujianTemplates() {
-    return Array.isArray(state.config?.mujian_templates) ? state.config.mujian_templates : [];
+  function turnNoteTemplates() {
+    return Array.isArray(state.config?.turn_note_templates) ? state.config.turn_note_templates : [];
   }
 
   function activeTemplateId() {
-    return state.currentTemplateId || state.config?.mujian_template_id || mujianTemplates()[0]?.id || "classic";
+    return state.currentTemplateId || state.config?.turn_note_template_id || turnNoteTemplates()[0]?.id || "classic";
   }
 
   function activeTemplate() {
     const id = activeTemplateId();
-    return mujianTemplates().find((item) => item.id === id) || mujianTemplates()[0] || { id: "classic", name: "简洁状态", note_style: "classic", fields: [], output_template: "" };
+    return turnNoteTemplates().find((item) => item.id === id) || turnNoteTemplates()[0] || { id: "classic", name: "简洁状态", note_style: "classic", fields: [], output_template: "" };
   }
 
   function renderTemplateText(template, sample = null) {
@@ -269,13 +416,13 @@
   }
 
   function renderTemplateSelectors() {
-    const templates = mujianTemplates();
+    const templates = turnNoteTemplates();
     const active = activeTemplateId();
     const options = templates.map((item) => {
       const selected = item.id === active ? "selected" : "";
       return `<option value="${escapeAttr(item.id)}" ${selected}>${escapeHtml(item.name || item.id)}</option>`;
     }).join("");
-    if (els.cfgMujianTemplateSelect) els.cfgMujianTemplateSelect.innerHTML = options;
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.innerHTML = options;
     if (els.templateSelect) els.templateSelect.innerHTML = options;
   }
 
@@ -284,17 +431,17 @@
     return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || `theme_${Date.now()}`;
   }
 
-  function mujianThemePacks() {
-    return Array.isArray(state.config?.mujian_theme_packs) ? state.config.mujian_theme_packs : [];
+  function turnNoteThemePacks() {
+    return Array.isArray(state.config?.turn_note_theme_packs) ? state.config.turn_note_theme_packs : [];
   }
 
   function activeThemeId() {
-    return state.currentThemeId || state.config?.mujian_theme_id || mujianThemePacks()[0]?.id || "standard";
+    return state.currentThemeId || state.config?.turn_note_theme_id || turnNoteThemePacks()[0]?.id || "standard";
   }
 
   function activeThemePack() {
     const id = activeThemeId();
-    return mujianThemePacks().find((item) => item.id === id) || mujianThemePacks()[0] || {
+    return turnNoteThemePacks().find((item) => item.id === id) || turnNoteThemePacks()[0] || {
       id: "standard",
       name: "标准样式",
       description: "默认样式",
@@ -308,15 +455,70 @@
     return BUILTIN_THEME_IDS.has(id);
   }
 
+  function themePackSourceLabel(pack) {
+    return isBuiltinThemePack(pack) ? "内置外观包" : "外置美化包";
+  }
+
+  function themePackDisplayName(pack) {
+    return String(pack?.name || pack?.id || "未命名外观包");
+  }
+
   function fallbackThemeIdAfterDelete(packs) {
-    const list = Array.isArray(packs) ? packs : mujianThemePacks();
+    const list = Array.isArray(packs) ? packs : turnNoteThemePacks();
     return list.find((item) => item?.id === "standard")?.id
       || list.find((item) => isBuiltinThemePack(item))?.id
       || "standard";
   }
 
+  function validateThemePackSafety(value, path = "美化包") {
+    if (!value || typeof value !== "object") return;
+    Object.entries(value).forEach(([key, item]) => {
+      const lowerKey = String(key || "").toLowerCase();
+      if (THEME_PACK_DANGEROUS_KEYS.has(lowerKey) || lowerKey.startsWith("on")) {
+        throw new Error(`${path} 包含不允许的字段：${key}`);
+      }
+      if (typeof item === "string") {
+        const text = item.trim();
+        if (/^https?:\/\//i.test(text)) {
+          throw new Error(`${path}.${key} 引用了远程资源，外观包只允许内嵌 data URI 或本地样式标记。`);
+        }
+        if (/^data:/i.test(text) && text.length > THEME_PACK_MAX_DATA_URI_BYTES) {
+          throw new Error(`${path}.${key} 的内嵌资源过大，请压缩后再导入。`);
+        }
+      }
+      if (item && typeof item === "object") validateThemePackSafety(item, `${path}.${key}`);
+    });
+  }
+
+  function themePackLayoutType(pack) {
+    const layout = pack?.style?.layout || pack?.layout || {};
+    return String(layout.layout_type || layout.type || layout.character_card || "standard").trim() || "standard";
+  }
+
+  function themePackProgressBars(pack) {
+    const list = pack?.style?.progress_bars || pack?.progress_bars || [];
+    return Array.isArray(list) ? list : [];
+  }
+
+  function themePackWarnings(pack) {
+    const warnings = [];
+    if (!pack?.kind) warnings.push("旧版包：已自动补充 kind。");
+    if (!pack?.schema_version) warnings.push("旧版包：已自动补充 schema_version。");
+    if (!pack?.style?.layout) warnings.push("未声明 layout，将使用默认预览布局。");
+    if (!pack?.style?.class_name) warnings.push("未声明 class_name，将自动生成安全类名。");
+    return warnings;
+  }
+
   function normalizeThemePack(pack) {
     if (!pack || typeof pack !== "object") throw new Error("美化包必须是 JSON 对象。");
+    const rawKind = String(pack.kind || pack.type || THEME_PACK_KIND).trim() || THEME_PACK_KIND;
+    if (![THEME_PACK_KIND, "xinjian_theme_pack", "turn_note_theme_pack"].includes(rawKind)) {
+      throw new Error(`这不是心笺外观模板包：${rawKind}`);
+    }
+    const schemaVersion = Number(pack.schema_version || pack.schemaVersion || THEME_PACK_SCHEMA_VERSION);
+    if (!Number.isFinite(schemaVersion) || schemaVersion < 1) throw new Error("美化包 schema_version 无效。");
+    if (schemaVersion > THEME_PACK_SCHEMA_VERSION) throw new Error(`美化包 schema_version=${schemaVersion} 高于当前支持版本 ${THEME_PACK_SCHEMA_VERSION}。`);
+    validateThemePackSafety(pack);
     const id = safeThemeId(pack?.id || pack?.name || `theme_${Date.now()}`);
     const rawStyle = (pack && typeof pack.style === "object" && pack.style)
       ? pack.style
@@ -332,11 +534,17 @@
       relationship_card: (style.relationship_card && typeof style.relationship_card === "object") ? style.relationship_card : {},
       status_bar: (style.status_bar && typeof style.status_bar === "object") ? style.status_bar : {},
     };
-    ["layout", "blocks", "tokens", "field_style", "media", "labels", "progress_bars"].forEach((key) => {
-      if (pack[key] && typeof pack[key] === "object") safeStyle[key] = pack[key];
-      else if (style[key] && typeof style[key] === "object") safeStyle[key] = style[key];
+    ["layout", "blocks", "tokens", "field_style", "media", "labels"].forEach((key) => {
+      if (pack[key] && typeof pack[key] === "object" && !Array.isArray(pack[key])) safeStyle[key] = pack[key];
+      else if (style[key] && typeof style[key] === "object" && !Array.isArray(style[key])) safeStyle[key] = style[key];
+    });
+    ["progress_bars"].forEach((key) => {
+      if (Array.isArray(pack[key])) safeStyle[key] = pack[key];
+      else if (Array.isArray(style[key])) safeStyle[key] = style[key];
     });
     const normalized = {
+      kind: THEME_PACK_KIND,
+      schema_version: THEME_PACK_SCHEMA_VERSION,
       id,
       name: String(pack?.name || id).trim() || id,
       version: String(pack?.version || "1.0.0").trim() || "1.0.0",
@@ -346,20 +554,28 @@
     };
     if (pack.media && typeof pack.media === "object") normalized.media = pack.media;
     if (pack.labels && typeof pack.labels === "object") normalized.labels = pack.labels;
+    normalized.__warnings = themePackWarnings(pack);
     return normalized;
   }
 
   function mergeThemePack(pack) {
-    const packs = mujianThemePacks().filter((item) => item && item.id !== pack.id);
+    const packs = turnNoteThemePacks().filter((item) => item && item.id !== pack.id);
     return [...packs, pack];
   }
 
+  function persistableThemePack(pack) {
+    const { __warnings, ...rest } = pack || {};
+    return rest;
+  }
+
   async function persistImportedTheme(pack) {
+    const cleanPack = persistableThemePack(pack);
     state.config = {
       ...state.config,
-      mujian_theme_packs: mergeThemePack(pack),
-      mujian_theme_id: pack.id,
+      turn_note_theme_packs: mergeThemePack(cleanPack),
+      turn_note_theme_id: cleanPack.id,
     };
+    pack = cleanPack;
     state.currentThemeId = pack.id;
     renderThemeSelectors();
     renderThemePreview();
@@ -383,14 +599,27 @@
       pageToast("内置外观包不可删除", "可以导出内置包作为模板，再导入为新的自定义外观包。", "error");
       return;
     }
-    const ok = window.confirm(`确认删除导入的外观包“${pack.name || pack.id}”吗？\n删除后会自动切回标准样式。`);
-    if (!ok) return;
-    const nextPacks = mujianThemePacks().filter((item) => item && item.id !== pack.id);
+    const nextPacks = turnNoteThemePacks().filter((item) => item && item.id !== pack.id);
     const nextThemeId = fallbackThemeIdAfterDelete(nextPacks);
+    const ok = await confirmAction({
+      title: "删除外置美化包？",
+      body: `
+        <p>将删除：<strong>${escapeHtml(themePackDisplayName(pack))}</strong></p>
+        <div class="sync-card-scope">
+          <strong>不会影响</strong>
+          <p>心笺数据、幕笺历史、角色变量、阶段规则、世界书标签。</p>
+          <strong>删除后</strong>
+          <p>如果当前正在使用该外观包，将自动切回「${escapeHtml(nextPacks.find((item) => item?.id === nextThemeId)?.name || "标准样式")}」。</p>
+        </div>
+      `,
+      confirmText: "确认删除",
+      danger: true,
+    });
+    if (!ok) return;
     state.config = {
       ...state.config,
-      mujian_theme_packs: nextPacks,
-      mujian_theme_id: nextThemeId,
+      turn_note_theme_packs: nextPacks,
+      turn_note_theme_id: nextThemeId,
     };
     state.currentThemeId = nextThemeId;
     renderThemeSelectors();
@@ -400,7 +629,7 @@
       body: JSON.stringify({ config: readConfig() }),
     });
     state.config = payload.config || state.config;
-    state.currentThemeId = state.config.mujian_theme_id || nextThemeId;
+    state.currentThemeId = state.config.turn_note_theme_id || nextThemeId;
     renderThemeSelectors();
     renderThemePreview();
     window.stateJournalChatBridge?.reloadConfig?.();
@@ -409,16 +638,43 @@
   }
 
   function renderThemeSelectors() {
-    const packs = mujianThemePacks();
+    const packs = turnNoteThemePacks();
     const active = activeThemeId();
-    const options = packs.map((item) => `<option value="${escapeAttr(item.id)}" ${item.id === active ? "selected" : ""}>${escapeHtml(item.name || item.id)}</option>`).join("");
-    if (els.cfgMujianThemeSelect) els.cfgMujianThemeSelect.innerHTML = options;
+    const option = (item) => `<option value="${escapeAttr(item.id)}" ${item.id === active ? "selected" : ""}>${escapeHtml(item.name || item.id)}</option>`;
+    const builtins = packs.filter((item) => item && isBuiltinThemePack(item));
+    const imports = packs.filter((item) => item && !isBuiltinThemePack(item));
+    const options = [
+      builtins.length ? `<optgroup label="内置外观包">${builtins.map(option).join("")}</optgroup>` : "",
+      imports.length ? `<optgroup label="外置美化包">${imports.map(option).join("")}</optgroup>` : "",
+    ].join("") || packs.map(option).join("");
+    if (els.cfgTurnNoteThemeSelect) els.cfgTurnNoteThemeSelect.innerHTML = options;
     if (els.themeSelect) els.themeSelect.innerHTML = options;
+  }
+
+  function renderThemePackMeta(pack) {
+    if (!els.themeMeta) return;
+    const builtin = isBuiltinThemePack(pack);
+    const progressCount = themePackProgressBars(pack).length;
+    const layoutType = themePackLayoutType(pack);
+    const style = pack.style || {};
+    const chips = [
+      themePackSourceLabel(pack),
+      `schema v${pack.schema_version || THEME_PACK_SCHEMA_VERSION}`,
+      `layout: ${layoutType}`,
+      `class: ${style.class_name || "theme-standard"}`,
+      progressCount ? `数值条 ${progressCount}` : "默认数值显示",
+    ];
+    const warnings = Array.isArray(pack.__warnings) ? pack.__warnings : [];
+    els.themeMeta.innerHTML = `
+      <div class="theme-pack-chip-row">${chips.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+      ${warnings.length ? `<div class="theme-pack-warning">${warnings.map(escapeHtml).join(" · ")}</div>` : ""}
+      <p>美化包只改变幕笺外观与字段呈现；不会修改变量计算、阶段判断、世界书标签或 worker 提示词。</p>
+    `;
   }
 
   function renderThemePreview() {
     const pack = activeThemePack();
-    if (els.cfgMujianThemeSelect) els.cfgMujianThemeSelect.value = pack.id;
+    if (els.cfgTurnNoteThemeSelect) els.cfgTurnNoteThemeSelect.value = pack.id;
     if (els.themeSelect) els.themeSelect.value = pack.id;
     if (els.themeName) els.themeName.value = pack.name || "";
     if (els.themeAuthor) els.themeAuthor.value = pack.author || "";
@@ -427,35 +683,71 @@
       const builtin = isBuiltinThemePack(pack);
       els.deleteThemeBtn.disabled = builtin;
       els.deleteThemeBtn.title = builtin ? "内置外观包不可删除" : `删除导入外观包：${pack.name || pack.id}`;
-      els.deleteThemeBtn.textContent = builtin ? "内置包不可删除" : "删除导入包";
+      els.deleteThemeBtn.textContent = "删除";
     }
+    if (els.themePreviewModeSelect) els.themePreviewModeSelect.value = state.themePreviewMode || "role";
+    renderThemePackMeta(pack);
     const style = pack.style || {};
     const cls = String(style.class_name || "theme-standard");
     const accent = String(style.accent || "");
+    const tokens = style.tokens || pack.tokens || {};
+    const progressBars = themePackProgressBars(pack);
+    const layoutType = themePackLayoutType(pack);
+    const normalizePreviewLabel = (value) => String(value || "").replace(/\s+/g, "").trim().toLowerCase();
+    const fieldLabel = (key, fallback) => {
+      const mark = String(tokens[key] || tokens[fallback] || "").trim();
+      const label = String(fallback || key || "字段").trim();
+      if (!mark || normalizePreviewLabel(mark) === normalizePreviewLabel(label)) return escapeHtml(label);
+      return `<span class="theme-preview-field-token">${escapeHtml(mark)}</span><span class="theme-preview-field-name">${escapeHtml(label)}</span>`;
+    };
+    const previewMetricSets = {
+      role: [
+        { key: "trust", name: "信任", value: 43, delta: "+3" },
+        { key: "warmth", name: "亲近", value: 31, delta: "+2" },
+        { key: "worry", name: "担忧", value: 34, delta: "+0" },
+        { key: "respect", name: "认可", value: 48, delta: "+1" },
+      ],
+      standard: [
+        { key: "favor_level", name: "好感", value: 43, delta: "+3" },
+        { key: "trust_level", name: "信任", value: 31, delta: "+2" },
+        { key: "guard_level", name: "戒备", value: 64, delta: "-3" },
+        { key: "pulse_level", name: "心绪", value: 48, delta: "+0" },
+      ],
+    };
+    const previewMetrics = previewMetricSets[state.themePreviewMode || "role"] || previewMetricSets.role;
+    const metricLabel = (bar, idx) => escapeHtml(bar.name || bar.display_name || bar.fallback_label || bar.label_cn || bar.cn || bar.title || ["信任", "亲近", "担忧", "认可"][idx] || bar.label || bar.key || "数值");
+    const isHudPreview = ["status_panel", "status_panel_pro", "hud", "hud_rows"].includes(layoutType)
+      || /(?:^|-)theme-status-(?:panel|pro)/.test(cls)
+      || /status-panel|status_pro|status-panel-advanced/i.test(`${pack?.id || ""} ${pack?.name || ""} ${cls}`);
+    const metricChipHtml = (metric, idx) => {
+      const bar = progressBars[idx] || metric;
+      const label = metricLabel({ ...bar, name: metric.name }, idx);
+      return `<span class="theme-preview-metric-chip"><b>${label}</b>${metric.value}/100（${metric.delta}）</span>`;
+    };
+    const metricBarHtml = (metric, idx) => {
+      const bar = progressBars[idx] || metric;
+      const label = metricLabel({ ...bar, name: metric.name }, idx);
+      return `<div class="theme-preview-metric"><span>${label}</span><b>${metric.value}/100（${metric.delta}）</b><i style="--xj-preview-value:${metric.value}%"></i></div>`;
+    };
+    // v1.19.4：进度条只作为 HUD / 状态面板类外观的特色；其他外观包恢复胶囊数值，避免朱砂、古风、月白等被强制进度条化。
+    const progressHtml = isHudPreview
+      ? `<div class="theme-preview-metrics is-meter-preview">${previewMetrics.map(metricBarHtml).join("")}</div>`
+      : `<div class="theme-preview-metrics compact is-chip-preview">${previewMetrics.map(metricChipHtml).join("")}</div>`;
     if (els.themePreview) {
       els.themePreview.className = `theme-preview-card ${cls}`;
       if (accent) els.themePreview.style.setProperty("--xj-beauty-accent", accent);
-      const isTimeCard = cls.includes("time-card");
-      const isGufeng = cls.includes("gufeng");
-      els.themePreview.innerHTML = isTimeCard ? `
-        <div class="theme-preview-title"><span>Time</span><strong>第六笺 · 《旧雨入帘》</strong><em>📅 入夜　🧭 泠音阁后楼　🌦️ 小雨初歇</em></div>
-        <div class="theme-preview-role"><h4>示例角色</h4><p><b>💗 情绪</b> 情绪稳定，状态字段按模板完整显示。</p><p><b>👘 衣着</b> 衣着与场景按当前模板输出。</p><p><b>🤝 互动</b> 关系变化与数值由心笺记录。</p></div>
-        <div class="theme-preview-relation"><b>关系变化</b> 信任更深，状态条式展示。</div>
-      ` : (isGufeng ? `
-        <div class="theme-preview-title"><span>XINJIAN · 幕题</span><strong>第六笺 · 《旧雨入帘》</strong><em>一场旧约，在灯火与药香里重新落定。</em></div>
-        <div class="theme-preview-role"><h4>示例角色</h4><p><b>情绪</b> 情绪稳定，状态字段按模板完整显示。</p><p><b>衣着</b> 衣着与场景按当前模板输出。</p></div>
-        <div class="theme-preview-relation"><b>关系变化</b> 信任更深，关系变化与数值由心笺记录。</div>
-      ` : `
-        <div class="theme-preview-title"><span>XINJIAN · 幕题</span><strong>第六笺 · 《旧雨入帘》</strong><em>一场旧约，在灯火与药香里重新落定。</em></div>
-        <div class="theme-preview-role"><h4>示例角色</h4><p><b>情绪</b> 情绪稳定，状态字段按模板完整显示。</p><p><b>衣着</b> 衣着与场景按当前模板输出。</p></div>
-        <div class="theme-preview-relation"><b>关系变化</b> 信任更深，关系变化与数值由心笺记录。</div>
-      `);
+      els.themePreview.innerHTML = `
+        <div class="theme-preview-title"><span>${layoutType === "status_panel_pro" ? "STATUS" : layoutType === "storyboard" ? "SCENE" : layoutType === "paper_time" ? "TIME NOTE" : "XINJIAN"}</span><strong>第六笺 · 《旧雨入帘》</strong><em>入夜 · 霜庭书馆 · 小雨初歇 · ${state.themePreviewMode === "standard" ? "标准模板预览" : "角色变量预览"}</em></div>
+        <div class="theme-preview-role"><h4>沈栖雪 · C阶段</h4><p><b>${fieldLabel("emotion", "情绪")}</b> 温静中带着担忧，主动递灯提醒用户休息。</p><p><b>${fieldLabel("focus", "关注点")}</b> 卷宗风险、用户状态与书馆规矩。</p><p><b>${fieldLabel("summary", "摘要")}</b> 信任稳定上升，照料动作更主动。</p>${progressHtml}</div>
+        <div class="theme-preview-role"><h4>陆青鸢 · B阶段</h4><p><b>${fieldLabel("interaction", "互动")}</b> 仍然嘴硬，但开始承认用户的配合与判断。</p></div>
+        <div class="theme-preview-relation"><b>阶段变化</b> 沈栖雪：B阶段 → C阶段；陆青鸢：维持 B阶段。</div>
+      `;
     }
   }
 
   function setActiveTheme(id) {
     state.currentThemeId = safeThemeId(id || activeThemeId());
-    state.config = { ...state.config, mujian_theme_id: state.currentThemeId };
+    state.config = { ...state.config, turn_note_theme_id: state.currentThemeId };
     renderThemeSelectors();
     renderThemePreview();
   }
@@ -463,10 +755,10 @@
   function bindTemplateEditor() {
     renderTemplateSelectors();
     let template = ensureTemplateOutputFields(activeTemplate());
-    const templates = mujianTemplates().slice();
+    const templates = turnNoteTemplates().slice();
     const templatePos = templates.findIndex((item) => item.id === template.id);
-    if (templatePos >= 0) { templates[templatePos] = template; state.config = { ...state.config, mujian_templates: templates }; }
-    if (els.cfgMujianTemplateSelect) els.cfgMujianTemplateSelect.value = template.id;
+    if (templatePos >= 0) { templates[templatePos] = template; state.config = { ...state.config, turn_note_templates: templates }; }
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.value = template.id;
     if (els.templateSelect) els.templateSelect.value = template.id;
     if (els.templateName) els.templateName.value = template.name || "";
     if (els.templateDesc) els.templateDesc.value = template.description || "";
@@ -537,10 +829,10 @@
 
   function commitTemplateEditorToState(options = {}) {
     const template = readTemplateEditor();
-    const templates = mujianTemplates().slice();
+    const templates = turnNoteTemplates().slice();
     const index = templates.findIndex((item) => item.id === template.id);
     if (index >= 0) templates[index] = template; else templates.push(template);
-    state.config = { ...state.config, mujian_templates: templates, mujian_template_id: template.id, mujian_note_style: template.note_style, mujian_style: template.note_style };
+    state.config = { ...state.config, turn_note_templates: templates, turn_note_template_id: template.id, turn_note_card_style: template.note_style, turn_note_style: template.note_style };
     state.currentTemplateId = template.id;
     if (options.rebind !== false) {
       bindTemplateEditor();
@@ -550,7 +842,40 @@
   }
 
   function applyAdminUiSyncMode(cfg = state.config || {}) {
-    document.documentElement.dataset.xjUiSync = cfg.ui_sync_global ? "global" : "native";
+    document.documentElement.dataset.stateJournalUiSync = cfg.ui_sync_global ? "global" : "native";
+  }
+
+
+  function statusText(enabled, onText = "开启", offText = "关闭") {
+    return enabled ? onText : offText;
+  }
+
+  function setRuntimeBadge(el, enabled, onText, offText) {
+    if (!el) return;
+    el.textContent = statusText(enabled, onText, offText);
+    el.classList.toggle("is-on", !!enabled);
+    el.classList.toggle("is-off", !enabled);
+  }
+
+  function renderRuntimeOverview() {
+    const cfg = state.config || {};
+    const enabled = cfg.enabled !== false;
+    const autoUpdate = !!cfg.auto_update;
+    const turnNoteEnabled = cfg.turn_note_enabled !== false;
+    setRuntimeBadge(els.runtimeEnabledBadge, enabled, "心笺启用", "心笺关闭");
+    setRuntimeBadge(els.runtimeAutoBadge, autoUpdate, "自动填表", "手动填表");
+    setRuntimeBadge(els.runtimeTurnNoteBadge, turnNoteEnabled, "幕笺展示", "幕笺关闭");
+    if (els.runtimeModelBadge) els.runtimeModelBadge.textContent = cfg.model ? `模型 ${cfg.model}` : "模型未配置";
+    if (els.runtimeLastRunText) els.runtimeLastRunText.textContent = els.updateSummaryText?.textContent || "暂无填表记录。";
+    if (els.runtimeFlowText) {
+      if (!enabled) els.runtimeFlowText.textContent = "当前不会在聊天后运行心笺，也不会写入结构化记录。";
+      else if (!autoUpdate) els.runtimeFlowText.textContent = "心笺已启用，但聊天后自动填表关闭；可手动根据最近对话更新。";
+      else if (!turnNoteEnabled) els.runtimeFlowText.textContent = "聊天后会自动填表并写入 SQLite，但 Chat 页面不显示幕笺。";
+      else els.runtimeFlowText.textContent = "聊天回复完成 → Hook 直传 → 心笺 worker 填表 → 写入 SQLite → Chat 显示幕笺。";
+    }
+    if (els.dashboardEnabled) els.dashboardEnabled.checked = enabled;
+    if (els.dashboardAutoUpdate) els.dashboardAutoUpdate.checked = autoUpdate;
+    if (els.dashboardTurnNote) els.dashboardTurnNote.checked = turnNoteEnabled;
   }
 
   function bindConfig() {
@@ -560,39 +885,40 @@
     els.cfgNotify.checked = !!cfg.notify_in_chat;
     if (els.cfgUiSyncGlobal) els.cfgUiSyncGlobal.checked = !!cfg.ui_sync_global;
     applyAdminUiSyncMode(cfg);
-    if (els.cfgMujianEnabled) els.cfgMujianEnabled.checked = cfg.mujian_enabled !== false;
-    if (els.cfgMujianTitle) els.cfgMujianTitle.checked = cfg.mujian_title_card !== false;
-    if (els.cfgMujianNote) els.cfgMujianNote.checked = cfg.mujian_turn_note !== false;
-    if (els.cfgMujianCollapsed) els.cfgMujianCollapsed.checked = cfg.mujian_default_collapsed !== false;
-    if (els.cfgMujianDisplayMode) els.cfgMujianDisplayMode.value = cfg.mujian_chat_display_mode || (cfg.mujian_default_collapsed === false ? "expanded" : "collapsed");
-    if (els.cfgMujianStyle) els.cfgMujianStyle.value = cfg.mujian_style || "classic";
-    if (els.cfgMujianTitleStyle) els.cfgMujianTitleStyle.value = cfg.mujian_title_style || cfg.mujian_style || "classic";
-    if (els.cfgMujianNoteStyle) els.cfgMujianNoteStyle.value = cfg.mujian_note_style || cfg.mujian_style || "classic";
-    if (els.cfgMujianExpand) els.cfgMujianExpand.value = cfg.mujian_expand_level || "standard";
-    if (els.cfgMujianDensity) els.cfgMujianDensity.value = cfg.mujian_note_density || "standard";
-    if (els.cfgMujianCharacterFilter) els.cfgMujianCharacterFilter.value = cfg.mujian_character_filter || "turn";
-    state.currentTemplateId = cfg.mujian_template_id || state.currentTemplateId || mujianTemplates()[0]?.id || "classic";
-    state.currentThemeId = cfg.mujian_theme_id || state.currentThemeId || mujianThemePacks()[0]?.id || "standard";
+    if (els.cfgTurnNoteEnabled) els.cfgTurnNoteEnabled.checked = cfg.turn_note_enabled !== false;
+    if (els.cfgTurnNoteTitle) els.cfgTurnNoteTitle.checked = cfg.turn_note_title_card !== false;
+    if (els.cfgTurnNoteNote) els.cfgTurnNoteNote.checked = cfg.turn_note_card !== false;
+    if (els.cfgTurnNoteCollapsed) els.cfgTurnNoteCollapsed.checked = cfg.turn_note_default_collapsed !== false;
+    if (els.cfgTurnNoteDisplayMode) els.cfgTurnNoteDisplayMode.value = cfg.turn_note_chat_display_mode || (cfg.turn_note_default_collapsed === false ? "expanded" : "collapsed");
+    if (els.cfgTurnNoteStyle) els.cfgTurnNoteStyle.value = cfg.turn_note_style || "classic";
+    if (els.cfgTurnNoteTitleStyle) els.cfgTurnNoteTitleStyle.value = cfg.turn_note_title_style || cfg.turn_note_style || "classic";
+    if (els.cfgTurnNoteNoteStyle) els.cfgTurnNoteNoteStyle.value = cfg.turn_note_card_style || cfg.turn_note_style || "classic";
+    if (els.cfgTurnNoteExpand) els.cfgTurnNoteExpand.value = cfg.turn_note_expand_level || "standard";
+    if (els.cfgTurnNoteDensity) els.cfgTurnNoteDensity.value = cfg.turn_note_density || "standard";
+    if (els.cfgTurnNoteCharacterFilter) els.cfgTurnNoteCharacterFilter.value = cfg.turn_note_character_filter || "turn";
+    state.currentTemplateId = cfg.turn_note_template_id || state.currentTemplateId || turnNoteTemplates()[0]?.id || "classic";
+    state.currentThemeId = cfg.turn_note_theme_id || state.currentThemeId || turnNoteThemePacks()[0]?.id || "standard";
     renderThemeSelectors();
     renderThemePreview();
     renderTemplateSelectors();
-    if (els.cfgMujianTemplateSelect) els.cfgMujianTemplateSelect.value = state.currentTemplateId;
-    if (els.cfgMujianCharacterNames) els.cfgMujianCharacterNames.value = cfg.mujian_character_names || "";
-    if (els.cfgMujianProtagonistEnabled) els.cfgMujianProtagonistEnabled.checked = !!cfg.mujian_protagonist_card_enabled;
-    if (els.cfgMujianProtagonistMode) els.cfgMujianProtagonistMode.value = cfg.mujian_protagonist_card_mode || "when_relevant";
-    if (els.cfgMujianProtagonistName) els.cfgMujianProtagonistName.value = cfg.mujian_protagonist_name || "";
-    if (els.cfgMujianProtagonistAliases) els.cfgMujianProtagonistAliases.value = cfg.mujian_protagonist_aliases || "";
-    if (els.cfgMujianWorkerPromptEnabled) els.cfgMujianWorkerPromptEnabled.checked = !!cfg.mujian_worker_custom_prompt_enabled;
-    if (els.cfgMujianWorkerStylePrompt) els.cfgMujianWorkerStylePrompt.value = cfg.mujian_worker_style_prompt || "";
-    if (els.cfgMujianWorkerProtagonistPrompt) els.cfgMujianWorkerProtagonistPrompt.value = cfg.mujian_worker_protagonist_prompt || "";
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.value = state.currentTemplateId;
+    if (els.cfgTurnNoteCharacterNames) els.cfgTurnNoteCharacterNames.value = cfg.turn_note_character_names || "";
+    if (els.cfgTurnNoteProtagonistEnabled) els.cfgTurnNoteProtagonistEnabled.checked = !!cfg.turn_note_protagonist_card_enabled;
+    if (els.cfgTurnNoteProtagonistMode) els.cfgTurnNoteProtagonistMode.value = cfg.turn_note_protagonist_card_mode || "when_relevant";
+    if (els.cfgTurnNoteProtagonistName) els.cfgTurnNoteProtagonistName.value = cfg.turn_note_protagonist_name || "";
+    if (els.cfgTurnNoteProtagonistAliases) els.cfgTurnNoteProtagonistAliases.value = cfg.turn_note_protagonist_aliases || "";
+    if (els.cfgTurnNoteWorkerPromptEnabled) els.cfgTurnNoteWorkerPromptEnabled.checked = !!cfg.turn_note_worker_custom_prompt_enabled;
+    if (els.cfgTurnNoteWorkerStylePrompt) els.cfgTurnNoteWorkerStylePrompt.value = cfg.turn_note_worker_style_prompt || "";
+    if (els.cfgTurnNoteWorkerProtagonistPrompt) els.cfgTurnNoteWorkerProtagonistPrompt.value = cfg.turn_note_worker_protagonist_prompt || "";
     bindTemplateEditor();
-    updateMujianStyleHelp();
+    updateTurnNoteStyleHelp();
     els.cfgBaseUrl.value = cfg.api_base_url || "";
     els.cfgApiKey.value = cfg.api_key || "";
     els.cfgModel.value = cfg.model || "";
     els.cfgTurns.value = cfg.input_turn_count || 3;
     els.cfgTimeout.value = cfg.request_timeout || 120;
     syncPresetSelectFromBaseUrl();
+    renderRuntimeOverview();
   }
 
   function readConfig() {
@@ -602,29 +928,29 @@
       auto_update: els.cfgAutoUpdate.checked,
       notify_in_chat: els.cfgNotify.checked,
       ui_sync_global: els.cfgUiSyncGlobal ? els.cfgUiSyncGlobal.checked : false,
-      mujian_enabled: els.cfgMujianEnabled ? els.cfgMujianEnabled.checked : true,
-      mujian_title_card: els.cfgMujianTitle ? els.cfgMujianTitle.checked : true,
-      mujian_turn_note: els.cfgMujianNote ? els.cfgMujianNote.checked : true,
-      mujian_default_collapsed: els.cfgMujianDisplayMode ? els.cfgMujianDisplayMode.value === "collapsed" : (els.cfgMujianCollapsed ? els.cfgMujianCollapsed.checked : true),
-      mujian_chat_display_mode: els.cfgMujianDisplayMode ? els.cfgMujianDisplayMode.value : (els.cfgMujianCollapsed && !els.cfgMujianCollapsed.checked ? "expanded" : "collapsed"),
-      mujian_style: els.cfgMujianNoteStyle ? els.cfgMujianNoteStyle.value : (els.cfgMujianStyle ? els.cfgMujianStyle.value : "classic"),
-      mujian_title_style: els.cfgMujianTitleStyle ? els.cfgMujianTitleStyle.value : "classic",
-      mujian_note_style: els.cfgMujianNoteStyle ? els.cfgMujianNoteStyle.value : "classic",
-      mujian_expand_level: els.cfgMujianExpand ? els.cfgMujianExpand.value : "standard",
-      mujian_note_density: els.cfgMujianDensity ? els.cfgMujianDensity.value : "standard",
-      mujian_character_filter: els.cfgMujianCharacterFilter ? els.cfgMujianCharacterFilter.value : "turn",
-      mujian_character_names: els.cfgMujianCharacterNames ? els.cfgMujianCharacterNames.value.trim() : "",
-      mujian_protagonist_card_enabled: els.cfgMujianProtagonistEnabled ? els.cfgMujianProtagonistEnabled.checked : false,
-      mujian_protagonist_card_mode: els.cfgMujianProtagonistMode ? els.cfgMujianProtagonistMode.value : "when_relevant",
-      mujian_protagonist_name: els.cfgMujianProtagonistName ? els.cfgMujianProtagonistName.value.trim() : "",
-      mujian_protagonist_aliases: els.cfgMujianProtagonistAliases ? els.cfgMujianProtagonistAliases.value.trim() : "",
-      mujian_worker_custom_prompt_enabled: els.cfgMujianWorkerPromptEnabled ? els.cfgMujianWorkerPromptEnabled.checked : false,
-      mujian_worker_style_prompt: els.cfgMujianWorkerStylePrompt ? els.cfgMujianWorkerStylePrompt.value.trim() : "",
-      mujian_worker_protagonist_prompt: els.cfgMujianWorkerProtagonistPrompt ? els.cfgMujianWorkerProtagonistPrompt.value.trim() : "",
-      mujian_template_id: activeTemplateId(),
-      mujian_templates: mujianTemplates(),
-      mujian_theme_id: activeThemeId(),
-      mujian_theme_packs: mujianThemePacks(),
+      turn_note_enabled: els.cfgTurnNoteEnabled ? els.cfgTurnNoteEnabled.checked : true,
+      turn_note_title_card: els.cfgTurnNoteTitle ? els.cfgTurnNoteTitle.checked : true,
+      turn_note_card: els.cfgTurnNoteNote ? els.cfgTurnNoteNote.checked : true,
+      turn_note_default_collapsed: els.cfgTurnNoteDisplayMode ? els.cfgTurnNoteDisplayMode.value === "collapsed" : (els.cfgTurnNoteCollapsed ? els.cfgTurnNoteCollapsed.checked : true),
+      turn_note_chat_display_mode: els.cfgTurnNoteDisplayMode ? els.cfgTurnNoteDisplayMode.value : (els.cfgTurnNoteCollapsed && !els.cfgTurnNoteCollapsed.checked ? "expanded" : "collapsed"),
+      turn_note_style: els.cfgTurnNoteNoteStyle ? els.cfgTurnNoteNoteStyle.value : (els.cfgTurnNoteStyle ? els.cfgTurnNoteStyle.value : "classic"),
+      turn_note_title_style: els.cfgTurnNoteTitleStyle ? els.cfgTurnNoteTitleStyle.value : "classic",
+      turn_note_card_style: els.cfgTurnNoteNoteStyle ? els.cfgTurnNoteNoteStyle.value : "classic",
+      turn_note_expand_level: els.cfgTurnNoteExpand ? els.cfgTurnNoteExpand.value : "standard",
+      turn_note_density: els.cfgTurnNoteDensity ? els.cfgTurnNoteDensity.value : "standard",
+      turn_note_character_filter: els.cfgTurnNoteCharacterFilter ? els.cfgTurnNoteCharacterFilter.value : "turn",
+      turn_note_character_names: els.cfgTurnNoteCharacterNames ? els.cfgTurnNoteCharacterNames.value.trim() : "",
+      turn_note_protagonist_card_enabled: els.cfgTurnNoteProtagonistEnabled ? els.cfgTurnNoteProtagonistEnabled.checked : false,
+      turn_note_protagonist_card_mode: els.cfgTurnNoteProtagonistMode ? els.cfgTurnNoteProtagonistMode.value : "when_relevant",
+      turn_note_protagonist_name: els.cfgTurnNoteProtagonistName ? els.cfgTurnNoteProtagonistName.value.trim() : "",
+      turn_note_protagonist_aliases: els.cfgTurnNoteProtagonistAliases ? els.cfgTurnNoteProtagonistAliases.value.trim() : "",
+      turn_note_worker_custom_prompt_enabled: els.cfgTurnNoteWorkerPromptEnabled ? els.cfgTurnNoteWorkerPromptEnabled.checked : false,
+      turn_note_worker_style_prompt: els.cfgTurnNoteWorkerStylePrompt ? els.cfgTurnNoteWorkerStylePrompt.value.trim() : "",
+      turn_note_worker_protagonist_prompt: els.cfgTurnNoteWorkerProtagonistPrompt ? els.cfgTurnNoteWorkerProtagonistPrompt.value.trim() : "",
+      turn_note_template_id: activeTemplateId(),
+      turn_note_templates: turnNoteTemplates(),
+      turn_note_theme_id: activeThemeId(),
+      turn_note_theme_packs: turnNoteThemePacks(),
       api_base_url: els.cfgBaseUrl.value.trim(),
       api_key: els.cfgApiKey.value.trim(),
       model: els.cfgModel.value.trim(),
@@ -687,13 +1013,13 @@
     },
   };
 
-  function updateMujianStyleHelp() {
-    const titleStyle = els.cfgMujianTitleStyle?.value || "classic";
-    const noteStyle = els.cfgMujianNoteStyle?.value || els.cfgMujianStyle?.value || "classic";
+  function updateTurnNoteStyleHelp() {
+    const titleStyle = els.cfgTurnNoteTitleStyle?.value || "classic";
+    const noteStyle = els.cfgTurnNoteNoteStyle?.value || els.cfgTurnNoteStyle?.value || "classic";
     const titleItem = MUJIAN_TITLE_STYLE_PREVIEWS[titleStyle] || MUJIAN_TITLE_STYLE_PREVIEWS.classic;
     const noteItem = MUJIAN_NOTE_STYLE_PREVIEWS[noteStyle] || MUJIAN_NOTE_STYLE_PREVIEWS.classic;
-    const descEl = document.getElementById("mujianStyleDesc");
-    const previewEl = document.getElementById("mujianStylePreview");
+    const descEl = document.getElementById("turnNoteStyleDesc");
+    const previewEl = document.getElementById("turnNoteStylePreview");
     if (descEl) descEl.textContent = `标题：${titleItem.label}，${titleItem.desc} 附笺：${noteItem.label}，${noteItem.desc}`;
     if (previewEl) previewEl.textContent = `${titleItem.sample}\n\n${noteItem.sample}`;
   }
@@ -1086,8 +1412,8 @@
 
   const WORKSPACE_DEFAULT_TAB = {
     journal: null,
-    mujian: "mujian",
-    generate: "generate",
+    roleState: "roleState",
+    turnNote: "turnNote",
     beauty: "template",
     settings: "model",
   };
@@ -1095,9 +1421,10 @@
   const TAB_WORKSPACE = {
     schema: "journal",
     rules: "journal",
+    roleState: "roleState",
     log: "settings",
-    mujian: "mujian",
-    generate: "generate",
+    turnNote: "turnNote",
+    generate: "settings",
     template: "beauty",
     theme: "beauty",
     model: "settings",
@@ -1107,11 +1434,12 @@
   const TAB_TITLES = {
     schema: "字段设置",
     rules: "规则设置",
+    roleState: "角色配置",
     log: "调试与日志",
-    mujian: "幕笺设置",
+    turnNote: "幕笺显示",
     generate: "生成规则",
     template: "幕笺模板",
-    theme: "幕笺美化包",
+    theme: "外观模板",
     model: "模型设置",
     link: "聊天联动",
   };
@@ -1157,6 +1485,438 @@
     document.querySelectorAll(".tab-btn").forEach((item) => item.classList.toggle("active", item.dataset.tab === tab));
     document.querySelectorAll(".tab-page").forEach((item) => item.classList.toggle("active", item.dataset.page === tab));
     setWorkspaceNav(workspace);
+    if (tab === "roleState") loadRoleStateConfig().catch((error) => pageToast("角色配置载入失败", error.message, "error"));
+  }
+
+  function roleStateStageKey(index) {
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    const i = Math.max(1, Number(index || 1));
+    return `stage_${letters[(i - 1) % letters.length]}${i > letters.length ? Math.ceil(i / letters.length) : ""}`;
+  }
+
+  function roleStateStageName(index) {
+    const key = roleStateStageKey(index).replace(/^stage_/, "").toUpperCase();
+    return `${key}阶段`;
+  }
+
+  function normalizeRoleStateConfig(config = {}) {
+    const roles = Array.isArray(config.roles) ? config.roles : [];
+    const roleSourceMode = normalizeRoleSourceMode(config.role_source_mode || config.roleSourceMode);
+    return { version: 1, enabled: config.enabled !== false, role_source_mode: roleSourceMode, role_source_summary: config.role_source_summary || {}, roles: roles.map((role, index) => ({
+      role_id: safeTemplateId(role.role_id || role.id || `role_${index + 1}`),
+      role_name: String(role.role_name || role.name || `角色${index + 1}`).trim(),
+      aliases: Array.isArray(role.aliases) ? role.aliases : [],
+      enabled: role.enabled !== false,
+      mode: normalizeRoleStateMode(role.mode || role.stateJournalMode, role),
+      stateJournalMode: normalizeRoleStateMode(role.mode || role.stateJournalMode, role),
+      use_default_variables: !!role.use_default_variables,
+      source: String(role.source || role.role_source || "").trim(),
+      initial_stage: safeTemplateId(role.initial_stage || "stage_a"),
+      variables: Array.isArray(role.variables) ? role.variables.map((variable, varIndex) => ({
+        var_key: safeTemplateId(variable.var_key || variable.key || `var_${varIndex + 1}`),
+        var_name: String(variable.var_name || variable.label || `变量${varIndex + 1}`).trim(),
+        enabled: variable.enabled !== false,
+        default_value: Number(variable.default_value ?? 0) || 0,
+        min_value: Number(variable.min_value ?? 0) || 0,
+        max_value: Number(variable.max_value ?? 100) || 100,
+        delta_min: Number(variable.delta_min ?? -2) || -2,
+        delta_max: Number(variable.delta_max ?? 2) || 2,
+        display: variable.display !== false,
+        stage_relevant: variable.stage_relevant !== false,
+        instruction: String(variable.instruction || ""),
+      })) : [],
+      stages: Array.isArray(role.stages) ? role.stages.map((stage, stageIndex) => ({
+        stage_key: safeTemplateId(stage.stage_key || stage.key || roleStateStageKey(stageIndex + 1)),
+        stage_name: String(stage.stage_name || stage.name || roleStateStageName(stageIndex + 1)).trim(),
+        enabled: stage.enabled !== false,
+        priority: Number(stage.priority ?? (stageIndex + 1) * 10) || (stageIndex + 1) * 10,
+        condition_mode: stage.condition_mode === "any" ? "any" : "all",
+        conditions: Array.isArray(stage.conditions) ? stage.conditions : [],
+        allow_regression: !!stage.allow_regression,
+        confirm_turns: Math.max(1, Number(stage.confirm_turns || 1) || 1),
+        cooldown_turns: Math.max(0, Number(stage.cooldown_turns || 0) || 0),
+      })) : [],
+      snapshotFields: Array.isArray(role.snapshotFields) ? role.snapshotFields.map((field, fieldIndex) => ({
+        key: safeTemplateId(field.key || field.field_key || `snapshot_${fieldIndex + 1}`),
+        label: String(field.label || field.name || `快照字段${fieldIndex + 1}`).trim(),
+        enabled: field.enabled !== false,
+        display: field.display !== false,
+        instruction: String(field.instruction || field.note || "根据本轮上下文生成该状态快照字段。"),
+      })) : [],
+      settings: role.settings || { allow_regression: false, confirm_turns: 1, cooldown_turns: 1 },
+    })) };
+  }
+
+  function currentRoleState() {
+    return (state.roleStateConfig.roles || []).find((role) => role.role_id === state.currentRoleStateId) || state.roleStateConfig.roles?.[0] || null;
+  }
+
+  function activeStageForRole(role) {
+    if (!role) return null;
+    const names = new Set([String(role.role_id || ""), String(role.role_name || ""), ...(Array.isArray(role.aliases) ? role.aliases.map(String) : [])].map((item) => item.trim()).filter(Boolean));
+    return (state.activeStageRows || []).find((item) => names.has(String(item.role_id || "").trim()) || names.has(String(item.role_name || "").trim())) || null;
+  }
+
+  function roleCurrentStageName(role) {
+    const active = activeStageForRole(role);
+    if (active?.stage_name) return active.stage_name;
+    const key = active?.stage_key || role?.initial_stage || "stage_a";
+    const stage = (role?.stages || []).find((item) => item.stage_key === key);
+    return stage?.stage_name || key || "未进入阶段";
+  }
+
+  function roleCurrentStageKey(role) {
+    const active = activeStageForRole(role);
+    return active?.stage_key || role?.initial_stage || "stage_a";
+  }
+
+
+  function stageActivationTag(role, stage) {
+    const roleId = safeTemplateId(role?.role_id || "");
+    const stageKey = safeTemplateId(stage?.stage_key || "");
+    return stage?.activation_tag || (roleId && stageKey ? `state_journal.stage.${roleId}.${stageKey}` : "");
+  }
+
+  async function createWorldbookEntryForStage(stageIndex) {
+    const role = currentRoleState();
+    const stage = role?.stages?.[Number(stageIndex)];
+    if (!role || !stage) return;
+    const tag = stageActivationTag(role, stage);
+    const ok = await confirmAction({
+      title: "创建世界书阶段条目",
+      body: `<p>将为「${escapeHtml(role.role_name || role.role_id)} · ${escapeHtml(stage.stage_name || stage.stage_key)}」创建一个 external_tag 世界书条目。</p><p><strong>机器标签：</strong><code>${escapeHtml(tag)}</code></p><p>世界书只负责阶段表现，不负责计算变量与条件。</p>`,
+      confirmText: "创建条目",
+    });
+    if (!ok) return;
+    const payload = await requestJson("./api/stage-tags/create-worldbook-entry", {
+      method: "POST",
+      body: JSON.stringify({ role_id: role.role_id, stage_key: stage.stage_key }),
+    });
+    if (payload.duplicate) {
+      pageToast("世界书条目已存在", payload.message || "该阶段已绑定世界书条目，可前往世界书管理页查看。", "warn");
+    } else {
+      pageToast("已创建世界书条目", payload.message || "阶段表现草稿已写入世界书。", "ok");
+    }
+  }
+
+
+  function renderRoleStateWorkspace() {
+    const list = document.getElementById("roleStateRoleList");
+    const detail = document.getElementById("roleStateDetail");
+    if (!list || !detail) return;
+    const roles = state.roleStateConfig.roles || [];
+    if (!state.currentRoleStateId && roles[0]) state.currentRoleStateId = roles[0].role_id;
+    const sourceInfo = roleSourceSummary(state.roleStateConfig);
+    const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>`;
+    list.innerHTML = sourceHintHtml + (roles.length ? roles.map((role) => {
+      const stageName = roleCurrentStageName(role);
+      const stageKey = roleCurrentStageKey(role);
+      const stageShort = String(stageName || stageKey || "未进入阶段").replace(/^([A-Z])阶段$/i, "$1阶段");
+      const mode = normalizeRoleStateMode(role.mode || role.stateJournalMode, role);
+      return `
+      <button type="button" class="role-state-role-card role-state-role-card-v115 ${role.role_id === state.currentRoleStateId ? "active" : ""}" data-role-id="${escapeAttr(role.role_id)}" title="${escapeAttr(roleStateModeLabel(role))}">
+        <div class="role-state-card-head"><strong>${escapeHtml(role.role_name || role.role_id)}</strong><span class="role-stage-pill ${mode === "full" ? "" : "muted"}">${mode === "full" ? escapeHtml(stageShort) : escapeHtml(roleStateModeShortLabel(role))}</span></div>
+        <div class="role-state-chip-row">
+          <span class="role-state-chip">变量 ${role.variables?.length || 0}</span>
+          <span class="role-state-chip">阶段 ${role.stages?.length || 0}</span>
+          <span class="role-state-chip">快照 ${role.snapshotFields?.length || 0}</span>
+        </div>
+        <div class="role-state-chip-row muted-row">
+          <span class="role-state-mode-badge ${mode === "disabled" ? "is-off" : "is-on"}">${escapeHtml(roleStateModeShortLabel(role))}</span>
+        </div>
+      </button>`;
+    }).join("") : `<div class="role-state-role-card active"><strong>尚未读取角色配置</strong><div class="role-state-chip-row"><span class="role-state-chip">变量 0</span><span class="role-state-chip">阶段 0</span><span class="role-state-chip">快照 0</span></div><small>可从当前角色卡读取变量与阶段配置。</small></div>`);
+    const role = currentRoleState();
+    document.querySelectorAll("[data-role-state-tab]").forEach((btn) => btn.classList.toggle("active", btn.dataset.roleStateTab === state.roleStateTab));
+    if (!role) {
+      detail.innerHTML = `<strong>尚未选择角色</strong><p>可从当前角色卡读取变量与阶段配置。</p>`;
+      return;
+    }
+    const roleMode = normalizeRoleStateMode(role.mode || role.stateJournalMode, role);
+    const roleStats = {
+      variables: role.variables?.length || 0,
+      stages: role.stages?.length || 0,
+      snapshots: role.snapshotFields?.length || 0,
+    };
+    const currentStageName = roleCurrentStageName(role);
+    const currentStageKey = roleCurrentStageKey(role);
+    const roleModeMeta = ROLE_STATE_MODES[roleMode] || ROLE_STATE_MODES.default;
+    const overviewPanel = `<div class="role-state-overview-card compact-overview-card">
+      <div class="role-state-overview-main">
+        <div class="role-state-overview-title">
+          <span class="micro-badge">当前角色</span>
+          <strong>${escapeHtml(role.role_name || role.role_id || "未命名角色")}</strong>
+        </div>
+        <div class="role-state-mode-panel">
+          <strong>使用方式</strong>
+          <select data-role-mode-select>
+            <option value="default" ${roleMode === "default" ? "selected" : ""}>默认幕笺模板</option>
+            <option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属幕笺</option>
+            <option value="full" ${roleMode === "full" ? "selected" : ""}>完整心笺：专属幕笺 + 变量阶段</option>
+            <option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不启用该角色</option>
+          </select>
+        </div>
+        <p>${escapeHtml(roleModeMeta.desc || ROLE_STATE_MODES.default.desc)}</p>
+      </div>
+    </div>`;
+    const wrapRoleStateEditor = (actionsHtml, tableHtml) => `${overviewPanel}<div class="role-state-editor-card"><div class="role-state-editor-head"><div><strong>${state.roleStateTab === "stages" ? "阶段规则" : state.roleStateTab === "snapshot" ? "状态快照字段" : "变量表"}</strong><small>${state.roleStateTab === "stages" ? "主表只展示摘要，条件编辑收在配置弹窗。" : state.roleStateTab === "snapshot" ? "只用于心笺 worker 与幕笺展示，不参与阶段判断。" : "记录可累计变量、变化范围与阶段用途。"}</small></div>${actionsHtml}</div>${tableHtml}</div>`;
+    if (state.roleStateTab === "snapshot") {
+      detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-snapshot-field>＋ 新增快照字段</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-snapshot-table"><thead><tr><th>启用</th><th>字段名</th><th>显示</th><th>生成说明</th><th>操作</th></tr></thead><tbody>
+        ${(role.snapshotFields || []).map((field, index) => `<tr data-snapshot-index="${index}"><td><input type="checkbox" data-snapshot-field="enabled" ${field.enabled !== false ? "checked" : ""}></td><td><input data-snapshot-field="label" value="${escapeAttr(field.label)}"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-snapshot-field="key" value="${escapeAttr(field.key)}"></label></details></td><td><input type="checkbox" data-snapshot-field="display" ${field.display !== false ? "checked" : ""}></td><td><input data-snapshot-field="instruction" value="${escapeAttr(field.instruction || "")}"></td><td><button type="button" class="ghost-btn" data-delete-snapshot-field>删除</button></td></tr>`).join("") || `<tr><td colspan="5">暂无状态快照字段。未配置时会回落到当前全局幕笺模板。</td></tr>`}
+        </tbody></table></div>`);
+    } else if (state.roleStateTab === "stages") {
+      detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-stage>＋ 新增阶段</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-stage-table stage-table-polish"><thead><tr><th>当前</th><th>启用</th><th>阶段</th><th>条件摘要</th><th>世界书</th><th>操作</th></tr></thead><tbody>
+        ${(role.stages || []).map((stage, index) => {
+          const isCurrent = stage.stage_key === roleCurrentStageKey(role);
+          const tagState = roleStateStageTagState(role, stage, isCurrent);
+          return `<tr data-stage-index="${index}" class="${isCurrent ? "current-stage-row" : ""}">
+            <td><span class="current-stage-dot" title="${isCurrent ? "当前阶段" : ""}">${isCurrent ? "✓" : ""}</span></td>
+            <td><input type="checkbox" data-stage-field="enabled" ${stage.enabled !== false ? "checked" : ""}></td>
+            <td>
+              <div class="stage-name-cell">
+                <input data-stage-field="stage_name" value="${escapeAttr(stage.stage_name)}">
+                <span class="stage-priority-pill">优先级 ${escapeHtml(stage.priority ?? 0)}</span>
+              </div>
+            </td>
+            <td><div class="stage-condition-chip-row" title="${escapeAttr(roleStateConditionText(role, stage))}">${roleStateConditionChips(role, stage)}</div></td>
+            <td><button type="button" class="stage-worldbook-pill ${tagState.cls}" data-create-stage-worldbook>${escapeHtml(tagState.label)}</button></td>
+            <td>
+              <div class="stage-row-actions">
+                <button type="button" class="ghost-btn tiny" data-config-stage>配置</button>
+                <details class="role-state-row-more">
+                  <summary>⋯</summary>
+                  <div class="role-state-row-menu">
+                    <button type="button" data-delete-stage>删除阶段</button>
+                    <code title="${escapeAttr(stageActivationTag(role, stage))}">${escapeHtml(stageActivationTag(role, stage))}</code>
+                  </div>
+                </details>
+              </div>
+            </td>
+          </tr>`;
+        }).join("") || `<tr><td colspan="6">暂无阶段。建议新增 A阶段。</td></tr>`}
+        </tbody></table></div>`);
+    } else {
+      detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-variable>＋ 新增变量</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-variable-table"><thead><tr><th>启用</th><th>变量名</th><th>初始值</th><th>范围</th><th>每轮变化</th><th>显示</th><th>阶段</th><th>操作</th></tr></thead><tbody>
+        ${(role.variables || []).map((variable, index) => `<tr data-variable-index="${index}"><td><input type="checkbox" data-var-field="enabled" ${variable.enabled !== false ? "checked" : ""}></td><td><input data-var-field="var_name" value="${escapeAttr(variable.var_name)}" placeholder="变量名"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-var-field="var_key" value="${escapeAttr(variable.var_key)}" placeholder="key"></label></details></td><td><input type="number" data-var-field="default_value" value="${escapeAttr(variable.default_value)}"></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="min_value" value="${escapeAttr(variable.min_value)}"><span>~</span><input class="mini" type="number" data-var-field="max_value" value="${escapeAttr(variable.max_value)}"></div></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="delta_min" value="${escapeAttr(variable.delta_min)}"><span>~</span><input class="mini" type="number" data-var-field="delta_max" value="${escapeAttr(variable.delta_max)}"></div></td><td><input type="checkbox" data-var-field="display" ${variable.display !== false ? "checked" : ""}></td><td><input type="checkbox" data-var-field="stage_relevant" ${variable.stage_relevant !== false ? "checked" : ""}></td><td><button type="button" class="ghost-btn" data-delete-variable>删除</button></td></tr>`).join("") || `<tr><td colspan="8">暂无变量。手动新增默认使用 var_1 / var_2，不自动拼音。</td></tr>`}
+        </tbody></table></div>`);
+    }
+  }
+
+
+  function renderRoleStateStageDialog(stageIndex) {
+    const role = currentRoleState();
+    const stage = role?.stages?.[Number(stageIndex)];
+    if (!role || !stage) return;
+    let modal = document.getElementById("roleStateStageDialog");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "roleStateStageDialog";
+      modal.className = "role-state-modal";
+      document.body.appendChild(modal);
+    }
+    const variables = role.variables || [];
+    const conditionRows = (stage.conditions || []).map((condition, index) => `
+      <div class="role-state-condition-line" data-condition-index="${index}">
+        <select data-stage-condition-field="var">${variables.map((v) => `<option value="${escapeAttr(v.var_key)}" ${String(condition.var || condition.field || "") === String(v.var_key) ? "selected" : ""}>${escapeHtml(v.var_name || v.var_key)}</option>`).join("")}</select>
+        <select data-stage-condition-field="op">
+          <option value=">=" ${condition.op === ">=" ? "selected" : ""}>≥</option>
+          <option value="<=" ${condition.op === "<=" ? "selected" : ""}>≤</option>
+          <option value=">" ${condition.op === ">" ? "selected" : ""}>＞</option>
+          <option value="<" ${condition.op === "<" ? "selected" : ""}>＜</option>
+          <option value="=" ${condition.op === "=" ? "selected" : ""}>＝</option>
+          <option value="!=" ${condition.op === "!=" ? "selected" : ""}>≠</option>
+        </select>
+        <input type="number" data-stage-condition-field="value" value="${escapeAttr(condition.value ?? 0)}">
+        <button type="button" class="tiny-btn" data-delete-stage-condition>×</button>
+      </div>`).join("");
+    modal.innerHTML = `
+      <div class="role-state-modal-mask" data-close-stage-dialog></div>
+      <section class="role-state-modal-card" role="dialog" aria-modal="true">
+        <header>
+          <div><strong>${escapeHtml(role.role_name || role.role_id)} · 阶段配置</strong><small>主表只显示中文摘要，机器 Key 收在高级信息里。</small></div>
+          <button type="button" class="ghost-btn" data-close-stage-dialog>关闭</button>
+        </header>
+        <div class="role-state-stage-form" data-stage-index="${Number(stageIndex)}">
+          <label>阶段名<input data-stage-basic="stage_name" value="${escapeAttr(stage.stage_name || "")}"></label>
+          <label>优先级<input type="number" data-stage-basic="priority" value="${escapeAttr(stage.priority ?? 10)}"></label>
+          <label>条件关系<select data-stage-basic="condition_mode"><option value="all" ${stage.condition_mode !== "any" ? "selected" : ""}>全部满足</option><option value="any" ${stage.condition_mode === "any" ? "selected" : ""}>任一满足</option></select></label>
+          <div class="role-state-condition-editor">
+            <div class="stage-condition-summary">${escapeHtml(roleStateConditionText(role, stage))}</div>
+            <div class="role-state-condition-list">${conditionRows || `<div class="role-state-empty-line">暂无条件。未设置条件时不会自动命中该阶段。</div>`}</div>
+            <button type="button" class="ghost-btn" data-add-stage-condition>＋ 添加条件</button>
+          </div>
+          <details class="role-state-advanced"><summary>高级 / 调试信息</summary><label>阶段 Key<input data-stage-basic="stage_key" value="${escapeAttr(stage.stage_key || "")}"></label><code>${escapeHtml(`state_journal.stage.${role.role_id}.${stage.stage_key}`)}</code></details>
+        </div>
+      </section>`;
+    const close = () => modal.remove();
+    modal.querySelectorAll("[data-close-stage-dialog]").forEach((btn) => btn.addEventListener("click", close));
+    const form = modal.querySelector("[data-stage-index]");
+    const commitBasic = (input) => {
+      const field = input.dataset.stageBasic;
+      if (!field) return;
+      if (field === "priority") stage.priority = Number(input.value || 0);
+      else if (field === "stage_key") stage.stage_key = safeTemplateId(input.value || stage.stage_key);
+      else if (field === "condition_mode") stage.condition_mode = input.value === "any" ? "any" : "all";
+      else stage[field] = input.value;
+      renderRoleStateWorkspace();
+      renderRoleStateStageDialog(stageIndex);
+    };
+    form?.querySelectorAll("[data-stage-basic]").forEach((input) => input.addEventListener("change", () => commitBasic(input)));
+    form?.addEventListener("change", (event) => {
+      const input = event.target.closest("[data-stage-condition-field]");
+      if (!input) return;
+      const row = input.closest("[data-condition-index]");
+      const condition = stage.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
+      if (!condition) return;
+      const field = input.dataset.stageConditionField;
+      if (field === "value") condition.value = Number(input.value || 0);
+      else condition[field] = input.value;
+      renderRoleStateWorkspace();
+      renderRoleStateStageDialog(stageIndex);
+    });
+    form?.addEventListener("click", (event) => {
+      if (event.target.closest("[data-add-stage-condition]")) {
+        stage.conditions = stage.conditions || [];
+        stage.conditions.push({ var: variables[0]?.var_key || "var_1", op: ">=", value: 0 });
+        renderRoleStateWorkspace();
+        renderRoleStateStageDialog(stageIndex);
+        return;
+      }
+      if (event.target.closest("[data-delete-stage-condition]")) {
+        const row = event.target.closest("[data-condition-index]");
+        const index = Number(row?.dataset.conditionIndex ?? -1);
+        if (index >= 0) stage.conditions.splice(index, 1);
+        renderRoleStateWorkspace();
+        renderRoleStateStageDialog(stageIndex);
+      }
+    });
+  }
+
+  async function loadRoleStateConfig() {
+    const payload = await requestJson("./api/role-state/config");
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : [];
+    renderRoleStateWorkspace();
+  }
+
+  async function saveRoleStateConfig() {
+    const payload = await requestJson("./api/role-state/config", { method: "POST", body: JSON.stringify({ config: state.roleStateConfig }) });
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
+    renderRoleStateWorkspace();
+    pageToast("心笺配置已保存", "变量与阶段配置已写入运行配置。", "ok");
+  }
+
+  async function readRoleStateFromCard() {
+    const payload = await requestJson("./api/role-state/from-card", { method: "POST", body: JSON.stringify({}) });
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : [];
+    state.currentRoleStateId = state.roleStateConfig.roles?.[0]?.role_id || "";
+    renderRoleStateWorkspace();
+    pageToast("已读取角色卡配置", payload.message || "", "ok");
+  }
+
+  function roleStateTempKeyWarnings(config = {}) {
+    const warnings = [];
+    const roles = Array.isArray(config.roles) ? config.roles : [];
+    roles.forEach((role) => {
+      const roleName = role.role_name || role.role_id || "未命名角色";
+      const tempVars = (role.variables || []).filter((item) => /^var_\d+$/i.test(String(item.var_key || "")));
+      const tempSnapshots = (role.snapshotFields || []).filter((item) => /^snapshot_\d+$/i.test(String(item.key || "")));
+      if (tempVars.length) warnings.push(`${roleName}：临时变量 ${tempVars.map((item) => item.var_name || item.var_key).join("、")}`);
+      if (tempSnapshots.length) warnings.push(`${roleName}：临时快照字段 ${tempSnapshots.map((item) => item.label || item.key).join("、")}`);
+    });
+    return warnings;
+  }
+
+  function buildSyncRoleStateConfirmBody() {
+    const config = normalizeRoleStateConfig(state.roleStateConfig || {});
+    const roles = Array.isArray(config.roles) ? config.roles : [];
+    const sourceInfo = roleSourceSummary(config);
+    const roleRows = roles.length ? roles.map((role) => {
+      const roleName = role.role_name || role.role_id || "未命名角色";
+      const mode = roleStateModeShortLabel(role);
+      return `<li><strong>${escapeHtml(roleName)}</strong><span>${escapeHtml(mode)} · 变量 ${role.variables?.length || 0} · 阶段 ${role.stages?.length || 0} · 快照 ${role.snapshotFields?.length || 0}</span></li>`;
+    }).join("") : `<li><strong>暂无角色</strong><span>当前配置中没有可同步的心笺角色。</span></li>`;
+    const warnings = roleStateTempKeyWarnings(config);
+    const warningHtml = warnings.length ? `<div class="sync-card-warning"><strong>检测到可能的测试字段</strong><ul>${warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p>如果这些字段只是测试保存 / 放弃修改，可以先删除或改成正式 key 后再同步。</p></div>` : "";
+    return `
+      <p>即将把当前心笺角色配置写入角色卡 <code>stateJournal</code>。</p>
+      <div class="sync-card-summary">
+        <div><span>角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<small>${escapeHtml(sourceInfo.detected)}</small>` : ""}</div>
+        <div><span>同步角色</span><strong>${roles.length}</strong><small>只同步配置模板</small></div>
+      </div>
+      <div class="sync-card-role-list"><ul>${roleRows}</ul></div>
+      ${warningHtml}
+      <div class="sync-card-scope">
+        <strong>会同步</strong>
+        <p>角色来源、角色列表、变量配置、阶段规则、状态快照字段、阶段 activation_tag / 世界书标签。</p>
+        <strong>不会同步</strong>
+        <p>当前运行数值、幕笺历史、聊天记录、心笺数据库日志。</p>
+      </div>
+    `;
+  }
+
+  async function syncRoleStateToCard() {
+    const ok = await confirmAction({
+      title: "同步配置至角色卡",
+      body: buildSyncRoleStateConfirmBody(),
+      confirmText: "确认写入角色卡",
+    });
+    if (!ok) return;
+    await requestJson("./api/role-state/sync-to-card", { method: "POST", body: JSON.stringify({ config: state.roleStateConfig }) });
+    pageToast("已同步至角色卡", "只同步变量、阶段、快照与角色来源配置，不同步运行值和历史。", "ok");
+  }
+
+  async function resetDefaultTurnNote() {
+    state.config = {
+      ...state.config,
+      turn_note_enabled: true,
+      notify_in_chat: true,
+      turn_note_template_id: "standard_metrics",
+      turn_note_theme_id: "standard",
+      turn_note_chat_display_mode: state.config.turn_note_chat_display_mode || "collapsed",
+    };
+    await saveConfig("turnNote");
+    bindConfig();
+    pageToast("已恢复默认幕笺", "已启用 Chat 幕笺，并切回标准状态模板与标准样式。", "ok");
+  }
+
+  async function initCurrentRoleState() {
+    const roles = (state.roleStateConfig.roles || []).filter((role) => role.enabled !== false && normalizeRoleStateMode(role.mode || role.stateJournalMode, role) === "full");
+    const ok = await confirmAction({
+      title: "初始化当前状态",
+      body: `<p>此操作会根据当前角色卡配置重建变量、阶段与快照状态，可能覆盖当前运行中的变量值和当前阶段，但不会删除历史记录。</p><p><strong>受影响角色：</strong>${escapeHtml(roles.map((role) => role.role_name || role.role_id).join("、") || "暂无完整心笺角色")}</p>`,
+      confirmText: "确认初始化",
+    });
+    if (!ok) return;
+    const payload = await requestJson("./api/role-state/init-current", { method: "POST", body: JSON.stringify({}) });
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
+    renderRoleStateWorkspace();
+    pageToast("当前状态已初始化", payload.message || "", "ok");
+  }
+
+  async function debugAdvanceCurrentStage() {
+    const role = currentRoleState();
+    if (!role) {
+      pageToast("未选择角色", "请先选择一个角色。", "warn");
+      return;
+    }
+    const stages = (role.stages || []).filter((stage) => stage.enabled !== false).sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0));
+    const currentKey = roleCurrentStageKey(role);
+    const idx = stages.findIndex((stage) => stage.stage_key === currentKey);
+    const next = stages[Math.min(idx + 1, stages.length - 1)] || stages[0];
+    const ok = await confirmAction({
+      title: "调试推进阶段",
+      body: `<p>这是测试功能，会强制把当前选中角色推进到下一阶段，用于测试世界书 external_tag 与幕笺显示。</p><p><strong>当前角色：</strong>${escapeHtml(role.role_name || role.role_id)}</p><p><strong>当前阶段：</strong>${escapeHtml(roleCurrentStageName(role))} · ${escapeHtml(currentKey)}</p><p><strong>目标阶段：</strong>${escapeHtml(next?.stage_name || "无")} · ${escapeHtml(next?.stage_key || "")}</p><p class="danger-text">不建议正式游玩时使用。</p>`,
+      confirmText: "确认推进",
+      danger: true,
+    });
+    if (!ok) return;
+    const payload = await requestJson("./api/role-state/debug-advance-stage", { method: "POST", body: JSON.stringify({ role_id: role.role_id }) });
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
+    renderRoleStateWorkspace();
+    pageToast("已推进调试阶段", payload.message || "", "ok");
   }
 
   function openRowDetail(index) {
@@ -1249,7 +2009,7 @@
     const titles = {
       model: "模型配置已保存",
       link: "聊天联动设置已保存",
-      mujian: "幕笺设置已保存",
+      turnNote: "幕笺设置已保存",
       generate: "生成规则已保存",
       template: "幕笺模板已保存",
       theme: "幕笺美化已保存",
@@ -1258,11 +2018,11 @@
     const details = {
       model: `${state.config.model || "未填写模型"} · ${state.config.api_base_url || "未填写 API URL"}`,
       link: `心笺${state.config.enabled === false ? "关闭" : "开启"}｜自动填表${state.config.auto_update ? "开启" : "关闭"}｜聊天提示${state.config.notify_in_chat ? "开启" : "关闭"}｜跟随全局UI${state.config.ui_sync_global ? "开启" : "关闭"}`,
-      mujian: `幕笺${state.config.mujian_enabled === false ? "关闭" : "开启"}｜显示：${({ collapsed: "折叠", expanded: "展开", compact: "状态条", hidden: "不显示" }[state.config.mujian_chat_display_mode || "collapsed"] || "折叠")}｜标题：${state.config.mujian_title_style || "classic"}｜附笺：${state.config.mujian_note_style || state.config.mujian_style || "classic"}｜密度：${state.config.mujian_note_density || "standard"}`,
-      generate: `自动填表${state.config.auto_update ? "开启" : "关闭"}｜读取最近 ${state.config.input_turn_count || 3} 轮｜主角状态卡${state.config.mujian_protagonist_card_enabled ? "开启" : "关闭"}`,
+      turnNote: `幕笺${state.config.turn_note_enabled === false ? "关闭" : "开启"}｜显示：${({ collapsed: "折叠", expanded: "展开", compact: "状态条", hidden: "不显示" }[state.config.turn_note_chat_display_mode || "collapsed"] || "折叠")}｜标题：${state.config.turn_note_title_style || "classic"}｜附笺：${state.config.turn_note_card_style || state.config.turn_note_style || "classic"}｜密度：${state.config.turn_note_density || "standard"}`,
+      generate: `自动填表${state.config.auto_update ? "开启" : "关闭"}｜读取最近 ${state.config.input_turn_count || 3} 轮｜主角状态卡${state.config.turn_note_protagonist_card_enabled ? "开启" : "关闭"}`,
       template: `${activeTemplate().name || activeTemplate().id}｜字段 ${activeTemplate().fields?.length || 0} 个`,
       theme: `${activeThemePack().name || activeThemePack().id}｜${activeThemePack().description || "美化包已启用"}`,
-      all: `${state.config.model || "未填写模型"} · 幕笺${state.config.mujian_enabled === false ? "关闭" : "开启"}`,
+      all: `${state.config.model || "未填写模型"} · 幕笺${state.config.turn_note_enabled === false ? "关闭" : "开启"}`,
     };
     const title = titles[kind] || titles.all;
     setStatus(`${title}。`, "ok");
@@ -1364,7 +2124,7 @@
   $("#openRulesDrawerBtn")?.addEventListener("click", () => openConfigDrawer("rules"));
   $("#openModelDrawerBtn")?.addEventListener("click", () => openConfigDrawer("model"));
   $("#openLinkDrawerBtn")?.addEventListener("click", () => openConfigDrawer("link"));
-  $("#openMujianDrawerBtn")?.addEventListener("click", () => openConfigDrawer("mujian"));
+  $("#openTurnNoteDrawerBtn")?.addEventListener("click", () => openConfigDrawer("turnNote"));
   $("#openTemplateDrawerBtn")?.addEventListener("click", () => openConfigDrawer("template"));
   $("#openLogDrawerBtn")?.addEventListener("click", () => { openConfigDrawer("log"); });
   $("#closeConfigDrawerBtn")?.addEventListener("click", closeConfigDrawer);
@@ -1383,12 +2143,21 @@
   $("#saveBtn").addEventListener("click", () => saveCurrentTable().catch((error) => { setStatus(error.message, "error"); pageToast("保存失败", error.message, "error"); }));
   $("#saveConfigBtn")?.addEventListener("click", () => saveConfig("model").catch((error) => { setStatus(error.message, "error"); pageToast("保存模型配置失败", error.message, "error"); }));
   $("#saveLinkConfigBtn")?.addEventListener("click", () => saveConfig("link").catch((error) => { setStatus(error.message, "error"); pageToast("保存联动设置失败", error.message, "error"); }));
-  $("#saveMujianConfigBtn")?.addEventListener("click", () => saveConfig("mujian").catch((error) => { setStatus(error.message, "error"); pageToast("保存幕笺设置失败", error.message, "error"); }));
+  $("#saveTurnNoteConfigBtn")?.addEventListener("click", () => saveConfig("turnNote").catch((error) => { setStatus(error.message, "error"); pageToast("保存幕笺设置失败", error.message, "error"); }));
   $("#saveGenerateConfigBtn")?.addEventListener("click", () => saveConfig("generate").catch((error) => { setStatus(error.message, "error"); pageToast("保存生成规则失败", error.message, "error"); }));
+  function bindRuntimeToggle(input, target, kind) {
+    input?.addEventListener("change", () => {
+      if (target) target.checked = input.checked;
+      saveConfig(kind).catch((error) => pageToast("运行状态保存失败", error.message, "error"));
+    });
+  }
+  bindRuntimeToggle(els.dashboardEnabled, els.cfgEnabled, "link");
+  bindRuntimeToggle(els.dashboardAutoUpdate, els.cfgAutoUpdate, "generate");
+  bindRuntimeToggle(els.dashboardTurnNote, els.cfgTurnNoteEnabled, "turnNote");
   els.resetWorkerPromptBtn?.addEventListener("click", () => {
-    if (els.cfgMujianWorkerPromptEnabled) els.cfgMujianWorkerPromptEnabled.checked = false;
-    if (els.cfgMujianWorkerStylePrompt) els.cfgMujianWorkerStylePrompt.value = "";
-    if (els.cfgMujianWorkerProtagonistPrompt) els.cfgMujianWorkerProtagonistPrompt.value = "";
+    if (els.cfgTurnNoteWorkerPromptEnabled) els.cfgTurnNoteWorkerPromptEnabled.checked = false;
+    if (els.cfgTurnNoteWorkerStylePrompt) els.cfgTurnNoteWorkerStylePrompt.value = "";
+    if (els.cfgTurnNoteWorkerProtagonistPrompt) els.cfgTurnNoteWorkerProtagonistPrompt.value = "";
     pageToast("已恢复默认附加提示词", "保存幕笺设置后生效。", "ok");
   });
   $("#saveTemplateConfigBtn")?.addEventListener("click", () => saveConfig("template").catch((error) => { setStatus(error.message, "error"); pageToast("保存模板设置失败", error.message, "error"); }));
@@ -1398,13 +2167,18 @@
   $("#fetchModelsBtn").addEventListener("click", () => fetchModels().catch((error) => { setStatus(error.message, "error"); pageToast("拉取模型列表失败", error.message, "error"); }));
   $("#testConnectionBtn").addEventListener("click", () => testConnection().catch((error) => { setStatus(error.message, "error"); pageToast("测试连接失败", error.message, "error"); }));
   $("#applyPresetBtn").addEventListener("click", applyServicePreset);
-  els.cfgMujianStyle?.addEventListener("change", updateMujianStyleHelp);
-  els.cfgMujianTitleStyle?.addEventListener("change", updateMujianStyleHelp);
-  els.cfgMujianNoteStyle?.addEventListener("change", updateMujianStyleHelp);
-  els.cfgMujianTemplateSelect?.addEventListener("change", () => { state.currentTemplateId = els.cfgMujianTemplateSelect.value; state.expandedTemplateFieldIndex = null; if (els.templateSelect) els.templateSelect.value = state.currentTemplateId; const tmpl = activeTemplate(); if (els.cfgMujianNoteStyle) els.cfgMujianNoteStyle.value = tmpl.note_style || "classic"; bindTemplateEditor(); updateMujianStyleHelp(); });
+  els.cfgTurnNoteStyle?.addEventListener("change", updateTurnNoteStyleHelp);
+  els.cfgTurnNoteTitleStyle?.addEventListener("change", updateTurnNoteStyleHelp);
+  els.cfgTurnNoteNoteStyle?.addEventListener("change", updateTurnNoteStyleHelp);
+  els.cfgTurnNoteTemplateSelect?.addEventListener("change", () => { state.currentTemplateId = els.cfgTurnNoteTemplateSelect.value; state.expandedTemplateFieldIndex = null; if (els.templateSelect) els.templateSelect.value = state.currentTemplateId; const tmpl = activeTemplate(); if (els.cfgTurnNoteNoteStyle) els.cfgTurnNoteNoteStyle.value = tmpl.note_style || "classic"; bindTemplateEditor(); updateTurnNoteStyleHelp(); });
 
-  els.cfgMujianThemeSelect?.addEventListener("change", () => setActiveTheme(els.cfgMujianThemeSelect.value));
+  els.cfgTurnNoteThemeSelect?.addEventListener("change", () => setActiveTheme(els.cfgTurnNoteThemeSelect.value));
   els.themeSelect?.addEventListener("change", () => setActiveTheme(els.themeSelect.value));
+  els.themePreviewModeSelect?.addEventListener("change", () => {
+    state.themePreviewMode = els.themePreviewModeSelect.value || "role";
+    localStorage.setItem("state_journal:themePreviewMode", state.themePreviewMode);
+    renderThemePreview();
+  });
   els.exportThemeBtn?.addEventListener("click", () => {
     const pack = activeThemePack();
     const blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json;charset=utf-8" });
@@ -1421,9 +2195,12 @@
     try {
       const payload = JSON.parse(await file.text());
       const pack = normalizeThemePack(payload);
+      const warnings = Array.isArray(pack.__warnings) ? pack.__warnings : [];
+      const warningText = warnings.length ? `；兼容处理：${warnings.join(" · ")}` : "";
       await persistImportedTheme(pack);
-      pageToast("美化包已导入并启用", `${pack.name || pack.id} · 已写入配置`, "ok");
-      setStatus(`美化包已导入并启用：${pack.name || pack.id}`, "ok");
+      const detail = `${themePackSourceLabel(pack)} · schema v${pack.schema_version || THEME_PACK_SCHEMA_VERSION} · layout: ${themePackLayoutType(pack)} · class: ${pack.style?.class_name || "theme-standard"}${themePackProgressBars(pack).length ? ` · 数值条 ${themePackProgressBars(pack).length}` : ""}`;
+      pageToast("美化包已导入并启用", `${pack.name || pack.id}｜${detail}${warningText}`, "ok");
+      setStatus(`美化包已导入并启用：${pack.name || pack.id}｜${detail}${warningText}`, "ok");
     } catch (error) {
       pageToast("导入美化包失败", error.message, "error");
       setStatus(`导入美化包失败：${error.message}`, "error");
@@ -1436,9 +2213,9 @@
     commitTemplateEditorToState({ rebind: false });
     state.currentTemplateId = nextId;
     state.expandedTemplateFieldIndex = null;
-    state.config = { ...state.config, mujian_template_id: nextId };
+    state.config = { ...state.config, turn_note_template_id: nextId };
     bindTemplateEditor();
-    if (els.cfgMujianTemplateSelect) els.cfgMujianTemplateSelect.value = nextId;
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.value = nextId;
   });
   els.templateFieldsEditor?.addEventListener("input", (event) => {
     const card = event.target.closest(".template-field-card");
@@ -1486,10 +2263,10 @@
       [template.fields[index + 1], template.fields[index]] = [template.fields[index], template.fields[index + 1]];
       state.expandedTemplateFieldIndex = index + 1;
     }
-    const templates = mujianTemplates().slice();
+    const templates = turnNoteTemplates().slice();
     const pos = templates.findIndex((item) => item.id === template.id);
     if (pos >= 0) templates[pos] = template;
-    state.config = { ...state.config, mujian_templates: templates };
+    state.config = { ...state.config, turn_note_templates: templates };
     renderTemplateFields(template);
     updateTemplatePreview();
   });
@@ -1512,16 +2289,16 @@
       template.output_template = `${String(template.output_template || "").trimEnd()}${template.output_template ? "\n" : ""}${line}`;
       if (els.templateOutput) els.templateOutput.value = template.output_template;
     }
-    const templates = mujianTemplates().slice();
+    const templates = turnNoteTemplates().slice();
     const pos = templates.findIndex((item) => item.id === template.id);
     if (pos >= 0) templates[pos] = template;
-    state.config = { ...state.config, mujian_templates: templates };
+    state.config = { ...state.config, turn_note_templates: templates };
     renderTemplateFields(template); updateTemplatePreview();
   });
   $("#newTemplateBtn")?.addEventListener("click", () => {
     const source = readTemplateEditor();
     const copy = { ...source, id: `custom_${Date.now()}`, name: `${source.name || "模板"} 副本` };
-    state.config = { ...state.config, mujian_templates: [...mujianTemplates(), copy], mujian_template_id: copy.id };
+    state.config = { ...state.config, turn_note_templates: [...turnNoteTemplates(), copy], turn_note_template_id: copy.id };
     state.currentTemplateId = copy.id; state.expandedTemplateFieldIndex = null; bindTemplateEditor(); pageToast("已复制模板", "修改后点击保存模板设置。", "ok");
   });
   $("#exportTemplateBtn")?.addEventListener("click", () => {
@@ -1537,12 +2314,170 @@
       const template = JSON.parse(await file.text());
       const id = safeTemplateId(template.id || template.name || `custom_${Date.now()}`);
       const normalized = { ...template, id, fields: Array.isArray(template.fields) ? template.fields : [] };
-      state.config = { ...state.config, mujian_templates: [...mujianTemplates().filter((item) => item.id !== id), normalized], mujian_template_id: id };
+      state.config = { ...state.config, turn_note_templates: [...turnNoteTemplates().filter((item) => item.id !== id), normalized], turn_note_template_id: id };
       state.currentTemplateId = id; state.expandedTemplateFieldIndex = null; bindTemplateEditor(); pageToast("模板已导入", normalized.name || id, "ok");
     } catch (error) { pageToast("导入模板失败", error.message, "error"); }
     event.target.value = "";
   });
   $("#toggleApiKeyBtn").addEventListener("click", () => { const hidden = els.cfgApiKey.type === "password"; els.cfgApiKey.type = hidden ? "text" : "password"; $("#toggleApiKeyBtn").textContent = hidden ? "隐藏" : "显示"; });
+
+  document.getElementById("roleStateReadCardBtn")?.addEventListener("click", () => readRoleStateFromCard().catch((error) => pageToast("读取角色卡失败", error.message, "error")));
+  document.getElementById("roleStateSaveBtn")?.addEventListener("click", () => saveRoleStateConfig().catch((error) => pageToast("保存心笺配置失败", error.message, "error")));
+  document.getElementById("roleStateSyncCardBtn")?.addEventListener("click", () => syncRoleStateToCard().catch((error) => pageToast("同步角色卡失败", error.message, "error")));
+  document.getElementById("roleStateInitBtn")?.addEventListener("click", () => initCurrentRoleState().catch((error) => pageToast("初始化失败", error.message, "error")));
+  document.getElementById("roleStateDebugNextStageBtn")?.addEventListener("click", () => debugAdvanceCurrentStage().catch((error) => pageToast("调试推进失败", error.message, "error")));
+  document.getElementById("roleStateRoleList")?.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-role-id]");
+    if (!card) return;
+    state.currentRoleStateId = card.dataset.roleId;
+    renderRoleStateWorkspace();
+  });
+  document.querySelectorAll("[data-role-state-tab]").forEach((btn) => btn.addEventListener("click", () => {
+    state.roleStateTab = btn.dataset.roleStateTab || "variables";
+    renderRoleStateWorkspace();
+  }));
+  document.getElementById("resetDefaultTurnNoteBtn")?.addEventListener("click", () => resetDefaultTurnNote().catch((error) => pageToast("恢复默认幕笺失败", error.message, "error")));
+
+  document.getElementById("roleStateDetail")?.addEventListener("change", (event) => {
+    const role = currentRoleState();
+    const modeSelect = event.target.closest("[data-role-mode-select]");
+    if (role && modeSelect) {
+      setRoleStateMode(role, modeSelect.value);
+      renderRoleStateWorkspace();
+      return;
+    }
+    const conditionInput = event.target.closest("[data-stage-condition-field]");
+    if (role && conditionInput) {
+      const tr = conditionInput.closest("[data-stage-index]");
+      const row = conditionInput.closest("[data-condition-index]");
+      const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
+      const condition = stage?.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
+      if (!condition) return;
+      const field = conditionInput.dataset.stageConditionField;
+      if (field === "value") condition.value = Number(conditionInput.value || 0);
+      else condition[field] = conditionInput.value;
+      renderRoleStateWorkspace();
+    }
+  });
+
+  document.getElementById("roleStateDetail")?.addEventListener("click", (event) => {
+    const role = currentRoleState();
+    if (!role) return;
+    const hit = (selector) => event.target.closest(selector);
+    if (hit("[data-add-variable]")) {
+      event.preventDefault();
+      const next = (role.variables || []).length + 1;
+      role.variables = role.variables || [];
+      role.variables.push({ var_key: `var_${next}`, var_name: `变量${next}`, enabled: true, default_value: 0, min_value: 0, max_value: 100, delta_min: -2, delta_max: 2, display: true, stage_relevant: true, instruction: "" });
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-delete-variable]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-variable-index]");
+      const index = Number(tr?.dataset.variableIndex ?? -1);
+      if (index >= 0) role.variables.splice(index, 1);
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-add-snapshot-field]")) {
+      event.preventDefault();
+      const next = (role.snapshotFields || []).length + 1;
+      role.snapshotFields = role.snapshotFields || [];
+      role.snapshotFields.push({ key: `snapshot_${next}`, label: `快照字段${next}`, enabled: true, display: true, instruction: "根据本轮上下文生成该状态快照字段。" });
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-delete-snapshot-field]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-snapshot-index]");
+      const index = Number(tr?.dataset.snapshotIndex ?? -1);
+      if (index >= 0) role.snapshotFields.splice(index, 1);
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-add-stage]")) {
+      event.preventDefault();
+      const next = (role.stages || []).length + 1;
+      role.stages = role.stages || [];
+      role.stages.push({ stage_key: roleStateStageKey(next), stage_name: roleStateStageName(next), enabled: true, priority: next * 10, condition_mode: "all", conditions: [], allow_regression: false, confirm_turns: 1, cooldown_turns: 1 });
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-config-stage]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-stage-index]");
+      renderRoleStateStageDialog(Number(tr?.dataset.stageIndex ?? -1));
+      return;
+    }
+    if (hit("[data-create-stage-worldbook]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-stage-index]");
+      createWorldbookEntryForStage(Number(tr?.dataset.stageIndex ?? -1));
+      return;
+    }
+    if (hit("[data-delete-stage]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-stage-index]");
+      const index = Number(tr?.dataset.stageIndex ?? -1);
+      if (index >= 0) role.stages.splice(index, 1);
+      renderRoleStateWorkspace();
+      return;
+    }
+  });
+  document.getElementById("roleStateDetail")?.addEventListener("input", (event) => {
+    const role = currentRoleState();
+    if (!role) return;
+    const varInput = event.target.closest("[data-var-field]");
+    if (varInput) {
+      const tr = varInput.closest("[data-variable-index]");
+      const variable = role.variables?.[Number(tr?.dataset.variableIndex ?? -1)];
+      if (!variable) return;
+      const field = varInput.dataset.varField;
+      if (["enabled", "display", "stage_relevant"].includes(field)) variable[field] = !!varInput.checked;
+      else if (["default_value", "min_value", "max_value", "delta_min", "delta_max"].includes(field)) variable[field] = Number(varInput.value || 0);
+      else if (field === "var_key") variable[field] = safeTemplateId(varInput.value || variable.var_key);
+      else variable[field] = varInput.value;
+    }
+    const snapshotInput = event.target.closest("[data-snapshot-field]");
+    if (snapshotInput) {
+      const tr = snapshotInput.closest("[data-snapshot-index]");
+      const fieldItem = role.snapshotFields?.[Number(tr?.dataset.snapshotIndex ?? -1)];
+      if (!fieldItem) return;
+      const field = snapshotInput.dataset.snapshotField;
+      if (["enabled", "display"].includes(field)) fieldItem[field] = !!snapshotInput.checked;
+      else if (field === "key") fieldItem[field] = safeTemplateId(snapshotInput.value || fieldItem.key);
+      else fieldItem[field] = snapshotInput.value;
+    }
+    const conditionInput = event.target.closest("[data-stage-condition-field]");
+    if (conditionInput) {
+      const tr = conditionInput.closest("[data-stage-index]");
+      const row = conditionInput.closest("[data-condition-index]");
+      const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
+      const condition = stage?.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
+      if (!condition) return;
+      const field = conditionInput.dataset.stageConditionField;
+      if (field === "value") condition.value = Number(conditionInput.value || 0);
+      else condition[field] = conditionInput.value;
+    }
+    const stageInput = event.target.closest("[data-stage-field]");
+    if (stageInput) {
+      const tr = stageInput.closest("[data-stage-index]");
+      const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
+      if (!stage) return;
+      const field = stageInput.dataset.stageField;
+      if (field === "enabled") stage.enabled = !!stageInput.checked;
+      else if (field === "priority") stage.priority = Number(stageInput.value || 0);
+      else if (field === "stage_key") stage.stage_key = safeTemplateId(stageInput.value || stage.stage_key);
+      else if (field === "conditions_text") {
+        stage.conditions = String(stageInput.value || "").split(";").map((part) => {
+          const match = part.trim().match(/^([a-zA-Z0-9_\-]+)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?)$/);
+          return match ? { var: match[1], op: match[2], value: Number(match[3]) } : null;
+        }).filter(Boolean);
+      } else stage[field] = stageInput.value;
+    }
+  });
+
   $("#manualWorkerBtn").addEventListener("click", () => manualWorkerUpdate());
   $("#loadLogBtn").addEventListener("click", () => loadLog().catch((error) => { els.logBox.textContent = error.message; }));
   $("#exportDebugLogBtn")?.addEventListener("click", () => exportDebugLog().catch((error) => pageToast("导出排查日志失败", error.message, "error")));

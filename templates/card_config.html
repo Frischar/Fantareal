@@ -315,6 +315,61 @@
       }
     </style>
 
+    <style id="state-journal-card-config-v1">
+      .card-state-journal-panel[hidden], .card-state-journal-dialog[hidden] { display: none !important; }
+      .card-state-journal-panel { margin-top: 18px; }
+      .card-state-journal-source-card { display: grid; grid-template-columns: minmax(210px, 0.8fr) minmax(260px, 1.2fr); gap: 12px; align-items: end; margin: 12px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--input-bg) 54%, transparent); }
+      .card-state-journal-source-card label { display: grid; gap: 6px; margin: 0; font-size: 0.82rem; color: var(--muted); font-weight: 760; }
+      .card-state-journal-source-card select { min-height: 38px; }
+      .card-state-journal-source-hint { margin: 0; color: var(--muted); line-height: 1.55; }
+      .card-state-journal-source-hint strong { color: var(--text); }
+
+      .card-state-journal-table-wrap { overflow-x: auto; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--input-bg) 58%, transparent); }
+      .card-state-journal-table { width: 100%; border-collapse: collapse; min-width: 760px; table-layout: auto; }
+      .card-state-journal-dialog .card-state-journal-table { min-width: 980px; }
+      .card-state-journal-table th, .card-state-journal-table td { padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb, var(--border) 66%, transparent); text-align: left; vertical-align: middle; white-space: nowrap; }
+      .card-state-journal-table th { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.04em; font-weight: 800; }
+      .card-state-journal-table tr:last-child td { border-bottom: none; }
+      .card-state-journal-table input[type="text"], .card-state-journal-table input[type="number"], .card-state-journal-table select { min-height: 36px; }
+      .card-state-journal-name-input { min-width: 128px; }
+      .card-state-journal-key-input { min-width: 128px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .card-state-journal-num-input { width: 76px; }
+      .card-state-journal-range-inputs { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+      .card-state-journal-check { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; }
+      .card-state-journal-check input[type="checkbox"], .card-state-journal-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+      .card-state-journal-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); background: color-mix(in srgb, var(--input-bg) 72%, transparent); color: var(--muted); font-size: 0.78rem; font-weight: 760; white-space: nowrap; }
+      .card-state-journal-dialog { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.38); backdrop-filter: blur(12px); }
+      .card-state-journal-dialog-card { width: min(1240px, calc(100vw - 40px)); max-height: min(88vh, 940px); overflow: auto; border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); border-radius: 24px; background: var(--panel-strong); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34); padding: 18px; }
+      .card-state-journal-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+      .card-state-journal-dialog-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+      .card-state-journal-tabs { display: inline-flex; align-items: center; gap: 4px; margin: 12px 0; padding: 4px; border: 1px solid color-mix(in srgb, var(--border) 74%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--input-bg) 56%, transparent); }
+      .card-state-journal-tabs button { border-radius: 999px; min-height: 34px; padding-inline: 14px; }
+      .card-state-journal-tabs button.active { background: color-mix(in srgb, var(--accent) 22%, var(--input-bg)); border-color: color-mix(in srgb, var(--accent) 52%, var(--border)); color: var(--text); }
+      .card-state-journal-tab[hidden] { display: none !important; }
+      .card-state-journal-editor-grid { display: grid; gap: 10px; }
+      .card-state-journal-editor-grid textarea { min-height: 70px; }
+      .card-state-journal-empty { padding: 18px; border: 1px dashed color-mix(in srgb, var(--border) 80%, transparent); border-radius: 18px; color: var(--muted); background: color-mix(in srgb, var(--input-bg) 44%, transparent); white-space: normal; }
+      .card-state-journal-code { display: inline-flex; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+      .card-state-journal-muted { display: block; margin-top: 4px; color: var(--muted); font-size: 0.76rem; }
+      .card-state-journal-advanced { margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
+      .card-state-journal-advanced summary { cursor: pointer; opacity: 0.72; }
+      .card-state-journal-advanced label { display: grid; gap: 4px; margin-top: 6px; }
+      .card-state-journal-advanced code { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px; }
+
+      .card-state-journal-condition-editor { min-width: 420px; max-width: 560px; }
+      .card-state-journal-condition-toolbar { margin: 8px 0; }
+      .card-state-journal-condition-list { display: grid; gap: 8px; margin: 8px 0; }
+      .card-state-journal-condition-row { display: grid; grid-template-columns: minmax(150px, 1fr) 76px 88px auto; gap: 8px; align-items: center; }
+      .card-state-journal-condition-row input, .card-state-journal-condition-row select { min-height: 34px; }
+      .card-state-journal-condition-dialog { z-index: 96; }
+      .card-state-journal-condition-dialog-card { width: min(760px, calc(100vw - 40px)); }
+      .card-state-journal-condition-dialog-body { display: grid; gap: 12px; }
+      .card-state-journal-stage-summary { display: grid; gap: 8px; min-width: 260px; white-space: normal; }
+      .card-state-journal-stage-summary strong { line-height: 1.55; }
+      @media (max-width: 760px) { .card-state-journal-dialog { padding: 14px; } .card-state-journal-dialog-card { width: calc(100vw - 20px); padding: 14px; } .card-state-journal-condition-row { grid-template-columns: 1fr; } }
+    </style>
+
+
   </head>
   <body class="modern-setting-page card-config-page app-sidebar-shell">
     <div class="topbar-stack">
@@ -479,9 +534,92 @@
             <textarea id="persona-{{ key }}-creator-notes" rows="3">{{ persona.creator_notes }}</textarea>
           </div>
           {% endfor %}
+
+        </div>
+
+        <div id="state-journal-card-panel" class="card-block card-state-journal-panel" hidden>
+          <div class="persona-toolbar">
+            <div>
+              <h3>心笺变量与阶段配置</h3>
+              <p class="helper-text">此配置仅用于心笺初始化与分享，不进入 prompt，也不保存运行时当前值或阶段历史。</p>
+            </div>
+            <div class="button-row">
+              <button id="state-journal-refresh-roles" type="button" class="secondary compact">同步角色列表</button>
+            </div>
+          </div>
+          <div class="card-state-journal-source-card">
+            <label>心笺角色来源
+              <select id="state-journal-role-source-mode">
+                <option value="auto">自动识别</option>
+                <option value="main_card">主卡就是角色</option>
+                <option value="personas_only">主卡是旁白，只读取多角色</option>
+              </select>
+            </label>
+            <p id="state-journal-role-source-hint" class="card-state-journal-source-hint">没有多角色时读取主卡；有多角色时默认读取多角色。</p>
+          </div>
+          <div class="card-state-journal-table-wrap">
+            <table class="card-state-journal-table">
+              <thead><tr><th>角色</th><th>使用方式</th><th>扫描结果</th><th>操作</th></tr></thead>
+              <tbody id="state-journal-role-table-body"></tbody>
+            </table>
+          </div>
+          <p class="helper-text">心笺关闭时本区块隐藏；导入卡内已有配置会继续保留，并随角色卡保存。</p>
         </div>
       </section>
 
+    </div>
+
+
+    <div id="state-journal-role-dialog" class="card-state-journal-dialog" hidden>
+      <div class="card-state-journal-dialog-card" role="dialog" aria-modal="true" aria-labelledby="state-journal-dialog-title">
+        <div class="card-state-journal-dialog-head">
+          <div>
+            <p class="eyebrow">心笺</p>
+            <h3 id="state-journal-dialog-title">心笺变量与阶段</h3>
+            <p id="state-journal-dialog-subtitle" class="helper-text"></p>
+          </div>
+          <button id="state-journal-close-dialog" type="button" class="secondary compact">关闭</button>
+        </div>
+        <div class="card-state-journal-tabs">
+          <button id="state-journal-tab-variables" type="button" class="secondary compact active">变量表</button>
+          <button id="state-journal-tab-stages" type="button" class="secondary compact">阶段规则</button>
+          <button id="state-journal-tab-snapshot" type="button" class="secondary compact">状态快照字段</button>
+        </div>
+        <section id="state-journal-variables-tab" class="card-state-journal-tab">
+          <div class="button-row"><button id="state-journal-add-variable" type="button" class="secondary compact">＋ 新增变量</button></div>
+          <div class="card-state-journal-table-wrap"><table class="card-state-journal-table"><thead><tr><th>启用</th><th>变量名</th><th>初始值</th><th>范围</th><th>每轮变化</th><th>显示</th><th>阶段</th><th>操作</th></tr></thead><tbody id="state-journal-variable-table-body"></tbody></table></div>
+        </section>
+        <section id="state-journal-stages-tab" class="card-state-journal-tab" hidden>
+          <div class="button-row"><button id="state-journal-add-stage" type="button" class="secondary compact">＋ 新增阶段</button></div>
+          <div class="card-state-journal-table-wrap"><table class="card-state-journal-table"><thead><tr><th>启用</th><th>阶段名</th><th>优先级</th><th>条件摘要</th><th>操作</th></tr></thead><tbody id="state-journal-stage-table-body"></tbody></table></div>
+        </section>
+        <section id="state-journal-snapshot-tab" class="card-state-journal-tab" hidden>
+          <div class="button-row"><button id="state-journal-add-snapshot-field" type="button" class="secondary compact">＋ 新增快照字段</button></div>
+          <div class="card-state-journal-table-wrap"><table class="card-state-journal-table"><thead><tr><th>启用</th><th>字段名</th><th>显示</th><th>生成说明</th><th>操作</th></tr></thead><tbody id="state-journal-snapshot-table-body"></tbody></table></div>
+        </section>
+        <div class="helper-text" style="margin-top:12px;">状态快照字段只用于心笺 worker 与幕笺展示，不参与阶段判断、不发给世界书、不进入主 prompt。未点击“保存配置”前，本弹窗内新增或修改不会写入角色卡当前编辑状态。</div>
+        <div class="card-state-journal-dialog-footer">
+          <button id="state-journal-cancel-dialog" type="button" class="secondary compact">放弃修改</button>
+          <button id="state-journal-save-dialog" type="button" class="primary compact">保存配置</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="state-journal-condition-dialog" class="card-state-journal-dialog card-state-journal-condition-dialog" hidden>
+      <div class="card-state-journal-dialog-card card-state-journal-condition-dialog-card" role="dialog" aria-modal="true" aria-labelledby="state-journal-condition-dialog-title">
+        <div class="card-state-journal-dialog-head">
+          <div>
+            <p class="eyebrow">阶段条件</p>
+            <h3 id="state-journal-condition-dialog-title">配置阶段条件</h3>
+            <p id="state-journal-condition-dialog-subtitle" class="helper-text">选择变量、比较符和数值；保存角色配置前仍属于草稿。</p>
+          </div>
+          <button id="state-journal-condition-close" type="button" class="secondary compact">关闭</button>
+        </div>
+        <div id="state-journal-condition-dialog-body" class="card-state-journal-condition-dialog-body"></div>
+        <div class="card-state-journal-dialog-footer">
+          <button id="state-journal-condition-done" type="button" class="primary compact">完成</button>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -517,8 +655,15 @@
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
       const initialWorkshop = {{ card_template.creativeWorkshop | tojson }};
+      const initialStateJournal = {{ card_template.stateJournal | tojson }};
       const initialWorkshopTemp = Number({{ workshop_state.temp or 0 }}) || 0;
       let currentWorkshop = null;
+      let currentStateJournal = null;
+      let stateJournalEnabled = false;
+      let activeStateJournalRoleId = "";
+      let activeStateJournalRoleDraft = null;
+      let activeStateJournalTab = "variables";
+      let activeStateJournalStageIndex = -1;
 
       function inferStatusState(text, state = "") {
         if (state) return state;
@@ -1127,6 +1272,630 @@
         return wrapper;
       }
 
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char] || char));
+      }
+
+      function escapeAttr(value) {
+        return escapeHtml(value);
+      }
+
+      function slugifyStateJournalKey(value, fallback = "") {
+        const text = String(value || fallback || "").trim().toLowerCase();
+        const normalized = text.replace(/\s+/g, "_").replace(/[^a-z0-9_\-]+/g, "").replace(/[_\-]{2,}/g, "_").replace(/^[_\-]+|[_\-]+$/g, "");
+        return normalized || fallback || `item_${Date.now()}`;
+      }
+
+      function createStateJournalTempId(prefix = "tmp") {
+        return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      }
+
+      function cloneStateJournalValue(value) {
+        return value == null ? value : JSON.parse(JSON.stringify(value));
+      }
+
+      function stateJournalItemIdentity(item, keys = []) {
+        const candidates = [item?._tmp_id, ...keys.map((key) => item?.[key])];
+        return String(candidates.find((value) => value !== undefined && value !== null && String(value).trim()) || "").trim();
+      }
+
+      function removeStateJournalItem(list, identity, keys = []) {
+        if (!Array.isArray(list)) return false;
+        const target = String(identity || "");
+        const index = list.findIndex((item) => stateJournalItemIdentity(item, keys) === target);
+        if (index < 0) return false;
+        list.splice(index, 1);
+        return true;
+      }
+
+      function stripStateJournalDraftIds(value) {
+        if (Array.isArray(value)) return value.map(stripStateJournalDraftIds);
+        if (!value || typeof value !== "object") return value;
+        const clean = {};
+        Object.entries(value).forEach(([key, item]) => {
+          if (key === "_tmp_id") return;
+          clean[key] = stripStateJournalDraftIds(item);
+        });
+        return clean;
+      }
+
+      function stateJournalStageLetter(index) {
+        const letters = "abcdefghijklmnopqrstuvwxyz";
+        const safeIndex = Math.max(1, Number(index || 1));
+        return letters[(safeIndex - 1) % letters.length] + (safeIndex > letters.length ? Math.ceil(safeIndex / letters.length) : "");
+      }
+
+      function defaultStateJournalStageKey(index) {
+        return `stage_${stateJournalStageLetter(index)}`;
+      }
+
+      function defaultStateJournalStageName(index) {
+        return `${stateJournalStageLetter(index).toUpperCase()}阶段`;
+      }
+
+      const STATE_JOURNAL_ROLE_MODES = {
+        default: "默认幕笺模板",
+        snapshot_only: "仅专属幕笺（不计算变量/阶段）",
+        full: "完整心笺：专属幕笺 + 变量阶段",
+        disabled: "不启用该角色",
+      };
+
+
+      const STATE_JOURNAL_ROLE_SOURCE_MODES = {
+        auto: {
+          label: "自动识别",
+          desc: "没有多角色时读取主卡；有多角色时默认只读取多角色，主卡视为旁白或总设定。",
+        },
+        main_card: {
+          label: "主卡就是角色",
+          desc: "适合普通单角色卡，心笺会把主卡作为唯一角色记录。",
+        },
+        personas_only: {
+          label: "主卡是旁白，只读取多角色",
+          desc: "适合双女主、多角色卡，主卡只作为旁白或总设定。",
+        },
+      };
+
+      function normalizeStateJournalRoleSourceMode(value) {
+        const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+        const aliases = { main: "main_card", single: "main_card", single_role: "main_card", card: "main_card", persona: "personas_only", personas: "personas_only", multi: "personas_only", multi_role: "personas_only", narrator: "personas_only" };
+        const mode = aliases[raw] || raw;
+        return STATE_JOURNAL_ROLE_SOURCE_MODES[mode] ? mode : "auto";
+      }
+
+      function normalizeStateJournalMode(value, role = {}) {
+        const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+        const aliases = { snapshot: "snapshot_only", snapshot_fields: "snapshot_only", note_only: "snapshot_only", off: "disabled", none: "disabled", disable: "disabled" };
+        const mode = aliases[raw] || raw;
+        if (STATE_JOURNAL_ROLE_MODES[mode]) return mode;
+        if (role.enabled === false) return "disabled";
+        if ((role.variables || []).length && (role.stages || []).length) return "full";
+        if ((role.snapshotFields || []).length) return "snapshot_only";
+        return "default";
+      }
+
+      function setStateJournalRoleMode(role, mode) {
+        const safeMode = STATE_JOURNAL_ROLE_MODES[mode] ? mode : "default";
+        role.mode = safeMode;
+        role.stateJournalMode = safeMode;
+        role.enabled = safeMode !== "disabled";
+      }
+
+      function stateJournalRoleTokens(role) {
+        return new Set([role.role_id, role.role_name, ...(role.aliases || [])].map((item) => String(item || "").trim().toLowerCase()).filter(Boolean));
+      }
+
+      function mergeStateJournalRoles(roles) {
+        const merged = [];
+        roles.filter(Boolean).forEach((role) => {
+          const normalized = normalizeStateJournalRole(role, merged.length + 1);
+          const tokens = stateJournalRoleTokens(normalized);
+          const idx = merged.findIndex((existing) => [...tokens].some((token) => stateJournalRoleTokens(existing).has(token)));
+          if (idx >= 0) {
+            const old = merged[idx];
+            const oldScore = (old.variables?.length || 0) * 5 + (old.stages?.length || 0) * 5 + (old.snapshotFields?.length || 0) * 3;
+            const newScore = (normalized.variables?.length || 0) * 5 + (normalized.stages?.length || 0) * 5 + (normalized.snapshotFields?.length || 0) * 3;
+            const primary = newScore > oldScore ? normalized : old;
+            const secondary = newScore > oldScore ? old : normalized;
+            primary.aliases = [...new Set([...(primary.aliases || []), secondary.role_id, secondary.role_name, ...(secondary.aliases || [])].filter(Boolean))];
+            if (!(primary.variables || []).length && (secondary.variables || []).length) primary.variables = secondary.variables;
+            if (!(primary.stages || []).length && (secondary.stages || []).length) primary.stages = secondary.stages;
+            if (!(primary.snapshotFields || []).length && (secondary.snapshotFields || []).length) primary.snapshotFields = secondary.snapshotFields;
+            merged[idx] = normalizeStateJournalRole(primary, idx + 1);
+          } else {
+            merged.push(normalized);
+          }
+        });
+        return merged;
+      }
+
+      function normalizeStateJournalConfig(raw) {
+        const config = raw && typeof raw === "object" ? raw : {};
+        const roles = Array.isArray(config.roles) ? config.roles : [];
+        return {
+          version: Number(config.version || 1) || 1,
+          enabled: config.enabled !== false,
+          role_source_mode: normalizeStateJournalRoleSourceMode(config.role_source_mode || config.roleSourceMode),
+          roles: mergeStateJournalRoles(roles.filter((role) => role && typeof role === "object")),
+        };
+      }
+
+      function ensureStateJournalConfigReady() {
+        if (currentStateJournal && typeof currentStateJournal === "object" && Array.isArray(currentStateJournal.roles)) {
+          return currentStateJournal;
+        }
+        try {
+          currentStateJournal = normalizeStateJournalConfig(initialStateJournal || {});
+        } catch (error) {
+          console.error("[stateJournal] card config init failed", error);
+          currentStateJournal = { version: 1, enabled: true, role_source_mode: "auto", roles: [] };
+        }
+        return currentStateJournal;
+      }
+
+      function safeRenderStateJournalPanel() {
+        try {
+          ensureStateJournalConfigReady();
+          renderStateJournalPanel();
+        } catch (error) {
+          console.error("[stateJournal] render panel failed", error);
+          const panel = document.getElementById("state-journal-card-panel");
+          if (panel) panel.hidden = true;
+        }
+      }
+
+      function normalizeStateJournalRole(role, index = 1) {
+        const roleName = String(role.role_name || role.name || `角色${index}`).trim();
+        const roleId = slugifyStateJournalKey(role.role_id || role.id || roleName, `role_${index}`);
+        return {
+          role_id: roleId,
+          role_name: roleName || roleId,
+          aliases: Array.isArray(role.aliases) ? role.aliases.map((item) => String(item).trim()).filter(Boolean) : [],
+          enabled: role.enabled !== false,
+          mode: normalizeStateJournalMode(role.mode || role.stateJournalMode, role),
+          stateJournalMode: normalizeStateJournalMode(role.mode || role.stateJournalMode, role),
+          use_default_variables: Boolean(role.use_default_variables),
+          source: String(role.source || role.role_source || "").trim(),
+          variables: Array.isArray(role.variables) ? role.variables.map((item, idx) => normalizeStateJournalVariable(item, idx + 1)).filter(Boolean) : [],
+          stages: Array.isArray(role.stages) ? role.stages.map((item, idx) => normalizeStateJournalStage(item, roleId, idx + 1)).filter(Boolean) : [],
+          snapshotFields: Array.isArray(role.snapshotFields) ? role.snapshotFields.map((item, idx) => normalizeStateJournalSnapshotField(item, idx + 1)).filter(Boolean) : [],
+          initial_stage: slugifyStateJournalKey(role.initial_stage || role.settings?.initial_stage, "stage_a"),
+          settings: role.settings && typeof role.settings === "object" ? role.settings : { allow_regression: false, confirm_turns: 1, cooldown_turns: 2 },
+        };
+      }
+
+      function normalizeStateJournalVariable(variable, index = 1) {
+        if (!variable || typeof variable !== "object") return null;
+        const key = slugifyStateJournalKey(variable.var_key || variable.key, `var_${index}`);
+        const min = Number(variable.min_value ?? 0);
+        const max = Number(variable.max_value ?? 100);
+        const safeMin = Number.isFinite(min) ? min : 0;
+        const safeMax = Number.isFinite(max) && max > safeMin ? max : 100;
+        const defaultValue = Number(variable.default_value ?? safeMin);
+        return {
+          var_key: key,
+          var_name: String(variable.var_name || variable.label || key).trim() || key,
+          enabled: variable.enabled !== false,
+          default_value: Math.min(Math.max(Number.isFinite(defaultValue) ? defaultValue : safeMin, safeMin), safeMax),
+          min_value: safeMin,
+          max_value: safeMax,
+          delta_min: Number(variable.delta_min ?? -5),
+          delta_max: Number(variable.delta_max ?? 5),
+          display: variable.display !== false,
+          stage_relevant: variable.stage_relevant !== false,
+          instruction: String(variable.instruction || "").trim(),
+        };
+      }
+
+      function normalizeStateJournalSnapshotField(field, index = 1) {
+        if (!field || typeof field !== "object") return null;
+        const key = slugifyStateJournalKey(field.key || field.field_key, `snapshot_${index}`);
+        return {
+          key,
+          label: String(field.label || field.name || key).trim() || key,
+          enabled: field.enabled !== false,
+          display: field.display !== false,
+          instruction: String(field.instruction || field.note || "根据本轮上下文生成该状态快照字段。").trim(),
+        };
+      }
+
+      function normalizeStateJournalStage(stage, roleId = "", index = 1) {
+        if (!stage || typeof stage !== "object") return null;
+        const key = slugifyStateJournalKey(stage.stage_key || stage.key, defaultStateJournalStageKey(index));
+        const conditions = Array.isArray(stage.conditions) ? stage.conditions.map((condition) => ({
+          var: slugifyStateJournalKey(condition?.var || condition?.field || "", ""),
+          op: [">", ">=", "<", "<=", "=", "!="].includes(String(condition?.op || ">=")) ? String(condition.op || ">=") : ">=",
+          value: Number(condition?.value ?? 0) || 0,
+        })).filter((item) => item.var) : [];
+        return {
+          stage_key: key,
+          stage_name: String(stage.stage_name || stage.name || defaultStateJournalStageName(index)).trim() || defaultStateJournalStageName(index),
+          enabled: stage.enabled !== false,
+          priority: Number(stage.priority ?? index * 10) || index * 10,
+          condition_mode: String(stage.condition_mode || "all") === "any" ? "any" : "all",
+          conditions,
+          allow_regression: Boolean(stage.allow_regression),
+          confirm_turns: Math.max(1, Number(stage.confirm_turns || 1) || 1),
+          cooldown_turns: Math.max(0, Number(stage.cooldown_turns || 0) || 0),
+          activation_tag: `state_journal.stage.${roleId}.${key}`,
+        };
+      }
+
+      function collectPersonaSummaries() {
+        return [...personaGridEl.querySelectorAll(".persona-card")].map((card, index) => {
+          const key = String(card.dataset.personaKey || index + 1).trim();
+          const name = card.querySelector(`#persona-${key}-name`)?.value.trim() || `角色${index + 1}`;
+          return { key, name, role_id: slugifyStateJournalKey(name || key, `role_${index + 1}`) };
+        });
+      }
+
+
+      function collectMainCardStateJournalRole() {
+        const name = value("card-name") || "主卡角色";
+        const roleId = slugifyStateJournalKey(name, "main_card");
+        return { role_id: roleId, role_name: name, aliases: [], mode: "default", stateJournalMode: "default", source: "main_card", variables: [], stages: [], snapshotFields: [] };
+      }
+
+      function stateJournalRoleHasConfig(role) {
+        return Boolean((role.variables || []).length || (role.stages || []).length || (role.snapshotFields || []).length);
+      }
+
+      function stateJournalDesiredSourceRoleSeeds() {
+        const mode = normalizeStateJournalRoleSourceMode(currentStateJournal?.role_source_mode || "auto");
+        const personas = collectPersonaSummaries();
+        if (mode === "main_card") return { detected: "main_card", roles: [collectMainCardStateJournalRole()], personas };
+        if (mode === "personas_only") return { detected: "personas_only", roles: personas.map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", variables: [], stages: [], snapshotFields: [] })), personas };
+        if (personas.length) return { detected: "personas_only", roles: personas.map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", variables: [], stages: [], snapshotFields: [] })), personas };
+        return { detected: "main_card", roles: [collectMainCardStateJournalRole()], personas };
+      }
+
+      function renderStateJournalRoleSourceHint() {
+        const select = document.getElementById("state-journal-role-source-mode");
+        const hint = document.getElementById("state-journal-role-source-hint");
+        if (!select || !hint) return;
+        const mode = normalizeStateJournalRoleSourceMode(currentStateJournal?.role_source_mode || "auto");
+        const desired = stateJournalDesiredSourceRoleSeeds();
+        select.value = mode;
+        const modeMeta = STATE_JOURNAL_ROLE_SOURCE_MODES[mode] || STATE_JOURNAL_ROLE_SOURCE_MODES.auto;
+        const detectedLabel = STATE_JOURNAL_ROLE_SOURCE_MODES[desired.detected]?.label || modeMeta.label;
+        const roleNames = desired.roles.map((role) => role.role_name).filter(Boolean).join("、") || "暂无角色";
+        hint.innerHTML = `<strong>${escapeHtml(modeMeta.label)}</strong>｜当前将按“${escapeHtml(detectedLabel)}”识别：${escapeHtml(roleNames)}。${escapeHtml(modeMeta.desc)}`;
+      }
+
+      function ensureStateJournalRolesFromPersonas() {
+        ensureStateJournalConfigReady();
+        currentStateJournal.role_source_mode = normalizeStateJournalRoleSourceMode(currentStateJournal.role_source_mode || "auto");
+        const desired = stateJournalDesiredSourceRoleSeeds();
+        const desiredSource = desired.detected === "main_card" ? "main_card" : "persona";
+        const existing = (currentStateJournal.roles || []).filter((role) => {
+          const source = String(role.source || "").trim();
+          if (!source || source === desiredSource) return true;
+          return stateJournalRoleHasConfig(role);
+        });
+        currentStateJournal.roles = mergeStateJournalRoles([...existing, ...desired.roles]);
+      }
+
+      function renderStateJournalPanel() {
+        ensureStateJournalConfigReady();
+        const panel = document.getElementById("state-journal-card-panel");
+        if (!panel) return;
+        const hasStoredStateJournal = Boolean(currentStateJournal?.roles?.length);
+        panel.hidden = !stateJournalEnabled;
+        panel.dataset.hasStateJournalData = hasStoredStateJournal ? "true" : "false";
+        if (!stateJournalEnabled) return;
+        ensureStateJournalRolesFromPersonas();
+        renderStateJournalRoleSourceHint();
+        const tbody = document.getElementById("state-journal-role-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        if (!currentStateJournal.roles.length) {
+          tbody.innerHTML = `<tr><td colspan="4"><div class="card-state-journal-empty">暂无角色配置。点击“同步角色列表”会按当前心笺角色来源生成空配置。</div></td></tr>`;
+          return;
+        }
+        currentStateJournal.roles.forEach((role) => {
+          const tr = document.createElement("tr");
+          const roleMode = normalizeStateJournalMode(role.mode || role.stateJournalMode, role);
+          tr.innerHTML = `
+            <td><strong>${escapeHtml(role.role_name || role.role_id)}</strong></td>
+            <td><select data-sj-role-mode><option value="default" ${roleMode === "default" ? "selected" : ""}>默认幕笺模板</option><option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属幕笺</option><option value="full" ${roleMode === "full" ? "selected" : ""}>完整心笺：专属幕笺 + 变量阶段</option><option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不启用该角色</option></select></td>
+            <td><span class="card-state-journal-badge">变量 ${role.variables?.length || 0}</span> <span class="card-state-journal-badge">阶段 ${role.stages?.length || 0}</span> <span class="card-state-journal-badge">快照 ${role.snapshotFields?.length || 0}</span></td>
+            <td><button type="button" class="secondary compact" data-sj-config-role="${escapeAttr(role.role_id)}">配置</button></td>
+          `;
+          tr.querySelector("[data-sj-role-mode]").addEventListener("change", (event) => { setStateJournalRoleMode(role, event.target.value); markCardDirty(); renderStateJournalPanel(); });
+          tr.querySelector("[data-sj-config-role]").addEventListener("click", () => openStateJournalRoleDialog(role.role_id));
+          tbody.appendChild(tr);
+        });
+      }
+
+      function openStateJournalRoleDialog(roleId) {
+        ensureStateJournalConfigReady();
+        const sourceRole = (currentStateJournal.roles || []).find((role) => role.role_id === roleId);
+        if (!sourceRole) return;
+        activeStateJournalRoleId = roleId;
+        activeStateJournalRoleDraft = normalizeStateJournalRole(cloneStateJournalValue(sourceRole), 1);
+        renderStateJournalDialog();
+        const dialog = document.getElementById("state-journal-role-dialog");
+        if (dialog) dialog.hidden = false;
+      }
+
+      function closeStateJournalRoleDialog() {
+        activeStateJournalRoleDraft = null;
+        const dialog = document.getElementById("state-journal-role-dialog");
+        if (dialog) dialog.hidden = true;
+      }
+
+      function activeStateJournalRole() {
+        return activeStateJournalRoleDraft;
+      }
+
+      function saveStateJournalRoleDialog() {
+        const draft = activeStateJournalRoleDraft ? normalizeStateJournalRole(activeStateJournalRoleDraft, 1) : null;
+        if (!draft) return;
+        ensureStateJournalConfigReady();
+        const index = (currentStateJournal.roles || []).findIndex((role) => role.role_id === activeStateJournalRoleId);
+        if (index >= 0) {
+          currentStateJournal.roles[index] = draft;
+        } else {
+          currentStateJournal.roles.push(draft);
+        }
+        currentStateJournal.roles = mergeStateJournalRoles(currentStateJournal.roles);
+        activeStateJournalRoleId = draft.role_id;
+        markCardDirty();
+        renderStateJournalPanel();
+        closeStateJournalRoleDialog();
+      }
+
+      function setStateJournalDialogTab(tab) {
+        activeStateJournalTab = tab === "stages" ? "stages" : (tab === "snapshot" ? "snapshot" : "variables");
+        document.getElementById("state-journal-tab-variables")?.classList.toggle("active", activeStateJournalTab === "variables");
+        document.getElementById("state-journal-tab-stages")?.classList.toggle("active", activeStateJournalTab === "stages");
+        document.getElementById("state-journal-tab-snapshot")?.classList.toggle("active", activeStateJournalTab === "snapshot");
+        const variablesTab = document.getElementById("state-journal-variables-tab");
+        const stagesTab = document.getElementById("state-journal-stages-tab");
+        const snapshotTab = document.getElementById("state-journal-snapshot-tab");
+        if (variablesTab) variablesTab.hidden = activeStateJournalTab !== "variables";
+        if (stagesTab) stagesTab.hidden = activeStateJournalTab !== "stages";
+        if (snapshotTab) snapshotTab.hidden = activeStateJournalTab !== "snapshot";
+      }
+
+      function summarizeStageConditions(stage) {
+        const role = activeStateJournalRole();
+        const nameMap = new Map((role?.variables || []).map((item) => [item.var_key, item.var_name || item.var_key]));
+        const items = Array.isArray(stage.conditions) ? stage.conditions : [];
+        if (!items.length) return "未设置条件";
+        const opMap = { ">=": "≥", "<=": "≤", ">": "＞", "<": "＜", "=": "＝", "!=": "≠" };
+        const joiner = stage.condition_mode === "any" ? " 或 " : " 且 ";
+        return items.map((item) => `${nameMap.get(item.var) || item.var} ${opMap[item.op] || item.op || "≥"} ${item.value ?? 0}`).join(joiner);
+      }
+
+      function stateJournalConditionVariableOptions(role, selected) {
+        const variables = Array.isArray(role?.variables) ? role.variables : [];
+        if (!variables.length) return `<option value="">请先添加变量</option>`;
+        return variables.map((item) => `<option value="${escapeAttr(item.var_key)}" ${item.var_key === selected ? "selected" : ""}>${escapeHtml(item.var_name || item.var_key)}</option>`).join("");
+      }
+
+      function stateJournalConditionOpOptions(selected) {
+        const ops = [[">=", "≥"], ["<=", "≤"], [">", "＞"], ["<", "＜"], ["=", "＝"], ["!=", "≠"]];
+        return ops.map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`).join("");
+      }
+
+      function openStateJournalStageConditionDialog(stageIndex) {
+        const role = activeStateJournalRole();
+        if (!role || !role.stages?.[stageIndex]) return;
+        activeStateJournalStageIndex = stageIndex;
+        renderStateJournalStageConditionDialog();
+        const dialog = document.getElementById("state-journal-condition-dialog");
+        if (dialog) dialog.hidden = false;
+      }
+
+      function closeStateJournalStageConditionDialog() {
+        activeStateJournalStageIndex = -1;
+        const dialog = document.getElementById("state-journal-condition-dialog");
+        if (dialog) dialog.hidden = true;
+        renderStateJournalDialog();
+      }
+
+      function renderStateJournalStageConditionDialog() {
+        const role = activeStateJournalRole();
+        const stage = role?.stages?.[activeStateJournalStageIndex];
+        const body = document.getElementById("state-journal-condition-dialog-body");
+        if (!body || !role || !stage) return;
+        stage.conditions = Array.isArray(stage.conditions) ? stage.conditions : [];
+        document.getElementById("state-journal-condition-dialog-title").textContent = `${stage.stage_name || stage.stage_key || "阶段"} · 条件配置`;
+        document.getElementById("state-journal-condition-dialog-subtitle").textContent = `当前摘要：${summarizeStageConditions(stage)}`;
+        const rows = stage.conditions.length ? stage.conditions.map((condition, conditionIndex) => `
+          <div class="card-state-journal-condition-row" data-condition-index="${conditionIndex}">
+            <select data-condition-index="${conditionIndex}" data-condition-field="var">${stateJournalConditionVariableOptions(role, condition.var)}</select>
+            <select data-condition-index="${conditionIndex}" data-condition-field="op">${stateJournalConditionOpOptions(condition.op || ">=")}</select>
+            <input type="number" value="${Number(condition.value ?? 0)}" data-condition-index="${conditionIndex}" data-condition-field="value">
+            <button type="button" class="secondary compact" data-remove-condition="${conditionIndex}">删除</button>
+          </div>
+        `).join("") : `<div class="card-state-journal-empty compact">暂无条件。点击“添加条件”后选择变量、比较符和数值。</div>`;
+        body.innerHTML = `
+          <div class="card-state-journal-condition-toolbar">
+            <label>满足方式
+              <select data-stage-condition-mode>
+                <option value="all" ${stage.condition_mode !== "any" ? "selected" : ""}>全部满足</option>
+                <option value="any" ${stage.condition_mode === "any" ? "selected" : ""}>任一满足</option>
+              </select>
+            </label>
+          </div>
+          <div class="card-state-journal-condition-list">${rows}</div>
+          <button type="button" class="secondary compact" data-add-condition="${activeStateJournalStageIndex}">＋ 添加条件</button>
+        `;
+        body.querySelector("[data-stage-condition-mode]")?.addEventListener("change", (event) => {
+          stage.condition_mode = event.target.value === "any" ? "any" : "all";
+          renderStateJournalStageConditionDialog();
+        });
+        body.querySelectorAll("[data-condition-field]").forEach((input) => input.addEventListener("change", () => {
+          const conditionIndex = Number(input.dataset.conditionIndex);
+          const condition = stage.conditions?.[conditionIndex];
+          if (!condition) return;
+          if (input.dataset.conditionField === "var") condition.var = input.value;
+          else if (input.dataset.conditionField === "op") condition.op = input.value;
+          else if (input.dataset.conditionField === "value") condition.value = Number(input.value || 0);
+          renderStateJournalStageConditionDialog();
+        }));
+        body.querySelectorAll("[data-remove-condition]").forEach((button) => button.addEventListener("click", (event) => {
+          event.preventDefault();
+          const conditionIndex = Number(button.dataset.removeCondition);
+          if (Number.isFinite(conditionIndex)) stage.conditions.splice(conditionIndex, 1);
+          renderStateJournalStageConditionDialog();
+        }));
+        body.querySelector("[data-add-condition]")?.addEventListener("click", (event) => {
+          event.preventDefault();
+          const firstVariable = role.variables?.[0]?.var_key || "";
+          stage.conditions.push({ var: firstVariable, op: ">=", value: 0 });
+          renderStateJournalStageConditionDialog();
+        });
+      }
+
+      function renderStateJournalDialog() {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        document.getElementById("state-journal-dialog-title").textContent = `${role.role_name || role.role_id} · 心笺配置`;
+        document.getElementById("state-journal-dialog-subtitle").textContent = `${STATE_JOURNAL_ROLE_MODES[normalizeStateJournalMode(role.mode || role.stateJournalMode, role)] || "默认幕笺模板"}｜变量 ${role.variables?.length || 0} 个｜阶段 ${role.stages?.length || 0} 个｜快照字段 ${role.snapshotFields?.length || 0} 个`;
+        renderStateJournalVariableRows(role);
+        renderStateJournalStageRows(role);
+        renderStateJournalSnapshotRows(role);
+        setStateJournalDialogTab(activeStateJournalTab);
+      }
+
+      function renderStateJournalVariableRows(role) {
+        const tbody = document.getElementById("state-journal-variable-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        if (!role.variables?.length) {
+          tbody.innerHTML = `<tr><td colspan="8"><div class="card-state-journal-empty">暂无变量。可点击新增变量录入初始化配置。</div></td></tr>`;
+          return;
+        }
+        role.variables.forEach((variable, index) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="card-state-journal-check"><input type="checkbox" title="启用变量" ${variable.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
+            <td><input class="card-state-journal-name-input" value="${escapeAttr(variable.var_name || variable.var_key)}" data-field="var_name"><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(variable.var_key)}" data-field="var_key"></label></details></td>
+            <td><input class="card-state-journal-num-input" type="number" value="${Number(variable.default_value ?? 0)}" data-field="default_value"></td>
+            <td><span class="card-state-journal-range-inputs"><input class="card-state-journal-num-input" type="number" value="${Number(variable.min_value ?? 0)}" data-field="min_value"> <span>~</span> <input class="card-state-journal-num-input" type="number" value="${Number(variable.max_value ?? 100)}" data-field="max_value"></span></td>
+            <td><span class="card-state-journal-range-inputs"><input class="card-state-journal-num-input" type="number" value="${Number(variable.delta_min ?? -5)}" data-field="delta_min"> <span>~</span> <input class="card-state-journal-num-input" type="number" value="${Number(variable.delta_max ?? 5)}" data-field="delta_max"></span></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在幕笺" ${variable.display !== false ? "checked" : ""} data-field="display"></span></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="参与阶段判断" ${variable.stage_relevant !== false ? "checked" : ""} data-field="stage_relevant"></span></td>
+            <td><button type="button" class="secondary compact" data-remove-variable-index="${index}">删除</button></td>
+          `;
+          tr.querySelectorAll("input").forEach((input) => input.addEventListener("change", () => {
+            const field = input.dataset.field;
+            if (["enabled", "display", "stage_relevant"].includes(field)) variable[field] = input.checked;
+            else if (["default_value", "min_value", "max_value", "delta_min", "delta_max"].includes(field)) variable[field] = Number(input.value || 0);
+            else if (field === "var_key") variable.var_key = slugifyStateJournalKey(input.value, variable.var_key);
+            else variable[field] = input.value.trim();
+            markCardDirty(); renderStateJournalPanel();
+          }));
+          tr.querySelector("[data-remove-variable-index]").addEventListener("click", (event) => {
+            event.preventDefault();
+            const removeIndex = Number(event.currentTarget.dataset.removeVariableIndex);
+            if (Number.isFinite(removeIndex)) role.variables.splice(removeIndex, 1);
+            renderStateJournalDialog();
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderStateJournalStageRows(role) {
+        const tbody = document.getElementById("state-journal-stage-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        if (!role.stages?.length) {
+          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无阶段规则。心笺会使用这里的条件判断阶段标签。</div></td></tr>`;
+          return;
+        }
+        role.stages.forEach((stage, index) => {
+          stage.conditions = Array.isArray(stage.conditions) ? stage.conditions : [];
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="card-state-journal-check"><input type="checkbox" title="启用阶段" ${stage.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
+            <td><input class="card-state-journal-name-input" value="${escapeAttr(stage.stage_name || stage.stage_key)}" data-field="stage_name"></td>
+            <td><input class="card-state-journal-num-input" type="number" value="${Number(stage.priority ?? 10)}" data-field="priority"></td>
+            <td>
+              <div class="card-state-journal-stage-summary">
+                <strong>${escapeHtml(summarizeStageConditions(stage))}</strong>
+                <button type="button" class="secondary compact" data-edit-stage-conditions="${index}">配置条件</button>
+              </div>
+            </td>
+            <td><button type="button" class="secondary compact" data-remove-stage-index="${index}">删除</button><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(stage.stage_key)}" data-field="stage_key"></label><code class="card-state-journal-code" title="${escapeAttr(`state_journal.stage.${role.role_id}.${stage.stage_key}`)}">${escapeHtml(`state_journal.stage.${role.role_id}.${stage.stage_key}`)}</code></details></td>
+          `;
+          tr.querySelectorAll("input,select").forEach((input) => input.addEventListener("change", () => {
+            const field = input.dataset.field;
+            if (field) {
+              if (field === "enabled") stage.enabled = input.checked;
+              else if (field === "priority") stage.priority = Number(input.value || 0);
+              else if (field === "stage_key") stage.stage_key = slugifyStateJournalKey(input.value, stage.stage_key);
+              else stage[field] = input.value.trim();
+              stage.activation_tag = `state_journal.stage.${role.role_id}.${stage.stage_key}`;
+              markCardDirty(); renderStateJournalDialog(); renderStateJournalPanel();
+              return;
+            }
+          }));
+          tr.querySelector("[data-edit-stage-conditions]")?.addEventListener("click", (event) => {
+            event.preventDefault();
+            const stageIndex = Number(event.currentTarget.dataset.editStageConditions);
+            openStateJournalStageConditionDialog(stageIndex);
+          });
+          tr.querySelector("[data-remove-stage-index]").addEventListener("click", (event) => {
+            event.preventDefault();
+            const removeIndex = Number(event.currentTarget.dataset.removeStageIndex);
+            if (Number.isFinite(removeIndex)) role.stages.splice(removeIndex, 1);
+            renderStateJournalDialog();
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderStateJournalSnapshotRows(role) {
+        const tbody = document.getElementById("state-journal-snapshot-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        const fields = Array.isArray(role.snapshotFields) ? role.snapshotFields : [];
+        if (!fields.length) {
+          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无状态快照字段。未配置时会回落到当前全局幕笺模板。</div></td></tr>`;
+          return;
+        }
+        fields.forEach((field, index) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="card-state-journal-check"><input type="checkbox" title="启用字段" ${field.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
+            <td><input class="card-state-journal-name-input" value="${escapeAttr(field.label || field.key)}" data-field="label"><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(field.key)}" data-field="key"></label></details></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在幕笺" ${field.display !== false ? "checked" : ""} data-field="display"></span></td>
+            <td><input class="card-state-journal-wide-input" value="${escapeAttr(field.instruction || "")}" data-field="instruction"></td>
+            <td><button type="button" class="secondary compact" data-remove-snapshot-field-index="${index}">删除</button></td>
+          `;
+          tr.querySelectorAll("input").forEach((input) => input.addEventListener("change", () => {
+            const key = input.dataset.field;
+            if (["enabled", "display"].includes(key)) field[key] = input.checked;
+            else if (key === "key") field.key = slugifyStateJournalKey(input.value, field.key);
+            else field[key] = input.value.trim();
+            markCardDirty(); renderStateJournalDialog(); renderStateJournalPanel();
+          }));
+          tr.querySelector("[data-remove-snapshot-field-index]").addEventListener("click", (event) => {
+            event.preventDefault();
+            const removeIndex = Number(event.currentTarget.dataset.removeSnapshotFieldIndex);
+            if (Number.isFinite(removeIndex)) fields.splice(removeIndex, 1);
+            role.snapshotFields = fields;
+            renderStateJournalDialog();
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      async function detectStateJournalEnabled() {
+        try {
+          const data = await fetch("/mods/state-journal/app/api/config", { cache: "no-store" }).then((response) => response.ok ? response.json() : null);
+          stateJournalEnabled = Boolean(data?.config?.enabled);
+        } catch (_) {
+          stateJournalEnabled = false;
+        }
+        safeRenderStateJournalPanel();
+      }
+
       function buildCardPayload() {
         const plotStages = {};
         stageGridEl.querySelectorAll(".stage-card").forEach((card) => {
@@ -1190,6 +1959,7 @@
           tags: value("card-tags").split(",").map((item) => item.trim()).filter(Boolean),
           plotStages,
           personas,
+          stateJournal: stripStateJournalDraftIds(normalizeStateJournalConfig(ensureStateJournalConfigReady())),
           creativeWorkshop,
         };
       }
@@ -1204,6 +1974,7 @@
         document.getElementById("card-scenario").value = card.scenario || "";
         document.getElementById("card-creator-notes").value = card.creator_notes || "";
         document.getElementById("card-tags").value = Array.isArray(card.tags) ? card.tags.join(", ") : "";
+        currentStateJournal = normalizeStateJournalConfig(card.stateJournal || {});
 
         stageGridEl.innerHTML = "";
         const stageEntries = Object.entries(card.plotStages || {}).sort((left, right) => {
@@ -1236,6 +2007,7 @@
           });
         }
         fillWorkshopForm(card.creativeWorkshop);
+        safeRenderStateJournalPanel();
       }
 
       async function refreshCardList(selectedFilename = "") {
@@ -1254,6 +2026,19 @@
         }
       }
 
+      function notifyWorkshopRoleCardChanged(reason, data = {}) {
+        try {
+          const payload = {
+            type: "role_card_loaded",
+            reason: reason || "card_config",
+            filename: data.filename || "",
+            workshop_preserved: Boolean(data.workshop_preserved),
+            at: Date.now(),
+          };
+          localStorage.setItem("fantareal:role_card_loaded", JSON.stringify(payload));
+        } catch (_) {}
+      }
+
       async function saveCard() {
         const filename = value("card-filename") || "role_card.json";
         const card = buildCardPayload();
@@ -1267,10 +2052,12 @@
         document.getElementById("card-filename").value = data.filename || filename;
         await refreshCardList(data.filename || filename);
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("save", data);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
         setStatus(data.workshop?.triggered
-          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
-          : `角色卡已保存并加载：${data.filename}。${slotSummary}`);
+          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`
+          : `角色卡已保存并加载：${data.filename}。${slotSummary}${preserveNote}`);
       }
 
       async function loadCard() {
@@ -1284,6 +2071,7 @@
         fillCardForm(loadedCard);
         await refreshCardList(data.filename || filename);
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("load", data);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
           ? `角色卡已加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
@@ -1311,12 +2099,73 @@
         document.getElementById("card-filename").value = data.filename || file.name || "imported_role_card.json";
         await refreshCardList(data.filename || file.name || "");
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("import", data);
         const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
         setStatus(data.workshop?.triggered
-          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
-          : `本地角色卡已导入：${data.filename || file.name}。${slotSummary}`);
+          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`
+          : `本地角色卡已导入：${data.filename || file.name}。${slotSummary}${preserveNote}`);
         return data;
       }
+
+
+      document.getElementById("state-journal-refresh-roles")?.addEventListener("click", () => {
+        ensureStateJournalRolesFromPersonas();
+        safeRenderStateJournalPanel();
+        markCardDirty();
+      });
+      document.getElementById("state-journal-role-source-mode")?.addEventListener("change", (event) => {
+        ensureStateJournalConfigReady();
+        currentStateJournal.role_source_mode = normalizeStateJournalRoleSourceMode(event.target.value);
+        ensureStateJournalRolesFromPersonas();
+        safeRenderStateJournalPanel();
+        markCardDirty();
+      });
+      document.getElementById("state-journal-close-dialog")?.addEventListener("click", closeStateJournalRoleDialog);
+      document.getElementById("state-journal-cancel-dialog")?.addEventListener("click", closeStateJournalRoleDialog);
+      document.getElementById("state-journal-save-dialog")?.addEventListener("click", saveStateJournalRoleDialog);
+      document.getElementById("state-journal-role-dialog")?.addEventListener("click", (event) => {
+        if (event.target?.id === "state-journal-role-dialog") closeStateJournalRoleDialog();
+      });
+      document.getElementById("state-journal-condition-close")?.addEventListener("click", closeStateJournalStageConditionDialog);
+      document.getElementById("state-journal-condition-done")?.addEventListener("click", closeStateJournalStageConditionDialog);
+      document.getElementById("state-journal-condition-dialog")?.addEventListener("click", (event) => {
+        if (event.target?.id === "state-journal-condition-dialog") closeStateJournalStageConditionDialog();
+      });
+      document.getElementById("state-journal-tab-variables")?.addEventListener("click", () => setStateJournalDialogTab("variables"));
+      document.getElementById("state-journal-tab-stages")?.addEventListener("click", () => setStateJournalDialogTab("stages"));
+      document.getElementById("state-journal-tab-snapshot")?.addEventListener("click", () => setStateJournalDialogTab("snapshot"));
+      document.getElementById("state-journal-add-variable")?.addEventListener("click", () => {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        role.variables = role.variables || [];
+        const draftVariable = normalizeStateJournalVariable({ var_key: `var_${role.variables.length + 1}`, var_name: "新变量", default_value: 0, min_value: 0, max_value: 100, delta_min: -2, delta_max: 2 }, role.variables.length + 1);
+        draftVariable._tmp_id = createStateJournalTempId("var");
+        role.variables.push(draftVariable);
+        renderStateJournalDialog();
+      });
+      document.getElementById("state-journal-add-stage")?.addEventListener("click", () => {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        role.stages = role.stages || [];
+        const nextStageIndex = role.stages.length + 1;
+        const draftStage = normalizeStateJournalStage({ stage_key: defaultStateJournalStageKey(nextStageIndex), stage_name: defaultStateJournalStageName(nextStageIndex), priority: nextStageIndex * 10, conditions: [] }, role.role_id, nextStageIndex);
+        draftStage._tmp_id = createStateJournalTempId("stage");
+        role.stages.push(draftStage);
+        renderStateJournalDialog();
+      });
+      document.getElementById("state-journal-add-snapshot-field")?.addEventListener("click", () => {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        role.snapshotFields = role.snapshotFields || [];
+        const next = role.snapshotFields.length + 1;
+        const draftField = normalizeStateJournalSnapshotField({ key: `snapshot_${next}`, label: "新快照字段", instruction: "根据本轮上下文生成该状态快照字段。" }, next);
+        draftField._tmp_id = createStateJournalTempId("snapshot");
+        role.snapshotFields.push(draftField);
+        renderStateJournalDialog();
+      });
+      ensureStateJournalConfigReady();
+      detectStateJournalEnabled();
 
       document.getElementById("save-card").addEventListener("click", async () => {
         try {

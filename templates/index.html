@@ -841,8 +841,7 @@
         </div>
       </div>
     </div>
-    {% if workshop_opening and workshop_opening.enabled %}
-    <div id="workshop-opening-overlay" class="workshop-opening-overlay workshop-opening-animation-{{ workshop_opening.animation or 'fade' }}" aria-modal="true" role="dialog" aria-labelledby="workshop-opening-title" {% if not show_workshop_opening %}hidden{% endif %}>
+    <div id="workshop-opening-overlay" class="workshop-opening-overlay workshop-opening-animation-{{ workshop_opening.animation or 'fade' }}" aria-modal="true" role="dialog" aria-labelledby="workshop-opening-title" {% if not (workshop_opening and workshop_opening.enabled and show_workshop_opening) %}hidden{% endif %}>
       <div class="workshop-opening-backdrop"></div>
       <section class="workshop-opening-card" {% if workshop_opening.coverImage %}style="--workshop-opening-cover: url('{{ workshop_opening.coverImage }}');"{% endif %}>
         <div class="workshop-opening-cover" aria-hidden="true"></div>
@@ -850,7 +849,7 @@
         <div class="workshop-opening-content">
           <p class="eyebrow">演出工坊 · 开场演出</p>
           <h1 id="workshop-opening-title">{{ workshop_opening.title or persona.name or "Fantareal" }}</h1>
-          {% if workshop_opening.subtitle %}<p class="workshop-opening-subtitle">{{ workshop_opening.subtitle }}</p>{% endif %}
+          <p class="workshop-opening-subtitle" {% if not workshop_opening.subtitle %}hidden{% endif %}>{{ workshop_opening.subtitle or "" }}</p>
           <button id="workshop-opening-start" class="workshop-opening-start" type="button">{{ workshop_opening.buttonText or "进入故事" }}</button>
           <div id="workshop-opening-loading" class="workshop-opening-loading" hidden aria-live="polite">
             <span id="workshop-opening-loading-text" class="workshop-opening-loading-text">正在入梦……</span>
@@ -861,7 +860,6 @@
         </div>
       </section>
     </div>
-    {% endif %}
     <audio id="workshop-audio-player" preload="auto"></audio>
     <audio id="workshop-opening-audio" preload="auto"></audio>
     <audio id="workshop-ambience-music-audio" preload="auto"></audio>
@@ -1130,11 +1128,16 @@
       const workshopOpeningAudioToggleEl = document.getElementById("workshop-opening-audio-toggle");
       const workshopOpeningAudioToggleIconEl = document.getElementById("workshop-opening-audio-toggle-icon");
       const workshopOpeningReplayBtn = document.getElementById("workshop-opening-replay");
-      const workshopOpeningConfig = {{ workshop_opening | tojson }};
-      const workshopAmbienceConfig = {{ workshop_ambience | tojson }};
-      const workshopDynamicScenesConfig = {{ workshop_dynamic_scenes | tojson }};
-      const workshopRuntimeState = {{ workshop_state | tojson }};
-      const shouldShowWorkshopOpening = {{ show_workshop_opening | tojson }};
+      const workshopOpeningFallbackTitle = document.getElementById("chat-title")?.textContent?.trim() || "Fantareal";
+      let workshopOpeningConfig = {{ workshop_opening | tojson }};
+      let workshopAmbienceConfig = {{ workshop_ambience | tojson }};
+      let workshopDynamicScenesConfig = {{ workshop_dynamic_scenes | tojson }};
+      let workshopRuntimeState = {{ workshop_state | tojson }};
+      let shouldShowWorkshopOpening = {{ show_workshop_opening | tojson }};
+      const WORKSHOP_RUNTIME_REFRESH_KEY = "fantareal:workshop_config_saved";
+      const WORKSHOP_ROLE_CARD_LOADED_KEY = "fantareal:role_card_loaded";
+      let lastWorkshopRuntimeRefreshAt = 0;
+      let lastWorkshopConfigSignature = "";
       let workshopOpeningEntering = false;
       let workshopOpeningManualReplayMode = false;
       let workshopOpeningMusicStarted = false;
@@ -3689,6 +3692,156 @@
         bodyEl.style.removeProperty("--workshop-ambience-bg");
         bodyEl.style.removeProperty("--workshop-ambience-overlay");
       }
+
+      function normalizeRuntimeWorkshopConfig(raw) {
+        const workshop = raw && typeof raw === "object" ? raw : {};
+        return {
+          opening: workshop.opening && typeof workshop.opening === "object" ? workshop.opening : {},
+          ambience: workshop.ambience && typeof workshop.ambience === "object" ? workshop.ambience : {},
+          dynamicScenes: Array.isArray(workshop.dynamicScenes) ? workshop.dynamicScenes : [],
+        };
+      }
+
+      function getWorkshopRuntimeSignature(workshop = {}) {
+        const normalized = normalizeRuntimeWorkshopConfig(workshop);
+        try {
+          return JSON.stringify(normalized);
+        } catch (_) {
+          return String(Date.now());
+        }
+      }
+      lastWorkshopConfigSignature = getWorkshopRuntimeSignature({ opening: workshopOpeningConfig, ambience: workshopAmbienceConfig, dynamicScenes: workshopDynamicScenesConfig });
+
+      function resetWorkshopAudioElement(audioEl) {
+        if (!audioEl) return;
+        try {
+          audioEl.pause();
+          audioEl.removeAttribute("src");
+          audioEl.load();
+        } catch (_) {}
+      }
+
+      function updateWorkshopOpeningDomFromConfig() {
+        if (!workshopOpeningOverlayEl) return;
+        const animation = String(workshopOpeningConfig?.animation || "fade").replace(/[^a-z0-9_-]/gi, "") || "fade";
+        Array.from(workshopOpeningOverlayEl.classList || []).forEach((name) => {
+          if (name.startsWith("workshop-opening-animation-")) workshopOpeningOverlayEl.classList.remove(name);
+        });
+        workshopOpeningOverlayEl.classList.add(`workshop-opening-animation-${animation}`);
+
+        const cardEl = workshopOpeningOverlayEl.querySelector(".workshop-opening-card");
+        const coverImage = String(workshopOpeningConfig?.coverImage || "").trim();
+        if (cardEl) {
+          if (coverImage) {
+            cardEl.style.setProperty("--workshop-opening-cover", `url('${coverImage.replace(/[\\'\n\r]/g, "")}')`);
+          } else {
+            cardEl.style.removeProperty("--workshop-opening-cover");
+          }
+        }
+
+        const titleEl = document.getElementById("workshop-opening-title");
+        if (titleEl) titleEl.textContent = String(workshopOpeningConfig?.title || workshopOpeningFallbackTitle || "Fantareal");
+
+        const subtitleEl = workshopOpeningOverlayEl.querySelector(".workshop-opening-subtitle");
+        if (subtitleEl) {
+          const subtitle = String(workshopOpeningConfig?.subtitle || "").trim();
+          subtitleEl.textContent = subtitle;
+          subtitleEl.hidden = !subtitle;
+        }
+
+        if (workshopOpeningStartEl) {
+          workshopOpeningStartEl.textContent = String(workshopOpeningConfig?.buttonText || "进入故事");
+        }
+
+        if (workshopOpeningReplayBtn) {
+          workshopOpeningReplayBtn.hidden = workshopOpeningConfig?.enabled !== true;
+        }
+      }
+
+      async function applyWorkshopRuntimeConfigFromCard(workshop, { reason = "refresh", showNotice = false } = {}) {
+        const normalized = normalizeRuntimeWorkshopConfig(workshop);
+        const previousAmbience = JSON.stringify(workshopAmbienceConfig || {});
+        const nextAmbience = JSON.stringify(normalized.ambience || {});
+        lastWorkshopConfigSignature = getWorkshopRuntimeSignature(normalized);
+
+        try { await stopDynamicSound({ restoreAmbience: false }); } catch (_) {}
+        resetWorkshopAudioElement(workshopOpeningAudioEl);
+        resetWorkshopAudioElement(workshopAmbienceMusicAudioEl);
+        resetWorkshopAudioElement(workshopAmbienceAmbientAudioEl);
+        workshopOpeningMusicStarted = false;
+        workshopAmbienceStarted = false;
+        workshopAmbienceMuted = false;
+        workshopActiveAudioGroup = "none";
+        workshopDynamicAudioActive = false;
+        workshopDynamicAudioRestoreAmbience = false;
+        workshopDynamicTriggeredSession.clear();
+        clearWorkshopAmbienceBackground();
+
+        workshopOpeningConfig = normalized.opening;
+        workshopAmbienceConfig = normalized.ambience;
+        workshopDynamicScenesConfig = normalized.dynamicScenes;
+        shouldShowWorkshopOpening = false;
+
+        updateWorkshopOpeningDomFromConfig();
+        if (workshopOpeningOverlayEl && !workshopOpeningManualReplayMode) workshopOpeningOverlayEl.hidden = true;
+
+        if (workshopAmbienceConfig?.enabled && workshopAmbienceConfig?.background?.enabled) {
+          applyWorkshopAmbienceBackground();
+        }
+        updateWorkshopOpeningAudioToggle();
+
+        if (showNotice || previousAmbience !== nextAmbience) {
+          setStatus("已应用当前角色卡的演出工坊设置。", "success");
+        }
+      }
+
+      async function reloadWorkshopConfigFromCurrentCard({ reason = "manual", force = false, showNotice = false } = {}) {
+        const now = Date.now();
+        if (!force && now - lastWorkshopRuntimeRefreshAt < 1200) return;
+        lastWorkshopRuntimeRefreshAt = now;
+        try {
+          const response = await fetch("/api/workshop/status", { cache: "no-store" });
+          if (!response.ok) return;
+          const data = await response.json().catch(() => ({}));
+          if (!data?.workshop) return;
+          const nextSignature = getWorkshopRuntimeSignature(data.workshop);
+          if (!force && nextSignature === lastWorkshopConfigSignature) return;
+          await applyWorkshopRuntimeConfigFromCard(data.workshop, { reason, showNotice });
+        } catch (error) {
+          console.warn("演出工坊运行配置刷新失败：", error);
+        }
+      }
+
+      function handleWorkshopConfigSavedPayload(payload = {}) {
+        const at = Number(payload?.at || Date.now()) || Date.now();
+        if (at && at <= lastWorkshopRuntimeRefreshAt) return;
+        lastWorkshopRuntimeRefreshAt = at - 1;
+        void reloadWorkshopConfigFromCurrentCard({ reason: payload?.reason || "storage", force: true, showNotice: true });
+      }
+
+      window.addEventListener("storage", (event) => {
+        if (!event.newValue) return;
+        if (event.key === WORKSHOP_RUNTIME_REFRESH_KEY) {
+          try {
+            const payload = JSON.parse(event.newValue);
+            if (payload?.type === "workshop_config_saved") handleWorkshopConfigSavedPayload(payload);
+          } catch (_) {
+            void reloadWorkshopConfigFromCurrentCard({ reason: "storage", force: true, showNotice: true });
+          }
+          return;
+        }
+        if (event.key === WORKSHOP_ROLE_CARD_LOADED_KEY) {
+          void reloadWorkshopConfigFromCurrentCard({ reason: "role_card_loaded", force: true, showNotice: true });
+        }
+      });
+
+      window.addEventListener("focus", () => {
+        void reloadWorkshopConfigFromCurrentCard({ reason: "focus" });
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) void reloadWorkshopConfigFromCurrentCard({ reason: "visibility" });
+      });
 
       async function startWorkshopAmbience({ fromUserGesture = false } = {}) {
         if (!hasWorkshopAmbienceAudio()) {
