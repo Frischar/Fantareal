@@ -27,6 +27,7 @@
 {% set persona_active = current_path == '/config/card' or current_path == '/config/preset' or current_path == '/config/memory' %}
 {% set worldbook_active = current_path.startswith('/config/worldbook') %}
 {% set plugins_active = current_path.startswith('/mods/tts-studio') or current_path.startswith('/mods/status-panel') or current_path.startswith('/mods/worldbook-maker') or current_path.startswith('/mods/soul-weaver') or current_path.startswith('/mods/card-writer') or current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/state-journal') or current_path.startswith('/mods/challenge-mode') %}
+{% set game_active = current_path == '/game' %}
 
 <nav class="topnav topnav-grouped" aria-label="Primary navigation">
   <details class="nav-group{% if current_path == '/chat' %} active-group{% endif %}" data-challenge-nav="keep">
@@ -122,6 +123,19 @@
     </div>
   </details>
   {% endif %}
+
+  <details class="nav-group{% if game_active %} active-group{% endif %}">
+    <summary class="nav-group-summary">
+      <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg></span>
+      <span class="nav-label">游戏</span>
+      <span class="nav-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span>
+    </summary>
+    <div class="nav-group-panel">
+      <div class="nav-group-links">
+        <a class="navlink{% if game_active %} active{% endif %}" href="/game">茶会派对</a>
+      </div>
+    </div>
+  </details>
 
 </nav>
 <div class="nav-group standalone-challenge" data-challenge-mode-entry hidden>

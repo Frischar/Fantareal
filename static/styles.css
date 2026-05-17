@@ -15,5 +15,6 @@
 @import url("./css/11-workshop-opening.css?v=ui-v141");
 @import url("./css/12-workshop-performance.css?v=ui-v142-workshop-radius");
 @import url("./css/13-route-forwarding.css?v=ui-v148-route-pointer-drag");
+@import url("./css/14-game.css?v=ui-v161");
 
 /* ui-v141: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */
