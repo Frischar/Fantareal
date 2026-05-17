@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
 
@@ -363,14 +364,9 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             raise HTTPException(status_code=500, detail=f"挑战模式四卡清空失败：{exc}") from exc
         return {"ok": True}
 
-    # ═══════════════════════════════════════════
-    # 茶会派对 游戏
-    # ═══════════════════════════════════════════
-
     _game_dir = Path(__file__).resolve().parent.parent / "game" / "Tea Party"
 
     def _setup_tea_party() -> types.ModuleType:
-        """动态加载 game/Tea Party/ 包（路径含空格，无法用 import 语句）。"""
         if "tea_party" in sys.modules:
             return sys.modules["tea_party"]
 
@@ -386,6 +382,8 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             ("tea_party.ai_opponent", "ai_opponent.py"),
         ]:
             spec = importlib.util.spec_from_file_location(mod_name, _game_dir / filename)
+            if spec is None or spec.loader is None:
+                raise HTTPException(status_code=500, detail=f"游戏模块加载失败：{filename}")
             mod = importlib.util.module_from_spec(spec)
             mod.__package__ = "tea_party"
             sys.modules[mod_name] = mod
@@ -398,8 +396,12 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                     setattr(tp, attr, getattr(m, attr))
         return tp
 
-    # 挂载游戏图片
-    from fastapi.staticfiles import StaticFiles
+    def _get_game_or_404(tp: types.ModuleType) -> Any:
+        game = tp.get_session()
+        if game is None:
+            raise HTTPException(status_code=404, detail="没有活跃的游戏，请先开始新游戏。")
+        return game
+
     _pictures_dir = _game_dir / "pictures"
     if _pictures_dir.is_dir():
         app.mount("/game/pictures", StaticFiles(directory=str(_pictures_dir)), name="game_pictures")
@@ -443,7 +445,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
     @app.post("/api/game/shoot")
     async def game_shoot(request: Request) -> dict[str, Any]:
         tp = _setup_tea_party()
-        game = tp.get_session()
+        game = _get_game_or_404(tp)
         body = await request.json()
         result = game.shoot(body["player_index"], body["target"])
         d = result.to_dict()
@@ -454,7 +456,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
     @app.post("/api/game/skip-turn")
     async def game_skip_turn(request: Request) -> dict[str, Any]:
         tp = _setup_tea_party()
-        game = tp.get_session()
+        game = _get_game_or_404(tp)
         body = await request.json()
         result = game.skip_turn(body["player_index"])
         return result.to_dict()
@@ -462,7 +464,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
     @app.post("/api/game/use-item")
     async def game_use_item(request: Request) -> dict[str, Any]:
         tp = _setup_tea_party()
-        game = tp.get_session()
+        game = _get_game_or_404(tp)
         body = await request.json()
         target = body.get("target_item_type", None)
         result = game.use_item(body["player_index"], body["item_type"], target)
@@ -471,7 +473,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
     @app.post("/api/game/discard-item")
     async def game_discard_item(request: Request) -> dict[str, Any]:
         tp = _setup_tea_party()
-        game = tp.get_session()
+        game = _get_game_or_404(tp)
         body = await request.json()
         result = game.discard_item(body["player_index"], body["item_type"])
         return result.to_dict()
@@ -493,20 +495,16 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
     async def game_reset() -> dict[str, Any]:
         tp = _setup_tea_party()
         tp.reset_session(mode="classic", difficulty="normal", p1_name="玩家", p2_name="对手")
-        # Immediately clear so next loadState returns phase:none
-        import sys
         engine_mod = sys.modules.get("tea_party.engine")
         if engine_mod:
-            engine_mod._active_game = None  # type: ignore
+            engine_mod._active_game = None  # type: ignore[attr-defined]
         return {"ok": True}
 
     @app.post("/api/game/no-ai-turn")
     async def game_no_ai_turn(request: Request) -> dict[str, Any]:
         try:
             tp = _setup_tea_party()
-            game = tp.get_session()
-            if game is None:
-                return {"success": False, "message": "没有活跃的游戏"}
+            game = _get_game_or_404(tp)
             if game.phase == tp.GamePhase.GAME_OVER:
                 return {"success": False, "message": "游戏已结束"}
             if game.current_player != 1:
@@ -515,7 +513,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             sanitized = game.get_sanitized_state()
             decision = tp.no_ai_decision(sanitized)
 
-            events: list[dict] = []
+            events: list[dict[str, Any]] = []
             for item_name in decision.get("items_to_use", []):
                 result = game.use_item(1, item_name)
                 if result.success:
@@ -526,7 +524,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             if shoot_result.success:
                 events.extend([{"type": e.event_type, **e.data} for e in shoot_result.events])
 
-            ai_extra_turn = (game.phase == tp.GamePhase.PLAYING and game.current_player == 1)
+            ai_extra_turn = game.phase == tp.GamePhase.PLAYING and game.current_player == 1
 
             return {
                 "success": True,
@@ -538,24 +536,25 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "winner": game.winner,
                 "state": game.get_state(),
             }
-        except Exception as e:
-            return {"success": False, "message": f"服务器错误: {e}"}
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"游戏对手回合处理失败：{exc}") from exc
 
     @app.post("/api/game/ai-turn")
     async def game_ai_turn(request: Request) -> dict[str, Any]:
         tp = _setup_tea_party()
-        game = tp.get_session()
+        game = _get_game_or_404(tp)
 
         if game.phase == tp.GamePhase.GAME_OVER:
             return {"success": False, "message": "游戏已结束"}
         if game.current_player != 1:
             return {"success": False, "message": "不是 AI 的回合"}
 
-        # 解析请求
         body = await request.json() if await request.body() else {}
-        party_chat_message = body.get("message", "")  # 派对模式下的聊天消息（暂未使用）
+        party_chat_message = body.get("message", "")
+        _ = party_chat_message
 
-        # 获取 LLM 配置和角色信息
         llm_config = ctx.get_runtime_chat_config()
         persona = ctx.get_persona() or {"name": "对手", "system_prompt": "", "greeting": ""}
 
@@ -565,7 +564,6 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
         if ai_mod is None:
             return {"success": False, "message": "AI 模块未加载"}
 
-        # 延迟导入，避免模块级循环引用
         from fantareal.app import request_json as _request_json
 
         decision = await ai_mod.request_ai_action(
@@ -575,20 +573,18 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             request_json_func=_request_json,
         )
 
-        # 执行 AI 的道具使用
-        events: list[dict] = []
+        events: list[dict[str, Any]] = []
         for item_name in decision.get("items_to_use", []):
             result = game.use_item(1, item_name)
             if result.success:
                 events.extend([{"type": e.event_type, **e.data} for e in result.events])
 
-        # 执行 AI 的开火
         target = decision.get("target", "opponent")
         shoot_result = game.shoot(1, target)
         if shoot_result.success:
             events.extend([{"type": e.event_type, **e.data} for e in shoot_result.events])
 
-        ai_extra_turn = (game.phase == tp.GamePhase.PLAYING and game.current_player == 1)
+        ai_extra_turn = game.phase == tp.GamePhase.PLAYING and game.current_player == 1
 
         return {
             "success": True,
