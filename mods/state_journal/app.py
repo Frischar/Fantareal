@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 
-VERSION = "2.0.5-workshop-apply-hotfix"
+VERSION = "2.0.7-role-specific-display-backfill"
 
 
 def get_resource_dir() -> Path:
@@ -2752,6 +2752,95 @@ def role_variables_for_character(conn: sqlite3.Connection, character_name: str) 
             return role, variables
     return role, default_variable_configs()
 
+def ensure_display_metrics_for_full_roles(conn: sqlite3.Connection, display_payload: dict[str, Any]) -> int:
+    """Ensure full-mode role cards always have a metrics array for display and state updates."""
+    if not isinstance(display_payload, dict):
+        return 0
+    characters = display_payload.get("characters")
+    if not isinstance(characters, list):
+        return 0
+    config = load_role_state_config(conn)
+    added = 0
+    for character in characters:
+        if not isinstance(character, dict):
+            continue
+        name = clean_display_text(character.get("name") or character.get("角色") or "", 80)
+        if not name:
+            continue
+        role = find_role_config(config, name)
+        if not role or role_state_mode(role) != "full":
+            continue
+        variables = [var for var in (role.get("variables") or []) if isinstance(var, dict) and var.get("enabled") is not False and var.get("display") is not False]
+        if not variables:
+            continue
+        existing = normalize_metric_display_records(character.get("metrics") or character.get("variables") or [])
+        existing_keys = {str(item.get("key") or item.get("metric_key") or "").strip() for item in existing if isinstance(item, dict)}
+        existing_labels = {str(item.get("label") or item.get("metric_label") or "").strip() for item in existing if isinstance(item, dict)}
+        for var in variables:
+            key = str(var.get("var_key") or var.get("key") or "").strip()
+            label = str(var.get("var_name") or var.get("label") or key).strip() or key
+            if not key or key in existing_keys or label in existing_labels:
+                continue
+            default_value = float(var.get("default_value") if var.get("default_value") is not None else var.get("min_value") or 0)
+            max_value = float(var.get("max_value") if var.get("max_value") is not None else 100)
+            existing.append({"key": key, "label": label, "value": default_value, "max": max_value, "delta": 0, "reason": "本轮未检测到明显变化。"})
+            added += 1
+        if existing:
+            character["metrics"] = existing
+    return added
+
+
+def ensure_relationship_fallback(display_payload: dict[str, Any], *, metric_records: list[dict[str, Any]] | None = None) -> int:
+    """Backfill relationship changes when the model omits display.relationships."""
+    if not isinstance(display_payload, dict):
+        return 0
+    relationships = display_payload.get("relationships")
+    if not isinstance(relationships, list):
+        relationships = []
+        display_payload["relationships"] = relationships
+    has_non_stage = any(isinstance(item, dict) and item.get("type") != "state_journal_stage" for item in relationships)
+    if has_non_stage:
+        return 0
+    by_character: dict[str, list[dict[str, Any]]] = {}
+    for character in display_payload.get("characters") or []:
+        if not isinstance(character, dict):
+            continue
+        name = clean_display_text(character.get("name") or "", 80)
+        if not name:
+            continue
+        metrics = normalize_metric_display_records(character.get("metrics") or [])
+        if metrics:
+            by_character.setdefault(name, []).extend(metrics)
+    for item in metric_records or []:
+        if not isinstance(item, dict):
+            continue
+        name = clean_display_text(item.get("character_name") or item.get("name") or "", 80)
+        if not name:
+            continue
+        by_character.setdefault(name, []).append(item)
+    generated: list[dict[str, Any]] = []
+    for name, metrics in by_character.items():
+        seen: set[str] = set()
+        parts: list[str] = []
+        for metric in metrics:
+            key = str(metric.get("key") or metric.get("metric_key") or metric.get("label") or "").strip()
+            label = str(metric.get("label") or metric.get("metric_label") or key).strip() or key
+            if not label or key in seen:
+                continue
+            seen.add(key)
+            delta = metric.get("delta") if metric.get("delta") is not None else metric.get("delta_value")
+            try:
+                delta_num = float(delta or 0)
+            except (TypeError, ValueError):
+                delta_num = 0
+            parts.append(f"{label}{format_metric_delta(delta_num)}" if abs(delta_num) >= 1e-9 else f"{label}不变")
+        if parts:
+            generated.append({"pair": f"{name}-用户", "stage": "关系变化", "change": "，".join(parts) + "。", "type": "state_journal_metric_relation"})
+    if generated:
+        display_payload["relationships"] = generated + relationships
+    return len(generated)
+
+
 def get_metric_snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     init_meta_tables(conn)
     safe_card_uid = current_card_uid()
@@ -3661,6 +3750,75 @@ def attach_metrics_to_display(display: dict[str, Any], metrics: Any) -> dict[str
             character["metrics"] = matched
     return display
 
+
+def collect_role_specific_display_characters(display: Any) -> list[dict[str, Any]]:
+    """Collect role-specific character cards from worker output or nested raw display.
+
+    v2.0.6 introduced role_specific_characters for snapshotFields/full roles, but
+    some model outputs leave display.characters empty.  This helper converts those
+    role-specific cards back into the normal display.characters shape before the
+    regular display normalizer runs.
+    """
+    collected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def append_items(source: Any) -> None:
+        if not isinstance(source, list):
+            return
+        for item in source[:12]:
+            if not isinstance(item, dict):
+                continue
+            schema = item.get("character_schema") if isinstance(item.get("character_schema"), dict) else {}
+            name = clean_display_text(
+                item.get("name") or item.get("role_name") or item.get("角色") or schema.get("name") or "",
+                80,
+            )
+            if not name:
+                continue
+            role_id = safe_id(item.get("role_id") or item.get("id") or "", "")
+            dedupe_key = role_id or name
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            character: dict[str, Any] = {"name": name}
+            if role_id:
+                character["role_id"] = role_id
+            mode = str(item.get("mode") or item.get("stateJournalMode") or "").strip()
+            if mode:
+                character["mode"] = mode
+
+            # Flatten the model's per-role schema into the normal character object.
+            for key, value in schema.items():
+                if key in {"name", "metrics", "variables"}:
+                    continue
+                if value is not None:
+                    character[key] = value
+            for key, value in item.items():
+                if key in {"character_schema", "role_specific_characters", "roleSpecificCharacters"}:
+                    continue
+                if key in {"metrics", "variables"}:
+                    continue
+                if key not in character and value is not None:
+                    character[key] = value
+
+            metrics = item.get("metrics") or item.get("variables") or schema.get("metrics") or schema.get("variables")
+            metric_records = normalize_metric_display_records(metrics)
+            if metric_records:
+                character["metrics"] = metric_records
+            collected.append(character)
+
+    def walk(node: Any, depth: int = 0) -> None:
+        if not isinstance(node, dict) or depth > 3:
+            return
+        for key in ("role_specific_characters", "roleSpecificCharacters", "role_characters", "roleCharacters"):
+            append_items(node.get(key))
+        raw = node.get("raw")
+        if isinstance(raw, dict):
+            walk(raw, depth + 1)
+
+    walk(display)
+    return collected
+
 def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | None = None, tables: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Normalize the assistant-generated front-end display payload.
 
@@ -3678,6 +3836,10 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
     characters = display.get("characters") or display.get("character_cards") or []
     if not isinstance(characters, list):
         characters = []
+    if not characters:
+        role_specific_characters = collect_role_specific_display_characters(display)
+        if role_specific_characters:
+            characters = role_specific_characters
     relationships = display.get("relationships") or display.get("relationship_cards") or []
     if not isinstance(relationships, list):
         relationships = []
@@ -3715,22 +3877,27 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
         name = clean_display_text(item.get("name") or item.get("角色") or "", 40)
         if not name:
             continue
-        effective_fields = role_snapshot_fields_for_character(role_state_config, name) or display_fields
+        role_snapshot_fields = role_snapshot_fields_for_character(role_state_config, name)
+        effective_fields = role_snapshot_fields or display_fields
+        has_role_snapshot_fields = bool(role_snapshot_fields)
         normalized_item = {
             "name": name,
             "snapshot_fields": effective_fields,
-            "emotion": clean_display_text(item.get("emotion") or item.get("mood") or item.get("情绪") or "", 220),
-            "clothing": clean_display_text(item.get("clothing") or item.get("衣着") or "", 260),
-            "posture": clean_display_text(item.get("posture") or item.get("pose") or item.get("角色神态") or "", 260),
-            "scene": clean_display_text(item.get("scene") or item.get("场景") or normalized_scene.get("location") or "", 180),
-            "sensory_field": clean_display_text(item.get("sensory_field") or item.get("感官场域") or "", 280),
-            "body_temperature": clean_display_text(item.get("body_temperature") or item.get("body_temp") or item.get("躯体温差") or "", 220),
-            "body_motion": clean_display_text(item.get("body_motion") or item.get("肢体动态") or "", 260),
-            "micro_reaction": clean_display_text(item.get("micro_reaction") or item.get("微生理反应") or "", 260),
-            "visual_focus": clean_display_text(item.get("visual_focus") or item.get("视觉焦点") or "", 260),
-            "interaction": clean_display_text(item.get("interaction") or item.get("角色互动") or "", 320),
-            "summary": clean_display_text(item.get("summary") or item.get("状态摘要") or "", 320),
         }
+        if not has_role_snapshot_fields:
+            normalized_item.update({
+                "emotion": clean_display_text(item.get("emotion") or item.get("mood") or item.get("情绪") or "", 220),
+                "clothing": clean_display_text(item.get("clothing") or item.get("衣着") or "", 260),
+                "posture": clean_display_text(item.get("posture") or item.get("pose") or item.get("角色神态") or "", 260),
+                "scene": clean_display_text(item.get("scene") or item.get("场景") or normalized_scene.get("location") or "", 180),
+                "sensory_field": clean_display_text(item.get("sensory_field") or item.get("感官场域") or "", 280),
+                "body_temperature": clean_display_text(item.get("body_temperature") or item.get("body_temp") or item.get("躯体温差") or "", 220),
+                "body_motion": clean_display_text(item.get("body_motion") or item.get("肢体动态") or "", 260),
+                "micro_reaction": clean_display_text(item.get("micro_reaction") or item.get("微生理反应") or "", 260),
+                "visual_focus": clean_display_text(item.get("visual_focus") or item.get("视觉焦点") or "", 260),
+                "interaction": clean_display_text(item.get("interaction") or item.get("角色互动") or "", 320),
+                "summary": clean_display_text(item.get("summary") or item.get("状态摘要") or "", 320),
+            })
         item_metrics = normalize_metric_display_records(item.get("metrics") or item.get("variables") or [])
         if item_metrics:
             normalized_item["metrics"] = item_metrics
@@ -4052,20 +4219,33 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
     custom_roles = [role for role in role_state_config.get("roles", []) if isinstance(role, dict) and role.get("enabled") is not False and role_state_mode_uses_variables(role) and role.get("variables") and not role.get("use_default_variables")]
     snapshot_roles = [role for role in role_state_config.get("roles", []) if isinstance(role, dict) and role.get("enabled") is not False and role_state_mode_uses_snapshot(role) and role.get("snapshotFields")]
     role_display_schemas: list[dict[str, Any]] = []
+    role_prompt_tasks: list[dict[str, Any]] = []
     for role in role_state_config.get("roles") or []:
-        if not isinstance(role, dict) or role.get("enabled") is False or role_state_mode(role) == "disabled":
+        if not isinstance(role, dict) or role.get("enabled") is False:
+            continue
+        mode = role_state_mode(role)
+        if mode == "disabled":
             continue
         role_fields = [field for field in (role.get("snapshotFields") or []) if role_state_mode_uses_snapshot(role) and isinstance(field, dict) and field.get("enabled") is not False and field.get("display") is not False]
         role_variables = [var for var in (role.get("variables") or []) if role_state_mode_uses_variables(role) and isinstance(var, dict) and var.get("enabled") is not False]
-        if not role_fields and not role_variables:
-            continue
-        role_schema = {"name": role.get("role_name") or role.get("role_id") or "角色名"}
-        for field in role_fields:
-            key = safe_id(field.get("key"), "")
-            if key:
-                role_schema[key] = f"{field.get('label') or key}。{field.get('instruction') or '根据本轮上下文生成该状态快照字段。'}"
-        if role_variables:
-            role_schema["metrics"] = [
+        role_stages = [stage for stage in (role.get("stages") or []) if role_state_mode_uses_stages(role) and isinstance(stage, dict) and stage.get("enabled") is not False]
+        role_name = role.get("role_name") or role.get("role_id") or "角色名"
+        role_task = {
+            "role_id": role.get("role_id"),
+            "role_name": role_name,
+            "aliases": role.get("aliases") or [],
+            "mode": mode,
+            "display_source": "snapshotFields" if role_fields else "global_template",
+            "display_fields": [
+                {
+                    "key": safe_id(field.get("key"), ""),
+                    "label": str(field.get("label") or field.get("key") or "").strip(),
+                    "instruction": str(field.get("instruction") or "根据本轮上下文生成该状态快照字段。").strip(),
+                }
+                for field in role_fields
+                if safe_id(field.get("key"), "")
+            ],
+            "metrics": [
                 {
                     "key": var.get("var_key"),
                     "label": var.get("var_name"),
@@ -4074,8 +4254,30 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
                 }
                 for var in role_variables
                 if var.get("var_key")
-            ]
-        role_display_schemas.append({"role_id": role.get("role_id"), "role_name": role.get("role_name"), "character_schema": role_schema})
+            ],
+            "stages": [
+                {
+                    "key": stage.get("stage_key"),
+                    "name": stage.get("stage_name"),
+                    "priority": stage.get("priority"),
+                    "conditions": stage.get("conditions") or [],
+                    "activation_tag": stage.get("activation_tag"),
+                }
+                for stage in role_stages
+                if stage.get("stage_key")
+            ],
+        }
+        role_prompt_tasks.append(role_task)
+        if not role_fields and not role_variables:
+            continue
+        role_schema = {"name": role_name}
+        for field in role_fields:
+            key = safe_id(field.get("key"), "")
+            if key:
+                role_schema[key] = f"{field.get('label') or key}。{field.get('instruction') or '根据本轮上下文生成该状态快照字段。'}"
+        if role_variables:
+            role_schema["metrics"] = role_task["metrics"]
+        role_display_schemas.append({"role_id": role.get("role_id"), "role_name": role.get("role_name"), "mode": mode, "character_schema": role_schema})
     system_prompt = """你是 Fantareal 的“心笺”结构化记录与幕笺展示助手。你的任务不是继续剧情，也不是扮演角色，而是根据聊天内容维护结构化表格，并生成正文之外给用户看的幕笺展示。\n\n硬性规则：\n1. 只输出一个合法 JSON 对象，不要输出 Markdown、解释、寒暄或代码块。\n2. JSON 根结构必须是 {\"updates\": [], \"display\": {}}。\n3. updates 用于写入事实表；没有明确事实变化时，updates 可以为空数组。\n4. display 是给用户看的幕笺展示，每轮都要生成，除非输入为空。\n5. 不要输出 SQL，心笺后端会把 JSON 更新安全写入 SQLite。\n6. 不要新增重大剧情事实，不要替用户行动，不要改变主模型正文已经确定的结果。\n7. 幕笺可以对情绪、衣着、姿态、感官、互动潜台词做合理扩写，但只能基于正文、上下文、角色状态与氛围自然延展。\n8. 事实表要保守，幕笺可以写意；不要把展示扩写当成长期事实强行写入 updates。\n9. updates 只能更新表结构中已经存在的字段，不得新增未知字段。\n10. operation 只能使用 upsert、update、delete。
 11. JSON 字符串内容中不要使用英文双引号；如需引用台词，请使用中文引号“……”或单引号，避免破坏 JSON。"""
     if config.get("strict_mode"):
@@ -4087,17 +4289,20 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
         system_prompt += f"\n14. 标题生成风格：{title_style_rule}"
         system_prompt += f"\n15. 附笺生成风格：{note_style_rule}"
         if note_style == "sensory":
-            system_prompt += "\n16. 感官标签不是外观皮肤，而是角色附笺内容结构。必须优先填满当前模板字段列表中的每一个字段。"
+            system_prompt += "\n16. 感官标签不是外观皮肤，而是角色附笺内容结构；但字段来源必须服从角色使用方式。"
         if template_lines:
-            system_prompt += "\n17. 当前附笺模板字段如下，display.characters 中每个角色都要按这些字段 key 输出；新增字段也必须真实生成，不得只保留在前端预览：\n" + "\n".join(template_lines)
-            system_prompt += "\n18. display.output_template 里的 {field_key} 占位符必须能从角色对象中取到对应 key 的内容。"
+            system_prompt += "\n17. 字段生成必须按角色使用方式分流：default 角色和未配置角色才使用全局默认幕笺模板；snapshot_only 角色只使用该角色 snapshotFields；full 角色只使用该角色 snapshotFields，并额外输出 metrics 与阶段判断相关信息；disabled 角色不得输出。"
+            system_prompt += "\n18. 对 user_payload.role_prompt_tasks 中 display_source=snapshotFields 的角色，display.characters 只能输出 display_fields 列出的展示字段；禁止补全全局模板字段，例如衣着、角色神态、场景、感官场域、躯体温差、肢体动态、微生理反应、视线焦点、角色互动，除非这些字段明确出现在该角色 display_fields 中。"
+            system_prompt += "\n19. 没有角色专属 display_fields 的角色，才使用以下全局默认幕笺模板字段：\n" + "\n".join(template_lines)
+            system_prompt += "\n20. display.output_template 只用于全局默认模板角色；角色专属 snapshotFields 角色不要为了 output_template 额外补默认字段。"
             if has_metric_fields:
-                system_prompt += "\n19. 当前模板包含关系/状态数值字段：这类字段必须使用固定格式 `当前值/100（本轮变化）`，例如 `65/100（+2）`、`72/100（+0）`、`18/100（-1）`。当前值限制在 0-100；变化值只表示本轮变化，不要写成长句解释。"
-                system_prompt += "\n20. 如果 current_metrics 提供了该角色上一轮数值，必须以上一轮数值为基准，根据本轮剧情判断 delta，再输出新当前值；不要每回合机械 +1 或凭空重置。"
+                system_prompt += "\n21. 当前模板包含关系/状态数值字段：这类字段必须使用固定格式 `当前值/100（本轮变化）`，例如 `65/100（+2）`、`72/100（+0）`、`18/100（-1）`。当前值限制在 0-100；变化值只表示本轮变化，不要写成长句解释。"
+                system_prompt += "\n22. 如果 current_metrics 提供了该角色上一轮数值，必须以上一轮数值为基准，根据本轮剧情判断 delta，再输出新当前值；不要每回合机械 +1 或凭空重置。"
             if custom_roles:
-                system_prompt += "\n21. 当前启用了角色专属变量：display.characters 中对应角色必须输出 metrics 数组。每项格式为 {key, label, delta, reason}；key 必须使用 role_state_config.variables[].var_key。后端只以 delta 更新变量并按 delta_min/delta_max 裁剪。"
+                system_prompt += "\n23. full 模式角色必须输出 metrics 数组。每项格式为 {key, label, delta, reason}；key 必须使用 role_prompt_tasks.metrics[].key / role_state_config.variables[].var_key。后端只以 delta 更新变量并按 delta_min/delta_max 裁剪。"
             if snapshot_roles:
-                system_prompt += "\n22. 当前启用了角色专属 snapshotFields：对应角色的 display.characters 必须优先按 snapshotFields 输出字段；不要再强制补全全局模板里的衣着、躯体温差、微生理反应等字段。snapshotFields 只用于幕笺展示，不参与阶段判断，不发给世界书。"
+                system_prompt += "\n24. snapshotFields 只用于幕笺展示，不参与阶段判断，不发给世界书；阶段与 external_tag 只由变量阶段系统处理。"
+            system_prompt += "\n25. display.relationships 尽量输出角色与用户/主要互动对象的关系变化；如果无明显变化也可以简短写保持稳定。"
         system_prompt += build_protagonist_prompt_rule(config)
         system_prompt += build_worker_custom_prompt_rule(config)
 
@@ -4142,6 +4347,7 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
         "current_metrics": metric_states or {},
         "role_state_config": role_state_config,
         "role_display_schemas": role_display_schemas,
+        "role_prompt_tasks": role_prompt_tasks,
         "role_variable_rules": {
             "key_rule": "变量 Key 使用 var_key；手动新增变量默认 var_1/var_2，不自动拼音。",
             "delta_rule": "输出本轮变化 delta；后端以 delta 为准更新当前值，并按 delta_min/delta_max 裁剪。",
@@ -5160,6 +5366,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         if config.get("turn_note_enabled", True) and not payload.get("dry_run", False):
             with connect_db() as conn:
                 init_meta_tables(conn)
+                ensure_display_metrics_for_full_roles(conn, display_payload)
                 metric_applied = []
                 metric_applied.extend(apply_display_metrics(conn, turn_id, display_payload))
                 metric_applied.extend(apply_update_metric_summaries(conn, turn_id, updates))
@@ -5189,6 +5396,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                     display_payload = build_fallback_display(latest_turn=latest_turn, tables=refreshed_tables)
                 if result.get("metrics"):
                     display_payload = attach_metrics_to_display(display_payload, result.get("metrics"))
+                ensure_relationship_fallback(display_payload, metric_records=result.get("metrics") or [])
                 display_payload = save_turn_display(display_payload, turn_id=turn_id, message_id=message_id, content_hash=payload.get("assistant_hash") or payload.get("content_hash") or payload.get("contentHash") or hash_text(assistant_text), turn_index=safe_turn_index, trigger_source=trigger_source)
             except Exception as exc:
                 result.setdefault("errors", []).append(f"幕笺保存失败：{exc}")

@@ -2386,7 +2386,8 @@
       <div class="state-journal-note-body">
         <div class="state-journal-note-toolbar"><span>附笺：${escapeHtml(noteStyleLabel)}</span><span>显示：${escapeHtml(filterLabel)}</span><span>密度：${escapeHtml(densityLabel)}</span>${sourceLabel}</div>
         ${characters.length ? characters.map((character, index) => {
-          const renderedTemplate = renderOutputTemplate(display?.output_template, character);
+          const hasRoleSnapshotFields = Array.isArray(character?.snapshot_fields) && character.snapshot_fields.length > 0;
+          const renderedTemplate = hasRoleSnapshotFields ? "" : renderOutputTemplate(display?.output_template, character);
           const characterName = character.name || "角色";
           const sectionTitle = ["storyboard", "storyboard_frame", "scene_board"].includes(layoutType)
             ? `CUT ${String(index + 1).padStart(2, "0")} · ${characterName}`

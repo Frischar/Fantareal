@@ -1,10 +1,10 @@
 {
   "label": "心笺",
-  "description": "AI 结构化状态记录与幕笺展示工具。v2.0.5 保留稳定整合功能，回退 Chat 自动重刷，并配合演出工坊角色卡应用修复。",
+  "description": "AI 结构化状态记录与幕笺展示工具。v2.0.7 修复角色专属幕笺展示卡回填，避免 role_specific_characters 未转入 characters 导致角色状态卡为空。",
   "hooks": {
     "chat_scripts": [
-      "/static/state-journal-chat.js?v=state-journal-v205-workshop-apply-hotfix"
+      "/static/state-journal-chat.js?v=state-journal-v207-role-display-backfill"
     ]
   },
-  "version": "2.0.5-workshop-apply-hotfix"
+  "version": "2.0.7-role-specific-display-backfill"
 }
