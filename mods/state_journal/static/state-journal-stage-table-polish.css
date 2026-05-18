@@ -20,7 +20,7 @@
 .role-state-stage-table.stage-table-polish th:nth-child(5),
 .role-state-stage-table.stage-table-polish td:nth-child(5) { width: 116px; text-align: center; }
 .role-state-stage-table.stage-table-polish th:nth-child(6),
-.role-state-stage-table.stage-table-polish td:nth-child(6) { width: 132px; text-align: right; }
+.role-state-stage-table.stage-table-polish td:nth-child(6) { width: 150px; text-align: right; }
 
 .role-state-stage-table.stage-table-polish tbody tr {
   position: relative;
@@ -438,4 +438,26 @@
     min-width: 830px !important;
     max-width: 830px !important;
   }
+}
+
+/* v2.0.8 · 阶段规则操作区收口：去掉行内 details 下拉，避免被表格裁切。 */
+.role-state-stage-table.stage-table-polish .stage-row-actions {
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+.role-state-stage-table.stage-table-polish .stage-row-actions .ghost-btn.tiny {
+  min-width: 52px;
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: .8rem;
+}
+.role-state-stage-table.stage-table-polish .stage-row-actions .danger-soft {
+  color: rgba(255,220,220,.94);
+  border-color: rgba(240,120,120,.32);
+  background: rgba(185,64,64,.13);
+}
+.role-state-stage-table.stage-table-polish .stage-row-actions .danger-soft:hover {
+  border-color: rgba(240,120,120,.52);
+  background: rgba(185,64,64,.22);
 }

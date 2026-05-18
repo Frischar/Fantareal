@@ -1683,13 +1683,7 @@
             <td>
               <div class="stage-row-actions">
                 <button type="button" class="ghost-btn tiny" data-config-stage>配置</button>
-                <details class="role-state-row-more">
-                  <summary>⋯</summary>
-                  <div class="role-state-row-menu">
-                    <button type="button" data-delete-stage>删除阶段</button>
-                    <code title="${escapeAttr(stageActivationTag(role, stage))}">${escapeHtml(stageActivationTag(role, stage))}</code>
-                  </div>
-                </details>
+                <button type="button" class="ghost-btn tiny danger-soft" data-delete-stage title="删除该阶段">删除</button>
               </div>
             </td>
           </tr>`;
