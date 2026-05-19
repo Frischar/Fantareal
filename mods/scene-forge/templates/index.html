@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>&#x666F;&#x6784; · &#x573A;&#x666F;&#x8865;&#x5168;&#x5668;</title>
+    <link rel="stylesheet" href="./static/scene-forge.css">
+</head>
+<body data-mod-base-path="__MOD_BASE_PATH__">
+    <main class="forge-shell">
+        <section class="forge-main" aria-label="&#x573A;&#x666F;&#x8865;&#x5168;&#x5668;">
+            <header class="forge-header">
+                <div>
+                    <p class="eyebrow">SCENE FORGE</p>
+                    <h1>&#x666F;&#x6784; · &#x573A;&#x666F;&#x8865;&#x5168;&#x5668;</h1>
+                </div>
+                <span id="toolState" class="state-chip">&#x5C31;&#x7EEA;</span>
+            </header>
+
+            <label class="brief-box" for="sceneBrief">
+                <span>&#x573A;&#x666F;&#x60F3;&#x6CD5;</span>
+                <textarea id="sceneBrief" rows="5" placeholder="&#x4F8B;&#x5982;&#xFF1A;&#x96E8;&#x591C;&#x8BCA;&#x7597;&#x5BA4;&#xFF0C;&#x4E00;&#x4E2A;&#x964C;&#x751F;&#x4EBA;&#x5E26;&#x7740;&#x4E0D;&#x8BE5;&#x5B58;&#x5728;&#x7684;&#x65E7;&#x75C5;&#x5386;&#x6765;&#x6C42;&#x52A9;&#x3002;"></textarea>
+            </label>
+
+            <div class="actions">
+                <button id="completeScene" class="primary-button" type="button">AI &#x8865;&#x5168;&#x573A;&#x666F;</button>
+                <button id="copyPrompt" class="ghost-button" type="button">&#x590D;&#x5236; Prompt</button>
+                <button id="injectChat" class="ghost-button" type="button">&#x6DFB;&#x52A0;&#x5230;&#x5BFC;&#x6F14;&#x6CE8;</button>
+            </div>
+            <p class="inject-hint">&#x53C2;&#x8003;&#xFF1A;&#x751F;&#x6548; 2 &#x56DE;&#x5408; · &#x63D2;&#x5165;&#x89D2;&#x8272;&#x524D;</p>
+
+            <label class="prompt-box" for="promptOutput">
+                <span>&#x751F;&#x6210; Prompt</span>
+                <textarea id="promptOutput" rows="17" spellcheck="false" placeholder="&#x8FD9;&#x91CC;&#x4F1A;&#x751F;&#x6210;&#x53EF;&#x7F16;&#x8F91;&#x7684;&#x573A;&#x666F; Prompt&#x3002;&#x4F60;&#x53EF;&#x4EE5;&#x5148;&#x624B;&#x5199;&#xFF0C;&#x4E5F;&#x53EF;&#x4EE5;&#x8BA9; AI &#x6839;&#x636E;&#x4E0A;&#x9762;&#x7684;&#x60F3;&#x6CD5;&#x8865;&#x5168;&#x3002;"></textarea>
+            </label>
+        </section>
+    </main>
+
+    <script>
+        const sceneBrief = document.getElementById("sceneBrief");
+        const promptOutput = document.getElementById("promptOutput");
+        const completeScene = document.getElementById("completeScene");
+        const copyPrompt = document.getElementById("copyPrompt");
+        const injectChat = document.getElementById("injectChat");
+        const toolState = document.getElementById("toolState");
+
+        function inferModBasePath() {
+            const configured = document.body.dataset.modBasePath || "";
+            if (configured && configured !== "__MOD_BASE_PATH__") {
+                return configured.replace(/\/$/, "");
+            }
+            const path = window.location.pathname.replace(/\/$/, "");
+            const marker = "/app";
+            const markerIndex = path.indexOf(marker);
+            if (path.startsWith("/mods/") && markerIndex > 0) {
+                return path.slice(0, markerIndex + marker.length);
+            }
+            return "/mods/scene-forge/app";
+        }
+
+        const modBasePath = inferModBasePath();
+
+        function setState(text, tone = "idle") {
+            toolState.textContent = text;
+            toolState.dataset.tone = tone;
+        }
+
+        async function postJson(url, payload) {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json; charset=utf-8" },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.ok === false) {
+                throw new Error(data.detail || data.reason || "\u8bf7\u6c42\u5931\u8d25");
+            }
+            return data;
+        }
+
+        async function copyText(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+            promptOutput.focus();
+            promptOutput.select();
+            document.execCommand("copy");
+            window.getSelection().removeAllRanges();
+        }
+
+        function notifyDirectorNotesChanged(items) {
+            const eventPayload = { at: Date.now(), items: Array.isArray(items) ? items : [] };
+            try {
+                if ("BroadcastChannel" in window) {
+                    const channel = new BroadcastChannel("fantareal-director-notes");
+                    channel.postMessage(eventPayload);
+                    channel.close();
+                }
+            } catch (error) {
+                // Cross-tab refresh is best-effort; the note is already saved by the API.
+            }
+            try {
+                localStorage.setItem("fantareal:director-notes-updated", JSON.stringify(eventPayload));
+            } catch (error) {
+                // Ignore private-mode or storage-disabled browsers.
+            }
+        }
+
+        completeScene.addEventListener("click", async () => {
+            const brief = sceneBrief.value.trim();
+            const prompt = promptOutput.value.trim();
+            if (!brief && !prompt) {
+                sceneBrief.focus();
+                setState("\u5148\u8f93\u5165\u573a\u666f\u60f3\u6cd5", "warn");
+                return;
+            }
+
+            completeScene.disabled = true;
+            setState("\u8865\u5168\u4e2d", "busy");
+            try {
+                const data = await postJson(`${modBasePath}/api/complete`, { brief, prompt });
+                promptOutput.value = data.prompt || "";
+                setState(data.mode === "ai" ? "AI \u5df2\u8865\u5168" : "\u672c\u5730\u5df2\u8865\u5168", data.mode === "ai" ? "ok" : "warn");
+            } catch (error) {
+                setState(error.message || "\u8865\u5168\u5931\u8d25", "error");
+            } finally {
+                completeScene.disabled = false;
+            }
+        });
+
+        copyPrompt.addEventListener("click", async () => {
+            if (!promptOutput.value.trim()) {
+                promptOutput.focus();
+                setState("\u6ca1\u6709\u53ef\u590d\u5236\u5185\u5bb9", "warn");
+                return;
+            }
+            try {
+                await copyText(promptOutput.value);
+                setState("\u5df2\u590d\u5236", "ok");
+            } catch (error) {
+                setState("\u590d\u5236\u5931\u8d25", "error");
+            }
+        });
+
+        injectChat.addEventListener("click", async () => {
+            const prompt = promptOutput.value.trim();
+            if (!prompt) {
+                promptOutput.focus();
+                setState("\u6ca1\u6709\u53ef\u6ce8\u5165\u5185\u5bb9", "warn");
+                return;
+            }
+
+            injectChat.disabled = true;
+            setState("\u6dfb\u52a0\u5bfc\u6f14\u6ce8\u4e2d", "busy");
+            try {
+                const data = await postJson("/api/chat/director-notes", {
+                    content: prompt,
+                    remaining_turns: 2,
+                    position: "before_char_defs",
+                });
+                notifyDirectorNotesChanged(data.items || []);
+                setState("\u5df2\u6dfb\u52a0\u5bfc\u6f14\u6ce8\uff1a2 \u56de\u5408 · \u89d2\u8272\u524d", "ok");
+            } catch (error) {
+                setState(error.message || "\u6dfb\u52a0\u5bfc\u6f14\u6ce8\u5931\u8d25", "error");
+            } finally {
+                injectChat.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

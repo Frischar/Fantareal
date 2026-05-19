@@ -331,6 +331,77 @@
         line-height: 1.45;
         color: var(--muted);
       }
+      .director-note-panel {
+        margin-top: 0.9rem;
+      }
+      .director-note-form {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .director-note-form textarea {
+        min-height: 5.6rem;
+        resize: vertical;
+      }
+      .director-note-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+      }
+      .director-note-actions {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.85rem;
+        flex-wrap: wrap;
+      }
+      .director-note-list {
+        display: grid;
+        gap: 0.7rem;
+        margin-top: 0.9rem;
+      }
+      .director-note-item {
+        border: 1px solid var(--border);
+        border-radius: 0.85rem;
+        background: var(--panel);
+        padding: 0.85rem 0.95rem;
+      }
+      .director-note-item-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.55rem;
+      }
+      .director-note-item-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+      }
+      .director-note-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.22rem 0.58rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--input-bg);
+        font-size: 0.76rem;
+      }
+      .director-note-content {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        color: var(--text);
+      }
+      .director-note-empty {
+        border: 1px dashed var(--border);
+        border-radius: 0.85rem;
+        padding: 0.95rem;
+        color: var(--muted);
+        background: color-mix(in srgb, var(--panel) 84%, transparent 16%);
+      }
       @media (max-width: 768px) {
         .preset-toolbar {
           flex-direction: column;
@@ -348,6 +419,9 @@
           left: 0;
           right: 0;
           max-width: 100%;
+        }
+        .director-note-grid {
+          grid-template-columns: 1fr;
         }
       }
 
@@ -779,6 +853,39 @@
                 </div>
                 <p class="muted">输入框里有内容时，可以查看系统提示、人设、记忆、世界书、最近聊天和本轮输入如何一起发送给模型。</p>
               </div>
+              <div class="drawer-debug-panel runtime-card director-note-panel">
+                <div class="drawer-debug-head">
+                  <div class="drawer-debug-meta">
+                    <span class="drawer-debug-title">导演注</span>
+                    <span class="muted">临时说明，会按剩余回合自动失效</span>
+                  </div>
+                </div>
+                <div class="director-note-form">
+                  <label for="director-note-content">内容</label>
+                  <textarea id="director-note-content" placeholder="例如：请遵从格式；现在角色的心态"></textarea>
+                  <div class="director-note-grid">
+                    <div>
+                      <label for="director-note-turns">最多生效回合</label>
+                      <input id="director-note-turns" type="number" min="1" max="20" step="1" value="1" />
+                    </div>
+                    <div>
+                      <label for="director-note-position">插入位置</label>
+                      <select id="director-note-position">
+                        <option value="before_char_defs">角色前</option>
+                        <option value="after_char_defs" selected>角色后</option>
+                        <option value="before_user_input">用户输入前</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="director-note-actions">
+                    <p class="muted">只影响后续聊天组包；Prompt 预览会显示位置，但不会消耗回合。</p>
+                    <button id="save-director-note" type="button" class="secondary compact">添加导演注</button>
+                  </div>
+                </div>
+                <div id="director-note-list" class="director-note-list">
+                  <div class="director-note-empty">当前没有生效中的导演注。</div>
+                </div>
+              </div>
               <div id="prompt-package-panel" class="drawer-debug-panel runtime-card" hidden>
                 <div class="drawer-debug-head">
                   <div class="drawer-debug-meta">
@@ -1107,6 +1214,17 @@
       const promptPackageSummaryEl = document.getElementById("prompt-package-summary");
       const promptPackageLayersEl = document.getElementById("prompt-package-layers");
       const promptPackagePreviewEl = document.getElementById("prompt-package-preview");
+      const directorNoteContentEl = document.getElementById("director-note-content");
+      const directorNoteTurnsEl = document.getElementById("director-note-turns");
+      const directorNotePositionEl = document.getElementById("director-note-position");
+      const saveDirectorNoteBtn = document.getElementById("save-director-note");
+      const directorNoteListEl = document.getElementById("director-note-list");
+      const DIRECTOR_NOTE_POSITION_LABELS = {
+        before_char_defs: "角色前",
+        after_char_defs: "角色后",
+        before_user_input: "用户输入前",
+      };
+      let directorNotesCache = [];
       let presetDebugCollapsed = true;
       const workshopModalEl = document.getElementById("workshop-modal");
       const workshopModalTitleEl = document.getElementById("workshop-modal-title");
@@ -3245,15 +3363,129 @@
           stored_memory_count: "记忆库",
           recalled_memory_count: "召回",
           hit_count: "命中",
+          note_count: "导演注",
+          position: "位置",
           turn_count: "历史",
           char_count: "字数",
           section_count: "段数",
         };
         return Object.entries(meta)
           .filter(([, value]) => value !== "" && value !== null && value !== undefined)
-          .map(([key, value]) => `${labels[key] || key}: ${value === true ? "开" : value === false ? "关" : value}`)
+          .map(([key, value]) => {
+            const normalizedValue = key === "position" ? (DIRECTOR_NOTE_POSITION_LABELS[value] || value) : value;
+            return `${labels[key] || key}: ${normalizedValue === true ? "开" : normalizedValue === false ? "关" : normalizedValue}`;
+          })
           .join(" · ");
       }
+
+      function directorNoteSummary(text, maxLength = 96) {
+        const cleanText = String(text || "").trim().replace(/\s+/g, " ");
+        if (cleanText.length <= maxLength) return cleanText;
+        return `${cleanText.slice(0, maxLength).trimEnd()}...`;
+      }
+
+      function renderDirectorNotes(items) {
+        directorNotesCache = Array.isArray(items) ? items.slice() : [];
+        if (!directorNoteListEl) return;
+        directorNoteListEl.innerHTML = "";
+        if (!directorNotesCache.length) {
+          directorNoteListEl.innerHTML = '<div class="director-note-empty">当前没有生效中的导演注。</div>';
+          return;
+        }
+        directorNotesCache.forEach((item) => {
+          const wrapper = document.createElement("div");
+          wrapper.className = "director-note-item";
+
+          const head = document.createElement("div");
+          head.className = "director-note-item-head";
+
+          const meta = document.createElement("div");
+          meta.className = "director-note-item-meta";
+
+          const positionChip = document.createElement("span");
+          positionChip.className = "director-note-chip";
+          positionChip.textContent = DIRECTOR_NOTE_POSITION_LABELS[item.position] || item.position || "未分类";
+
+          const turnsChip = document.createElement("span");
+          turnsChip.className = "director-note-chip";
+          turnsChip.textContent = `剩余 ${Number(item.remaining_turns || 0)} 回合`;
+
+          meta.appendChild(positionChip);
+          meta.appendChild(turnsChip);
+
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "secondary compact";
+          removeBtn.textContent = "删除";
+          removeBtn.addEventListener("click", () => {
+            deleteDirectorNote(item.id).catch((error) => {
+              setStatus(`删除导演注失败：${error.message}`, "error");
+              showToast(`删除导演注失败：${error.message}`, "error");
+            });
+          });
+
+          head.appendChild(meta);
+          head.appendChild(removeBtn);
+
+          const content = document.createElement("p");
+          content.className = "director-note-content";
+          content.textContent = directorNoteSummary(item.content || "", 160);
+
+          wrapper.appendChild(head);
+          wrapper.appendChild(content);
+          directorNoteListEl.appendChild(wrapper);
+        });
+      }
+
+      async function loadDirectorNotes() {
+        const response = await fetch("/api/chat/director-notes");
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "加载导演注失败");
+        }
+        const data = await response.json();
+        renderDirectorNotes(data.items || []);
+        return data;
+      }
+
+      async function createDirectorNote() {
+        const content = directorNoteContentEl?.value.trim() || "";
+        if (!content) {
+          throw new Error("导演注内容不能为空");
+        }
+        const turns = Number(directorNoteTurnsEl?.value || 1);
+        const position = directorNotePositionEl?.value || "after_char_defs";
+        const data = await postJson("/api/chat/director-notes", {
+          content,
+          remaining_turns: turns,
+          position,
+        });
+        renderDirectorNotes(data.items || []);
+        if (directorNoteContentEl) directorNoteContentEl.value = "";
+        if (directorNoteTurnsEl) directorNoteTurnsEl.value = "1";
+        return data;
+      }
+
+      async function deleteDirectorNote(noteId) {
+        const data = await postJson("/api/chat/director-notes/delete", { id: noteId });
+        renderDirectorNotes(data.items || []);
+        return data;
+      }
+
+      function refreshDirectorNotesFromExternalEvent() {
+        loadDirectorNotes().catch((error) => console.warn("Director notes refresh failed:", error));
+      }
+
+      if ("BroadcastChannel" in window) {
+        const directorNoteChannel = new BroadcastChannel("fantareal-director-notes");
+        directorNoteChannel.addEventListener("message", refreshDirectorNotesFromExternalEvent);
+      }
+
+      window.addEventListener("storage", (event) => {
+        if (event.key === "fantareal:director-notes-updated") {
+          refreshDirectorNotesFromExternalEvent();
+        }
+      });
 
       function renderPromptPackage(pkg) {
         const layers = Array.isArray(pkg?.layers) ? pkg.layers : [];
@@ -3336,6 +3568,7 @@
           renderWorldbookHits(data.worldbook_hits || []);
           renderWorldbookDebug(data.worldbook_debug || {});
           renderPresetDebug(data.preset_debug || {}, presetStoreCache);
+          renderDirectorNotes(data.director_notes || []);
           renderPromptPackage(data.prompt_package || {});
           setRuntimeTab("prompt");
           setStatus("已生成本轮 Prompt 预览");
@@ -4695,6 +4928,7 @@
               renderWorldbookHits(data.worldbook_hits || []);
               renderWorldbookDebug(data.worldbook_debug || {});
               renderPresetDebug(data.preset_debug || {}, presetStoreCache);
+              renderDirectorNotes(data.director_notes || []);
               renderPromptPackage(data.prompt_package || {});
             },
             onThinkStart() {
@@ -4726,6 +4960,7 @@
               triggerDynamicScenesByRound(workshopRoundCount);
               ensureFinalVisible(assistantEntry, finalReply);
               assistantEntry.wrapper.dataset.messageContent = finalReply;
+              loadDirectorNotes().catch((error) => console.warn("Director notes refresh failed:", error));
               if (typeof data.think === "string") {
                 assistantEntry.state.think = data.think;
               }
@@ -4988,6 +5223,18 @@
         });
       });
 
+      saveDirectorNoteBtn?.addEventListener("click", () => {
+        createDirectorNote()
+          .then(() => {
+            setStatus("导演注已添加", "success");
+            showToast("导演注已添加", "success");
+          })
+          .catch((error) => {
+            setStatus(`导演注添加失败：${error.message}`, "error");
+            showToast(`导演注添加失败：${error.message}`, "error");
+          });
+      });
+
       workshopModalCloseEl?.addEventListener("click", hideWorkshopImagePopup);
       workshopModalConfirmEl?.addEventListener("click", hideWorkshopImagePopup);
       workshopModalEl?.addEventListener("click", (event) => {
@@ -5017,6 +5264,9 @@
       loadWorldbook().catch(() => {
         worldbookEntries = [];
         renderWorldbookEditor();
+      });
+      loadDirectorNotes().catch(() => {
+        renderDirectorNotes([]);
       });
     </script>
     {% for mod in registered_mods or [] %}
