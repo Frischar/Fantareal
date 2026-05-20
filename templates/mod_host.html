@@ -28,10 +28,13 @@
 
       .mod-frame-panel {
         padding: 10px;
+        overflow: hidden;
       }
 
       .mod-frame {
+        display: block;
         width: 100%;
+        max-width: 100%;
         min-height: calc(100vh - 150px);
         border: 0;
         border-radius: 22px;
@@ -47,6 +50,47 @@
         margin-top: 0.7rem;
         color: var(--muted);
         font-size: 0.88rem;
+      }
+
+
+      @media (max-width: 1560px) {
+        .mod-host-page {
+          padding: 0 10px 16px;
+        }
+
+        .mod-host-shell {
+          gap: 10px;
+        }
+
+        .mod-intro-panel {
+          display: none;
+        }
+
+        .mod-frame-panel {
+          padding: 8px;
+        }
+
+        .mod-frame {
+          min-height: calc(100vh - 118px);
+          border-radius: 18px;
+        }
+      }
+
+
+      @media (max-width: 1360px) {
+        .mod-host-page {
+          padding: 0 6px 12px;
+        }
+
+        .mod-frame-panel {
+          padding: 6px;
+          border-radius: 18px;
+        }
+
+        .mod-frame {
+          min-height: calc(100vh - 100px);
+          border-radius: 16px;
+        }
       }
 
       @media (max-width: 980px) {

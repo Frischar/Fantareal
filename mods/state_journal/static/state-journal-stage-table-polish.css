@@ -461,3 +461,67 @@
   border-color: rgba(240,120,120,.52);
   background: rgba(185,64,64,.22);
 }
+
+/* v2.1.1-sync-confirm-modal-fit
+   150% 缩放修复：同步至角色卡确认弹窗在 iframe 内高度受限时，必须完整显示并允许内部滚动。 */
+.state-journal-confirm-modal {
+  padding: clamp(10px, 2vw, 18px) !important;
+  align-items: center;
+  justify-items: center;
+  overflow: auto;
+}
+
+.state-journal-confirm-card {
+  width: min(680px, calc(100vw - 24px)) !important;
+  max-width: 100% !important;
+  max-height: min(82vh, calc(100vh - 24px)) !important;
+  overflow: auto !important;
+  box-sizing: border-box !important;
+}
+
+.state-journal-confirm-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.state-journal-confirm-actions {
+  flex-wrap: wrap;
+}
+
+.sync-card-role-list {
+  max-height: min(28vh, 220px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+@media (max-width: 1360px) {
+  .state-journal-confirm-card {
+    width: min(640px, 100%) !important;
+    max-height: min(84vh, calc(100vh - 20px)) !important;
+    padding: 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .sync-card-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .sync-card-role-list li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sync-card-role-list li span {
+    text-align: left;
+  }
+}
+
+@media (max-height: 760px) {
+  .state-journal-confirm-modal {
+    align-items: start;
+  }
+
+  .state-journal-confirm-card {
+    max-height: calc(100vh - 20px) !important;
+  }
+}

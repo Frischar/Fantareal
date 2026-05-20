@@ -338,8 +338,8 @@
       .card-state-journal-check { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; }
       .card-state-journal-check input[type="checkbox"], .card-state-journal-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
       .card-state-journal-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); background: color-mix(in srgb, var(--input-bg) 72%, transparent); color: var(--muted); font-size: 0.78rem; font-weight: 760; white-space: nowrap; }
-      .card-state-journal-dialog { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.38); backdrop-filter: blur(12px); }
-      .card-state-journal-dialog-card { width: min(1240px, calc(100vw - 40px)); max-height: min(88vh, 940px); overflow: auto; border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); border-radius: 24px; background: var(--panel-strong); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34); padding: 18px; }
+      .card-state-journal-dialog { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; padding: 24px; box-sizing: border-box; background: rgba(0, 0, 0, 0.38); backdrop-filter: blur(12px); }
+      .card-state-journal-dialog-card { width: min(1240px, 100%); max-width: 100%; max-height: min(88vh, 940px); overflow: auto; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); border-radius: 24px; background: var(--panel-strong); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34); padding: 18px; }
       .card-state-journal-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
       .card-state-journal-dialog-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
       .card-state-journal-tabs { display: inline-flex; align-items: center; gap: 4px; margin: 12px 0; padding: 4px; border: 1px solid color-mix(in srgb, var(--border) 74%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--input-bg) 56%, transparent); }
@@ -361,12 +361,13 @@
       .card-state-journal-condition-list { display: grid; gap: 8px; margin: 8px 0; }
       .card-state-journal-condition-row { display: grid; grid-template-columns: minmax(150px, 1fr) 76px 88px auto; gap: 8px; align-items: center; }
       .card-state-journal-condition-row input, .card-state-journal-condition-row select { min-height: 34px; }
-      .card-state-journal-condition-dialog { z-index: 96; }
-      .card-state-journal-condition-dialog-card { width: min(760px, calc(100vw - 40px)); }
+      .card-state-journal-condition-dialog { z-index: 270; }
+      .card-state-journal-condition-dialog-card { width: min(760px, 100%); max-width: 100%; }
       .card-state-journal-condition-dialog-body { display: grid; gap: 12px; }
       .card-state-journal-stage-summary { display: grid; gap: 8px; min-width: 260px; white-space: normal; }
       .card-state-journal-stage-summary strong { line-height: 1.55; }
-      @media (max-width: 760px) { .card-state-journal-dialog { padding: 14px; } .card-state-journal-dialog-card { width: calc(100vw - 20px); padding: 14px; } .card-state-journal-condition-row { grid-template-columns: 1fr; } }
+      @media (max-width: 1180px) { .card-state-journal-dialog { padding: 18px; } .card-state-journal-dialog .card-state-journal-table { min-width: 900px; } }
+      @media (max-width: 760px) { .card-state-journal-dialog { padding: 14px; } .card-state-journal-dialog-card { width: 100%; padding: 14px; } .card-state-journal-condition-row { grid-template-columns: 1fr; } }
     </style>
 
 
