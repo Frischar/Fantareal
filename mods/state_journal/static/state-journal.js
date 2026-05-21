@@ -16,6 +16,9 @@
     activeStageRows: [],
     currentRoleStateId: "",
     roleStateTab: "variables",
+    storyTime: {},
+    storyTimeHistory: [],
+    storyTimeExpanded: localStorage.getItem("state_journal:storyTimeExpanded") === "1",
     themePreviewMode: localStorage.getItem("state_journal:themePreviewMode") || "role",
   };
 
@@ -219,6 +222,16 @@
     personas_only: { label: "主卡是旁白，只读取多角色", desc: "适合双女主、多角色卡，主卡只作为旁白或总设定。" },
   };
 
+  const STORY_TIME_FIELDS = [
+    { key: "elapsed_days", label: "已过天数", type: "number" },
+    { key: "elapsed_hours", label: "已过小时", type: "number" },
+    { key: "current_hour", label: "当前小时", type: "number" },
+    { key: "current_date", label: "当前日期", type: "text" },
+    { key: "time_slot", label: "当前时段", type: "select", options: [["late_night", "深夜"], ["dawn", "清晨"], ["morning", "上午"], ["noon", "正午"], ["afternoon", "下午"], ["dusk", "黄昏"], ["night", "夜晚"], ["day", "白日"]] },
+    { key: "season", label: "当前季节", type: "select", options: [["spring", "春"], ["summer", "夏"], ["autumn", "秋"], ["winter", "冬"]] },
+  ];
+  const STORY_TIME_FIELD_MAP = new Map(STORY_TIME_FIELDS.map((field) => [field.key, field]));
+
   function normalizeRoleSourceMode(value) {
     const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
     const aliases = { main: "main_card", single: "main_card", single_role: "main_card", card: "main_card", persona: "personas_only", personas: "personas_only", multi: "personas_only", multi_role: "personas_only", narrator: "personas_only" };
@@ -272,8 +285,8 @@
   function roleStateConditionText(role, stage) {
     const variables = new Map((role?.variables || []).map((item) => [item.var_key, item.var_name || item.var_key]));
     const parts = (stage?.conditions || []).map((condition) => {
-      const key = condition.var || condition.field || "";
-      const label = variables.get(key) || key || "变量";
+      const key = condition.source === "story_time" ? condition.field : (condition.var || condition.field || "");
+      const label = condition.source === "story_time" ? `剧情时间 · ${(STORY_TIME_FIELD_MAP.get(key)?.label || key || "时间字段")}` : (variables.get(key) || key || "变量");
       const op = condition.op === ">=" ? "≥" : condition.op === "<=" ? "≤" : condition.op === "!=" ? "≠" : condition.op === "=" ? "=" : condition.op || "≥";
       return `${label} ${op} ${condition.value ?? 0}`;
     }).filter(Boolean);
@@ -286,14 +299,54 @@
     const conditions = Array.isArray(stage?.conditions) ? stage.conditions : [];
     if (!conditions.length) return `<span class="stage-condition-chip muted">无条件</span>`;
     const visible = conditions.slice(0, 3).map((condition) => {
-      const key = condition.var || condition.field || "";
-      const label = variables.get(key) || key || "变量";
+      const key = condition.source === "story_time" ? condition.field : (condition.var || condition.field || "");
+      const label = condition.source === "story_time" ? `剧情时间 · ${(STORY_TIME_FIELD_MAP.get(key)?.label || key || "时间字段")}` : (variables.get(key) || key || "变量");
       const op = condition.op === ">=" ? "≥" : condition.op === "<=" ? "≤" : condition.op === "!=" ? "≠" : condition.op === "=" ? "=" : condition.op || "≥";
       return `<span class="stage-condition-chip">${escapeHtml(label)} ${escapeHtml(op)} ${escapeHtml(condition.value ?? 0)}</span>`;
     });
     if (conditions.length > visible.length) visible.push(`<span class="stage-condition-chip muted">+${conditions.length - visible.length} 条</span>`);
     const mode = stage?.condition_mode === "any" ? "任一满足" : "全部满足";
     return `<span class="stage-condition-mode">${mode}</span>${visible.join("")}`;
+  }
+
+  function normalizeStageCondition(condition = {}, role = {}) {
+    const source = condition.source === "story_time" ? "story_time" : "variable";
+    const op = [">=", "<=", ">", "<", "=", "!="].includes(condition.op) ? condition.op : ">=";
+    if (source === "story_time") {
+      const field = STORY_TIME_FIELD_MAP.has(condition.field) ? condition.field : "elapsed_days";
+      const meta = STORY_TIME_FIELD_MAP.get(field);
+      const fallbackValue = meta?.options?.[0]?.[0] || "";
+      return { source, field, op, value: meta?.type === "number" ? Number(condition.value || 0) : String(condition.value ?? fallbackValue) };
+    }
+    const variables = role.variables || [];
+    const varKey = safeTemplateId(condition.var || condition.field || variables[0]?.var_key || "var_1");
+    return { source: "variable", var: varKey, op, value: Number(condition.value || 0) };
+  }
+
+  function updateStageConditionFromInput(condition, input, role = {}) {
+    const field = input.dataset.stageConditionField;
+    if (field === "source") {
+      const next = input.value === "story_time" ? { source: "story_time", field: "elapsed_days", op: ">=", value: 0 } : { source: "variable", var: role.variables?.[0]?.var_key || "var_1", op: ">=", value: 0 };
+      Object.keys(condition).forEach((key) => delete condition[key]);
+      Object.assign(condition, next);
+      return;
+    }
+    if (field === "field") {
+      if (condition.source === "story_time") {
+        const meta = STORY_TIME_FIELD_MAP.get(input.value) || STORY_TIME_FIELDS[0];
+        condition.field = meta.key;
+        condition.value = meta.type === "number" ? Number(condition.value || 0) : String(condition.value || meta.options?.[0]?.[0] || "");
+      } else {
+        condition.var = input.value;
+      }
+      return;
+    }
+    if (field === "value") {
+      const meta = condition.source === "story_time" ? STORY_TIME_FIELD_MAP.get(condition.field) : null;
+      condition.value = meta?.type === "number" || condition.source !== "story_time" ? Number(input.value || 0) : input.value;
+      return;
+    }
+    condition[field] = input.value;
   }
 
   function roleStateStageTagState(role, stage, isCurrent) {
@@ -1531,7 +1584,7 @@
         enabled: stage.enabled !== false,
         priority: Number(stage.priority ?? (stageIndex + 1) * 10) || (stageIndex + 1) * 10,
         condition_mode: stage.condition_mode === "any" ? "any" : "all",
-        conditions: Array.isArray(stage.conditions) ? stage.conditions : [],
+        conditions: Array.isArray(stage.conditions) ? stage.conditions.map((condition) => normalizeStageCondition(condition, role)) : [],
         allow_regression: !!stage.allow_regression,
         confirm_turns: Math.max(1, Number(stage.confirm_turns || 1) || 1),
         cooldown_turns: Math.max(0, Number(stage.cooldown_turns || 0) || 0),
@@ -1568,6 +1621,185 @@
   function roleCurrentStageKey(role) {
     const active = activeStageForRole(role);
     return active?.stage_key || role?.initial_stage || "stage_a";
+  }
+
+  function normalizeStoryTime(raw = {}) {
+    return {
+      enabled: !!raw.enabled,
+      show_in_note: raw.show_in_note !== false,
+      base_time: raw.base_time || "",
+      current_time: raw.current_time || "",
+      display_time: raw.display_time || "",
+      time_slot: raw.time_slot || "",
+      time_slot_label: raw.time_slot_label || "",
+      season: raw.season || "",
+      season_label: raw.season_label || "",
+      elapsed_seconds: Number(raw.elapsed_seconds || 0) || 0,
+      advance_mode: ["explicit", "smart", "manual", "custom"].includes(raw.advance_mode) ? raw.advance_mode : "smart",
+      custom_advance_type: ["fixed", "range"].includes(raw.custom_advance_type) ? raw.custom_advance_type : "range",
+      custom_advance_min_seconds: Number(raw.custom_advance_min_seconds ?? 300) || 0,
+      custom_advance_max_seconds: Number(raw.custom_advance_max_seconds ?? 900) || 0,
+      display_mode: ["datetime_minute", "datetime_second", "day_slot"].includes(raw.display_mode) ? raw.display_mode : "datetime_minute",
+      last_delta_seconds: Number(raw.last_delta_seconds || 0) || 0,
+      last_delta_text: raw.last_delta_text || "",
+      last_confidence: raw.last_confidence || "",
+      initialized: !!raw.initialized || !!raw.current_time,
+    };
+  }
+
+  function parseStoryTimeParts(value) {
+    const text = String(value || "").trim();
+    const match = text.match(/^(\d{1,6})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    return {
+      year: Number(match?.[1] || new Date().getFullYear()),
+      month: Number(match?.[2] || 1),
+      day: Number(match?.[3] || 1),
+      hour: Number(match?.[4] || 0),
+      minute: Number(match?.[5] || 0),
+      second: Number(match?.[6] || 0),
+    };
+  }
+
+  function secondsToMinutes(value, fallback = 0) {
+    const seconds = Number(value ?? fallback) || 0;
+    return Math.max(0, Math.round(seconds / 60));
+  }
+
+  function minutesToSeconds(value, fallback = 0) {
+    const minutes = Number(value ?? fallback);
+    const safe = Number.isFinite(minutes) ? minutes : fallback;
+    return Math.max(0, Math.round(safe * 60));
+  }
+
+  function readStoryTimeForm() {
+    const form = document.getElementById("storyTimePanel");
+    const read = (key) => form?.querySelector(`[data-story-time-field="${key}"]`);
+    const story = normalizeStoryTime(state.storyTime || {});
+    const baseParts = parseStoryTimeParts(story.base_time);
+    const num = (key, fallback = 0) => Number(read(key)?.value || fallback) || fallback;
+    const customType = read("custom_advance_type")?.value || story.custom_advance_type || "range";
+    const customMinSeconds = minutesToSeconds(read("custom_advance_min_minutes")?.value, secondsToMinutes(story.custom_advance_min_seconds, 5));
+    const customMaxSeconds = customType === "fixed"
+      ? customMinSeconds
+      : minutesToSeconds(read("custom_advance_max_minutes")?.value, secondsToMinutes(story.custom_advance_max_seconds, 15));
+    return {
+      enabled: read("enabled") ? !!read("enabled").checked : !!story.enabled,
+      show_in_note: read("show_in_note") ? !!read("show_in_note").checked : story.show_in_note !== false,
+      base_year: num("base_year", baseParts.year || new Date().getFullYear()),
+      base_month: num("base_month", baseParts.month || 1),
+      base_day: num("base_day", baseParts.day || 1),
+      base_hour: num("base_hour", baseParts.hour || 0),
+      base_minute: num("base_minute", baseParts.minute || 0),
+      base_second: num("base_second", baseParts.second || 0),
+      advance_mode: read("advance_mode")?.value || story.advance_mode || "smart",
+      custom_advance_type: customType,
+      custom_advance_min_seconds: customMinSeconds,
+      custom_advance_max_seconds: customMaxSeconds,
+      display_mode: read("display_mode")?.value || story.display_mode || "datetime_minute",
+    };
+  }
+
+  function storyTimePartsInputs(prefix, timeText) {
+    const parts = parseStoryTimeParts(timeText);
+    const fields = [["year", "年", 1, 999999], ["month", "月", 1, 12], ["day", "日", 1, 31], ["hour", "时", 0, 23], ["minute", "分", 0, 59], ["second", "秒", 0, 59]];
+    return fields.map(([key, label, min, max]) => `<label>${label}<input type="number" min="${min}" max="${max}" data-story-time-field="${prefix}_${key}" value="${escapeAttr(parts[key])}"></label>`).join("");
+  }
+
+  function renderStoryTimePanel() {
+    const mount = document.getElementById("storyTimeGlobalMount") || document.getElementById("roleStateDetail");
+    if (!mount) return;
+    const story = normalizeStoryTime(state.storyTime || {});
+    const elapsedDays = Math.floor((story.elapsed_seconds || 0) / 86400);
+    const expanded = !!state.storyTimeExpanded;
+    const isCustomFixed = story.custom_advance_type === "fixed";
+    const customMinMinutes = secondsToMinutes(story.custom_advance_min_seconds, 5);
+    const customMaxMinutes = isCustomFixed ? customMinMinutes : secondsToMinutes(story.custom_advance_max_seconds, 15);
+    const customSettingsHtml = story.advance_mode === "custom" ? `
+          <div class="story-time-section" data-story-time-custom-settings>
+            <strong>用户自定义推进</strong>
+            <div class="story-time-grid">
+              <label>推进类型<select data-story-time-field="custom_advance_type">
+                <option value="fixed" ${story.custom_advance_type === "fixed" ? "selected" : ""}>固定每轮推进</option>
+                <option value="range" ${story.custom_advance_type === "range" ? "selected" : ""}>范围内浮动</option>
+              </select></label>
+              <label>${isCustomFixed ? "每轮推进" : "最小推进"}（分钟）<input type="number" min="0" max="1440" step="1" data-story-time-field="custom_advance_min_minutes" value="${escapeAttr(customMinMinutes)}"></label>
+              <label class="${isCustomFixed ? "is-disabled-field" : ""}">${isCustomFixed ? "最大推进（固定模式同步）" : "最大推进"}（分钟）<input type="number" min="0" max="1440" step="1" data-story-time-field="custom_advance_max_minutes" value="${escapeAttr(customMaxMinutes)}" ${isCustomFixed ? "disabled title=\"固定每轮推进时会自动同步每轮推进值\"" : ""}></label>
+            </div>
+          </div>` : "";
+    const summaryText = story.current_time
+      ? `${story.display_time || story.current_time}${story.time_slot_label ? ` · ${story.time_slot_label}` : ""}${story.season_label ? ` · ${story.season_label}` : ""}${story.initialized ? ` · 已过 ${elapsedDays} 天` : ""}`
+      : `尚未初始化${story.time_slot_label ? ` · ${story.time_slot_label}` : ""}${story.season_label ? ` · ${story.season_label}` : ""}`;
+    mount.innerHTML = `
+      <section id="storyTimePanel" class="story-time-panel ${expanded ? "is-expanded" : "is-collapsed"}">
+        <div class="story-time-summary">
+          <button type="button" class="story-time-summary-main" data-story-time-action="toggle" aria-expanded="${expanded ? "true" : "false"}">
+            <span class="micro-badge">全局状态</span>
+            <strong>剧情时间</strong>
+            <small>${escapeHtml(summaryText)}</small>
+          </button>
+          <div class="story-time-summary-controls">
+            <label class="story-time-switch"><input type="checkbox" data-story-time-field="enabled" ${story.enabled ? "checked" : ""}>启用</label>
+            <label class="story-time-switch"><input type="checkbox" data-story-time-field="show_in_note" ${story.show_in_note ? "checked" : ""}>幕笺</label>
+            <button type="button" class="ghost-btn compact-btn" data-story-time-action="save">保存</button>
+            <button type="button" class="ghost-btn compact-btn" data-story-time-action="toggle" aria-expanded="${expanded ? "true" : "false"}"><span class="story-time-toggle-label">${expanded ? "收起" : "展开"}</span></button>
+          </div>
+        </div>
+        <div class="story-time-body">
+          <div class="story-time-current-card">
+            <span>当前时间</span>
+            <strong>${escapeHtml(story.current_time || "尚未初始化")}</strong>
+            <small>${escapeHtml(story.display_time || "")}${story.time_slot_label ? ` · ${escapeHtml(story.time_slot_label)}` : ""}${story.season_label ? ` · ${escapeHtml(story.season_label)}` : ""}${story.initialized ? ` · 已过 ${elapsedDays} 天` : ""}</small>
+          </div>
+          <div class="story-time-section">
+            <strong>初始时间</strong>
+            <div class="story-time-parts">${storyTimePartsInputs("base", story.base_time)}</div>
+          </div>
+          <div class="story-time-grid">
+            <label>推进方式<select data-story-time-field="advance_mode">
+              <option value="explicit" ${story.advance_mode === "explicit" ? "selected" : ""}>只在正文明确出现时间推进时更新</option>
+              <option value="smart" ${story.advance_mode === "smart" ? "selected" : ""}>智能自然推进</option>
+              <option value="custom" ${story.advance_mode === "custom" ? "selected" : ""}>用户自定义推进</option>
+              <option value="manual" ${story.advance_mode === "manual" ? "selected" : ""}>手动推进</option>
+            </select></label>
+            <label>显示方式<select data-story-time-field="display_mode">
+              <option value="datetime_minute" ${story.display_mode === "datetime_minute" ? "selected" : ""}>年月日时分</option>
+              <option value="datetime_second" ${story.display_mode === "datetime_second" ? "selected" : ""}>年月日时分秒</option>
+              <option value="day_slot" ${story.display_mode === "day_slot" ? "selected" : ""}>第 N 日 · 时段</option>
+            </select></label>
+          </div>
+          ${customSettingsHtml}
+          <div class="story-time-actions">
+            <button type="button" class="primary-btn" data-story-time-action="save">保存剧情时间</button>
+            <button type="button" class="ghost-btn" data-story-time-action="initialize">初始化剧情时间</button>
+            <button type="button" class="ghost-btn" data-story-time-action="calibrate">校准当前时间</button>
+            <button type="button" class="ghost-btn danger-soft" data-story-time-action="reset">重置为初始时间</button>
+            <button type="button" class="ghost-btn" data-story-time-action="history">查看时间历史</button>
+          </div>
+          <div class="story-time-history" id="storyTimeHistory"></div>
+        </div>
+      </section>`;
+    renderStoryTimeHistory();
+  }
+
+  function setStoryTimeExpanded(expanded) {
+    state.storyTimeExpanded = !!expanded;
+    localStorage.setItem("state_journal:storyTimeExpanded", state.storyTimeExpanded ? "1" : "0");
+    const panel = document.getElementById("storyTimePanel");
+    if (!panel) return;
+    panel.classList.toggle("is-expanded", state.storyTimeExpanded);
+    panel.classList.toggle("is-collapsed", !state.storyTimeExpanded);
+    panel.querySelectorAll("[data-story-time-action='toggle']").forEach((button) => {
+      button.setAttribute("aria-expanded", state.storyTimeExpanded ? "true" : "false");
+      const label = button.querySelector(".story-time-toggle-label");
+      if (label) label.textContent = state.storyTimeExpanded ? "收起" : "展开";
+    });
+  }
+
+  function renderStoryTimeHistory() {
+    const box = document.getElementById("storyTimeHistory");
+    if (!box) return;
+    const rows = state.storyTimeHistory || [];
+    box.innerHTML = rows.length ? `<strong>时间历史</strong>${rows.map((row) => `<div class="story-time-history-row"><span>${escapeHtml(row.created_at || "")}</span><b>${escapeHtml(row.old_time || "—")} → ${escapeHtml(row.new_time || "—")}</b><small>${escapeHtml(row.delta_text || row.reason || row.source || "")}</small></div>`).join("")}` : "";
   }
 
 
@@ -1608,6 +1840,7 @@
     if (!state.currentRoleStateId && roles[0]) state.currentRoleStateId = roles[0].role_id;
     const sourceInfo = roleSourceSummary(state.roleStateConfig);
     const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>`;
+    renderStoryTimePanel();
     list.innerHTML = sourceHintHtml + (roles.length ? roles.map((role) => {
       const stageName = roleCurrentStageName(role);
       const stageKey = roleCurrentStageKey(role);
@@ -1709,9 +1942,28 @@
       document.body.appendChild(modal);
     }
     const variables = role.variables || [];
+    stage.conditions = (stage.conditions || []).map((condition) => normalizeStageCondition(condition, role));
+    const variableOptions = variables.map((v) => `<option value="${escapeAttr(v.var_key)}">${escapeHtml(v.var_name || v.var_key)}</option>`).join("");
+    const storyFieldOptions = STORY_TIME_FIELDS.map((field) => `<option value="${escapeAttr(field.key)}">${escapeHtml(field.label)}</option>`).join("");
+    const conditionValueInput = (condition) => {
+      if (condition.source !== "story_time") return `<input type="number" data-stage-condition-field="value" value="${escapeAttr(condition.value ?? 0)}">`;
+      const meta = STORY_TIME_FIELD_MAP.get(condition.field) || STORY_TIME_FIELDS[0];
+      if (meta.type === "select") {
+        return `<select data-stage-condition-field="value">${(meta.options || []).map(([value, label]) => `<option value="${escapeAttr(value)}" ${String(condition.value || "") === value ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select>`;
+      }
+      return `<input type="${meta.type === "number" ? "number" : "text"}" data-stage-condition-field="value" value="${escapeAttr(condition.value ?? "")}">`;
+    };
     const conditionRows = (stage.conditions || []).map((condition, index) => `
       <div class="role-state-condition-line" data-condition-index="${index}">
-        <select data-stage-condition-field="var">${variables.map((v) => `<option value="${escapeAttr(v.var_key)}" ${String(condition.var || condition.field || "") === String(v.var_key) ? "selected" : ""}>${escapeHtml(v.var_name || v.var_key)}</option>`).join("")}</select>
+        <select data-stage-condition-field="source">
+          <option value="variable" ${condition.source !== "story_time" ? "selected" : ""}>角色变量</option>
+          <option value="story_time" ${condition.source === "story_time" ? "selected" : ""}>剧情时间</option>
+        </select>
+        <select data-stage-condition-field="field">
+          ${condition.source === "story_time"
+            ? storyFieldOptions.replace(`value="${escapeAttr(condition.field)}"`, `value="${escapeAttr(condition.field)}" selected`)
+            : variableOptions.replace(`value="${escapeAttr(condition.var || condition.field || "")}"`, `value="${escapeAttr(condition.var || condition.field || "")}" selected`)}
+        </select>
         <select data-stage-condition-field="op">
           <option value=">=" ${condition.op === ">=" ? "selected" : ""}>≥</option>
           <option value="<=" ${condition.op === "<=" ? "selected" : ""}>≤</option>
@@ -1720,7 +1972,7 @@
           <option value="=" ${condition.op === "=" ? "selected" : ""}>＝</option>
           <option value="!=" ${condition.op === "!=" ? "selected" : ""}>≠</option>
         </select>
-        <input type="number" data-stage-condition-field="value" value="${escapeAttr(condition.value ?? 0)}">
+        ${conditionValueInput(condition)}
         <button type="button" class="tiny-btn" data-delete-stage-condition>×</button>
       </div>`).join("");
     modal.innerHTML = `
@@ -1762,16 +2014,14 @@
       const row = input.closest("[data-condition-index]");
       const condition = stage.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
       if (!condition) return;
-      const field = input.dataset.stageConditionField;
-      if (field === "value") condition.value = Number(input.value || 0);
-      else condition[field] = input.value;
+      updateStageConditionFromInput(condition, input, role);
       renderRoleStateWorkspace();
       renderRoleStateStageDialog(stageIndex);
     });
     form?.addEventListener("click", (event) => {
       if (event.target.closest("[data-add-stage-condition]")) {
         stage.conditions = stage.conditions || [];
-        stage.conditions.push({ var: variables[0]?.var_key || "var_1", op: ">=", value: 0 });
+        stage.conditions.push({ source: "variable", var: variables[0]?.var_key || "var_1", op: ">=", value: 0 });
         renderRoleStateWorkspace();
         renderRoleStateStageDialog(stageIndex);
         return;
@@ -1787,10 +2037,58 @@
   }
 
   async function loadRoleStateConfig() {
-    const payload = await requestJson("./api/role-state/config");
+    const [payload, storyPayload] = await Promise.all([requestJson("./api/role-state/config"), requestJson("./api/story-time")]);
     state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
     state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : [];
+    state.storyTime = normalizeStoryTime(storyPayload.story_time || {});
     renderRoleStateWorkspace();
+  }
+
+  async function loadStoryTime() {
+    const payload = await requestJson("./api/story-time");
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+  }
+
+  async function saveStoryTimeConfig() {
+    const payload = await requestJson("./api/story-time/config", { method: "POST", body: JSON.stringify(readStoryTimeForm()) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已保存", payload.message || "", "ok");
+  }
+
+  async function initializeStoryTime() {
+    const ok = await confirmAction({ title: "初始化剧情时间", body: "<p>此操作会把当前剧情时间设为初始时间，并影响后续幕笺显示和阶段判断。</p>", confirmText: "初始化" });
+    if (!ok) return;
+    const payload = await requestJson("./api/story-time/initialize", { method: "POST", body: JSON.stringify(readStoryTimeForm()) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已初始化", payload.message || "", "ok");
+  }
+
+  async function resetStoryTime() {
+    const ok = await confirmAction({ title: "重置为初始时间", body: "<p>此操作会回到 base_time，并影响后续幕笺显示和阶段判断。</p>", confirmText: "重置" });
+    if (!ok) return;
+    const payload = await requestJson("./api/story-time/reset", { method: "POST", body: JSON.stringify({}) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已重置", payload.message || "", "ok");
+  }
+
+  async function calibrateStoryTime() {
+    const ok = await confirmAction({ title: "校准当前时间", body: "<p>此操作会把当前时间改为面板中的初始时间数值，并影响后续幕笺显示和阶段判断。</p>", confirmText: "校准" });
+    if (!ok) return;
+    const form = readStoryTimeForm();
+    const payload = await requestJson("./api/story-time/calibrate", { method: "POST", body: JSON.stringify({ current_year: form.base_year, current_month: form.base_month, current_day: form.base_day, current_hour: form.base_hour, current_minute: form.base_minute, current_second: form.base_second }) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已校准", payload.message || "", "ok");
+  }
+
+  async function loadStoryTimeHistory() {
+    const payload = await requestJson("./api/story-time/history");
+    state.storyTimeHistory = Array.isArray(payload.history) ? payload.history : [];
+    renderStoryTimePanel();
   }
 
   async function saveRoleStateConfig() {
@@ -1879,12 +2177,13 @@
   async function initCurrentRoleState() {
     const roles = (state.roleStateConfig.roles || []).filter((role) => role.enabled !== false && normalizeRoleStateMode(role.mode || role.stateJournalMode, role) === "full");
     const ok = await confirmAction({
-      title: "初始化当前状态",
-      body: `<p>此操作会根据当前角色卡配置重建变量、阶段与快照状态，可能覆盖当前运行中的变量值和当前阶段，但不会删除历史记录。</p><p><strong>受影响角色：</strong>${escapeHtml(roles.map((role) => role.role_name || role.role_id).join("、") || "暂无完整心笺角色")}</p>`,
-      confirmText: "确认初始化",
+      title: "从角色卡初始化当前状态",
+      body: `<p>此操作会先读取当前角色卡里的 <code>stateJournal</code> 配置，再重建心笺当前变量与阶段。它可能覆盖当前运行中的变量值和当前阶段，但不会删除历史记录。</p><p><strong>当前已加载的完整心笺角色：</strong>${escapeHtml(roles.map((role) => role.role_name || role.role_id).join("、") || "暂无完整心笺角色")}</p><p>适合首轮开局前使用；游玩中请谨慎操作。</p>`,
+      confirmText: "确认从角色卡初始化",
     });
     if (!ok) return;
-    const payload = await requestJson("./api/role-state/init-current", { method: "POST", body: JSON.stringify({}) });
+    const payload = await requestJson("./api/role-state/init-current", { method: "POST", body: JSON.stringify({ source: "role_card", from_card: true }) });
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || state.roleStateConfig || {});
     state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
     renderRoleStateWorkspace();
     pageToast("当前状态已初始化", payload.message || "", "ok");
@@ -2332,7 +2631,35 @@
   }));
   document.getElementById("resetDefaultTurnNoteBtn")?.addEventListener("click", () => resetDefaultTurnNote().catch((error) => pageToast("恢复默认幕笺失败", error.message, "error")));
 
+  function handleStoryTimeFieldChange(event) {
+    const storyField = event.target.closest("[data-story-time-field]");
+    if (storyField && ["advance_mode", "custom_advance_type"].includes(storyField.dataset.storyTimeField)) {
+      state.storyTime = normalizeStoryTime({ ...state.storyTime, ...readStoryTimeForm() });
+      renderStoryTimePanel();
+      return true;
+    }
+    return false;
+  }
+
+  function handleStoryTimeFieldInput(event) {
+    const storyField = event.target.closest("[data-story-time-field='custom_advance_min_minutes']");
+    if (!storyField) return false;
+    const panel = document.getElementById("storyTimePanel");
+    const type = panel?.querySelector("[data-story-time-field='custom_advance_type']")?.value;
+    const maxInput = panel?.querySelector("[data-story-time-field='custom_advance_max_minutes']");
+    if (type === "fixed" && maxInput) maxInput.value = storyField.value;
+    return type === "fixed";
+  }
+
+  document.getElementById("storyTimeGlobalMount")?.addEventListener("change", (event) => {
+    handleStoryTimeFieldChange(event);
+  });
+  document.getElementById("storyTimeGlobalMount")?.addEventListener("input", (event) => {
+    handleStoryTimeFieldInput(event);
+  });
+
   document.getElementById("roleStateDetail")?.addEventListener("change", (event) => {
+    if (handleStoryTimeFieldChange(event)) return;
     const role = currentRoleState();
     const modeSelect = event.target.closest("[data-role-mode-select]");
     if (role && modeSelect) {
@@ -2347,14 +2674,30 @@
       const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
       const condition = stage?.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
       if (!condition) return;
-      const field = conditionInput.dataset.stageConditionField;
-      if (field === "value") condition.value = Number(conditionInput.value || 0);
-      else condition[field] = conditionInput.value;
+      updateStageConditionFromInput(condition, conditionInput, role);
       renderRoleStateWorkspace();
     }
   });
 
-  document.getElementById("roleStateDetail")?.addEventListener("click", (event) => {
+  document.querySelector(".role-state-workspace")?.addEventListener("click", (event) => {
+    const storyAction = event.target.closest("[data-story-time-action]");
+    if (storyAction) {
+      event.preventDefault();
+      const action = storyAction.dataset.storyTimeAction;
+      if (action === "toggle") {
+        setStoryTimeExpanded(!state.storyTimeExpanded);
+        return;
+      }
+      const tasks = {
+        save: saveStoryTimeConfig,
+        initialize: initializeStoryTime,
+        calibrate: calibrateStoryTime,
+        reset: resetStoryTime,
+        history: loadStoryTimeHistory,
+      };
+      tasks[action]?.().catch((error) => pageToast("剧情时间操作失败", error.message, "error"));
+      return;
+    }
     const role = currentRoleState();
     if (!role) return;
     const hit = (selector) => event.target.closest(selector);
@@ -2420,6 +2763,7 @@
     }
   });
   document.getElementById("roleStateDetail")?.addEventListener("input", (event) => {
+    if (handleStoryTimeFieldInput(event)) return;
     const role = currentRoleState();
     if (!role) return;
     const varInput = event.target.closest("[data-var-field]");
@@ -2450,9 +2794,7 @@
       const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
       const condition = stage?.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
       if (!condition) return;
-      const field = conditionInput.dataset.stageConditionField;
-      if (field === "value") condition.value = Number(conditionInput.value || 0);
-      else condition[field] = conditionInput.value;
+      updateStageConditionFromInput(condition, conditionInput, role);
     }
     const stageInput = event.target.closest("[data-stage-field]");
     if (stageInput) {

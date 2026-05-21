@@ -1339,6 +1339,183 @@ select option:disabled {
 .role-state-placeholder strong { display: block; color: var(--xj-text); margin-bottom: 8px; }
 @media (max-width: 900px) { .role-state-toolbar { flex-direction: column; } .role-state-layout { grid-template-columns: 1fr; } .role-state-actions { justify-content: flex-start; } }
 
+.role-state-global.turn-note-config-card.standalone { padding: 10px 12px; }
+.role-state-global:empty { display: none; }
+.story-time-panel { display: grid; gap: 10px; min-width: 0; }
+.story-time-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.story-time-summary-main {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.story-time-summary-main strong {
+  color: var(--xj-text);
+  font-size: .96rem;
+  white-space: nowrap;
+}
+.story-time-summary-main small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--xj-muted);
+  font-size: .84rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.story-time-summary-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.story-time-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  color: var(--xj-muted);
+  font-size: .8rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.story-time-switch input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  width: 34px;
+  min-width: 34px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--xj-border);
+  background: rgba(255,255,255,.08);
+  cursor: pointer;
+}
+.story-time-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--xj-muted);
+  transition: transform .16s ease, background .16s ease;
+}
+.story-time-switch input[type="checkbox"]:checked {
+  border-color: rgba(99,211,132,.42);
+  background: rgba(99,211,132,.18);
+}
+.story-time-switch input[type="checkbox"]:checked::before {
+  transform: translateX(14px);
+  background: #b9f2c9;
+}
+.story-time-body {
+  display: grid;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+.story-time-panel.is-collapsed .story-time-body { display: none; }
+.story-time-overview { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.story-time-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.story-time-grid label,
+.story-time-section {
+  display: grid;
+  gap: 7px;
+  color: var(--xj-muted);
+  font-weight: 800;
+}
+.story-time-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+}
+.story-time-panel input,
+.story-time-panel select {
+  min-height: 38px;
+  border: 1px solid var(--xj-border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .18);
+  color: var(--xj-text);
+  padding: 8px 10px;
+  box-sizing: border-box;
+}
+.story-time-grid label.is-disabled-field {
+  opacity: .64;
+}
+.story-time-grid label.is-disabled-field input:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+  border-color: rgba(255,255,255,.16);
+  background: rgba(255,255,255,.035);
+  color: rgba(242,237,225,.58);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.16);
+}
+.story-time-grid label.is-disabled-field::after {
+  content: "固定模式下自动同步";
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(242,237,225,.6);
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.story-time-current-card {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--xj-border);
+  border-radius: 16px;
+  background: var(--xj-card-soft);
+}
+.story-time-current-card span,
+.story-time-current-card small { color: var(--xj-muted); }
+.story-time-current-card strong { color: var(--xj-text); font-size: 1.05rem; }
+.story-time-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.story-time-actions .primary-btn,
+.story-time-actions .ghost-btn,
+.story-time-summary-controls .compact-btn {
+  min-height: 31px;
+  padding: 5px 12px;
+}
+.story-time-history { display: grid; gap: 8px; }
+.story-time-history-row {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--xj-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.04);
+}
+.story-time-history-row span,
+.story-time-history-row small { color: var(--xj-muted); }
+@media (max-width: 760px) {
+  .story-time-summary { grid-template-columns: 1fr; }
+  .story-time-summary-main { grid-template-columns: auto auto 1fr; }
+  .story-time-summary-controls { justify-content: flex-start; }
+}
+
 .role-state-table-actions {
   display: flex;
   justify-content: flex-end;
@@ -1882,6 +2059,10 @@ select option:disabled {
 .state-journal-metric-diary-row p { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .state-journal-metric-diary-row span { display: inline-flex; gap: 5px; align-items: center; border: 1px solid rgba(120,140,170,.22); border-radius: 999px; padding: 4px 8px; background: rgba(255,255,255,.06); }
 @media (max-width: 760px) { .role-state-condition-line { grid-template-columns: 1fr; } }
+.role-state-condition-line {
+  grid-template-columns: minmax(96px, .8fr) minmax(150px, 1.2fr) 82px minmax(110px, .9fr) 34px !important;
+}
+@media (max-width: 760px) { .role-state-condition-line { grid-template-columns: 1fr !important; } }
 
 /* v1.1.2-fix9 · 表格列宽重排：隐藏机器 Key 后释放空间，变量/快照表不再留大空白 */
 .role-state-table-wrap {
