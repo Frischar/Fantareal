@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Fantareal Mobile</title>
     <link rel="stylesheet" href="./app.css" />
   </head>
@@ -67,29 +67,45 @@
 
       <main class="route-host">
         <section class="route-screen" data-route="chat">
-          <section class="chat-panel panel chat-only-panel">
-            <div class="section-head chat-header">
-              <div>
-                <p class="eyebrow">Persona</p>
-                <h3 id="chatPersonaName">Template Character</h3>
-                <p class="muted compact" id="chatGreeting"></p>
+          <section class="chat-panel chat-only-panel pe-min-chat">
+            <div class="pe-scene-backdrop" aria-hidden="true"></div>
+
+            <header class="pe-scene-topbar">
+              <button class="pe-scene-back" data-nav="config" type="button" aria-label="设置">‹</button>
+              <div class="pe-scene-name" id="peSceneTitle">Fantareal</div>
+              <div class="pe-scene-actions">
+                <div class="pe-scene-chip">
+                  <span>✦</span>
+                  <strong id="peSceneCount">0</strong>
+                </div>
+                <button class="pe-scene-icon" data-nav="card" type="button" aria-label="人设总览">+</button>
               </div>
-              <div class="button-row compact-buttons">
-                <button class="ghost-button small-chip" id="previewPromptButton" type="button">预览 Prompt</button>
-                <button class="ghost-button small-chip" id="refreshChatRouteButton" type="button">刷新</button>
-              </div>
+            </header>
+
+            <div class="pe-hidden-chat-meta" aria-hidden="true">
+              <h3 id="chatPersonaName">已导入 1 个人设</h3>
+              <p id="chatGreeting"></p>
+              <button id="refreshChatRouteButton" type="button">刷新</button>
+              <button id="previewPromptButton" type="button">预览 Prompt</button>
+              <span id="statusText">就绪</span>
             </div>
-            <div class="chat-reading-shell">
+
+            <div class="chat-reading-shell pe-min-reading-shell">
               <div class="message-list" id="messageList"></div>
             </div>
-            <div class="composer-card">
-              <textarea id="messageInput" rows="4" placeholder="输入你想说的话..."></textarea>
-              <div class="composer-toolbar">
-                <p class="muted" id="statusText">就绪</p>
-                <div class="composer-actions">
-                  <button class="ghost-button" id="endConversationButton" type="button">结束当前对话</button>
-                  <button class="ghost-button" id="exportChatButton" type="button">导出记录</button>
-                  <button class="primary-button" id="sendButton" type="button">发送</button>
+
+            <div class="pe-chat-dock">
+              <div class="pe-config-rail" aria-label="配置方向">
+                <button class="pe-rail-pill" data-nav="config" type="button">设置</button>
+                <button class="pe-rail-pill" data-nav="card" type="button">人设总览</button>
+                <button class="pe-rail-pill" id="endConversationButton" type="button">结束</button>
+                <button class="pe-rail-pill" id="exportChatButton" type="button">导出</button>
+              </div>
+
+              <div class="composer-card pe-composer-card">
+                <div class="pe-composer-shell">
+                  <textarea id="messageInput" rows="1" placeholder="输入消息" aria-label="消息输入框"></textarea>
+                  <button class="primary-button pe-send-button" id="sendButton" type="button">发送</button>
                 </div>
               </div>
             </div>
@@ -97,18 +113,21 @@
         </section>
 
         <section class="route-screen hidden" data-route="config">
+          <button class="pe-page-back" data-nav="chat" type="button" aria-label="返回聊天">‹</button>
           <div class="config-grid">
-            <article class="panel section-card">
+            <article class="panel section-card pe-main-settings">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Model</p>
-                  <h3>模型配置</h3>
+                  <p class="eyebrow">设置</p>
+                  <h3>自定义 API</h3>
                 </div>
                 <button class="ghost-button" id="testConnectionButton" type="button">测试连接</button>
               </div>
 
-              <label for="presetSelect">接口预设</label>
-              <select id="presetSelect"></select>
+              <div class="pe-logic-only">
+                <label for="presetSelect">接口预设</label>
+                <select id="presetSelect"></select>
+              </div>
 
               <label for="apiBaseUrl">API URL</label>
               <input id="apiBaseUrl" placeholder="例如 https://api.openai.com/v1" />
@@ -119,7 +138,7 @@
               <label for="modelName">模型名</label>
               <input id="modelName" placeholder="例如 gpt-4.1-mini" />
 
-              <div class="two-col">
+              <div class="two-col pe-logic-only">
                 <div>
                   <label for="temperature">Temperature</label>
                   <input id="temperature" type="number" min="0" max="2" step="0.05" />
@@ -130,7 +149,7 @@
                 </div>
               </div>
 
-              <div class="two-col">
+              <div class="two-col pe-logic-only">
                 <div>
                   <label for="historyLimit">上下文保留轮数</label>
                   <input id="historyLimit" type="number" min="4" max="60" step="1" />
@@ -148,25 +167,27 @@
                 </div>
               </div>
               <div class="button-row compact-buttons">
-                <button class="ghost-button" id="saveRefreshConfigButton" type="button">保存并刷新模型配置</button>
+                <button class="primary-button" id="saveRefreshConfigButton" type="button">保存 API</button>
               </div>
             </article>
 
-            <article class="panel section-card">
+            <article class="panel section-card pe-background-settings">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Appearance</p>
-                  <h3>界面与背景</h3>
+                  <p class="eyebrow">背景</p>
+                  <h3>自定义背景图</h3>
                 </div>
               </div>
 
-              <label for="uiOpacity">界面透明度</label>
-              <input id="uiOpacity" type="range" min="0.25" max="1" step="0.01" />
-              <div class="inline-value" id="uiOpacityValue">0.88</div>
+              <div class="pe-logic-only">
+                <label for="uiOpacity">界面透明度</label>
+                <input id="uiOpacity" type="range" min="0.25" max="1" step="0.01" />
+                <div class="inline-value" id="uiOpacityValue">0.88</div>
 
-              <label for="backgroundOverlay">背景遮罩强度</label>
-              <input id="backgroundOverlay" type="range" min="0" max="0.9" step="0.01" />
-              <div class="inline-value" id="backgroundOverlayValue">0.36</div>
+                <label for="backgroundOverlay">背景遮罩强度</label>
+                <input id="backgroundOverlay" type="range" min="0" max="0.9" step="0.01" />
+                <div class="inline-value" id="backgroundOverlayValue">0.36</div>
+              </div>
 
               <label for="backgroundImageUrl">背景图 URL</label>
               <input id="backgroundImageUrl" placeholder="可以填写远程图片地址" />
@@ -180,10 +201,25 @@
               </div>
             </article>
 
+            <article class="panel section-card pe-import-settings">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">导入</p>
+                  <h3>四卡导入</h3>
+                </div>
+              </div>
+              <div class="pe-import-grid">
+                <button class="ghost-button" id="peImportRoleButton" type="button">导入角色卡</button>
+                <button class="ghost-button" id="peImportPresetButton" type="button">导入预设卡</button>
+                <button class="ghost-button" id="peImportMemoryButton" type="button">导入记忆卡</button>
+                <button class="ghost-button" id="peImportWorldbookButton" type="button">导入世界书卡</button>
+              </div>
+            </article>
+
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Retrieval</p>
+                  <p class="eyebrow">检索</p>
                   <h3>检索与重排</h3>
                 </div>
               </div>
@@ -232,7 +268,7 @@
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Avatar</p>
+                  <p class="eyebrow">头像</p>
                   <h3>头像资料</h3>
                 </div>
               </div>
@@ -273,7 +309,7 @@
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Runtime</p>
+                  <p class="eyebrow">运行态</p>
                   <h3>当前运行阶段</h3>
                 </div>
               </div>
@@ -286,7 +322,7 @@
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Persona</p>
+                  <p class="eyebrow">角色</p>
                   <h3>当前加载人设摘要</h3>
                 </div>
               </div>
@@ -305,7 +341,7 @@
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Soundtrack</p>
+                  <p class="eyebrow">音景</p>
                   <h3>剧情音乐</h3>
                 </div>
               </div>
@@ -326,7 +362,7 @@
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Data</p>
+                  <p class="eyebrow">数据</p>
                   <h3>运行态备份与组合包</h3>
                 </div>
               </div>
@@ -348,7 +384,7 @@
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Preset</p>
+                <p class="eyebrow">预设</p>
                   <h3>预设管理</h3>
                 </div>
               </div>
@@ -372,7 +408,7 @@
               <aside class="panel section-card preset-sidebar">
                 <div class="section-head">
                   <div>
-                    <p class="eyebrow">Library</p>
+                    <p class="eyebrow">预设库</p>
                     <h3>预设列表</h3>
                   </div>
                 </div>
@@ -396,7 +432,7 @@
                 <article class="panel section-card">
                   <div class="section-head">
                     <div>
-                      <p class="eyebrow">Editor</p>
+                      <p class="eyebrow">编辑</p>
                       <h3>当前预设</h3>
                     </div>
                     <p id="presetStatusText" class="muted compact">就绪</p>
@@ -420,7 +456,7 @@
                 <article class="panel section-card">
                   <div class="section-head">
                     <div>
-                      <p class="eyebrow">Modules</p>
+                      <p class="eyebrow">模块</p>
                       <h3>常用模块</h3>
                     </div>
                   </div>
@@ -438,7 +474,7 @@
                 <article class="panel section-card">
                   <div class="section-head">
                     <div>
-                      <p class="eyebrow">Blocks</p>
+                      <p class="eyebrow">规则块</p>
                       <h3>额外规则块</h3>
                     </div>
                   </div>
@@ -461,17 +497,53 @@
         </section>
 
         <section class="route-screen hidden" data-route="card">
+          <button class="pe-page-back" data-nav="chat" type="button" aria-label="返回聊天">‹</button>
+          <article class="panel section-card pe-overview-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">人设总览</p>
+                <h3 id="peOverviewTitle">已导入 1 个人设</h3>
+              </div>
+            </div>
+            <div class="pe-overview-stats">
+              <div>
+                <span>角色卡</span>
+                <strong id="peOverviewRoleName">当前角色</strong>
+              </div>
+              <div>
+                <span>预设</span>
+                <strong id="peOverviewPresetName">默认预设</strong>
+              </div>
+              <div>
+                <span>记忆</span>
+                <strong id="peOverviewMemoryCount">0</strong>
+              </div>
+              <div>
+                <span>世界书</span>
+                <strong id="peOverviewWorldbookCount">0</strong>
+              </div>
+            </div>
+            <div class="pe-overview-block">
+              <span>开场白</span>
+              <p id="peOverviewGreeting">暂无</p>
+            </div>
+            <div class="pe-overview-block">
+              <span>人设列表</span>
+              <div id="peOverviewPersonaList" class="pe-overview-list"></div>
+            </div>
+          </article>
+
           <article class="panel section-card">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Role Card</p>
+                <p class="eyebrow">角色</p>
                 <h3>角色卡编辑器</h3>
               </div>
               <div class="button-row compact-buttons">
                 <button class="ghost-button small-chip" id="applySingleTemplateButton" type="button">单人模板</button>
                 <button class="ghost-button small-chip" id="applyMultiTemplateButton" type="button">多人模板</button>
-                <label class="ghost-button fake-file-button">
-                  导入
+                <label class="primary-button fake-file-button import-file-button">
+                  选择并导入角色卡
                   <input id="cardImportInput" type="file" accept=".json,.txt,application/json,text/plain" hidden />
                 </label>
                 <button class="ghost-button small-chip" id="exportCardButton" type="button">导出</button>
@@ -489,21 +561,21 @@
                   <h3>角色卡基础字段</h3>
                 </summary>
                 <div class="section-fold-body">
-                  <label for="cardName">name（角色名称 / 显示名）</label>
+                  <label for="cardName">角色名称</label>
                   <input id="cardName" />
-                  <label for="cardTags">tags（标签，使用逗号分隔）</label>
+                  <label for="cardTags">标签</label>
                   <input id="cardTags" />
-                  <label for="cardDescription">description（角色背景 / 基础介绍）</label>
+                  <label for="cardDescription">角色背景</label>
                   <textarea id="cardDescription" rows="5"></textarea>
-                  <label for="cardPersonality">personality（性格 / 说话风格）</label>
+                  <label for="cardPersonality">性格与说话风格</label>
                   <textarea id="cardPersonality" rows="6"></textarea>
-                  <label for="cardScenario">scenario（当前场景 / 相处设定）</label>
+                  <label for="cardScenario">当前场景</label>
                   <textarea id="cardScenario" rows="6"></textarea>
-                  <label for="cardFirstMes">first_mes（开场白 / 初始回复）</label>
+                  <label for="cardFirstMes">开场白</label>
                   <textarea id="cardFirstMes" rows="5"></textarea>
-                  <label for="cardMesExample">mes_example（对话示例）</label>
+                  <label for="cardMesExample">对话示例</label>
                   <textarea id="cardMesExample" rows="5"></textarea>
-                  <label for="cardCreatorNotes">creator_notes（仅给模型看的补充说明）</label>
+                  <label for="cardCreatorNotes">模型补充说明</label>
                   <textarea id="cardCreatorNotes" rows="6"></textarea>
                 </div>
               </details>
@@ -514,7 +586,7 @@
                 <summary class="section-summary with-action">
                   <div>
                     <p class="eyebrow">剧情阶段</p>
-                    <h3>plotStages 动态列表</h3>
+                    <h3>剧情阶段列表</h3>
                   </div>
                   <button class="ghost-button small-chip" id="addPlotStageButton" type="button">+ 阶段</button>
                 </summary>
@@ -548,7 +620,7 @@
               <summary class="section-summary with-action">
                 <div>
                   <p class="eyebrow">多人设</p>
-                  <h3>personas 动态列表</h3>
+                  <h3>动态角色列表</h3>
                 </div>
                 <button class="ghost-button small-chip" id="addPersonaButton" type="button">+ 角色</button>
               </summary>
@@ -564,7 +636,7 @@
             <article class="panel section-card">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">Runtime</p>
+                  <p class="eyebrow">运行态</p>
                   <h3>阶段判定</h3>
                 </div>
               </div>
@@ -607,7 +679,7 @@
           <article class="panel section-card">
             <div class="section-head">
               <div>
-                <p class="eyebrow">Memory</p>
+                <p class="eyebrow">记忆</p>
                 <h3>记忆库</h3>
                 <p class="muted compact">这里管理的是全局运行态记忆。原记忆按原方式参与聊天；多选后可以合并成“合并后的记忆”，并同步写入大纲表。</p>
               </div>
@@ -898,6 +970,24 @@
           </div>
         </section>
       </main>
+
+      <nav class="bottom-nav" aria-label="PE 主导航">
+        <button data-open-drawer type="button" aria-label="工具">
+          <span>功能</span>
+        </button>
+        <button data-nav="worldbook" type="button" aria-label="题库">
+          <span>题库</span>
+        </button>
+        <button data-nav="chat" type="button" aria-label="首页">
+          <span>首页</span>
+        </button>
+        <button data-nav="config" type="button" aria-label="AI 配置">
+          <span>AI</span>
+        </button>
+        <button data-nav="card" type="button" aria-label="我的">
+          <span>我的</span>
+        </button>
+      </nav>
     </div>
 
     <div class="modal-backdrop hidden" id="modalBackdrop">
