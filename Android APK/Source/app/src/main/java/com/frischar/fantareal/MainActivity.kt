@@ -1,6 +1,7 @@
 package com.frischar.fantareal
 
 import android.annotation.SuppressLint
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
@@ -58,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         })
 
         configureWebView()
+        installKeyboardInsetBridge()
         loadLocalApp()
     }
 
@@ -124,6 +126,29 @@ class MainActivity : AppCompatActivity() {
     private fun loadLocalApp() {
         binding.progressBar.isVisible = true
         binding.webView.loadUrl(LOCAL_APP_URL)
+    }
+
+    private fun installKeyboardInsetBridge() {
+        val visibleFrame = Rect()
+        var lastCssKeyboardInset = -1
+        binding.root.viewTreeObserver.addOnGlobalLayoutListener {
+            binding.root.getWindowVisibleDisplayFrame(visibleFrame)
+            val rootHeight = binding.root.rootView.height
+            val rawInset = (rootHeight - visibleFrame.bottom).coerceAtLeast(0)
+            val density = resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
+            val threshold = (72f * density).toInt()
+            val cssInset = if (rawInset > threshold) (rawInset / density).toInt() else 0
+            if (cssInset == lastCssKeyboardInset) return@addOnGlobalLayoutListener
+            lastCssKeyboardInset = cssInset
+            val js = """
+                (function(){
+                  var value = '${cssInset}px';
+                  document.documentElement.style.setProperty('--pe-keyboard-inset', value);
+                  if (document.body) document.body.style.setProperty('--pe-keyboard-inset', value);
+                })();
+            """.trimIndent()
+            binding.webView.evaluateJavascript(js, null)
+        }
     }
 
     private fun preferHighRefreshRate() {

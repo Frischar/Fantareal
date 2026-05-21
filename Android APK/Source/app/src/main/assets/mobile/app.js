@@ -1,5 +1,5 @@
 ﻿const APP_STATE_KEY = "xuqi-mobile-state-v4";
-const ROUTES = ["chat", "config", "preset", "card", "workshop", "memory", "worldbook"];
+const ROUTES = ["chat", "config", "card"];
 const GLOBAL_RUNTIME_NAME = "全局运行数据";
 const MODEL_PRESETS = [
   { id: "custom", label: "自定义", url: "" },
@@ -36,10 +36,10 @@ const DEFAULT_SETTINGS = {
   timeoutSec: 90,
   historyLimit: 20,
   maxTokens: 0,
-  theme: "dark",
-  uiOpacity: 0.88,
+  theme: "light",
+  uiOpacity: 1,
   backgroundImageUrl: "",
-  backgroundOverlay: 0.36,
+  backgroundOverlay: 0,
   modelPreset: "custom",
   musicPreset: "off",
   musicUrl: "",
@@ -1501,6 +1501,17 @@ function getCurrentRoleLabel() {
   return String(getCurrentPersona()?.name || getCurrentCardStore()?.raw?.name || "当前角色").trim() || "当前角色";
 }
 
+function getImportedPersonaCount() {
+  const card = getCurrentCardStore()?.raw || {};
+  const personas = card.personas && typeof card.personas === "object" ? card.personas : {};
+  const count = Object.values(personas).filter((item) => {
+    if (!item || typeof item !== "object") return false;
+    return [item.name, item.description, item.personality, item.scenario, item.creator_notes]
+      .some((value) => String(value || "").trim());
+  }).length;
+  return Math.max(1, count);
+}
+
 function formatTime(ts) {
   return new Date(ts).toLocaleString();
 }
@@ -1557,18 +1568,42 @@ function detectPreset(url) {
   return found ? found.id : "custom";
 }
 
+function isTextEntryFocused() {
+  const active = document.activeElement;
+  if (!active) return false;
+  return Boolean(active.closest("input, textarea, select, [contenteditable='true']"));
+}
+
+function syncStableViewportHeight({ force = false } = {}) {
+  const root = document.documentElement;
+  const current = Math.round(window.innerHeight || root.clientHeight || 0);
+  if (!current) return;
+  const existing = Number.parseFloat(root.style.getPropertyValue("--pe-stable-vh"));
+  if (!force && isTextEntryFocused() && existing) return;
+  const next = force || !existing ? current : Math.max(existing, current);
+  root.style.setProperty("--pe-stable-vh", `${next}px`);
+}
+
 function applyAppearance() {
+  syncStableViewportHeight();
   const app = qs("mobileApp");
   const settings = state.settings;
   document.body.classList.toggle("light-theme", settings.theme === "light");
-  app.style.setProperty("--content-opacity", String(Number(settings.uiOpacity || 0.88)));
-  app.style.setProperty("--overlay-strength", String(Number(settings.backgroundOverlay || 0.36)));
+  app.style.setProperty("--content-opacity", String(Number(settings.uiOpacity ?? 1)));
+  app.style.setProperty("--overlay-strength", String(Number(settings.backgroundOverlay ?? 0)));
+  document.body.classList.add("pe-apk-shell");
   if (settings.backgroundImageUrl) {
+    document.documentElement.style.setProperty("--pe-background-image", `url("${settings.backgroundImageUrl}")`);
+    document.body.style.setProperty("--pe-background-image", `url("${settings.backgroundImageUrl}")`);
+    app.style.setProperty("--pe-background-image", `url("${settings.backgroundImageUrl}")`);
     document.body.style.backgroundImage =
       `linear-gradient(rgba(12, 21, 33, ${settings.backgroundOverlay}), rgba(19, 29, 43, ${settings.backgroundOverlay})), url("${settings.backgroundImageUrl}")`;
     document.body.style.backgroundSize = "cover";
     document.body.style.backgroundPosition = "center";
   } else {
+    document.documentElement.style.setProperty("--pe-background-image", "none");
+    document.body.style.setProperty("--pe-background-image", "none");
+    app.style.setProperty("--pe-background-image", "none");
     document.body.style.backgroundImage = "";
     document.body.style.backgroundSize = "";
     document.body.style.backgroundPosition = "";
@@ -1578,6 +1613,7 @@ function applyAppearance() {
 function renderGlobalChrome() {
   applyAppearance();
   const slot = getActiveSlot();
+  document.body.dataset.activeRoute = state.activeRoute || "chat";
   qs("currentRouteTitle").textContent = ROUTE_META[state.activeRoute]?.title || "聊天";
   qs("activeRuntimeName").textContent = getCurrentRoleLabel();
   const stage = getCurrentGameStage(slot);
@@ -1730,6 +1766,20 @@ function buildMessageNode(item) {
   return wrapper;
 }
 
+function buildIntroMessageNode(persona) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "message assistant intro-message";
+  const column = document.createElement("div");
+  column.className = "message-column";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble intro-bubble";
+  const introText = String(persona.greeting || persona.systemPrompt || "").trim();
+  bubble.textContent = introText ? `介绍：${introText}` : `介绍：已导入 ${getImportedPersonaCount()} 个人设。`;
+  column.appendChild(bubble);
+  wrapper.appendChild(column);
+  return wrapper;
+}
+
 function syncChatScrollRange() {
   const list = qs("messageList");
   const range = qs("chatScrollRange");
@@ -1771,11 +1821,14 @@ function isMessageListNearBottom(list, threshold = 48) {
 function renderChat({ stickToBottom = true } = {}) {
   const slot = getActiveSlot();
   const persona = getCurrentPersona();
-  qs("chatPersonaName").textContent = persona.name || "Template Character";
-  qs("chatGreeting").textContent = persona.greeting || "";
+  if (qs("peSceneTitle")) qs("peSceneTitle").textContent = persona.name || getCurrentRoleLabel();
+  if (qs("peSceneCount")) qs("peSceneCount").textContent = String((slot.messages || []).length);
+  qs("chatPersonaName").textContent = `已导入 ${getImportedPersonaCount()} 个人设`;
+  qs("chatGreeting").textContent = "";
   const list = qs("messageList");
   const previousBottomOffset = Math.max(0, list.scrollHeight - list.clientHeight - list.scrollTop);
   list.innerHTML = "";
+  list.appendChild(buildIntroMessageNode(persona));
   slot.messages.forEach((item) => list.appendChild(buildMessageNode(item)));
   if (stickToBottom) {
     list.scrollTop = list.scrollHeight;
@@ -3187,9 +3240,9 @@ function createStageNode(key, stage) {
         <button class="ghost-button danger-button icon-action" data-remove-stage="${escapeAttr(key)}" type="button" aria-label="删除阶段">−</button>
       </summary>
       <div class="editor-body">
-        <label>description（这一阶段发生了什么）</label>
+        <label>阶段说明</label>
         <textarea data-stage-desc="${escapeAttr(key)}" rows="4">${escapeHtml(stage.description || "")}</textarea>
-        <label>rules（这一阶段的行为规则 / 限制）</label>
+        <label>阶段规则</label>
         <textarea data-stage-rules="${escapeAttr(key)}" rows="4">${escapeHtml(stage.rules || "")}</textarea>
       </div>
     </details>
@@ -3208,20 +3261,61 @@ function createPersonaNode(key, persona) {
         <button class="ghost-button danger-button icon-action" data-remove-persona="${escapeAttr(key)}" type="button" aria-label="删除角色">−</button>
       </summary>
       <div class="editor-body">
-        <label>name（该角色显示名）</label>
+        <label>角色名称</label>
         <input data-persona-name="${escapeAttr(key)}" value="${escapeAttr(persona.name || "")}" />
-        <label>description（身份 / 背景简介）</label>
+        <label>身份背景</label>
         <textarea data-persona-desc="${escapeAttr(key)}" rows="4">${escapeHtml(persona.description || "")}</textarea>
-        <label>personality（个性 / 语气倾向）</label>
+        <label>个性与语气</label>
         <textarea data-persona-personality="${escapeAttr(key)}" rows="4">${escapeHtml(persona.personality || "")}</textarea>
-        <label>scenario（该角色所处场景 / 关系定位）</label>
+        <label>场景与关系</label>
         <textarea data-persona-scenario="${escapeAttr(key)}" rows="4">${escapeHtml(persona.scenario || "")}</textarea>
-        <label>creator_notes（仅给模型看的补充说明）</label>
+        <label>模型补充说明</label>
         <textarea data-persona-notes="${escapeAttr(key)}" rows="4">${escapeHtml(persona.creator_notes || "")}</textarea>
       </div>
     </details>
   `;
   return node;
+}
+
+function renderPersonaOverview() {
+  if (!qs("peOverviewTitle")) return;
+  const slot = getActiveSlot();
+  const cardStore = getCurrentCardStore();
+  const card = normalizeRoleCard(cardStore.raw);
+  const personaEntries = sortedEntries(card.personas, (left, right) => {
+    const a = personaSortKey(left);
+    const b = personaSortKey(right);
+    if (a[0] !== b[0]) return a[0] - b[0];
+    if (a[1] > b[1]) return 1;
+    if (a[1] < b[1]) return -1;
+    return 0;
+  });
+  const personaCount = getImportedPersonaCount();
+  const activePreset = getActivePresetFromStore(slot.presetStore);
+  qs("peOverviewTitle").textContent = `已导入 ${personaCount} 个人设`;
+  qs("peOverviewRoleName").textContent = card.name || cardStore.sourceName || "当前角色";
+  qs("peOverviewPresetName").textContent = activePreset?.name || "默认预设";
+  qs("peOverviewMemoryCount").textContent = String((slot.memories || []).length + (slot.mergedMemories || []).length);
+  qs("peOverviewWorldbookCount").textContent = String((slot.worldbook?.entries || []).length);
+  qs("peOverviewGreeting").textContent = String(card.first_mes || getCurrentPersona()?.greeting || "暂无").trim() || "暂无";
+  const list = qs("peOverviewPersonaList");
+  list.innerHTML = "";
+  personaEntries.forEach(([key, persona]) => {
+    const item = document.createElement("div");
+    item.className = "pe-overview-persona";
+    const details = [persona.description, persona.personality, persona.scenario]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join(" / ");
+    item.innerHTML = `<strong>${escapeHtml(persona.name || `角色 ${key}`)}</strong><span>${escapeHtml(details || "已导入")}</span>`;
+    list.appendChild(item);
+  });
+  if (!list.children.length) {
+    const empty = document.createElement("div");
+    empty.className = "pe-overview-persona";
+    empty.innerHTML = `<strong>${escapeHtml(card.name || "当前角色")}</strong><span>已导入</span>`;
+    list.appendChild(empty);
+  }
 }
 
 function renderCard() {
@@ -3270,6 +3364,7 @@ function renderCard() {
       ? `当前已启用创意工坊，共有 ${workshop.items.length} 条规则，其中 ${customCount} 条是自定义 Temp 触发。`
       : `当前创意工坊未启用，但角色卡内已配置 ${workshop.items.length} 条规则。`;
   }
+  renderPersonaOverview();
 }
 
 function renderWorkshopSettings() {
@@ -4850,6 +4945,7 @@ async function importRoleCard(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   try {
+    setStatus(`正在导入 ${file.name}`);
     const text = await file.text();
     const json = extractJsonObject(text) || JSON.parse(text);
     state.currentCard.sourceName = safeFileName(file.name, "role_card.json");
@@ -4860,8 +4956,9 @@ async function importRoleCard(event) {
     renderGlobalChrome();
     renderCard();
     renderChat();
-    setStatus("角色卡已导入");
-    showModal("导入成功", "角色卡已经导入并应用到当前运行态，现有记忆、世界书和预设保持不变。");
+    const personaCount = getImportedPersonaCount();
+    setStatus(`已导入 ${personaCount} 个人设`);
+    showModal("导入成功", `已导入 ${personaCount} 个人设。`);
   } catch {
     setStatus("角色卡导入失败");
     showModal("导入失败", "角色卡不是有效的 JSON 或内容结构不正确。");
@@ -5385,6 +5482,9 @@ function bindGlobalEvents() {
   });
 
   if (qs("openDrawerButton")) qs("openDrawerButton").addEventListener("click", openDrawer);
+  document.querySelectorAll("[data-open-drawer]").forEach((button) => {
+    button.addEventListener("click", openDrawer);
+  });
   if (qs("closeDrawerButton")) qs("closeDrawerButton").addEventListener("click", closeDrawer);
   if (qs("drawerBackdrop")) {
     qs("drawerBackdrop").addEventListener("click", (event) => {
@@ -5425,6 +5525,10 @@ function bindGlobalEvents() {
   });
   qs("endConversationButton").addEventListener("click", () => void endConversation());
   qs("exportChatButton").addEventListener("click", exportChatHistory);
+  if (qs("peImportRoleButton")) qs("peImportRoleButton").addEventListener("click", () => qs("cardImportInput").click());
+  if (qs("peImportPresetButton")) qs("peImportPresetButton").addEventListener("click", () => qs("importPresetFile").click());
+  if (qs("peImportMemoryButton")) qs("peImportMemoryButton").addEventListener("click", () => qs("importMemoryFile").click());
+  if (qs("peImportWorldbookButton")) qs("peImportWorldbookButton").addEventListener("click", () => qs("importWorldbookFile").click());
 
   qs("testConnectionButton").addEventListener("click", async () => {
     if (!state.settings.apiBaseUrl || !state.settings.model) {
@@ -5985,9 +6089,16 @@ window.XuqiMobileApp = {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+  syncStableViewportHeight({ force: true });
   bindGlobalEvents();
   renderAll();
 });
+
+window.addEventListener("resize", () => syncStableViewportHeight());
+window.addEventListener("orientationchange", () => {
+  window.setTimeout(() => syncStableViewportHeight({ force: true }), 260);
+});
+document.addEventListener("focusin", () => syncStableViewportHeight(), true);
 
 window.addEventListener("beforeunload", flushState);
 document.addEventListener("visibilitychange", () => {
