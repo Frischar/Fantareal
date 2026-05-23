@@ -5,7 +5,7 @@ import json
 import re
 import sqlite3
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 
-VERSION = "2.0.7-role-specific-display-backfill"
+VERSION = "2.0.9-story-time-fix1"
 
 
 def get_resource_dir() -> Path:
@@ -245,6 +245,38 @@ OPERATION_ALIASES = {
     "set": "update",
     "delete": "delete",
     "remove": "delete",
+}
+TIME_FMT = "%Y-%m-%d %H:%M:%S"
+STORY_TIME_ADVANCE_MODES = {"explicit", "smart", "manual", "custom"}
+STORY_TIME_DISPLAY_MODES = {"datetime_minute", "datetime_second", "day_slot"}
+STORY_TIME_CUSTOM_ADVANCE_TYPES = {"fixed", "range"}
+STORY_TIME_NUMERIC_FIELDS = {"elapsed_seconds", "elapsed_hours", "elapsed_days", "current_hour"}
+STORY_TIME_TEXT_FIELDS = {"current_date", "time_slot", "season"}
+STORY_TIME_FIELDS = STORY_TIME_NUMERIC_FIELDS | STORY_TIME_TEXT_FIELDS
+TIME_SLOT_LABELS = {
+    "late_night": "深夜",
+    "dawn": "清晨",
+    "morning": "上午",
+    "noon": "正午",
+    "afternoon": "下午",
+    "dusk": "黄昏",
+    "night": "夜晚",
+    "day": "白日",
+}
+SEASON_LABELS = {
+    "spring": "春",
+    "summer": "夏",
+    "autumn": "秋",
+    "winter": "冬",
+}
+STORY_TIME_FIELD_LABELS = {
+    "elapsed_seconds": "已过秒数",
+    "elapsed_hours": "已过小时",
+    "elapsed_days": "已过天数",
+    "current_hour": "当前小时",
+    "current_date": "当前日期",
+    "time_slot": "当前时段",
+    "season": "当前季节",
 }
 
 app = FastAPI(title="Fantareal State Journal Mod")
@@ -866,6 +898,41 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
             active_tag TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS state_journal_story_time_state (
+            card_uid TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 0,
+            show_in_note INTEGER NOT NULL DEFAULT 1,
+            base_time TEXT,
+            current_time TEXT,
+            elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+            season TEXT,
+            time_slot TEXT,
+            advance_mode TEXT NOT NULL DEFAULT 'smart',
+            custom_advance_type TEXT NOT NULL DEFAULT 'range',
+            custom_advance_min_seconds INTEGER NOT NULL DEFAULT 300,
+            custom_advance_max_seconds INTEGER NOT NULL DEFAULT 900,
+            display_mode TEXT NOT NULL DEFAULT 'datetime_minute',
+            last_delta_seconds INTEGER NOT NULL DEFAULT 0,
+            last_delta_text TEXT,
+            last_confidence TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS state_journal_story_time_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_uid TEXT NOT NULL,
+            turn_id TEXT,
+            message_id TEXT,
+            turn_index INTEGER,
+            old_time TEXT,
+            new_time TEXT,
+            delta_seconds INTEGER NOT NULL DEFAULT 0,
+            delta_text TEXT,
+            confidence TEXT,
+            reason TEXT,
+            source TEXT NOT NULL DEFAULT 'worker',
+            created_at TEXT
+        );
         CREATE TABLE IF NOT EXISTS state_journal_hook_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             created_at TEXT NOT NULL,
@@ -1000,6 +1067,18 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
         cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
         if "card_uid" not in cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN card_uid TEXT NOT NULL DEFAULT 'global'")
+    story_time_cols = {row["name"] for row in conn.execute("PRAGMA table_info(state_journal_story_time_state)").fetchall()}
+    story_time_extra_cols = {
+        "custom_advance_type": "TEXT NOT NULL DEFAULT 'range'",
+        "custom_advance_min_seconds": "INTEGER NOT NULL DEFAULT 300",
+        "custom_advance_max_seconds": "INTEGER NOT NULL DEFAULT 900",
+    }
+    for col, ddl in story_time_extra_cols.items():
+        if col not in story_time_cols:
+            conn.execute(f"ALTER TABLE state_journal_story_time_state ADD COLUMN {col} {ddl}")
+    story_history_cols = {row["name"] for row in conn.execute("PRAGMA table_info(state_journal_story_time_history)").fetchall()}
+    if "source" not in story_history_cols:
+        conn.execute("ALTER TABLE state_journal_story_time_history ADD COLUMN source TEXT NOT NULL DEFAULT 'worker'")
 
     rows = conn.execute("SELECT turn_id FROM state_journal_turn_records WHERE seq_no IS NULL OR seq_no<=0 ORDER BY created_at, rowid").fetchall()
     if rows:
@@ -1790,10 +1869,11 @@ def upsert_full_row(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[
 
 def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = "reroll") -> int:
     safe_turn = normalize_turn_id(turn_id)
+    count = rollback_story_time_effects(conn, safe_turn)
     row = conn.execute("SELECT effects_json FROM state_journal_turn_effects WHERE turn_id=?", (safe_turn,)).fetchone()
     if not row:
         conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (safe_turn,))
-        return 0
+        return count
     try:
         payload = json.loads(row["effects_json"] or "{}")
     except ValueError:
@@ -1802,7 +1882,6 @@ def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = 
     if not isinstance(applied, list):
         applied = []
     schemas = {schema["id"]: schema for schema in list_schemas_from_db(conn)}
-    count = 0
     for item in reversed(applied):
         if not isinstance(item, dict):
             continue
@@ -1925,6 +2004,7 @@ def save_turn_effects(conn: sqlite3.Connection, turn_id: str, result: dict[str, 
         "errors": result.get("errors") or [],
         "touched_tables": result.get("touched_tables") or [],
         "metrics": result.get("metrics") or [],
+        "story_time": result.get("story_time") or {},
     }
     conn.execute(
         "INSERT INTO state_journal_turn_effects(turn_id, created_at, effects_json) VALUES(?, ?, ?) ON CONFLICT(turn_id) DO UPDATE SET created_at=excluded.created_at, effects_json=excluded.effects_json",
@@ -2218,13 +2298,25 @@ def normalize_role_state_stage(raw: Any, role_id: str = "", index: int = 1) -> d
         for item in raw_conditions:
             if not isinstance(item, dict):
                 continue
-            var_key = normalize_role_state_key(item.get("var") or item.get("field"), "")
-            if not var_key:
-                continue
             op = str(item.get("op") or ">=").strip()
             if op not in STAGE_OPERATORS:
                 op = ">="
-            conditions.append({"var": var_key, "op": op, "value": role_state_number(item.get("value"), 0)})
+            source = str(item.get("source") or "").strip().lower()
+            if source == "story_time":
+                field_key = normalize_role_state_key(item.get("field"), "")
+                if field_key not in STORY_TIME_FIELDS:
+                    continue
+                value = item.get("value")
+                if field_key in STORY_TIME_NUMERIC_FIELDS:
+                    value = role_state_number(value, 0)
+                else:
+                    value = str(value or "").strip()
+                conditions.append({"source": "story_time", "field": field_key, "op": op, "value": value})
+                continue
+            var_key = normalize_role_state_key(item.get("var") or item.get("field"), "")
+            if not var_key:
+                continue
+            conditions.append({"source": "variable", "var": var_key, "op": op, "value": role_state_number(item.get("value"), 0)})
     return {
         "stage_key": stage_key,
         "stage_name": stage_name,
@@ -2333,6 +2425,51 @@ def role_state_role_tokens(role: dict[str, Any]) -> set[str]:
 
 def role_state_role_score(role: dict[str, Any]) -> int:
     return len(role.get("variables") or []) * 10 + len(role.get("stages") or []) * 10 + len(role.get("snapshotFields") or []) * 6 + len(role.get("aliases") or [])
+
+
+PLACEHOLDER_ROLE_NAME_RE = re.compile(r"^role\s*[a-z0-9]+$", re.I)
+PLACEHOLDER_ROLE_ID_RE = re.compile(r"^role[_\-\s]*[a-z0-9]+$", re.I)
+PLACEHOLDER_PERSONA_HINTS = (
+    "main emotional anchor",
+    "secondary analytical voice",
+    "secondary lively voice",
+    "warm and stable",
+    "calm and concise",
+    "bright and expressive",
+    "leads most daily conversation",
+    "adds another perspective when needed",
+    "adds energy and contrast",
+)
+
+
+def is_placeholder_role_label(value: Any) -> bool:
+    text = str(value or "").strip()
+    return bool(text and (PLACEHOLDER_ROLE_NAME_RE.match(text) or PLACEHOLDER_ROLE_ID_RE.match(text)))
+
+
+def is_placeholder_role_state_role(role: dict[str, Any]) -> bool:
+    if not isinstance(role, dict):
+        return False
+    if role.get("variables") or role.get("stages") or role.get("snapshotFields"):
+        return False
+    role_id = str(role.get("role_id") or role.get("id") or "").strip()
+    role_name = str(role.get("role_name") or role.get("name") or "").strip()
+    if not (is_placeholder_role_label(role_id) or is_placeholder_role_label(role_name)):
+        return False
+    aliases = [str(item or "").strip() for item in (role.get("aliases") or [])]
+    return all((not alias) or alias.isdigit() or is_placeholder_role_label(alias) for alias in aliases)
+
+
+def is_placeholder_persona(persona_key: str, persona: dict[str, Any]) -> bool:
+    if not isinstance(persona, dict):
+        return False
+    if not is_placeholder_role_label(persona.get("name")):
+        return False
+    persona_text = " ".join(str(persona.get(key) or "") for key in ("description", "personality", "scenario", "creator_notes")).lower()
+    if any(hint in persona_text for hint in PLACEHOLDER_PERSONA_HINTS):
+        return True
+    key_text = str(persona_key or "").strip()
+    return key_text.isdigit() and not persona_text.strip()
 
 
 def merge_role_state_role(base: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
@@ -2449,6 +2586,8 @@ def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
     for index, (persona_key, persona) in enumerate(personas.items(), start=1):
         if not isinstance(persona, dict):
             continue
+        if is_placeholder_persona(str(persona_key), persona):
+            continue
         name = str(persona.get("name") or f"角色{index}").strip()
         role_id = normalize_role_state_key(persona.get("role_id") or persona.get("id") or name or persona_key, f"role_{index}")
         aliases: list[str] = []
@@ -2503,14 +2642,19 @@ def role_state_config_from_current_card() -> dict[str, Any]:
     config["card_uid"] = card_uid
     config["card"] = current_card_summary()
     personas = raw_card.get("personas") if isinstance(raw_card.get("personas"), dict) else {}
-    has_personas = bool(personas)
     main_role = role_state_main_card_role(raw_card)
     main_role_name = str((main_role or {}).get("role_name") or raw_card.get("name") or "").strip()
-    if config.get("roles"):
-        detected = "personas_only" if has_personas else "main_card"
-        config["role_source_summary"] = role_source_summary(source_mode, detected, config.get("roles") or [], has_personas, main_role_name)
-        return config
     persona_roles = role_state_persona_roles(raw_card)
+    has_personas = bool(persona_roles)
+    if config.get("roles"):
+        filtered_roles = [role for role in (config.get("roles") or []) if not is_placeholder_role_state_role(role)]
+        if not filtered_roles:
+            config["roles"] = []
+        else:
+            config["roles"] = filtered_roles
+            detected = "personas_only" if has_personas or len(filtered_roles) > 1 else "main_card"
+            config["role_source_summary"] = role_source_summary(source_mode, detected, config.get("roles") or [], has_personas, main_role_name)
+            return config
     roles: list[dict[str, Any]] = []
     detected_mode = "auto"
     if source_mode == "main_card":
@@ -2627,6 +2771,613 @@ def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if not row:
         return None
     return {key: row[key] for key in row.keys()}
+
+
+def derive_season(month: int) -> str:
+    if month in (3, 4, 5):
+        return "spring"
+    if month in (6, 7, 8):
+        return "summer"
+    if month in (9, 10, 11):
+        return "autumn"
+    return "winter"
+
+
+def derive_time_slot(hour: int) -> str:
+    if 23 <= hour or hour <= 6:
+        return "late_night"
+    if 7 <= hour <= 8:
+        return "dawn"
+    if 9 <= hour <= 11:
+        return "morning"
+    if 12 <= hour <= 14:
+        return "noon"
+    if 15 <= hour <= 18:
+        return "afternoon"
+    if 19 <= hour <= 20:
+        return "dusk"
+    if 21 <= hour <= 22:
+        return "night"
+    return "day"
+
+
+def parse_story_time(value: Any, fallback: datetime | None = None) -> datetime:
+    text = str(value or "").strip()
+    if text:
+        for fmt in (TIME_FMT, "%Y-%m-%d %H:%M", "%Y-%m-%d", "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M"):
+            try:
+                parsed = datetime.strptime(text, fmt)
+                if fmt == "%Y-%m-%d":
+                    parsed = parsed.replace(hour=8)
+                return parsed
+            except ValueError:
+                continue
+    if fallback is not None:
+        return fallback
+    return datetime.now().replace(microsecond=0)
+
+
+def story_time_from_parts(payload: dict[str, Any], prefix: str = "") -> datetime:
+    explicit = payload.get(f"{prefix}time") or payload.get(f"{prefix}date_time") or payload.get("time") or payload.get("datetime")
+    if explicit:
+        return parse_story_time(explicit)
+    year = role_state_int(payload.get(f"{prefix}year") or payload.get("year"), datetime.now().year, 1)
+    month = role_state_int(payload.get(f"{prefix}month") or payload.get("month"), 1, 1)
+    day = role_state_int(payload.get(f"{prefix}day") or payload.get("day"), 1, 1)
+    hour = role_state_int(payload.get(f"{prefix}hour") or payload.get("hour"), 0, 0)
+    minute = role_state_int(payload.get(f"{prefix}minute") or payload.get("minute"), 0, 0)
+    second = role_state_int(payload.get(f"{prefix}second") or payload.get("second"), 0, 0)
+    month = min(max(month, 1), 12)
+    hour = min(max(hour, 0), 23)
+    minute = min(max(minute, 0), 59)
+    second = min(max(second, 0), 59)
+    for safe_day in range(min(max(day, 1), 31), 0, -1):
+        try:
+            return datetime(year, month, safe_day, hour, minute, second)
+        except ValueError:
+            continue
+    return datetime(year, month, 1, hour, minute, second)
+
+
+def normalize_story_time_mode(value: Any) -> str:
+    mode = str(value or "smart").strip().lower()
+    return mode if mode in STORY_TIME_ADVANCE_MODES else "smart"
+
+
+def normalize_story_time_display_mode(value: Any) -> str:
+    mode = str(value or "datetime_minute").strip().lower()
+    return mode if mode in STORY_TIME_DISPLAY_MODES else "datetime_minute"
+
+
+def normalize_story_time_custom_advance_type(value: Any) -> str:
+    mode = str(value or "range").strip().lower()
+    return mode if mode in STORY_TIME_CUSTOM_ADVANCE_TYPES else "range"
+
+
+def normalize_story_time_custom_seconds(value: Any, fallback: int = 0) -> int:
+    try:
+        seconds = int(float(value))
+    except (TypeError, ValueError):
+        seconds = int(fallback or 0)
+    return min(max(seconds, 0), 86400)
+
+
+def story_time_label(value: Any, mapping: dict[str, str]) -> str:
+    key = str(value or "").strip()
+    return mapping.get(key, key)
+
+
+def story_time_state_defaults(card_uid: str | None = None) -> dict[str, Any]:
+    safe_card_uid = normalize_role_state_key(card_uid or current_card_uid(), "global")
+    base = datetime.now().replace(microsecond=0)
+    season = derive_season(base.month)
+    time_slot = derive_time_slot(base.hour)
+    return {
+        "card_uid": safe_card_uid,
+        "enabled": False,
+        "show_in_note": True,
+        "base_time": base.strftime(TIME_FMT),
+        "current_time": "",
+        "elapsed_seconds": 0,
+        "season": season,
+        "season_label": story_time_label(season, SEASON_LABELS),
+        "time_slot": time_slot,
+        "time_slot_label": story_time_label(time_slot, TIME_SLOT_LABELS),
+        "advance_mode": "smart",
+        "custom_advance_type": "range",
+        "custom_advance_min_seconds": 300,
+        "custom_advance_max_seconds": 900,
+        "display_mode": "datetime_minute",
+        "last_delta_seconds": 0,
+        "last_delta_text": "",
+        "last_confidence": "",
+        "created_at": "",
+        "updated_at": "",
+        "initialized": False,
+        "display_time": "",
+    }
+
+
+def serialize_story_time_state(row: dict[str, Any] | sqlite3.Row | None, card_uid: str | None = None) -> dict[str, Any]:
+    if row is None:
+        return story_time_state_defaults(card_uid)
+    data = row_to_dict(row) if isinstance(row, sqlite3.Row) else dict(row)
+    current_text = str(data.get("current_time") or "").strip()
+    base_text = str(data.get("base_time") or "").strip()
+    current_dt = parse_story_time(current_text, None) if current_text else None
+    base_dt = parse_story_time(base_text, None) if base_text else current_dt
+    if current_dt:
+        season = derive_season(current_dt.month)
+        time_slot = derive_time_slot(current_dt.hour)
+    else:
+        season = str(data.get("season") or "")
+        time_slot = str(data.get("time_slot") or "")
+    display_mode = normalize_story_time_display_mode(data.get("display_mode"))
+    custom_advance_type = normalize_story_time_custom_advance_type(data.get("custom_advance_type"))
+    custom_min = normalize_story_time_custom_seconds(data.get("custom_advance_min_seconds"), 300)
+    custom_max = normalize_story_time_custom_seconds(data.get("custom_advance_max_seconds"), 900)
+    if custom_advance_type == "fixed":
+        custom_max = custom_min
+    elif custom_max < custom_min:
+        custom_min, custom_max = custom_max, custom_min
+    serialized = {
+        "card_uid": normalize_role_state_key(data.get("card_uid") or card_uid or current_card_uid(), "global"),
+        "enabled": bool(data.get("enabled")),
+        "show_in_note": data.get("show_in_note") is not False and int(data.get("show_in_note") or 0) != 0,
+        "base_time": base_dt.strftime(TIME_FMT) if base_dt else base_text,
+        "current_time": current_dt.strftime(TIME_FMT) if current_dt else current_text,
+        "elapsed_seconds": int(data.get("elapsed_seconds") or 0),
+        "season": season,
+        "season_label": story_time_label(season, SEASON_LABELS),
+        "time_slot": time_slot,
+        "time_slot_label": story_time_label(time_slot, TIME_SLOT_LABELS),
+        "advance_mode": normalize_story_time_mode(data.get("advance_mode")),
+        "custom_advance_type": custom_advance_type,
+        "custom_advance_min_seconds": custom_min,
+        "custom_advance_max_seconds": custom_max,
+        "display_mode": display_mode,
+        "last_delta_seconds": int(data.get("last_delta_seconds") or 0),
+        "last_delta_text": str(data.get("last_delta_text") or ""),
+        "last_confidence": str(data.get("last_confidence") or ""),
+        "created_at": str(data.get("created_at") or ""),
+        "updated_at": str(data.get("updated_at") or ""),
+        "initialized": bool(current_dt),
+    }
+    serialized["display_time"] = format_story_time_display(serialized)
+    return serialized
+
+
+def story_time_context_from_state(state: dict[str, Any] | None) -> dict[str, Any]:
+    if not state or not state.get("current_time"):
+        return {}
+    current = parse_story_time(state.get("current_time"))
+    elapsed_seconds = int(state.get("elapsed_seconds") or 0)
+    return {
+        "elapsed_seconds": elapsed_seconds,
+        "elapsed_hours": elapsed_seconds // 3600,
+        "elapsed_days": elapsed_seconds // 86400,
+        "current_hour": current.hour,
+        "current_date": current.strftime("%Y-%m-%d"),
+        "time_slot": derive_time_slot(current.hour),
+        "season": derive_season(current.month),
+    }
+
+
+def format_story_time_display(state: dict[str, Any] | None) -> str:
+    if not state or not state.get("current_time"):
+        return ""
+    current = parse_story_time(state.get("current_time"))
+    mode = normalize_story_time_display_mode(state.get("display_mode"))
+    if mode == "datetime_second":
+        return f"{current.year}年{current.month}月{current.day}日 {current:%H:%M:%S}"
+    if mode == "day_slot":
+        elapsed_days = int(state.get("elapsed_seconds") or 0) // 86400 + 1
+        slot = story_time_label(state.get("time_slot") or derive_time_slot(current.hour), TIME_SLOT_LABELS)
+        return f"第 {elapsed_days} 日 · {slot}"
+    return f"{current.year}年{current.month}月{current.day}日 {current:%H:%M}"
+
+
+def load_story_time_state(conn: sqlite3.Connection, card_uid: str | None = None) -> dict[str, Any]:
+    init_meta_tables(conn)
+    safe_card_uid = normalize_role_state_key(card_uid or current_card_uid(), "global")
+    row = conn.execute("SELECT * FROM state_journal_story_time_state WHERE card_uid=?", (safe_card_uid,)).fetchone()
+    return serialize_story_time_state(row, safe_card_uid)
+
+
+def upsert_story_time_state(conn: sqlite3.Connection, state: dict[str, Any]) -> dict[str, Any]:
+    init_meta_tables(conn)
+    safe_card_uid = normalize_role_state_key(state.get("card_uid") or current_card_uid(), "global")
+    now = now_string()
+    existing = conn.execute("SELECT created_at FROM state_journal_story_time_state WHERE card_uid=?", (safe_card_uid,)).fetchone()
+    current_time = str(state.get("current_time") or "").strip()
+    base_time = str(state.get("base_time") or "").strip()
+    current_dt = parse_story_time(current_time, None) if current_time else None
+    base_dt = parse_story_time(base_time, current_dt) if base_time or current_dt else None
+    elapsed = int(state.get("elapsed_seconds") or 0)
+    if current_dt and base_dt:
+        elapsed = max(0, int((current_dt - base_dt).total_seconds()))
+    season = derive_season(current_dt.month) if current_dt else str(state.get("season") or "")
+    time_slot = derive_time_slot(current_dt.hour) if current_dt else str(state.get("time_slot") or "")
+    custom_advance_type = normalize_story_time_custom_advance_type(state.get("custom_advance_type"))
+    custom_min = normalize_story_time_custom_seconds(state.get("custom_advance_min_seconds"), 300)
+    custom_max = normalize_story_time_custom_seconds(state.get("custom_advance_max_seconds"), 900)
+    if custom_advance_type == "fixed":
+        custom_max = custom_min
+    elif custom_max < custom_min:
+        custom_min, custom_max = custom_max, custom_min
+    conn.execute(
+        """
+        INSERT INTO state_journal_story_time_state(
+            card_uid, enabled, show_in_note, base_time, current_time, elapsed_seconds, season, time_slot,
+            advance_mode, custom_advance_type, custom_advance_min_seconds, custom_advance_max_seconds,
+            display_mode, last_delta_seconds, last_delta_text, last_confidence, created_at, updated_at
+        )
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(card_uid) DO UPDATE SET
+            enabled=excluded.enabled,
+            show_in_note=excluded.show_in_note,
+            base_time=excluded.base_time,
+            current_time=excluded.current_time,
+            elapsed_seconds=excluded.elapsed_seconds,
+            season=excluded.season,
+            time_slot=excluded.time_slot,
+            advance_mode=excluded.advance_mode,
+            custom_advance_type=excluded.custom_advance_type,
+            custom_advance_min_seconds=excluded.custom_advance_min_seconds,
+            custom_advance_max_seconds=excluded.custom_advance_max_seconds,
+            display_mode=excluded.display_mode,
+            last_delta_seconds=excluded.last_delta_seconds,
+            last_delta_text=excluded.last_delta_text,
+            last_confidence=excluded.last_confidence,
+            updated_at=excluded.updated_at
+        """,
+        (
+            safe_card_uid,
+            1 if state.get("enabled") else 0,
+            1 if state.get("show_in_note", True) else 0,
+            base_dt.strftime(TIME_FMT) if base_dt else "",
+            current_dt.strftime(TIME_FMT) if current_dt else "",
+            elapsed,
+            season,
+            time_slot,
+            normalize_story_time_mode(state.get("advance_mode")),
+            custom_advance_type,
+            custom_min,
+            custom_max,
+            normalize_story_time_display_mode(state.get("display_mode")),
+            int(state.get("last_delta_seconds") or 0),
+            str(state.get("last_delta_text") or ""),
+            str(state.get("last_confidence") or ""),
+            str(existing["created_at"] or now) if existing else now,
+            now,
+        ),
+    )
+    return load_story_time_state(conn, safe_card_uid)
+
+
+def story_time_config_from_payload(payload: dict[str, Any], existing: dict[str, Any]) -> dict[str, Any]:
+    has_base_parts = any(key in payload for key in ("base_year", "base_month", "base_day", "base_hour", "base_minute", "base_second", "year", "month", "day", "hour", "minute", "second"))
+    if payload.get("base_time"):
+        base_dt = parse_story_time(payload.get("base_time"), None)
+    elif has_base_parts:
+        base_dt = story_time_from_parts(payload, "base_")
+    else:
+        base_dt = parse_story_time(existing.get("base_time"), None)
+    current_text = payload.get("current_time")
+    current_dt = parse_story_time(current_text, None) if current_text else (parse_story_time(existing.get("current_time"), None) if existing.get("current_time") else None)
+    if payload.get("initialize") or (payload.get("enabled") and not current_dt):
+        current_dt = base_dt
+    custom_advance_type = normalize_story_time_custom_advance_type(payload.get("custom_advance_type", existing.get("custom_advance_type")))
+    custom_min = normalize_story_time_custom_seconds(payload.get("custom_advance_min_seconds", existing.get("custom_advance_min_seconds")), 300)
+    custom_max = normalize_story_time_custom_seconds(payload.get("custom_advance_max_seconds", existing.get("custom_advance_max_seconds")), 900)
+    if custom_advance_type == "fixed":
+        custom_max = custom_min
+    elif custom_max < custom_min:
+        custom_min, custom_max = custom_max, custom_min
+    merged = {**existing}
+    merged.update(
+        {
+            "enabled": bool(payload.get("enabled", existing.get("enabled", False))),
+            "show_in_note": bool(payload.get("show_in_note", existing.get("show_in_note", True))),
+            "base_time": base_dt.strftime(TIME_FMT),
+            "current_time": current_dt.strftime(TIME_FMT) if current_dt else "",
+            "advance_mode": normalize_story_time_mode(payload.get("advance_mode", existing.get("advance_mode"))),
+            "custom_advance_type": custom_advance_type,
+            "custom_advance_min_seconds": custom_min,
+            "custom_advance_max_seconds": custom_max,
+            "display_mode": normalize_story_time_display_mode(payload.get("display_mode", existing.get("display_mode"))),
+        }
+    )
+    return merged
+
+
+def record_story_time_history(
+    conn: sqlite3.Connection,
+    *,
+    card_uid: str,
+    turn_id: str = "",
+    message_id: str = "",
+    turn_index: int | None = None,
+    old_time: str = "",
+    new_time: str = "",
+    delta_seconds: int = 0,
+    delta_text: str = "",
+    confidence: str = "",
+    reason: str = "",
+    source: str = "worker",
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO state_journal_story_time_history(
+            card_uid, turn_id, message_id, turn_index, old_time, new_time, delta_seconds, delta_text, confidence, reason, source, created_at
+        )
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            normalize_role_state_key(card_uid, "global"),
+            normalize_turn_id(turn_id) if turn_id else "",
+            normalize_turn_id(message_id) if message_id else "",
+            int(turn_index or 0) if str(turn_index or "").strip() else 0,
+            old_time,
+            new_time,
+            int(delta_seconds or 0),
+            delta_text,
+            confidence,
+            reason,
+            source,
+            now_string(),
+        ),
+    )
+
+
+def apply_story_time_delta_to_state(state: dict[str, Any], delta_seconds: int) -> dict[str, Any]:
+    current = parse_story_time(state.get("current_time"))
+    base = parse_story_time(state.get("base_time"), current)
+    delta = max(0, int(delta_seconds or 0))
+    new_current = current + timedelta(seconds=delta)
+    elapsed_seconds = max(0, int((new_current - base).total_seconds()))
+    updated = {**state}
+    updated.update(
+        {
+            "current_time": new_current.strftime(TIME_FMT),
+            "elapsed_seconds": elapsed_seconds,
+            "season": derive_season(new_current.month),
+            "time_slot": derive_time_slot(new_current.hour),
+        }
+    )
+    return updated
+
+
+def normalize_story_time_delta(raw: Any, advance_mode: str = "smart") -> dict[str, Any]:
+    data = raw if isinstance(raw, dict) else {}
+    mode = normalize_story_time_mode(advance_mode)
+    try:
+        delta_seconds = int(float(data.get("delta_seconds") or 0))
+    except (TypeError, ValueError):
+        delta_seconds = 0
+    changed = bool(data.get("changed")) or delta_seconds > 0
+    confidence = str(data.get("confidence") or ("medium" if changed else "none")).strip().lower()
+    if confidence not in {"none", "low", "medium", "high"}:
+        confidence = "medium" if changed else "none"
+    if mode == "manual":
+        delta_seconds = 0
+        changed = False
+    if delta_seconds < 0:
+        delta_seconds = 0
+    if delta_seconds > 86400:
+        delta_seconds = 86400
+    if delta_seconds > 7200 and confidence != "high":
+        delta_seconds = 7200
+    return {
+        "changed": changed and delta_seconds > 0,
+        "delta_seconds": delta_seconds,
+        "delta_text": clean_display_text(data.get("delta_text") or ("时间略有流逝。" if delta_seconds else ""), 160),
+        "confidence": confidence,
+        "reason": clean_display_text(data.get("reason") or "", 240),
+    }
+
+
+def format_duration_zh(seconds: int) -> str:
+    total = max(0, int(seconds or 0))
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days}天")
+    if hours:
+        parts.append(f"{hours}小时")
+    if minutes:
+        parts.append(f"{minutes}分钟")
+    if secs or not parts:
+        parts.append(f"{secs}秒")
+    return "".join(parts)
+
+
+def story_time_custom_delta(state: dict[str, Any], *, turn_id: str = "", message_id: str = "", turn_index: int | None = None) -> dict[str, Any]:
+    custom_type = normalize_story_time_custom_advance_type(state.get("custom_advance_type"))
+    min_seconds = normalize_story_time_custom_seconds(state.get("custom_advance_min_seconds"), 300)
+    max_seconds = normalize_story_time_custom_seconds(state.get("custom_advance_max_seconds"), 900)
+    if custom_type == "fixed":
+        max_seconds = min_seconds
+    elif max_seconds < min_seconds:
+        min_seconds, max_seconds = max_seconds, min_seconds
+    if custom_type == "range" and max_seconds > min_seconds:
+        seed = "|".join(
+            [
+                str(state.get("card_uid") or ""),
+                str(state.get("current_time") or ""),
+                str(turn_id or ""),
+                str(message_id or ""),
+                str(turn_index if turn_index is not None else ""),
+                str(min_seconds),
+                str(max_seconds),
+            ]
+        )
+        span = max_seconds - min_seconds
+        offset = int(hashlib.sha256(seed.encode("utf-8")).hexdigest()[:8], 16) % (span + 1)
+        delta_seconds = min_seconds + offset
+    else:
+        delta_seconds = min_seconds
+    return {
+        "changed": delta_seconds > 0,
+        "delta_seconds": delta_seconds,
+        "delta_text": f"用户自定义{'浮动' if custom_type == 'range' and max_seconds > min_seconds else '固定'}推进 {format_duration_zh(delta_seconds)}。",
+        "confidence": "high" if delta_seconds > 0 else "none",
+        "reason": f"推进方式为用户自定义：{min_seconds}-{max_seconds} 秒。" if custom_type == "range" else f"推进方式为用户自定义：固定 {min_seconds} 秒。",
+    }
+
+
+def apply_story_time_update(
+    conn: sqlite3.Connection,
+    raw_delta: Any,
+    *,
+    turn_id: str = "",
+    message_id: str = "",
+    turn_index: int | None = None,
+    source: str = "worker",
+) -> dict[str, Any] | None:
+    state = load_story_time_state(conn)
+    if not state.get("enabled") or not state.get("current_time"):
+        return None
+    if normalize_story_time_mode(state.get("advance_mode")) == "custom":
+        delta = story_time_custom_delta(state, turn_id=turn_id, message_id=message_id, turn_index=turn_index)
+        source = "custom"
+    else:
+        delta = normalize_story_time_delta(raw_delta, state.get("advance_mode"))
+    old_time = str(state.get("current_time") or "")
+    updated = apply_story_time_delta_to_state(state, delta["delta_seconds"])
+    updated.update(
+        {
+            "last_delta_seconds": delta["delta_seconds"],
+            "last_delta_text": delta["delta_text"],
+            "last_confidence": delta["confidence"],
+        }
+    )
+    saved = upsert_story_time_state(conn, updated)
+    if delta["delta_seconds"] > 0 or delta["changed"]:
+        record_story_time_history(
+            conn,
+            card_uid=saved["card_uid"],
+            turn_id=turn_id,
+            message_id=message_id,
+            turn_index=turn_index,
+            old_time=old_time,
+            new_time=saved.get("current_time") or "",
+            delta_seconds=delta["delta_seconds"],
+            delta_text=delta["delta_text"],
+            confidence=delta["confidence"],
+            reason=delta["reason"],
+            source=source,
+        )
+    return {"state": saved, **delta}
+
+
+def rollback_story_time_effects(conn: sqlite3.Connection, turn_id: str, message_id: str = "") -> int:
+    init_meta_tables(conn)
+    safe_turn = normalize_turn_id(turn_id) if turn_id else ""
+    safe_message = normalize_turn_id(message_id) if message_id else ""
+    if not safe_turn and not safe_message:
+        return 0
+    if safe_message:
+        rows = conn.execute(
+            "SELECT * FROM state_journal_story_time_history WHERE message_id=? OR turn_id=? ORDER BY id DESC",
+            (safe_message, safe_turn),
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM state_journal_story_time_history WHERE turn_id=? ORDER BY id DESC", (safe_turn,)).fetchall()
+    count = 0
+    for row in rows:
+        card_uid = normalize_role_state_key(row["card_uid"], "global")
+        state = load_story_time_state(conn, card_uid)
+        old_time = str(row["old_time"] or "")
+        if old_time:
+            old_dt = parse_story_time(old_time)
+            base_dt = parse_story_time(state.get("base_time"), old_dt)
+            restore_dt = base_dt if old_dt < base_dt else old_dt
+            restored = {**state}
+            restored.update(
+                {
+                    "current_time": restore_dt.strftime(TIME_FMT),
+                    "elapsed_seconds": max(0, int((restore_dt - base_dt).total_seconds())),
+                    "season": derive_season(restore_dt.month),
+                    "time_slot": derive_time_slot(restore_dt.hour),
+                    "last_delta_seconds": 0,
+                    "last_delta_text": "",
+                    "last_confidence": "",
+                }
+            )
+            upsert_story_time_state(conn, restored)
+            count += 1
+    if safe_message:
+        conn.execute("DELETE FROM state_journal_story_time_history WHERE message_id=? OR turn_id=?", (safe_message, safe_turn))
+    else:
+        conn.execute("DELETE FROM state_journal_story_time_history WHERE turn_id=?", (safe_turn,))
+    return count
+
+
+def inject_story_time_display(display_payload: dict[str, Any], story_time_result: dict[str, Any] | None = None) -> dict[str, Any]:
+    if not isinstance(display_payload, dict):
+        return display_payload
+    state = story_time_result.get("state") if isinstance(story_time_result, dict) else None
+    if not state:
+        with connect_db() as conn:
+            state = load_story_time_state(conn)
+    if not state or not state.get("enabled") or not state.get("show_in_note") or not state.get("current_time"):
+        return display_payload
+    scene = display_payload.setdefault("scene", {})
+    if not isinstance(scene, dict):
+        display_payload["scene"] = scene = {}
+    scene["time"] = format_story_time_display(state)
+    scene["time_slot"] = story_time_label(state.get("time_slot"), TIME_SLOT_LABELS)
+    scene["season"] = story_time_label(state.get("season"), SEASON_LABELS)
+    delta_text = str((story_time_result or {}).get("delta_text") or state.get("last_delta_text") or "").strip()
+    if delta_text:
+        scene["time_delta"] = delta_text
+    return display_payload
+
+
+def manual_set_story_time(
+    conn: sqlite3.Connection,
+    *,
+    target_time: datetime,
+    source: str,
+    turn_id: str = "",
+    message_id: str = "",
+    turn_index: int | None = None,
+) -> dict[str, Any]:
+    state = load_story_time_state(conn)
+    old_time = str(state.get("current_time") or "")
+    base_dt = parse_story_time(state.get("base_time"), target_time)
+    updated = {**state}
+    updated.update(
+        {
+            "current_time": target_time.strftime(TIME_FMT),
+            "elapsed_seconds": max(0, int((target_time - base_dt).total_seconds())),
+            "season": derive_season(target_time.month),
+            "time_slot": derive_time_slot(target_time.hour),
+            "last_delta_seconds": 0,
+            "last_delta_text": "",
+            "last_confidence": "",
+        }
+    )
+    saved = upsert_story_time_state(conn, updated)
+    if old_time and old_time != saved["current_time"]:
+        record_story_time_history(
+            conn,
+            card_uid=saved["card_uid"],
+            turn_id=turn_id,
+            message_id=message_id,
+            turn_index=turn_index,
+            old_time=old_time,
+            new_time=saved["current_time"],
+            delta_seconds=max(0, int((target_time - parse_story_time(old_time)).total_seconds())),
+            delta_text="用户手动调整剧情时间。",
+            confidence="high",
+            reason=source,
+            source=source,
+        )
+    return saved
 
 
 
@@ -3103,20 +3854,33 @@ def apply_update_metric_summaries(conn: sqlite3.Connection, turn_id: str, update
     return applied
 
 
-def compare_stage_condition(current_value: float | None, op: str, target_value: float) -> bool:
+def compare_stage_condition(current_value: Any, op: str, target_value: Any) -> bool:
     if current_value is None:
         return False
+    if isinstance(current_value, str) or isinstance(target_value, str):
+        current_text = str(current_value or "").strip()
+        target_text = str(target_value or "").strip()
+        if op == "!=":
+            return current_text != target_text
+        if op == "=":
+            return current_text == target_text
+        return False
+    try:
+        current_number = float(current_value)
+        target_number = float(target_value)
+    except (TypeError, ValueError):
+        return False
     if op == ">":
-        return current_value > target_value
+        return current_number > target_number
     if op == ">=":
-        return current_value >= target_value
+        return current_number >= target_number
     if op == "<":
-        return current_value < target_value
+        return current_number < target_number
     if op == "<=":
-        return current_value <= target_value
+        return current_number <= target_number
     if op == "!=":
-        return current_value != target_value
-    return current_value == target_value
+        return current_number != target_number
+    return current_number == target_number
 
 
 def stage_by_key(role: dict[str, Any], key: str) -> dict[str, Any] | None:
@@ -3140,7 +3904,7 @@ def role_metric_values(conn: sqlite3.Connection, role: dict[str, Any]) -> tuple[
     return str(role.get("role_name") or role.get("role_id") or ""), {}
 
 
-def evaluate_stage_conditions(stage: dict[str, Any], values: dict[str, float]) -> tuple[bool, dict[str, Any]]:
+def evaluate_stage_conditions(stage: dict[str, Any], values: dict[str, float], story_time_context: dict[str, Any] | None = None) -> tuple[bool, dict[str, Any]]:
     conditions = stage.get("conditions") if isinstance(stage.get("conditions"), list) else []
     if not conditions:
         return False, {}
@@ -3153,9 +3917,18 @@ def evaluate_stage_conditions(stage: dict[str, Any], values: dict[str, float]) -
         op = str(condition.get("op") or ">=").strip()
         if op not in STAGE_OPERATORS:
             op = ">="
-        target = role_state_number(condition.get("value"), 0)
-        current = values.get(var_key)
-        trigger_values[var_key] = current
+        if str(condition.get("source") or "").strip().lower() == "story_time":
+            field_key = str(condition.get("field") or "").strip()
+            if field_key not in STORY_TIME_FIELDS:
+                continue
+            context = story_time_context or {}
+            current = context.get(field_key)
+            target = role_state_number(condition.get("value"), 0) if field_key in STORY_TIME_NUMERIC_FIELDS else str(condition.get("value") or "").strip()
+            trigger_values[f"story_time.{field_key}"] = current
+        else:
+            target = role_state_number(condition.get("value"), 0)
+            current = values.get(var_key)
+            trigger_values[var_key] = current
         results.append(compare_stage_condition(current, op, target))
     if not results:
         return False, trigger_values
@@ -3163,12 +3936,12 @@ def evaluate_stage_conditions(stage: dict[str, Any], values: dict[str, float]) -
     return (any(results) if mode == "any" else all(results)), trigger_values
 
 
-def choose_stage_for_role(role: dict[str, Any], values: dict[str, float]) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+def choose_stage_for_role(role: dict[str, Any], values: dict[str, float], story_time_context: dict[str, Any] | None = None) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     enabled_stages = [stage for stage in (role.get("stages") or []) if isinstance(stage, dict) and stage.get("enabled") is not False]
     enabled_stages.sort(key=lambda item: role_state_int(item.get("priority"), 0), reverse=True)
     best_trigger_values: dict[str, Any] = {}
     for stage in enabled_stages:
-        matched, trigger_values = evaluate_stage_conditions(stage, values)
+        matched, trigger_values = evaluate_stage_conditions(stage, values, story_time_context)
         if matched:
             return stage, trigger_values
     initial_key = str(role.get("initial_stage") or "stage_a")
@@ -3205,6 +3978,7 @@ def append_stage_relationships(display_payload: dict[str, Any], stage_rows: list
 def evaluate_stage_rules(conn: sqlite3.Connection, turn_id: str, display_payload: dict[str, Any] | None = None, turn_index: int = 0) -> list[dict[str, Any]]:
     init_meta_tables(conn)
     config = load_role_state_config(conn)
+    story_time_context = story_time_context_from_state(load_story_time_state(conn))
     safe_turn = normalize_turn_id(turn_id)
     now = now_string()
     stage_rows: list[dict[str, Any]] = []
@@ -3214,7 +3988,7 @@ def evaluate_stage_rules(conn: sqlite3.Connection, turn_id: str, display_payload
         role_id = str(role.get("role_id") or "").strip()
         role_name = str(role.get("role_name") or role_id).strip()
         character_name, values = role_metric_values(conn, role)
-        target_stage, trigger_values = choose_stage_for_role(role, values)
+        target_stage, trigger_values = choose_stage_for_role(role, values, story_time_context)
         if not target_stage:
             continue
         target_key = str(target_stage.get("stage_key") or "").strip()
@@ -3242,12 +4016,24 @@ def evaluate_stage_rules(conn: sqlite3.Connection, turn_id: str, display_payload
         for var_key, value in trigger_values.items():
             if value is None:
                 continue
-            var_label = var_key
-            for var in role.get("variables") or []:
-                if isinstance(var, dict) and var.get("var_key") == var_key:
-                    var_label = str(var.get("var_name") or var_key)
-                    break
-            reason_parts.append(f"{var_label} {format_metric_number(value)}")
+            if str(var_key).startswith("story_time."):
+                story_field = str(var_key).split(".", 1)[1]
+                var_label = f"剧情时间·{STORY_TIME_FIELD_LABELS.get(story_field, story_field)}"
+                if story_field == "time_slot":
+                    value = story_time_label(value, TIME_SLOT_LABELS)
+                elif story_field == "season":
+                    value = story_time_label(value, SEASON_LABELS)
+            else:
+                var_label = var_key
+                for var in role.get("variables") or []:
+                    if isinstance(var, dict) and var.get("var_key") == var_key:
+                        var_label = str(var.get("var_name") or var_key)
+                        break
+            if isinstance(value, (int, float)):
+                value_text = str(format_metric_number(value))
+            else:
+                value_text = str(value)
+            reason_parts.append(f"{var_label} {value_text}")
         reason = f"触发依据：{'，'.join(reason_parts)}，满足阶段条件。" if reason_parts else "使用初始阶段或阶段条件已满足。"
         conn.execute(
             """
@@ -3849,12 +4635,15 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
     normalized_scene = {
         "title": title,
         "subtitle": subtitle,
-        "time": clean_display_text(scene.get("time") or scene.get("time_text") or "时间未明", 80),
+        "time": clean_display_text(scene.get("time") or scene.get("time_text") or "", 80),
         "location": clean_display_text(scene.get("location") or "", 100),
         "weather": clean_display_text(scene.get("weather") or "", 80),
         "atmosphere": clean_display_text(scene.get("atmosphere") or "", 160),
         "event_summary": clean_display_text(scene.get("event_summary") or scene.get("summary") or display.get("summary") or "", 320),
         "characters": clean_display_text(scene.get("characters") or "", 180),
+        "time_slot": clean_display_text(scene.get("time_slot") or "", 40),
+        "season": clean_display_text(scene.get("season") or "", 40),
+        "time_delta": clean_display_text(scene.get("time_delta") or "", 180),
     }
 
     try:
@@ -3867,8 +4656,10 @@ def normalize_display_payload(payload: Any, *, latest_turn: dict[str, Any] | Non
     try:
         with connect_db() as role_conn:
             role_state_config = load_role_state_config(role_conn)
+            story_time_state = load_story_time_state(role_conn)
     except Exception:
         role_state_config = {"version": 1, "enabled": True, "role_source_mode": "auto", "roles": []}
+        story_time_state = story_time_state_defaults()
 
     normalized_characters: list[dict[str, Any]] = []
     for item in characters[:8]:
@@ -4214,8 +5005,10 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
     try:
         with connect_db() as role_conn:
             role_state_config = load_role_state_config(role_conn)
+            story_time_state = load_story_time_state(role_conn)
     except Exception:
         role_state_config = {"version": 1, "enabled": True, "role_source_mode": "auto", "roles": []}
+        story_time_state = story_time_state_defaults()
     custom_roles = [role for role in role_state_config.get("roles", []) if isinstance(role, dict) and role.get("enabled") is not False and role_state_mode_uses_variables(role) and role.get("variables") and not role.get("use_default_variables")]
     snapshot_roles = [role for role in role_state_config.get("roles", []) if isinstance(role, dict) and role.get("enabled") is not False and role_state_mode_uses_snapshot(role) and role.get("snapshotFields")]
     role_display_schemas: list[dict[str, Any]] = []
@@ -4305,6 +5098,30 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
             system_prompt += "\n25. display.relationships 尽量输出角色与用户/主要互动对象的关系变化；如果无明显变化也可以简短写保持稳定。"
         system_prompt += build_protagonist_prompt_rule(config)
         system_prompt += build_worker_custom_prompt_rule(config)
+    if story_time_state.get("enabled") and story_time_state.get("current_time"):
+        advance_mode = story_time_state.get("advance_mode") or "smart"
+        mode_rule = {
+            "explicit": "没有明确时间提示时，delta_seconds 必须为 0。",
+            "smart": "普通连续对话、整理、散步、吃饭等可合理推进少量时间。",
+            "manual": "不要自动推进，delta_seconds 固定为 0。",
+            "custom": "本模式由用户自定义推进量控制，delta_seconds 固定为 0，后端会按用户配置推进。",
+        }.get(advance_mode, "普通连续对话、整理、散步、吃饭等可合理推进少量时间。")
+        system_prompt += f"""
+
+【剧情时间推进判断】
+当前心笺启用了剧情时间。你只需要判断本轮对话结束后，剧情时间是否发生推进。
+必须在 JSON 根对象额外输出 story_time_delta 字段；不要输出完整当前时间，不要自行计算年月日时分秒。
+完整剧情时间由系统后端根据 delta_seconds 自动计算。
+推进模式：{advance_mode}。{mode_rule}
+输出规则：
+- 如果正文没有明确时间推进，并且推进模式不是 smart，changed=false，delta_seconds=0。
+- 如果只是普通一句话、一个眼神、短暂触碰，可判断为 1 秒到 10 分钟。
+- 如果是吃饭、散步、洗澡、小睡、长谈，可判断为 10 分钟到 2 小时。
+- 如果是睡了一夜、次日、三日后、长途旅行、昏迷等，才允许超过 2 小时。
+- 长时间推进必须有明确叙事依据。不要为了随机而随机，优先贴合剧情行为。
+story_time_delta 格式：
+{{"changed": true/false, "delta_seconds": 数字, "delta_text": "自然语言说明", "confidence": "none/low/medium/high", "reason": "判断依据"}}
+"""
 
 
     display_schema = {
@@ -4346,6 +5163,23 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
         "active_note_template": active_template,
         "current_metrics": metric_states or {},
         "role_state_config": role_state_config,
+        "story_time": {
+            "enabled": bool(story_time_state.get("enabled")),
+            "show_in_note": bool(story_time_state.get("show_in_note")),
+            "current_time": story_time_state.get("current_time") or "",
+            "display_time": story_time_state.get("display_time") or "",
+            "time_slot": story_time_state.get("time_slot") or "",
+            "time_slot_label": story_time_state.get("time_slot_label") or "",
+            "season": story_time_state.get("season") or "",
+            "season_label": story_time_state.get("season_label") or "",
+            "elapsed_seconds": story_time_state.get("elapsed_seconds") or 0,
+            "advance_mode": story_time_state.get("advance_mode") or "smart",
+            "custom_advance_type": story_time_state.get("custom_advance_type") or "range",
+            "custom_advance_min_seconds": story_time_state.get("custom_advance_min_seconds") or 0,
+            "custom_advance_max_seconds": story_time_state.get("custom_advance_max_seconds") or 0,
+            "worker_output_required": bool(story_time_state.get("enabled") and story_time_state.get("current_time")),
+            "output_field": "story_time_delta",
+        },
         "role_display_schemas": role_display_schemas,
         "role_prompt_tasks": role_prompt_tasks,
         "role_variable_rules": {
@@ -4509,7 +5343,7 @@ async def repair_worker_json(*, config: dict[str, Any], raw_output: str, parse_e
     system_prompt = (
         "你是严格的 JSON 修复器。只修复用户提供的非法 JSON 文本，"
         "不要新增、删减或改写剧情含义。必须只返回一个合法 JSON 对象，"
-        "根结构必须是 {\"updates\": [], \"display\": {}}。"
+        "根结构至少包含 {\"updates\": [], \"display\": {}}；如果原文包含 story_time_delta，必须保留在根对象。"
     )
     user_prompt = (
         "下面是一段模型返回的非法 JSON，请修复为合法 JSON。\n"
@@ -4517,7 +5351,8 @@ async def repair_worker_json(*, config: dict[str, Any], raw_output: str, parse_e
         "1. 只返回 JSON 对象，不要 Markdown、解释或代码块。\n"
         "2. 保留原字段和原内容含义。\n"
         "3. 字符串中的英文双引号请改为中文引号或正确转义。\n"
-        "4. 不要新增重大剧情事实。\n\n"
+        "4. 不要新增重大剧情事实。\n"
+        "5. 如果原文包含 story_time_delta，请保留该字段和值；不要自行计算完整当前时间。\n\n"
         f"解析错误：{parse_error}\n\n"
         "非法 JSON 原文：\n"
         f"{raw_output}"
@@ -4596,6 +5431,95 @@ async def api_main_config() -> dict[str, Any]:
     }
 
 
+@app.get("/api/story-time")
+async def api_story_time() -> dict[str, Any]:
+    ensure_runtime_data()
+    with connect_db() as conn:
+        state = load_story_time_state(conn)
+    return {"ok": True, "story_time": state, "card": current_card_summary(), "fields": STORY_TIME_FIELD_LABELS, "time_slot_labels": TIME_SLOT_LABELS, "season_labels": SEASON_LABELS}
+
+
+@app.post("/api/story-time/config")
+async def api_story_time_config(request: Request) -> dict[str, Any]:
+    ensure_runtime_data()
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    config_payload = payload.get("story_time") if isinstance(payload.get("story_time"), dict) else payload
+    with connect_db() as conn:
+        existing = load_story_time_state(conn)
+        state = story_time_config_from_payload(config_payload, existing)
+        saved = upsert_story_time_state(conn, state)
+        conn.commit()
+    return {"ok": True, "story_time": saved, "card": current_card_summary(), "message": "剧情时间配置已保存。"}
+
+
+@app.post("/api/story-time/initialize")
+async def api_story_time_initialize(request: Request) -> dict[str, Any]:
+    ensure_runtime_data()
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    with connect_db() as conn:
+        existing = load_story_time_state(conn)
+        state = story_time_config_from_payload({**payload, "initialize": True}, existing)
+        state["current_time"] = state["base_time"]
+        state["elapsed_seconds"] = 0
+        state["last_delta_seconds"] = 0
+        state["last_delta_text"] = ""
+        state["last_confidence"] = ""
+        saved = upsert_story_time_state(conn, state)
+        conn.commit()
+    return {"ok": True, "story_time": saved, "card": current_card_summary(), "message": "剧情时间已初始化。"}
+
+
+@app.post("/api/story-time/reset")
+async def api_story_time_reset(request: Request) -> dict[str, Any]:
+    ensure_runtime_data()
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    with connect_db() as conn:
+        state = load_story_time_state(conn)
+        if not state.get("base_time"):
+            raise HTTPException(status_code=400, detail="尚未设置初始剧情时间。")
+        target = parse_story_time(state["base_time"])
+        saved = manual_set_story_time(conn, target_time=target, source="reset", turn_id=payload.get("turn_id") or "", message_id=payload.get("message_id") or "", turn_index=payload.get("turn_index"))
+        conn.commit()
+    return {"ok": True, "story_time": saved, "card": current_card_summary(), "message": "剧情时间已重置为初始时间。"}
+
+
+@app.post("/api/story-time/calibrate")
+async def api_story_time_calibrate(request: Request) -> dict[str, Any]:
+    ensure_runtime_data()
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        payload = {}
+    target = parse_story_time(payload.get("current_time"), None) if payload.get("current_time") else story_time_from_parts(payload, "current_")
+    with connect_db() as conn:
+        saved = manual_set_story_time(conn, target_time=target, source="calibrate", turn_id=payload.get("turn_id") or "", message_id=payload.get("message_id") or "", turn_index=payload.get("turn_index"))
+        conn.commit()
+    return {"ok": True, "story_time": saved, "card": current_card_summary(), "message": "剧情时间已校准。"}
+
+
+@app.get("/api/story-time/history")
+async def api_story_time_history(limit: int = 50) -> dict[str, Any]:
+    ensure_runtime_data()
+    safe_limit = min(max(int(limit or 50), 1), 200)
+    safe_card_uid = current_card_uid()
+    with connect_db() as conn:
+        init_meta_tables(conn)
+        rows = conn.execute(
+            "SELECT * FROM state_journal_story_time_history WHERE card_uid=? ORDER BY id DESC LIMIT ?",
+            (safe_card_uid, safe_limit),
+        ).fetchall()
+    history = [row_to_dict(row) for row in rows]
+    return {"ok": True, "history": history, "count": len(history), "card": current_card_summary()}
+
+
 
 @app.get("/api/role-state/config")
 async def api_role_state_config() -> dict[str, Any]:
@@ -4644,16 +5568,29 @@ async def api_role_state_sync_to_card(request: Request) -> dict[str, Any]:
 
 
 @app.post("/api/role-state/init-current")
-async def api_role_state_init_current() -> dict[str, Any]:
+async def api_role_state_init_current(request: Request) -> dict[str, Any]:
     ensure_runtime_data()
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    source = str(payload.get("source") or "").strip().lower()
+    from_card = bool(payload.get("from_card") or payload.get("fromCard") or source in {"card", "role_card", "current_card"})
     with connect_db() as conn:
         init_meta_tables(conn)
-        config = load_role_state_config(conn)
+        config = role_state_config_from_current_card() if from_card else load_role_state_config(conn)
+        if from_card:
+            config = save_role_state_config(conn, config)
         now = now_string()
+        initialized_roles = 0
+        initialized_metrics = 0
         for role in config.get("roles") or []:
             if not isinstance(role, dict) or role.get("enabled") is False or not role_state_mode_uses_variables(role):
                 continue
             role_name = str(role.get("role_name") or role.get("role_id") or "").strip()
+            role_metric_count = 0
             for variable in role.get("variables") or []:
                 if not isinstance(variable, dict) or variable.get("enabled") is False:
                     continue
@@ -4679,9 +5616,29 @@ async def api_role_state_init_current() -> dict[str, Any]:
                     """,
                     (current_card_uid(), role_name, key, label, value, max_value, raw_value, now),
                 )
+                role_metric_count += 1
+                initialized_metrics += 1
+            if role_metric_count:
+                initialized_roles += 1
         stage_rows = evaluate_stage_rules(conn, "init_current", {}, 0)
         conn.commit()
-    return {"ok": True, "card": current_card_summary(), "stages": stage_rows, "message": "已按当前角色卡初始化变量与阶段。"}
+    source_label = "角色卡" if from_card else "当前心笺配置"
+    if initialized_metrics:
+        message = f"已按{source_label}初始化 {initialized_roles} 个角色、{initialized_metrics} 个变量，并刷新阶段。"
+    elif config.get("roles"):
+        message = f"已读取{source_label}并刷新阶段；当前没有可初始化的完整变量配置。"
+    else:
+        message = f"未在{source_label}中找到可初始化的心笺角色配置。"
+    return {
+        "ok": True,
+        "card": current_card_summary(),
+        "config": config,
+        "stages": stage_rows,
+        "source": "role_card" if from_card else "runtime_config",
+        "initialized_roles": initialized_roles,
+        "initialized_metrics": initialized_metrics,
+        "message": message,
+    }
 
 
 @app.get("/api/role-state/active-tags")
@@ -5263,8 +6220,58 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         if config.get("debug_enabled", True):
             save_worker_log(log_payload)
         return {"ok": False, "status": "error", "error_type": "empty_context", "message": result["errors"][0], "summary": build_update_summary(result, tables), "updates": [], "turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "display": {}, "result": result, "raw_output": ""}
-    system_prompt, user_prompt = build_worker_prompt(tables=tables, latest_turn=latest_turn, history=history, config=config, metric_states=metric_states)
     raw_output = ""
+    system_prompt = ""
+    user_prompt = ""
+    try:
+        system_prompt, user_prompt = build_worker_prompt(tables=tables, latest_turn=latest_turn, history=history, config=config, metric_states=metric_states)
+    except Exception as exc:
+        result = {"applied": [], "errors": [f"心笺内部错误：生成 worker prompt 失败：{exc}"], "touched_tables": []}
+        log_payload = {
+            "created_at": now_string(),
+            "storage_engine": "sqlite",
+            "database": str(DB_PATH),
+            "request": {"turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "event_type": payload.get("event_type") or payload.get("source") or "auto_update", "latest_turn": latest_turn, "history": history, "table_ids": table_ids, "dry_run": bool(payload.get("dry_run", False)), "user_hash": payload.get("user_hash"), "assistant_hash": payload.get("assistant_hash")},
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "raw_output": raw_output,
+            "parsed": None,
+            "updates": [],
+            "display": {},
+            "result": result,
+            "error_type": "worker_prompt_error",
+            "error_detail": str(exc),
+        }
+        if not payload.get("dry_run", False):
+            save_worker_turn_state(
+                turn_id=turn_id,
+                user_text=user_text,
+                assistant_text=assistant_text,
+                status="completed",
+                state_journal_status="error",
+                message_id=message_id,
+                turn_index=safe_turn_index,
+                trigger_source=trigger_source,
+                stale_reason="worker_prompt_error",
+            )
+        if config.get("debug_enabled", True):
+            save_worker_log(log_payload)
+        summary = build_update_summary(result, tables)
+        return {
+            "ok": False,
+            "status": "error",
+            "error_type": "worker_prompt_error",
+            "message": result["errors"][0],
+            "summary": summary,
+            "updates": [],
+            "turn_id": turn_id,
+            "message_id": message_id,
+            "turn_index": safe_turn_index,
+            "trigger_source": trigger_source,
+            "display": {},
+            "result": result,
+            "raw_output": "",
+        }
     try:
         raw_output = await call_worker_model(config=config, system_prompt=system_prompt, user_prompt=user_prompt)
     except WorkerProviderError as exc:
@@ -5321,9 +6328,13 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     parsed: Any = None
     updates: list[dict[str, Any]] = []
     display_payload: dict[str, Any] = {}
+    story_time_delta_payload: Any = None
+    story_time_result: dict[str, Any] | None = None
+    story_time_delta_missing = False
     try:
         parsed = extract_json_from_text(raw_output)
         updates = normalize_updates(parsed)
+        story_time_delta_payload = parsed.get("story_time_delta") if isinstance(parsed, dict) else None
         if config.get("turn_note_enabled", True):
             display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
     except Exception as exc:
@@ -5332,6 +6343,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             repair_output = await repair_worker_json(config=config, raw_output=raw_output, parse_error=parse_error)
             parsed = extract_json_from_text(repair_output)
             updates = normalize_updates(parsed)
+            story_time_delta_payload = parsed.get("story_time_delta") if isinstance(parsed, dict) else None
             if config.get("turn_note_enabled", True):
                 display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
             repair_used = True
@@ -5362,31 +6374,60 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                 rollback_turn_effects(conn, turn_id, reason="regenerate_before_update")
                 save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="assistant_ready", state_journal_status="running", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
-        result = apply_updates(updates, dry_run=bool(payload.get("dry_run", False)))
-        if config.get("turn_note_enabled", True) and not payload.get("dry_run", False):
-            with connect_db() as conn:
-                init_meta_tables(conn)
-                ensure_display_metrics_for_full_roles(conn, display_payload)
-                metric_applied = []
-                metric_applied.extend(apply_display_metrics(conn, turn_id, display_payload))
-                metric_applied.extend(apply_update_metric_summaries(conn, turn_id, updates))
-                if metric_applied:
-                    result["metrics"] = metric_applied
-                    result["metric_count"] = len(metric_applied)
-                stage_applied = evaluate_stage_rules(conn, turn_id, display_payload, safe_turn_index)
-                if stage_applied:
-                    result["stages"] = stage_applied
-                    result["stage_count"] = len(stage_applied)
-                save_turn_effects(conn, turn_id, result)
-                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
-                conn.commit()
-        elif not payload.get("dry_run", False):
-            with connect_db() as conn:
-                init_meta_tables(conn)
-                save_turn_effects(conn, turn_id, result)
-                save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
-                conn.commit()
-        if config.get("turn_note_enabled", True) and not payload.get("dry_run", False):
+        result = {"applied": [], "errors": [], "touched_tables": []}
+        try:
+            result = apply_updates(updates, dry_run=bool(payload.get("dry_run", False)))
+            if config.get("turn_note_enabled", True) and not payload.get("dry_run", False):
+                with connect_db() as conn:
+                    init_meta_tables(conn)
+                    ensure_display_metrics_for_full_roles(conn, display_payload)
+                    metric_applied = []
+                    metric_applied.extend(apply_display_metrics(conn, turn_id, display_payload))
+                    metric_applied.extend(apply_update_metric_summaries(conn, turn_id, updates))
+                    if metric_applied:
+                        result["metrics"] = metric_applied
+                        result["metric_count"] = len(metric_applied)
+                    story_time_state_for_update = load_story_time_state(conn)
+                    story_time_delta_missing = bool(
+                        story_time_state_for_update.get("enabled")
+                        and story_time_state_for_update.get("current_time")
+                        and normalize_story_time_mode(story_time_state_for_update.get("advance_mode")) not in {"manual", "custom"}
+                        and story_time_delta_payload is None
+                    )
+                    story_time_result = apply_story_time_update(conn, story_time_delta_payload, turn_id=turn_id, message_id=message_id, turn_index=safe_turn_index)
+                    if story_time_result:
+                        result["story_time"] = story_time_result
+                    if story_time_delta_missing:
+                        result.setdefault("warnings", []).append({"type": "story_time_delta_missing", "message": "剧情时间已启用，但本轮 worker 输出缺少 story_time_delta，已按 0 秒处理。"})
+                    stage_applied = evaluate_stage_rules(conn, turn_id, display_payload, safe_turn_index)
+                    if stage_applied:
+                        result["stages"] = stage_applied
+                        result["stage_count"] = len(stage_applied)
+                    save_turn_effects(conn, turn_id, result)
+                    save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
+                    conn.commit()
+            elif not payload.get("dry_run", False):
+                with connect_db() as conn:
+                    init_meta_tables(conn)
+                    save_turn_effects(conn, turn_id, result)
+                    save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
+                    conn.commit()
+        except Exception as exc:
+            worker_error_type = "worker_apply_error"
+            result = {"applied": [], "errors": [f"心笺应用失败：{exc}"], "touched_tables": [], "warnings": result.get("warnings") or []}
+            if not payload.get("dry_run", False):
+                save_worker_turn_state(
+                    turn_id=turn_id,
+                    user_text=user_text,
+                    assistant_text=assistant_text,
+                    status="completed",
+                    state_journal_status="error",
+                    message_id=message_id,
+                    turn_index=safe_turn_index,
+                    trigger_source=trigger_source,
+                    stale_reason="worker_apply_error",
+                )
+        if config.get("turn_note_enabled", True) and not payload.get("dry_run", False) and worker_error_type != "worker_apply_error":
             try:
                 # Refresh snapshots after fact updates so fallback display can read fresh state.
                 with connect_db() as conn:
@@ -5397,6 +6438,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                 if result.get("metrics"):
                     display_payload = attach_metrics_to_display(display_payload, result.get("metrics"))
                 ensure_relationship_fallback(display_payload, metric_records=result.get("metrics") or [])
+                display_payload = inject_story_time_display(display_payload, story_time_result)
                 display_payload = save_turn_display(display_payload, turn_id=turn_id, message_id=message_id, content_hash=payload.get("assistant_hash") or payload.get("content_hash") or payload.get("contentHash") or hash_text(assistant_text), turn_index=safe_turn_index, trigger_source=trigger_source)
             except Exception as exc:
                 result.setdefault("errors", []).append(f"幕笺保存失败：{exc}")
@@ -5428,6 +6470,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         "display": display_payload,
         "result": result,
         "error_type": worker_error_type,
+        "story_time_delta_missing": story_time_delta_missing,
     }
     if config.get("debug_enabled", True):
         save_worker_log(log_payload)
@@ -5446,6 +6489,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         "turn_index": safe_turn_index,
         "trigger_source": trigger_source,
         "repair_used": repair_used,
+        "warnings": result.get("warnings") or [],
         "display": display_payload if config.get("turn_note_enabled", True) and ok else {},
         "result": result,
         "raw_output": raw_output if config.get("debug_enabled") else "",

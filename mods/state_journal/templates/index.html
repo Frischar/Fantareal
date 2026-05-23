@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>心笺 - Fantareal</title>
-    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-v211-sync-modal-fit" />
+    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-story-time-v1" />
     <link rel="stylesheet" href="./static/state-journal-stage-table-polish.css?v=state-journal-v211-sync-modal-fit" />
     <link rel="stylesheet" href="./static/state-journal-theme-pack-contract.css?v=state-journal-v210-zoom150-fit" />
   </head>
@@ -163,10 +163,13 @@
               </div>
               <div class="role-state-actions grouped-actions">
                 <div class="action-group"><span>配置</span><button id="roleStateReadCardBtn" type="button" class="ghost-btn">读取角色卡</button><button id="roleStateSaveBtn" type="button" class="primary-btn">保存配置</button><button id="roleStateSyncCardBtn" type="button" class="ghost-btn">同步至角色卡</button></div>
-                <div class="action-group"><span>运行</span><button id="roleStateInitBtn" type="button" class="ghost-btn">初始化状态</button></div>
+                <div class="action-group"><span>运行</span><button id="roleStateInitBtn" type="button" class="ghost-btn">从角色卡初始化当前状态</button></div>
                 <div class="action-group debug-group"><span>调试</span><button id="roleStateDebugNextStageBtn" type="button" class="ghost-btn" title="仅调试模式使用：直接把当前选中角色推进到下一阶段，用于测试世界书 external_tag 和幕笺展示。">推进阶段</button></div>
               </div>
             </div>
+            <section class="role-state-global turn-note-config-card standalone">
+              <div id="storyTimeGlobalMount"></div>
+            </section>
             <div class="role-state-layout">
               <aside class="role-state-sidebar turn-note-config-card soft-card">
                 <div class="subhead compact"><strong>角色列表</strong></div>
@@ -411,6 +414,6 @@
       </aside>
       <div id="rowDetailMask" class="drawer-mask" hidden></div>
     </main>
-    <script src="./static/state-journal.js?v=state-journal-v210-zoom150-fit"></script>
+    <script src="./static/state-journal.js?v=state-journal-story-time-v1"></script>
   </body>
 </html>

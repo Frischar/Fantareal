@@ -2473,6 +2473,10 @@
           syncMessageTurnBadge(wrapper);
         });
         syncMessageActionState();
+        dispatchChatLifecycleEvent("fantareal:messages-indexed", {
+          count: wrappers.length,
+          source: "refreshMessageControls",
+        });
       }
 
       function startUserMessageEdit(wrapper) {

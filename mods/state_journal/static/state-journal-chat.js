@@ -9,6 +9,7 @@
   const processedTurns = new Set();
   const workerStatusTimers = new Map();
   const retryTurnDetails = new Map();
+  let restoreDisplaysTimer = null;
   let pendingTurn = null;
 
   function simpleHash(value) {
@@ -1223,6 +1224,18 @@
       const byTurn = messages.filter((msg) => msg.dataset.stateJournalTurn === turnId || msg.dataset.turnId === turnId);
       if (byTurn.length) return byTurn[byTurn.length - 1];
     }
+    const assistantText = String(detail.assistantCleanText || detail.assistant_clean_text || detail.assistantText || detail.assistant_text || "").trim();
+    const contentHash = String(detail.contentHash || detail.content_hash || detail.assistantHash || detail.assistant_hash || (assistantText ? simpleHash(assistantText) : "")).trim();
+    if (contentHash) {
+      const byHash = messages.find((msg) => msg.dataset.contentHash === contentHash);
+      if (byHash) return byHash;
+    }
+    if (assistantText) {
+      const byStoredText = messages.find((msg) => String(msg.dataset.messageContent || "").trim() === assistantText);
+      if (byStoredText) return byStoredText;
+      const byDomText = messages.find((msg) => readMessageText(msg) === assistantText);
+      if (byDomText) return byDomText;
+    }
     return null;
   }
 
@@ -1274,19 +1287,52 @@
     if (pendingTurn?.turnId === key) pendingTurn = null;
   }
 
+  function clearMessageDisplayRuntime(msg) {
+    if (!msg) return;
+    const turnId = msg.dataset.stateJournalTurn || msg.dataset.turnId || "";
+    if (turnId) {
+      invalidatedTurns.add(turnId);
+      clearDomFallback(turnId);
+      inFlightTurns.delete(turnId);
+    }
+    clearExistingTurnDisplay(msg);
+  }
+
   function invalidateMessageDisplaysFromIndex(index = -1) {
     const minIndex = Number(index);
+    if (!Number.isFinite(minIndex) || minIndex < 0) return 0;
+    let cleared = 0;
     assistantMessages().forEach((msg) => {
       const historyIndex = Number(msg.dataset.historyIndex ?? -1);
-      if (Number.isFinite(minIndex) && minIndex >= 0 && historyIndex >= 0 && historyIndex < minIndex) return;
-      const turnId = msg.dataset.stateJournalTurn || msg.dataset.turnId || "";
-      if (turnId) {
-        invalidatedTurns.add(turnId);
-        clearDomFallback(turnId);
-        inFlightTurns.delete(turnId);
-      }
-      clearExistingTurnDisplay(msg);
+      if (historyIndex >= 0 && historyIndex < minIndex) return;
+      clearMessageDisplayRuntime(msg);
+      cleared += 1;
     });
+    return cleared;
+  }
+
+  function invalidateMessageDisplaysForDetail(detail = {}) {
+    const index = detail.trimmedFrom ?? detail.messageIndex ?? detail.index;
+    if (Number.isFinite(Number(index)) && Number(index) >= 0) {
+      return invalidateMessageDisplaysFromIndex(index);
+    }
+    const turnId = String(detail.turnId || detail.turn_id || detail.fromTurnId || detail.from_turn_id || "").trim();
+    if (!turnId) return 0;
+    let cleared = 0;
+    assistantMessages().forEach((msg) => {
+      if (msg.dataset.stateJournalTurn !== turnId && msg.dataset.turnId !== turnId) return;
+      clearMessageDisplayRuntime(msg);
+      cleared += 1;
+    });
+    return cleared;
+  }
+
+  function scheduleRestoreRecentDisplays(delay = 450) {
+    if (restoreDisplaysTimer) window.clearTimeout(restoreDisplaysTimer);
+    restoreDisplaysTimer = window.setTimeout(() => {
+      restoreDisplaysTimer = null;
+      restoreRecentDisplays().catch((error) => console.warn("State Journal delayed display restore failed:", error));
+    }, delay);
   }
 
   function readMessageText(message) {
@@ -1792,11 +1838,14 @@
   function sceneRows(display) {
     const scene = display?.scene || {};
     return [
-      ["time", "时间", scene.time || "时间未明"],
+      ["time", "时间", scene.time || ""],
+      ["time_slot", "时段", scene.time_slot || ""],
+      ["season", "季节", scene.season || ""],
       ["location", "地点", scene.location || "地点未明"],
       ["weather", "天气", scene.weather || ""],
       ["atmosphere", "氛围", scene.atmosphere || ""],
       ["characters", "人物", scene.characters || ""],
+      ["time_delta", "本轮推进", scene.time_delta || ""],
     ].filter((row) => row[2]);
   }
 
@@ -1942,11 +1991,14 @@
       if (toggle) toggle.textContent = card.open ? "收起" : "展开";
     });
     const rows = [
-      ["time", "时间", scene.time || "时间未明"],
+      ["time", "时间", scene.time || ""],
+      ["time_slot", "时段", scene.time_slot || ""],
+      ["season", "季节", scene.season || ""],
       ["location", "地点", scene.location || "地点未明"],
       ["weather", "天气", scene.weather || ""],
       ["atmosphere", "氛围", scene.atmosphere || ""],
       ["characters", "人物", scene.characters || ""],
+      ["time_delta", "本轮推进", scene.time_delta || ""],
     ].filter((row) => row[2]);
     card.querySelector(".state-journal-scene-meta").innerHTML = rows.map(([key, label, value]) => `<span class="state-journal-scene-chip"><i>${escapeHtml(tokenForLabel(label, key))}</i><b>${escapeHtml(label)}：</b><span>${escapeHtml(value)}</span></span>`).join("");
     card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "心笺已生成本轮幕题。";
@@ -1984,13 +2036,15 @@
       const toggle = card.querySelector(".state-journal-scene-toggle");
       if (toggle) toggle.textContent = card.open ? "收起" : "展开";
     });
-    const time = scene.time || "时间未明";
     const metaItems = [
-      time ? `时间：${time}` : "时间：时间未明",
+      scene.time ? `时间：${scene.time}` : "",
+      scene.time_slot ? `时段：${scene.time_slot}` : "",
+      scene.season ? `季节：${scene.season}` : "",
       scene.location ? `地点：${scene.location}` : "",
       scene.weather ? `天气：${scene.weather}` : "",
       scene.atmosphere ? `氛围：${scene.atmosphere}` : "",
       scene.characters ? `人物：${scene.characters}` : "",
+      scene.time_delta ? `本轮推进：${scene.time_delta}` : "",
     ].filter(Boolean);
     card.querySelector(".state-journal-scene-meta").innerHTML = metaItems.map((item) => `<span class="state-journal-scene-chip">${escapeHtml(item)}</span>`).join("");
     card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "心笺已生成本轮幕题。";
@@ -2434,9 +2488,13 @@
     if (!display || !targetMessage) return;
     const turnId = stableTurnId(display, payload?.turn_id || payload?.created_at || "");
     targetMessage.dataset.stateJournalTurn = turnId;
-    if (payload?.message_id && targetMessage.dataset.messageId !== String(payload.message_id)) {
+    const restoringDisplay = payload?.trigger_source === "restore_cache";
+    if (payload?.message_id && targetMessage.dataset.messageId !== String(payload.message_id) && !restoringDisplay) {
       console.warn("State Journal display message_id mismatch, skip render", payload.message_id, targetMessage.dataset.messageId);
       return;
+    }
+    if (restoringDisplay && payload?.message_id && !targetMessage.dataset.messageId) {
+      targetMessage.dataset.messageId = String(payload.message_id);
     }
     clearExistingTurnDisplay(targetMessage);
     attachSceneCard(display, targetMessage, turnId);
@@ -2459,8 +2517,25 @@
       ...options,
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.detail || payload.message || `请求失败：${response.status}`);
+    if (!response.ok) {
+      const message = payload.detail || payload.message || `请求失败：${response.status}`;
+      const error = new Error(message);
+      error.status = response.status;
+      error.payload = payload;
+      error.errorType = payload.error_type || payload.status || "";
+      throw error;
+    }
     return payload;
+  }
+
+  function requestErrorDetail(error) {
+    const payload = error?.payload && typeof error.payload === "object" ? error.payload : {};
+    return {
+      status: error?.status || 0,
+      error_type: error?.errorType || payload.error_type || payload.status || "",
+      message: error?.message || payload.message || "",
+      payload,
+    };
   }
 
   async function startTrackedTurn(detail = {}) {
@@ -2479,7 +2554,7 @@
     if (isLifecycleRebuild) {
       forgetTurnRuntime(turnId);
       processedTurns.clear();
-      invalidateMessageDisplaysFromIndex(detail.trimmedFrom ?? detail.messageIndex ?? detail.index ?? -1);
+      invalidateMessageDisplaysForDetail({ ...detail, turnId });
     }
     invalidatedTurns.delete(turnId);
     pendingTurn = {
@@ -2514,7 +2589,7 @@
     if (turnId) forgetTurnRuntime(turnId);
     else clearAllDomFallbacks();
     processedTurns.clear();
-    invalidateMessageDisplaysFromIndex(detail.trimmedFrom ?? detail.messageIndex ?? detail.index ?? -1);
+    invalidateMessageDisplaysForDetail(detail);
     if (reason === "reroll" || reason === "edit_user" || reason === "edit") {
       showBubble("pending", "心笺已标记本轮重算", "旧幕笺已失效，正在等待新回复完成……");
     } else {
@@ -2536,11 +2611,11 @@
     }
   }
 
-  async function pingHook(event = "loaded", message = "聊天页心笺脚本已加载。", turnId = "") {
+  async function pingHook(event = "loaded", message = "聊天页心笺脚本已加载。", turnId = "", extra = {}) {
     try {
       await requestJson(new URL("hook/ping", apiBase).toString(), {
         method: "POST",
-        body: JSON.stringify({ event, message, page: "chat", turn_id: turnId }),
+        body: JSON.stringify({ event, message, page: "chat", turn_id: turnId, ...(extra && typeof extra === "object" ? extra : {}) }),
       });
     } catch (error) {
       console.warn("State Journal hook ping failed:", error);
@@ -2692,6 +2767,7 @@
       targetMessage.dataset.turnId = turnId;
       if (turnIndex) targetMessage.dataset.turnIndex = String(turnIndex);
       if (contentHash) targetMessage.dataset.contentHash = contentHash;
+      if (assistantText || rawAssistantText) targetMessage.dataset.messageContent = rawAssistantText || assistantText;
       if (!messageId) {
         messageId = targetMessage.dataset.messageId || `msg_${turnId}_assistant`;
         targetMessage.dataset.messageId = messageId;
@@ -2820,14 +2896,20 @@
       } else {
         showBubble("empty", payload.display ? "幕笺已生成" : "心笺无变化", `${triggerSource === "dom_fallback" ? "DOM兜底｜" : "Hook｜"}${payload.message || "本轮没有需要写入的状态"}`, 3000);
       }
-      pingHook(payload.ok === false || payload.status === "error" ? "auto_update_error" : (isRebuild ? "auto_rebuild_done" : "auto_update_done"), payload.message || "自动填表与幕笺生成已完成。", turnId);
+      pingHook(payload.ok === false || payload.status === "error" ? "auto_update_error" : (isRebuild ? "auto_rebuild_done" : "auto_update_done"), payload.message || "自动填表与幕笺生成已完成。", turnId, {
+        backend_status: payload.status || "",
+        error_type: payload.error_type || "",
+        warnings: payload.warnings || payload.result?.warnings || [],
+        errors,
+      });
       if (pendingTurn?.turnId === turnId) pendingTurn = null;
       window.dispatchEvent(new CustomEvent("state_journal:updated", { detail: { ...payload, trigger_source: triggerSource } }));
+      if (isRebuild) scheduleRestoreRecentDisplays(800);
     } catch (error) {
       const retryDetail = retryTurnDetails.get(turnId) || normalized;
       if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, error.message || "心笺生成失败，本轮未写入新数据。", "error", { retryDetail });
       showBubble("error", "心笺生成失败", `${error.message || "未知错误"}，点击查看日志`, 9000);
-      pingHook("auto_update_error", error.message || "自动填表失败。", turnId);
+      pingHook("auto_update_error", error.message || "自动填表失败。", turnId, requestErrorDetail(error));
       console.warn("State Journal auto update failed:", error);
     } finally {
       clearWorkerStatusTimers(turnId);
@@ -2844,6 +2926,7 @@
   window.addEventListener("fantareal:chat-edit", (event) => invalidateTrackedTurn({ ...(event.detail || {}), reason: "edit_user" }));
   window.addEventListener("fantareal:message-invalidated", (event) => invalidateTrackedTurn(event.detail || {}));
   window.addEventListener("fantareal:chat-delete", (event) => invalidateTrackedTurn({ ...(event.detail || {}), reason: "delete_history" }));
+  window.addEventListener("fantareal:messages-indexed", () => scheduleRestoreRecentDisplays(120));
 
   window.stateJournalChatBridge = {
     reloadConfig: loadConfig,
