@@ -93,7 +93,7 @@ README 先放主入口。更细的“主程序、角色、记忆、世界书”�
 | 类别 | 入口 | 说明 |
 | --- | --- | --- |
 | Discord | [加入 Fantareal 交流区](https://discord.gg/EwYTWpqdqY) | 教程、反馈、素材分享、使用交流 |
-| Issues | [GitHub Issues](https://github.com/cOkieeman/Fantareal/issues) | Bug、建议、可复现问题 |
+| Issues | [GitHub Issues](https://github.com/Frischar/Fantareal/issues) | Bug、建议、可复现问题 |
 | 文档 | [Fantareal_map](https://github.com/Frischar/Fantareal_map) | 新手教程、模块说明、使用指南 |
 
 如果你只是想随便问问怎么用，社区会比 Issues 更合适。
