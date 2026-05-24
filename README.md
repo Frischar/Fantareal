@@ -80,7 +80,6 @@ http://127.0.0.1:8000
 本仓库里也保留了一些补充资料：
 
 - [新手写卡指南](./新手教程/Fantareal-你们心中的-幻想乡-从零开始的写卡指南.md)：从角色卡到设定写法，适合新手慢慢读。
-- [项目说明书](./说明书.md)：更偏开发者视角，拆解项目里的 Python 模块和常见改动点。
 - `mods/state_journal/docs/`：心笺相关说明，适合想了解状态记录和长期剧情辅助的人。
 - `mods/status panel/状态栏使用说明.md`：状态栏的普通用户教程。
 
@@ -94,7 +93,6 @@ README 先放主入口。更细的“主程序、角色、记忆、世界书”�
 | --- | --- | --- |
 | Discord | [加入 Fantareal 交流区](https://discord.gg/EwYTWpqdqY) | 教程、反馈、素材分享、使用交流 |
 | Issues | [GitHub Issues](https://github.com/Frischar/Fantareal/issues) | Bug、建议、可复现问题 |
-| 文档 | [Fantareal_map](https://github.com/Frischar/Fantareal_map) | 新手教程、模块说明、使用指南 |
 | QQ | [加入我们](https://qm.qq.com/q/ke8LQ1WtJ6) |入门交流|
 
 
