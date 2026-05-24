@@ -306,7 +306,52 @@
 
     </div>
 
-    <div id="result-modal" class="result-modal" hidden style="display:none;">
+    <div id="bundle-export-modal" class="result-modal" hidden>
+      <div id="bundle-export-modal-backdrop" class="result-modal-backdrop"></div>
+      <div class="result-modal-card panel bundle-export-panel" role="dialog" aria-modal="true" aria-labelledby="bundle-export-title">
+        <div class="memory-card-head bundle-export-head">
+          <div>
+            <p class="eyebrow">Export bundle</p>
+            <strong id="bundle-export-title">组合导出当前人设存档</strong>
+          </div>
+        </div>
+        <div class="bundle-export-body">
+          <div class="bundle-export-grid">
+            <label class="checkbox-row bundle-export-line is-required"><input type="checkbox" checked disabled /><span><strong>人设卡</strong></span></label>
+            <label class="checkbox-row bundle-export-line"><input id="bundle-export-memories" type="checkbox" checked /><span><strong>记忆</strong></span></label>
+            <label class="checkbox-row bundle-export-line"><input id="bundle-export-worldbook" type="checkbox" checked /><span><strong>世界书</strong></span></label>
+            <label class="checkbox-row bundle-export-line"><input id="bundle-export-preset" type="checkbox" checked /><span><strong>预设</strong></span></label>
+            <label class="checkbox-row bundle-export-line bundle-export-line-wide"><input id="bundle-export-media" type="checkbox" checked /><span><strong>本地演出包</strong></span></label>
+          </div>
+          <p class="bundle-export-note">外链、内置 /assets/、data URL 不会被打包；不勾选本地演出包时，目标设备可能无法显示本地封面或播放本地音乐。</p>
+        </div>
+        <div class="bundle-export-actions">
+          <button id="bundle-export-cancel" type="button" class="secondary bundle-export-action">取消</button>
+          <button id="bundle-export-confirm" type="button" class="bundle-export-action">导出</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="import-conflict-modal" class="result-modal" hidden>
+      <div id="import-conflict-modal-backdrop" class="result-modal-backdrop"></div>
+      <div class="result-modal-card panel bundle-export-panel import-conflict-panel" role="dialog" aria-modal="true" aria-labelledby="import-conflict-title">
+        <div class="memory-card-head bundle-export-head">
+          <div>
+            <p class="eyebrow">Import conflict</p>
+            <strong id="import-conflict-title">角色卡已存在</strong>
+          </div>
+        </div>
+        <div class="bundle-export-body">
+          <p class="bundle-export-note" id="import-conflict-detail">角色卡列表中已存在同名文件，是否覆盖？</p>
+        </div>
+        <div class="bundle-export-actions">
+          <button id="import-conflict-cancel" type="button" class="secondary bundle-export-action">取消</button>
+          <button id="import-conflict-confirm" type="button" class="bundle-export-action">覆盖导入</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="result-modal" class="result-modal" hidden>
       <div id="result-modal-backdrop" class="result-modal-backdrop"></div>
       <div class="result-modal-card panel">
         <div class="memory-card-head">
@@ -329,6 +374,12 @@
       const backgroundOverlayValueEl = document.getElementById("background-overlay-value");
       const backgroundPreviewEl = document.getElementById("background-preview");
       const resultModalEl = document.getElementById("result-modal");
+      const bundleExportModalEl = document.getElementById("bundle-export-modal");
+      const bundleExportMemoriesEl = document.getElementById("bundle-export-memories");
+      const bundleExportWorldbookEl = document.getElementById("bundle-export-worldbook");
+      const bundleExportPresetEl = document.getElementById("bundle-export-preset");
+      const bundleExportMediaEl = document.getElementById("bundle-export-media");
+      const bundleExportConfirmEl = document.getElementById("bundle-export-confirm");
       const resultModalTitleEl = document.getElementById("result-modal-title");
       const resultModalBodyEl = document.getElementById("result-modal-body");
       const presetHelperEl = document.getElementById("preset-helper");
@@ -379,7 +430,36 @@
         },
       };
 
-      const saveTimers = { settings: null };
+      function showBundleExportModal() {
+        bundleExportModalEl.hidden = false;
+        bundleExportConfirmEl?.focus();
+      }
+
+      function hideBundleExportModal() {
+        bundleExportModalEl.hidden = true;
+      }
+
+      function buildBundleExportUrl() {
+        const params = new URLSearchParams({
+          memories: bundleExportMemoriesEl?.checked ? "1" : "0",
+          worldbook: bundleExportWorldbookEl?.checked ? "1" : "0",
+          preset: bundleExportPresetEl?.checked ? "1" : "0",
+          media: bundleExportMediaEl?.checked ? "1" : "0",
+        });
+        return `/api/export/current-bundle?${params.toString()}`;
+      }
+
+      function startCurrentBundleExport() {
+        const button = document.getElementById("export-current-bundle");
+        setButtonState(button, "loading", "打包中…");
+        setStatus("正在按所选内容打包当前人设存档…", "busy");
+        showToast("正在导出当前人设存档", "info");
+        window.setTimeout(() => {
+          setButtonState(button, "success", "已开始下载 ✓");
+          setStatus("已完成：人设存档下载已开始", "success");
+        }, 700);
+        window.location.href = buildBundleExportUrl();
+      }
 
       function inferStatusKind(text) {
         const value = String(text || "");
@@ -1001,26 +1081,31 @@
         scheduleSave(saveSettings, "已填入预设，正在保存...", 250);
       });
 
-      document.getElementById("export-current-bundle").addEventListener("click", (event) => {
-        const button = event.currentTarget;
-        setButtonState(button, "loading", "打包中…");
-        setStatus("正在打包当前人设卡、记忆、世界书和预设…", "busy");
-        showToast("正在导出当前人设存档", "info");
-        window.setTimeout(() => {
-          setButtonState(button, "success", "已开始下载 ✓");
-          setStatus("已完成：人设存档下载已开始", "success");
-        }, 700);
-        window.location.href = "/api/export/current-bundle";
+      document.getElementById("export-current-bundle").addEventListener("click", () => {
+        showBundleExportModal();
       });
 
       document.getElementById("import-bundle").addEventListener("click", () => {
         document.getElementById("import-bundle-file").click();
       });
 
-      document.getElementById("import-bundle-file").addEventListener("change", async (event) => {
-        const file = event.target.files && event.target.files[0];
-        if (!file) return;
+      const importConflictModalEl = document.getElementById("import-conflict-modal");
+      const importConflictDetailEl = document.getElementById("import-conflict-detail");
+      let pendingImportFile = null;
 
+      function showImportConflictModal(detail) {
+        if (importConflictDetailEl && detail) {
+          importConflictDetailEl.textContent = detail;
+        }
+        importConflictModalEl.hidden = false;
+        document.getElementById("import-conflict-confirm")?.focus();
+      }
+
+      function hideImportConflictModal() {
+        importConflictModalEl.hidden = true;
+      }
+
+      async function runBundleImport(file, overwrite) {
         const button = document.getElementById("import-bundle");
         try {
           setButtonState(button, "loading", "导入中…");
@@ -1030,7 +1115,8 @@
           const formData = new FormData();
           formData.append("file", file);
 
-          const response = await fetch("/api/import/bundle", {
+          const url = overwrite ? "/api/import/bundle?overwrite=1" : "/api/import/bundle";
+          const response = await fetch(url, {
             method: "POST",
             body: formData,
           });
@@ -1041,20 +1127,41 @@
           }
 
           const data = await response.json();
+          if (data && data.conflict) {
+            pendingImportFile = file;
+            setButtonState(button, "idle", "导入人设存档 ZIP");
+            setStatus("检测到同名角色卡，等待确认…", "busy");
+            showImportConflictModal(data.detail);
+            return;
+          }
+
           const filesInfo = data.imported_files || {};
           let msg = "人设存档导入成功。";
           if (filesInfo.role_card) msg += ` 已加载：${filesInfo.role_card}`;
           if (filesInfo.memories) msg += " 记忆已导入";
           if (filesInfo.worldbook) msg += " 世界书已导入";
           if (filesInfo.preset) msg += " 预设已导入";
+          if (filesInfo.media?.available) {
+            msg += ` 本地演出资源已恢复 ${filesInfo.media.restored || 0} 个`;
+            if (filesInfo.media.skipped) msg += `，跳过 ${filesInfo.media.skipped} 个`;
+          }
 
           setButtonState(button, "success", "导入成功 ✓");
           setStatus(msg, "success");
           showToast(msg, "success");
+          window.setTimeout(() => window.location.reload(), 900);
         } catch (error) {
           setButtonState(button, "idle", "导入人设存档 ZIP");
           setStatus(`导入失败：${error.message}`, "error");
           showToast(`导入失败：${error.message}`, "error");
+        }
+      }
+
+      document.getElementById("import-bundle-file").addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          await runBundleImport(file, false);
         } finally {
           event.target.value = "";
         }
@@ -1096,6 +1203,34 @@
 
       document.getElementById("result-modal-close").addEventListener("click", hideResultModal);
       document.getElementById("result-modal-backdrop").addEventListener("click", hideResultModal);
+      document.getElementById("bundle-export-modal-backdrop").addEventListener("click", hideBundleExportModal);
+      document.getElementById("bundle-export-cancel").addEventListener("click", hideBundleExportModal);
+      document.getElementById("bundle-export-confirm").addEventListener("click", () => {
+        hideBundleExportModal();
+        startCurrentBundleExport();
+      });
+
+      document.getElementById("import-conflict-modal-backdrop").addEventListener("click", () => {
+        hideImportConflictModal();
+        pendingImportFile = null;
+        setStatus("已取消导入", "idle");
+        showToast("已取消导入", "info");
+      });
+      document.getElementById("import-conflict-cancel").addEventListener("click", () => {
+        hideImportConflictModal();
+        pendingImportFile = null;
+        setStatus("已取消导入", "idle");
+        showToast("已取消导入", "info");
+      });
+      document.getElementById("import-conflict-confirm").addEventListener("click", async () => {
+        const file = pendingImportFile;
+        pendingImportFile = null;
+        hideImportConflictModal();
+        if (file) {
+          await runBundleImport(file, true);
+        }
+      });
+
 
       toggleSecret("llm-api-key", "toggle-llm-api-key");
       toggleSecret("embedding-api-key", "toggle-embedding-api-key");

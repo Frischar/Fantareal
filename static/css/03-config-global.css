@@ -612,6 +612,133 @@ body.modern-setting-page .about-secret-trigger,
   transition: opacity 0.12s ease !important;
   cursor: pointer;
 }
+body.modern-setting-page .bundle-export-panel {
+  width: min(520px, calc(100vw - 34px));
+  max-height: calc(100vh - 44px);
+  overflow: auto;
+  padding: 16px;
+}
+
+body.modern-setting-page .bundle-export-head {
+  margin-bottom: 8px;
+}
+
+body.modern-setting-page .bundle-export-head strong {
+  display: block;
+  font-size: 1.04rem;
+  line-height: 1.25;
+}
+
+body.modern-setting-page .bundle-export-body {
+  display: grid;
+  gap: 8px;
+}
+
+body.modern-setting-page .bundle-export-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body.modern-setting-page .bundle-export-line {
+  display: flex;
+  align-items: center;
+  gap: 0.64rem;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent);
+  color: var(--text);
+  font-weight: 740;
+}
+
+body.modern-setting-page .bundle-export-line-wide {
+  grid-column: 1 / -1;
+}
+
+body.modern-setting-page .bundle-export-line input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: color-mix(in srgb, var(--panel-strong) 76%, transparent);
+  cursor: pointer;
+}
+
+body.modern-setting-page .bundle-export-line input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 82%, white);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+body.modern-setting-page .bundle-export-line input[type="checkbox"]:checked {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--border));
+  background: color-mix(in srgb, var(--accent) 38%, var(--panel-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+body.modern-setting-page .bundle-export-line input[type="checkbox"]:checked::before {
+  transform: translateX(18px);
+  background: white;
+}
+
+body.modern-setting-page .bundle-export-line span {
+  display: block;
+  min-width: 0;
+}
+
+body.modern-setting-page .bundle-export-line strong {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+body.modern-setting-page .bundle-export-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+body.modern-setting-page .bundle-export-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+body.modern-setting-page .bundle-export-action {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.86rem;
+}
+
+body.modern-setting-page .import-conflict-panel {
+  width: min(420px, calc(100vw - 34px));
+}
+
+@media (max-width: 640px) {
+  body.modern-setting-page .bundle-export-panel {
+    width: min(100vw - 24px, 520px);
+    padding: 14px;
+  }
+  body.modern-setting-page .bundle-export-grid {
+    grid-template-columns: 1fr;
+  }
+}
 body.modern-setting-page .about-secret-trigger::after,
 .about-secret-trigger::after {
   display: none;
