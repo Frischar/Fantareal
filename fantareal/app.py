@@ -719,11 +719,6 @@ def default_role_card() -> dict[str, Any]:
                 "volume": 0.65,
             },
         },
-        "plotStages": {
-            "A": {"description": "", "rules": ""},
-            "B": {"description": "", "rules": ""},
-            "C": {"description": "", "rules": ""},
-        },
         "personas": {
             "1": {
                 "name": "",
@@ -1382,21 +1377,6 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
     card["tags"] = sanitize_tags(raw.get("tags", []))
     card["stateJournal"] = sanitize_state_journal_config(raw.get("stateJournal", {}))
     card["creativeWorkshop"] = sanitize_creative_workshop(raw.get("creativeWorkshop", {}))
-
-    # Preserve every imported plot stage instead of only the built-in A/B/C slots.
-    raw_plot_stages = raw.get("plotStages", {})
-    normalized_plot_stages: dict[str, dict[str, str]] = {}
-    if isinstance(raw_plot_stages, dict):
-        for source_key, value in raw_plot_stages.items():
-            stage_key = str(source_key).strip()
-            if not stage_key or not isinstance(value, dict):
-                continue
-            normalized_plot_stages[stage_key] = {
-                "description": str(value.get("description", "")).strip(),
-                "rules": str(value.get("rules", "")).strip(),
-            }
-    if normalized_plot_stages:
-        card["plotStages"] = normalized_plot_stages
 
     # Preserve every imported persona instead of mapping into the default 1/2/3 slots.
     raw_personas = raw.get("personas", {})
@@ -2145,24 +2125,6 @@ def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
     if mes_example:
         sections.append(f"Dialogue Example: {mes_example}")
 
-    plot_stages = card.get("plotStages", {})
-    if isinstance(plot_stages, dict):
-        stage_lines = []
-        for key, value in plot_stages.items():
-            if not isinstance(value, dict):
-                continue
-            desc = str(value.get("description", "")).strip()
-            rules = str(value.get("rules", "")).strip()
-            if desc or rules:
-                line = f"Stage {key}"
-                if desc:
-                    line += f": {desc}"
-                if rules:
-                    line += f"; Rules: {rules}"
-                stage_lines.append(line)
-        if stage_lines:
-            sections.append("Plot Stages:\n" + "\n".join(stage_lines))
-
     personas = card.get("personas", {})
     if isinstance(personas, dict):
         persona_lines = []
@@ -2208,82 +2170,6 @@ def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
         "greeting": str(card.get("first_mes", "")).strip() or "Hello, let's start chatting.",
         "system_prompt": "\n\n".join(section for section in sections if section).strip(),
     }
-
-def build_memories_from_role_card(card: dict[str, Any]) -> list[dict[str, Any]]:
-    memories: list[dict[str, Any]] = []
-
-    tags = sanitize_tags(card.get("tags", []))
-    base_content = "\n".join(
-        part
-        for part in [
-            str(card.get("description", "")).strip(),
-            str(card.get("personality", "")).strip(),
-            str(card.get("scenario", "")).strip(),
-        ]
-        if part
-    ).strip()
-    if base_content:
-        memories.append(
-            {
-                "id": "card-base",
-                "title": str(card.get("name", "")).strip() or "瑙掕壊鍩虹璁惧畾",
-                "content": base_content,
-                "tags": tags,
-                "notes": str(card.get("creator_notes", "")).strip(),
-            }
-        )
-
-    plot_stages = card.get("plotStages", {})
-    if isinstance(plot_stages, dict):
-        for key, value in plot_stages.items():
-            if not isinstance(value, dict):
-                continue
-            content = "\n".join(
-                part
-                for part in [
-                    str(value.get("description", "")).strip(),
-                    str(value.get("rules", "")).strip(),
-                ]
-                if part
-            ).strip()
-            if content:
-                memories.append(
-                    {
-                        "id": f"plot-stage-{key}",
-                        "title": f"鍓ф儏闃舵 {key}",
-                        "content": content,
-                        "tags": ["plotStage", key],
-                        "notes": "",
-                    }
-                )
-
-    personas = card.get("personas", {})
-    if isinstance(personas, dict):
-        for key, value in personas.items():
-            if not isinstance(value, dict):
-                continue
-            content = "\n".join(
-                part
-                for part in [
-                    str(value.get("description", "")).strip(),
-                    str(value.get("personality", "")).strip(),
-                    str(value.get("scenario", "")).strip(),
-                ]
-                if part
-            ).strip()
-            if content:
-                memories.append(
-                    {
-                        "id": f"persona-{key}",
-                        "title": str(value.get("name", "")).strip() or f"瑙掕壊 {key}",
-                        "content": content,
-                        "tags": ["persona", key],
-                        "notes": str(value.get("creator_notes", "")).strip(),
-                    }
-                )
-
-    return sanitize_memories(memories)
-
 
 def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str | None = None) -> dict[str, Any]:
     normalized_card = normalize_role_card(card)

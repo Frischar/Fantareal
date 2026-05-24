@@ -15,6 +15,8 @@ DEFAULT_PRESET_MODULES = {
     "emotion_detail": True,
     "multi_character_boundary": True,
     "scene_continuation": True,
+    "anti_horny": False,
+    "anti_deification": False,
     "v4f_output_guard": False,
 }
 

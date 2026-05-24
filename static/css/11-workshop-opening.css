@@ -139,12 +139,6 @@ body.workshop-config-page .workshop-asset-row .ghost {
   background: color-mix(in srgb, var(--input-bg) 58%, transparent);
 }
 
-body.workshop-config-page .workshop-rules-subhead {
-  margin-top: 8px;
-  padding-top: 16px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-}
-
 body.workshop-opening-active {
   overflow: hidden;
 }

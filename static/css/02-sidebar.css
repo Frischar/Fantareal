@@ -469,8 +469,7 @@ body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar > .standalone-abo
   border-color: transparent;
 }
 
-body.app-sidebar-shell:not(.chat-page) .config-shell,
-body.app-sidebar-shell:not(.chat-page) .welcome-shell {
+body.app-sidebar-shell:not(.chat-page) .config-shell {
   width: min(1760px, calc(100vw - var(--app-sidebar-width) - 32px));
   max-width: min(1760px, calc(100vw - var(--app-sidebar-width) - 32px));
   margin-left: 0;
@@ -797,8 +796,7 @@ body.app-sidebar-shell:not(.chat-page) .slot-toolbar {
   }
 
   body.app-sidebar-shell:not(.chat-page) .config-shell,
-  body.app-sidebar-shell:not(.chat-page) .config-shell.wide,
-  body.app-sidebar-shell:not(.chat-page) .welcome-shell {
+  body.app-sidebar-shell:not(.chat-page) .config-shell.wide {
     width: 100%;
     max-width: 100%;
   }

@@ -215,22 +215,6 @@ body.modern-setting-page.card-config-page .card-item-title strong {
   white-space: nowrap;
 }
 
-body.modern-setting-page.card-config-page .card-title-sub {
-  max-width: 220px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.86rem;
-}
-
-body.modern-setting-page.card-config-page .card-head-summary {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
 body.modern-setting-page.card-config-page .card-summary-chip {
   display: inline-flex;
   align-items: center;
@@ -306,10 +290,6 @@ body.modern-setting-page.card-config-page .persona-toolbar {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  body.modern-setting-page.card-config-page .card-head-summary {
-    grid-column: 1 / 3;
-    justify-content: flex-start;
-  }
 }
 
 /* Card editor v0.9.7: confirmed role layout cleanup.
@@ -322,19 +302,6 @@ body.modern-setting-page.card-config-page .card-workbench-actions {
   gap: 10px;
 }
 
-body.modern-setting-page.card-config-page .card-action-separator {
-  width: 1px;
-  height: 28px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--border) 72%, transparent);
-  margin: 0 2px;
-}
-
-body.modern-setting-page.card-config-page .card-action-spacer {
-  display: none !important;
-}
-
 body.modern-setting-page.card-config-page .card-main-actions,
 body.modern-setting-page.card-config-page .card-source-actions {
   margin-left: 0 !important;
@@ -343,10 +310,6 @@ body.modern-setting-page.card-config-page .card-source-actions {
 
 body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
   margin-left: 0;
-}
-
-body.modern-setting-page.card-config-page .card-head-summary {
-  display: none !important;
 }
 
 body.modern-setting-page.card-config-page .card-item-head {
@@ -396,9 +359,6 @@ body.modern-setting-page.card-config-page .card-field-tip {
   body.modern-setting-page.card-config-page .card-persona-grid {
     grid-template-columns: 1fr !important;
   }
-  body.modern-setting-page.card-config-page .card-action-separator {
-    display: none;
-  }
 }
 
 /* Card editor v0.9.8: final role-page cleanup.
@@ -437,11 +397,6 @@ body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
   min-width: 126px;
   margin-left: 0 !important;
   font-weight: 850;
-}
-
-body.modern-setting-page.card-config-page .card-action-separator,
-body.modern-setting-page.card-config-page .card-action-spacer {
-  display: none !important;
 }
 
 body.modern-setting-page.card-config-page .card-persona-grid {

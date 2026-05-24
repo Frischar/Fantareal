@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>User - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
+    <link rel="stylesheet" href="/static/styles.css?v=v161" />
 </head>
     <body class="modern-setting-page app-sidebar-shell user-config-page">
     <div id="user-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
@@ -99,9 +99,8 @@
       </aside>
     </div>
 
+    <script src="/static/js/app-core.js?v=v161"></script>
     <script>
-      const rootEl = document.documentElement;
-      const bodyEl = document.body;
       const statusEl = document.getElementById("status-text");
       const toastHostEl = document.getElementById("user-toast-host");
       const currentTheme = {{ settings.theme | tojson }};
@@ -109,13 +108,7 @@
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
 
-      function inferStatusKind(text) {
-        const value = String(text || "");
-        if (/失败|错误|异常|不能为空|不可用|请先选择/.test(value)) return "error";
-        if (/正在|保存中|上传|读取|重新读取|处理中/.test(value)) return "busy";
-        if (/已|成功|完成/.test(value)) return "success";
-        return "idle";
-      }
+      const { inferStatusKind, applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
 
       function setStatus(text, kind = null) {
         if (!statusEl) return;
@@ -126,16 +119,7 @@
       }
 
       function showToast(message, type = "info") {
-        if (!toastHostEl || !message) return;
-        const toast = document.createElement("div");
-        toast.className = `app-toast ${type}`;
-        toast.textContent = message;
-        toastHostEl.appendChild(toast);
-        requestAnimationFrame(() => toast.classList.add("show"));
-        window.setTimeout(() => {
-          toast.classList.remove("show");
-          window.setTimeout(() => toast.remove(), 220);
-        }, 2200);
+        window.Fantareal.showToast(toastHostEl, message, type);
       }
 
       function rememberButtonLabel(button) {
@@ -175,41 +159,6 @@
         document.querySelectorAll(selector).forEach((button) => setButtonState(button, state, label));
       }
 
-      function applyTheme(theme) {
-        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-      }
-
-      function applyUiOpacity(value) {
-        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
-        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
-        const palette = theme === "dark"
-          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
-          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
-        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
-        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
-        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
-      }
-
-      function applyBackground(url, overlay) {
-        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
-        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
-        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
-      }
-
-      async function postJson(url, payload) {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.detail || "请求失败");
-        }
-        return response.json();
-      }
 
       function profilePayload() {
         return {

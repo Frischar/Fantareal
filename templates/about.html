@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>About - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v141" />
+    <link rel="stylesheet" href="/static/styles.css?v=v161" />
   </head>
   <body class="modern-setting-page app-sidebar-shell global-config-page">
     <div class="topbar-stack">
@@ -119,37 +119,14 @@
       </div>
     </div>
 
+    <script src="/static/js/app-core.js?v=v161"></script>
     <script>
-      const rootEl = document.documentElement;
-      const bodyEl = document.body;
       const bgUrl = {{ settings.background_image_url | tojson }};
       const bgOverlay = {{ settings.background_overlay | tojson }};
       const themeVal = {{ settings.theme | tojson }};
       const uiOpacity = {{ settings.ui_opacity | tojson }};
 
-      function applyTheme(theme) {
-        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-      }
-
-      function applyUiOpacity(value) {
-        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
-        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
-        const palette = theme === "dark"
-          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
-          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
-        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
-        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
-        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
-      }
-
-      function applyBackground(url, overlay) {
-        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
-        const bgValue = url ? `url("${url}")` : "none";
-        bodyEl.style.setProperty("--background-image", bgValue);
-        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
-      }
+      const { applyTheme, applyUiOpacity, applyBackground } = window.Fantareal;
 
       applyTheme(themeVal);
       applyUiOpacity(uiOpacity);
