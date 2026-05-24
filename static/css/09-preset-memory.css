@@ -369,22 +369,10 @@ body.memory-config-page .memory-wide .stat-box strong {
   line-height: 1.25;
 }
 
-body.memory-config-page .memory-status-box {
-  min-width: min(280px, 100%);
-}
-
 body.memory-config-page .memory-actions,
 body.memory-config-page .merge-toolbar,
 body.memory-config-page .selection-row {
   margin-bottom: 0;
-}
-
-body.memory-config-page .memory-status-box strong {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 body.memory-config-page .memory-tool-stack {
@@ -1026,23 +1014,12 @@ body.memory-config-page .outline-brief-summary {
   line-height: 1.75;
 }
 
-body.memory-config-page .outline-brief-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 body.memory-config-page .outline-detail-side {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
   flex: 0 0 auto;
-}
-
-body.memory-config-page .outline-detail-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 body.memory-config-page .outline-detail-toggle {
@@ -1142,10 +1119,6 @@ body.memory-config-page .loading-button::after {
     grid-template-columns: 1fr;
   }
 
-  body.memory-config-page .outline-detail-grid,
-  body.memory-config-page .outline-brief-meta {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 900px) {

@@ -307,12 +307,6 @@ body::after {
   min-width: 0;
 }
 
-.slot-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .slot-badge {
   display: inline-flex;
   align-items: center;
@@ -342,10 +336,6 @@ body::after {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
-}
-
-.slot-select {
-  min-width: 180px;
 }
 
 .navlink,
@@ -380,10 +370,6 @@ body::after {
   padding: 24px;
 }
 
-.welcome-shell {
-  padding: 24px;
-}
-
 .chat-shell {
   height: calc(100vh - 92px);
   overflow: hidden;
@@ -394,99 +380,6 @@ body::after {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 20px;
-}
-
-.welcome-hero {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 28px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
-  gap: 24px;
-  align-items: stretch;
-}
-
-.welcome-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  justify-content: center;
-}
-
-.welcome-copy h1 {
-  margin: 0;
-  font-size: clamp(34px, 5vw, 56px);
-  line-height: 1.08;
-}
-
-.welcome-lead {
-  margin: 0;
-  font-size: 18px;
-  line-height: 1.8;
-  color: var(--text);
-}
-
-.welcome-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 4px;
-}
-
-.welcome-primary,
-.welcome-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 138px;
-  padding: 12px 18px;
-  border-radius: 999px;
-  text-decoration: none;
-  font-weight: 700;
-  transition: transform 0.16s ease, opacity 0.16s ease;
-}
-
-.welcome-primary {
-  background: var(--accent);
-  color: white;
-}
-
-.welcome-secondary {
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel-strong) 90%, transparent 10%);
-  color: var(--text);
-}
-
-.welcome-primary:hover,
-.welcome-secondary:hover {
-  transform: translateY(-1px);
-}
-
-.welcome-card-grid {
-  display: grid;
-  gap: 16px;
-}
-
-.welcome-card {
-  padding: 18px;
-  border-radius: 22px;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel-strong) 90%, transparent 10%);
-}
-
-.welcome-card h2 {
-  margin: 0 0 12px;
-}
-
-.welcome-list {
-  margin: 0;
-  padding-left: 18px;
-  line-height: 1.9;
-  color: var(--text);
-}
-
-.welcome-list.ordered {
-  padding-left: 22px;
 }
 
 .config-shell.wide {
@@ -513,10 +406,6 @@ body::after {
 }
 
 .full-span {
-  grid-column: 1 / -1;
-}
-
-.memory-panel {
   grid-column: 1 / -1;
 }
 
@@ -1183,7 +1072,6 @@ a.compact {
   .topbar,
   .slot-toolbar,
   .slot-toolbar-left,
-  .slot-toolbar-right,
   .chat-header,
   .header-actions,
   .button-row,
@@ -1204,8 +1092,7 @@ a.compact {
   a.compact,
   .composer-actions button,
   .button-row button,
-  .action-group button,
-  .slot-select {
+  .action-group button {
     width: 100%;
   }
 
@@ -1396,13 +1283,6 @@ a.compact {
   gap: 12px;
 }
 
-.sub-title {
-  margin-bottom: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--accent);
-}
-
 .card-persona-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -1434,19 +1314,6 @@ a.compact {
 .card-builder textarea {
   resize: vertical;
   min-height: 96px;
-}
-
-.workshop-toolbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
-.workshop-info-grid {
-  margin-bottom: 12px;
 }
 
 .workshop-search-block {
@@ -1565,10 +1432,6 @@ a.compact {
   margin: 0;
   padding: 10px 16px;
   border-radius: 999px;
-}
-
-.topnav-chat {
-  align-items: center;
 }
 
 @media (max-width: 1100px) {

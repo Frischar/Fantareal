@@ -591,11 +591,6 @@ body.chat-page::after {
   font-size: 13px;
 }
 
-.chat-page .runtime-main-text {
-  margin: 0 0 6px;
-  font-weight: 700;
-}
-
 .chat-page .runtime-inline-link {
   color: var(--accent);
   text-decoration: none;
@@ -821,14 +816,6 @@ body.chat-page::after {
   }
 }
 
-.sprite-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .sprite-frame {
   flex: 1;
   min-height: 360px;
@@ -1024,10 +1011,6 @@ body.chat-page::after {
 }
 
 @media (max-width: 1080px) {
-  .welcome-hero {
-    grid-template-columns: 1fr;
-  }
-
   .chat-layout,
   .chat-layout.runtime-panel-open,
   .chat-layout.runtime-panel-collapsed {
@@ -1047,9 +1030,6 @@ body.chat-page::after {
     display: none;
   }
 
-  .sprite-stage {
-    min-height: 280px;
-  }
 }
 
 /* Runtime panel handle v4 */

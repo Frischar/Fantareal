@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
+    <link rel="stylesheet" href="/static/styles.css?v=v161" />
     <style>
       .worldbook-config-page .worldbook-config-shell {
         gap: 12px;
@@ -631,9 +631,9 @@
           </section>
         </div>
       </section>
+    <script src="/static/js/app-core.js?v=v161"></script>
     <script>
-      const rootEl = document.documentElement;
-      const bodyEl = document.body;
+      const { applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
       const statusPill = document.getElementById("wb-status-pill");
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
@@ -666,42 +666,6 @@
           button.classList.remove("is-feedback");
           button.textContent = oldText;
         }, 950);
-      }
-
-      function applyTheme(theme) {
-        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-      }
-
-      function applyUiOpacity(value) {
-        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
-        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
-        const palette = theme === "dark"
-          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
-          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
-        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
-        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
-        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
-      }
-
-      function applyBackground(url, overlay) {
-        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
-        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
-        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
-      }
-
-      async function postJson(url, payload) {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.detail || "请求失败");
-        }
-        return response.json();
       }
 
       function setControlValue(id, value) {

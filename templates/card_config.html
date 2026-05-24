@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Card Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
+    <link rel="stylesheet" href="/static/styles.css?v=v161" />
   
     <style id="ui-unify-v1">
       body.modern-setting-page {
@@ -461,7 +461,10 @@
 
               <label for="card-scenario">scenario <span class="field-note">（当前世界观 / 场景基调）</span></label>
               <textarea id="card-scenario" rows="4">{{ card_template.scenario }}</textarea>
-
+            </div>
+          </div>
+          <div class="card-column">
+            <div class="card-block">
               <label for="card-first-mes">first_mes <span class="field-note">（开场白 / 初见时第一句）</span></label>
               <p class="field-note card-field-tip">只作为新对话首次展示，不作为常驻提示词反复注入。</p>
               <textarea id="card-first-mes" rows="4">{{ card_template.first_mes }}</textarea>
@@ -471,33 +474,6 @@
 
               <label for="card-creator-notes">creator_notes <span class="field-note">（隐藏规则 / 对模型的补充说明）</span></label>
               <textarea id="card-creator-notes" rows="4">{{ card_template.creator_notes }}</textarea>
-            </div>
-          </div>
-          <div class="card-column">
-            <div class="card-block">
-              <div class="persona-toolbar">
-                <h3>剧情阶段</h3>
-                <div class="button-row">
-                  <button id="add-stage" type="button" class="secondary compact card-add-button">＋ 新增阶段</button>
-                </div>
-              </div>
-              <div id="stage-grid" class="stage-grid">
-                {% for stage_key, stage in stage_items %}
-                <div class="sub-block stage-card" data-stage-key="{{ stage_key }}">
-                  <div class="memory-card-head persona-card-head card-item-head">
-                    <div class="card-item-title">
-                      <strong>plotStages.{{ stage_key }}</strong>
-                      <span class="card-summary-chip">剧情阶段</span>
-                    </div>
-                    <button type="button" class="card-icon-button card-danger-icon remove-stage" title="删除阶段" aria-label="删除阶段">×</button>
-                  </div>
-                  <label for="stage-{{ stage_key }}-description">description <span class="field-note">（这一阶段发生了什么）</span></label>
-                  <textarea id="stage-{{ stage_key }}-description" rows="3">{{ stage.description }}</textarea>
-                  <label for="stage-{{ stage_key }}-rules">rules <span class="field-note">（这一阶段的行为规则 / 限制）</span></label>
-                  <textarea id="stage-{{ stage_key }}-rules" rows="3">{{ stage.rules }}</textarea>
-                </div>
-                {% endfor %}
-              </div>
             </div>
           </div>
         </div>
@@ -623,6 +599,7 @@
       </div>
     </div>
 
+    <script src="/static/js/app-core.js?v=v161"></script>
     <script>
       const PERSONA_LABELS = {
         name: "（该角色显示名）",
@@ -631,10 +608,6 @@
         scenario: "（该角色所处场景 / 关系定位）",
         creator_notes: "（仅给模型看的补充说明）",
       };
-      const STAGE_LABELS = {
-        description: "（这一阶段发生了什么）",
-        rules: "（这一阶段的行为规则 / 限制）",
-      };
       const WORKSHOP_STAGE_LIMITS = { aMax: 2, bMax: 5 };
       const MUSIC_PRESETS = [
         { id: "off", label: "关闭", url: "" },
@@ -642,10 +615,8 @@
         { id: "night", label: "夜晚钢琴", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
         { id: "rain", label: "雨声氛围", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
       ];
-      const rootEl = document.documentElement;
-      const bodyEl = document.body;
+      const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml, escapeAttr } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
-      const stageGridEl = document.getElementById("stage-grid");
       const personaGridEl = document.getElementById("persona-grid");
       const workshopEnabledEl = document.getElementById("workshop-enabled");
       const workshopRuleListEl = document.getElementById("workshop-rule-list");
@@ -684,44 +655,6 @@
 
       function markCardDirty() {
         setStatus("已修改，尚未保存。", "dirty");
-      }
-
-      function applyTheme(theme) {
-        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-      }
-
-      function applyUiOpacity(value) {
-        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
-        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
-        const palette = theme === "dark"
-          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
-          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
-        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
-        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
-        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
-      }
-
-      function applyBackground(url, overlay) {
-        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
-        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
-        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
-      }
-
-      async function postJson(url, payload) {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.detail || "请求失败");
-        }
-
-        return response.json();
       }
 
       function value(id) {
@@ -1180,44 +1113,6 @@
         return String((keys.length ? Math.max(...keys) : 0) + 1);
       }
 
-      function getNextStageKey() {
-        const existingKeys = [...stageGridEl.querySelectorAll(".stage-card")]
-          .map((card) => String(card.dataset.stageKey || "").trim())
-          .filter(Boolean);
-        const used = new Set(existingKeys.map((key) => key.toUpperCase()));
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        for (const letter of alphabet) {
-          if (!used.has(letter)) return letter;
-        }
-        return `Stage${existingKeys.length + 1}`;
-      }
-
-      function createStageBlock(key, stage = {}) {
-        const wrapper = document.createElement("div");
-        wrapper.className = "sub-block stage-card";
-        wrapper.dataset.stageKey = key;
-        wrapper.innerHTML = `
-          <div class="memory-card-head persona-card-head card-item-head">
-            <div class="card-item-title">
-              <strong>plotStages.${key}</strong>
-              <span class="card-summary-chip">剧情阶段</span>
-            </div>
-            <button type="button" class="card-icon-button card-danger-icon remove-stage" title="删除阶段" aria-label="删除阶段">×</button>
-          </div>
-          <label for="stage-${key}-description">description <span class="field-note">${STAGE_LABELS.description}</span></label>
-          <textarea id="stage-${key}-description" rows="3"></textarea>
-          <label for="stage-${key}-rules">rules <span class="field-note">${STAGE_LABELS.rules}</span></label>
-          <textarea id="stage-${key}-rules" rows="3"></textarea>
-        `;
-        wrapper.querySelector(`#stage-${key}-description`).value = stage.description || "";
-        wrapper.querySelector(`#stage-${key}-rules`).value = stage.rules || "";
-        wrapper.querySelector(".remove-stage").addEventListener("click", () => {
-          wrapper.remove();
-          setStatus(`已删除 plotStages.${key}`);
-        });
-        return wrapper;
-      }
-
       function formatPersonaIndex(value) {
         const number = Number(value);
         const chinese = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
@@ -1271,15 +1166,6 @@
           setStatus(`已删除角色：personas.${key}`);
         });
         return wrapper;
-      }
-
-
-      function escapeHtml(value) {
-        return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char] || char));
-      }
-
-      function escapeAttr(value) {
-        return escapeHtml(value);
       }
 
       function slugifyStateJournalKey(value, fallback = "") {
@@ -1898,15 +1784,6 @@
       }
 
       function buildCardPayload() {
-        const plotStages = {};
-        stageGridEl.querySelectorAll(".stage-card").forEach((card) => {
-          const key = String(card.dataset.stageKey || "").trim();
-          if (!key) return;
-          plotStages[key] = {
-            description: card.querySelector(`#stage-${key}-description`)?.value.trim() || "",
-            rules: card.querySelector(`#stage-${key}-rules`)?.value.trim() || "",
-          };
-        });
         const personas = {};
         personaGridEl.querySelectorAll(".persona-card").forEach((card) => {
           const key = card.dataset.personaKey;
@@ -1958,7 +1835,6 @@
           scenario: value("card-scenario"),
           creator_notes: value("card-creator-notes"),
           tags: value("card-tags").split(",").map((item) => item.trim()).filter(Boolean),
-          plotStages,
           personas,
           stateJournal: stripStateJournalDraftIds(normalizeStateJournalConfig(ensureStateJournalConfigReady())),
           creativeWorkshop,
@@ -1976,18 +1852,6 @@
         document.getElementById("card-creator-notes").value = card.creator_notes || "";
         document.getElementById("card-tags").value = Array.isArray(card.tags) ? card.tags.join(", ") : "";
         currentStateJournal = normalizeStateJournalConfig(card.stateJournal || {});
-
-        stageGridEl.innerHTML = "";
-        const stageEntries = Object.entries(card.plotStages || {}).sort((left, right) => {
-          return String(left[0]).localeCompare(String(right[0]), "zh-CN", { numeric: true });
-        });
-        if (stageEntries.length === 0) {
-          stageGridEl.appendChild(createStageBlock("A", {}));
-        } else {
-          stageEntries.forEach(([key, stage]) => {
-            stageGridEl.appendChild(createStageBlock(key, stage || {}));
-          });
-        }
 
         personaGridEl.innerHTML = "";
         const personaEntries = Object.entries(card.personas || {}).sort((left, right) => {
@@ -2210,13 +2074,6 @@
           button.textContent = originalText;
         }, 950);
       }
-
-      document.getElementById("add-stage").addEventListener("click", (event) => {
-        const key = getNextStageKey();
-        stageGridEl.appendChild(createStageBlock(key, {}));
-        setStatus(`已新增 plotStages.${key}`);
-        flashButtonFeedback(event.currentTarget, "已新增");
-      });
 
       document.getElementById("add-persona").addEventListener("click", (event) => {
         const key = getNextPersonaKey();

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preset - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-v140" />
+    <link rel="stylesheet" href="/static/styles.css?v=v161" />
     <style>
       .config-shell.compact {
         width: min(1760px, calc(100vw - 32px));
@@ -1154,9 +1154,9 @@
       </section>
     </div>
 
+    <script src="/static/js/app-core.js?v=v161"></script>
     <script>
-      const rootEl = document.documentElement;
-      const bodyEl = document.body;
+      const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
       const statusStripEl = document.getElementById("preset-status-strip");
       const presetListEl = document.getElementById("preset-list");
@@ -1180,10 +1180,6 @@
       let draggedCard = null;
       let dragIntentCard = null;
       const MODULE_MUTEX = { short_paragraph: ["long_paragraph"], long_paragraph: ["short_paragraph"], second_person: ["third_person"], third_person: ["second_person"] };
-
-      function escapeHtml(value) {
-        return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
-      }
 
       function generateId(prefix) {
         return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -1219,42 +1215,6 @@
 
       function markDirty(message = "有未保存修改，记得保存当前预设。") {
         setDirty(true, message);
-      }
-
-      function applyTheme(theme) {
-        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
-      }
-
-      function applyUiOpacity(value) {
-        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
-        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
-        const palette = theme === "dark"
-          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
-          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
-        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
-        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
-        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
-        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
-      }
-
-      function applyBackground(url, overlay) {
-        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
-        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
-        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
-      }
-
-      async function postJson(url, payload) {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.detail || "请求失败");
-        }
-        return response.json();
       }
 
       function getPresetById(id) {

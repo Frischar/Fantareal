@@ -240,7 +240,6 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "cards": ctx.list_role_card_files(),
                 "current_card": current_card,
                 "card_template": card_template,
-                "stage_items": list(card_template.get("plotStages", {}).items()),
                 "persona_items": list(card_template.get("personas", {}).items()),
                 "workshop_state": workshop_state,
                 "workshop_stage": ctx.get_workshop_stage(workshop_state.get("temp", 0)),
