@@ -68,10 +68,6 @@ PERSONA_FIELDS = [
     "creator_notes",
 ]
 
-PLOT_STAGE_DEFAULT = {
-    "description": "",
-    "rules": "",
-}
 
 PERSONA_SINGLE_DEFAULT = {
     "name": "",
@@ -114,7 +110,6 @@ PERSONA_CARD_DEFAULTS = {
         "enabled": True,
         "items": [],
     },
-    "plotStages": {},
     "personas": {"1": copy.deepcopy(PERSONA_SINGLE_DEFAULT)},
 }
 
@@ -439,7 +434,6 @@ class CardCompiler:
         card = copy.deepcopy(normalized["persona_card"])
         card["tags"] = split_tags(card.get("tags", []))
         card["creativeWorkshop"] = normalize_creative_workshop(card.get("creativeWorkshop"))
-        card["plotStages"] = normalize_plot_stage_map(card.get("plotStages"))
         card["personas"] = normalize_personas_map(card.get("personas"))
         return card
 
@@ -627,28 +621,8 @@ def normalize_text(value: Any) -> str:
     return str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
-def normalize_stage_item(key: str, stage: Any) -> dict[str, Any]:
-    raw = stage if isinstance(stage, dict) else {}
-    label = normalize_text(raw.get("label", "")) or key
-    return {
-        "label": label,
-        "description": normalize_text(raw.get("description", "")),
-        "rules": normalize_text(raw.get("rules", "")),
-    }
 
 
-def normalize_plot_stage_map(value: Any) -> dict[str, dict[str, Any]]:
-    if isinstance(value, dict):
-        items = value.items()
-    elif isinstance(value, list):
-        items = ((str(item.get("id") or item.get("label") or chr(ord("A") + index)).strip().upper(), item) for index, item in enumerate(value) if isinstance(item, dict))
-    else:
-        items = []
-    result: dict[str, dict[str, Any]] = {}
-    for key, item in items:
-        stage_key = str(key or "").strip().upper() or "A"
-        result[stage_key] = normalize_stage_item(stage_key, item)
-    return result
 
 
 def normalize_persona_single(value: Any) -> dict[str, Any]:
@@ -714,7 +688,6 @@ def normalize_persona_card(value: Any) -> dict[str, Any]:
         data[key] = normalize_text(raw.get(key, data[key]))
     data["tags"] = split_tags(raw.get("tags", []))
     data["creativeWorkshop"] = normalize_creative_workshop(raw.get("creativeWorkshop"))
-    data["plotStages"] = normalize_plot_stage_map(raw.get("plotStages"))
     data["personas"] = normalize_personas_map(raw.get("personas"))
     return data
 
@@ -1251,7 +1224,6 @@ def build_card_writer_json_schema() -> dict[str, Any]:
             "creator_notes": "string",
             "tags": ["string"],
             "creativeWorkshop": {"enabled": True, "items": [WORKSHOP_ITEM_DEFAULT]},
-            "plotStages": {"A": {"label": "string", "description": "string", "rules": "string"}},
             "personas": {"1": PERSONA_SINGLE_DEFAULT},
         },
         "worldbook": {"settings": WORLDBOOK_SETTINGS_DEFAULTS, "entries": [WORLDBOOK_ENTRY_DEFAULT]},
@@ -1711,13 +1683,11 @@ def normalize_old_project(payload: dict[str, Any]) -> dict[str, Any]:
     project = create_empty_project()
     card_raw = payload.get("card") if isinstance(payload.get("card"), dict) else {}
     personas_raw = payload.get("personas") if isinstance(payload.get("personas"), list) else []
-    plot_raw = payload.get("plot_stages") if isinstance(payload.get("plot_stages"), list) else []
     worldbooks_raw = payload.get("worldbooks") if isinstance(payload.get("worldbooks"), list) else []
     memories_raw = payload.get("memories") if isinstance(payload.get("memories"), list) else []
     presets_raw = payload.get("presets") if isinstance(payload.get("presets"), list) else []
 
     persona_map = normalize_personas_map(personas_raw)
-    plot_map = normalize_plot_stage_map(plot_raw)
     persona_card = {
         "name": normalize_text(card_raw.get("name")),
         "description": normalize_text(card_raw.get("description")),
@@ -1728,7 +1698,6 @@ def normalize_old_project(payload: dict[str, Any]) -> dict[str, Any]:
         "creator_notes": normalize_text(card_raw.get("creator_notes")),
         "tags": split_tags(card_raw.get("tags", [])),
         "creativeWorkshop": {"enabled": True, "items": []},
-        "plotStages": plot_map,
         "personas": persona_map,
     }
     project["version"] = as_int(payload.get("version"), 2)
@@ -1806,7 +1775,6 @@ def normalize_legacy_project(payload: dict[str, Any]) -> dict[str, Any]:
     basic = parse_basic(node_map.get("basic", ""))
     project = create_empty_project()
     persona_map = normalize_personas_map(parse_personas(node_map.get("personas", "")))
-    stage_map = normalize_plot_stage_map(parse_plot_stages(node_map.get("plot_stages", "")))
     project["version"] = 3
     project["type"] = PROJECT_TYPE
     project["title"] = normalize_text(payload.get("title")) or basic["name"]
@@ -1820,7 +1788,6 @@ def normalize_legacy_project(payload: dict[str, Any]) -> dict[str, Any]:
         "first_mes": node_map.get("first_mes", ""),
         "mes_example": node_map.get("mes_example", ""),
         "creator_notes": node_map.get("creator_notes", ""),
-        "plotStages": stage_map,
         "personas": persona_map,
     })
     return project
@@ -1840,33 +1807,6 @@ def parse_basic(content: str) -> dict[str, Any]:
         elif match := re.match(r"标签[：:]\s*(.*)", current):
             result["tags"] = split_tags(match.group(1).strip())
     return result
-
-
-def parse_plot_stages(content: str) -> list[dict[str, Any]]:
-    stages: list[dict[str, Any]] = []
-    text = normalize_text(content)
-    if not text:
-        return stages
-    blocks = re.split(r"\n+(?=阶段\s*[A-Za-z0-9])", text)
-    for block in blocks:
-        current = block.strip()
-        if not current:
-            continue
-        header = re.match(r"阶段\s*([A-Za-z0-9]+)[：:]\s*(.*)", current)
-        if not header:
-            continue
-        key = header.group(1).upper()
-        body = current[header.end():].strip()
-        description = ""
-        rules = ""
-        if match := re.search(r"描述[：:]\s*([\s\S]*?)(?=\n规则[：:]|\Z)", body):
-            description = match.group(1).strip()
-        if match := re.search(r"规则[：:]\s*([\s\S]*)", body):
-            rules = match.group(1).strip()
-        stages.append({"id": key, "label": header.group(2).strip() or key, "description": description, "rules": rules})
-    return stages
-
-
 def parse_personas(content: str) -> list[dict[str, Any]]:
     personas: list[dict[str, Any]] = []
     text = normalize_text(content)
