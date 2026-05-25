@@ -4283,8 +4283,10 @@ route_forwarding_runtime.install()
 
 route_ctx = SimpleNamespace(
     ALLOWED_IMAGE_SUFFIXES=ALLOWED_IMAGE_SUFFIXES,
+    ALLOWED_AUDIO_SUFFIXES=ALLOWED_AUDIO_SUFFIXES,
     CARDS_DIR=CARDS_DIR,
     EXPORT_DIR=EXPORT_DIR,
+    MAX_WORKSHOP_UPLOAD_SIZE_BYTES=MAX_WORKSHOP_UPLOAD_SIZE_BYTES,
     MAX_BACKGROUND_UPLOAD_SIZE_BYTES=MAX_BACKGROUND_UPLOAD_SIZE_BYTES,
     ALLOWED_FONT_SUFFIXES=ALLOWED_FONT_SUFFIXES,
     MAX_FONT_UPLOAD_SIZE_BYTES=MAX_FONT_UPLOAD_SIZE_BYTES,
@@ -4380,6 +4382,8 @@ route_ctx = SimpleNamespace(
     sprite_dir_path=sprite_dir_path,
     stream_model_reply=stream_model_reply,
     user_profile_path=user_profile_path,
+    workshop_asset_dir=workshop_asset_dir,
+    workshop_asset_url=workshop_asset_url,
     workshop_state_path=workshop_state_path,
     worldbook_path=worldbook_path,
     workshop_signature=workshop_signature,

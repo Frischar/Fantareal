@@ -2,11 +2,12 @@ import json
 import re
 from io import BytesIO
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
 import shutil
+import tempfile
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -47,6 +48,12 @@ MAX_MEMORY_BUNDLE_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_MEMORY_BUNDLE_ENTRY_BYTES = 5 * 1024 * 1024
 MAX_MEMORY_BUNDLE_TOTAL_BYTES = 12 * 1024 * 1024
 MAX_MEMORY_BUNDLE_FILE_COUNT = 8
+MAX_CAMPAIGN_BUNDLE_UPLOAD_BYTES = 200 * 1024 * 1024
+WORKSHOP_MEDIA_MANIFEST = "media_manifest.json"
+WORKSHOP_MEDIA_PREFIXES = {
+    "/static/uploads/workshop/image/": "image",
+    "/static/uploads/workshop/music/": "music",
+}
 MEMORY_BUNDLE_ALLOWED_FILENAMES = {
     "memories.json",
     "merged_memories.json",
@@ -191,6 +198,259 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         )
         safe_name = re.sub(r'[\\/:*?"<>|]+', "_", display_name).strip(" ._") or "当前角色"
         return safe_name[:64], current_card, card
+
+    def parse_bundle_option(value: Any, default: bool = True) -> bool:
+        if value is None:
+            return default
+        return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+    def get_nested_value(payload: Any, path: str) -> Any:
+        current = payload
+        for part in path.split("."):
+            if isinstance(current, list):
+                if not part.isdigit():
+                    return None
+                index = int(part)
+                if index < 0 or index >= len(current):
+                    return None
+                current = current[index]
+                continue
+            if not isinstance(current, dict) or part not in current:
+                return None
+            current = current[part]
+        return current
+
+    def set_nested_value(payload: Any, path: str, value: Any) -> bool:
+        parts = path.split(".")
+        current = payload
+        for part in parts[:-1]:
+            if isinstance(current, list):
+                if not part.isdigit():
+                    return False
+                index = int(part)
+                if index < 0 or index >= len(current):
+                    return False
+                current = current[index]
+                continue
+            if not isinstance(current, dict) or part not in current:
+                return False
+            current = current[part]
+        final = parts[-1]
+        if isinstance(current, list):
+            if not final.isdigit():
+                return False
+            index = int(final)
+            if index < 0 or index >= len(current):
+                return False
+            current[index] = value
+            return True
+        if not isinstance(current, dict) or final not in current:
+            return False
+        current[final] = value
+        return True
+
+    def iter_workshop_media_fields(card: dict[str, Any]) -> list[tuple[str, str]]:
+        workshop = card.get("creativeWorkshop", {}) if isinstance(card, dict) else {}
+        if not isinstance(workshop, dict):
+            return []
+
+        fields: list[tuple[str, str]] = []
+        base_paths = [
+            "creativeWorkshop.opening.coverImage",
+            "creativeWorkshop.opening.musicUrl",
+            "creativeWorkshop.ambience.background.imageUrl",
+            "creativeWorkshop.ambience.music.url",
+            "creativeWorkshop.ambience.ambient.url",
+        ]
+        for path in base_paths:
+            value = get_nested_value(card, path)
+            if isinstance(value, str) and value.strip():
+                fields.append((path, value.strip()))
+
+        scenes = workshop.get("dynamicScenes", [])
+        if isinstance(scenes, list):
+            for index, _scene in enumerate(scenes):
+                for suffix in [
+                    "content.imageUrl",
+                    "content.soundUrl",
+                    "content.backgroundUrl",
+                    "audio.url",
+                ]:
+                    path = f"creativeWorkshop.dynamicScenes.{index}.{suffix}"
+                    value = get_nested_value(card, path)
+                    if isinstance(value, str) and value.strip():
+                        fields.append((path, value.strip()))
+        return fields
+
+    def classify_workshop_media_url(url: str) -> tuple[str, str] | None:
+        text = str(url or "").strip()
+        for prefix, kind in WORKSHOP_MEDIA_PREFIXES.items():
+            if text.startswith(prefix):
+                filename = text.removeprefix(prefix).strip()
+                if filename and "/" not in filename and "\\" not in filename:
+                    return kind, filename
+        return None
+
+    def workshop_media_zip_path(kind: str, filename: str) -> str:
+        safe_name = Path(str(filename or "")).name
+        normalized_kind = "image" if kind == "image" else "music"
+        return f"media/workshop/{normalized_kind}/{safe_name}"
+
+    def is_safe_workshop_media_zip_path(name: str, kind: str) -> bool:
+        if not name or "\\" in name or name.startswith("/") or re.match(r"^[A-Za-z]:", name):
+            return False
+        path = PurePosixPath(name)
+        parts = path.parts
+        if ".." in parts or len(parts) != 4:
+            return False
+        return parts[:3] == ("media", "workshop", "image" if kind == "image" else "music") and bool(parts[3])
+
+    def allowed_workshop_media_suffix(kind: str, filename: str) -> bool:
+        suffix = Path(str(filename or "")).suffix.lower()
+        allowed = ctx.ALLOWED_IMAGE_SUFFIXES if kind == "image" else ctx.ALLOWED_AUDIO_SUFFIXES
+        return suffix in allowed
+
+    def collect_workshop_media_for_export(card: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
+        items: list[dict[str, Any]] = []
+        skipped: list[str] = []
+        seen: set[str] = set()
+
+        for field_path, url in iter_workshop_media_fields(card):
+            classified = classify_workshop_media_url(url)
+            if not classified:
+                if url.startswith("/static/") or url.startswith("/assets/") or ":" in url or url.startswith("/"):
+                    skipped.append(f"{field_path}: 非可打包本地演出资源，已跳过（{url}）")
+                continue
+            kind, filename = classified
+            if not allowed_workshop_media_suffix(kind, filename):
+                skipped.append(f"{field_path}: 文件类型不支持，已跳过（{url}）")
+                continue
+            source = ctx.workshop_asset_dir(kind) / filename
+            try:
+                if not source.is_file():
+                    skipped.append(f"{field_path}: 文件不存在，已跳过（{url}）")
+                    continue
+                size = source.stat().st_size
+            except OSError:
+                skipped.append(f"{field_path}: 文件无法读取，已跳过（{url}）")
+                continue
+            if size > ctx.MAX_WORKSHOP_UPLOAD_SIZE_BYTES:
+                skipped.append(f"{field_path}: 文件超过 25 MB，已跳过（{url}）")
+                continue
+
+            zip_path = workshop_media_zip_path(kind, filename)
+            dedupe_key = f"{field_path}\0{zip_path}"
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            items.append(
+                {
+                    "field": field_path,
+                    "url": url,
+                    "kind": kind,
+                    "filename": filename,
+                    "zip_path": zip_path,
+                    "size": size,
+                    "source_path": source,
+                }
+            )
+        return items, skipped
+
+    def make_import_media_filename(original: str, existing_target: Path) -> str:
+        stem = ctx.sanitize_sprite_filename_tag(Path(original).stem) or "workshop_asset"
+        suffix = Path(original).suffix.lower()
+        if not existing_target.exists():
+            return existing_target.name
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        return f"{timestamp}_{uuid4().hex[:8]}_{stem}{suffix}"
+
+    def restore_workshop_media_from_bundle(archive: ZipFile, card: dict[str, Any]) -> dict[str, Any]:
+        summary: dict[str, Any] = {"restored": 0, "skipped": 0, "skipped_items": []}
+        if WORKSHOP_MEDIA_MANIFEST not in archive.namelist():
+            summary["available"] = False
+            return summary
+
+        summary["available"] = True
+        try:
+            manifest = json.loads(archive.read(WORKSHOP_MEDIA_MANIFEST).decode("utf-8"))
+        except Exception:
+            summary["skipped"] += 1
+            summary["skipped_items"].append("media_manifest.json 无法读取，已跳过媒体恢复。")
+            return summary
+
+        items = manifest.get("items", []) if isinstance(manifest, dict) else []
+        if not isinstance(items, list):
+            summary["skipped"] += 1
+            summary["skipped_items"].append("media_manifest.json 格式不正确，已跳过媒体恢复。")
+            return summary
+
+        names = set(archive.namelist())
+        restored_urls: dict[str, str] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                summary["skipped"] += 1
+                summary["skipped_items"].append("媒体清单项目格式不正确，已跳过。")
+                continue
+            field_path = str(item.get("field", "")).strip()
+            kind = str(item.get("kind", "")).strip().lower()
+            zip_path = str(item.get("zip_path", "")).strip()
+            original_name = Path(str(item.get("filename", "") or PurePosixPath(zip_path).name)).name
+            if kind not in {"image", "music"} or not field_path:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体清单项目缺少必要字段，已跳过（{zip_path or original_name}）。")
+                continue
+            if not is_safe_workshop_media_zip_path(zip_path, kind) or zip_path not in names:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体路径不安全或不存在，已跳过（{zip_path}）。")
+                continue
+            if not allowed_workshop_media_suffix(kind, original_name):
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体类型不支持，已跳过（{original_name}）。")
+                continue
+            if zip_path in restored_urls:
+                if set_nested_value(card, field_path, restored_urls[zip_path]):
+                    continue
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体已恢复但角色卡字段未能重写（{field_path}）。")
+                continue
+            info = archive.getinfo(zip_path)
+            if info.is_dir() or info.file_size > ctx.MAX_WORKSHOP_UPLOAD_SIZE_BYTES:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件超过 25 MB 或不是文件，已跳过（{zip_path}）。")
+                continue
+
+            try:
+                content = archive.read(zip_path)
+            except Exception:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件读取失败，已跳过（{zip_path}）。")
+                continue
+            if not content or len(content) > ctx.MAX_WORKSHOP_UPLOAD_SIZE_BYTES:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件为空或超过 25 MB，已跳过（{zip_path}）。")
+                continue
+
+            target_dir = ctx.workshop_asset_dir(kind)
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / original_name
+            target_name = make_import_media_filename(original_name, target)
+            target = target_dir / target_name
+            try:
+                target.write_bytes(content)
+            except OSError:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件写入失败，已跳过（{original_name}）。")
+                continue
+
+            new_url = ctx.workshop_asset_url(kind, target.name)
+            if not set_nested_value(card, field_path, new_url):
+                target.unlink(missing_ok=True)
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体已恢复但角色卡字段未能重写（{field_path}）。")
+                continue
+            restored_urls[zip_path] = new_url
+            summary["restored"] += 1
+        return summary
 
     @app.get("/api/user-profile")
     async def api_get_user_profile() -> dict[str, Any]:
@@ -1112,25 +1372,56 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         )
 
     @app.get("/api/export/current-bundle")
-    async def api_export_current_bundle() -> FileResponse:
+    async def api_export_current_bundle(
+        memories: str | None = "1",
+        worldbook: str | None = "1",
+        preset: str | None = "1",
+        media: str | None = "1",
+    ) -> FileResponse:
         ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
         bundle_label, current_card, card = build_bundle_label()
         export_path = ctx.EXPORT_DIR / f"{bundle_label}存档.zip"
 
-        memories_payload = {"items": ctx.get_memories()}
-        worldbook_payload = ctx.get_worldbook_store()
-        preset_payload = ctx.get_preset_store()
+        include_memories = parse_bundle_option(memories, True)
+        include_worldbook = parse_bundle_option(worldbook, True)
+        include_preset = parse_bundle_option(preset, True)
+        include_media = parse_bundle_option(media, True)
+
         manifest_lines = [
             f"导出角色：{bundle_label}",
             "",
             f"1. {bundle_label}的人设卡.json",
-            f"2. {bundle_label}的记忆.json",
-            f"3. {bundle_label}的世界书.json",
-            f"4. {bundle_label}的预设.json",
-            "",
-            f"原始角色卡文件：{str(current_card.get('source_name', '')).strip() or '未命名角色卡'}",
-            f"导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         ]
+        if include_memories:
+            manifest_lines.append(f"2. {bundle_label}的记忆.json")
+        if include_worldbook:
+            manifest_lines.append(f"3. {bundle_label}的世界书.json")
+        if include_preset:
+            manifest_lines.append(f"4. {bundle_label}的预设.json")
+        manifest_lines.extend(
+            [
+                "",
+                f"原始角色卡文件：{str(current_card.get('source_name', '')).strip() or '未命名角色卡'}",
+                f"导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            ]
+        )
+
+        media_items: list[dict[str, Any]] = []
+        media_skipped: list[str] = []
+        if include_media:
+            media_items, media_skipped = collect_workshop_media_for_export(card)
+            total_media_size = sum(int(item.get("size", 0) or 0) for item in media_items)
+            manifest_lines.extend(
+                [
+                    "",
+                    f"已打包本地演出资源：{len({item['zip_path'] for item in media_items})} 个，共 {total_media_size / 1024 / 1024:.2f} MB",
+                ]
+            )
+            if media_skipped:
+                manifest_lines.append("以下本地演出资源未打包：")
+                manifest_lines.extend(f"- {item}" for item in media_skipped)
+        else:
+            manifest_lines.extend(["", "本次未勾选本地演出资源，封面、背景和音乐文件不会随包迁移。"])
 
         try:
             with ZipFile(export_path, "w", compression=ZIP_DEFLATED) as archive:
@@ -1138,18 +1429,37 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                     f"{bundle_label}的人设卡.json",
                     json.dumps(card, ensure_ascii=False, indent=2),
                 )
-                archive.writestr(
-                    f"{bundle_label}的记忆.json",
-                    json.dumps(memories_payload, ensure_ascii=False, indent=2),
-                )
-                archive.writestr(
-                    f"{bundle_label}的世界书.json",
-                    json.dumps(worldbook_payload, ensure_ascii=False, indent=2),
-                )
-                archive.writestr(
-                    f"{bundle_label}的预设.json",
-                    json.dumps(preset_payload, ensure_ascii=False, indent=2),
-                )
+                if include_memories:
+                    archive.writestr(
+                        f"{bundle_label}的记忆.json",
+                        json.dumps({"items": ctx.get_memories()}, ensure_ascii=False, indent=2),
+                    )
+                if include_worldbook:
+                    archive.writestr(
+                        f"{bundle_label}的世界书.json",
+                        json.dumps(ctx.get_worldbook_store(), ensure_ascii=False, indent=2),
+                    )
+                if include_preset:
+                    archive.writestr(
+                        f"{bundle_label}的预设.json",
+                        json.dumps(ctx.get_preset_store(), ensure_ascii=False, indent=2),
+                    )
+                if include_media and media_items:
+                    manifest_items = [
+                        {key: value for key, value in item.items() if key != "source_path"}
+                        for item in media_items
+                    ]
+                    archive.writestr(
+                        WORKSHOP_MEDIA_MANIFEST,
+                        json.dumps({"version": 1, "items": manifest_items}, ensure_ascii=False, indent=2),
+                    )
+                    written_paths: set[str] = set()
+                    for item in media_items:
+                        zip_path = str(item.get("zip_path", ""))
+                        if zip_path in written_paths:
+                            continue
+                        written_paths.add(zip_path)
+                        archive.write(item["source_path"], zip_path)
                 archive.writestr(
                     f"{bundle_label}的导出说明.txt",
                     "\n".join(manifest_lines),
@@ -1168,20 +1478,32 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         )
 
     @app.post("/api/import/bundle")
-    async def api_import_bundle(file: UploadFile = File(...)) -> dict[str, Any]:
+    async def api_import_bundle(
+        file: UploadFile = File(...),
+        overwrite: str | None = None,
+    ) -> dict[str, Any]:
         """导入四卡完整存档 ZIP 包"""
         suffix = Path(file.filename or "").suffix.lower()
         if suffix != ".zip":
             raise HTTPException(status_code=400, detail="请选择 .zip 格式的存档文件。")
 
-        content = await file.read(50 * 1024 * 1024 + 1)
-        if len(content) > 50 * 1024 * 1024:
-            raise HTTPException(status_code=413, detail="文件大小不能超过 50 MB。")
-
         active_slot = ctx.get_active_slot_id()
 
+        tmp_path: Path | None = None
         try:
-            with ZipFile(BytesIO(content)) as archive:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                tmp_path = Path(tmp.name)
+                total = 0
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_CAMPAIGN_BUNDLE_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="文件大小不能超过 200 MB。")
+                    tmp.write(chunk)
+
+            with ZipFile(tmp_path) as archive:
                 namelist = archive.namelist()
 
                 def read_json(name: str) -> dict[str, Any] | None:
@@ -1191,50 +1513,68 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                         return None
 
                 role_card = None
-                memories = None
-                worldbook = None
-                preset = None
+                memories_payload = None
+                worldbook_payload = None
+                preset_payload = None
 
                 for name in namelist:
                     if "人设卡" in name and name.endswith(".json"):
                         role_card = read_json(name)
                     elif "记忆" in name and name.endswith(".json"):
-                        memories = read_json(name)
+                        memories_payload = read_json(name)
                     elif "世界书" in name and name.endswith(".json"):
-                        worldbook = read_json(name)
+                        worldbook_payload = read_json(name)
                     elif "预设" in name and name.endswith(".json"):
-                        preset = read_json(name)
+                        preset_payload = read_json(name)
 
                 if role_card is None:
                     raise HTTPException(status_code=400, detail="存档包中未找到人设卡文件。")
-
-                if isinstance(memories, dict) and "items" in memories:
-                    ctx.save_memories(memories.get("items", []), active_slot)
-                elif isinstance(memories, list):
-                    ctx.save_memories(memories, active_slot)
-
-                if isinstance(worldbook, dict):
-                    ctx.save_worldbook_store(worldbook, active_slot)
-
-                if isinstance(preset, dict):
-                    ctx.save_preset_store(preset, active_slot)
 
                 source_name = "imported_bundle.json"
                 for name in namelist:
                     if name.endswith(".json") and "人设卡" in name:
                         source_name = normalize_card_filename(Path(name).name)
                         break
+
+                target_card_path = ctx.CARDS_DIR / Path(source_name).name
+                if target_card_path.exists() and overwrite != "1":
+                    return {
+                        "ok": False,
+                        "conflict": True,
+                        "card_name": source_name,
+                        "detail": f"角色卡列表中已存在「{source_name}」，是否覆盖？",
+                    }
+
+                media_summary = restore_workshop_media_from_bundle(archive, role_card)
+
+                if isinstance(memories_payload, dict) and "items" in memories_payload:
+                    ctx.save_memories(memories_payload.get("items", []), active_slot)
+                elif isinstance(memories_payload, list):
+                    ctx.save_memories(memories_payload, active_slot)
+
+                if isinstance(worldbook_payload, dict):
+                    ctx.save_worldbook_store(worldbook_payload, active_slot)
+
+                if isinstance(preset_payload, dict):
+                    ctx.save_preset_store(preset_payload, active_slot)
+
                 card_to_apply, workshop_preserved = preserve_existing_workshop_when_importing(role_card, source_name)
 
                 result = ctx.apply_role_card(card_to_apply, source_name=source_name, slot_id=active_slot)
+                ctx.persist_json(
+                    target_card_path,
+                    result.get("card", {}).get("raw", card_to_apply),
+                    detail="保存导入的角色卡到卡片目录失败。",
+                )
                 result["workshop"] = ctx.evaluate_creative_workshop(slot_id=active_slot, reason="import")
                 result["ok"] = True
                 result["workshop_preserved"] = workshop_preserved
                 result["imported_files"] = {
                     "role_card": source_name,
-                    "memories": bool(memories),
-                    "worldbook": bool(worldbook),
-                    "preset": bool(preset),
+                    "memories": bool(memories_payload),
+                    "worldbook": bool(worldbook_payload),
+                    "preset": bool(preset_payload),
+                    "media": media_summary,
                 }
                 return result
 
@@ -1243,6 +1583,9 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         except Exception as exc:
             ctx.logger.exception("Bundle import failed")
             raise HTTPException(status_code=500, detail=f"导入存档失败：{exc}") from exc
+        finally:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
 
     @app.get("/api/logs/export")
     async def api_export_logs() -> FileResponse:
