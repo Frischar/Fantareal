@@ -277,7 +277,6 @@ def convert_card_to_xuqi(tavern_data: dict) -> tuple[dict, list[str]]:
         "scenario": scenario,
         "creator_notes": merged_notes,
         "tags": tags,
-        "plotStages": {},
         "personas": {
             "1": {
                 "name": name,
