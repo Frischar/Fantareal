@@ -2051,15 +2051,6 @@ def repair_deepseek_card_json(text: str) -> str:
 
     repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
 
-    marker = '"plotStages"'
-    if marker in repaired:
-        marker_index = repaired.find(marker)
-        close_index = repaired.rfind("}", 0, marker_index)
-        open_index = repaired.rfind("{", 0, marker_index)
-        if close_index != -1 and open_index != -1 and close_index > open_index:
-            repaired = repaired[:close_index] + repaired[close_index + 1 :]
-            repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
-
     return repaired
 
 
@@ -2080,7 +2071,7 @@ def extract_role_card_payload(data: Any) -> dict[str, Any]:
         return {}
 
     merged = dict(candidate)
-    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "stateJournal", "creativeWorkshop", "plotStages", "personas"]:
+    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "stateJournal", "creativeWorkshop", "personas"]:
         if not merged.get(key) and data.get(key):
             merged[key] = data.get(key)
 

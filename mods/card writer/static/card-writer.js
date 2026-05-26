@@ -601,7 +601,6 @@
         creator_notes: "",
         tags: [],
         creativeWorkshop: { enabled: true, items: [] },
-        plotStages: {},
         personas: { "1": { name: "", description: "", personality: "", scenario: "", creator_notes: "" } },
       },
       worldbook: {
@@ -650,7 +649,6 @@
       enabled: Boolean(merged.persona_card.creativeWorkshop?.enabled ?? true),
       items: Array.isArray(merged.persona_card.creativeWorkshop?.items) ? merged.persona_card.creativeWorkshop.items.map(normalizeWorkshopItem) : [],
     };
-    merged.persona_card.plotStages = normalizeStageMap(merged.persona_card.plotStages || {});
     merged.persona_card.personas = normalizePersonaMap(merged.persona_card.personas || {});
 
     merged.worldbook = merged.worldbook || {};
@@ -679,33 +677,6 @@
     if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
     return String(value || "").split(/[、，,]/).map((item) => item.trim()).filter(Boolean);
   }
-
-  function normalizeStageMap(value) {
-    const result = {};
-    if (Array.isArray(value)) {
-      value.forEach((item, index) => {
-        const key = String(item?.id || item?.label || String.fromCharCode(65 + index)).trim().toUpperCase() || "A";
-        result[key] = {
-          label: String(item?.label || key),
-          description: String(item?.description || ""),
-          rules: String(item?.rules || ""),
-        };
-      });
-      return result;
-    }
-    Object.entries(value || {}).forEach(([key, item]) => {
-      result[String(key).trim().toUpperCase() || "A"] = {
-        label: String(item?.label || key),
-        description: String(item?.description || ""),
-        rules: String(item?.rules || ""),
-      };
-    });
-    if (!Object.keys(result).length) {
-      result.A = { label: "A", description: "", rules: "" };
-    }
-    return result;
-  }
-
   function normalizePersonaMap(value) {
     const result = {};
     if (Array.isArray(value)) {
@@ -901,7 +872,7 @@
 
   function renderSidebarMeta() {
     $("#projectTitle").value = project.title || "";
-    const totalBlocks = project.worldbook.entries.length + project.memory.items.length + project.preset.presets.length + project.persona_card.creativeWorkshop.items.length + Object.keys(project.persona_card.plotStages).length;
+    const totalBlocks = project.worldbook.entries.length + project.memory.items.length + project.preset.presets.length + project.persona_card.creativeWorkshop.items.length;
     $("#editorStats").textContent = `${totalBlocks} 个块`;
   }
 
@@ -933,36 +904,6 @@
         <div class="detail-fields-grid">
           ${PERSONA_FIELDS.map((field) => renderFieldControl(field, getAtPath(project, `persona_card.${field.key}`), { path: `persona_card.${field.key}` })).join("")}
           ${renderFieldControl({ key: "tags", label: "标签", type: "tags", spanTwo: true }, project.persona_card.tags, { path: "persona_card.tags" })}
-        </div>
-      </div>
-
-      <div class="editor-card">
-        <div class="card-header-solo">
-          <div>
-            <h3>剧情阶段</h3>
-            <p class="muted">保留对象结构，但做成更顺手的分块编辑。</p>
-          </div>
-          <div class="inline-actions">
-            <button class="ghost-button compact" type="button" data-action="add-stage">+ 阶段</button>
-          </div>
-        </div>
-        <div class="stack-list">
-          ${Object.entries(project.persona_card.plotStages).map(([stageKey, stage]) => `
-            <section class="sub-card">
-              <div class="sub-card-head">
-                <strong>${escHtml(stageKey)}</strong>
-                <div class="inline-actions">
-                  <button class="ghost-button compact" type="button" data-action="rename-stage" data-stage-key="${escAttr(stageKey)}">改名</button>
-                  <button class="ghost-button compact danger" type="button" data-action="remove-stage" data-stage-key="${escAttr(stageKey)}">删除</button>
-                </div>
-              </div>
-              <div class="detail-fields-grid">
-                ${renderFieldControl({ key: "label", label: "阶段标题", type: "text" }, stage.label, { path: `persona_card.plotStages.${stageKey}.label` })}
-                ${renderFieldControl({ key: "description", label: "阶段描述", type: "textarea", rows: 4, spanTwo: true }, stage.description, { path: `persona_card.plotStages.${stageKey}.description` })}
-                ${renderFieldControl({ key: "rules", label: "阶段规则", type: "textarea", rows: 4, spanTwo: true }, stage.rules, { path: `persona_card.plotStages.${stageKey}.rules` })}
-              </div>
-            </section>
-          `).join("")}
         </div>
       </div>
 
@@ -2239,22 +2180,7 @@
 
     let revealBrowserType = "";
 
-    if (action === "add-stage") {
-      const nextKey = getNextStageKey();
-      project.persona_card.plotStages[nextKey] = { label: nextKey, description: "", rules: "" };
-    } else if (action === "rename-stage") {
-      const oldKey = button.dataset.stageKey;
-      const next = window.prompt("新的阶段 key", oldKey || "")?.trim().toUpperCase();
-      if (next && next !== oldKey) {
-        project.persona_card.plotStages[next] = project.persona_card.plotStages[oldKey];
-        delete project.persona_card.plotStages[oldKey];
-      }
-    } else if (action === "remove-stage") {
-      delete project.persona_card.plotStages[button.dataset.stageKey];
-      if (!Object.keys(project.persona_card.plotStages).length) {
-        project.persona_card.plotStages.A = { label: "A", description: "", rules: "" };
-      }
-    } else if (action === "add-workshop") {
+    if (action === "add-workshop") {
       project.persona_card.creativeWorkshop.items.push(normalizeWorkshopItem({}));
     } else if (action === "remove-workshop") {
       project.persona_card.creativeWorkshop.items.splice(index, 1);
@@ -2367,16 +2293,6 @@
     if (name) return name;
     return `分身 ${index + 1} · key=${personaKey}`;
   }
-
-  function getNextStageKey() {
-    const keys = Object.keys(project.persona_card.plotStages || {});
-    for (let code = 65; code <= 90; code += 1) {
-      const key = String.fromCharCode(code);
-      if (!keys.includes(key)) return key;
-    }
-    return `S${keys.length + 1}`;
-  }
-
   function getNextPersonaKey() {
     const keys = new Set(Object.keys(project.persona_card.personas || {}));
     let next = 1;
@@ -2862,17 +2778,6 @@
       html += `<h4>${label}</h4>`;
       html += `<div class="field-val">${value ? escHtml(String(value)) : '<span class="muted">未填写</span>'}</div>`;
     });
-
-    if (card.plotStages && Object.keys(card.plotStages).length) {
-      html += "<h4>剧情阶段</h4>";
-      Object.entries(card.plotStages).forEach(([key, value]) => {
-        html += `<div class="field-val"><strong>${escHtml(key)}</strong> · ${escHtml(value.label || "")}`;
-        if (value.description) html += `<br>${escHtml(value.description)}`;
-        if (value.rules) html += `<br><span class="muted">规则：</span>${escHtml(value.rules)}`;
-        html += "</div>";
-      });
-    }
-
     if (card.personas && Object.keys(card.personas).length) {
       html += "<h4>Persona</h4>";
       Object.entries(card.personas).forEach(([key, value]) => {

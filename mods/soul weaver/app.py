@@ -232,11 +232,6 @@ ROLE_CARD_PROMPT = """你是 余声的角色卡生成引擎。
       }
     ]
   },
-  "plotStages": {
-    "A": { "description": "早期/防备阶段详细描述（至少200字）", "rules": "阶段规则" },
-    "B": { "description": "熟悉阶段详细描述（至少200字）", "rules": "阶段规则" },
-    "C": { "description": "真结局后详细描述（至少200字）", "rules": "阶段规则" }
-  },
   "personas": {
     "1": {
       "name": "Main Persona",
@@ -1145,11 +1140,6 @@ def normalize_role_card(raw: dict[str, Any], character_name: str) -> dict[str, A
             })
     workshop["items"] = normalized_items
     card["creativeWorkshop"] = workshop
-    card.setdefault("plotStages", {
-        "A": {"description": "", "rules": ""},
-        "B": {"description": "", "rules": ""},
-        "C": {"description": "", "rules": ""},
-    })
     card.setdefault("personas", {
         "1": {
             "name": "Main Persona",
