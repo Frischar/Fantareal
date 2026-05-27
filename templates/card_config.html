@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Card Config - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   
     <style id="ui-unify-v1">
       body.modern-setting-page {
@@ -372,7 +373,7 @@
 
 
   </head>
-  <body class="modern-setting-page card-config-page app-sidebar-shell">
+  <body class="modern-setting-page card-config-page app-sidebar-shell pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">

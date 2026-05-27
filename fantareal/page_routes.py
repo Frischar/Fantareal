@@ -182,6 +182,14 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             build_chat_template_context(),
         )
 
+    @app.get("/mobile", response_class=HTMLResponse)
+    async def mobile_index(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "mobile_index.html",
+            build_chat_template_context(),
+        )
+
     @app.get("/config", response_class=HTMLResponse)
     async def config_page(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(
@@ -191,6 +199,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "settings": ctx.get_settings(),
                 "memory_count": len(ctx.get_memories()),
                 "current_card": ctx.get_current_card(),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -211,6 +220,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "active_preset": active_preset,
                 "preset_count": len(preset_store.get("presets", [])),
                 "preset_modules": preset_modules,
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -222,6 +232,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             {
                 "settings": ctx.get_settings(),
                 "user_profile": ctx.get_user_profile(),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -243,6 +254,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "persona_items": list(card_template.get("personas", {}).items()),
                 "workshop_state": workshop_state,
                 "workshop_stage": ctx.get_workshop_stage(workshop_state.get("temp", 0)),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -262,6 +274,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "card_template": card_template,
                 "workshop_state": workshop_state,
                 "workshop_stage": ctx.get_workshop_stage(workshop_state.get("temp", 0)),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -274,6 +287,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "settings": ctx.get_settings(),
                 "route_forwarding": ctx.get_route_forwarding_config(),
                 "route_forwarding_stats": ctx.get_route_forwarding_runtime_stats(),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -286,6 +300,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "settings": ctx.get_settings(),
                 "memories": ctx.get_memories(),
                 "memory_count": len(ctx.get_memories()),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -297,6 +312,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             {
                 "settings": ctx.get_settings(),
                 "worldbook_settings": ctx.get_worldbook_settings(),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -310,6 +326,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "worldbook_settings": ctx.get_worldbook_settings(),
                 "worldbook_entries": ctx.get_worldbook_entries(),
                 "worldbook_count": len(ctx.get_worldbook_entries()),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -324,6 +341,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
                 "sprite_count": len(ctx.list_sprite_assets()),
                 "sprite_base_path": ctx.default_sprite_base_path_for_slot(),
                 "role_avatar_url": ctx.get_role_avatar_url(),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
@@ -334,6 +352,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             "about.html",
             {
                 "settings": ctx.get_settings(),
+                "force_mobile_shell": request.query_params.get("mobile") == "1",
             },
         )
 
