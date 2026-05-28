@@ -460,3 +460,188 @@ body.modern-setting-page.card-config-page .card-add-button.is-feedback {
   }
 }
 
+/* Card editor v1.0.0: PE soft-canvas pass.
+   The card page was visually split into too many hard nested panels. This layer
+   keeps the editor dense, but blends blocks into one continuous glass workbench. */
+body.modern-setting-page.card-config-page {
+  --card-pe-radius-xl: 26px;
+  --card-pe-radius-lg: 20px;
+  --card-pe-radius-md: 16px;
+  --card-pe-border: color-mix(in srgb, var(--accent) 18%, var(--line) 82%);
+  --card-pe-border-soft: color-mix(in srgb, var(--line) 54%, transparent 46%);
+  --card-pe-surface: color-mix(in srgb, var(--panel-strong) 58%, transparent 42%);
+  --card-pe-surface-soft: color-mix(in srgb, var(--panel) 36%, transparent 64%);
+  --card-pe-field: color-mix(in srgb, var(--input-bg) 74%, transparent 26%);
+  --card-pe-shadow: 0 18px 46px rgba(0, 0, 0, 0.16);
+}
+
+html[data-theme="dark"] body.modern-setting-page.card-config-page {
+  --card-pe-border: color-mix(in srgb, #78b7ff 24%, var(--line) 76%);
+  --card-pe-border-soft: rgba(152, 190, 233, 0.13);
+  --card-pe-surface: rgba(22, 33, 45, 0.52);
+  --card-pe-surface-soft: rgba(18, 27, 37, 0.34);
+  --card-pe-field: rgba(13, 20, 28, 0.46);
+  --card-pe-shadow: 0 22px 56px rgba(0, 0, 0, 0.26);
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type {
+  border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 34%),
+    linear-gradient(180deg, var(--card-pe-surface), var(--card-pe-surface-soft));
+  box-shadow: var(--card-pe-shadow);
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.card-builder {
+  padding: 18px;
+  border-color: var(--card-pe-border);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 84% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 32%),
+    linear-gradient(180deg, var(--card-pe-surface), var(--card-pe-surface-soft));
+  box-shadow: var(--card-pe-shadow);
+  overflow: hidden;
+}
+
+body.modern-setting-page.card-config-page .card-workbench {
+  border-color: var(--card-pe-border-soft);
+  border-radius: var(--card-pe-radius-xl);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 46%, transparent 54%),
+      color-mix(in srgb, var(--input-bg) 28%, transparent 72%));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 30px rgba(0, 0, 0, 0.08);
+}
+
+body.modern-setting-page.card-config-page .card-builder > .card-grid,
+body.modern-setting-page.card-config-page .card-builder > .persona-toolbar,
+body.modern-setting-page.card-config-page .card-builder > .card-persona-grid,
+body.modern-setting-page.card-config-page .card-builder > .card-state-journal-panel {
+  position: relative;
+  z-index: 1;
+}
+
+body.modern-setting-page.card-config-page .card-grid {
+  gap: 16px;
+  align-items: start;
+}
+
+body.modern-setting-page.card-config-page .card-column {
+  gap: 16px;
+}
+
+body.modern-setting-page.card-config-page .card-block,
+body.modern-setting-page.card-config-page .sub-block {
+  border-color: var(--card-pe-border-soft);
+  border-radius: var(--card-pe-radius-lg);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 40%, transparent 60%),
+      color-mix(in srgb, var(--panel) 28%, transparent 72%));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 10px 24px rgba(0, 0, 0, 0.055);
+}
+
+body.modern-setting-page.card-config-page .card-grid > .card-column > .card-block {
+  height: auto;
+}
+
+body.modern-setting-page.card-config-page .card-block h3,
+body.modern-setting-page.card-config-page .persona-toolbar h3 {
+  color: color-mix(in srgb, var(--text) 92%, var(--accent) 8%);
+  font-size: 1.04rem;
+  letter-spacing: 0;
+}
+
+body.modern-setting-page.card-config-page .persona-toolbar {
+  min-height: 48px;
+  margin-top: 2px;
+  padding: 2px 2px 0;
+}
+
+body.modern-setting-page.card-config-page .card-item-head {
+  min-height: 44px;
+  padding: 8px 10px;
+  border-color: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: var(--card-pe-radius-md);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      color-mix(in srgb, var(--input-bg) 32%, transparent));
+  box-shadow: none;
+}
+
+body.modern-setting-page.card-config-page .card-field-tip {
+  margin: -2px 0 2px;
+  color: color-mix(in srgb, var(--muted) 92%, var(--text) 8%);
+}
+
+body.modern-setting-page.card-config-page .card-builder input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body.modern-setting-page.card-config-page .card-builder select,
+body.modern-setting-page.card-config-page .card-builder textarea {
+  border-color: color-mix(in srgb, var(--line) 54%, transparent 46%) !important;
+  border-radius: var(--card-pe-radius-md) !important;
+  background: var(--card-pe-field) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 1px 0 rgba(0, 0, 0, 0.035) !important;
+}
+
+body.modern-setting-page.card-config-page .card-builder textarea {
+  min-height: 108px;
+  resize: vertical;
+}
+
+body.modern-setting-page.card-config-page .card-builder input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+body.modern-setting-page.card-config-page .card-builder select:focus,
+body.modern-setting-page.card-config-page .card-builder textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 56%, var(--line) 44%) !important;
+  background: color-mix(in srgb, var(--card-pe-field) 80%, var(--panel-strong) 20%) !important;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.065) !important;
+}
+
+body.modern-setting-page.card-config-page .stage-grid {
+  gap: 10px;
+}
+
+body.modern-setting-page.card-config-page .card-persona-grid {
+  gap: 14px;
+}
+
+body.modern-setting-page.card-config-page .persona-card {
+  min-height: 100%;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions button,
+body.modern-setting-page.card-config-page .card-add-button {
+  border-color: var(--card-pe-border-soft) !important;
+  background: color-mix(in srgb, var(--input-bg) 48%, transparent 52%) !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--line) 48%) !important;
+  background: color-mix(in srgb, var(--accent) 82%, var(--panel-strong) 18%) !important;
+  color: white !important;
+}
+
+body.force-mobile-shell.card-config-page .panel.config-panel.card-builder {
+  padding: 12px;
+  border-radius: 24px;
+}
+
+body.force-mobile-shell.card-config-page .card-block,
+body.force-mobile-shell.card-config-page .sub-block {
+  padding: 12px;
+  border-radius: 18px;
+}
+
+body.force-mobile-shell.card-config-page .card-builder textarea {
+  min-height: 120px;
+}
+

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Fantareal Chat - 移动端</title>
+  <link rel="icon" href="/static/fantareal_icon.ico" />
+  <link rel="stylesheet" href="/static/css/mobile-md3.css" />
+  <style>
+    .msg-bubble p { margin-bottom: 8px; }
+    .msg-bubble p:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<div class="mobile-layout">
+
+  <!-- Top App Bar -->
+  <header class="mobile-header">
+    <div class="header-role-info">
+      {% if persona and persona.avatar %}
+      <img src="{{ role_avatar_url }}" alt="Avatar" class="header-avatar" id="headerAvatar">
+      {% else %}
+      <div class="header-avatar" style="background:var(--md-sys-color-surface-container-high); display:flex; align-items:center; justify-content:center; color:var(--md-sys-color-on-surface-variant);">?</div>
+      {% endif %}
+      <div class="header-title">{{ persona.name if persona else 'Fantareal' }}</div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="toggleDrawer()">
+        <!-- Google Material Menu Icon -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Chat Content -->
+  <div class="mobile-chat-container" id="chatContainer">
+
+    <!-- 系统提示 -->
+    <div class="msg-row system">
+      <div class="msg-bubble">欢迎来到 Fantareal 移动端预览版</div>
+    </div>
+
+    <!-- 欢迎消息/开场白 -->
+    {% if show_opening_message and opening_message %}
+    <div class="msg-row assistant">
+      {% if persona and persona.avatar %}
+      <img src="{{ role_avatar_url }}" alt="Avatar" class="msg-avatar">
+      {% else %}
+      <div class="msg-avatar" style="background:var(--md-sys-color-surface-container-high);"></div>
+      {% endif %}
+      <div class="msg-bubble">
+        {{ opening_message | safe }}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- 历史记录 -->
+    {% for item in history %}
+      {% if item.role == "user" %}
+      <div class="msg-row user">
+        <div class="msg-avatar" style="background:var(--md-sys-color-surface-container-high); display:flex; align-items:center; justify-content:center; color:var(--md-sys-color-on-surface-variant); font-size:14px;">U</div>
+        <div class="msg-bubble">{{ item.html | safe if item.html else item.content }}</div>
+      </div>
+      {% elif item.role == "assistant" %}
+      <div class="msg-row assistant">
+        {% if persona and persona.avatar %}
+        <img src="{{ role_avatar_url }}" class="msg-avatar">
+        {% else %}
+        <div class="msg-avatar" style="background:var(--md-sys-color-surface-container-high);"></div>
+        {% endif %}
+        <div class="msg-bubble">{{ item.html | safe if item.html else item.content }}</div>
+      </div>
+      {% endif %}
+    {% endfor %}
+
+  </div>
+
+  <!-- Bottom Input Bar -->
+  <footer class="mobile-input-area">
+    <button class="icon-btn" style="width: 48px; flex-shrink:0;" onclick="window.location.reload()">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 2v6h-6"></path>
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+        <path d="M3 3v5h5"></path>
+      </svg>
+    </button>
+
+    <div class="textarea-wrapper">
+      <textarea
+        class="mobile-textarea"
+        id="userInput"
+        placeholder="聊点什么..."
+        rows="1"
+        oninput="autoResizeTextarea(this)"
+      ></textarea>
+    </div>
+
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    </button>
+  </footer>
+
+</div>
+
+<!-- Navigation Drawer -->
+<div class="mobile-drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
+<div class="mobile-drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">菜单选项</div>
+  </div>
+  <div class="drawer-content">
+    <a href="/mobile" class="drawer-item">
+      <span class="drawer-icon">💬</span> 移动聊天
+    </a>
+    <a href="/?desktop=1" class="drawer-item">
+      <span class="drawer-icon">💻</span> 切换到桌面版
+    </a>
+    <div class="drawer-section-title">设置</div>
+    <a href="/config?mobile=1" class="drawer-item">
+      <span class="drawer-icon">⚙️</span> 全局设置
+    </a>
+    <a href="/config/user?mobile=1" class="drawer-item">
+      <span class="drawer-icon">👤</span> 用户设定
+    </a>
+    <a href="/config/route-forwarding?mobile=1" class="drawer-item">
+      <span class="drawer-icon">🔀</span> 路由转发
+    </a>
+    <a href="/config/workshop?mobile=1" class="drawer-item">
+      <span class="drawer-icon">🎬</span> 演出工坊
+    </a>
+    <div class="drawer-section-title">角色与知识</div>
+    <a href="/config/card?mobile=1" class="drawer-item">
+      <span class="drawer-icon">🎭</span> 角色卡管理
+    </a>
+    <a href="/config/sprite?mobile=1" class="drawer-item">
+      <span class="drawer-icon">🖼️</span> 立绘管理
+    </a>
+    <a href="/config/preset?mobile=1" class="drawer-item">
+      <span class="drawer-icon">📦</span> 预设管理
+    </a>
+    <a href="/config/memory?mobile=1" class="drawer-item">
+      <span class="drawer-icon">🧠</span> 记忆管理
+    </a>
+    <a href="/config/worldbook?mobile=1" class="drawer-item">
+      <span class="drawer-icon">📚</span> 世界书设置
+    </a>
+    <a href="/config/worldbook/entries?mobile=1" class="drawer-item">
+      <span class="drawer-icon">📝</span> 词条管理
+    </a>
+    <div class="drawer-section-title">娱乐</div>
+    <a href="/game?mobile=1" class="drawer-item">
+      <span class="drawer-icon">🎲</span> 茶会派对
+    </a>
+    <a href="/game/flying-chess?mobile=1" class="drawer-item">
+      <span class="drawer-icon">✈️</span> 飞行棋
+    </a>
+  </div>
+</div>
+
+<script>
+  let isGenerating = false;
+  const runtimeState = {
+    llm_base_url: {{ settings.llm_base_url | tojson }},
+    llm_api_key: {{ settings.llm_api_key | tojson }},
+    llm_model: {{ settings.llm_model | tojson }},
+    temperature: {{ settings.temperature | tojson }},
+    history_limit: {{ settings.history_limit | tojson }},
+    request_timeout: {{ settings.request_timeout | tojson }},
+    demo_mode: {{ settings.demo_mode | tojson }},
+    embedding_base_url: {{ settings.embedding_base_url | tojson }},
+    embedding_api_key: {{ settings.embedding_api_key | tojson }},
+    embedding_model: {{ settings.embedding_model | tojson }},
+    embedding_fields: {{ settings.embedding_fields | tojson }},
+    retrieval_top_k: {{ settings.retrieval_top_k | tojson }},
+    rerank_enabled: {{ settings.rerank_enabled | tojson }},
+    rerank_base_url: {{ settings.rerank_base_url | tojson }},
+    rerank_api_key: {{ settings.rerank_api_key | tojson }},
+    rerank_model: {{ settings.rerank_model | tojson }},
+    rerank_top_n: {{ settings.rerank_top_n | tojson }},
+    sprite_enabled: false,
+  };
+
+  function buildChatRuntimeConfig() {
+    return {
+      llm_base_url: runtimeState.llm_base_url,
+      llm_api_key: runtimeState.llm_api_key,
+      llm_model: runtimeState.llm_model,
+      temperature: runtimeState.temperature,
+      history_limit: runtimeState.history_limit,
+      request_timeout: runtimeState.request_timeout,
+      demo_mode: runtimeState.demo_mode,
+      embedding_base_url: runtimeState.embedding_base_url,
+      embedding_api_key: runtimeState.embedding_api_key,
+      embedding_model: runtimeState.embedding_model,
+      embedding_fields: Array.isArray(runtimeState.embedding_fields) ? runtimeState.embedding_fields : [],
+      retrieval_top_k: runtimeState.retrieval_top_k,
+      rerank_enabled: runtimeState.rerank_enabled,
+      rerank_base_url: runtimeState.rerank_base_url,
+      rerank_api_key: runtimeState.rerank_api_key,
+      rerank_model: runtimeState.rerank_model,
+      rerank_top_n: runtimeState.rerank_top_n,
+      sprite_enabled: false,
+    };
+  }
+
+  function toggleDrawer() {
+    document.getElementById('drawer').classList.toggle('active');
+    document.getElementById('drawerOverlay').classList.toggle('active');
+  }
+
+  function autoResizeTextarea(el) {
+    el.style.height = 'auto';
+    el.style.height = (el.scrollHeight) + 'px';
+    if(el.value === '') {
+      el.style.height = '24px';
+    }
+  }
+
+  function normalizeThinkTags(html) {
+    return html
+      .replace(/&lt;\s*think\b[\s\S]*?&gt;/gi, '<think>')
+      .replace(/&lt;\s*\/\s*think\s*&gt;/gi, '</think>')
+      .replace(/<\s*think\b[^>]*>/gi, '<think>')
+      .replace(/<\s*\/\s*think\s*>/gi, '</think>');
+  }
+
+  function splitThinkHtml(html) {
+    const normalized = normalizeThinkTags(html);
+    const lowered = normalized.toLowerCase();
+    const thinkParts = [];
+    const visibleParts = [];
+    let cursor = 0;
+
+    while (cursor < normalized.length) {
+      const openIndex = lowered.indexOf('<think>', cursor);
+      if (openIndex === -1) {
+        visibleParts.push(normalized.slice(cursor));
+        break;
+      }
+
+      visibleParts.push(normalized.slice(cursor, openIndex));
+      const contentStart = openIndex + '<think>'.length;
+      const closeIndex = lowered.indexOf('</think>', contentStart);
+      if (closeIndex === -1) {
+        const trailingThink = normalized.slice(contentStart).trim();
+        if (trailingThink) thinkParts.push(trailingThink);
+        break;
+      }
+
+      const thinkHtml = normalized.slice(contentStart, closeIndex).trim();
+      if (thinkHtml) thinkParts.push(thinkHtml);
+      cursor = closeIndex + '</think>'.length;
+    }
+
+    return {
+      thinkHtml: thinkParts.join('<br><br>').trim(),
+      visibleHtml: visibleParts.join('').trim().replace(/^(?:<br\s*\/?>|\s|<p>\s*<\/p>)+/i, ''),
+    };
+  }
+
+  function parseThinkInBubble(bubble) {
+    const visibleContentEl = bubble.querySelector('.visible-content');
+    const sourceEl = visibleContentEl || bubble;
+    const rawHtml = sourceEl.innerHTML;
+    const normalized = normalizeThinkTags(rawHtml);
+
+    if (!normalized.toLowerCase().includes('<think>')) return;
+
+    const { thinkHtml, visibleHtml } = splitThinkHtml(rawHtml);
+    if (!thinkHtml) return;
+
+    let thinkBox = bubble.querySelector('.think-box');
+    if (!thinkBox) {
+      thinkBox = document.createElement('details');
+      thinkBox.className = 'think-box';
+      thinkBox.innerHTML = `
+        <summary>查看思考链</summary>
+        <div class="think-content"></div>
+      `;
+    }
+
+    const thinkContent = thinkBox.querySelector('.think-content');
+    thinkContent.innerHTML = thinkHtml;
+
+    if (visibleContentEl) {
+      visibleContentEl.innerHTML = visibleHtml;
+      if (!thinkBox.parentElement) {
+        bubble.insertBefore(thinkBox, visibleContentEl);
+      }
+    } else {
+      const visibleWrap = document.createElement('div');
+      visibleWrap.className = 'visible-content';
+      visibleWrap.innerHTML = visibleHtml;
+      bubble.innerHTML = '';
+      bubble.appendChild(thinkBox);
+      bubble.appendChild(visibleWrap);
+    }
+  }
+
+  function parseHistoryThoughts() {
+    document.querySelectorAll('.msg-row.assistant .msg-bubble').forEach(parseThinkInBubble);
+  }
+
+  parseHistoryThoughts();
+
+  // Scroll to bottom on load
+  const chatContainer = document.getElementById('chatContainer');
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  async function streamChat(payload, handlers = {}) {
+    const response = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.detail || "请求失败");
+    }
+    if (!response.body) {
+      throw new Error("Streaming is not supported in this browser.");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const block = buffer.slice(0, boundary).trim();
+        buffer = buffer.slice(boundary + 2);
+        if (block.startsWith("data:")) {
+          const jsonText = block.slice(5).trim();
+          if (jsonText) {
+            const event = JSON.parse(jsonText);
+            if (event.type === "meta" && handlers.onMeta) handlers.onMeta(event);
+            if (event.type === "think_start" && handlers.onThinkStart) handlers.onThinkStart(event);
+            if (event.type === "think_chunk" && handlers.onThinkChunk) handlers.onThinkChunk(event);
+            if (event.type === "think_end" && handlers.onThinkEnd) handlers.onThinkEnd(event);
+            if (event.type === "chunk" && handlers.onChunk) handlers.onChunk(event);
+            if (event.type === "done" && handlers.onDone) handlers.onDone(event);
+            if (event.type === "error" && handlers.onError) handlers.onError(event);
+          }
+        }
+        boundary = buffer.indexOf("\n\n");
+      }
+      if (done) break;
+    }
+  }
+
+  async function sendMessage() {
+    if (isGenerating) return;
+    const input = document.getElementById('userInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    // Build user message row
+    const userRow = document.createElement('div');
+    userRow.className = 'msg-row user';
+    userRow.innerHTML = `
+      <div class="msg-avatar" style="background:var(--md-sys-color-surface-container-high); display:flex; align-items:center; justify-content:center; color:var(--md-sys-color-on-surface-variant); font-size:14px;">U</div>
+      <div class="msg-bubble">${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+    `;
+    chatContainer.appendChild(userRow);
+
+    input.value = '';
+    autoResizeTextarea(input);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Build assistant message row placeholder
+    const assistantRow = document.createElement('div');
+    assistantRow.className = 'msg-row assistant';
+    const avatarSrc = document.getElementById('headerAvatar') ? document.getElementById('headerAvatar').src : '';
+    const avatarHtml = avatarSrc ? `<img src="${avatarSrc}" class="msg-avatar">` : `<div class="msg-avatar" style="background:var(--md-sys-color-surface-container-high);"></div>`;
+
+    assistantRow.innerHTML = `
+      ${avatarHtml}
+      <div class="msg-bubble"><div class="visible-content">...</div></div>
+    `;
+    chatContainer.appendChild(assistantRow);
+    const bubbleEl = assistantRow.querySelector('.msg-bubble');
+    const visibleContentEl = bubbleEl.querySelector('.visible-content');
+
+    isGenerating = true;
+    document.getElementById('sendBtn').style.opacity = '0.5';
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    try {
+      let contentHtml = "";
+      await streamChat({
+        message: text,
+        display_message: text,
+        runtime_config: buildChatRuntimeConfig()
+      }, {
+        onMeta() {},
+        onThinkStart() {
+          let thinkBox = bubbleEl.querySelector('.think-box');
+          if (!thinkBox) {
+            thinkBox = document.createElement('details');
+            thinkBox.className = 'think-box';
+            thinkBox.open = true;
+            thinkBox.innerHTML = `
+              <summary>思考中...</summary>
+              <div class="think-content"></div>
+            `;
+            bubbleEl.insertBefore(thinkBox, visibleContentEl);
+          } else {
+            thinkBox.open = true;
+            thinkBox.querySelector('summary').textContent = '思考中...';
+          }
+        },
+        onThinkChunk(event) {
+          const thinkBox = bubbleEl.querySelector('.think-box');
+          if (!thinkBox) return;
+          const thinkContent = thinkBox.querySelector('.think-content');
+          thinkContent.innerHTML += (event.delta || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        },
+        onThinkEnd() {
+          const thinkBox = bubbleEl.querySelector('.think-box');
+          if (!thinkBox) return;
+          thinkBox.querySelector('summary').textContent = '查看思考链';
+        },
+        onChunk(event) {
+          if (event.delta) {
+             contentHtml += event.delta.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+             visibleContentEl.innerHTML = contentHtml;
+             parseThinkInBubble(bubbleEl);
+             chatContainer.scrollTop = chatContainer.scrollHeight;
+          }
+        },
+        onDone(event) {
+          if (typeof event.reply === 'string') {
+             visibleContentEl.innerHTML = event.reply.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+          }
+          parseThinkInBubble(bubbleEl);
+        },
+        onError(event) {
+          bubbleEl.innerHTML += `<div style="color:red; margin-top:8px;">${event.detail}</div>`;
+        }
+      });
+    } catch (e) {
+      bubbleEl.innerHTML += `<div style="color:red; margin-top:8px;">${e.message}</div>`;
+    } finally {
+      isGenerating = false;
+      document.getElementById('sendBtn').style.opacity = '1';
+    }
+  }
+
+  // Handle enter key to send
+  document.getElementById('userInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+</script>
+
+</body>
+</html>

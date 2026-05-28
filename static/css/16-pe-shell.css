@@ -1,0 +1,291 @@
+/* PE shell v1: mobile-first navigation, surfaces, and bottom sheets. */
+
+:root {
+  --pe-safe-bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  --pe-safe-top: max(14px, env(safe-area-inset-top, 0px));
+  --pe-bottom-nav-height: 78px;
+  --pe-bottom-nav-total: calc(var(--pe-bottom-nav-height) + var(--pe-safe-bottom));
+  --pe-sheet-radius: 26px;
+  --pe-card-radius: 22px;
+  --pe-pill-radius: 999px;
+  --pe-surface: color-mix(in srgb, var(--panel-strong) 92%, white 8%);
+  --pe-surface-muted: color-mix(in srgb, var(--panel) 82%, transparent 18%);
+  --pe-border: color-mix(in srgb, var(--line) 90%, transparent 10%);
+  --pe-shadow: 0 18px 44px rgba(37, 25, 18, 0.12);
+}
+
+:root[data-theme="dark"] {
+  --pe-surface: color-mix(in srgb, var(--panel-strong) 94%, #162231 6%);
+  --pe-surface-muted: color-mix(in srgb, var(--panel) 88%, transparent 12%);
+  --pe-border: color-mix(in srgb, var(--line) 96%, transparent 4%);
+  --pe-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+}
+
+.pe-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  body.pe-shell,
+  body.modern-setting-page.app-sidebar-shell {
+    padding-bottom: var(--pe-bottom-nav-total);
+  }
+
+  body.pe-shell .topbar,
+  body.modern-setting-page.app-sidebar-shell .topbar-stack > .topbar {
+    padding-top: var(--pe-safe-top);
+    backdrop-filter: blur(20px) saturate(1.08);
+    -webkit-backdrop-filter: blur(20px) saturate(1.08);
+  }
+
+  body.pe-shell .topbar-left,
+  body.modern-setting-page.app-sidebar-shell .topbar-stack > .topbar .topbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  body.pe-shell .topnav,
+  body.pe-shell .topnav-grouped,
+  body.modern-setting-page.app-sidebar-shell .topbar-stack > .topbar .topnav,
+  body.modern-setting-page.app-sidebar-shell .topbar-stack > .topbar .topnav-grouped {
+    display: none;
+  }
+
+  .pe-bottom-nav {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 260;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+    align-items: stretch;
+    padding: 8px;
+    border: 1px solid var(--pe-border);
+    border-radius: 28px;
+    background: color-mix(in srgb, var(--pe-surface) 92%, transparent 8%);
+    box-shadow: var(--pe-shadow);
+    backdrop-filter: blur(22px) saturate(1.08);
+    -webkit-backdrop-filter: blur(22px) saturate(1.08);
+  }
+
+  .pe-bottom-link {
+    min-width: 0;
+    min-height: 60px;
+    display: grid;
+    place-items: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border-radius: 22px;
+    color: var(--muted);
+    text-decoration: none;
+    background: transparent;
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+
+  .pe-bottom-link.active {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 14%, var(--input-bg) 86%);
+  }
+
+  .pe-bottom-icon {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 14px;
+    line-height: 1;
+    border: 1px solid color-mix(in srgb, currentColor 16%, transparent 84%);
+  }
+
+  .pe-bottom-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  body.modern-setting-page.app-sidebar-shell .config-shell,
+  body.modern-setting-page.app-sidebar-shell .config-shell.wide,
+  body.modern-setting-page.app-sidebar-shell .welcome-shell {
+    width: calc(100% - 16px) !important;
+    max-width: calc(100% - 16px) !important;
+    margin: 0 auto !important;
+  }
+
+  body.modern-setting-page.app-sidebar-shell .slot-toolbar {
+    margin: 12px 8px 0;
+    padding: 14px 16px;
+    border-radius: var(--pe-card-radius);
+    background: color-mix(in srgb, var(--pe-surface) 88%, transparent 12%);
+    border: 1px solid var(--pe-border);
+    box-shadow: none;
+  }
+
+  body.modern-setting-page.app-sidebar-shell .config-sticky-actions {
+    position: static;
+    margin: 12px 8px 0;
+    padding: 14px 16px;
+    min-height: 0;
+    border-radius: var(--pe-card-radius);
+  }
+
+  body.modern-setting-page.app-sidebar-shell .config-sticky-actions,
+  body.modern-setting-page.app-sidebar-shell .config-sticky-buttons,
+  body.modern-setting-page.app-sidebar-shell .config-workbench-actions,
+  body.modern-setting-page.app-sidebar-shell .card-workbench-actions,
+  body.modern-setting-page.app-sidebar-shell .button-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.modern-setting-page.app-sidebar-shell .config-sticky-buttons button,
+  body.modern-setting-page.app-sidebar-shell .config-workbench-actions button,
+  body.modern-setting-page.app-sidebar-shell .config-workbench-actions select,
+  body.modern-setting-page.app-sidebar-shell .card-workbench-actions button,
+  body.modern-setting-page.app-sidebar-shell .button-row button,
+  body.modern-setting-page.app-sidebar-shell .button-row a {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.modern-setting-page.app-sidebar-shell .config-workbench-shell,
+  body.modern-setting-page.app-sidebar-shell .user-workbench-shell.user-layout-a,
+  body.modern-setting-page.app-sidebar-shell .user-workbench-shell.user-layout-b {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding-left: 0 !important;
+  padding-bottom: var(--pe-bottom-nav-total);
+  overflow-x: hidden;
+  box-shadow: none;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar {
+  position: sticky;
+  inset: auto;
+  top: 0;
+  width: 100%;
+  min-height: auto;
+  padding: var(--pe-safe-top) 16px 14px;
+  flex-direction: row;
+  align-items: center;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+  overflow: visible;
+  backdrop-filter: blur(20px) saturate(1.08);
+  -webkit-backdrop-filter: blur(20px) saturate(1.08);
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topbar-left {
+  width: auto;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand {
+  width: auto;
+  min-height: 56px;
+  padding: 8px 10px;
+  border-radius: 15px;
+  font-size: 22px;
+  white-space: nowrap;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  flex-basis: 38px;
+  border-radius: 11px;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topnav,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topnav-grouped {
+  display: none !important;
+}
+
+body.force-mobile-shell .pe-bottom-nav {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  z-index: 260;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
+  padding: 8px;
+  border: 1px solid var(--pe-border);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--pe-surface) 92%, transparent 8%);
+  box-shadow: var(--pe-shadow);
+  backdrop-filter: blur(22px) saturate(1.08);
+  -webkit-backdrop-filter: blur(22px) saturate(1.08);
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-shell,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-shell.wide,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .welcome-shell {
+  width: min(1480px, calc(100vw - 32px)) !important;
+  max-width: min(1480px, calc(100vw - 32px)) !important;
+  margin: 0 auto !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .slot-toolbar {
+  margin: 12px 8px 0;
+  padding: 14px 16px;
+  border-radius: var(--pe-card-radius);
+  background: color-mix(in srgb, var(--pe-surface) 88%, transparent 12%);
+  border: 1px solid var(--pe-border);
+  box-shadow: none;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-actions {
+  position: static;
+  margin: 12px 8px 0;
+  padding: 14px 16px;
+  min-height: 0;
+  border-radius: var(--pe-card-radius);
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-actions,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-buttons,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-actions,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .card-workbench-actions,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .button-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-buttons button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-actions button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-actions select,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .card-workbench-actions button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .button-row button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .button-row a {
+  width: 100%;
+  min-width: 0;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-shell,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .user-workbench-shell.user-layout-a,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .user-workbench-shell.user-layout-b,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .card-editor-layout,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-two,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-three,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-four,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-two-uneven {
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+}

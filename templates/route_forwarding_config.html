@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>路由转发 - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
-  <body class="modern-setting-page app-sidebar-shell route-forwarding-page">
+  <body class="modern-setting-page app-sidebar-shell route-forwarding-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
     <div id="route-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">

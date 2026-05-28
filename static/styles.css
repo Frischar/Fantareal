@@ -4,11 +4,12 @@
 @import url("./css/00-base.css?v=v161");
 @import url("./css/01-chat.css?v=v161");
 @import url("./css/02-sidebar.css?v=v161");
+@import url("./css/16-pe-shell.css?v=ui-v170-pe-shell");
 @import url("./css/03-config-global.css?v=v161");
 @import url("./css/04-user-workshop.css?v=v161");
 @import url("./css/05-config-helpers.css?v=v161");
 @import url("./css/06-workshop-controls.css?v=v161");
-@import url("./css/07-card-editor.css?v=v161");
+@import url("./css/07-card-editor.css?v=ui-v176-pe-soft-card");
 @import url("./css/08-config-fields.css?v=v161");
 @import url("./css/09-preset-memory.css?v=v161");
 @import url("./css/10-worldbook.css?v=v161");
@@ -16,5 +17,6 @@
 @import url("./css/12-workshop-performance.css?v=v161");
 @import url("./css/13-route-forwarding.css?v=v161");
 @import url("./css/14-game.css?v=v161");
+@import url("./css/99-mobile-responsive.css?v=ui-v174-mobile-responsive");
 
 /* v161: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */

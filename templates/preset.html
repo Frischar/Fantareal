@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preset - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
     <style>
       .config-shell.compact {
         width: min(1760px, calc(100vw - 32px));
@@ -1007,7 +1008,7 @@
       }
     </style>
   </head>
-  <body class="app-sidebar-shell modern-setting-page preset-config-page">
+  <body class="app-sidebar-shell modern-setting-page preset-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">

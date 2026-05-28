@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Config - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
 </head>
-  <body class="modern-setting-page app-sidebar-shell global-config-page">
+  <body class="modern-setting-page app-sidebar-shell global-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
     <div id="config-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">

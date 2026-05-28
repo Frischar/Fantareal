@@ -1,0 +1,402 @@
+/* Google Material Design 3 风格重置与变量 */
+:root {
+  /* Light Theme Colors (Material 3) */
+  --md-sys-color-primary: #0b57d0;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d3e3fd;
+  --md-sys-color-on-primary-container: #041e49;
+
+  --md-sys-color-surface: #ffffff;
+  --md-sys-color-surface-container: #f3f4f6; /* 对话区背景 */
+  --md-sys-color-surface-container-high: #e8eaed; /* 输入框背景 */
+
+  --md-sys-color-on-surface: #1f1f1f;
+  --md-sys-color-on-surface-variant: #444746;
+
+  --md-sys-color-outline: #c4c7c5;
+
+  --elevation-1: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --elevation-2: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15);
+
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
+}
+
+[data-theme="dark"] {
+  /* Dark Theme Colors (Material 3) */
+  --md-sys-color-primary: #a8c7fa;
+  --md-sys-color-on-primary: #062e6f;
+  --md-sys-color-primary-container: #0842a0;
+  --md-sys-color-on-primary-container: #d3e3fd;
+
+  --md-sys-color-surface: #131314;
+  --md-sys-color-surface-container: #1e1f20;
+  --md-sys-color-surface-container-high: #282a2c;
+
+  --md-sys-color-on-surface: #e3e3e3;
+  --md-sys-color-on-surface-variant: #c4c7c5;
+
+  --md-sys-color-outline: #444746;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  font-family: "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.mobile-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+}
+
+/* Top App Bar (Material 3) */
+.mobile-header {
+  flex: 0 0 auto;
+  height: calc(64px + var(--safe-area-top));
+  padding-top: var(--safe-area-top);
+  background-color: var(--md-sys-color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 16px;
+  padding-right: 16px;
+  z-index: 10;
+  /* 极其轻微的阴影或无阴影，靠颜色区分 */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+}
+
+.header-role-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: -0.2px;
+}
+
+.icon-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.icon-btn:active {
+  background-color: var(--md-sys-color-surface-container-high);
+}
+
+/* 聊天消息区域 */
+.mobile-chat-container {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  scroll-behavior: smooth;
+}
+
+.msg-row {
+  display: flex;
+  width: 100%;
+}
+
+.msg-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-top: auto; /* Google Messages 风格：头像靠下对齐 */
+  margin-bottom: 2px;
+}
+
+.msg-bubble {
+  max-width: 80%;
+  padding: 12px 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  font-weight: 400;
+  letter-spacing: 0.1px;
+}
+
+/* Assistant Message (Left) */
+.msg-row.assistant {
+  justify-content: flex-start;
+}
+.msg-row.assistant .msg-avatar {
+  margin-right: 12px;
+}
+.msg-row.assistant .msg-bubble {
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  border-radius: 24px 24px 24px 4px; /* Material 圆角：对话尾巴尖锐，其余圆滑 */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* 非常优雅的轻微卡片感 */
+}
+
+/* User Message (Right) */
+.msg-row.user {
+  justify-content: flex-end;
+}
+.msg-row.user .msg-avatar {
+  margin-left: 12px;
+  order: 2;
+}
+.msg-row.user .msg-bubble {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: 24px 24px 4px 24px;
+  order: 1;
+}
+
+/* System Message */
+.msg-row.system {
+  justify-content: center;
+}
+.msg-row.system .msg-bubble {
+  background-color: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  max-width: 90%;
+  padding: 4px 8px;
+}
+
+.visible-content:empty {
+  display: none;
+}
+
+.think-box {
+  margin: 0 0 10px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 16px;
+  background-color: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  overflow: hidden;
+}
+
+.think-box summary {
+  min-height: 40px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.think-box summary::-webkit-details-marker {
+  display: none;
+}
+
+.think-box summary::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.2s ease;
+}
+
+.think-box[open] summary::before {
+  transform: rotate(45deg);
+}
+
+.think-content {
+  padding: 0 14px 12px 30px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Bottom Input Area */
+.mobile-input-area {
+  flex: 0 0 auto;
+  background-color: var(--md-sys-color-surface);
+  padding: 12px 16px calc(12px + var(--safe-area-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  z-index: 10;
+}
+
+.textarea-wrapper {
+  flex: 1;
+  background-color: var(--md-sys-color-surface-container-high);
+  border-radius: 28px; /* 药丸形状 */
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+}
+
+.mobile-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 16px;
+  color: var(--md-sys-color-on-surface);
+  max-height: 120px;
+  min-height: 24px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.mobile-textarea::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 400;
+}
+
+.send-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.send-btn:active {
+  transform: scale(0.92);
+  background-color: #0842a0; /* primary dark */
+}
+
+.send-btn svg {
+  margin-left: -2px; /* 视觉居中微调 */
+}
+
+/* 侧边抽屉菜单 */
+.mobile-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4); /* Material scrim */
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-drawer-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 85%;
+  max-width: 320px;
+  height: 100%;
+  background-color: var(--md-sys-color-surface);
+  border-top-left-radius: 24px; /* Material Drawer 大圆角 */
+  border-bottom-left-radius: 24px;
+  z-index: 101;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-drawer.active {
+  right: 0;
+}
+
+.drawer-header {
+  padding: calc(28px + var(--safe-area-top)) 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drawer-title {
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--md-sys-color-on-surface);
+}
+
+.drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+.drawer-section-title {
+  padding: 16px 16px 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.drawer-item {
+  padding: 16px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 100px; /* 选中的药丸背景效果 */
+  margin-bottom: 4px;
+}
+
+.drawer-item:active {
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+
+.drawer-icon {
+  font-size: 20px;
+  opacity: 0.8;
+}
