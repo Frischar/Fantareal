@@ -1,0 +1,705 @@
+/* Fantareal UI System · v1
+   Scope: compatibility-first shared UI classes for main program pages.
+   This file should not rewrite legacy page behavior directly. New pages and
+   gradual cleanups can adopt .ui-* classes first, then old classes can be
+   mapped here once each page is verified. */
+
+:root {
+  --ui-radius-sm: 10px;
+  --ui-radius-md: 14px;
+  --ui-radius-lg: 18px;
+  --ui-radius-pill: 999px;
+  --ui-card-radius: 24px;
+  --ui-sub-radius: 18px;
+  --ui-gap: 18px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-control-height: 38px;
+  --ui-control-radius: 999px;
+  --ui-control-border: color-mix(in srgb, var(--border, var(--line)) 82%, transparent);
+  --ui-control-bg: color-mix(in srgb, var(--input-bg) 70%, transparent);
+  --ui-control-hover-bg: color-mix(in srgb, var(--input-bg) 82%, transparent);
+  --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  --ui-check-size: 20px;
+  --ui-check-radius: 6px;
+  --ui-switch-w: 36px;
+  --ui-switch-h: 20px;
+  --ui-switch-dot: 14px;
+  --ui-switch-offset: 2px;
+  --ui-switch-shift: calc(var(--ui-switch-w) - var(--ui-switch-dot) - var(--ui-switch-offset) - var(--ui-switch-offset));
+  --fr-toggle-w: var(--ui-switch-w);
+  --fr-toggle-h: var(--ui-switch-h);
+  --fr-toggle-dot: var(--ui-switch-dot);
+  --fr-toggle-offset: var(--ui-switch-offset);
+  --fr-toggle-shift: var(--ui-switch-shift);
+  --ui-font-body: 400 14px/1.65 "Microsoft YaHei", "PingFang SC", sans-serif;
+  --ui-font-label: 700 13px/1.35 "Microsoft YaHei", "PingFang SC", sans-serif;
+  --ui-font-helper: 400 12px/1.45 "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.ui-panel {
+  min-width: 0;
+  border: 1px solid var(--ui-border-soft, var(--line));
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-card, var(--panel-strong));
+  box-shadow: var(--shadow-soft, var(--shadow));
+  padding: var(--ui-space-5);
+}
+
+.ui-panel.is-danger {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--line) 66%);
+  background: var(--danger-bg);
+}
+
+.ui-summary-card {
+  display: grid;
+  gap: var(--ui-space-1);
+  min-width: 0;
+  padding: 12px 13px;
+  border-radius: var(--ui-sub-radius);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 78%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 72%, transparent),
+      color-mix(in srgb, var(--panel) 82%, transparent));
+}
+
+.ui-summary-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 820;
+  letter-spacing: 0.03em;
+}
+
+.ui-summary-card strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.ui-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line) 68%);
+  border-radius: var(--ui-radius-pill);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font: var(--ui-font-label);
+  padding: 0 var(--ui-space-4);
+  text-decoration: none;
+}
+
+.ui-button.secondary {
+  background: var(--ui-surface-control, var(--input-bg));
+  color: var(--accent);
+}
+
+.ui-button.ghost {
+  background: transparent;
+  color: var(--text);
+}
+
+.ui-button.danger {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--line) 58%);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.ui-button.icon {
+  width: 38px;
+  padding: 0;
+}
+
+.ui-field {
+  display: grid;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.ui-field > label,
+.ui-label {
+  color: var(--text);
+  font: var(--ui-font-label);
+}
+
+.ui-helper {
+  margin: 0;
+  color: var(--muted);
+  font: var(--ui-font-helper);
+}
+
+.ui-field input,
+.ui-field select,
+.ui-field textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-checkbox-row,
+.ui-switch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  min-height: 42px;
+  color: var(--text);
+  font: var(--ui-font-label);
+}
+
+.ui-checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.fr-compact-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius-pill);
+  padding: 4px 9px;
+  background: var(--input-bg);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.fr-compact-switch:hover {
+  border-color: var(--accent);
+}
+
+.fr-compact-switch input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fr-compact-switch-track {
+  position: relative;
+  width: var(--ui-switch-w);
+  height: var(--ui-switch-h);
+  border-radius: var(--ui-radius-pill);
+  background: rgba(148, 163, 184, 0.42);
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+  flex: 0 0 auto;
+}
+
+.fr-compact-switch-track::before {
+  content: "";
+  position: absolute;
+  top: var(--ui-switch-offset);
+  left: var(--ui-switch-offset);
+  width: var(--ui-switch-dot);
+  height: var(--ui-switch-dot);
+  border-radius: var(--ui-radius-pill);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transition: transform 0.16s ease;
+}
+
+.fr-compact-switch input[type="checkbox"]:checked + .fr-compact-switch-track,
+.fr-compact-switch.is-on .fr-compact-switch-track {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+}
+
+.fr-compact-switch input[type="checkbox"]:checked + .fr-compact-switch-track::before,
+.fr-compact-switch.is-on .fr-compact-switch-track::before {
+  transform: translateX(var(--ui-switch-shift));
+}
+
+.fr-compact-switch-label {
+  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 24px;
+}
+
+.fr-compact-switch.is-on .fr-compact-switch-label {
+  color: var(--text);
+}
+
+.ui-switch {
+  --ui-switch-w: 42px;
+  --ui-switch-h: 24px;
+  --ui-switch-pad: 3px;
+  position: relative;
+  display: inline-flex;
+  width: var(--ui-switch-w);
+  height: var(--ui-switch-h);
+  flex: 0 0 auto;
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--muted) 34%, transparent);
+  transition: background 0.16s ease;
+}
+
+.ui-switch::after {
+  content: "";
+  position: absolute;
+  top: var(--ui-switch-pad);
+  left: var(--ui-switch-pad);
+  width: calc(var(--ui-switch-h) - var(--ui-switch-pad) * 2);
+  height: calc(var(--ui-switch-h) - var(--ui-switch-pad) * 2);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--panel-strong) 88%, white 12%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: transform 0.16s ease;
+}
+
+input:checked + .ui-switch,
+.ui-switch.is-on {
+  background: var(--accent);
+}
+
+input:checked + .ui-switch::after,
+.ui-switch.is-on::after {
+  transform: translateX(var(--ui-switch-shift));
+}
+
+.ui-chip,
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-height: 26px;
+  border: 1px solid var(--ui-border-soft, var(--line));
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--accent) 10%, transparent 90%);
+  color: var(--text);
+  font: var(--ui-font-helper);
+  padding: 0 var(--ui-space-3);
+}
+
+.ui-filter-chip {
+  min-width: 0;
+  width: auto;
+  flex: 0 0 auto;
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-control-bg);
+  color: var(--text);
+  cursor: pointer;
+  font: var(--ui-font-helper);
+  line-height: 1.1;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.ui-filter-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--ui-control-border));
+  background: var(--ui-control-hover-bg);
+}
+
+.ui-filter-chip.active,
+.ui-filter-chip.is-active {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--input-bg));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 800;
+}
+
+.ui-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 360px;
+  min-width: 0;
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-control-bg);
+  color: var(--muted);
+  font: var(--ui-font-helper);
+  overflow: hidden;
+  padding: 3px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-summary-chip.strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ui-summary-chip.warning {
+  border-color: color-mix(in srgb, var(--danger, #dc5454) 45%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--danger, #dc5454) 12%, transparent);
+  color: var(--text);
+}
+
+.ui-options-grid {
+  display: grid;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-3);
+  padding: 10px;
+  border-radius: var(--ui-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 56%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 52%, transparent);
+}
+
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  min-width: 0;
+}
+
+.ui-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-space-3);
+}
+
+@media (max-width: 720px) {
+  .ui-panel {
+    padding: var(--ui-space-4);
+  }
+
+  .ui-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ui-toolbar-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* =========================================================
+   Legacy mapping v1
+   ---------------------------------------------------------
+   Keep old templates working while converging pages on one set of
+   tokens. This intentionally excludes chat/game/challenge because
+   those surfaces have dedicated interaction-heavy layouts.
+   ========================================================= */
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) {
+  --ui-page-panel-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--panel-strong) 76%, transparent),
+      color-mix(in srgb, var(--panel) 92%, transparent)
+    );
+  --ui-page-panel-border: color-mix(in srgb, var(--border, var(--line)) 76%, transparent);
+  --ui-page-panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.10);
+}
+
+:root[data-theme="dark"] body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) {
+  --ui-page-panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .panel.config-panel {
+  border-radius: var(--ui-card-radius);
+  border-color: var(--ui-page-panel-border);
+  background: var(--ui-page-panel-bg);
+  box-shadow: var(--ui-page-panel-shadow);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .panel.config-panel.full-span:first-of-type {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--ui-page-panel-border));
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .sprite-frame {
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 78%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 62%, transparent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"] {
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--ui-sub-radius);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 80%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 70%, transparent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 80%, transparent);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  color: var(--text);
+  font-weight: 760;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"]::file-selector-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border, var(--line)));
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-strong));
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .section-head h2,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .section-head h3 {
+  letter-spacing: 0;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) label:not(.checkbox-row):not(.check-chip):not(.fr-setting-switch-row) {
+  color: color-mix(in srgb, var(--text) 82%, var(--muted));
+  font: var(--ui-font-label);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) textarea {
+  border-radius: var(--ui-radius-md);
+  border-color: var(--ui-control-border);
+  background: color-mix(in srgb, var(--input-bg) 92%, transparent);
+  color: var(--text);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):focus,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line) 54%);
+  box-shadow: var(--ui-focus-ring);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="range"] {
+  accent-color: var(--accent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-row,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .action-group,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .inline-field {
+  gap: var(--ui-space-3);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary {
+  min-height: var(--ui-control-height);
+  border-radius: var(--ui-control-radius);
+  transform: none !important;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:hover {
+  transform: none !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.secondary,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link {
+  border: 1px solid var(--ui-control-border);
+  background: var(--ui-control-bg);
+  color: var(--text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.secondary:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:hover {
+  background: var(--ui-control-hover-bg);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--ui-control-border));
+}
+
+/* Plain checkbox rows: square checkboxes. Switches must use .fr-setting-switch-row. */
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  min-height: 40px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent);
+  color: var(--text);
+  font: var(--ui-font-label);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: relative !important;
+  flex: 0 0 auto !important;
+  width: var(--ui-check-size) !important;
+  height: var(--ui-check-size) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: var(--ui-check-radius) !important;
+  border: 1.5px solid color-mix(in srgb, var(--border, var(--line)) 92%, var(--muted)) !important;
+  background: color-mix(in srgb, var(--panel-strong) 78%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
+  cursor: pointer;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]::before {
+  content: none !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:checked {
+  border-color: transparent !important;
+  background: var(--accent) !important;
+  box-shadow: var(--ui-focus-ring);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  border-radius: 1px;
+  transform: translate(-50%, -58%) rotate(-45deg);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  min-height: 40px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  font: var(--ui-font-label);
+  cursor: pointer;
+  user-select: none;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  flex: 0 0 var(--ui-switch-w) !important;
+  width: var(--ui-switch-w) !important;
+  height: var(--ui-switch-h) !important;
+  min-width: var(--ui-switch-w) !important;
+  min-height: var(--ui-switch-h) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: var(--ui-radius-pill) !important;
+  border: 1px solid var(--ui-control-border) !important;
+  background: color-mix(in srgb, var(--muted) 52%, transparent) !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--ui-switch-offset);
+  width: var(--ui-switch-dot);
+  height: var(--ui-switch-dot);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--panel-strong) 84%, white 16%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transform: translateY(-50%);
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent) !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked::before {
+  transform: translate(var(--ui-switch-shift), -50%);
+  background: #fff;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .field-chip-row {
+  gap: var(--ui-space-2);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip {
+  position: relative;
+  min-height: 38px;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-height: 38px;
+  padding: 8px 13px;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid var(--ui-control-border);
+  background: var(--ui-control-bg);
+  color: color-mix(in srgb, var(--text) 86%, var(--muted));
+  font: var(--ui-font-label);
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip span::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 5px;
+  border: 1.5px solid color-mix(in srgb, var(--border, var(--line)) 92%, var(--muted));
+  background: color-mix(in srgb, var(--panel-strong) 78%, transparent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:checked + span {
+  color: color-mix(in srgb, var(--text) 90%, var(--accent));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:checked + span::before {
+  content: "";
+  border-color: transparent;
+  background:
+    linear-gradient(135deg, transparent 0 43%, #fff 44% 56%, transparent 57%),
+    linear-gradient(45deg, transparent 0 50%, #fff 51% 63%, transparent 64%),
+    var(--accent);
+}
