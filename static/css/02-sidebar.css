@@ -142,7 +142,7 @@ body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
   border-radius: 14px;
   border: 1px solid rgba(190, 152, 121, 0.30);
   background:
-    url("/static/fantareal_icon.ico") center / cover no-repeat,
+    url("/static/fantareal_icon.ico?v=ui-debug-icon-1") center / cover no-repeat,
     rgba(255, 252, 248, 0.94);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.55),
@@ -181,7 +181,7 @@ body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
 :root[data-theme="dark"] body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
   border-color: rgba(195, 217, 244, 0.30);
   background:
-    url("/static/fantareal_icon.ico") center / cover no-repeat,
+    url("/static/fantareal_icon.ico?v=ui-debug-icon-1") center / cover no-repeat,
     rgba(240, 246, 255, 0.96);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.34),
