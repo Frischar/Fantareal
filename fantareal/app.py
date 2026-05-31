@@ -35,6 +35,7 @@ from .route_forwarding import (
 from .preset_rules import (
     PRESET_MODULE_RULES,
     activate_preset_in_store,
+    build_preset_observation_segments_from_preset,
     build_preset_prompt_from_preset,
     create_preset_in_store,
     default_preset_store as default_preset_store_data,
@@ -844,6 +845,10 @@ def get_active_preset(slot_id: str | None = None) -> dict[str, Any]:
 
 def build_preset_prompt(slot_id: str | None = None) -> str:
     return build_preset_prompt_from_preset(get_active_preset(slot_id))
+
+
+def build_preset_observation_segments(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return build_preset_observation_segments_from_preset(get_active_preset(slot_id))
 
 
 def get_active_preset_module_labels(slot_id: str | None = None) -> list[str]:
@@ -4238,6 +4243,7 @@ configure_prompt_builder(
     bucket_worldbook_matches=bucket_worldbook_matches,
     normalize_worldbook_injection_role=_normalize_worldbook_injection_role,
     build_preset_prompt=build_preset_prompt,
+    build_preset_observation_segments=build_preset_observation_segments,
 )
 
 load_env_file()

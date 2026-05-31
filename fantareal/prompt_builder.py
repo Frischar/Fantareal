@@ -61,6 +61,46 @@ def _extract_runtime_guard_from_preset(preset_prompt: str) -> tuple[str, str]:
     return cleaned, V4F_OUTPUT_GUARD_PROMPT.strip()
 
 
+def _build_prompt_segment(
+    segment_id: str,
+    *,
+    source: str,
+    kind: str,
+    role: str,
+    content: str,
+    placement: str,
+    order: int,
+    required: bool = False,
+    strength: str = "soft",
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    text = str(content or "").strip()
+    if not text:
+        return None
+    segment: dict[str, Any] = {
+        "id": segment_id,
+        "source": source,
+        "kind": kind,
+        "role": role,
+        "content": text,
+        "enabled": True,
+        "placement": placement,
+        "order": order,
+        "required": required,
+        "strength": strength,
+        "char_count": len(text),
+    }
+    if metadata:
+        segment["metadata"] = metadata
+    return segment
+
+
+def _append_prompt_segment(segments: list[dict[str, Any]], *args: Any, **kwargs: Any) -> None:
+    segment = _build_prompt_segment(*args, **kwargs)
+    if segment:
+        segments.append(segment)
+
+
 def _worldbook_direct_question(user_message: str) -> bool:
     text = str(user_message or "").strip().lower()
     if not text:
@@ -299,6 +339,7 @@ def build_prompt_package(
     bucket_worldbook_matches = _dep("bucket_worldbook_matches")
     normalize_worldbook_injection_role = _dep("normalize_worldbook_injection_role")
     build_preset_prompt = _dep("build_preset_prompt")
+    build_preset_observation_segments = _optional_dep("build_preset_observation_segments")
     build_preset_output_guard = _optional_dep("build_preset_output_guard")
 
     persona = get_persona()
@@ -312,6 +353,7 @@ def build_prompt_package(
     worldbook_buckets = bucket_worldbook_matches(matched_worldbook_entries)
 
     preset_prompt = build_preset_prompt()
+    preset_observation_segments = build_preset_observation_segments() if build_preset_observation_segments else []
     preset_prompt, marker_output_guard_prompt = _extract_runtime_guard_from_preset(preset_prompt)
     system_prompt = str(persona.get("system_prompt", "")).strip()
     memory_recap_prompt = build_memory_recap_prompt(memories)
@@ -422,6 +464,241 @@ def build_prompt_package(
 
     clean_user_message = str(user_message or "").strip()
     messages.append({"role": "user", "content": clean_user_message})
+
+    prompt_segments: list[dict[str, Any]] = []
+    segment_order = 0
+
+    def append_segment(
+        segment_id: str,
+        *,
+        source: str,
+        kind: str,
+        role: str,
+        content: str,
+        placement: str,
+        required: bool = False,
+        strength: str = "soft",
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        nonlocal segment_order
+        segment_order += 10
+        _append_prompt_segment(
+            prompt_segments,
+            segment_id,
+            source=source,
+            kind=kind,
+            role=role,
+            content=content,
+            placement=placement,
+            order=segment_order,
+            required=required,
+            strength=strength,
+            metadata=metadata,
+        )
+
+    if preset_observation_segments:
+        for preset_segment in preset_observation_segments:
+            segment_order += 10
+            segment = dict(preset_segment)
+            segment["order"] = segment_order
+            metadata = dict(segment.get("metadata") or {})
+            metadata.setdefault("layer_id", "preset_rules")
+            segment["metadata"] = metadata
+            prompt_segments.append(segment)
+    else:
+        append_segment(
+            "preset.rules",
+            source="preset",
+            kind="base",
+            role="system",
+            content=preset_prompt,
+            placement="system_core",
+            required=True,
+            strength="hard",
+            metadata={"layer_id": "preset_rules"},
+        )
+    append_segment(
+        "worldbook.before_char_defs",
+        source="worldbook",
+        kind="lore_policy",
+        role="system",
+        content=worldbook_before_char_defs_prompt,
+        placement="before_character",
+        required=True,
+        strength="hard",
+        metadata={"layer_id": "worldbook_before_char_defs", "hit_count": len(worldbook_buckets.get("before_char_defs", []))},
+    )
+    append_segment(
+        "character.definition",
+        source="character",
+        kind="character_policy",
+        role="system",
+        content=system_prompt,
+        placement="character",
+        required=True,
+        strength="hard",
+        metadata={"layer_id": "character_definition", "character_name": str(persona.get("name", "")).strip()},
+    )
+    append_segment(
+        "worldbook.stable",
+        source="worldbook",
+        kind="lore_policy",
+        role="system",
+        content=worldbook_stable_prompt,
+        placement="lore_context",
+        strength="hard",
+        metadata={"layer_id": "stable_worldbook", "hit_count": len(worldbook_buckets.get("stable", []))},
+    )
+    append_segment(
+        "worldbook.after_char_defs",
+        source="worldbook",
+        kind="lore_policy",
+        role="system",
+        content=worldbook_after_char_defs_prompt,
+        placement="after_character",
+        strength="hard",
+        metadata={"layer_id": "worldbook_after_char_defs", "hit_count": len(worldbook_buckets.get("after_char_defs", []))},
+    )
+    append_segment(
+        "memory.recap",
+        source="memory",
+        kind="memory",
+        role="system",
+        content=memory_recap_prompt,
+        placement="memory_context",
+        metadata={"layer_id": "memory_and_user_profile", "stored_memory_count": len(memories)},
+    )
+    append_segment(
+        "user_profile.current",
+        source="user_profile",
+        kind="memory",
+        role="system",
+        content=user_profile_prompt,
+        placement="memory_context",
+        metadata={"layer_id": "memory_and_user_profile"},
+    )
+    append_segment(
+        "worldbook.current_state",
+        source="worldbook",
+        kind="lore_policy",
+        role="system",
+        content=worldbook_current_state_prompt,
+        placement="lore_context",
+        metadata={"layer_id": "current_state_context", "hit_count": len(worldbook_buckets.get("current_state", []))},
+    )
+    append_segment(
+        "memory.retrieval",
+        source="memory",
+        kind="reference",
+        role="system",
+        content=retrieval_prompt,
+        placement="memory_context",
+        metadata={"layer_id": "retrieval_context", "recalled_memory_count": len(recalled_memories)},
+    )
+    append_segment(
+        "worldbook.dynamic",
+        source="worldbook",
+        kind="lore_policy",
+        role="system",
+        content=worldbook_dynamic_prompt,
+        placement="near_latest_user",
+        metadata={"layer_id": "dynamic_worldbook", "hit_count": len(worldbook_buckets.get("dynamic", []))},
+    )
+    append_segment(
+        "worldbook.answer_guard",
+        source="worldbook",
+        kind="output_guard",
+        role="system",
+        content=worldbook_answer_guard,
+        placement="near_latest_user",
+        strength="hard",
+        metadata={"layer_id": "worldbook_answer_guard", "hit_count": len(matched_worldbook_entries)},
+    )
+    append_segment(
+        "runtime.sprite",
+        source="runtime",
+        kind="output_rule",
+        role="system",
+        content=sprite_prompt,
+        placement="system_format",
+        metadata={"layer_id": "final_output_guard", "sprite_enabled": bool(llm_config.get("sprite_enabled", False))},
+    )
+
+    def append_in_chat_segments(depth: int) -> None:
+        bucket = in_chat_buckets.get(depth, [])
+        if not bucket:
+            return
+
+        role_groups: list[tuple[str, list[dict[str, Any]]]] = []
+        for item in bucket:
+            role = normalize_worldbook_injection_role(item.get("injection_role", "system"), "system")
+            if not role_groups or role_groups[-1][0] != role:
+                role_groups.append((role, [item]))
+            else:
+                role_groups[-1][1].append(item)
+
+        for group_index, (role, role_items) in enumerate(role_groups, start=1):
+            append_segment(
+                f"worldbook.in_chat.depth_{depth}.{group_index}",
+                source="worldbook",
+                kind="lore_policy",
+                role=role,
+                content=build_worldbook_prompt(
+                    role_items,
+                    heading=f"The following are in-chat worldbook notes at depth {depth}.",
+                ),
+                placement="at_depth",
+                metadata={"layer_id": f"worldbook_in_chat_depth_{depth}", "depth": depth, "hit_count": len(role_items)},
+            )
+
+    for index, item in enumerate(recent_history, start=1):
+        tail_depth = history_count - (index - 1)
+        append_in_chat_segments(tail_depth)
+        role = str(item.get("role", "assistant")).strip() or "assistant"
+        append_segment(
+            f"history.{index}",
+            source="runtime",
+            kind="dialogue",
+            role=role,
+            content=strip_thought_blocks(item.get("content", "")),
+            placement="before_history",
+            metadata={"layer_id": "recent_history", "tail_depth": tail_depth},
+        )
+
+    append_in_chat_segments(0)
+    append_segment(
+        "preset.output_guard",
+        source="preset",
+        kind="output_guard",
+        role="system",
+        content=preset_output_guard_prompt,
+        placement="output_guard",
+        required=True,
+        strength="hard",
+        metadata={"layer_id": "final_output_guard"},
+    )
+    append_segment(
+        "worldbook.output_guard",
+        source="worldbook",
+        kind="output_guard",
+        role="system",
+        content=worldbook_output_guard_prompt,
+        placement="output_guard",
+        required=True,
+        strength="hard",
+        metadata={"layer_id": "final_output_guard", "hit_count": len(worldbook_buckets.get("output_guard", []))},
+    )
+    append_segment(
+        "runtime.user_input",
+        source="runtime",
+        kind="dialogue",
+        role="user",
+        content=clean_user_message,
+        placement="near_latest_user",
+        required=True,
+        strength="hard",
+        metadata={"layer_id": "user_input", "char_count": len(clean_user_message)},
+    )
 
     layers: list[dict[str, Any]] = []
 
@@ -535,6 +812,12 @@ def build_prompt_package(
     return {
         "layers": layers,
         "messages": messages,
+        "prompt_segments": prompt_segments,
+        "prompt_segment_summary": {
+            "segment_count": len(prompt_segments),
+            "total_char_count": sum(int(segment.get("char_count", 0)) for segment in prompt_segments),
+            "placements": sorted({str(segment.get("placement", "")) for segment in prompt_segments if segment.get("placement")}),
+        },
         "preview_text": "\n\n".join(preview_blocks).strip(),
         "message_count": len(messages),
         "system_section_count": len(actual_system_sections),
