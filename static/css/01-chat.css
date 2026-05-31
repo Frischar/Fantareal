@@ -219,7 +219,7 @@ body.chat-page::after {
 }
 
 .chat-page .chat-layout {
-  --runtime-panel-width: clamp(320px, 27vw, 390px);
+  --runtime-panel-width: clamp(420px, 34vw, 560px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 0;
   gap: 0;
