@@ -4,249 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
-    <style>
-      .worldbook-manager-page .worldbook-selection-panel {
-        position: fixed;
-        right: 24px;
-        top: clamp(112px, 15vh, 156px);
-        width: min(340px, calc(100vw - 32px));
-        max-height: calc(100vh - 140px);
-        z-index: 80;
-        opacity: 0;
-        pointer-events: none;
-        transform: translateX(calc(100% + 32px));
-        transition: opacity 180ms ease, transform 220ms ease;
-      }
-
-      .worldbook-manager-page .worldbook-selection-panel.is-visible {
-        opacity: 1;
-        pointer-events: auto;
-        transform: translateX(0);
-      }
-
-      .worldbook-manager-page .worldbook-selection-card,
-      .worldbook-manager-page .worldbook-import-modal {
-        background: var(--panel-strong, rgba(18, 27, 37, 0.92));
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        box-shadow: 0 22px 58px rgba(2, 8, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(22px);
-        -webkit-backdrop-filter: blur(22px);
-      }
-
-      .worldbook-manager-page .worldbook-selection-card {
-        overflow: hidden;
-        border-radius: 22px;
-      }
-
-      .worldbook-manager-page .worldbook-selection-head,
-      .worldbook-manager-page .worldbook-import-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 18px 18px 12px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-      }
-
-      .worldbook-manager-page .worldbook-selection-head h3,
-      .worldbook-manager-page .worldbook-import-head h2 {
-        margin: 2px 0 4px;
-      }
-
-      .worldbook-manager-page .worldbook-selection-count {
-        color: var(--accent, #7dd3fc);
-      }
-
-      .worldbook-manager-page .worldbook-close-button {
-        width: 34px;
-        height: 34px;
-        border-radius: 999px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .worldbook-manager-page .worldbook-selection-content {
-        display: grid;
-        gap: 12px;
-        padding: 14px 16px 16px;
-        max-height: calc(100vh - 250px);
-        overflow: auto;
-      }
-
-      .worldbook-manager-page .worldbook-selection-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-
-      .worldbook-manager-page .worldbook-selection-actions .full-row {
-        grid-column: 1 / -1;
-      }
-
-      .worldbook-manager-page .worldbook-selection-actions button,
-      .worldbook-manager-page .worldbook-bulk-editor button,
-      .worldbook-manager-page .worldbook-import-modal button {
-        min-height: 36px;
-      }
-
-      .worldbook-manager-page .worldbook-bulk-editor {
-        display: grid;
-        gap: 12px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(148, 163, 184, 0.14);
-      }
-
-      .worldbook-manager-page .worldbook-bulk-editor.is-collapsed {
-        display: none;
-      }
-
-      .worldbook-manager-page .worldbook-bulk-section {
-        display: grid;
-        gap: 10px;
-        padding: 12px;
-        border-radius: 16px;
-        background: rgba(148, 163, 184, 0.08);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-      }
-
-      .worldbook-manager-page .worldbook-bulk-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
-      .worldbook-manager-page .worldbook-import-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 28px;
-        background: rgba(2, 8, 23, 0.46);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-      }
-
-      .worldbook-manager-page .worldbook-import-backdrop.is-hidden {
-        display: none;
-      }
-
-      .worldbook-manager-page .worldbook-import-modal {
-        width: min(760px, calc(100vw - 40px));
-        max-height: calc(100vh - 56px);
-        overflow: hidden;
-        border-radius: 24px;
-      }
-
-      .worldbook-manager-page .worldbook-import-body {
-        display: grid;
-        gap: 16px;
-        padding: 18px;
-        max-height: calc(100vh - 190px);
-        overflow: auto;
-      }
-
-      .worldbook-manager-page .worldbook-import-step {
-        display: grid;
-        gap: 12px;
-        padding: 14px;
-        border-radius: 18px;
-        background: rgba(148, 163, 184, 0.08);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-      }
-
-      .worldbook-manager-page .worldbook-import-step-title {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .worldbook-manager-page .worldbook-import-step-title strong {
-        font-size: 0.98rem;
-      }
-
-      .worldbook-manager-page .worldbook-import-footer {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 10px;
-        padding: 14px 18px 18px;
-        border-top: 1px solid rgba(148, 163, 184, 0.14);
-      }
-
-      .worldbook-manager-page .worldbook-inline-hint {
-        margin: 0;
-        line-height: 1.65;
-      }
-
-
-      .worldbook-manager-page .wb-stage-select-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
-      .worldbook-manager-page .wb-external-status-chip {
-        display: inline-flex;
-        align-items: center;
-        width: fit-content;
-        min-height: 30px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(125, 211, 252, 0.28);
-        background: rgba(125, 211, 252, 0.12);
-        color: var(--accent, #7dd3fc);
-        font-size: 0.82rem;
-      }
-
-      .worldbook-manager-page .wb-external-status-chip.is-active {
-        border-color: rgba(74, 222, 128, 0.35);
-        background: rgba(74, 222, 128, 0.12);
-        color: #86efac;
-      }
-
-      .worldbook-manager-page .wb-external-status-chip.is-missing {
-        border-color: rgba(251, 191, 36, 0.35);
-        background: rgba(251, 191, 36, 0.1);
-        color: #facc15;
-      }
-
-      @media (max-width: 1180px) {
-        .worldbook-manager-page .worldbook-selection-panel {
-          right: 12px;
-          top: 96px;
-          width: min(320px, calc(100vw - 24px));
-          max-height: calc(100vh - 112px);
-        }
-      }
-
-      @media (max-width: 760px) {
-        .worldbook-manager-page .worldbook-selection-panel {
-          left: 12px;
-          right: 12px;
-          top: auto;
-          bottom: 12px;
-          width: auto;
-          max-height: min(72vh, 620px);
-        }
-
-        .worldbook-manager-page .worldbook-selection-content {
-          max-height: min(58vh, 480px);
-        }
-
-        .worldbook-manager-page .worldbook-bulk-row,
-        .worldbook-manager-page .worldbook-selection-actions {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
   </head>
   <body class="app-sidebar-shell worldbook-manager-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
     <div class="topbar-stack">
@@ -488,7 +248,7 @@
                 </div>
               </div>
 
-              <div class="wb-options-grid" data-section-title="选项">
+              <div class="wb-options-grid ui-options-grid" data-section-title="选项">
                 <label class="checkbox-row">
                   <input class="wb-enabled" type="checkbox" {% if item.enabled %}checked{% endif %} />
                   <span>启用</span>
@@ -814,7 +574,7 @@
             </div>
           </div>
 
-          <div class="wb-options-grid" data-section-title="选项">
+          <div class="wb-options-grid ui-options-grid" data-section-title="选项">
             <label class="checkbox-row">
               <input class="wb-enabled" type="checkbox" checked />
               <span>启用</span>
@@ -1172,7 +932,7 @@
         QUICK_FILTERS.forEach((item) => {
           const button = document.createElement("button");
           button.type = "button";
-          button.className = `worldbook-quick-filter-button${item.key === activeQuickFilter ? " active" : ""}`;
+          button.className = `worldbook-quick-filter-button ui-filter-chip${item.key === activeQuickFilter ? " active" : ""}`;
           button.dataset.quickFilter = item.key;
           button.textContent = item.label;
           quickFiltersEl.appendChild(button);
@@ -1370,7 +1130,7 @@
 
       function createSummaryChip(text, className = "") {
         const chip = document.createElement("span");
-        chip.className = `worldbook-summary-chip${className ? ` ${className}` : ""}`;
+        chip.className = `worldbook-summary-chip ui-summary-chip${className ? ` ${className}` : ""}`;
         chip.textContent = text;
         return chip;
       }
@@ -1381,12 +1141,12 @@
         let switchEl = head.querySelector(".wb-quick-enabled-switch");
         if (!switchEl) {
           switchEl = document.createElement("label");
-          switchEl.className = "wb-quick-enabled-switch";
+          switchEl.className = "wb-quick-enabled-switch fr-compact-switch";
           switchEl.title = "快速启用 / 停用这条世界书词条";
           switchEl.innerHTML = `
             <input class="wb-quick-enabled" type="checkbox" aria-label="快速启用或停用词条" />
-            <span class="wb-quick-enabled-track" aria-hidden="true"></span>
-            <em class="wb-quick-enabled-label">启用</em>
+            <span class="wb-quick-enabled-track fr-compact-switch-track" aria-hidden="true"></span>
+            <em class="wb-quick-enabled-label fr-compact-switch-label">启用</em>
           `;
         }
         const actions = head.querySelector(".button-row");

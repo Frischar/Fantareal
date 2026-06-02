@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
-    <link rel="icon" href="/static/fantareal_icon.ico" />
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=challenge-hide-v1" data-mod-hook="{{ mod.slug }}" />
@@ -297,6 +297,31 @@
       .prompt-package-summary {
         font-size: 0.82rem;
       }
+      .prompt-package-actions {
+        display: grid;
+        gap: 0.55rem;
+        justify-items: center;
+        width: 100%;
+      }
+      .prompt-package-history-row,
+      .prompt-package-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.45rem;
+        width: 100%;
+      }
+      .prompt-package-action-row .secondary.compact {
+        padding-inline: 0.75rem;
+      }
+      .prompt-package-actions select.compact {
+        width: min(100%, 24rem);
+        min-height: 2rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        text-align: center;
+      }
       .prompt-layer-list {
         display: grid;
         gap: 0.7rem;
@@ -330,6 +355,136 @@
         font-size: 0.8rem;
         line-height: 1.45;
         color: var(--muted);
+      }
+      .prompt-segment-panel {
+        margin-bottom: 0.85rem;
+      }
+      .prompt-segment-list {
+        display: grid;
+        gap: 0.45rem;
+        margin-top: 0.6rem;
+      }
+      .prompt-segment-card {
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        background: rgba(255, 255, 255, 0.028);
+        overflow: hidden;
+      }
+      .prompt-segment-card[open] {
+        background: rgba(255, 255, 255, 0.045);
+      }
+      .prompt-segment-row {
+        display: grid;
+        grid-template-columns: 3rem minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.45rem 0.65rem;
+        padding: 0.62rem 0.75rem;
+        cursor: pointer;
+        list-style: none;
+      }
+      .prompt-segment-row::-webkit-details-marker {
+        display: none;
+      }
+      .prompt-segment-order {
+        color: var(--muted);
+        font-size: 0.76rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .prompt-segment-title {
+        min-width: 0;
+        font-size: 0.82rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .prompt-segment-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        padding: 0.16rem 0.48rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.04);
+        font-size: 0.72rem;
+        white-space: nowrap;
+      }
+      .prompt-segment-chip.source-preset {
+        border-color: rgba(185, 147, 255, 0.5);
+        background: rgba(133, 88, 255, 0.16);
+      }
+      .prompt-segment-chip.source-character {
+        border-color: rgba(112, 179, 255, 0.45);
+        background: rgba(62, 130, 220, 0.15);
+      }
+      .prompt-segment-chip.source-worldbook {
+        border-color: rgba(104, 214, 158, 0.42);
+        background: rgba(54, 154, 105, 0.14);
+      }
+      .prompt-segment-chip.source-memory,
+      .prompt-segment-chip.source-user_profile {
+        border-color: rgba(236, 202, 116, 0.48);
+        background: rgba(184, 139, 48, 0.14);
+      }
+      .prompt-segment-chip.source-runtime {
+        border-color: rgba(170, 184, 205, 0.35);
+        background: rgba(130, 148, 176, 0.12);
+      }
+      .prompt-segment-placement,
+      .prompt-segment-meta,
+      .prompt-segment-size {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 0.74rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .prompt-segment-placement {
+        grid-column: 2 / 3;
+      }
+      .prompt-segment-meta {
+        display: none;
+      }
+      .prompt-segment-flags {
+        grid-column: 3 / 4;
+        grid-row: 2;
+        display: inline-flex;
+        justify-content: flex-end;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+      }
+      .prompt-segment-flag {
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        padding: 0.12rem 0.4rem;
+        color: var(--muted);
+        font-size: 0.68rem;
+        white-space: nowrap;
+      }
+      .prompt-segment-flag.hard,
+      .prompt-segment-flag.required {
+        color: var(--text);
+        border-color: rgba(255, 184, 108, 0.45);
+        background: rgba(255, 184, 108, 0.1);
+      }
+      .prompt-segment-detail {
+        border-top: 1px solid var(--border);
+        padding: 0.65rem 0.75rem 0.75rem;
+      }
+      .prompt-segment-snippet {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.42;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      @media (max-width: 980px) {
+        .prompt-segment-row {
+          grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+        }
       }
       .director-note-panel {
         margin-top: 0.9rem;
@@ -892,8 +1047,26 @@
                     <span class="drawer-debug-title">Prompt Package</span>
                     <span id="prompt-package-summary" class="prompt-package-summary muted">尚未生成</span>
                   </div>
+                  <div class="prompt-package-actions">
+                    <div class="prompt-package-history-row">
+                      <select id="prompt-package-history-select" class="compact" disabled aria-label="选择 Prompt Package 记录">
+                        <option value="">最近一轮</option>
+                      </select>
+                    </div>
+                    <div class="prompt-package-action-row">
+                      <button id="download-prompt-json" type="button" class="secondary compact" disabled>下载 JSON</button>
+                      <button id="clear-prompt-preview" type="button" class="secondary compact" disabled>清除当前</button>
+                    </div>
+                  </div>
                 </div>
                 <div class="drawer-debug-body">
+                  <div id="prompt-segment-panel" class="prompt-segment-panel" hidden>
+                    <div class="prompt-layer-head">
+                      <strong class="prompt-layer-title">PromptSegment 视窗</strong>
+                      <span id="prompt-segment-summary" class="prompt-layer-meta"></span>
+                    </div>
+                    <div id="prompt-segment-list" class="prompt-segment-list"></div>
+                  </div>
                   <div id="prompt-package-layers" class="prompt-layer-list"></div>
                   <pre id="prompt-package-preview" class="debug-code-block"></pre>
                 </div>
@@ -1214,6 +1387,12 @@
       const promptPackageSummaryEl = document.getElementById("prompt-package-summary");
       const promptPackageLayersEl = document.getElementById("prompt-package-layers");
       const promptPackagePreviewEl = document.getElementById("prompt-package-preview");
+      const promptPackageHistorySelectEl = document.getElementById("prompt-package-history-select");
+      const downloadPromptJsonBtn = document.getElementById("download-prompt-json");
+      const clearPromptPreviewBtn = document.getElementById("clear-prompt-preview");
+      const promptSegmentPanelEl = document.getElementById("prompt-segment-panel");
+      const promptSegmentSummaryEl = document.getElementById("prompt-segment-summary");
+      const promptSegmentListEl = document.getElementById("prompt-segment-list");
       const directorNoteContentEl = document.getElementById("director-note-content");
       const directorNoteTurnsEl = document.getElementById("director-note-turns");
       const directorNotePositionEl = document.getElementById("director-note-position");
@@ -3491,15 +3670,450 @@
         }
       });
 
-      function renderPromptPackage(pkg) {
+      const PROMPT_SEGMENT_SOURCE_LABELS = {
+        preset: "预设",
+        character: "角色卡",
+        worldbook: "世界书",
+        memory: "记忆",
+        user_profile: "用户资料",
+        runtime: "运行时",
+        mod: "插件",
+      };
+      const PROMPT_SEGMENT_PLACEMENT_LABELS = {
+        system_core: "系统核心",
+        system_format: "系统格式",
+        before_character: "角色前",
+        character: "角色卡",
+        after_character: "角色后",
+        lore_context: "世界书层",
+        memory_context: "记忆层",
+        before_history: "历史前",
+        at_depth: "历史深度",
+        near_latest_user: "近本轮输入",
+        output_guard: "输出守卫",
+      };
+      const PROMPT_SEGMENT_KIND_LABELS = {
+        base: "基础",
+        output_rule: "输出规则",
+        output_guard: "输出守卫",
+        style: "文风",
+        lore_policy: "设定",
+        character_policy: "角色规则",
+        memory: "记忆",
+        reference: "引用",
+        dialogue: "对话",
+        director_note: "导演注",
+        mod: "插件",
+      };
+      const PROMPT_SEGMENT_ROLE_LABELS = {
+        system: "系统",
+        user: "用户",
+        assistant: "助手",
+      };
+      const PROMPT_SEGMENT_FLAG_LABELS = {
+        hard: "硬规则",
+        soft: "软提示",
+        required: "必带",
+      };
+
+      const PROMPT_PREVIEW_CACHE_KEY = "fantareal:lastPromptPackagePreview";
+      const PROMPT_PREVIEW_HISTORY_LIMIT = 10;
+      let promptPackageHistory = { active_id: "", items: [] };
+      let lastPromptPackagePayload = null;
+
+      function getPromptSegmentLabel(map, value, fallback = "-") {
+        const key = String(value || "").trim();
+        return key ? (map[key] || key) : fallback;
+      }
+
+      function getPromptSegmentSourceClass(source) {
+        const normalized = String(source || "runtime").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+        return `source-${normalized || "runtime"}`;
+      }
+
+      function getPromptSegmentTitle(segment) {
+        const metadata = segment?.metadata && typeof segment.metadata === "object" ? segment.metadata : {};
+        if (metadata.module_label) return `模块：${metadata.module_label}`;
+        if (metadata.group_name && metadata.item_name) return `${metadata.group_name} / ${metadata.item_name}`;
+        if (metadata.item_name) return `规则块：${metadata.item_name}`;
+        const id = String(segment?.id || "segment");
+        const titleMap = {
+          "preset.base_system_prompt": "BASE / 预设内核",
+          "character.definition": "角色卡主体",
+          "worldbook.stable": "稳定世界书",
+          "worldbook.current_state": "当前状态世界书",
+          "memory.recap": "长期记忆摘要",
+          "memory.retrieval": "本轮记忆召回",
+          "user_profile.current": "用户资料",
+          "runtime.user_input": "本轮用户输入",
+          "runtime.sprite": "状态栏格式",
+          "preset.output_guard": "预设输出守卫",
+          "worldbook.output_guard": "世界书输出守卫",
+        };
+        return titleMap[id] || id;
+      }
+
+      function createPromptSegmentChip(text, source) {
+        const chip = document.createElement("span");
+        chip.className = `prompt-segment-chip ${getPromptSegmentSourceClass(source)}`;
+        chip.textContent = text || "运行时";
+        return chip;
+      }
+
+      function createPromptSegmentText(className, text) {
+        const element = document.createElement("span");
+        element.className = className;
+        element.textContent = text || "-";
+        return element;
+      }
+
+      function sanitizePromptFilename(value) {
+        return String(value || "prompt-package")
+          .trim()
+          .replace(/[\\/:*?"<>|]+/g, "-")
+          .replace(/\s+/g, "-")
+          .slice(0, 80) || "prompt-package";
+      }
+
+      function getPromptPackageInputSnippet(pkg) {
+        const messages = Array.isArray(pkg?.messages) ? pkg.messages : [];
+        const lastUser = [...messages].reverse().find((message) => message?.role === "user");
+        const text = String(lastUser?.content || "").trim().replace(/\s+/g, " ");
+        return text ? directorNoteSummary(text, 18) : "Prompt 预览";
+      }
+
+      function createPromptPackageHistoryItem(pkg, source = "preview") {
+        const now = new Date();
+        const timestamp = now.toISOString();
+        const messageCount = Number(pkg?.message_count || 0);
+        const historyTurns = Number(pkg?.recent_history_turns || 0);
+        const turnNumber = Math.max(1, Math.ceil((historyTurns + 1) / 2));
+        const snippet = getPromptPackageInputSnippet(pkg);
+        const sourceLabel = source === "stream" ? "聊天" : "预览";
+        return {
+          id: `${source}_${timestamp.replace(/[-:.TZ]/g, "")}_${Math.random().toString(16).slice(2, 8)}`,
+          label: `第 ${turnNumber} 轮`,
+          summary: snippet,
+          created_at: timestamp,
+          source,
+          source_label: sourceLabel,
+          message_count: messageCount,
+          prompt_package: pkg,
+        };
+      }
+
+      function normalizePromptPackageHistory(raw) {
+        if (raw?.items && Array.isArray(raw.items)) {
+          const items = raw.items
+            .filter((item) => item?.prompt_package && typeof item.prompt_package === "object")
+            .slice(0, PROMPT_PREVIEW_HISTORY_LIMIT);
+          return {
+            active_id: raw.active_id && items.some((item) => item.id === raw.active_id) ? raw.active_id : (items[0]?.id || ""),
+            items,
+          };
+        }
+        if (raw?.prompt_package && typeof raw.prompt_package === "object") {
+          const item = createPromptPackageHistoryItem(raw.prompt_package, "preview");
+          return { active_id: item.id, items: [item] };
+        }
+        return { active_id: "", items: [] };
+      }
+
+      function persistPromptPackageHistory() {
+        if (!promptPackageHistory.items.length) {
+          localStorage.removeItem(PROMPT_PREVIEW_CACHE_KEY);
+          return;
+        }
+        try {
+          localStorage.setItem(PROMPT_PREVIEW_CACHE_KEY, JSON.stringify(promptPackageHistory));
+        } catch (error) {
+          console.warn("Prompt preview history cache failed:", error);
+        }
+      }
+
+      function getActivePromptPackageHistoryItem() {
+        return promptPackageHistory.items.find((item) => item.id === promptPackageHistory.active_id) || promptPackageHistory.items[0] || null;
+      }
+
+      function renderPromptPackageHistorySelector() {
+        if (!promptPackageHistorySelectEl) return;
+        promptPackageHistorySelectEl.innerHTML = "";
+        const hasItems = promptPackageHistory.items.length > 0;
+        if (!hasItems) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "最近一轮";
+          promptPackageHistorySelectEl.appendChild(option);
+          promptPackageHistorySelectEl.disabled = true;
+          return;
+        }
+        promptPackageHistory.items.forEach((item) => {
+          const option = document.createElement("option");
+          option.value = item.id;
+          const time = item.created_at ? new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "--:--";
+          const label = String(item.label || "Prompt Package").split(" · ")[0];
+          option.textContent = `${label} · ${item.source_label || item.source || "预览"} · ${time}`;
+          promptPackageHistorySelectEl.appendChild(option);
+        });
+        promptPackageHistorySelectEl.value = promptPackageHistory.active_id || promptPackageHistory.items[0].id;
+        promptPackageHistorySelectEl.disabled = promptPackageHistory.items.length <= 1;
+      }
+
+      function setActivePromptPackageHistoryItem(itemId) {
+        if (!itemId) return;
+        const item = promptPackageHistory.items.find((entry) => entry.id === itemId);
+        if (!item) return;
+        promptPackageHistory.active_id = item.id;
+        persistPromptPackageHistory();
+        renderPromptPackageHistorySelector();
+        renderPromptPackage(item.prompt_package, { skipHistory: true });
+      }
+
+      function addPromptPackageToHistory(pkg, source = "preview") {
+        if (!pkg || typeof pkg !== "object") {
+          promptPackageHistory = { active_id: "", items: [] };
+          lastPromptPackagePayload = null;
+          persistPromptPackageHistory();
+          renderPromptPackageHistorySelector();
+          setPromptExportButtonsEnabled(false);
+          return;
+        }
+        const item = createPromptPackageHistoryItem(pkg, source);
+        promptPackageHistory.items = [item, ...promptPackageHistory.items].slice(0, PROMPT_PREVIEW_HISTORY_LIMIT);
+        promptPackageHistory.active_id = item.id;
+        lastPromptPackagePayload = pkg;
+        persistPromptPackageHistory();
+        renderPromptPackageHistorySelector();
+        setPromptExportButtonsEnabled(true);
+      }
+
+      function removeActivePromptPackageHistoryItem() {
+        const activeItem = getActivePromptPackageHistoryItem();
+        if (!activeItem) return;
+        promptPackageHistory.items = promptPackageHistory.items.filter((item) => item.id !== activeItem.id);
+        promptPackageHistory.active_id = promptPackageHistory.items[0]?.id || "";
+        const nextItem = getActivePromptPackageHistoryItem();
+        lastPromptPackagePayload = nextItem?.prompt_package || null;
+        persistPromptPackageHistory();
+        renderPromptPackageHistorySelector();
+        setPromptExportButtonsEnabled(!!nextItem);
+        if (nextItem) {
+          renderPromptPackage(nextItem.prompt_package, { skipHistory: true });
+          return;
+        }
+        if (promptPackagePanelEl) promptPackagePanelEl.hidden = true;
+        if (promptPackageLayersEl) promptPackageLayersEl.innerHTML = "";
+        if (promptPackagePreviewEl) promptPackagePreviewEl.textContent = "";
+        if (promptSegmentPanelEl) promptSegmentPanelEl.hidden = true;
+        if (promptSegmentListEl) promptSegmentListEl.innerHTML = "";
+        if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = "尚未生成";
+        if (promptSegmentSummaryEl) promptSegmentSummaryEl.textContent = "";
+        if (promptRuntimeDotEl) promptRuntimeDotEl.hidden = true;
+      }
+
+      function downloadPromptPackageJson(pkg) {
+        const payload = buildPromptPackageExportPayload(pkg);
+        const activeItem = getActivePromptPackageHistoryItem();
+        const filenameSeed = activeItem?.label || getPromptPackageInputSnippet(pkg);
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${sanitizePromptFilename(filenameSeed)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function countBy(items, key) {
+        return items.reduce((result, item) => {
+          const value = String(item?.[key] || "unknown").trim() || "unknown";
+          result[value] = (result[value] || 0) + 1;
+          return result;
+        }, {});
+      }
+
+      function sumBy(items, key) {
+        return items.reduce((total, item) => total + (Number(item?.[key]) || 0), 0);
+      }
+
+      function buildPromptPackageExportPayload(pkg) {
+        const packagePayload = pkg && typeof pkg === "object" ? pkg : {};
+        const activeItem = getActivePromptPackageHistoryItem();
+        const messages = Array.isArray(packagePayload.messages) ? packagePayload.messages : [];
+        const promptSegments = Array.isArray(packagePayload.prompt_segments) ? packagePayload.prompt_segments : [];
+        const layers = Array.isArray(packagePayload.layers) ? packagePayload.layers : [];
+        return {
+          schema: "fantareal.prompt_package.debug.v1",
+          exported_at: new Date().toISOString(),
+          record: activeItem ? {
+            id: activeItem.id,
+            label: activeItem.label,
+            summary: activeItem.summary || "",
+            source: activeItem.source || "preview",
+            source_label: activeItem.source_label || "预览",
+            created_at: activeItem.created_at || null,
+          } : {
+            id: null,
+            label: getPromptPackageInputSnippet(packagePayload),
+            summary: "",
+            source: "manual",
+            source_label: "手动导出",
+            created_at: null,
+          },
+          summary: {
+            message_count: packagePayload.message_count ?? messages.length,
+            system_section_count: packagePayload.system_section_count ?? null,
+            recent_history_turns: packagePayload.recent_history_turns ?? null,
+            segment_count: promptSegments.length,
+            layer_count: layers.length,
+            total_segment_chars: packagePayload.prompt_segment_summary?.total_char_count ?? sumBy(promptSegments, "char_count"),
+            message_roles: countBy(messages, "role"),
+            segment_sources: countBy(promptSegments, "source"),
+            segment_placements: countBy(promptSegments, "placement"),
+            segment_kinds: countBy(promptSegments, "kind"),
+            segment_strengths: countBy(promptSegments, "strength"),
+          },
+          notes: {
+            messages: "Actual model request messages sent to the provider.",
+            prompt_segments: "Debug-only observation segments. They do not replace messages unless layered injection mode is enabled in a future version.",
+            layers: "Human-readable prompt preview layers for inspection.",
+          },
+          messages,
+          prompt_segments: promptSegments,
+          layers,
+        };
+      }
+
+      function setPromptExportButtonsEnabled(enabled) {
+        [downloadPromptJsonBtn, clearPromptPreviewBtn].forEach((button) => {
+          if (button) button.disabled = !enabled;
+        });
+        if (promptPackageHistorySelectEl) {
+          promptPackageHistorySelectEl.disabled = !enabled || promptPackageHistory.items.length <= 1;
+        }
+      }
+
+      function cachePromptPackage(pkg, source = "preview") {
+        addPromptPackageToHistory(pkg, source);
+      }
+
+      function loadCachedPromptPackage() {
+        try {
+          const raw = localStorage.getItem(PROMPT_PREVIEW_CACHE_KEY);
+          if (!raw) {
+            renderPromptPackageHistorySelector();
+            setPromptExportButtonsEnabled(false);
+            return;
+          }
+          promptPackageHistory = normalizePromptPackageHistory(JSON.parse(raw));
+          renderPromptPackageHistorySelector();
+          const activeItem = getActivePromptPackageHistoryItem();
+          if (!activeItem?.prompt_package) {
+            setPromptExportButtonsEnabled(false);
+            return;
+          }
+          lastPromptPackagePayload = activeItem.prompt_package;
+          renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
+          setRuntimeTab("prompt");
+          setPromptExportButtonsEnabled(true);
+          setStatus("已恢复最近一次 Prompt 预览");
+        } catch (error) {
+          console.warn("Prompt preview cache load failed:", error);
+          localStorage.removeItem(PROMPT_PREVIEW_CACHE_KEY);
+          promptPackageHistory = { active_id: "", items: [] };
+          renderPromptPackageHistorySelector();
+          setPromptExportButtonsEnabled(false);
+        }
+      }
+
+      function renderPromptSegments(pkg) {
+        const segments = Array.isArray(pkg?.prompt_segments) ? pkg.prompt_segments : [];
+        if (!promptSegmentPanelEl || !promptSegmentListEl) return;
+        promptSegmentListEl.innerHTML = "";
+        if (!segments.length) {
+          promptSegmentPanelEl.hidden = true;
+          if (promptSegmentSummaryEl) promptSegmentSummaryEl.textContent = "";
+          return;
+        }
+
+        const summary = pkg?.prompt_segment_summary || {};
+        const summaryBits = [`${segments.length} 段`];
+        if (typeof summary.total_char_count === "number") {
+          summaryBits.push(`约 ${summary.total_char_count} 字符`);
+        }
+        if (Array.isArray(summary.placements) && summary.placements.length) {
+          summaryBits.push(summary.placements.map((item) => getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, item)).join(" / "));
+        }
+        if (promptSegmentSummaryEl) promptSegmentSummaryEl.textContent = summaryBits.join(" · ");
+
+        segments.forEach((segment) => {
+          const details = document.createElement("details");
+          details.className = "prompt-segment-card";
+
+          const row = document.createElement("summary");
+          row.className = "prompt-segment-row";
+
+          const order = Number.isFinite(Number(segment.order)) ? String(segment.order) : "-";
+          row.appendChild(createPromptSegmentText("prompt-segment-order", order));
+          row.appendChild(createPromptSegmentText("prompt-segment-title", getPromptSegmentTitle(segment)));
+          row.appendChild(createPromptSegmentChip(getPromptSegmentLabel(PROMPT_SEGMENT_SOURCE_LABELS, segment.source, "运行时"), segment.source));
+          const placementText = getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, segment.placement);
+          const roleKindText = [
+            getPromptSegmentLabel(PROMPT_SEGMENT_ROLE_LABELS, segment.role),
+            getPromptSegmentLabel(PROMPT_SEGMENT_KIND_LABELS, segment.kind),
+          ].filter((item) => item && item !== "-").join(" · ");
+          const charCountText = typeof segment.char_count === "number" ? `${segment.char_count} 字符` : "";
+          row.appendChild(createPromptSegmentText(
+            "prompt-segment-placement",
+            [placementText, roleKindText, charCountText].filter((item) => item && item !== "-").join(" · ")
+          ));
+
+          const flags = document.createElement("span");
+          flags.className = "prompt-segment-flags";
+          [segment.strength, segment.required ? "required" : ""].filter(Boolean).forEach((flag) => {
+            const flagEl = document.createElement("span");
+            flagEl.className = `prompt-segment-flag ${flag}`;
+            flagEl.textContent = getPromptSegmentLabel(PROMPT_SEGMENT_FLAG_LABELS, flag, flag);
+            flags.appendChild(flagEl);
+          });
+          row.appendChild(flags);
+
+          const detail = document.createElement("div");
+          detail.className = "prompt-segment-detail";
+          const detailMeta = document.createElement("p");
+          detailMeta.className = "prompt-segment-snippet";
+          detailMeta.textContent = `ID：${segment.id || "segment"}`;
+          const snippet = document.createElement("p");
+          snippet.className = "prompt-segment-snippet";
+          snippet.textContent = directorNoteSummary(segment.content || "", 320);
+          detail.appendChild(detailMeta);
+          detail.appendChild(snippet);
+
+          details.appendChild(row);
+          details.appendChild(detail);
+          promptSegmentListEl.appendChild(details);
+        });
+        promptSegmentPanelEl.hidden = false;
+      }
+
+      function renderPromptPackage(pkg, options = {}) {
         const layers = Array.isArray(pkg?.layers) ? pkg.layers : [];
+        const segments = Array.isArray(pkg?.prompt_segments) ? pkg.prompt_segments : [];
         const previewText = typeof pkg?.preview_text === "string" ? pkg.preview_text.trim() : "";
-        if (!layers.length && !previewText) {
+        if (!layers.length && !previewText && !segments.length) {
           if (promptPackagePanelEl) promptPackagePanelEl.hidden = true;
           if (promptPackageLayersEl) promptPackageLayersEl.innerHTML = "";
           if (promptPackagePreviewEl) promptPackagePreviewEl.textContent = "";
+          if (promptSegmentPanelEl) promptSegmentPanelEl.hidden = true;
+          if (promptSegmentListEl) promptSegmentListEl.innerHTML = "";
+          if (!options.skipHistory) cachePromptPackage(null);
           return;
         }
+        lastPromptPackagePayload = pkg;
+        setPromptExportButtonsEnabled(true);
+        if (!options.skipHistory) cachePromptPackage(pkg, options.source || "preview");
 
         const summaryBits = [];
         if (typeof pkg?.system_section_count === "number") {
@@ -3511,9 +4125,13 @@
         if (typeof pkg?.message_count === "number") {
           summaryBits.push(`messages ${pkg.message_count} 条`);
         }
+        if (segments.length) {
+          summaryBits.push(`segments ${segments.length} 段`);
+        }
         if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = summaryBits.join(" · ") || `共 ${layers.length} 层`;
 
         if (!promptPackagePanelEl || !promptPackageLayersEl || !promptPackagePreviewEl) return;
+        renderPromptSegments(pkg);
         promptPackageLayersEl.innerHTML = "";
         layers.forEach((layer, index) => {
           const card = document.createElement("div");
@@ -3573,7 +4191,7 @@
           renderWorldbookDebug(data.worldbook_debug || {});
           renderPresetDebug(data.preset_debug || {}, presetStoreCache);
           renderDirectorNotes(data.director_notes || []);
-          renderPromptPackage(data.prompt_package || {});
+          renderPromptPackage(data.prompt_package || {}, { source: "preview" });
           setRuntimeTab("prompt");
           setStatus("已生成本轮 Prompt 预览");
           showToast("Prompt 预览已生成", "success");
@@ -3651,6 +4269,28 @@
           setPresetDebugCollapsed(!presetDebugCollapsed);
         });
       }
+
+      downloadPromptJsonBtn?.addEventListener("click", () => {
+        if (!lastPromptPackagePayload) return;
+        try {
+          downloadPromptPackageJson(lastPromptPackagePayload);
+          setStatus("已下载 Prompt JSON");
+          showToast("Prompt JSON 已下载", "success");
+        } catch (error) {
+          setStatus(`下载 Prompt JSON 失败：${error.message}`, "error");
+          showToast(`下载 Prompt JSON 失败：${error.message}`, "error");
+        }
+      });
+
+      promptPackageHistorySelectEl?.addEventListener("change", () => {
+        setActivePromptPackageHistoryItem(promptPackageHistorySelectEl.value);
+      });
+
+      clearPromptPreviewBtn?.addEventListener("click", () => {
+        removeActivePromptPackageHistoryItem();
+        setStatus("已清除当前 Prompt 预览");
+        showToast("当前 Prompt 预览已清除", "success");
+      });
 
       if (worldbookDebugFiltersEl) {
         worldbookDebugFiltersEl.addEventListener("click", (event) => {
@@ -4933,7 +5573,7 @@
               renderWorldbookDebug(data.worldbook_debug || {});
               renderPresetDebug(data.preset_debug || {}, presetStoreCache);
               renderDirectorNotes(data.director_notes || []);
-              renderPromptPackage(data.prompt_package || {});
+              renderPromptPackage(data.prompt_package || {}, { source: "stream" });
             },
             onThinkStart() {
               assistantEntry.state.thinking = true;
@@ -5261,6 +5901,7 @@
       setWorldbookDebugCollapsed(false);
       hydrateExistingMessages();
       refreshMessageControls();
+      loadCachedPromptPackage();
       if (!shouldShowWorkshopOpening) startOpeningFirstMessageTypewriter();
       loadPresetStoreForChat().catch(() => {
         presetDebugPanelEl.hidden = true;

@@ -63,7 +63,7 @@ body.chat-page::after {
   border: 1px solid color-mix(in srgb, var(--text) 24%, transparent 76%);
   border-radius: 12px;
   background:
-    url("/static/fantareal_icon.ico") center / cover no-repeat,
+    url("/static/fantareal_icon.ico?v=ui-debug-icon-1") center / cover no-repeat,
     color-mix(in srgb, var(--panel) 72%, white 28%);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, white 46%, transparent 54%);
 }
@@ -219,7 +219,7 @@ body.chat-page::after {
 }
 
 .chat-page .chat-layout {
-  --runtime-panel-width: clamp(320px, 27vw, 390px);
+  --runtime-panel-width: clamp(420px, 34vw, 560px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 0;
   gap: 0;

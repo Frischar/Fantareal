@@ -19,7 +19,10 @@ body.modern-setting-page.workshop-config-page {
 }
 
 /* Keep workshop toggles compact without replacing the page's glass style. */
-body.modern-setting-page.workshop-config-page .checkbox-row {
+body.modern-setting-page.workshop-config-page .fr-setting-switch-row {
+  width: auto !important;
+  max-width: 100% !important;
+  flex: 0 0 auto !important;
   min-height: 30px !important;
   padding: 5px 8px !important;
   gap: 7px !important;
@@ -27,18 +30,28 @@ body.modern-setting-page.workshop-config-page .checkbox-row {
   font-size: 0.88rem !important;
   font-weight: 760 !important;
   line-height: 1.1 !important;
+  justify-content: space-between !important;
+  flex-direction: row-reverse !important;
   transform: none !important;
 }
 
-body.modern-setting-page.workshop-config-page .workshop-runtime-panel-side .checkbox-row,
-body.modern-setting-page.workshop-config-page .workshop-action-panel .grid-two .checkbox-row,
-body.modern-setting-page.workshop-config-page .workshop-rule-body > .checkbox-row {
+body.modern-setting-page.workshop-config-page .workshop-runtime-panel-side .fr-setting-switch-row,
+body.modern-setting-page.workshop-config-page .workshop-action-panel .grid-two .fr-setting-switch-row,
+body.modern-setting-page.workshop-config-page .workshop-rule-body > .fr-setting-switch-row,
+body.modern-setting-page.workshop-config-page .workshop-opening-typewriter-row > .fr-setting-switch-row,
+body.modern-setting-page.workshop-config-page .workshop-opening-media-card > .fr-setting-switch-row,
+body.modern-setting-page.workshop-config-page .dynamic-enabled-row {
   width: 100% !important;
-  justify-content: space-between !important;
-  flex-direction: row-reverse !important;
+  flex: 1 1 auto !important;
 }
 
-body.modern-setting-page.workshop-config-page .checkbox-row input[type="checkbox"] {
+body.modern-setting-page.workshop-config-page .workshop-opening-config-head > .fr-setting-switch-row {
+  width: fit-content !important;
+  flex: 0 0 auto !important;
+  align-self: flex-start !important;
+}
+
+body.modern-setting-page.workshop-config-page .fr-setting-switch-row input[type="checkbox"] {
   box-sizing: border-box !important;
   display: block !important;
   width: var(--fr-toggle-w) !important;
@@ -52,7 +65,7 @@ body.modern-setting-page.workshop-config-page .checkbox-row input[type="checkbox
   vertical-align: middle !important;
 }
 
-body.modern-setting-page.workshop-config-page .checkbox-row input[type="checkbox"]::before {
+body.modern-setting-page.workshop-config-page .fr-setting-switch-row input[type="checkbox"]::before {
   box-sizing: border-box !important;
   top: 50% !important;
   left: var(--fr-toggle-offset) !important;
@@ -61,7 +74,7 @@ body.modern-setting-page.workshop-config-page .checkbox-row input[type="checkbox
   transform: translateY(-50%) !important;
 }
 
-body.modern-setting-page.workshop-config-page .checkbox-row input[type="checkbox"]:checked::before {
+body.modern-setting-page.workshop-config-page .fr-setting-switch-row input[type="checkbox"]:checked::before {
   transform: translate(var(--fr-toggle-shift), -50%) !important;
 }
 

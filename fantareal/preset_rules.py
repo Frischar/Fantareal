@@ -219,6 +219,91 @@ def parse_int(value: Any, default: int = 0, *, min_value: int | None = None, max
     return result
 
 
+PRESET_SEGMENT_PLACEMENTS = {
+    "system_core",
+    "system_format",
+    "before_character",
+    "character",
+    "after_character",
+    "lore_context",
+    "memory_context",
+    "before_history",
+    "at_depth",
+    "near_latest_user",
+    "output_guard",
+}
+PRESET_SEGMENT_KINDS = {
+    "base",
+    "creator_persona",
+    "thinking_protocol",
+    "format",
+    "html_protocol",
+    "output_rule",
+    "output_guard",
+    "style",
+    "tone",
+    "plot",
+    "dialogue",
+    "scene",
+    "relationship",
+    "character_policy",
+    "lore_policy",
+    "reference",
+    "memory",
+    "director_note",
+    "mod",
+}
+PRESET_SEGMENT_STRENGTHS = {"hard", "soft"}
+
+
+def normalize_preset_segment_placement(value: Any, default: str | None = None) -> str | None:
+    text = str(value or "").strip()
+    if text in PRESET_SEGMENT_PLACEMENTS:
+        return text
+    return default
+
+
+def normalize_preset_segment_kind(value: Any, default: str = "style") -> str:
+    text = str(value or "").strip()
+    return text if text in PRESET_SEGMENT_KINDS else default
+
+
+def normalize_preset_segment_strength(value: Any, default: str = "soft") -> str:
+    text = str(value or "").strip()
+    return text if text in PRESET_SEGMENT_STRENGTHS else default
+
+
+def sanitize_activation_tags(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    tags: list[str] = []
+    for item in value:
+        tag = str(item or "").strip()[:128]
+        if tag and tag not in tags:
+            tags.append(tag)
+    return tags[:32]
+
+
+def apply_prompt_segment_fields(target: dict[str, Any], raw: dict[str, Any]) -> None:
+    placement = normalize_preset_segment_placement(raw.get("placement"))
+    if placement:
+        target["placement"] = placement
+    kind = normalize_preset_segment_kind(raw.get("kind"), "")
+    if kind:
+        target["kind"] = kind
+    strength = normalize_preset_segment_strength(raw.get("strength"), "")
+    if strength:
+        target["strength"] = strength
+    if "required" in raw:
+        target["required"] = parse_bool(raw.get("required"), False)
+    token_budget = parse_int(raw.get("tokenBudget"), 0, min_value=0, max_value=999999)
+    if token_budget > 0:
+        target["tokenBudget"] = token_budget
+    activation_tags = sanitize_activation_tags(raw.get("activation_tags"))
+    if activation_tags:
+        target["activation_tags"] = activation_tags
+
+
 def generate_preset_id() -> str:
     return f"preset_{uuid4().hex[:10]}"
 
@@ -280,13 +365,15 @@ def sanitize_prompt_item(raw: Any, index: int) -> dict[str, Any] | None:
     prompt_id = str(raw.get("id", "")).strip() or f"preset-block-{index}"
     name = str(raw.get("name", "")).strip()[:64] or f"规则块 {index}"
     content = str(raw.get("content", "")).strip()[:12000]
-    return {
+    cleaned = {
         "id": prompt_id,
         "name": name,
         "enabled": parse_bool(raw.get("enabled"), True),
         "content": content,
         "order": parse_int(raw.get("order"), index * 100, min_value=0, max_value=999999),
     }
+    apply_prompt_segment_fields(cleaned, raw)
+    return cleaned
 
 
 def normalize_selection_mode(value: Any) -> str:
@@ -302,12 +389,14 @@ def sanitize_prompt_group_item(raw: Any, index: int) -> dict[str, Any] | None:
     item_id = str(raw.get("id", "")).strip() or generate_prompt_group_item_id()
     name = str(raw.get("name", "")).strip()[:64] or f"规则项 {index}"
     content = str(raw.get("content", "")).strip()[:12000]
-    return {
+    cleaned = {
         "id": item_id,
         "name": name,
         "enabled": parse_bool(raw.get("enabled"), True),
         "content": content,
     }
+    apply_prompt_segment_fields(cleaned, raw)
+    return cleaned
 
 
 def sanitize_prompt_group(raw: Any, index: int) -> dict[str, Any] | None:
@@ -470,6 +559,164 @@ def build_selected_prompt_group_blocks(groups: list[dict[str, Any]]) -> list[tup
             item_name = str(item.get("name", "")).strip() or "规则项"
             blocks.append((order, f"[规则组：{group_name} / {item_name}]\n{content}"))
     return blocks
+
+
+def build_preset_observation_segments_from_preset(preset: dict[str, Any]) -> list[dict[str, Any]]:
+    sanitized = sanitize_single_preset(preset)
+    if not sanitized.get("enabled", True):
+        return []
+
+    segments: list[dict[str, Any]] = []
+
+    def append_segment(
+        segment_id: str,
+        *,
+        kind: str,
+        content: str,
+        order: int,
+        required: bool = False,
+        strength: str = "soft",
+        placement: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        token_budget: int | None = None,
+        activation_tags: list[str] | None = None,
+    ) -> None:
+        text = str(content or "").strip()
+        if not text:
+            return
+        resolved_placement = placement or ("system_core" if kind in {"base", "output_rule"} else "before_history")
+        segment: dict[str, Any] = {
+            "id": segment_id,
+            "source": "preset",
+            "kind": kind,
+            "role": "system",
+            "content": text,
+            "enabled": True,
+            "placement": resolved_placement,
+            "order": order,
+            "required": required,
+            "strength": strength,
+            "char_count": len(text),
+        }
+        if token_budget:
+            segment["tokenBudget"] = token_budget
+        if activation_tags:
+            segment["activation_tags"] = activation_tags
+        if metadata:
+            segment["metadata"] = metadata
+        segments.append(segment)
+
+    base_prompt = str(sanitized.get("base_system_prompt", "")).strip()
+    base_prompt_segment: dict[str, Any] = {}
+    apply_prompt_segment_fields(base_prompt_segment, sanitized)
+    append_segment(
+        "preset.base_system_prompt",
+        kind=normalize_preset_segment_kind(base_prompt_segment.get("kind"), "base"),
+        content=base_prompt,
+        order=10,
+        required=parse_bool(base_prompt_segment.get("required"), True),
+        strength=normalize_preset_segment_strength(base_prompt_segment.get("strength"), "hard"),
+        placement=normalize_preset_segment_placement(base_prompt_segment.get("placement"), "system_core"),
+        token_budget=parse_int(base_prompt_segment.get("tokenBudget"), 0, min_value=0, max_value=999999) or None,
+        activation_tags=sanitize_activation_tags(base_prompt_segment.get("activation_tags")),
+        metadata={"preset_id": sanitized.get("id"), "preset_name": sanitized.get("name")},
+    )
+
+    modules = sanitized.get("modules", {})
+    module_order = 100
+    for key, meta in PRESET_MODULE_RULES.items():
+        if key in RUNTIME_ONLY_PRESET_MODULES:
+            if modules.get(key) and key == "v4f_output_guard":
+                append_segment(
+                    "preset.module.v4f_output_guard",
+                    kind="output_guard",
+                    content=V4F_OUTPUT_GUARD_PROMPT.strip(),
+                    order=900,
+                    required=True,
+                    strength="hard",
+                    placement="output_guard",
+                    metadata={"module_key": key, "module_label": meta.get("label", key), "runtime_only": True},
+                )
+            continue
+        if not modules.get(key):
+            continue
+        prompt = str(meta.get("prompt", "")).strip()
+        append_segment(
+            f"preset.module.{key}",
+            kind="output_rule",
+            content=prompt,
+            order=module_order,
+            required=True,
+            strength="hard",
+            metadata={"module_key": key, "module_label": meta.get("label", key)},
+        )
+        module_order += 10
+
+    block_seq = 0
+    for group_index, group in enumerate(sanitized.get("prompt_groups", []), start=1):
+        if not isinstance(group, dict) or not parse_bool(group.get("enabled"), True):
+            continue
+        group_name = str(group.get("name", "")).strip() or f"规则组 {group_index}"
+        selected_ids = [str(item_id).strip() for item_id in group.get("selected_ids", []) if str(item_id).strip()]
+        if not selected_ids:
+            continue
+        selected_set = set(selected_ids)
+        order = parse_int(group.get("order"), group_index * 100, min_value=0, max_value=999999)
+        items = group.get("items", [])
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_id = str(item.get("id", "")).strip()
+            if item_id not in selected_set or not parse_bool(item.get("enabled"), True):
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            block_seq += 1
+            item_name = str(item.get("name", "")).strip() or "规则项"
+            item_options = item if isinstance(item, dict) else {}
+            append_segment(
+                f"preset.group.{group.get('id')}.{item_id}",
+                kind=normalize_preset_segment_kind(item_options.get("kind"), "style"),
+                content=f"[规则组：{group_name} / {item_name}]\n{content}",
+                order=1000 + order + block_seq,
+                required=parse_bool(item_options.get("required"), False),
+                strength=normalize_preset_segment_strength(item_options.get("strength"), "soft"),
+                placement=normalize_preset_segment_placement(item_options.get("placement"), "before_history"),
+                token_budget=parse_int(item_options.get("tokenBudget"), 0, min_value=0, max_value=999999) or None,
+                activation_tags=sanitize_activation_tags(item_options.get("activation_tags")),
+                metadata={
+                    "group_id": group.get("id"),
+                    "group_name": group_name,
+                    "item_id": item_id,
+                    "item_name": item_name,
+                },
+            )
+
+    for item_index, item in enumerate(sanitized.get("extra_prompts", []), start=1):
+        if not isinstance(item, dict) or not parse_bool(item.get("enabled"), True):
+            continue
+        content = str(item.get("content", "")).strip()
+        if not content:
+            continue
+        name = str(item.get("name", "")).strip() or "规则块"
+        order = parse_int(item.get("order"), item_index * 100, min_value=0, max_value=999999)
+        append_segment(
+            f"preset.extra.{item.get('id') or item_index}",
+            kind=normalize_preset_segment_kind(item.get("kind"), "style"),
+            content=f"[{name}]\n{content}",
+            order=2000 + order + item_index,
+            required=parse_bool(item.get("required"), False),
+            strength=normalize_preset_segment_strength(item.get("strength"), "soft"),
+            placement=normalize_preset_segment_placement(item.get("placement"), "before_history"),
+            token_budget=parse_int(item.get("tokenBudget"), 0, min_value=0, max_value=999999) or None,
+            activation_tags=sanitize_activation_tags(item.get("activation_tags")),
+            metadata={"item_id": item.get("id"), "item_name": name},
+        )
+
+    return sorted(segments, key=lambda item: int(item.get("order", 0)))
 
 
 def build_preset_prompt_from_preset(preset: dict[str, Any]) -> str:
