@@ -95,6 +95,57 @@ def _build_prompt_segment(
     return segment
 
 
+def _sanitize_segment_activation_tags(value: Any) -> list[str]:
+    raw_items = value if isinstance(value, list) else [value]
+    tags: list[str] = []
+    for item in raw_items:
+        tag = str(item or "").strip()[:128]
+        if tag and tag not in tags:
+            tags.append(tag)
+    return tags[:32]
+
+
+def _preset_segment_title(segment: dict[str, Any]) -> str:
+    metadata = segment.get("metadata", {}) if isinstance(segment.get("metadata"), dict) else {}
+    group_name = str(metadata.get("group_name", "")).strip()
+    item_name = str(metadata.get("item_name", "")).strip()
+    if group_name and item_name:
+        return f"{group_name} / {item_name}"
+    for key in ("module_label", "item_name", "preset_name"):
+        value = str(metadata.get(key, "")).strip()
+        if value:
+            return value
+    return str(segment.get("id", "")).strip() or "preset segment"
+
+
+def collect_preset_activation_tags(prompt_segments: list[dict[str, Any]]) -> dict[str, Any]:
+    tags: list[str] = []
+    segments: list[dict[str, Any]] = []
+    for segment in prompt_segments:
+        if not isinstance(segment, dict):
+            continue
+        segment_id = str(segment.get("id", "")).strip()
+        source = str(segment.get("source", "")).strip()
+        if source != "preset" and not segment_id.startswith("preset."):
+            continue
+        segment_tags = _sanitize_segment_activation_tags(segment.get("activation_tags", []))
+        if not segment_tags:
+            continue
+        for tag in segment_tags:
+            if tag not in tags:
+                tags.append(tag)
+        segments.append(
+            {
+                "id": segment_id,
+                "title": _preset_segment_title(segment),
+                "placement": str(segment.get("placement", "")).strip(),
+                "kind": str(segment.get("kind", "")).strip(),
+                "tags": segment_tags,
+            }
+        )
+    return {"tags": tags, "count": len(tags), "segments": segments}
+
+
 def _append_prompt_segment(segments: list[dict[str, Any]], *args: Any, **kwargs: Any) -> None:
     segment = _build_prompt_segment(*args, **kwargs)
     if segment:
@@ -330,6 +381,7 @@ def build_prompt_package(
     *,
     runtime_overrides: dict[str, Any] | None = None,
     worldbook_matches: list[dict[str, Any]] | None = None,
+    preset_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     get_persona = _dep("get_persona")
     get_conversation = _dep("get_conversation")
@@ -352,8 +404,16 @@ def build_prompt_package(
     recalled_memories = retrieved_items or []
     worldbook_buckets = bucket_worldbook_matches(matched_worldbook_entries)
 
-    preset_prompt = build_preset_prompt()
-    preset_observation_segments = build_preset_observation_segments() if build_preset_observation_segments else []
+    if isinstance(preset_context, dict):
+        preset_prompt = str(preset_context.get("prompt", "")).strip()
+        preset_observation_segments = (
+            preset_context.get("observation_segments", [])
+            if isinstance(preset_context.get("observation_segments", []), list)
+            else []
+        )
+    else:
+        preset_prompt = build_preset_prompt()
+        preset_observation_segments = build_preset_observation_segments() if build_preset_observation_segments else []
     preset_prompt, marker_output_guard_prompt = _extract_runtime_guard_from_preset(preset_prompt)
     system_prompt = str(persona.get("system_prompt", "")).strip()
     memory_recap_prompt = build_memory_recap_prompt(memories)
@@ -390,6 +450,7 @@ def build_prompt_package(
 
     history_limit = max(1, int(llm_config["history_limit"]))
     prompt_history = filter_prompt_history(history, persona)
+    conversation_turn_number = sum(1 for item in prompt_history if str(item.get("role", "")).strip() == "user") + 1
     recent_history = prompt_history[-history_limit:]
     recent_history_text = build_conversation_transcript(recent_history, persona)
 
@@ -809,19 +870,29 @@ def build_prompt_package(
     for index, layer in enumerate(layers, start=1):
         preview_blocks.append(f"[{index}. {layer['title']}]\n{layer['content']}")
 
+    preset_activation_tags = (
+        preset_context.get("activation_tags")
+        if isinstance(preset_context, dict) and isinstance(preset_context.get("activation_tags"), dict)
+        else collect_preset_activation_tags(prompt_segments)
+    )
+
     return {
         "layers": layers,
         "messages": messages,
         "prompt_segments": prompt_segments,
+        "preset_activation_tags": preset_activation_tags,
         "prompt_segment_summary": {
             "segment_count": len(prompt_segments),
             "total_char_count": sum(int(segment.get("char_count", 0)) for segment in prompt_segments),
             "placements": sorted({str(segment.get("placement", "")) for segment in prompt_segments if segment.get("placement")}),
+            "activation_tag_count": int(preset_activation_tags.get("count", 0)),
         },
         "preview_text": "\n\n".join(preview_blocks).strip(),
         "message_count": len(messages),
         "system_section_count": len(actual_system_sections),
         "recent_history_turns": len(recent_history),
+        "total_history_turns": len(prompt_history),
+        "conversation_turn_number": conversation_turn_number,
     }
 
 

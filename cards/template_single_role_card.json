@@ -19,7 +19,9 @@
         "role_id": "main_persona",
         "role_name": "Main Persona",
         "aliases": [
-          "1"
+          "1",
+          "main_persona",
+          "Main Persona"
         ],
         "enabled": true,
         "use_default_variables": false,
@@ -81,20 +83,6 @@
       }
     },
     "dynamicScenes": []
-  },
-  "plotStages": {
-    "A": {
-      "description": "Early stage",
-      "rules": "Be polite, calm, and build trust."
-    },
-    "B": {
-      "description": "Familiar stage",
-      "rules": "Speak more naturally and reference shared context."
-    },
-    "C": {
-      "description": "Deep stage",
-      "rules": "Show stronger closeness while keeping healthy boundaries."
-    }
   },
   "personas": {
     "1": {

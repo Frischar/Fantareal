@@ -481,6 +481,18 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      .prompt-segment-tag-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.38rem;
+        margin: 0.1rem 0;
+      }
+      .prompt-segment-tag-label {
+        color: var(--muted);
+        font-size: 0.76rem;
+        font-weight: 800;
+      }
       @media (max-width: 980px) {
         .prompt-segment-row {
           grid-template-columns: 2.5rem minmax(0, 1fr) auto;
@@ -1390,6 +1402,7 @@
       const promptPackageHistorySelectEl = document.getElementById("prompt-package-history-select");
       const downloadPromptJsonBtn = document.getElementById("download-prompt-json");
       const clearPromptPreviewBtn = document.getElementById("clear-prompt-preview");
+      const promptPackageCacheScope = {{ prompt_package_cache_scope | tojson }};
       const promptSegmentPanelEl = document.getElementById("prompt-segment-panel");
       const promptSegmentSummaryEl = document.getElementById("prompt-segment-summary");
       const promptSegmentListEl = document.getElementById("prompt-segment-list");
@@ -2732,7 +2745,10 @@
             content,
           });
           closeMessageEditors();
-          removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
+          const trimmedFrom = Number(data.trimmed_from ?? index);
+          const rollbackTurnNumber = getRollbackPromptPackageTurn(trimmedFrom);
+          removeDomMessagesFromIndex(trimmedFrom);
+          prunePromptPackageHistoryFromTurn(rollbackTurnNumber);
           historyMutationInFlight = false;
           await generateChatTurn(String(data.message || content), { clearInput: false, source: "edit", turnId: stateJournalTurnId || undefined });
         } catch (error) {
@@ -2769,7 +2785,10 @@
           const data = await postJson("/api/chat/history/reroll", {
             message_index: index,
           });
-          removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
+          const trimmedFrom = Number(data.trimmed_from ?? index);
+          const rollbackTurnNumber = getRollbackPromptPackageTurn(trimmedFrom);
+          removeDomMessagesFromIndex(trimmedFrom);
+          prunePromptPackageHistoryFromTurn(rollbackTurnNumber);
           historyMutationInFlight = false;
           await generateChatTurn(String(data.message || ""), { clearInput: false, source: "reroll", turnId: stateJournalTurnId || undefined });
         } catch (error) {
@@ -3716,10 +3735,48 @@
         required: "必带",
       };
 
-      const PROMPT_PREVIEW_CACHE_KEY = "fantareal:lastPromptPackagePreview";
+      const PROMPT_PREVIEW_LEGACY_CACHE_KEY = "fantareal:lastPromptPackagePreview";
+      const PROMPT_PREVIEW_CACHE_SCHEMA = "prompt-package-cache-v2";
       const PROMPT_PREVIEW_HISTORY_LIMIT = 10;
-      let promptPackageHistory = { active_id: "", items: [] };
+      let promptPackageHistory = createEmptyPromptPackageHistory();
       let lastPromptPackagePayload = null;
+
+      function sanitizePromptCacheKeyPart(value, fallback = "unknown") {
+        const text = String(value || "").trim().replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80);
+        return text || fallback;
+      }
+
+      function getPromptPackageCacheScope() {
+        const scope = promptPackageCacheScope && typeof promptPackageCacheScope === "object" ? promptPackageCacheScope : {};
+        return {
+          schema: String(scope.schema || PROMPT_PREVIEW_CACHE_SCHEMA),
+          workspace_id: String(scope.workspace_id || "unknown-workspace"),
+          slot_id: String(scope.slot_id || "global"),
+          card_id: String(scope.card_id || "unknown-card"),
+        };
+      }
+
+      function getPromptPreviewCacheKey() {
+        const scope = getPromptPackageCacheScope();
+        return [
+          "fantareal",
+          "promptPackagePreview",
+          sanitizePromptCacheKeyPart(scope.schema, PROMPT_PREVIEW_CACHE_SCHEMA),
+          sanitizePromptCacheKeyPart(scope.workspace_id, "unknown-workspace"),
+          sanitizePromptCacheKeyPart(scope.slot_id, "global"),
+          sanitizePromptCacheKeyPart(scope.card_id, "unknown-card"),
+        ].join(":");
+      }
+
+      function isPromptPackageCacheScopeMatched(rawScope) {
+        if (!rawScope || typeof rawScope !== "object") return false;
+        const current = getPromptPackageCacheScope();
+        return ["schema", "workspace_id", "slot_id", "card_id"].every((key) => String(rawScope[key] || "") === String(current[key] || ""));
+      }
+
+      function createEmptyPromptPackageHistory() {
+        return { scope: getPromptPackageCacheScope(), active_id: "", items: [] };
+      }
 
       function getPromptSegmentLabel(map, value, fallback = "-") {
         const key = String(value || "").trim();
@@ -3787,9 +3844,16 @@
         const timestamp = now.toISOString();
         const messageCount = Number(pkg?.message_count || 0);
         const historyTurns = Number(pkg?.recent_history_turns || 0);
-        const turnNumber = Math.max(1, Math.ceil((historyTurns + 1) / 2));
+        const conversationTurnNumber = Number(pkg?.conversation_turn_number || 0);
+        const turnNumber = conversationTurnNumber > 0 ? conversationTurnNumber : Math.max(1, Math.ceil((historyTurns + 1) / 2));
         const snippet = getPromptPackageInputSnippet(pkg);
-        const sourceLabel = source === "stream" ? "聊天" : "预览";
+        const sourceLabelMap = {
+          stream: "聊天",
+          preview: "预览",
+          reroll: "重 roll",
+          edit: "编辑",
+        };
+        const sourceLabel = sourceLabelMap[source] || source || "预览";
         return {
           id: `${source}_${timestamp.replace(/[-:.TZ]/g, "")}_${Math.random().toString(16).slice(2, 8)}`,
           label: `第 ${turnNumber} 轮`,
@@ -3803,29 +3867,30 @@
       }
 
       function normalizePromptPackageHistory(raw) {
+        if (!isPromptPackageCacheScopeMatched(raw?.scope)) return createEmptyPromptPackageHistory();
         if (raw?.items && Array.isArray(raw.items)) {
           const items = raw.items
             .filter((item) => item?.prompt_package && typeof item.prompt_package === "object")
             .slice(0, PROMPT_PREVIEW_HISTORY_LIMIT);
           return {
+            scope: getPromptPackageCacheScope(),
             active_id: raw.active_id && items.some((item) => item.id === raw.active_id) ? raw.active_id : (items[0]?.id || ""),
             items,
           };
         }
-        if (raw?.prompt_package && typeof raw.prompt_package === "object") {
-          const item = createPromptPackageHistoryItem(raw.prompt_package, "preview");
-          return { active_id: item.id, items: [item] };
-        }
-        return { active_id: "", items: [] };
+        return createEmptyPromptPackageHistory();
       }
 
       function persistPromptPackageHistory() {
+        const cacheKey = getPromptPreviewCacheKey();
+        localStorage.removeItem(PROMPT_PREVIEW_LEGACY_CACHE_KEY);
         if (!promptPackageHistory.items.length) {
-          localStorage.removeItem(PROMPT_PREVIEW_CACHE_KEY);
+          localStorage.removeItem(cacheKey);
           return;
         }
         try {
-          localStorage.setItem(PROMPT_PREVIEW_CACHE_KEY, JSON.stringify(promptPackageHistory));
+          promptPackageHistory.scope = getPromptPackageCacheScope();
+          localStorage.setItem(cacheKey, JSON.stringify(promptPackageHistory));
         } catch (error) {
           console.warn("Prompt preview history cache failed:", error);
         }
@@ -3869,9 +3934,48 @@
         renderPromptPackage(item.prompt_package, { skipHistory: true });
       }
 
+      function getPromptPackageHistoryTurn(item) {
+        const turnNumber = Number(item?.prompt_package?.conversation_turn_number || 0);
+        return Number.isFinite(turnNumber) && turnNumber > 0 ? Math.floor(turnNumber) : 0;
+      }
+
+      function getRollbackPromptPackageTurn(trimmedFrom) {
+        const rollbackIndex = Math.max(0, Number(trimmedFrom) || 0);
+        return Math.floor(rollbackIndex / 2) + 1;
+      }
+
+      function prunePromptPackageHistoryFromTurn(turnNumber) {
+        const safeTurnNumber = Math.max(1, Math.floor(Number(turnNumber) || 0));
+        if (!safeTurnNumber || !promptPackageHistory.items.length) return;
+        promptPackageHistory.items = promptPackageHistory.items.filter((item) => {
+          const itemTurn = getPromptPackageHistoryTurn(item);
+          return itemTurn > 0 && itemTurn < safeTurnNumber;
+        });
+        promptPackageHistory.active_id = promptPackageHistory.items[0]?.id || "";
+        const activeItem = getActivePromptPackageHistoryItem();
+        lastPromptPackagePayload = activeItem?.prompt_package || null;
+        persistPromptPackageHistory();
+        renderPromptPackageHistorySelector();
+        setPromptExportButtonsEnabled(!!activeItem);
+        if (activeItem) {
+          renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
+          return;
+        }
+        if (!activeItem) {
+          if (promptPackagePanelEl) promptPackagePanelEl.hidden = true;
+          if (promptPackageLayersEl) promptPackageLayersEl.innerHTML = "";
+          if (promptPackagePreviewEl) promptPackagePreviewEl.textContent = "";
+          if (promptSegmentPanelEl) promptSegmentPanelEl.hidden = true;
+          if (promptSegmentListEl) promptSegmentListEl.innerHTML = "";
+          if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = "尚未生成";
+          if (promptSegmentSummaryEl) promptSegmentSummaryEl.textContent = "";
+          if (promptRuntimeDotEl) promptRuntimeDotEl.hidden = true;
+        }
+      }
+
       function addPromptPackageToHistory(pkg, source = "preview") {
         if (!pkg || typeof pkg !== "object") {
-          promptPackageHistory = { active_id: "", items: [] };
+          promptPackageHistory = createEmptyPromptPackageHistory();
           lastPromptPackagePayload = null;
           persistPromptPackageHistory();
           renderPromptPackageHistorySelector();
@@ -3944,6 +4048,9 @@
         const messages = Array.isArray(packagePayload.messages) ? packagePayload.messages : [];
         const promptSegments = Array.isArray(packagePayload.prompt_segments) ? packagePayload.prompt_segments : [];
         const layers = Array.isArray(packagePayload.layers) ? packagePayload.layers : [];
+        const presetActivationTags = packagePayload.preset_activation_tags && typeof packagePayload.preset_activation_tags === "object"
+          ? packagePayload.preset_activation_tags
+          : { tags: [], count: 0, segments: [] };
         return {
           schema: "fantareal.prompt_package.debug.v1",
           exported_at: new Date().toISOString(),
@@ -3966,9 +4073,12 @@
             message_count: packagePayload.message_count ?? messages.length,
             system_section_count: packagePayload.system_section_count ?? null,
             recent_history_turns: packagePayload.recent_history_turns ?? null,
+            total_history_turns: packagePayload.total_history_turns ?? null,
+            conversation_turn_number: packagePayload.conversation_turn_number ?? null,
             segment_count: promptSegments.length,
             layer_count: layers.length,
             total_segment_chars: packagePayload.prompt_segment_summary?.total_char_count ?? sumBy(promptSegments, "char_count"),
+            preset_activation_tag_count: presetActivationTags.count || 0,
             message_roles: countBy(messages, "role"),
             segment_sources: countBy(promptSegments, "source"),
             segment_placements: countBy(promptSegments, "placement"),
@@ -3982,6 +4092,7 @@
           },
           messages,
           prompt_segments: promptSegments,
+          preset_activation_tags: presetActivationTags,
           layers,
         };
       }
@@ -4000,14 +4111,19 @@
       }
 
       function loadCachedPromptPackage() {
+        const cacheKey = getPromptPreviewCacheKey();
+        localStorage.removeItem(PROMPT_PREVIEW_LEGACY_CACHE_KEY);
         try {
-          const raw = localStorage.getItem(PROMPT_PREVIEW_CACHE_KEY);
+          const raw = localStorage.getItem(cacheKey);
           if (!raw) {
             renderPromptPackageHistorySelector();
             setPromptExportButtonsEnabled(false);
             return;
           }
           promptPackageHistory = normalizePromptPackageHistory(JSON.parse(raw));
+          if (!promptPackageHistory.items.length) {
+            localStorage.removeItem(cacheKey);
+          }
           renderPromptPackageHistorySelector();
           const activeItem = getActivePromptPackageHistoryItem();
           if (!activeItem?.prompt_package) {
@@ -4018,11 +4134,11 @@
           renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
           setRuntimeTab("prompt");
           setPromptExportButtonsEnabled(true);
-          setStatus("已恢复最近一次 Prompt 预览");
+          setStatus("已恢复当前会话的 Prompt 预览");
         } catch (error) {
           console.warn("Prompt preview cache load failed:", error);
-          localStorage.removeItem(PROMPT_PREVIEW_CACHE_KEY);
-          promptPackageHistory = { active_id: "", items: [] };
+          localStorage.removeItem(cacheKey);
+          promptPackageHistory = createEmptyPromptPackageHistory();
           renderPromptPackageHistorySelector();
           setPromptExportButtonsEnabled(false);
         }
@@ -4085,10 +4201,28 @@
           const detailMeta = document.createElement("p");
           detailMeta.className = "prompt-segment-snippet";
           detailMeta.textContent = `ID：${segment.id || "segment"}`;
+          const activationTags = Array.isArray(segment.activation_tags)
+            ? segment.activation_tags.map((tag) => String(tag || "").trim()).filter(Boolean)
+            : [];
           const snippet = document.createElement("p");
           snippet.className = "prompt-segment-snippet";
           snippet.textContent = directorNoteSummary(segment.content || "", 320);
           detail.appendChild(detailMeta);
+          if (activationTags.length) {
+            const tagRow = document.createElement("div");
+            tagRow.className = "prompt-segment-tag-row";
+            const tagLabel = document.createElement("span");
+            tagLabel.className = "prompt-segment-tag-label";
+            tagLabel.textContent = "Activation tags";
+            tagRow.appendChild(tagLabel);
+            activationTags.forEach((tag) => {
+              const tagChip = document.createElement("span");
+              tagChip.className = "prompt-segment-flag soft";
+              tagChip.textContent = tag;
+              tagRow.appendChild(tagChip);
+            });
+            detail.appendChild(tagRow);
+          }
           detail.appendChild(snippet);
 
           details.appendChild(row);
@@ -4127,6 +4261,10 @@
         }
         if (segments.length) {
           summaryBits.push(`segments ${segments.length} 段`);
+        }
+        const presetTagCount = Number(pkg?.preset_activation_tags?.count || pkg?.prompt_segment_summary?.activation_tag_count || 0);
+        if (presetTagCount > 0) {
+          summaryBits.push(`preset tags ${presetTagCount} 个`);
         }
         if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = summaryBits.join(" · ") || `共 ${layers.length} 层`;
 
@@ -5573,7 +5711,8 @@
               renderWorldbookDebug(data.worldbook_debug || {});
               renderPresetDebug(data.preset_debug || {}, presetStoreCache);
               renderDirectorNotes(data.director_notes || []);
-              renderPromptPackage(data.prompt_package || {}, { source: "stream" });
+              const promptPackageSource = ["edit", "reroll"].includes(options.source) ? options.source : "stream";
+              renderPromptPackage(data.prompt_package || {}, { source: promptPackageSource });
             },
             onThinkStart() {
               assistantEntry.state.thinking = true;

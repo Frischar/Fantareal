@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import sys
@@ -121,6 +122,51 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             and not _has_workshop_progress(workshop_state)
         )
 
+    def _prompt_package_cache_scope(active_slot: str | None, current_card: dict[str, Any], history: list[dict[str, Any]]) -> dict[str, str]:
+        workspace_source = ""
+        try:
+            slot_dir = ctx.get_slot_dir(active_slot) if active_slot is not None and hasattr(ctx, "get_slot_dir") else None
+            if slot_dir is not None:
+                workspace_source = str(Path(slot_dir).resolve().parent)
+        except Exception:
+            workspace_source = ""
+        if not workspace_source:
+            try:
+                card_dir = getattr(ctx, "CARDS_DIR", None)
+                if card_dir is not None:
+                    workspace_source = str(Path(card_dir).resolve().parent)
+            except Exception:
+                workspace_source = ""
+        workspace_id = hashlib.sha256((workspace_source or "fantareal-workspace").encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+        card_source_name = str(current_card.get("source_name", "") or "").strip()
+        raw_card = current_card.get("raw", {}) if isinstance(current_card, dict) else {}
+        raw_card_name = str(raw_card.get("name", "") or "").strip() if isinstance(raw_card, dict) else ""
+        card_display_name = card_source_name or raw_card_name
+        if card_source_name or raw_card_name:
+            card_identity_source = f"source:{card_source_name}\nname:{raw_card_name}"
+        else:
+            fallback_payload = json.dumps(
+                {
+                    "name": raw_card_name,
+                    "description": raw_card.get("description", "") if isinstance(raw_card, dict) else "",
+                    "first_mes": raw_card.get("first_mes", "") if isinstance(raw_card, dict) else "",
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            )
+            card_identity_source = fallback_payload or "unknown-card"
+        card_fingerprint = hashlib.sha256(card_identity_source.encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+        return {
+            "schema": "prompt-package-cache-v2",
+            "workspace_id": workspace_id,
+            "slot_id": str(active_slot or "global"),
+            "card_id": card_fingerprint,
+            "card_name": card_display_name,
+        }
+
     def build_chat_template_context() -> dict[str, Any]:
         active_slot = ctx.get_active_slot_id() if hasattr(ctx, "get_active_slot_id") else None
         persona = ctx.get_persona()
@@ -155,6 +201,7 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             "active_preset": active_preset,
             "active_preset_modules": preset_debug["active_modules"],
             "preset_debug": preset_debug,
+            "prompt_package_cache_scope": _prompt_package_cache_scope(active_slot, current_card, history),
             "opening_message": opening_message,
             "show_opening_message": show_opening_message,
             "workshop_opening": workshop_opening,

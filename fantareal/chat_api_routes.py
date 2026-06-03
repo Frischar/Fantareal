@@ -243,14 +243,17 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
         runtime_overrides = payload.runtime_config or {}
         retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
+        preset_context = ctx.build_active_preset_context()
         active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
-        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_stage_tags)
+        active_tag_context = ctx.build_active_tag_context(active_stage_tags, preset_context)
+        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_tag_context)
         worldbook_debug_snapshot = ctx.get_worldbook_debug_snapshot()
         prompt_package = ctx.build_prompt_package(
             message,
             retrieved_items,
             runtime_overrides=runtime_overrides,
             worldbook_matches=worldbook_matches,
+            preset_context=preset_context,
         )
         return {
             "retrieved_items": retrieved_items,
@@ -260,7 +263,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 worldbook_matches,
                 debug_snapshot=worldbook_debug_snapshot,
             ),
-            "preset_debug": ctx.build_preset_debug_payload(),
+            "preset_debug": ctx.build_preset_debug_payload(preset_context=preset_context),
             "prompt_package": prompt_package,
         }
 
@@ -273,20 +276,23 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         runtime_overrides = payload.runtime_config or {}
         llm_config = ctx.get_runtime_chat_config(runtime_overrides)
         retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
+        preset_context = ctx.build_active_preset_context()
         active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
-        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_stage_tags)
+        active_tag_context = ctx.build_active_tag_context(active_stage_tags, preset_context)
+        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_tag_context)
         worldbook_debug_snapshot = ctx.get_worldbook_debug_snapshot()
         worldbook_debug = ctx.build_worldbook_debug_payload(
             message,
             worldbook_matches,
             debug_snapshot=worldbook_debug_snapshot,
         )
-        preset_debug = ctx.build_preset_debug_payload()
+        preset_debug = ctx.build_preset_debug_payload(preset_context=preset_context)
         prompt_package = ctx.build_prompt_package(
             message,
             retrieved_items,
             runtime_overrides=runtime_overrides,
             worldbook_matches=worldbook_matches,
+            preset_context=preset_context,
         )
 
         if not (llm_config["base_url"] and llm_config["model"]):
