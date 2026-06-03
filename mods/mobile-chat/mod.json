@@ -1,0 +1,13 @@
+{
+  "label": "小手机",
+  "description": "轻量口袋群聊插件：在主 Chat 右下角打开小手机浮窗，与当前角色卡角色进行短句群聊。",
+  "version": "1.9.0-alpha.1",
+  "hooks": {
+    "chat_styles": [
+      "/static/mobile-chat-chat.css?v=mobile-chat-v1-9-0-alpha-1"
+    ],
+    "chat_scripts": [
+      "/static/mobile-chat-chat.js?v=mobile-chat-v1-9-0-alpha-1"
+    ]
+  }
+}
