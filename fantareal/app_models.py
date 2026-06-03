@@ -205,6 +205,12 @@ class PresetPromptPayload(BaseModel):
     enabled: bool = True
     content: str = ""
     order: int = 100
+    placement: str | None = None
+    kind: str | None = None
+    strength: str | None = None
+    required: bool | None = None
+    tokenBudget: int | None = None
+    activation_tags: list[str] | None = None
 
 
 class PresetPromptGroupItemPayload(BaseModel):
@@ -212,6 +218,12 @@ class PresetPromptGroupItemPayload(BaseModel):
     name: str = ""
     enabled: bool = True
     content: str = ""
+    placement: str | None = None
+    kind: str | None = None
+    strength: str | None = None
+    required: bool | None = None
+    tokenBudget: int | None = None
+    activation_tags: list[str] | None = None
 
 
 class PresetPromptGroupPayload(BaseModel):

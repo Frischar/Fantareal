@@ -1186,6 +1186,153 @@
         return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
       }
 
+      const SEGMENT_PLACEMENT_OPTIONS = [
+        ["", "默认（不指定）"],
+        ["system_core", "系统核心"],
+        ["system_format", "系统格式"],
+        ["before_character", "角色前"],
+        ["character", "角色卡"],
+        ["after_character", "角色后"],
+        ["lore_context", "世界书区"],
+        ["memory_context", "记忆区"],
+        ["before_history", "聊天历史前"],
+        ["at_depth", "聊天深度"],
+        ["near_latest_user", "近本轮输入"],
+        ["output_guard", "输出守卫"],
+      ];
+      const SEGMENT_KIND_OPTIONS = [
+        ["", "默认（不指定）"],
+        ["base", "基础"],
+        ["creator_persona", "幕后人格"],
+        ["thinking_protocol", "思考协议"],
+        ["format", "格式"],
+        ["html_protocol", "HTML 协议"],
+        ["output_rule", "输出规则"],
+        ["output_guard", "输出守卫"],
+        ["style", "文风"],
+        ["tone", "语气"],
+        ["plot", "剧情"],
+        ["dialogue", "对白"],
+        ["scene", "场景"],
+        ["relationship", "关系"],
+        ["character_policy", "角色策略"],
+        ["lore_policy", "设定策略"],
+        ["reference", "参考"],
+        ["memory", "记忆"],
+        ["director_note", "导演注"],
+        ["mod", "插件"],
+      ];
+      const SEGMENT_STRENGTH_OPTIONS = [
+        ["", "默认（不指定）"],
+        ["soft", "软提示"],
+        ["hard", "硬规则"],
+      ];
+
+      function renderSegmentSelectOptions(options, selectedValue) {
+        const selected = String(selectedValue || "").trim();
+        return options.map(([value, label]) => {
+          const optionValue = String(value || "");
+          return `<option value="${escapeHtml(optionValue)}" ${selected === optionValue ? "selected" : ""}>${escapeHtml(label)}</option>`;
+        }).join("");
+      }
+
+      function formatActivationTags(tags) {
+        if (Array.isArray(tags)) {
+          return tags.map((tag) => String(tag || "").trim()).filter(Boolean).join("\n");
+        }
+        return String(tags || "").trim();
+      }
+
+      function parseActivationTags(value) {
+        const tags = [];
+        String(value || "")
+          .split(/[\n\r,，]+/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .forEach((tag) => {
+            if (!tags.includes(tag)) tags.push(tag);
+          });
+        return tags.slice(0, 32);
+      }
+
+      function hasSegmentAdvancedFields(item = {}) {
+        if (!item || typeof item !== "object") return false;
+        if (String(item.placement || "").trim()) return true;
+        if (String(item.kind || "").trim()) return true;
+        if (String(item.strength || "").trim()) return true;
+        if (item.required === true) return true;
+        if (Number(item.tokenBudget || 0) > 0) return true;
+        return parseActivationTags(formatActivationTags(item.activation_tags)).length > 0;
+      }
+
+      function renderSegmentAdvancedFields(item = {}, variant = "block") {
+        const detailsClass = variant === "group-item" ? "preset-advanced-fields preset-group-item-advanced" : "preset-advanced-fields";
+        const openAttr = hasSegmentAdvancedFields(item) ? " open" : "";
+        const tokenBudget = Number(item.tokenBudget || 0) > 0 ? Number(item.tokenBudget || 0) : "";
+        return `
+          <details class="${detailsClass}"${openAttr}>
+            <summary class="preset-advanced-summary">
+              <span class="preset-advanced-summary-main">高级字段</span>
+              <span class="preset-advanced-summary-note">可选，普通预设可保持默认</span>
+            </summary>
+            <div class="preset-advanced-body">
+              <p class="muted helper-text preset-advanced-note">这些字段用于 PromptSegment 观察与后续高级编排；不懂可保持默认。</p>
+              <div class="preset-advanced-grid">
+                <label class="preset-advanced-field">
+                  <span>注入层级 placement</span>
+                  <select class="preset-segment-placement">${renderSegmentSelectOptions(SEGMENT_PLACEMENT_OPTIONS, item.placement)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>片段类型 kind</span>
+                  <select class="preset-segment-kind">${renderSegmentSelectOptions(SEGMENT_KIND_OPTIONS, item.kind)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>强度 strength</span>
+                  <select class="preset-segment-strength">${renderSegmentSelectOptions(SEGMENT_STRENGTH_OPTIONS, item.strength)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>Token 预算</span>
+                  <input class="preset-segment-token-budget" type="number" min="0" max="999999" step="1" value="${escapeHtml(tokenBudget)}" placeholder="默认不限制" />
+                </label>
+                <label class="preset-advanced-switch preset-required-switch" title="预算不足时优先保留；当前仍为观察字段，不改变真实裁剪逻辑。">
+                  <input class="preset-segment-required" type="checkbox" ${item.required === true ? "checked" : ""} />
+                  <span>必需片段</span>
+                </label>
+                <label class="preset-advanced-field preset-advanced-tags">
+                  <span>激活标签</span>
+                  <textarea class="preset-segment-activation-tags" rows="2" placeholder="一行一个，例如 preset.style.daily-prose；后续可升级为 tag 输入">${escapeHtml(formatActivationTags(item.activation_tags))}</textarea>
+                </label>
+              </div>
+            </div>
+          </details>
+        `;
+      }
+
+      function collectSegmentAdvancedFields(scopeEl) {
+        const result = {};
+        if (!scopeEl) return result;
+        const placement = scopeEl.querySelector(".preset-segment-placement")?.value.trim() || "";
+        const kind = scopeEl.querySelector(".preset-segment-kind")?.value.trim() || "";
+        const strength = scopeEl.querySelector(".preset-segment-strength")?.value.trim() || "";
+        const required = scopeEl.querySelector(".preset-segment-required")?.checked === true;
+        const tokenBudget = Number(scopeEl.querySelector(".preset-segment-token-budget")?.value || 0);
+        const activationTags = parseActivationTags(scopeEl.querySelector(".preset-segment-activation-tags")?.value || "");
+        if (placement) result.placement = placement;
+        if (kind) result.kind = kind;
+        if (strength) result.strength = strength;
+        if (required) result.required = true;
+        if (Number.isFinite(tokenBudget) && tokenBudget > 0) result.tokenBudget = Math.min(Math.floor(tokenBudget), 999999);
+        if (activationTags.length) result.activation_tags = activationTags;
+        return result;
+      }
+
+      function countAdvancedGroupItems(card) {
+        if (!card) return 0;
+        return Array.from(card.querySelectorAll(".preset-group-item"))
+          .filter((row) => Object.keys(collectSegmentAdvancedFields(row)).length > 0)
+          .length;
+      }
+
       function setStatus(text) {
         const value = text || "就绪";
         statusEl.textContent = value;
@@ -1301,13 +1448,16 @@
           chips.push(selectedNames.length ? `当前：${selectedNames.slice(0, 2).join("、")}${selectedNames.length > 2 ? "等" : ""}` : "当前：未选择");
           chips.push(`${itemCount} 项`);
           chips.push(`${contentLength} 字`);
+          const advancedCount = countAdvancedGroupItems(card);
+          if (advancedCount > 0) chips.push(`含高级项 ${advancedCount}`);
         } else {
           chips.push("普通规则块");
           chips.push(`${contentLength} 字`);
+          if (Object.keys(collectSegmentAdvancedFields(card)).length > 0) chips.push("高级字段");
         }
         chips.forEach((text) => {
           const chip = document.createElement("span");
-          chip.className = "preset-summary-chip";
+          chip.className = text.includes("高级") ? "preset-summary-chip advanced" : "preset-summary-chip";
           chip.textContent = text;
           summary.appendChild(chip);
         });
@@ -1446,6 +1596,7 @@
           </div>
           <label>正文</label>
           <textarea class="preset-block-content" rows="5" placeholder="这里填写要拼进系统规则的文本。">${escapeHtml(item.content || "")}</textarea>
+          ${renderSegmentAdvancedFields(item, "block")}
         `;
         setCardCollapsed(card, collapsed);
         updateCardSummary(card);
@@ -1467,6 +1618,7 @@
             <button type="button" class="secondary preset-icon-button preset-group-item-remove" title="删除规则项">×</button>
           </div>
           <textarea class="preset-group-item-content" rows="4" placeholder="这里填写这个规则项被选中后要拼进 prompt 的文本。">${escapeHtml(item.content || "")}</textarea>
+          ${renderSegmentAdvancedFields(item, "group-item")}
         `;
         row.querySelector(".preset-group-item-remove")?.addEventListener("click", () => {
           const card = row.closest(".preset-card");
@@ -1607,10 +1759,12 @@
             card.querySelectorAll(".preset-group-item").forEach((row) => {
               parts.push(row.querySelector(".preset-group-item-name-input")?.value || "");
               parts.push(row.querySelector(".preset-group-item-content")?.value || "");
+              parts.push(row.querySelector(".preset-segment-activation-tags")?.value || "");
             });
           } else {
             parts.push(card.querySelector(".preset-block-name")?.value || "");
             parts.push(card.querySelector(".preset-block-content")?.value || "");
+            parts.push(card.querySelector(".preset-segment-activation-tags")?.value || "");
           }
           const matched = !keyword || parts.join("\n").toLowerCase().includes(keyword);
           card.hidden = !matched;
@@ -1668,6 +1822,7 @@
                 name: row.querySelector(".preset-group-item-name-input")?.value.trim() || `规则项 ${itemIndex + 1}`,
                 enabled: true,
                 content: row.querySelector(".preset-group-item-content")?.value.trim() || "",
+                ...collectSegmentAdvancedFields(row),
               });
             });
             prompt_groups.push({
@@ -1686,6 +1841,7 @@
               enabled: card.querySelector(".preset-block-enabled")?.checked !== false,
               content: card.querySelector(".preset-block-content")?.value.trim() || "",
               order,
+              ...collectSegmentAdvancedFields(card),
             });
           }
         });
