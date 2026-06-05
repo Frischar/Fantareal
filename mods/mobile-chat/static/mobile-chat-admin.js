@@ -18,6 +18,16 @@
     data: ["数据工具", "导出、清理和备份工具。"],
   };
 
+
+  const channelTokenRows = [
+    ["default", "默认频道"],
+    ["forum", "论坛"],
+    ["feed", "动态"],
+    ["live", "直播"],
+    ["mail", "邮箱"],
+    ["diary", "日记"],
+    ["calendar", "日程"],
+  ];
   const state = {
     summary: null,
     groups: [],
@@ -408,7 +418,10 @@
                 <strong>${esc(role.display_name)}</strong>
                 <span>${esc(role.role_id)} · ${esc(role.source)} · ${role.enabled ? "启用" : "禁用"}</span>
               </div>
-              <button class="fmca-button" type="button" data-action="edit-role" data-role-id="${esc(role.role_id)}">编辑</button>
+              <div class="fmca-actions">
+                ${role.enabled ? "" : `<button class="fmca-button" type="button" data-action="restore-role" data-role-id="${esc(role.role_id)}">恢复</button>`}
+                <button class="fmca-button" type="button" data-action="edit-role" data-role-id="${esc(role.role_id)}">编辑</button>
+              </div>
             </header>
             <p>${esc(role.summary || "暂无摘要。")}</p>
           </article>
@@ -473,7 +486,8 @@
         </label>
         <div class="fmca-actions">
           <button class="fmca-button fmca-primary" type="submit">${role ? "保存角色" : "创建角色"}</button>
-          ${role ? `<button class="fmca-button fmca-danger" type="button" data-action="disable-role" data-role-id="${esc(role.role_id)}">禁用角色</button>` : ""}
+          ${role && role.enabled ? `<button class="fmca-button fmca-danger" type="button" data-action="disable-role" data-role-id="${esc(role.role_id)}">禁用角色</button>` : ""}
+          ${role && !role.enabled ? `<button class="fmca-button" type="button" data-action="restore-role" data-role-id="${esc(role.role_id)}">恢复角色</button>` : ""}
           ${role ? `<button class="fmca-button fmca-danger" type="button" data-action="delete-role" data-role-id="${esc(role.role_id)}">删除角色</button>` : ""}
         </div>
       </form>
@@ -586,6 +600,7 @@
         </div>
         <div class="fmca-actions">
           <button class="fmca-button" type="button" data-action="extract-event-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>从事件提取候选</button>
+          <button class="fmca-button" type="button" data-action="extract-chat-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>从主 Chat 提取候选</button>
           <button class="fmca-button" type="button" data-action="clear-role-generator" ${state.roleGeneratorBusy ? "disabled" : ""}>清空</button>
         </div>
       </div>
@@ -914,6 +929,31 @@
     if (resultBox) resultBox.textContent = state.workbenchResult ? JSON.stringify(state.workbenchResult, null, 2) : "-";
   }
 
+
+  function renderChannelTokenSettings(settings) {
+    const root = byId("fmca-channel-token-settings");
+    if (!root) return;
+    const tokenSettings = settings.channel_token_settings || {};
+    root.innerHTML = channelTokenRows.map(([key, label]) => {
+      const row = tokenSettings[key] || {};
+      return `
+        <label><span>${esc(label)}初次 tokens</span><input data-channel-token="${esc(key)}" data-token-field="initial" type="number" min="64" max="32000" value="${esc(row.initial || "")}"></label>
+        <label><span>${esc(label)}重试 tokens</span><input data-channel-token="${esc(key)}" data-token-field="retry" type="number" min="64" max="32000" value="${esc(row.retry || "")}"></label>
+      `;
+    }).join("");
+  }
+
+  function collectChannelTokenSettings() {
+    const rows = {};
+    document.querySelectorAll("[data-channel-token][data-token-field]").forEach((input) => {
+      const key = input.dataset.channelToken || "default";
+      const field = input.dataset.tokenField || "initial";
+      const value = Number.parseInt(input.value, 10);
+      rows[key] = rows[key] || {};
+      if (Number.isFinite(value)) rows[key][field] = value;
+    });
+    return rows;
+  }
   function applySettingsForm(settings) {
     byId("fmca-enabled").checked = Boolean(settings.enabled);
     byId("fmca-show-fab").checked = Boolean(settings.show_floating_button);
@@ -922,6 +962,7 @@
     byId("fmca-max-tokens").value = settings.max_tokens || 500;
     byId("fmca-recent-limit").value = settings.recent_message_limit || 30;
     byId("fmca-role-reply").checked = settings.allow_role_to_role_reply !== false;
+    renderChannelTokenSettings(settings);
   }
 
   function renderSummary() {
@@ -1040,6 +1081,7 @@
       max_tokens: Number.parseInt(byId("fmca-max-tokens").value, 10),
       recent_message_limit: Number.parseInt(byId("fmca-recent-limit").value, 10),
       allow_role_to_role_reply: byId("fmca-role-reply").checked,
+      channel_token_settings: collectChannelTokenSettings(),
     };
     try {
       await request("/settings", { method: "POST", body: JSON.stringify(payload) });
@@ -1142,6 +1184,26 @@
       state.roleGeneratorDrafts = result.drafts || (result.draft ? [result.draft] : []);
       state.roleGeneratorSelectedIndex = 0;
       setToast(state.roleGeneratorDrafts.length ? `已从小手机事件提取 ${state.roleGeneratorDrafts.length} 个候选。` : "没有提取到新的事件候选。");
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      state.roleGeneratorBusy = false;
+      renderRoleGeneratorKeepingScroll(scrollTop);
+    }
+  }
+
+  async function extractChatRoleDrafts() {
+    const scrollTop = pageScrollTop();
+    state.roleGeneratorBusy = true;
+    renderRoleGeneratorKeepingScroll(scrollTop);
+    try {
+      const result = await request("/admin/role-generator/extract-chat", {
+        method: "POST",
+        body: JSON.stringify({ limit: 20, recent_messages: 160 }),
+      });
+      state.roleGeneratorDrafts = result.drafts || (result.draft ? [result.draft] : []);
+      state.roleGeneratorSelectedIndex = 0;
+      setToast(state.roleGeneratorDrafts.length ? `已从主 Chat 提取 ${state.roleGeneratorDrafts.length} 个候选。` : "没有提取到新的主 Chat 候选。");
     } catch (error) {
       setError(error.message);
     } finally {
@@ -1530,6 +1592,11 @@
         await refresh();
         setToast("角色已禁用。");
       }
+      if (action === "restore-role") {
+        await request(`/admin/roles/${encodeURIComponent(button.dataset.roleId || "")}/restore`, { method: "POST" });
+        await refresh();
+        setToast("角色已恢复。");
+      }
       if (action === "delete-role") {
         const roleId = button.dataset.roleId || "";
         if (!window.confirm(`确定从小手机角色库永久删除“${roleId}”？这不会删除主角色卡。`)) return;
@@ -1555,6 +1622,9 @@
       }
       if (action === "extract-event-role-drafts") {
         void extractEventRoleDrafts();
+      }
+      if (action === "extract-chat-role-drafts") {
+        void extractChatRoleDrafts();
       }
       if (action === "edit-pack") {
         state.manifestRows = [];

@@ -103,8 +103,13 @@
                 <option value="1-2">1-2 人</option>
               </select>
             </label>
-            <label class="fmca-row"><span>最大输出 tokens</span><input id="fmca-max-tokens" type="number" min="64" max="1200"></label>
+            <label class="fmca-row"><span>最大输出 tokens</span><input id="fmca-max-tokens" type="number" min="64" max="32000"></label>
             <label class="fmca-row"><span>保留最近消息</span><input id="fmca-recent-limit" type="number" min="1" max="80"></label>
+            <fieldset class="fmca-panel fmca-token-policy">
+              <legend>频道生成 max_tokens</legend>
+              <p>按应用类型设置 seed 生成的初次与重试 token 下限；不同模型可以自行调大。</p>
+              <div id="fmca-channel-token-settings" class="fmca-form-grid"></div>
+            </fieldset>
             <label class="fmca-row"><span>角色互相回复</span><input id="fmca-role-reply" type="checkbox"></label>
             <div class="fmca-actions">
               <button class="fmca-button fmca-primary" type="submit">保存设置</button>
