@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>小手机后台管理</title>
+    <link rel="stylesheet" href="./static/mobile-chat-admin.css?v=mobile-chat-v4-2-2-alpha-1">
+  </head>
+  <body>
+    <main class="fmca-shell">
+      <aside class="fmca-sidebar" aria-label="小手机后台导航">
+        <div class="fmca-brand">
+          <p>Fantareal Mod</p>
+          <h1>小手机后台</h1>
+          <span id="fmca-status">读取中</span>
+        </div>
+        <nav class="fmca-nav">
+          <button class="is-active" type="button" data-tab="overview">总览</button>
+          <button type="button" data-tab="settings">生成设置</button>
+          <button type="button" data-tab="workbench">工作台</button>
+          <button type="button" data-tab="groups">群聊管理</button>
+          <button type="button" data-tab="roles">角色管理</button>
+          <button type="button" data-tab="role-generator">人物生成</button>
+          <button type="button" data-tab="stickers">表情包</button>
+          <button type="button" data-tab="automation">自动行为</button>
+          <button type="button" data-tab="prompt">Prompt 配置</button>
+          <button type="button" data-tab="apps">应用管理</button>
+          <button type="button" data-tab="channels">频道生成</button>
+          <button type="button" data-tab="ui">UI 设置</button>
+          <button type="button" data-tab="diagnostics">诊断</button>
+          <button type="button" data-tab="data">数据工具</button>
+        </nav>
+      </aside>
+
+      <section class="fmca-main">
+        <header class="fmca-topbar">
+          <div>
+            <p class="fmca-kicker">v4.2.2 Console</p>
+            <h2 id="fmca-page-title">总览</h2>
+            <p id="fmca-page-copy">插件运行状态、数据摘要和快捷操作。</p>
+          </div>
+          <div class="fmca-top-actions">
+            <button class="fmca-button" id="fmca-refresh" type="button">刷新</button>
+            <button class="fmca-button fmca-primary" id="fmca-back-chat" type="button">回到聊天</button>
+          </div>
+        </header>
+
+        <p class="fmca-error" id="fmca-error" hidden></p>
+        <p class="fmca-toast" id="fmca-toast" hidden></p>
+
+        <section class="fmca-tab is-active" data-panel="overview">
+          <div class="fmca-grid">
+            <article class="fmca-card"><span>启用状态</span><strong id="fmca-enabled-state">-</strong></article>
+            <article class="fmca-card"><span>群聊数量</span><strong id="fmca-groups">-</strong></article>
+            <article class="fmca-card"><span>消息数量</span><strong id="fmca-messages">-</strong></article>
+            <article class="fmca-card"><span>当前角色</span><strong id="fmca-roles">-</strong></article>
+            <article class="fmca-card"><span>贴纸数量</span><strong id="fmca-stickers">-</strong></article>
+            <article class="fmca-card"><span>Schema</span><strong id="fmca-schema">-</strong></article>
+            <article class="fmca-card"><span>轻应用</span><strong id="fmca-apps">-</strong></article>
+            <article class="fmca-card"><span>频道事件</span><strong id="fmca-channel-events">-</strong></article>
+            <article class="fmca-card"><span>通知</span><strong id="fmca-notifications">-</strong></article>
+          </div>
+
+          <div class="fmca-two-col">
+            <article class="fmca-panel">
+              <h3>模型状态</h3>
+              <dl class="fmca-facts">
+                <div><dt>模型</dt><dd id="fmca-model-name">-</dd></div>
+                <div><dt>API URL</dt><dd id="fmca-model-url">-</dd></div>
+                <div><dt>API Key</dt><dd id="fmca-model-key">-</dd></div>
+                <div><dt>Temperature</dt><dd id="fmca-model-temp">-</dd></div>
+              </dl>
+            </article>
+
+            <article class="fmca-panel">
+              <h3>快捷操作</h3>
+              <p>这些操作只影响小手机插件数据，不会写入主 Chat 历史。</p>
+              <div class="fmca-actions">
+                <a class="fmca-button" href="./api/export">导出数据</a>
+                <button class="fmca-button" id="fmca-reset-position" type="button">复位位置</button>
+                <button class="fmca-button fmca-danger" id="fmca-clear" type="button">清空所有群聊记录</button>
+              </div>
+            </article>
+          </div>
+
+          <article class="fmca-panel">
+            <h3>最近错误</h3>
+            <p id="fmca-latest-error">暂无错误记录。</p>
+          </article>
+        </section>
+
+        <section class="fmca-tab" data-panel="settings">
+          <form class="fmca-panel fmca-form" id="fmca-settings-form">
+            <h3>生成设置</h3>
+            <p>本页先承接 v0.1 已有设置。v1.0 后续会继续拆分模型、prompt 和自动行为。</p>
+            <label class="fmca-row"><span>启用小手机</span><input id="fmca-enabled" type="checkbox"></label>
+            <label class="fmca-row"><span>显示 Chat 页悬浮球</span><input id="fmca-show-fab" type="checkbox"></label>
+            <label class="fmca-row"><span>记住拖拽位置</span><input id="fmca-remember-position" type="checkbox"></label>
+            <label class="fmca-row">
+              <span>每轮回复角色数</span>
+              <select id="fmca-reply-count">
+                <option value="1">1 人</option>
+                <option value="1-2">1-2 人</option>
+              </select>
+            </label>
+            <label class="fmca-row"><span>最大输出 tokens</span><input id="fmca-max-tokens" type="number" min="64" max="1200"></label>
+            <label class="fmca-row"><span>保留最近消息</span><input id="fmca-recent-limit" type="number" min="1" max="80"></label>
+            <label class="fmca-row"><span>角色互相回复</span><input id="fmca-role-reply" type="checkbox"></label>
+            <div class="fmca-actions">
+              <button class="fmca-button fmca-primary" type="submit">保存设置</button>
+              <button class="fmca-button" id="fmca-reset-form" type="button">恢复当前值</button>
+            </div>
+          </form>
+        </section>
+
+
+
+        <section class="fmca-tab" data-panel="workbench">
+          <article class="fmca-panel">
+            <h3>&#27169;&#22411;&#24037;&#20316;&#21488;</h3>
+            <p>&#25226;&#35282;&#33394;&#29983;&#25104;&#12289;Prompt &#39044;&#35272;&#21644;&#27169;&#22411;&#27979;&#35797;&#25918;&#22312;&#25554;&#20214;&#21518;&#21488;&#22788;&#29702;&#65292;&#36991;&#20813;&#23567;&#25163;&#26426;&#21069;&#31471;&#25215;&#25285;&#37197;&#32622;&#24037;&#20316;&#12290;</p>
+            <dl class="fmca-facts" id="fmca-workbench-model"></dl>
+          </article>
+
+          <div class="fmca-two-col">
+            <article class="fmca-panel">
+              <h3>&#35282;&#33394;&#33609;&#31295;</h3>
+              <p>&#20174;&#24403;&#21069;&#35282;&#33394;&#24211;&#25110;&#20027; Chat &#35282;&#33394;&#21345;&#29983;&#25104;&#21487;&#32534;&#36753; profile &#33609;&#31295;&#65292;&#21518;&#32493;&#20877;&#20889;&#20837;&#27491;&#24335;&#35282;&#33394;&#24211;&#12290;</p>
+              <form class="fmca-form" data-form="workbench-role-draft">
+                <label class="fmca-row"><span>&#35282;&#33394; ID / &#21517;&#31216;</span><input name="role_id" placeholder="&#30041;&#31354;&#21017;&#20351;&#29992;&#24403;&#21069;&#20505;&#36873;&#35282;&#33394;"></label>
+                <div class="fmca-actions"><button class="fmca-button fmca-primary" type="submit">&#29983;&#25104;&#33609;&#31295;</button></div>
+              </form>
+              <pre class="fmca-pre" id="fmca-workbench-role-draft">-</pre>
+            </article>
+
+            <article class="fmca-panel">
+              <h3>Prompt / Schema &#39044;&#35272;</h3>
+              <p>&#25353; scope &#26597;&#30475;&#26368;&#32456;&#25340;&#35013; prompt &#21644;&#23545;&#24212;&#36755;&#20986;&#32467;&#26500;&#65292;&#20415;&#20110;&#21518;&#21488;&#35843;&#35797;&#25552;&#31034;&#35789;&#12290;</p>
+              <div class="fmca-actions">
+                <button class="fmca-button" type="button" data-action="workbench-preview" data-scope="feed">&#21160;&#24577;</button>
+                <button class="fmca-button" type="button" data-action="workbench-preview" data-scope="forum">&#35770;&#22363;</button>
+                <button class="fmca-button" type="button" data-action="workbench-preview" data-scope="mail">&#37038;&#20214;</button>
+                <button class="fmca-button" type="button" data-action="workbench-preview" data-scope="phone">&#30005;&#35805;</button>
+              </div>
+              <pre class="fmca-pre" id="fmca-workbench-preview">-</pre>
+            </article>
+          </div>
+
+          <article class="fmca-panel">
+            <h3>生成测试</h3>
+            <p>用来测试某个 scope 的输出结构。mock / dry-run 不调用模型；真实模型会调用当前模型配置；只有勾选“保存到频道”时才会写入频道 events。</p>
+            <form class="fmca-form-grid" data-form="workbench-generate">
+              <label><span>Scope</span><select name="scope"><option value="feed">&#21160;&#24577;</option><option value="forum">&#35770;&#22363;</option><option value="mail">&#37038;&#20214;</option><option value="diary">&#26085;&#35760;</option><option value="calendar">&#26085;&#31243;</option><option value="phone">&#30005;&#35805;</option></select></label>
+              <label><span>模式</span><select name="mode"><option value="mock">mock / dry-run</option><option value="real">真实模型</option></select></label>
+              <label><span>频道 ID</span><input name="channel_id" placeholder="feed_main / forum_main / mail_inbox"></label>
+              <label><span>角色 ID</span><input name="role_id" placeholder="电话测试可指定角色。"></label>
+              <label class="fmca-wide"><span>测试输入</span><textarea name="user_input" placeholder="给模型的测试上下文，不写入主 Chat。"></textarea></label>
+              <label class="fmca-row"><span>保存到频道</span><input name="save" type="checkbox"></label>
+              <div class="fmca-actions"><button class="fmca-button fmca-primary" type="submit">运行测试</button></div>
+            </form>
+            <pre class="fmca-pre" id="fmca-workbench-result">-</pre>
+          </article>
+        </section>
+
+
+        <section class="fmca-tab" data-panel="groups">
+          <article class="fmca-panel">
+            <h3>群聊管理</h3>
+            <p>编辑群名、简介、成员、回复人数和自动插话开关。群聊仍独立保存在 <code>data/mobile_chat</code>。</p>
+            <div class="fmca-list" id="fmca-group-list"></div>
+          </article>
+          <article class="fmca-panel" id="fmca-group-editor"></article>
+        </section>
+
+        <section class="fmca-tab" data-panel="roles">
+          <article class="fmca-panel">
+            <h3>角色管理</h3>
+            <p>维护小手机自己的角色资料库。这里的资料只影响小手机 prompt，不会写回角色卡。</p>
+            <div class="fmca-actions">
+              <button class="fmca-button" id="fmca-sync-current-card" type="button">同步当前角色卡</button>
+              <button class="fmca-button" id="fmca-import-group-roles" type="button">从群聊导入</button>
+            </div>
+            <div class="fmca-list" id="fmca-role-list"></div>
+          </article>
+          <article class="fmca-panel" id="fmca-role-editor"></article>
+        </section>
+
+        <section class="fmca-tab" data-panel="role-generator">
+          <article class="fmca-panel" id="fmca-role-generator"></article>
+        </section>
+
+        <section class="fmca-tab" data-panel="stickers">
+          <article class="fmca-panel">
+            <h3>表情包管理</h3>
+            <p>读取本地 PNG，并可编辑对应 <code>manifest.json</code> 的 label、tags 和 description。PNG 资源本身不进入 PR。</p>
+            <div class="fmca-list" id="fmca-sticker-list"></div>
+          </article>
+          <article class="fmca-panel" id="fmca-sticker-editor"></article>
+        </section>
+
+        <section class="fmca-tab" data-panel="automation">
+          <article class="fmca-panel">
+            <h3>自动行为</h3>
+            <p>默认关闭。开启后由前台页面在空闲时调用小手机自己的续聊接口，带有频率限制和多标签锁。</p>
+            <dl class="fmca-facts" id="fmca-auto-facts"></dl>
+          </article>
+          <article class="fmca-panel" id="fmca-automation-editor"></article>
+        </section>
+
+        <section class="fmca-tab" data-panel="prompt">
+          <article class="fmca-panel">
+            <h3>Prompt 配置</h3>
+            <p>这里管理小手机自己的 prompt blocks 和输出契约。默认不影响正文，也不写回角色卡。</p>
+            <div class="fmca-actions">
+              <button class="fmca-button" type="button" data-action="refresh-prompt-preview">刷新预览</button>
+              <button class="fmca-button fmca-danger" type="button" data-action="reset-prompt-blocks">重置 blocks</button>
+            </div>
+          </article>
+          <article class="fmca-panel" id="fmca-prompt-blocks"></article>
+          <article class="fmca-panel">
+            <h3>Prompt Preview</h3>
+            <pre class="fmca-pre" id="fmca-prompt-preview">-</pre>
+          </article>
+        </section>
+
+        <section class="fmca-tab" data-panel="apps">
+          <article class="fmca-panel">
+            <h3>轻应用注册表</h3>
+            <p>这里控制小手机桌面 App 是否显示、排序和副标题。排序数字越小越靠前；不会安装新应用，也不会改主 Chat。</p>
+            <div class="fmca-actions">
+              <button class="fmca-button fmca-primary" type="button" data-action="save-apps">保存应用设置</button>
+              <button class="fmca-button fmca-danger" type="button" data-action="reset-apps">重置应用</button>
+            </div>
+            <div class="fmca-list" id="fmca-app-list"></div>
+          </article>
+        </section>
+
+        <section class="fmca-tab" data-panel="channels">
+          <article class="fmca-panel">
+            <h3>频道与首次生成</h3>
+            <p>动态、论坛、邮箱、日记、日程共用 channel/event 基座。seed 会真实调用模型，测试前请确认模型配置。</p>
+            <div class="fmca-list" id="fmca-channel-list"></div>
+          </article>
+        </section>
+
+        <section class="fmca-tab" data-panel="ui">
+          <article class="fmca-panel">
+            <h3>UI 设置</h3>
+            <p>这里将承载悬浮球、展开面板、主题和尺寸设置。</p>
+            <dl class="fmca-facts" id="fmca-ui-facts"></dl>
+          </article>
+        </section>
+
+        <section class="fmca-tab" data-panel="diagnostics">
+          <article class="fmca-panel">
+            <h3>生成控制</h3>
+            <p>控制小手机全局生成、每 App 生成入口和小时预算。真实生成入口会先经过这里再调用模型。</p>
+            <div id="fmca-generation-control"></div>
+          </article>
+          <article class="fmca-panel">
+            <h3>运行诊断</h3>
+            <p>确认数据隔离、生成 guard、active job、最近失败和新增数据文件状态。</p>
+            <div class="fmca-actions">
+              <button class="fmca-button" type="button" data-action="refresh-diagnostics">刷新诊断</button>
+              <button class="fmca-button fmca-danger" type="button" data-action="reset-generation-guard">清理生成 guard</button>
+            </div>
+            <pre class="fmca-pre" id="fmca-diagnostics">-</pre>
+          </article>
+        </section>
+
+        <section class="fmca-tab" data-panel="data">
+          <article class="fmca-panel">
+            <h3>数据工具</h3>
+            <p>运行时数据目录：<code id="fmca-data-dir">data/mobile_chat</code></p>
+            <div class="fmca-actions">
+              <a class="fmca-button" href="./api/export">导出全部数据</a>
+              <button class="fmca-button" type="button" data-action="refresh-data-overview">刷新数据概览</button>
+              <button class="fmca-button" type="button" data-action="notifications-read-all">通知全部已读</button>
+              <button class="fmca-button fmca-danger" type="button" data-action="clear-invalid-notifications">清理无效通知</button>
+              <button class="fmca-button fmca-danger" type="button" data-action="prune-empty-phone">清理空电话会话</button>
+              <button class="fmca-button fmca-danger" id="fmca-clear-data" type="button">清空所有群聊记录</button>
+            </div>
+          </article>
+          <article class="fmca-panel">
+            <h3>频道数据清理</h3>
+            <p>仅清理带 fallback、workbench 或 test 标记的测试数据，不清理普通角色生成内容。</p>
+            <div class="fmca-list" id="fmca-data-channel-tools"></div>
+          </article>
+          <article class="fmca-panel">
+            <h3>数据概览</h3>
+            <pre class="fmca-pre" id="fmca-data-overview">-</pre>
+          </article>
+        </section>
+      </section>
+    </main>
+    <script src="./static/mobile-chat-admin.js?v=mobile-chat-v4-2-2-alpha-1"></script>
+  </body>
+</html>
