@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   "use strict";
 
   const script = document.currentScript;
@@ -75,6 +75,7 @@
     channelReplyOpen: {},
     diaryRoleId: "",
     calendarSelectedDate: "",
+    channelListScrollTops: {},
     notifications: [],
     phoneSessions: [],
     phoneRoles: [],
@@ -363,6 +364,12 @@
     return `正在生成${label}内容...`;
   }
 
+  function channelSeedCount(channel) {
+    const configured = Number.parseInt(channel?.seed_count, 10);
+    const count = Number.isFinite(configured) && configured > 0 ? configured : 5;
+    return channel?.type === "forum" ? 1 : count;
+  }
+
   function generationOverlayMarkup() {
     if (!state.generationTask) return "";
     return `
@@ -506,16 +513,14 @@
       }
       return rows;
     }
-    if (channel?.type === "forum" && tab === "hot") {
-      return rows.sort((a, b) => eventStats(b).views - eventStats(a).views);
-    }
-    if (channel?.type === "forum" && tab === "discover") {
-      return rows.sort((a, b) => eventSocialScore(b) - eventSocialScore(a));
+    if (channel?.type === "forum") {
+      rows = rows.sort((a, b) => eventTimeValue(b) - eventTimeValue(a));
     }
     if (channel?.type === "forum" && tab === "nearby") {
       const nearby = rows.filter((event) => /附近|本地|街|巷|院|店|茶馆|门口|同城|nearby/i.test(eventSearchText(event)));
       return nearby.length ? nearby : rows;
     }
+    if (channel?.type === "forum") return rows;
     if (channel?.type === "live") {
       if (tab === "living") return rows.filter((event) => /直播中|live|on/i.test(metadataValueText(event.metadata?.live_status) || "直播中"));
       if (tab === "chat") {
@@ -580,6 +585,12 @@
   function eventSocialScore(event) {
     const stats = eventStats(event);
     return (stats.views || 0) + (stats.likes || 0) * 5 + eventReplies(event).length * 8;
+  }
+
+  function eventTimeValue(event) {
+    const value = event?.created_at || event?.updated_at || event?.metadata?.date || "";
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) ? time : 0;
   }
 
   function isOwnEvent(event) {
@@ -849,9 +860,12 @@
   }
 
   function selectedCalendarDate(events) {
-    if (state.calendarSelectedDate) return state.calendarSelectedDate;
-    const first = events.find((event) => eventDateLabel(event));
-    state.calendarSelectedDate = isoDateOnly(first?.metadata?.date || first?.created_at || new Date());
+    const dates = [...new Set((events || [])
+      .map((event) => isoDateOnly(event?.metadata?.date || event?.created_at))
+      .filter(Boolean))]
+      .sort();
+    if (state.calendarSelectedDate && dates.includes(state.calendarSelectedDate)) return state.calendarSelectedDate;
+    state.calendarSelectedDate = dates[0] || state.calendarSelectedDate || isoDateOnly(new Date());
     return state.calendarSelectedDate;
   }
 
@@ -977,8 +991,9 @@
   }
 
   function forumEventCardMarkup(event, index) {
-    const pinned = index === 0 || (event.tags || []).some((tag) => /公告|置顶|预警|官方/.test(String(tag)));
     const tags = event.tags || [];
+    const pinned = tags.some((tag) => /公告|置顶|预警|官方/.test(String(tag)));
+    const created = formatDate(event.created_at);
     return `
       <button class="fmcp-event-card fmcp-event-card-button fmcp-forum-card is-${esc(event.channel_type)}${pinned ? " is-pinned" : ""}${isFallbackEvent(event) ? " is-fallback" : ""}" type="button" data-action="open-channel-event" data-channel-id="${esc(event.channel_id)}" data-event-id="${esc(event.event_id)}">
         <span class="fmcp-forum-title-row">
@@ -989,6 +1004,7 @@
         ${tags.length && !isFallbackEvent(event) ? `<span class="fmcp-forum-badges">${tags.slice(0, 2).map((tag, tagIndex) => `<span class="${pinned && tagIndex === 0 ? "is-official" : ""}">${esc(tag)}</span>`).join("")}${pinned ? '<span>置顶</span>' : ""}</span>` : ""}
         <span class="fmcp-forum-footer">
           <span class="fmcp-forum-author">${esc(event.author_name || "System")}</span>
+          ${created ? `<span class="fmcp-forum-time">${esc(created)}</span>` : ""}
           <span class="fmcp-social-stats">${eventStatsMarkup(event, index)}</span>
         </span>
       </button>
@@ -1412,14 +1428,15 @@
   }
 
   function calendarChannelMarkup(channel, events, visibleEvents) {
-    const selectedDate = selectedCalendarDate(visibleEvents);
+    const calendarEvents = visibleEvents.length ? visibleEvents : events;
+    const selectedDate = selectedCalendarDate(calendarEvents);
     const monthStart = new Date(`${selectedDate.slice(0, 7)}-01T00:00:00`);
     const year = monthStart.getFullYear();
     const month = monthStart.getMonth();
     const firstDay = monthStart.getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const byDate = new Map();
-    visibleEvents.forEach((item) => {
+    calendarEvents.forEach((item) => {
       const key = isoDateOnly(item.metadata?.date || item.created_at);
       byDate.set(key, [...(byDate.get(key) || []), item]);
     });
@@ -1428,7 +1445,7 @@
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const count = (byDate.get(date) || []).length;
-      cells.push(`<button class="fmcp-calendar-cell ${date === selectedDate ? "is-active" : ""} ${count ? "has-events" : ""}" type="button" data-action="select-calendar-date" data-date="${esc(date)}" title="${count ? `${count} 条安排` : "暂无安排"}"><strong>${day}</strong>${count ? '<small class="fmcp-calendar-dot" aria-hidden="true"></small>' : ""}</button>`);
+      cells.push(`<button class="fmcp-calendar-cell ${date === selectedDate ? "is-active" : ""} ${count ? "has-events" : ""}" type="button" data-action="select-calendar-date" data-date="${esc(date)}" title="${count ? "有安排" : "暂无安排"}"><strong>${day}</strong>${count ? '<small class="fmcp-calendar-dot" aria-hidden="true"></small>' : ""}</button>`);
     }
     const dayEvents = byDate.get(selectedDate) || [];
     return `
@@ -1843,8 +1860,8 @@
               </select>
             </label>
             <label class="fmcp-settings-row">
-              <span class="fmcp-settings-copy"><strong>最大输出 tokens</strong><small>范围 64-1200</small></span>
-              <input class="fmcp-number-input" name="max_tokens" type="number" min="64" max="1200" value="${esc(settings.max_tokens || 500)}">
+              <span class="fmcp-settings-copy"><strong>最大输出 tokens</strong><small>范围 64-32000</small></span>
+              <input class="fmcp-number-input" name="max_tokens" type="number" min="64" max="32000" value="${esc(settings.max_tokens || 500)}">
             </label>
             <label class="fmcp-settings-row">
               <span class="fmcp-settings-copy"><strong>保留最近消息</strong><small>范围 1-80 条</small></span>
@@ -2126,6 +2143,7 @@
           <div class="fmcp-form-actions fmcp-generator-actions">
             <button class="fmcp-button" type="button" data-action="clear-role-generator" ${state.roleGeneratorBusy ? "disabled" : ""}>清空</button>
             <button class="fmcp-button" type="button" data-action="extract-event-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>从事件提取候选</button>
+            <button class="fmcp-button" type="button" data-action="extract-chat-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>从主 Chat 提取候选</button>
             <button class="fmcp-button fmcp-button-primary" type="submit" ${state.roleGeneratorBusy ? "disabled" : ""}>${state.roleGeneratorBusy ? "生成中..." : "生成草稿"}</button>
           </div>
         </form>
@@ -2484,6 +2502,30 @@
     }
   }
 
+  async function extractChatRoleDrafts() {
+    const scrollTop = currentBodyScrollTop();
+    state.roleGeneratorBusy = true;
+    state.roleGeneratorNotice = "";
+    state.error = "";
+    renderKeepingBodyScroll(scrollTop);
+    try {
+      const result = await request("/role-generator/extract-chat", {
+        method: "POST",
+        body: JSON.stringify({ limit: 12, recent_messages: 120 }),
+      });
+      state.roleGeneratorDrafts = result.drafts || (result.draft ? [result.draft] : []);
+      state.roleGeneratorSelectedIndex = 0;
+      state.roleGeneratorNotice = state.roleGeneratorDrafts.length
+        ? `已从主 Chat 正文提取 ${state.roleGeneratorDrafts.length} 个候选草稿。`
+        : "没有从主 Chat 正文中提取到新的候选。";
+    } catch (error) {
+      state.error = error.message;
+    } finally {
+      state.roleGeneratorBusy = false;
+      renderKeepingBodyScroll(scrollTop);
+    }
+  }
+
   async function saveRoleDrafts({ all = false } = {}) {
     const drafts = state.roleGeneratorDrafts || [];
     const selected = drafts[state.roleGeneratorSelectedIndex || 0];
@@ -2833,7 +2875,7 @@
     try {
       const payload = await request(`/channels/${encodeURIComponent(state.currentChannelId)}/seed`, {
         method: "POST",
-        body: JSON.stringify({ count: 5 }),
+        body: JSON.stringify({ count: channelSeedCount(channel) }),
         signal: controller.signal,
       });
       state.channelEvents[state.currentChannelId] = payload.events || [];
@@ -3328,9 +3370,10 @@
     }
     if (action === "back") {
       if (state.page.startsWith("channel-") && state.currentChannelEventId) {
+        const scrollTop = state.channelListScrollTops[state.currentChannelId];
         state.currentChannelEventId = "";
         state.error = "";
-        render();
+        renderKeepingBodyScroll(scrollTop);
         return;
       }
       state.page = state.page === "chat" || state.page === "create" ? "groups" : "home";
@@ -3419,14 +3462,16 @@
       render();
     }    if (action === "open-channel-event") {
       state.currentChannelId = button.dataset.channelId || state.currentChannelId;
+      state.channelListScrollTops = { ...state.channelListScrollTops, [state.currentChannelId]: currentBodyScrollTop() };
       state.currentChannelEventId = button.dataset.eventId || "";
       state.error = "";
       render();
     }
     if (action === "show-channel-list") {
+      const scrollTop = state.channelListScrollTops[state.currentChannelId];
       state.currentChannelEventId = "";
       state.error = "";
-      render();
+      renderKeepingBodyScroll(scrollTop);
     }
     if (action === "read-notification") void readNotification(button.dataset.notificationId || "");
     if (action === "notification-filter") {
@@ -3492,6 +3537,7 @@
     if (action === "save-all-role-drafts") void saveRoleDrafts({ all: true });
     if (action === "clear-role-generator") clearRoleGenerator();
     if (action === "extract-event-role-drafts") void extractEventRoleDrafts();
+    if (action === "extract-chat-role-drafts") void extractChatRoleDrafts();
     if (action === "save-mail-draft") {
       const eventId = button.dataset.eventId || state.currentChannelEventId;
       const form = button.closest("form");
