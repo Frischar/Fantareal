@@ -1,0 +1,129 @@
+.prompt-debug-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+.prompt-debug-summary-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.prompt-debug-flow-card,
+.prompt-debug-card {
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--panel);
+  padding: 0.8rem 0.9rem;
+}
+.prompt-debug-flow-card strong {
+  display: block;
+  font-size: 1.05rem;
+  margin-bottom: 0.18rem;
+}
+.prompt-debug-flow-card span,
+.prompt-debug-card p {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.prompt-debug-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}
+.prompt-debug-card-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+.prompt-debug-relation-list,
+.prompt-debug-layer-list,
+.prompt-debug-worldbook-list {
+  display: grid;
+  gap: 0.6rem;
+}
+.prompt-debug-relation-card {
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--input-bg);
+  padding: 0.75rem 0.85rem;
+}
+.prompt-debug-relation-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.65rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}
+.prompt-debug-tag-name {
+  font-weight: 700;
+  word-break: break-word;
+}
+.prompt-debug-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.prompt-debug-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  padding: 0.18rem 0.5rem;
+  font-size: 0.72rem;
+}
+.prompt-debug-badge.hit,
+.prompt-debug-badge.injected {
+  border-color: rgba(104, 214, 158, 0.42);
+  background: rgba(54, 154, 105, 0.14);
+}
+.prompt-debug-badge.missing {
+  border-color: rgba(236, 202, 116, 0.42);
+  background: rgba(184, 139, 48, 0.12);
+}
+.prompt-debug-badge.dropped {
+  border-color: rgba(255, 184, 108, 0.45);
+  background: rgba(255, 184, 108, 0.1);
+}
+.prompt-debug-badge.base {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border) 64%);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel) 88%);
+}
+.prompt-debug-base-kernel {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border) 74%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 7%, var(--panel) 93%), var(--panel));
+}
+.prompt-debug-base-kernel-body {
+  display: grid;
+  gap: 0.45rem;
+}
+.prompt-debug-base-marker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+.prompt-debug-relation-meta,
+.prompt-debug-layer-row {
+  display: grid;
+  gap: 0.28rem;
+  color: var(--muted);
+  font-size: 0.79rem;
+}
+.prompt-debug-layer-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--input-bg);
+  padding: 0.55rem 0.7rem;
+}
+.prompt-debug-empty {
+  border: 1px dashed var(--border);
+  border-radius: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 0.8rem;
+}

@@ -53,6 +53,19 @@ V4F_OUTPUT_GUARD_PROMPT = (
     "结尾应停在仍可继续互动的位置，不要写成总结、落幕、升华、回顾或明显收束。"
 )
 
+BASE_KERNEL_MARKERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("worker_persona", "幕后工作人格", ("幕后工作人格",)),
+    ("turn_extraction", "本轮提取格式", ("本轮提取格式",)),
+    ("injection_reading", "注入内容读取规则", ("注入内容读取规则",)),
+    ("priority_rules", "冲突优先级", ("冲突优先级",)),
+    ("body_isolation", "正文隔离规则", ("正文隔离规则",)),
+    ("plot_direction", "剧情走向", ("剧情走向",)),
+    ("style_taboo", "文风与禁忌", ("文风与禁忌",)),
+    ("physical_engine", "物理引擎", ("物理引擎",)),
+    ("user_input_truth", "用户输入真实性边界", ("用户输入真实性边界",)),
+)
+
+
 PRESET_MODULE_RULES: dict[str, dict[str, str]] = {
     "no_user_speaking": {
         "label": "防抢话",
@@ -531,6 +544,22 @@ def get_active_preset_from_store(store: dict[str, Any]) -> dict[str, Any]:
     return sanitized["presets"][0]
 
 
+def build_base_kernel_metadata(content: Any) -> dict[str, Any]:
+    text = str(content or "").strip()
+    markers: list[str] = []
+    marker_labels: list[str] = []
+    for key, label, keywords in BASE_KERNEL_MARKERS:
+        if any(keyword in text for keyword in keywords):
+            markers.append(key)
+            marker_labels.append(label)
+    return {
+        "enabled": bool(text),
+        "char_count": len(text),
+        "markers": markers,
+        "marker_labels": marker_labels,
+    }
+
+
 def build_selected_prompt_group_blocks(groups: list[dict[str, Any]]) -> list[tuple[int, str]]:
     blocks: list[tuple[int, str]] = []
     for group_index, group in enumerate(groups, start=1):
@@ -619,7 +648,11 @@ def build_preset_observation_segments_from_preset(preset: dict[str, Any]) -> lis
         placement=normalize_preset_segment_placement(base_prompt_segment.get("placement"), "system_core"),
         token_budget=parse_int(base_prompt_segment.get("tokenBudget"), 0, min_value=0, max_value=999999) or None,
         activation_tags=sanitize_activation_tags(base_prompt_segment.get("activation_tags")),
-        metadata={"preset_id": sanitized.get("id"), "preset_name": sanitized.get("name")},
+        metadata={
+            "preset_id": sanitized.get("id"),
+            "preset_name": sanitized.get("name"),
+            "base_kernel": build_base_kernel_metadata(base_prompt),
+        },
     )
 
     modules = sanitized.get("modules", {})

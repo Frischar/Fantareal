@@ -2389,6 +2389,22 @@ def normalize_role_state_role(raw: Any, index: int = 1) -> dict[str, Any] | None
     mode = normalize_role_state_mode(raw.get("mode") or raw.get("stateJournalMode"), enabled=enabled, has_variables=bool(variables), has_stages=bool(stages), has_snapshot=bool(snapshot_fields))
     if mode == "disabled":
         enabled = False
+    source = str(raw.get("source") or raw.get("role_source") or "").strip()
+    source_type = str(raw.get("source_type") or raw.get("sourceType") or "").strip()
+    has_state_journal_config = bool(
+        raw.get("has_state_journal_config")
+        or raw.get("hasStateJournalConfig")
+        or variables
+        or stages
+        or snapshot_fields
+        or mode in {"snapshot_only", "full"}
+    )
+    is_empty_slot = bool(raw.get("is_empty_slot") or raw.get("isEmptySlot"))
+    if not is_empty_slot and source_type == "multi_role_slot" and not has_state_journal_config and not variables and not stages and not snapshot_fields:
+        is_empty_slot = True
+    display_policy = str(raw.get("display_policy") or raw.get("displayPolicy") or "").strip()
+    if not display_policy:
+        display_policy = "hide_empty" if is_empty_slot else "show"
     return {
         "role_id": role_id,
         "role_name": role_name or role_id,
@@ -2401,7 +2417,11 @@ def normalize_role_state_role(raw: Any, index: int = 1) -> dict[str, Any] | None
         "variables": variables,
         "stages": stages,
         "snapshotFields": snapshot_fields,
-        "source": str(raw.get("source") or raw.get("role_source") or "").strip(),
+        "source": source,
+        "source_type": source_type or ("multi_role_slot" if source == "persona" else source or "manual"),
+        "has_state_journal_config": has_state_journal_config,
+        "is_empty_slot": is_empty_slot,
+        "display_policy": display_policy,
         "settings": {
             "allow_regression": bool(settings.get("allow_regression", False)),
             "confirm_turns": role_state_int(settings.get("confirm_turns"), 1, 1),
@@ -2472,6 +2492,43 @@ def is_placeholder_persona(persona_key: str, persona: dict[str, Any]) -> bool:
     return key_text.isdigit() and not persona_text.strip()
 
 
+def persona_has_state_journal_payload(persona: dict[str, Any]) -> bool:
+    if not isinstance(persona, dict):
+        return False
+    state_journal = persona.get("stateJournal") if isinstance(persona.get("stateJournal"), dict) else {}
+    if state_journal.get("roles") or state_journal.get("variables") or state_journal.get("stages") or state_journal.get("snapshotFields"):
+        return True
+    return bool(persona.get("variables") or persona.get("stages") or persona.get("snapshotFields") or persona.get("fields"))
+
+
+def is_empty_persona_slot(persona_key: str, persona: dict[str, Any]) -> bool:
+    if not isinstance(persona, dict):
+        return False
+    if persona_has_state_journal_payload(persona):
+        return False
+    name = str(persona.get("name") or "").strip()
+    if not is_placeholder_role_label(name):
+        return False
+    meaningful_keys = (
+        "description",
+        "personality",
+        "scenario",
+        "creator_notes",
+        "first_mes",
+        "mes_example",
+        "system_prompt",
+        "prompt",
+    )
+    persona_text = " ".join(str(persona.get(key) or "").strip() for key in meaningful_keys)
+    compact = re.sub(r"\s+", " ", persona_text).strip().lower()
+    if not compact:
+        return True
+    if any(hint in compact for hint in PLACEHOLDER_PERSONA_HINTS):
+        return True
+    # Role A/B/C 这类多角色模板名如果没有心笺配置，即使带有少量模板描述，也不默认作为心笺角色展示。
+    return True
+
+
 def merge_role_state_role(base: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
     # 保留配置更完整的一方作为主体，另一方只补缺失项，避免 persona 自动补角色生成空重复项。
     primary, secondary = (incoming, base) if role_state_role_score(incoming) > role_state_role_score(base) else (base, incoming)
@@ -2501,7 +2558,7 @@ def merge_role_state_role(base: dict[str, Any], incoming: dict[str, Any]) -> dic
     return normalize_role_state_role(merged, 1) or merged
 
 
-def normalize_role_state_config(raw: Any) -> dict[str, Any]:
+def normalize_role_state_config(raw: Any, *, include_hidden_empty: bool = True) -> dict[str, Any]:
     config = {"version": 1, "enabled": True, "role_source_mode": "auto", "roles": []}
     if not isinstance(raw, dict):
         return config
@@ -2519,6 +2576,8 @@ def normalize_role_state_config(raw: Any) -> dict[str, Any]:
         for index, item in enumerate(raw_roles, start=1):
             role = normalize_role_state_role(item, index)
             if not role:
+                continue
+            if not include_hidden_empty and role.get("display_policy") == "hide_empty":
                 continue
             tokens = role_state_role_tokens(role)
             existing_index = -1
@@ -2577,6 +2636,10 @@ def role_state_main_card_role(raw_card: dict[str, Any]) -> dict[str, Any] | None
         "snapshotFields": [],
         "initial_stage": "stage_a",
         "source": "main_card",
+        "source_type": "main_card",
+        "has_state_journal_config": False,
+        "is_empty_slot": False,
+        "display_policy": "show",
     }
 
 
@@ -2586,7 +2649,7 @@ def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
     for index, (persona_key, persona) in enumerate(personas.items(), start=1):
         if not isinstance(persona, dict):
             continue
-        if is_placeholder_persona(str(persona_key), persona):
+        if is_placeholder_persona(str(persona_key), persona) or is_empty_persona_slot(str(persona_key), persona):
             continue
         name = str(persona.get("name") or f"角色{index}").strip()
         role_id = normalize_role_state_key(persona.get("role_id") or persona.get("id") or name or persona_key, f"role_{index}")
@@ -2594,7 +2657,7 @@ def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
         key_text = str(persona_key or "").strip()
         if key_text and key_text != role_id:
             aliases.append(key_text)
-        roles.append({"role_id": role_id, "role_name": name, "aliases": aliases, "enabled": True, "mode": "default", "stateJournalMode": "default", "use_default_variables": True, "variables": [], "stages": [], "snapshotFields": [], "initial_stage": "stage_a", "source": "persona"})
+        roles.append({"role_id": role_id, "role_name": name, "aliases": aliases, "enabled": True, "mode": "default", "stateJournalMode": "default", "use_default_variables": True, "variables": [], "stages": [], "snapshotFields": [], "initial_stage": "stage_a", "source": "persona", "source_type": "multi_role_slot", "has_state_journal_config": False, "is_empty_slot": False, "display_policy": "show"})
     return roles
 
 
@@ -2688,7 +2751,7 @@ def sync_role_state_config_to_current_card(config: dict[str, Any]) -> bool:
     raw_card = data.get("raw")
     if not isinstance(raw_card, dict):
         raw_card = {}
-    normalized = normalize_role_state_config(config)
+    normalized = normalize_role_state_config(config, include_hidden_empty=False)
     existing_state_journal = raw_card.get("stateJournal") if isinstance(raw_card.get("stateJournal"), dict) else {}
     normalized["role_source_mode"] = normalize_role_source_mode(normalized.get("role_source_mode") or existing_state_journal.get("role_source_mode") or existing_state_journal.get("roleSourceMode"))
     normalized["card_uid"] = current_card_uid()
@@ -3444,7 +3507,7 @@ def load_role_state_config(conn: sqlite3.Connection, card_uid: str | None = None
 def save_role_state_config(conn: sqlite3.Connection, config: dict[str, Any], card_uid: str | None = None) -> dict[str, Any]:
     init_meta_tables(conn)
     safe_card_uid = normalize_role_state_key(card_uid or (config or {}).get("card_uid") or current_card_uid(), "global")
-    normalized = normalize_role_state_config(config)
+    normalized = normalize_role_state_config(config, include_hidden_empty=False)
     normalized["card_uid"] = safe_card_uid
     normalized["card"] = current_card_summary()
     now = now_string()
@@ -4093,20 +4156,38 @@ def get_active_stage_tags_from_db() -> dict[str, Any]:
         , (current_card_uid(),)).fetchall()
     stages = []
     tags = []
+    sources = []
     for row in rows:
         tag = str(row["active_tag"] or "").strip()
         if not tag:
             continue
+        role_id = str(row["role_id"] or "").strip()
+        role_name = str(row["role_name"] or role_id).strip()
+        stage_key = str(row["current_stage_key"] or "").strip()
+        stage_name = str(row["current_stage_name"] or stage_key).strip()
+        updated_at = str(row["updated_at"] or "").strip()
         tags.append(tag)
+        stage_ref = {
+            "role_id": role_id,
+            "role_name": role_name,
+            "stage_key": stage_key,
+            "stage_name": stage_name,
+            "is_active": True,
+            "updated_at": updated_at,
+        }
         stages.append({
-            "role_id": row["role_id"],
-            "role_name": row["role_name"],
-            "stage_key": row["current_stage_key"],
-            "stage_name": row["current_stage_name"],
+            **stage_ref,
             "tag": tag,
-            "updated_at": row["updated_at"],
+            "activation_tag": tag,
+            "updated_at": updated_at,
         })
-    return {"active_stage_tags": tags, "stages": stages}
+        sources.append({
+            "tag": tag,
+            "source": "state_journal",
+            "label": " · ".join([item for item in [role_name, stage_name] if item]) or "心笺阶段",
+            "ref": stage_ref,
+        })
+    return {"active_stage_tags": tags, "active_stage_sources": sources, "stages": stages}
 
 
 
