@@ -3233,29 +3233,12 @@
   font-size: 13px;
 }
 
-.fmcp-calendar-cell small {
-  display: grid;
-  width: 15px;
-  height: 15px;
-  place-items: center;
-  border-radius: 999px;
-  background: #e4edff;
-  color: #315fcb;
-  font-size: 10px;
-  font-weight: 820;
-}
-
 .fmcp-calendar-cell.has-events {
   border-color: rgba(49, 95, 203, 0.36);
 }
 
 .fmcp-calendar-cell.is-active {
   background: #315fcb;
-  color: #fff;
-}
-
-.fmcp-calendar-cell.is-active small {
-  background: rgba(255, 255, 255, 0.22);
   color: #fff;
 }
 
@@ -3610,11 +3593,6 @@
   background: #effaf6;
 }
 
-.fmcp-calendar-cell small {
-  background: #176b57;
-  color: #ffffff;
-}
-
 .fmcp-calendar-day-panel {
   color: #111827;
 }
@@ -3876,6 +3854,18 @@
 }
 
 .fmcp-calendar-cell.is-active .fmcp-calendar-dot {
+  background: #ffffff;
+}
+
+.fmcp-calendar-cell.is-active,
+.fmcp-calendar-cell.has-events.is-active {
+  border-color: rgba(31, 79, 180, 0.88);
+  background: #2451b8;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(36, 81, 184, 0.18);
+}
+
+.fmcp-calendar-cell.has-events.is-active .fmcp-calendar-dot {
   background: #ffffff;
 }
 
@@ -4934,4 +4924,134 @@
     transform: translateY(0) scale(1);
     box-shadow: 0 8px 18px rgba(22, 35, 58, 0.07);
   }
+}
+
+/* 4.2.7 forum list readability and recency polish */
+.fmcp-forum-app {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  margin: -4px;
+  min-height: 100%;
+  padding: 10px 10px 72px;
+  background: #edf3fa;
+  color: #172233;
+}
+
+.fmcp-forum-topbar {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(83, 109, 156, 0.26);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(28, 52, 87, 0.08);
+}
+
+.fmcp-forum-topbar strong {
+  color: #172233;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 880;
+}
+
+.fmcp-forum-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 42px;
+  align-items: end;
+  overflow: hidden;
+  border: 1px solid rgba(83, 109, 156, 0.22);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.fmcp-forum-tabs button {
+  min-height: 40px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #5d6c82;
+  font-size: 13px;
+  font-weight: 820;
+}
+
+.fmcp-forum-tabs button.is-active {
+  border-bottom-color: #426fdf;
+  color: #315fcb;
+}
+
+.fmcp-forum-board {
+  display: grid;
+  gap: 9px;
+}
+
+.fmcp-forum-card {
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(83, 109, 156, 0.28);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172233;
+  box-shadow: 0 8px 16px rgba(28, 52, 87, 0.08);
+}
+
+.fmcp-forum-card.is-pinned {
+  border-color: rgba(66, 111, 223, 0.5);
+  background: #f4f8ff;
+}
+
+.fmcp-forum-title-row strong {
+  color: #172233;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.fmcp-forum-card .fmcp-event-card-copy {
+  -webkit-line-clamp: 2;
+  color: #53627a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fmcp-forum-footer {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: center;
+  color: #75859e;
+  font-size: 11px;
+}
+
+.fmcp-forum-footer .fmcp-social-stats {
+  grid-column: 1 / -1;
+}
+
+.fmcp-forum-time {
+  justify-self: end;
+  color: #8a98ad;
+  font-weight: 680;
+}
+
+.fmcp-forum-compose-fab {
+  position: sticky;
+  z-index: 5;
+  bottom: 12px;
+  display: inline-flex;
+  width: auto;
+  min-height: 42px;
+  align-items: center;
+  justify-self: end;
+  gap: 7px;
+  margin-top: -52px;
+  border-radius: 8px;
+  background: #426fdf;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 840;
+  padding: 0 13px;
+  box-shadow: 0 10px 20px rgba(49, 95, 203, 0.24);
 }

@@ -4,7 +4,7 @@ import asyncio
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -40,6 +40,7 @@ MAIN_SETTINGS_PATH = PROJECT_ROOT / "data" / "settings.json"
 ROUTE_FORWARDING_PATH = PROJECT_ROOT / "data" / "route_forwarding.json"
 CURRENT_ROLE_CARD_PATH = PROJECT_ROOT / "data" / "current_role_card.json"
 USER_PROFILE_PATH = PROJECT_ROOT / "data" / "user_profile.json"
+MAIN_CONVERSATIONS_PATH = PROJECT_ROOT / "data" / "conversations.json"
 STATIC_DIR = RESOURCE_DIR / "static"
 TEMPLATES_DIR = RESOURCE_DIR / "templates"
 PROMPT_PATH = RESOURCE_DIR / "prompts" / "mobile_chat_prompt.txt"
@@ -94,6 +95,15 @@ DEFAULT_PROMPT_SETTINGS = {
     "use_block_prompt": False,
     "last_preview_channel": "group_chat",
 }
+DEFAULT_CHANNEL_TOKEN_SETTINGS = {
+    "default": {"initial": 4500, "retry": 6000},
+    "feed": {"initial": 4500, "retry": 6000},
+    "forum": {"initial": 8000, "retry": 10000},
+    "live": {"initial": 4500, "retry": 6000},
+    "mail": {"initial": 4500, "retry": 6000},
+    "diary": {"initial": 4500, "retry": 6000},
+    "calendar": {"initial": 4500, "retry": 6000},
+}
 DEFAULT_GENERATION_CONTROL_SETTINGS = {
     "paused": False,
     "hourly_limit": 24,
@@ -131,6 +141,7 @@ DEFAULT_SETTINGS = {
     "roles": DEFAULT_ROLES_SETTINGS,
     "groups": DEFAULT_GROUPS_SETTINGS,
     "prompt": DEFAULT_PROMPT_SETTINGS,
+    "channel_token_settings": DEFAULT_CHANNEL_TOKEN_SETTINGS,
     "generation_control": DEFAULT_GENERATION_CONTROL_SETTINGS,
 }
 DEFAULT_ROLE_PROFILES = {
@@ -229,7 +240,7 @@ DEFAULT_CHANNELS = {
     "schema_version": 1,
     "channels": [
         {"channel_id": "feed_main", "type": "feed", "label": "动态", "description": "角色围绕当前世界观发布的近况。", "seed_count": 5, "enabled": True},
-        {"channel_id": "forum_main", "type": "forum", "label": "论坛", "description": "角色和世界内路人讨论事件的帖子。", "seed_count": 5, "enabled": True},
+        {"channel_id": "forum_main", "type": "forum", "label": "论坛", "description": "角色和世界内路人讨论事件的帖子。", "seed_count": 3, "enabled": True},
         {"channel_id": "live_main", "type": "live", "label": "直播", "description": "角色直播间、弹幕、醒目留言和贡献榜。", "seed_count": 4, "enabled": True},
         {"channel_id": "mail_inbox", "type": "mail", "label": "邮箱", "description": "角色发来的邮件和系统邮件。", "seed_count": 4, "enabled": True},
         {"channel_id": "diary_main", "type": "diary", "label": "日记", "description": "角色或用户视角的碎片记录。", "seed_count": 4, "enabled": True},
@@ -374,6 +385,11 @@ class RoleGeneratorSavePayload(BaseModel):
 class RoleEventExtractPayload(BaseModel):
     channel_ids: list[Any] | None = None
     limit: int | None = None
+
+
+class RoleChatExtractPayload(BaseModel):
+    limit: int | None = None
+    recent_messages: int | None = None
 
 
 class StickerManifestPayload(BaseModel):
@@ -761,6 +777,14 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
+def local_today() -> date:
+    return datetime.now(timezone.utc).astimezone().date()
+
+
+def local_today_iso() -> str:
+    return local_today().isoformat()
+
+
 def normalize_id(value: Any, fallback: str = "") -> str:
     raw = compact_text(value, 120).lower().replace(" ", "_")
     normalized = SAFE_ID_RE.sub("_", raw).strip("_")
@@ -916,6 +940,18 @@ def generation_control_payload() -> dict[str, Any]:
     }
 
 
+
+def sanitize_channel_token_settings(raw: Any) -> dict[str, dict[str, int]]:
+    source = raw if isinstance(raw, dict) else {}
+    settings = clone_default(DEFAULT_CHANNEL_TOKEN_SETTINGS)
+    for key, defaults in DEFAULT_CHANNEL_TOKEN_SETTINGS.items():
+        row = source.get(key) if isinstance(source.get(key), dict) else {}
+        initial = clamp_int(row.get("initial"), 64, 32000, defaults["initial"])
+        retry = clamp_int(row.get("retry"), 64, 32000, defaults["retry"])
+        settings[key] = {"initial": initial, "retry": max(initial, retry)}
+    return settings
+
+
 def sanitize_settings(raw: Any) -> dict[str, Any]:
     source = raw if isinstance(raw, dict) else {}
     settings = clone_default(DEFAULT_SETTINGS)
@@ -927,6 +963,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     groups_source = section_source(source, "groups")
     prompt_source = section_source(source, "prompt")
     generation_control_source = section_source(source, "generation_control")
+    channel_token_source = section_source(source, "channel_token_settings")
 
     settings["schema_version"] = 2
     settings["enabled"] = bool(source.get("enabled", DEFAULT_SETTINGS["enabled"]))
@@ -946,7 +983,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     settings["max_tokens"] = clamp_int(
         pick_section_value(source, generation_source, "max_tokens", DEFAULT_GENERATION_SETTINGS["max_tokens"]),
         64,
-        1200,
+        32000,
         DEFAULT_GENERATION_SETTINGS["max_tokens"],
     )
     settings["recent_message_limit"] = clamp_int(
@@ -993,6 +1030,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
         "last_preview_channel": compact_text(prompt_source.get("last_preview_channel", DEFAULT_PROMPT_SETTINGS["last_preview_channel"]), 40)
         or DEFAULT_PROMPT_SETTINGS["last_preview_channel"],
     }
+    settings["channel_token_settings"] = sanitize_channel_token_settings(channel_token_source)
     settings["generation_control"] = sanitize_generation_control(generation_control_source)
     return settings
 
@@ -1299,7 +1337,7 @@ def finish_generation_job(job: dict[str, str], status: str, error: str = "") -> 
 
 def merge_settings_update(current: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
     merged = {**current, **updates}
-    for key in ("ui", "generation", "auto_behavior", "stickers", "roles", "groups", "prompt", "generation_control"):
+    for key in ("ui", "generation", "auto_behavior", "stickers", "roles", "groups", "prompt", "generation_control", "channel_token_settings"):
         if isinstance(current.get(key), dict) and isinstance(updates.get(key), dict):
             merged[key] = {**current[key], **updates[key]}
     ui = updates.get("ui") if isinstance(updates.get("ui"), dict) else {}
@@ -1427,7 +1465,7 @@ def sanitize_role_profile(raw: Any, index: int = 0) -> dict[str, Any] | None:
     if role_id == "user":
         return None
     source = normalize_id(raw.get("source"), "manual")
-    if source not in {"manual", "current_card", "group_import", "role_generator", "admin_role_generator", "event_extract", "admin_event_extract", "admin_workbench"}:
+    if source not in {"manual", "current_card", "group_import", "role_generator", "admin_role_generator", "event_extract", "admin_event_extract", "chat_extract", "admin_chat_extract", "admin_workbench"}:
         source = "manual"
     auto_weight = clamp_float(raw.get("auto_speak_weight"), 0.0, 10.0, 1.0)
     return {
@@ -1633,6 +1671,12 @@ def event_role_name_allowed(name: str) -> bool:
         "系统",
         "小手机",
         "旁白",
+        "主角",
+        "先生",
+        "姑娘",
+        "小姐",
+        "夫人",
+        "公子",
         "主播",
         "观众",
         "路人",
@@ -1775,6 +1819,125 @@ def extract_event_role_profiles(payload: RoleEventExtractPayload | None = None, 
                 for item in contributors:
                     if isinstance(item, dict):
                         add_candidate(channel, event, item.get("name") or item.get("author_name") or item.get("user"), "contributor", item.get("note") or item.get("amount"))
+
+    sorted_candidates = sorted(
+        candidates.values(),
+        key=lambda item: (-int(item.get("count") or 0), compact_text(item.get("name"), 80).casefold()),
+    )
+    drafts = [event_role_profile_from_candidate(candidate, index, source) for index, candidate in enumerate(sorted_candidates[:limit])]
+    return [draft for draft in drafts if draft]
+
+
+CHAT_SPEAKER_LABEL_RE = re.compile(r"(?:^|\n)\s*([A-Za-z\u4e00-\u9fff][A-Za-z0-9\u4e00-\u9fff·._ -]{1,23})\s*[：:](?=\S)")
+CHAT_TTS_LABEL_RE = re.compile(r"\[TTSVoice:([^:\]\n]{2,40})")
+CHAT_MENTION_RE = re.compile(r"(?:看着|望向|想起|提到|遇见|听见|联系|拨给|写给|收到|名叫|叫做)([A-Za-z\u4e00-\u9fff·]{2,12})")
+
+
+def main_chat_existing_name_keys() -> set[str]:
+    keys = {role_name_key(item.get("display_name")) for item in get_role_profiles(include_disabled=True)}
+    current = extract_current_card_roles()
+    for role in current.get("roles", []):
+        keys.add(role_name_key(role.get("name")))
+    keys.add(role_name_key(current.get("user", {}).get("name") or current_user_member().get("name")))
+    return {key for key in keys if key}
+
+
+def iter_main_chat_messages(payload: Any) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+
+    def visit(value: Any) -> None:
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+            return
+        if not isinstance(value, dict):
+            return
+        nested = value.get("messages") or value.get("conversation") or value.get("items")
+        if isinstance(nested, list):
+            visit(nested)
+        if any(key in value for key in ("content", "raw_content", "assistant_clean_text")):
+            messages.append(value)
+
+    visit(payload)
+    return messages
+
+
+def main_chat_message_text(message: dict[str, Any]) -> str:
+    parts = [
+        compact_text(message.get("raw_content"), 4000),
+        compact_text(message.get("assistant_clean_text"), 4000),
+        compact_text(message.get("content"), 4000),
+    ]
+    seen: set[str] = set()
+    rows: list[str] = []
+    for part in parts:
+        if part and part not in seen:
+            rows.append(part)
+            seen.add(part)
+    return "\n".join(rows)
+
+
+def main_chat_candidate_names(text: str) -> list[tuple[str, str]]:
+    candidates: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    def add(name: Any, kind: str) -> None:
+        cleaned = compact_text(name, 80).strip("“”\"'（）()[]【】「」『』，,。.!！？?；;：:")
+        cleaned = re.sub(r"(?:的|吧|吗|呢)$", "", cleaned)
+        key = role_name_key(cleaned)
+        if event_role_name_allowed(cleaned) and key not in seen:
+            seen.add(key)
+            candidates.append((cleaned, kind))
+
+    for match in CHAT_TTS_LABEL_RE.finditer(text):
+        add(match.group(1), "tts")
+    for match in CHAT_SPEAKER_LABEL_RE.finditer(text):
+        add(match.group(1), "speaker")
+    for match in CHAT_MENTION_RE.finditer(text):
+        add(match.group(1), "mention")
+    return candidates
+
+
+def extract_main_chat_role_profiles(payload: RoleChatExtractPayload | None = None, *, source: str = "chat_extract") -> list[dict[str, Any]]:
+    payload = payload or RoleChatExtractPayload()
+    limit = clamp_int(payload.limit, 1, 30, 12)
+    recent_messages = clamp_int(payload.recent_messages, 20, 300, 120)
+    conversations = read_json(MAIN_CONVERSATIONS_PATH, [])
+    messages = iter_main_chat_messages(conversations)[-recent_messages:]
+    existing_names = main_chat_existing_name_keys()
+    candidates: dict[str, dict[str, Any]] = {}
+
+    def add_candidate(message: dict[str, Any], name: str, kind: str, snippet_source: str) -> None:
+        key = role_name_key(name)
+        if not key or key in existing_names:
+            return
+        row = candidates.setdefault(
+            key,
+            {
+                "name": name,
+                "count": 0,
+                "apps": {"group_chat"},
+                "refs": [],
+                "snippets": [],
+                "appearances": [],
+                "identity": "从主 Chat 正文只读提取的边缘角色候选",
+            },
+        )
+        row["count"] += 1
+        ref = compact_text(f"main_chat:{message.get('turn_id') or message.get('message_id') or 'message'}:{kind}", 180)
+        if ref and ref not in row["refs"]:
+            row["refs"].append(ref)
+        snippet = compact_text(snippet_source, 180)
+        if snippet and snippet not in row["snippets"]:
+            row["snippets"].append(snippet)
+
+    for message in messages:
+        text = main_chat_message_text(message)
+        if not text:
+            continue
+        snippet = compact_text(re.sub(r"\[TTSVoice:[^\]]+\]", "", text), 180)
+        for name, kind in main_chat_candidate_names(text):
+            add_candidate(message, name, kind, snippet)
 
     sorted_candidates = sorted(
         candidates.values(),
@@ -2215,12 +2378,15 @@ def sanitize_channel(raw: Any, index: int = 0) -> dict[str, Any] | None:
     if channel_type not in CHANNEL_TYPES or channel_type == "group_chat":
         channel_type = "feed"
     label = compact_text(raw.get("label"), 60) or channel_id
+    seed_count = clamp_int(raw.get("seed_count"), 1, 20, 5)
+    if channel_type == "forum":
+        seed_count = min(seed_count, 3)
     return {
         "channel_id": channel_id,
         "type": channel_type,
         "label": label,
         "description": compact_text(raw.get("description"), 500),
-        "seed_count": clamp_int(raw.get("seed_count"), 1, 20, 5),
+        "seed_count": seed_count,
         "enabled": bool(raw.get("enabled", True)),
     }
 
@@ -2311,6 +2477,18 @@ def date_only(value: Any, fallback: str | None = None) -> str:
         except ValueError:
             pass
     return (fallback or now_iso())[:10]
+
+
+def calendar_date_only(value: Any, index: int = 0) -> str:
+    today = local_today()
+    offset = max(0, min(index, 30))
+    fallback = (today + timedelta(days=offset)).isoformat()
+    text = date_only(value, fallback=fallback)
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError:
+        return fallback
+    return parsed.isoformat() if parsed >= today else fallback
 
 
 def normalize_author_type(value: Any, fallback: str = "role") -> str:
@@ -2445,6 +2623,8 @@ def sanitize_channel_event(raw: Any, channel: dict[str, Any], index: int = 0) ->
     event_type = normalize_id(raw.get("event_type") or raw.get("type"), channel["type"])
     if event_type not in CHANNEL_EVENT_TYPES:
         event_type = {"feed": "post", "forum": "thread", "mail": "mail", "diary": "diary", "calendar": "calendar", "live": "live"}.get(channel["type"], "post")
+    if channel["type"] == "forum":
+        event_type = "thread"
     metadata_source = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
     metadata = sanitize_event_metadata(metadata_source)
     if channel["type"] in {"feed", "forum"}:
@@ -2456,7 +2636,7 @@ def sanitize_channel_event(raw: Any, channel: dict[str, Any], index: int = 0) ->
         if replies:
             metadata["replies"] = replies
     if channel["type"] == "calendar":
-        metadata["date"] = date_only(metadata_source.get("date") or metadata_source.get("time") or raw.get("created_at"))
+        metadata["date"] = calendar_date_only(metadata_source.get("date") or metadata_source.get("time") or raw.get("created_at"), index)
         if metadata_source.get("time"):
             metadata["time"] = compact_text(metadata_source.get("time"), 80)
     if channel["type"] == "diary":
@@ -2578,32 +2758,75 @@ def summarize_mobile_context() -> dict[str, Any]:
     }
 
 
+def summarize_mobile_seed_context(channel: dict[str, Any]) -> dict[str, Any]:
+    roles = get_role_profiles(include_disabled=False)[:12]
+    groups = get_groups()[:8]
+    return {
+        "roles": [
+            {
+                "role_id": item["role_id"],
+                "display_name": item["display_name"],
+                "summary": compact_text(item.get("summary"), 160),
+                "status": compact_text(item.get("status"), 80),
+                "chat_style": compact_text(item.get("chat_style"), 120),
+            }
+            for item in roles
+        ],
+        "groups": [
+            {
+                "name": item["name"],
+                "members": [member["name"] for member in item.get("members", []) if member.get("type") == "character"][:8],
+            }
+            for item in groups
+        ],
+        "recent_channel_events": [
+            {"title": event["title"], "author_name": event["author_name"], "content": event["content"][:120]}
+            for event in get_channel_events(channel["channel_id"])[:3]
+        ],
+    }
+
+
+def effective_channel_seed_count(channel: dict[str, Any], count: Any = None) -> int:
+    safe_count = clamp_int(count, 1, 20, channel.get("seed_count", 5))
+    if channel.get("type") == "forum":
+        return 1
+    return safe_count
+
+
 def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dict[str, str]]:
     schema = next((item for item in channel_schema_catalog() if item["type"] == channel["type"]), {})
+    current_datetime = now_iso()
     context = {
         "channel": channel,
         "count": count,
         "schema": schema,
-        "mobile_context": summarize_mobile_context(),
+        "current_date": current_datetime[:10],
+        "current_datetime": current_datetime,
+        "mobile_context": summarize_mobile_seed_context(channel),
     }
     system_text = assembled_prompt_text(channel["type"]) or system_prompt_text()
-    content_limit = 280 if channel["type"] in {"diary", "live"} else 180 if channel["type"] in {"mail", "calendar"} else 140
+    content_limit = 520 if channel["type"] == "forum" else 280 if channel["type"] in {"diary", "live"} else 180 if channel["type"] in {"mail", "calendar"} else 140
     output_rules = [
         f"Generate exactly {count} event(s) for this mobile app channel.",
         "Return compact valid JSON only, with no markdown, no explanation, and no surrounding text.",
         "The root shape must be {\"events\":[...]} and each event must include title, content, author_name, event_type, tags and metadata.",
         f"Use 1-3 short text tags. Keep each title <= 24 Chinese characters and each content <= {content_limit} Chinese characters.",
         "Keep metadata small and JSON-serializable.",
+        "Use Context JSON current_date/current_datetime as the present time unless the provided world context explicitly sets a different in-world date.",
     ]
     if channel["type"] == "forum":
         output_rules.append(
+            "Generate one substantial forum thread, not a short social feed post. "
+            "The thread content should read like a complete forum post with concrete details, context, and a clear question or point of discussion. "
             "For each forum thread, put exactly 2 compact floor replies in metadata.replies; "
             "each reply must include author_name, author_type, source, content, mood and floor. "
-            "Mix at least one bystander/random passerby reply with role/moderator replies; each reply content <= 70 Chinese characters."
+            "Mix at least one bystander/random passerby reply with role/moderator replies; each reply content <= 120 Chinese characters."
         )
     if channel["type"] == "calendar":
         output_rules.append(
             "For every calendar event, metadata.date is required in YYYY-MM-DD format; "
+            "metadata.date must be current_date or a future date when no explicit in-world date is provided; "
+            "spread events across current_date and the next few days instead of inventing unrelated past months or years. "
             "metadata should also include time, location and participants when useful."
         )
     if channel["type"] == "diary":
@@ -2625,12 +2848,54 @@ def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dic
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
-def channel_seed_max_tokens(channel: dict[str, Any], count: int) -> int:
-    configured = get_settings()["max_tokens"]
+def build_channel_seed_retry_messages(channel: dict[str, Any], count: int) -> list[dict[str, str]]:
+    current_datetime = now_iso()
+    context = {
+        "channel": {
+            "channel_id": channel["channel_id"],
+            "type": channel["type"],
+            "label": channel["label"],
+            "description": channel.get("description", ""),
+        },
+        "count": count,
+        "current_date": current_datetime[:10],
+        "current_datetime": current_datetime,
+        "mobile_context": summarize_mobile_seed_context(channel),
+    }
+    system_text = (
+        "Return compact valid JSON only. Do not include markdown, prose, analysis, hidden reasoning, or explanations. "
+        "The response must start with { and end with }."
+    )
+    reply_rule = ""
+    if channel["type"] == "forum":
+        reply_rule = (
+            "Generate one substantial forum thread with concrete details, context, and a clear question or point of discussion. "
+            "Each event must be event_type thread and include metadata.replies with exactly 2 replies. "
+            "Each reply must include author_name, author_type, source, content, mood and floor, and each reply content <= 120 Chinese characters."
+        )
+    user_text = (
+        f"Generate exactly {count} {channel['type']} event(s). "
+        "Root shape: {\"events\":[...]}. "
+        "Each event requires title, content, author_name, event_type, tags and metadata. "
+        "Keep titles <= 24 Chinese characters, content <= 520 Chinese characters, tags <= 3. "
+        f"{reply_rule}\nContext JSON:\n"
+        + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+    )
+    return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
+
+
+def channel_seed_max_tokens(channel: dict[str, Any], count: int, *, retry: bool = False) -> int:
+    settings = get_settings()
+    configured = settings["max_tokens"]
     safe_count = clamp_int(count, 1, 20, 1)
     baseline = 1100 if channel["type"] == "forum" else 1000
     per_event = 380 if channel["type"] == "forum" else 340
-    recommended = min(4000, baseline + safe_count * per_event)
+    recommended = baseline + safe_count * per_event
+    token_settings = settings.get("channel_token_settings", {})
+    channel_floor = token_settings.get(channel["type"], token_settings.get("default", {}))
+    floor_key = "retry" if retry else "initial"
+    configured_floor = clamp_int(channel_floor.get(floor_key), 64, 32000, 0) if isinstance(channel_floor, dict) else 0
+    recommended = max(recommended, configured_floor)
     return max(configured, recommended)
 
 
@@ -2845,6 +3110,11 @@ def parse_channel_seed_events(raw: str, channel: dict[str, Any], count: int) -> 
         return events
     record_parser_diagnostic(f"channel_{channel['type']}_seed", "events", channel["channel_id"], "no_valid_events", raw)
     return []
+
+
+def is_reasoning_only_error(exc: HTTPException) -> bool:
+    detail = compact_text(exc.detail, 240).lower()
+    return "只返回了推理内容" in detail or "reasoning" in detail
 
 
 def sanitize_notification(raw: Any, index: int = 0) -> dict[str, Any] | None:
@@ -3331,6 +3601,51 @@ def loads_json_lenient(text: str) -> Any:
     return None
 
 
+def recover_json_array_items(text: str, root_key: str, *, limit: int = 20) -> list[dict[str, Any]]:
+    cleaned = strip_json_fence(text)
+    match = re.search(rf'"{re.escape(root_key)}"\s*:\s*\[', cleaned)
+    if not match:
+        return []
+    rows: list[dict[str, Any]] = []
+    depth = 0
+    item_start: int | None = None
+    in_string = False
+    escaped = False
+    for index in range(match.end(), len(cleaned)):
+        char = cleaned[index]
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and in_string:
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == "{":
+            if depth == 0:
+                item_start = index
+            depth += 1
+            continue
+        if char == "}":
+            if depth <= 0:
+                continue
+            depth -= 1
+            if depth == 0 and item_start is not None:
+                item = loads_json_lenient(cleaned[item_start : index + 1])
+                if isinstance(item, dict):
+                    rows.append(item)
+                item_start = None
+                if len(rows) >= limit:
+                    break
+            continue
+        if char == "]" and depth == 0:
+            break
+    return rows
+
+
 
 def parse_payload_shape(payload: Any, root_key: str) -> Any:
     if isinstance(payload, dict):
@@ -3387,6 +3702,10 @@ def parse_model_json_output(raw: str, *, scope: str, schema: str, root_key: str,
     cleaned = strip_json_fence(raw)
     payload = loads_json_lenient(cleaned)
     if payload is None:
+        recovered = recover_json_array_items(cleaned, root_key)
+        if recovered:
+            record_parser_diagnostic(scope, schema, target_id, "json_partial_recovered", raw)
+            return recovered, ""
         record_parser_diagnostic(scope, schema, target_id, "json_parse_failed", raw)
         return None, "json_parse_failed"
     shaped = parse_payload_shape(payload, root_key)
@@ -3626,6 +3945,18 @@ async def api_disable_role(role_id: str) -> dict[str, Any]:
     return {"ok": True, "role": profiles[index], "roles": get_role_profiles(include_disabled=True)}
 
 
+@app.post("/api/admin/roles/{role_id}/restore")
+async def api_restore_role(role_id: str) -> dict[str, Any]:
+    safe_role_id = normalize_id(role_id)
+    profiles = get_role_profiles(include_disabled=True)
+    index = next((idx for idx, item in enumerate(profiles) if item["role_id"] == safe_role_id), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail="角色不存在。")
+    profiles[index] = {**profiles[index], "enabled": True, "updated_at": now_iso()}
+    save_role_profiles(profiles)
+    return {"ok": True, "role": profiles[index], "roles": get_role_profiles(include_disabled=True)}
+
+
 @app.delete("/api/admin/roles/{role_id}/purge")
 async def api_delete_role(role_id: str) -> dict[str, Any]:
     safe_role_id = normalize_id(role_id)
@@ -3668,6 +3999,18 @@ async def api_role_generator_extract_events(payload: RoleEventExtractPayload | N
 @app.post("/api/admin/role-generator/extract-events")
 async def api_admin_role_generator_extract_events(payload: RoleEventExtractPayload | None = None) -> dict[str, Any]:
     drafts = extract_event_role_profiles(payload, source="admin_event_extract")
+    return {"ok": True, "draft": drafts[0] if drafts else None, "drafts": drafts}
+
+
+@app.post("/api/role-generator/extract-chat")
+async def api_role_generator_extract_chat(payload: RoleChatExtractPayload | None = None) -> dict[str, Any]:
+    drafts = extract_main_chat_role_profiles(payload, source="chat_extract")
+    return {"ok": True, "draft": drafts[0] if drafts else None, "drafts": drafts}
+
+
+@app.post("/api/admin/role-generator/extract-chat")
+async def api_admin_role_generator_extract_chat(payload: RoleChatExtractPayload | None = None) -> dict[str, Any]:
+    drafts = extract_main_chat_role_profiles(payload, source="admin_chat_extract")
     return {"ok": True, "draft": drafts[0] if drafts else None, "drafts": drafts}
 
 
@@ -4489,6 +4832,7 @@ async def api_add_live_message(channel_id: str, event_id: str, payload: LiveMess
     event = update_channel_event(channel["channel_id"], event)
     return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
 async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any]:
+    count = effective_channel_seed_count(channel, count)
     job = begin_generation_job(f"channel_{channel['type']}", channel["channel_id"])
     try:
         raw_reply = await call_chat_model(
@@ -4497,8 +4841,18 @@ async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any
             temperature=read_main_llm_config()["temperature"],
         )
     except HTTPException as exc:
-        finish_generation_job(job, "error", compact_text(exc.detail, 240))
-        raise
+        if not is_reasoning_only_error(exc):
+            finish_generation_job(job, "error", compact_text(exc.detail, 240))
+            raise
+        try:
+            raw_reply = await call_chat_model(
+                build_channel_seed_retry_messages(channel, count),
+                max_tokens=channel_seed_max_tokens(channel, count, retry=True),
+                temperature=read_main_llm_config()["temperature"],
+            )
+        except HTTPException as retry_exc:
+            finish_generation_job(job, "error", compact_text(retry_exc.detail, 240))
+            raise retry_exc
     events = parse_channel_seed_events(raw_reply, channel, count)
     if not events:
         finish_generation_job(job, "error", "parser_no_valid_events")
@@ -4513,7 +4867,7 @@ async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any
 @app.post("/api/channels/{channel_id}/seed", response_model=None)
 async def api_seed_channel(channel_id: str, payload: ChannelSeedPayload | None = None) -> JSONResponse | dict[str, Any]:
     channel = get_channel_or_404(channel_id)
-    count = clamp_int(payload.count if payload else None, 1, 20, channel["seed_count"])
+    count = effective_channel_seed_count(channel, payload.count if payload else None)
     try:
         return await run_channel_seed(channel, count)
     except HTTPException as exc:
@@ -4525,8 +4879,8 @@ async def api_admin_seed_channel(payload: ChannelSeedPayload) -> JSONResponse | 
     channel = get_channel_or_404(payload.channel_id)
     existing = get_channel_events(channel["channel_id"])
     if existing and not payload.force:
-        return {"ok": True, "channel": channel, "events": existing[: channel["seed_count"]], "skipped": True}
-    count = clamp_int(payload.count, 1, 20, channel["seed_count"])
+        return {"ok": True, "channel": channel, "events": existing[: effective_channel_seed_count(channel)], "skipped": True}
+    count = effective_channel_seed_count(channel, payload.count)
     try:
         return await run_channel_seed(channel, count)
     except HTTPException as exc:
