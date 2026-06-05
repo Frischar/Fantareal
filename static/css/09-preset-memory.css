@@ -477,7 +477,93 @@ body.modern-setting-page.preset-config-page .preset-summary-chip.advanced {
   }
 }
 
-/* Memory page styles migrated from template inline CSS. */
+/* BASE kernel template helpers. */
+body.modern-setting-page.preset-config-page .preset-base-template-panel {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border) 78%);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 7%, var(--panel-strong) 93%),
+      color-mix(in srgb, var(--input-bg) 88%, transparent 12%));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 10px;
+  margin-bottom: 9px;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-copy strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-copy span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker {
+  display: grid;
+  gap: 6px;
+  align-items: end;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker label {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker select {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker button {
+  width: auto !important;
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border-radius: 999px;
+  transform: none !important;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker button:hover,
+body.modern-setting-page.preset-config-page .preset-base-template-picker button:active {
+  transform: none !important;
+}
+
+html[data-theme="dark"] body.modern-setting-page.preset-config-page .preset-base-template-panel {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border) 72%);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 10%, var(--panel-strong) 90%),
+      color-mix(in srgb, var(--input-bg) 82%, transparent 18%));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 10px 22px rgba(0, 0, 0, 0.16);
+}
+
+@media (max-width: 760px) {
+  body.modern-setting-page.preset-config-page .preset-base-template-picker {
+    grid-template-columns: 1fr;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-base-template-picker button {
+    width: 100% !important;
+  }
+}
+
 
 body.memory-config-page .config-shell.compact.memory-wide {
   width: min(1760px, calc(100vw - 32px));

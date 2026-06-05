@@ -1074,8 +1074,8 @@
         <section class="panel config-panel">
           <div class="section-head">
             <p class="eyebrow">Base</p>
-            <h2>基础系统规则</h2>
-            <p class="muted">每轮都会进入 prompt，适合放长期稳定的输出要求。</p>
+            <h2>BASE｜预设内核</h2>
+            <p class="muted">适合放长期稳定的预设内核：幕后工作人格、可见思考时的本轮提取格式、预设子内容 / 世界书 / 记忆 / 上下文读取方式，以及正文生成前的简要检查清单。</p>
           </div>
           <div class="preset-meta-grid">
             <div>
@@ -1088,11 +1088,22 @@
               <span>启用当前编辑预设</span>
             </label>
           </div>
-          <label for="base-system-prompt">基础系统规则</label>
-          <textarea id="base-system-prompt" rows="12" placeholder="这里放每轮都要稳定生效的系统规则。"></textarea>
+          <label for="base-system-prompt">BASE｜预设内核内容</label>
+          <div class="preset-base-template-panel" aria-label="BASE 预设内核模板">
+            <div class="preset-base-template-copy">
+              <strong>模板插入</strong>
+              <span>选择模板后确认插入；不会自动保存，详细规则仍建议放在预设子内容或世界书。</span>
+            </div>
+            <div class="preset-base-template-picker">
+              <label for="base-template-select">选择模板</label>
+              <select id="base-template-select"></select>
+            </div>
+          </div>
+          <textarea id="base-system-prompt" rows="12" placeholder="这里放长期稳定的预设内核。详细文风、禁忌和场景规则建议放在预设子内容或世界书中，BASE 只负责定义读取方式、本轮提取格式和正文隔离边界。"></textarea>
           <div class="preset-base-footer">
-            <span class="muted helper-text">基础规则：<strong id="base-prompt-count">0</strong> 字</span>
+            <span class="muted helper-text">预设内核：<strong id="base-prompt-count">0</strong> 字</span>
             <div class="preset-editor-actions">
+              <button id="insert-base-template" type="button" class="secondary">插入模板</button>
               <button id="save-preset" type="button">保存当前预设</button>
               <button id="reload-preset" type="button" class="secondary">重新读取</button>
             </div>
@@ -1181,6 +1192,87 @@
       let draggedCard = null;
       let dragIntentCard = null;
       const MODULE_MUTEX = { short_paragraph: ["long_paragraph"], long_paragraph: ["short_paragraph"], second_person: ["third_person"], third_person: ["second_person"] };
+      const BASE_KERNEL_TEMPLATES = {
+        workerPersona: `【幕后工作人格：atone】
+当模型产生可见思考过程时，请让幕后工作人格「atone」负责阅读后续注入内容，并为本轮正文生成做简短工作整理。
+
+atone 的信息来源：
+- 当前预设与预设子内容；
+- 角色卡；
+- 世界书；
+- 长期记忆与本轮召回记忆；
+- 最近上下文；
+- 用户本轮输入；
+- 最终输出格式与禁忌规则。
+
+atone 的工作边界：
+- atone 不负责提供新的详细设定。
+- atone 只从已注入内容中提取本轮最相关的几条提醒。
+- 不长篇复述设定原文。
+- 不替代预设子内容、世界书、角色卡或记忆。
+- 不得把 worldbook 的 Matched、external_tag、activation_tags 当成用户本轮原话。
+- 只有 runtime.user_input / 最后一条 user message 中明确出现的内容，才可视为用户本轮输入。
+- 最终正文不得提及 atone、预设、世界书、记忆、模型、思考过程或规则来源。`,
+        turnExtraction: `【atone 本轮提取格式】
+如果本轮需要整理创作方向，可在可见思考过程中简短使用以下格式：
+
+剧情走向：
+从上下文、世界书、记忆和用户本轮输入中提取本轮应推进 / 应暂缓 / 应避免的剧情方向。
+
+文风与禁忌：
+- 视角：提取当前预设指定的叙事视角和称呼方式。
+- 语言：提取当前预设指定的语言密度、口吻、描写风格。
+- 感官重点：提取本轮最适合强调的气味、声音、触感、温度、光线、身体反应。
+- 禁忌：提取本轮必须避开的词汇、比喻、剧情走向和角色越界。
+- 物理引擎：提取当前场景里应该保持连续的物件、姿势、距离、衣物、动作惯性和环境反馈。
+- 正文检查：确认正文只自然呈现场景，不解释规则。
+
+注意：
+- 这里的具体内容应从预设子内容、世界书、记忆、上下文和用户本轮输入中提取；BASE 不应写死所有场景的详细感官、禁词和文风。
+- 不得为了填充本轮提取格式而虚构用户说过的话、做过的动作、产生的情绪或作出的决定。
+- worldbook 的 Matched、external_tag、activation_tags 只是激活信号，不等于用户本轮原话。`,
+        injectionReading: `【注入内容读取规则】
+生成正文前，atone 应按以下方式阅读后续注入内容：
+
+- 预设子内容：读取当前启用的文风、输出格式、禁忌词、叙事视角和正文结构要求。
+- 角色卡：读取角色身份、关系边界、性格、当前互动限制和不可违背的人设。
+- 世界书：读取本轮命中的设定、阶段、地点、关系状态、物理规则和临时事件。
+- 记忆：读取长期状态、用户偏好、剧情累积和不能遗忘的事实。
+- 上下文：读取最近对话里的动作连续性、情绪承接、位置关系和未完成互动。
+- 用户本轮输入：优先承接用户明确写出的动作、台词、意图和限制，不替用户推进未写出的行为。`,
+        priority: `【冲突优先级】
+当 BASE 的通用要求与更具体内容冲突时，优先级如下：
+
+1. 用户本轮明确要求。
+2. 最终输出格式 / 禁忌规则。
+3. 本轮命中的世界书与当前状态。
+4. 当前启用的预设子内容。
+5. 角色卡核心设定。
+6. 长期记忆与最近上下文。
+7. BASE 中的通用工作方式。
+
+BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内容。`,
+        bodyIsolation: `【正文隔离规则】
+- atone 是幕后工作人格，不是正文角色。
+- 正文角色不知道 atone 的存在。
+- 正文中不要提及 atone、预设、世界书、记忆、模型、思考过程或规则来源。
+- 可见思考中的提取结果只能服务于正文生成，不应以分析清单形式进入正文。
+- 最终正文必须自然、沉浸、角色内，优先通过动作、对白、停顿、环境和感官细节呈现场景。`,
+        userInputTruth: `【用户输入真实性边界】
+- atone 只能引用用户本轮明确写出的内容。
+- 不得虚构用户说过的话、做过的动作、产生的情绪或作出的决定。
+- 不得把未出现在 runtime.user_input / 最后一条 user message 中的内容当成用户本轮输入。
+- 不得把 worldbook 的 Matched、external_tag、activation_tags 当成用户原话；这些只代表设定或规则被激活。
+- 如果用户本轮输入很短或含糊，应标记为“用户意图待承接”，而不是补写具体台词、动作或情绪。`,
+      };
+      const BASE_KERNEL_TEMPLATE_LABELS = {
+        workerPersona: "幕后工作人格",
+        turnExtraction: "本轮提取格式",
+        injectionReading: "注入内容读取规则",
+        priority: "冲突优先级",
+        bodyIsolation: "正文隔离规则",
+        userInputTruth: "用户输入真实性边界",
+      };
 
       function generateId(prefix) {
         return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -1363,6 +1455,64 @@
 
       function markDirty(message = "有未保存修改，记得保存当前预设。") {
         setDirty(true, message);
+      }
+
+      function getBaseTemplateSelect() {
+        return document.getElementById("base-template-select");
+      }
+
+      function getSelectedBaseTemplateKey() {
+        return getBaseTemplateSelect()?.value || "";
+      }
+
+      function getBaseTemplateText(key = getSelectedBaseTemplateKey()) {
+        return String(BASE_KERNEL_TEMPLATES[key] || "").trim();
+      }
+
+      function renderBaseTemplateOptions() {
+        const select = getBaseTemplateSelect();
+        if (!select) return;
+        select.innerHTML = "";
+        Object.entries(BASE_KERNEL_TEMPLATE_LABELS).forEach(([key, label]) => {
+          const option = document.createElement("option");
+          option.value = key;
+          option.textContent = label;
+          select.appendChild(option);
+        });
+      }
+
+      function normalizeTemplateText(value) {
+        return String(value || "").replace(/\s+/g, "").trim();
+      }
+
+      function insertBaseKernelTemplate(key) {
+        const textarea = document.getElementById("base-system-prompt");
+        const text = getBaseTemplateText(key);
+        if (!text || !textarea) return;
+
+        const current = textarea.value || "";
+        const normalizedCurrent = normalizeTemplateText(current);
+        const normalizedTemplate = normalizeTemplateText(text);
+        if (normalizedTemplate && normalizedCurrent.includes(normalizedTemplate)) {
+          const shouldInsertDuplicate = window.confirm("检测到这个模板内容已经存在，仍然要重复插入吗？");
+          if (!shouldInsertDuplicate) return;
+        }
+        const shouldInsert = window.confirm("将把所选模板插入到当前光标位置；不会自动保存。是否继续？");
+        if (!shouldInsert) return;
+
+        const start = typeof textarea.selectionStart === "number" ? textarea.selectionStart : current.length;
+        const end = typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : current.length;
+        const before = current.slice(0, start);
+        const after = current.slice(end);
+        const prefix = before && !before.endsWith("\n") ? "\n\n" : "";
+        const suffix = after && !after.startsWith("\n") ? "\n\n" : "";
+
+        textarea.value = `${before}${prefix}${text}${suffix}${after}`;
+        const nextCursor = `${before}${prefix}${text}`.length;
+        textarea.focus();
+        textarea.setSelectionRange(nextCursor, nextCursor);
+        updateOverview();
+        markDirty("已插入 BASE 预设内核模板，有未保存修改。");
       }
 
       function getPresetById(id) {
@@ -1978,6 +2128,10 @@
       document.getElementById("base-system-prompt").addEventListener("input", () => {
         updateOverview();
         markDirty();
+      });
+      renderBaseTemplateOptions();
+      document.getElementById("insert-base-template")?.addEventListener("click", () => {
+        insertBaseKernelTemplate(getSelectedBaseTemplateKey());
       });
       presetListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".preset-card");

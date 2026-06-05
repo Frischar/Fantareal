@@ -1650,17 +1650,8 @@
   function normalizeRoleStateConfig(config = {}) {
     const roles = Array.isArray(config.roles) ? config.roles : [];
     const roleSourceMode = normalizeRoleSourceMode(config.role_source_mode || config.roleSourceMode);
-    return { version: 1, enabled: config.enabled !== false, role_source_mode: roleSourceMode, role_source_summary: config.role_source_summary || {}, roles: roles.map((role, index) => ({
-      role_id: safeTemplateId(role.role_id || role.id || `role_${index + 1}`),
-      role_name: String(role.role_name || role.name || `角色${index + 1}`).trim(),
-      aliases: Array.isArray(role.aliases) ? role.aliases : [],
-      enabled: role.enabled !== false,
-      mode: normalizeRoleStateMode(role.mode || role.stateJournalMode, role),
-      stateJournalMode: normalizeRoleStateMode(role.mode || role.stateJournalMode, role),
-      use_default_variables: !!role.use_default_variables,
-      source: String(role.source || role.role_source || "").trim(),
-      initial_stage: safeTemplateId(role.initial_stage || "stage_a"),
-      variables: Array.isArray(role.variables) ? role.variables.map((variable, varIndex) => ({
+    return { version: 1, enabled: config.enabled !== false, role_source_mode: roleSourceMode, role_source_summary: config.role_source_summary || {}, roles: roles.map((role, index) => {
+      const variables = Array.isArray(role.variables) ? role.variables.map((variable, varIndex) => ({
         var_key: safeTemplateId(variable.var_key || variable.key || `var_${varIndex + 1}`),
         var_name: String(variable.var_name || variable.label || `变量${varIndex + 1}`).trim(),
         enabled: variable.enabled !== false,
@@ -1672,8 +1663,8 @@
         display: variable.display !== false,
         stage_relevant: variable.stage_relevant !== false,
         instruction: String(variable.instruction || ""),
-      })) : [],
-      stages: Array.isArray(role.stages) ? role.stages.map((stage, stageIndex) => ({
+      })) : [];
+      const stages = Array.isArray(role.stages) ? role.stages.map((stage, stageIndex) => ({
         stage_key: safeTemplateId(stage.stage_key || stage.key || roleStateStageKey(stageIndex + 1)),
         stage_name: String(stage.stage_name || stage.name || roleStateStageName(stageIndex + 1)).trim(),
         enabled: stage.enabled !== false,
@@ -1683,20 +1674,52 @@
         allow_regression: !!stage.allow_regression,
         confirm_turns: Math.max(1, Number(stage.confirm_turns || 1) || 1),
         cooldown_turns: Math.max(0, Number(stage.cooldown_turns || 0) || 0),
-      })) : [],
-      snapshotFields: Array.isArray(role.snapshotFields) ? role.snapshotFields.map((field, fieldIndex) => ({
+      })) : [];
+      const snapshotFields = Array.isArray(role.snapshotFields) ? role.snapshotFields.map((field, fieldIndex) => ({
         key: safeTemplateId(field.key || field.field_key || `snapshot_${fieldIndex + 1}`),
         label: String(field.label || field.name || `快照字段${fieldIndex + 1}`).trim(),
         enabled: field.enabled !== false,
         display: field.display !== false,
         instruction: String(field.instruction || field.note || "根据本轮上下文生成该状态快照字段。"),
-      })) : [],
-      settings: role.settings || { allow_regression: false, confirm_turns: 1, cooldown_turns: 1 },
-    })) };
+      })) : [];
+      const source = String(role.source || role.role_source || "").trim();
+      const sourceType = String(role.source_type || role.sourceType || (source === "persona" ? "multi_role_slot" : source || "manual")).trim();
+      const mode = normalizeRoleStateMode(role.mode || role.stateJournalMode, { ...role, variables, stages, snapshotFields });
+      const hasStateJournalConfig = !!(role.has_state_journal_config || role.hasStateJournalConfig || variables.length || stages.length || snapshotFields.length || ["snapshot_only", "full"].includes(mode));
+      const isEmptySlot = !!(role.is_empty_slot || role.isEmptySlot || (sourceType === "multi_role_slot" && !hasStateJournalConfig && !variables.length && !stages.length && !snapshotFields.length));
+      return {
+        role_id: safeTemplateId(role.role_id || role.id || `role_${index + 1}`),
+        role_name: String(role.role_name || role.name || `角色${index + 1}`).trim(),
+        aliases: Array.isArray(role.aliases) ? role.aliases : [],
+        enabled: role.enabled !== false,
+        mode,
+        stateJournalMode: mode,
+        use_default_variables: !!role.use_default_variables,
+        source,
+        source_type: sourceType,
+        has_state_journal_config: hasStateJournalConfig,
+        is_empty_slot: isEmptySlot,
+        display_policy: String(role.display_policy || role.displayPolicy || (isEmptySlot ? "hide_empty" : "show")).trim(),
+        initial_stage: safeTemplateId(role.initial_stage || "stage_a"),
+        variables,
+        stages,
+        snapshotFields,
+        settings: role.settings || { allow_regression: false, confirm_turns: 1, cooldown_turns: 1 },
+      };
+    }) };
+  }
+
+  function shouldShowRoleStateRole(role) {
+    if (!role) return false;
+    if (role.display_policy === "hide_empty") return false;
+    if (role.source_type === "multi_role_slot" && !role.has_state_journal_config && !(role.variables || []).length && !(role.stages || []).length && !(role.snapshotFields || []).length) return false;
+    return true;
   }
 
   function currentRoleState() {
-    return (state.roleStateConfig.roles || []).find((role) => role.role_id === state.currentRoleStateId) || state.roleStateConfig.roles?.[0] || null;
+    const roles = state.roleStateConfig.roles || [];
+    const visibleRoles = roles.filter(shouldShowRoleStateRole);
+    return visibleRoles.find((role) => role.role_id === state.currentRoleStateId) || visibleRoles[0] || roles.find((role) => role.role_id === state.currentRoleStateId) || roles[0] || null;
   }
 
   function activeStageForRole(role) {
@@ -1931,10 +1954,14 @@
     const list = document.getElementById("roleStateRoleList");
     const detail = document.getElementById("roleStateDetail");
     if (!list || !detail) return;
-    const roles = state.roleStateConfig.roles || [];
+    const allRoles = state.roleStateConfig.roles || [];
+    const roles = allRoles.filter(shouldShowRoleStateRole);
+    const hiddenEmptyCount = allRoles.length - roles.length;
     if (!state.currentRoleStateId && roles[0]) state.currentRoleStateId = roles[0].role_id;
+    if (state.currentRoleStateId && !roles.some((role) => role.role_id === state.currentRoleStateId) && roles[0]) state.currentRoleStateId = roles[0].role_id;
     const sourceInfo = roleSourceSummary(state.roleStateConfig);
-    const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>`;
+    const hiddenHintHtml = hiddenEmptyCount > 0 ? `<div class="role-state-source-hint muted"><span class="micro-badge">已隐藏</span><strong>${hiddenEmptyCount} 个空多角色槽位</strong><small>这些槽位没有变量、阶段或快照配置，不会写入心笺角色配置。</small></div>` : "";
+    const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>${hiddenHintHtml}`;
     renderStoryTimePanel();
     list.innerHTML = sourceHintHtml + (roles.length ? roles.map((role) => {
       const stageName = roleCurrentStageName(role);
@@ -2203,7 +2230,7 @@
     const payload = await requestJson("./api/role-state/from-card", { method: "POST", body: JSON.stringify({}) });
     state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
     state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : [];
-    state.currentRoleStateId = state.roleStateConfig.roles?.[0]?.role_id || "";
+    state.currentRoleStateId = state.roleStateConfig.roles?.filter(shouldShowRoleStateRole)?.[0]?.role_id || state.roleStateConfig.roles?.[0]?.role_id || "";
     renderRoleStateWorkspace();
     pageToast("已读取角色卡配置", payload.message || "", "ok");
   }

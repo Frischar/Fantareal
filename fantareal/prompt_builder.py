@@ -32,6 +32,33 @@ V4F_OUTPUT_GUARD_PROMPT = (
     "TTS标签必须严格使用预设指定格式，不得解释标签含义，不得把隐藏标签当作正文内容复述。 \n"
     "结尾应停在仍可继续互动的位置，不要写成总结、落幕、升华、回顾或明显收束。"
 )
+BASE_KERNEL_MARKERS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("worker_persona", "幕后工作人格", ("幕后工作人格",)),
+    ("turn_extraction", "本轮提取格式", ("本轮提取格式",)),
+    ("injection_reading", "注入内容读取规则", ("注入内容读取规则",)),
+    ("priority_rules", "冲突优先级", ("冲突优先级",)),
+    ("body_isolation", "正文隔离规则", ("正文隔离规则",)),
+    ("plot_direction", "剧情走向", ("剧情走向",)),
+    ("style_taboo", "文风与禁忌", ("文风与禁忌",)),
+    ("physical_engine", "物理引擎", ("物理引擎",)),
+    ("user_input_truth", "用户输入真实性边界", ("用户输入真实性边界",)),
+)
+
+
+def build_base_kernel_metadata(content: Any) -> dict[str, Any]:
+    text = str(content or "").strip()
+    markers: list[str] = []
+    marker_labels: list[str] = []
+    for key, label, keywords in BASE_KERNEL_MARKERS:
+        if any(keyword in text for keyword in keywords):
+            markers.append(key)
+            marker_labels.append(label)
+    return {
+        "enabled": bool(text),
+        "char_count": len(text),
+        "markers": markers,
+        "marker_labels": marker_labels,
+    }
 
 
 def configure_prompt_builder(**deps: Callable[..., Any]) -> None:
@@ -564,6 +591,8 @@ def build_prompt_package(
             segment["order"] = segment_order
             metadata = dict(segment.get("metadata") or {})
             metadata.setdefault("layer_id", "preset_rules")
+            if str(segment.get("id", "")).strip() == "preset.base_system_prompt":
+                metadata.setdefault("base_kernel", build_base_kernel_metadata(segment.get("content", "")))
             segment["metadata"] = metadata
             prompt_segments.append(segment)
     else:
@@ -576,7 +605,7 @@ def build_prompt_package(
             placement="system_core",
             required=True,
             strength="hard",
-            metadata={"layer_id": "preset_rules"},
+            metadata={"layer_id": "preset_rules", "base_kernel": build_base_kernel_metadata(preset_prompt)},
         )
     append_segment(
         "worldbook.before_char_defs",
