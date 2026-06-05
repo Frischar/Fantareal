@@ -127,7 +127,7 @@
         <a class="navlink{% if current_path.startswith('/mods/state-journal') %} active{% endif %}" href="/mods/state-journal{{ mobile_query }}">心笺 · 状态数据库</a>
         {% endif %}
         {% if mod_state.has_mobile_chat %}
-        <a class="navlink{% if current_path.startswith('/mods/mobile-chat') %} active{% endif %}" href="/mods/mobile-chat/app/{{ mobile_query }}">小手机 · 后台管理</a>
+        <a class="navlink{% if current_path.startswith('/mods/mobile-chat') %} active{% endif %}" href="/mods/mobile-chat{{ mobile_query }}">小手机 · 后台管理</a>
         {% endif %}
         <a class="navlink challenge-mode-navlink{% if current_path.startswith('/mods/challenge-mode') %} active{% endif %}" href="/mods/challenge-mode{{ mobile_query }}" data-challenge-mode-link hidden>挑战模式</a>
       </div>

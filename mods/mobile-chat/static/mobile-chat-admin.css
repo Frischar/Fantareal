@@ -330,6 +330,11 @@ code {
   opacity: 0.62;
 }
 
+.fmca-list-card.is-selected {
+  border-color: rgba(135, 217, 203, 0.5);
+  background: rgba(63, 113, 145, 0.24);
+}
+
 .fmca-list-card header,
 .fmca-list-head,
 .fmca-editor-header {
@@ -354,13 +359,20 @@ code {
   gap: 7px;
 }
 
+.fmca-form-grid > label {
+  display: grid;
+  gap: 7px;
+}
+
 .fmca-field.is-wide,
+.fmca-form-grid > label.fmca-wide,
 .fmca-member-grid,
 .fmca-manifest-list {
   grid-column: 1 / -1;
 }
 
 .fmca-field span,
+.fmca-form-grid > label > span,
 .fmca-member-grid > span {
   color: rgba(219, 231, 241, 0.72);
   font-size: 13px;
@@ -369,7 +381,10 @@ code {
 
 .fmca-field input,
 .fmca-field textarea,
-.fmca-field select {
+.fmca-field select,
+.fmca-form-grid > label input,
+.fmca-form-grid > label textarea,
+.fmca-form-grid > label select {
   width: 100%;
   min-height: 38px;
   border: 1px solid rgba(255, 255, 255, 0.13);
@@ -379,7 +394,8 @@ code {
   padding: 8px 10px;
 }
 
-.fmca-field textarea {
+.fmca-field textarea,
+.fmca-form-grid > label textarea {
   min-height: 92px;
   resize: vertical;
 }
@@ -395,6 +411,64 @@ code {
   width: 18px;
   height: 18px;
   accent-color: #58d2bd;
+}
+
+.fmca-chip-checks,
+.fmca-chip-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fmca-chip-check {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fmca-chip-check input {
+  width: 15px;
+  height: 15px;
+}
+
+.fmca-chip-line {
+  align-items: center;
+  margin-top: 8px;
+}
+
+.fmca-chip-line em {
+  color: rgba(219, 231, 241, 0.62);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.fmca-chip-line span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(88, 210, 189, 0.13);
+  color: rgba(237, 245, 251, 0.84);
+  font-size: 12px;
+}
+
+.fmca-chip-line.is-muted span {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(219, 231, 241, 0.66);
+}
+
+.fmca-role-generator-result {
+  margin-top: 16px;
+}
+
+.fmca-role-draft-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.fmca-role-draft-editor .fmca-form-grid {
+  gap: 12px;
 }
 
 .fmca-member-list {

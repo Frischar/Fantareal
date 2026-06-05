@@ -33,6 +33,7 @@ CHANNELS_PATH = DATA_DIR / "channels.json"
 NOTIFICATIONS_PATH = DATA_DIR / "notifications.json"
 PHONE_CALLS_PATH = DATA_DIR / "phone_calls.json"
 GENERATION_STATE_PATH = DATA_DIR / "generation_state.json"
+PARSER_DIAGNOSTICS_PATH = DATA_DIR / "parser_diagnostics.json"
 MESSAGES_DIR = DATA_DIR / "messages"
 EVENTS_DIR = DATA_DIR / "events"
 MAIN_SETTINGS_PATH = PROJECT_ROOT / "data" / "settings.json"
@@ -56,6 +57,7 @@ MESSAGE_TYPES = {"text", "sticker", "system", "error"}
 MESSAGE_SOURCES = {"user", "ai", "system"}
 GROUP_ID_RE = re.compile(r"^group_[a-z0-9_-]{6,80}$")
 SAFE_ID_RE = re.compile(r"[^a-z0-9_-]+")
+REASONING_MODEL_HINTS = ("deepseek-v4", "deepseek-reasoner", "v4-pro", "reason", "r1", "o1", "o3", "o4")
 STORAGE_LOCK = RLock()
 GROUP_ASYNC_LOCKS: dict[str, asyncio.Lock] = {}
 
@@ -96,6 +98,22 @@ DEFAULT_PROMPT_SETTINGS = {
     "use_block_prompt": False,
     "last_preview_channel": "group_chat",
 }
+DEFAULT_GENERATION_CONTROL_SETTINGS = {
+    "paused": False,
+    "hourly_limit": 24,
+    "retry_limit": 1,
+    "cost_notice": True,
+    "app_enabled": {
+        "group_chat": True,
+        "feed": True,
+        "forum": True,
+        "mail": True,
+        "diary": True,
+        "calendar": True,
+        "phone": True,
+        "workbench": True,
+    },
+}
 DEFAULT_SETTINGS = {
     "schema_version": 2,
     "enabled": True,
@@ -117,6 +135,7 @@ DEFAULT_SETTINGS = {
     "roles": DEFAULT_ROLES_SETTINGS,
     "groups": DEFAULT_GROUPS_SETTINGS,
     "prompt": DEFAULT_PROMPT_SETTINGS,
+    "generation_control": DEFAULT_GENERATION_CONTROL_SETTINGS,
 }
 DEFAULT_ROLE_PROFILES = {
     "schema_version": 1,
@@ -139,7 +158,7 @@ DEFAULT_PROMPT_BLOCKS = {
             "order": 10,
             "enabled": True,
             "locked": False,
-            "scope": ["group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone"],
+            "scope": ["group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone", "live"],
             "content": (
                 "You are running Fantareal Mobile Chat, an isolated in-world phone plugin. "
                 "Use the provided character, world and recent plugin-only context. "
@@ -152,7 +171,7 @@ DEFAULT_PROMPT_BLOCKS = {
             "order": 20,
             "enabled": True,
             "locked": False,
-            "scope": ["group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone"],
+            "scope": ["group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone", "live"],
             "content": (
                 "Characters should act according to their profile summaries, chat styles, aliases, status, "
                 "the current channel, and the recent plugin-only events."
@@ -164,7 +183,7 @@ DEFAULT_PROMPT_BLOCKS = {
             "order": 30,
             "enabled": True,
             "locked": False,
-            "scope": ["feed", "forum", "notification", "mail", "diary", "calendar", "phone"],
+            "scope": ["feed", "forum", "notification", "mail", "diary", "calendar", "phone", "live"],
             "content": (
                 "For app channels, generate compact believable content around the current characters, "
                 "world context and ongoing situation. Keep it suitable for a phone app UI."
@@ -188,7 +207,7 @@ DEFAULT_PROMPT_BLOCKS = {
             "order": 90,
             "enabled": True,
             "locked": True,
-            "scope": ["group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone"],
+            "scope": ["group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone", "live"],
             "content": "Return valid JSON only. Do not include markdown fences or explanations.",
         },
     ],
@@ -199,8 +218,10 @@ DEFAULT_APP_REGISTRY = {
         {"app_id": "group_chat", "label": "口袋群聊", "subtitle": "角色卡群聊", "icon": "message", "page": "groups", "order": 10, "enabled": True, "stage": "v1.3"},
         {"app_id": "settings", "label": "详细设置", "subtitle": "偏好与模型", "icon": "settings", "page": "settings", "order": 20, "enabled": True, "stage": "v1.3"},
         {"app_id": "stickers", "label": "贴纸包", "subtitle": "内置资源", "icon": "smile", "page": "stickers", "order": 30, "enabled": True, "stage": "v1.3"},
+        {"app_id": "assist", "label": "辅助功能", "subtitle": "人物生成", "icon": "toolbox", "page": "assist", "order": 35, "enabled": True, "stage": "v4.0"},
         {"app_id": "feed", "label": "动态", "subtitle": "角色近况", "icon": "spark", "page": "channel-feed_main", "order": 40, "enabled": True, "stage": "v1.7"},
         {"app_id": "forum", "label": "论坛", "subtitle": "世界讨论板", "icon": "forum", "page": "channel-forum_main", "order": 50, "enabled": True, "stage": "v1.7"},
+        {"app_id": "live", "label": "直播", "subtitle": "弹幕与醒目留言", "icon": "live", "page": "channel-live_main", "order": 55, "enabled": True, "stage": "v4.1"},
         {"app_id": "notifications", "label": "通知", "subtitle": "系统与角色提醒", "icon": "bell", "page": "notifications", "order": 60, "enabled": True, "stage": "v1.7"},
         {"app_id": "phone", "label": "电话", "subtitle": "模拟通话 RP", "icon": "phone", "page": "phone", "order": 70, "enabled": True, "stage": "v1.8"},
         {"app_id": "mail", "label": "邮箱", "subtitle": "角色邮件", "icon": "mail", "page": "channel-mail_inbox", "order": 80, "enabled": True, "stage": "v1.8"},
@@ -213,6 +234,7 @@ DEFAULT_CHANNELS = {
     "channels": [
         {"channel_id": "feed_main", "type": "feed", "label": "动态", "description": "角色围绕当前世界观发布的近况。", "seed_count": 5, "enabled": True},
         {"channel_id": "forum_main", "type": "forum", "label": "论坛", "description": "角色和世界内路人讨论事件的帖子。", "seed_count": 5, "enabled": True},
+        {"channel_id": "live_main", "type": "live", "label": "直播", "description": "角色直播间、弹幕、醒目留言和贡献榜。", "seed_count": 4, "enabled": True},
         {"channel_id": "mail_inbox", "type": "mail", "label": "邮箱", "description": "角色发来的邮件和系统邮件。", "seed_count": 4, "enabled": True},
         {"channel_id": "diary_main", "type": "diary", "label": "日记", "description": "角色或用户视角的碎片记录。", "seed_count": 4, "enabled": True},
         {"channel_id": "calendar_main", "type": "calendar", "label": "日程", "description": "接下来可能发生的事件安排。", "seed_count": 4, "enabled": True},
@@ -231,8 +253,8 @@ DEFAULT_GENERATION_STATE = {
     "active_jobs": {},
     "last_jobs": [],
 }
-CHANNEL_TYPES = {"group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone"}
-CHANNEL_EVENT_TYPES = {"post", "thread", "reply", "notice", "mail", "diary", "calendar", "call_line", "system"}
+CHANNEL_TYPES = {"group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone", "live"}
+CHANNEL_EVENT_TYPES = {"post", "thread", "reply", "notice", "mail", "diary", "calendar", "call_line", "live", "system"}
 
 
 class SettingsPayload(BaseModel):
@@ -256,6 +278,7 @@ class SettingsPayload(BaseModel):
     roles: dict[str, Any] | None = None
     groups: dict[str, Any] | None = None
     prompt: dict[str, Any] | None = None
+    generation_control: dict[str, Any] | None = None
 
 
 class GroupCreatePayload(BaseModel):
@@ -299,9 +322,14 @@ class RoleProfilePayload(BaseModel):
     source_ref: str | None = Field(default=None, max_length=240)
     aliases: list[Any] | None = None
     avatar: str | None = Field(default=None, max_length=500)
+    identity: str | None = Field(default=None, max_length=160)
+    appearance: str | None = Field(default=None, max_length=260)
     summary: str | None = Field(default=None, max_length=500)
     status: str | None = Field(default=None, max_length=80)
     chat_style: str | None = Field(default=None, max_length=500)
+    suitable_apps: list[Any] | None = None
+    blocked_apps: list[Any] | None = None
+    generator_notes: str | None = Field(default=None, max_length=500)
     sticker_preferences: dict[str, Any] | None = None
     auto_speak_weight: float | None = None
     enabled: bool | None = None
@@ -313,12 +341,43 @@ class RoleProfilePatchPayload(BaseModel):
     source_ref: str | None = Field(default=None, max_length=240)
     aliases: list[Any] | None = None
     avatar: str | None = Field(default=None, max_length=500)
+    identity: str | None = Field(default=None, max_length=160)
+    appearance: str | None = Field(default=None, max_length=260)
     summary: str | None = Field(default=None, max_length=500)
     status: str | None = Field(default=None, max_length=80)
     chat_style: str | None = Field(default=None, max_length=500)
+    suitable_apps: list[Any] | None = None
+    blocked_apps: list[Any] | None = None
+    generator_notes: str | None = Field(default=None, max_length=500)
     sticker_preferences: dict[str, Any] | None = None
     auto_speak_weight: float | None = None
     enabled: bool | None = None
+
+
+class RoleGeneratorPayload(BaseModel):
+    known_info: str | None = Field(default="", max_length=1000)
+    overall_request: str | None = Field(default="", max_length=1000)
+    real_name: str | None = Field(default="", max_length=80)
+    nickname: str | None = Field(default="", max_length=80)
+    identity: str | None = Field(default="", max_length=160)
+    impression: str | None = Field(default="", max_length=300)
+    hair_color: str | None = Field(default="", max_length=80)
+    hairstyle: str | None = Field(default="", max_length=120)
+    speech_style: str | None = Field(default="", max_length=240)
+    suitable_apps: list[Any] | None = None
+    blocked_apps: list[Any] | None = None
+    count: int | None = None
+    source: str | None = Field(default="role_generator", max_length=40)
+
+
+class RoleGeneratorSavePayload(BaseModel):
+    role: dict[str, Any] | None = None
+    roles: list[Any] | None = None
+
+
+class RoleEventExtractPayload(BaseModel):
+    channel_ids: list[Any] | None = None
+    limit: int | None = None
 
 
 class StickerManifestPayload(BaseModel):
@@ -362,6 +421,39 @@ class ChannelSeedPayload(BaseModel):
     force: bool | None = None
 
 
+class ChannelInteractionPayload(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+    content: str = Field(default="", max_length=1200)
+
+
+class ChannelReplyPayload(BaseModel):
+    content: str = Field(default="", max_length=800)
+
+
+class MailReplyPayload(BaseModel):
+    content: str = Field(default="", max_length=1000)
+    generate_reply: bool | None = True
+
+
+class LiveMessagePayload(BaseModel):
+    content: str = Field(default="", max_length=240)
+
+
+class WorkbenchRoleDraftPayload(BaseModel):
+    role_id: str | None = Field(default=None, max_length=120)
+    display_name: str | None = Field(default=None, max_length=80)
+    source: str | None = Field(default="current_card", max_length=40)
+
+
+class WorkbenchGeneratePayload(BaseModel):
+    scope: str = Field(default="feed", max_length=40)
+    mode: str = Field(default="mock", max_length=20)
+    channel_id: str | None = Field(default=None, max_length=120)
+    role_id: str | None = Field(default=None, max_length=120)
+    user_input: str | None = Field(default="", max_length=1000)
+    save: bool | None = False
+
+
 class NotificationPatchPayload(BaseModel):
     read: bool | None = None
 
@@ -370,6 +462,10 @@ class PhoneCallPayload(BaseModel):
     role_id: str
     user_line: str | None = Field(default="", max_length=500)
     session_id: str | None = Field(default=None, max_length=120)
+
+
+class PhoneHangupPayload(BaseModel):
+    session_id: str = Field(default="", max_length=120)
 
 
 app = FastAPI(title="Fantareal Mobile Chat Mod")
@@ -647,7 +743,7 @@ def _read_json_unlocked(path: Path, default: Any) -> Any:
     if not path.exists():
         return clone_default(default)
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         return clone_default(default)
 
@@ -700,6 +796,8 @@ def ensure_runtime_data() -> None:
             _write_json_unlocked(PHONE_CALLS_PATH, DEFAULT_PHONE_CALLS)
         if not GENERATION_STATE_PATH.exists():
             _write_json_unlocked(GENERATION_STATE_PATH, DEFAULT_GENERATION_STATE)
+        if not PARSER_DIAGNOSTICS_PATH.exists():
+            _write_json_unlocked(PARSER_DIAGNOSTICS_PATH, {"schema_version": 1, "items": []})
 
 
 def sanitize_position(raw: Any, default: dict[str, int]) -> dict[str, int]:
@@ -735,6 +833,57 @@ def sanitize_auto_behavior(raw: Any, legacy_enabled: bool) -> dict[str, Any]:
     }
 
 
+
+def sanitize_generation_control(raw: Any) -> dict[str, Any]:
+    source = raw if isinstance(raw, dict) else {}
+    defaults = clone_default(DEFAULT_GENERATION_CONTROL_SETTINGS)
+    app_source = source.get("app_enabled") if isinstance(source.get("app_enabled"), dict) else {}
+    app_enabled = {
+        key: bool(app_source.get(key, defaults["app_enabled"].get(key, True)))
+        for key in defaults["app_enabled"]
+    }
+    return {
+        "paused": bool(source.get("paused", defaults["paused"])),
+        "hourly_limit": clamp_int(source.get("hourly_limit"), 1, 240, defaults["hourly_limit"]),
+        "retry_limit": clamp_int(source.get("retry_limit"), 0, 5, defaults["retry_limit"]),
+        "cost_notice": bool(source.get("cost_notice", defaults["cost_notice"])),
+        "app_enabled": app_enabled,
+    }
+
+
+def generation_kind_scope(kind: str) -> str:
+    safe = compact_text(kind, 80)
+    if safe.startswith("channel_"):
+        return safe.replace("channel_", "", 1).replace("_interaction", "")
+    if safe == "group_chat":
+        return "group_chat"
+    if safe == "phone":
+        return "phone"
+    if safe.startswith("workbench"):
+        return "workbench"
+    return safe or "group_chat"
+
+
+def assert_generation_allowed(kind: str) -> None:
+    control = get_settings().get("generation_control", DEFAULT_GENERATION_CONTROL_SETTINGS)
+    scope = generation_kind_scope(kind)
+    if control.get("paused"):
+        raise HTTPException(status_code=423, detail="Mobile chat generation is paused in admin settings.")
+    if control.get("app_enabled", {}).get(scope, True) is False:
+        raise HTTPException(status_code=423, detail=f"Generation for {scope} is disabled in admin settings.")
+    hourly_limit = clamp_int(control.get("hourly_limit"), 1, 240, DEFAULT_GENERATION_CONTROL_SETTINGS["hourly_limit"])
+    recent = [item for item in get_generation_state().get("last_jobs", []) if compact_text(item.get("finished_at"), 13) == compact_text(now_iso(), 13)]
+    if len(recent) >= hourly_limit:
+        raise HTTPException(status_code=429, detail="Mobile chat hourly generation budget has been reached.")
+
+
+def generation_control_payload() -> dict[str, Any]:
+    return {
+        "settings": get_settings().get("generation_control", DEFAULT_GENERATION_CONTROL_SETTINGS),
+        "state": get_generation_state(),
+    }
+
+
 def sanitize_settings(raw: Any) -> dict[str, Any]:
     source = raw if isinstance(raw, dict) else {}
     settings = clone_default(DEFAULT_SETTINGS)
@@ -745,6 +894,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     roles_source = section_source(source, "roles")
     groups_source = section_source(source, "groups")
     prompt_source = section_source(source, "prompt")
+    generation_control_source = section_source(source, "generation_control")
 
     settings["schema_version"] = 2
     settings["enabled"] = bool(source.get("enabled", DEFAULT_SETTINGS["enabled"]))
@@ -811,6 +961,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
         "last_preview_channel": compact_text(prompt_source.get("last_preview_channel", DEFAULT_PROMPT_SETTINGS["last_preview_channel"]), 40)
         or DEFAULT_PROMPT_SETTINGS["last_preview_channel"],
     }
+    settings["generation_control"] = sanitize_generation_control(generation_control_source)
     return settings
 
 
@@ -945,7 +1096,8 @@ def channel_schema_catalog() -> list[dict[str, Any]]:
             "root": "events",
             "required_fields": ["event_type", "title", "content", "author_name"],
             "event_types": ["thread", "reply"],
-            "notes": "Forum thread cards and compact replies.",
+            "structured_metadata": {"replies": ["author_name", "content", "mood", "floor"]},
+            "notes": "Forum thread cards. Thread events may include metadata.replies for compact floor replies.",
         },
         {
             "type": "notification",
@@ -974,6 +1126,13 @@ def channel_schema_catalog() -> list[dict[str, Any]]:
             "required_fields": ["event_type", "title", "content", "author_name"],
             "event_types": ["calendar"],
             "notes": "Upcoming phone calendar entries.",
+        },
+        {
+            "type": "live",
+            "root": "events",
+            "required_fields": ["event_type", "title", "content", "author_name"],
+            "event_types": ["live"],
+            "notes": "Live rooms with danmaku, highlight messages, inner thoughts and contributor boards.",
         },
         {
             "type": "phone",
@@ -1073,6 +1232,7 @@ def begin_generation_job(kind: str, target_id: str) -> dict[str, str]:
     safe_kind = compact_text(kind, 80) or "unknown"
     safe_target = compact_text(target_id, 120) or "default"
     key = f"{safe_kind}:{safe_target}"
+    assert_generation_allowed(safe_kind)
     state = get_generation_state()
     if key in state["active_jobs"]:
         raise HTTPException(status_code=409, detail="A generation task is already running for this target.")
@@ -1107,7 +1267,7 @@ def finish_generation_job(job: dict[str, str], status: str, error: str = "") -> 
 
 def merge_settings_update(current: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
     merged = {**current, **updates}
-    for key in ("ui", "generation", "auto_behavior", "stickers", "roles", "groups", "prompt"):
+    for key in ("ui", "generation", "auto_behavior", "stickers", "roles", "groups", "prompt", "generation_control"):
         if isinstance(current.get(key), dict) and isinstance(updates.get(key), dict):
             merged[key] = {**current[key], **updates[key]}
     ui = updates.get("ui") if isinstance(updates.get("ui"), dict) else {}
@@ -1188,6 +1348,30 @@ def sanitize_aliases(value: Any) -> list[str]:
     return aliases
 
 
+def split_compact_values(value: Any, *, limit: int = 12, item_limit: int = 80) -> list[str]:
+    source = value
+    if isinstance(value, str):
+        source = re.split(r"[,，、\n]+", value)
+    if not isinstance(source, list):
+        return []
+    values: list[str] = []
+    seen: set[str] = set()
+    for item in source:
+        text = compact_text(item, item_limit)
+        key = role_name_key(text)
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        values.append(text)
+        if len(values) >= limit:
+            break
+    return values
+
+
+def sanitize_role_app_scope(value: Any) -> list[str]:
+    return split_compact_values(value, limit=12, item_limit=40)
+
+
 def sanitize_sticker_preferences(value: Any) -> dict[str, Any]:
     source = value if isinstance(value, dict) else {}
     default_pack = compact_text(source.get("default_pack"), 80) or DEFAULT_STICKERS_SETTINGS["default_pack"]
@@ -1211,7 +1395,7 @@ def sanitize_role_profile(raw: Any, index: int = 0) -> dict[str, Any] | None:
     if role_id == "user":
         return None
     source = normalize_id(raw.get("source"), "manual")
-    if source not in {"manual", "current_card", "group_import"}:
+    if source not in {"manual", "current_card", "group_import", "role_generator", "admin_role_generator", "event_extract", "admin_event_extract", "admin_workbench"}:
         source = "manual"
     auto_weight = clamp_float(raw.get("auto_speak_weight"), 0.0, 10.0, 1.0)
     return {
@@ -1221,9 +1405,14 @@ def sanitize_role_profile(raw: Any, index: int = 0) -> dict[str, Any] | None:
         "source_ref": compact_text(raw.get("source_ref"), 240),
         "aliases": sanitize_aliases(raw.get("aliases")),
         "avatar": safe_avatar(raw.get("avatar")),
+        "identity": compact_text(raw.get("identity"), 160),
+        "appearance": compact_text(raw.get("appearance"), 260),
         "summary": compact_text(raw.get("summary"), 500),
         "status": compact_text(raw.get("status"), 80) or "online",
         "chat_style": compact_text(raw.get("chat_style"), 500),
+        "suitable_apps": sanitize_role_app_scope(raw.get("suitable_apps")),
+        "blocked_apps": sanitize_role_app_scope(raw.get("blocked_apps")),
+        "generator_notes": compact_text(raw.get("generator_notes"), 500),
         "sticker_preferences": sanitize_sticker_preferences(raw.get("sticker_preferences")),
         "auto_speak_weight": auto_weight,
         "enabled": raw.get("enabled") is not False,
@@ -1249,6 +1438,320 @@ def save_role_profiles(profiles: list[dict[str, Any]]) -> None:
     write_json(ROLE_PROFILES_PATH, {"schema_version": 1, "roles": sanitized})
 
 
+def role_generator_display_name(raw: dict[str, Any], index: int, count: int) -> str:
+    base_name = (
+        compact_text(raw.get("nickname"), 80)
+        or compact_text(raw.get("real_name"), 80)
+        or compact_text(raw.get("identity"), 80)
+        or compact_text(raw.get("impression"), 80)
+    )
+    if not base_name:
+        fallback_names = ["临时联系人", "论坛路人", "群聊旁观者", "邮件联系人", "日程相关人", "通知发信人", "电话那头的人", "日记线索人", "邻近住户", "店内熟人"]
+        base_name = fallback_names[index % len(fallback_names)]
+    if count <= 1:
+        return base_name[:80]
+    return compact_text(f"{base_name} {index + 1}", 80)
+
+
+def role_generator_notes(raw: dict[str, Any]) -> str:
+    rows = [
+        ("已知信息", compact_text(raw.get("known_info"), 1000)),
+        ("整体要求", compact_text(raw.get("overall_request"), 1000)),
+        ("真实姓名", compact_text(raw.get("real_name"), 80)),
+        ("网名/昵称", compact_text(raw.get("nickname"), 80)),
+        ("身份", compact_text(raw.get("identity"), 160)),
+        ("整体印象", compact_text(raw.get("impression"), 300)),
+        ("发色", compact_text(raw.get("hair_color"), 80)),
+        ("发型", compact_text(raw.get("hairstyle"), 120)),
+        ("说话风格", compact_text(raw.get("speech_style"), 240)),
+    ]
+    return "；".join(f"{label}：{value}" for label, value in rows if value)[:500]
+
+
+def role_generator_profile(raw: dict[str, Any], index: int, count: int) -> dict[str, Any]:
+    display_name = role_generator_display_name(raw, index, count)
+    source = normalize_id(raw.get("source"), "role_generator")
+    if source not in {"role_generator", "admin_role_generator"}:
+        source = "role_generator"
+    real_name = compact_text(raw.get("real_name"), 80)
+    nickname = compact_text(raw.get("nickname"), 80)
+    identity = compact_text(raw.get("identity"), 160)
+    impression = compact_text(raw.get("impression"), 300)
+    known_info = compact_text(raw.get("known_info"), 1000)
+    overall_request = compact_text(raw.get("overall_request"), 1000)
+    hair_color = compact_text(raw.get("hair_color"), 80)
+    hairstyle = compact_text(raw.get("hairstyle"), 120)
+    speech_style = compact_text(raw.get("speech_style"), 240)
+    appearance = "；".join(
+        item for item in [
+            f"发色：{hair_color}" if hair_color else "",
+            f"发型：{hairstyle}" if hairstyle else "",
+        ] if item
+    )
+    suitable_apps = sanitize_role_app_scope(raw.get("suitable_apps"))
+    blocked_apps = sanitize_role_app_scope(raw.get("blocked_apps"))
+    alias_candidates = [item for item in [real_name, nickname] if item and item != display_name]
+    summary_parts = [
+        identity,
+        impression,
+        known_info,
+        f"整体要求：{overall_request}" if overall_request else "",
+        appearance,
+    ]
+    summary = "；".join(part for part in summary_parts if part)
+    style_parts = [
+        speech_style,
+        f"适合出现：{', '.join(suitable_apps)}" if suitable_apps else "",
+        f"避免出现：{', '.join(blocked_apps)}" if blocked_apps else "",
+    ]
+    base_for_id = normalize_id(nickname or real_name or display_name)
+    role_id = normalize_id(f"{base_for_id}_{index + 1}" if count > 1 and base_for_id else base_for_id, make_id("role_generator"))
+    return sanitize_role_profile(
+        {
+            "role_id": role_id,
+            "display_name": display_name,
+            "source": source,
+            "source_ref": "4.0 人物生成器",
+            "aliases": alias_candidates,
+            "identity": identity,
+            "appearance": appearance,
+            "summary": summary,
+            "status": "online",
+            "chat_style": "；".join(part for part in style_parts if part),
+            "suitable_apps": suitable_apps,
+            "blocked_apps": blocked_apps,
+            "generator_notes": role_generator_notes(raw),
+            "enabled": True,
+            "auto_speak_weight": 1.0,
+        },
+        index,
+    ) or {}
+
+
+def generate_role_profiles(payload: RoleGeneratorPayload) -> list[dict[str, Any]]:
+    raw = payload.model_dump()
+    count = clamp_int(raw.get("count"), 1, 10, 1)
+    drafts = [role_generator_profile(raw, index, count) for index in range(count)]
+    return [draft for draft in drafts if draft]
+
+
+def unique_role_id(base_role_id: str, existing_ids: set[str]) -> str:
+    role_id = normalize_id(base_role_id, make_id("role_generator"))
+    if role_id not in existing_ids:
+        return role_id
+    for suffix in range(2, 100):
+        candidate = normalize_id(f"{role_id}_{suffix}", make_id("role_generator"))
+        if candidate not in existing_ids:
+            return candidate
+    return make_id("role_generator")
+
+
+def save_generated_role_profiles(raw_roles: list[Any], *, source: str = "role_generator") -> list[dict[str, Any]]:
+    profiles = get_role_profiles(include_disabled=True)
+    existing_ids = {item["role_id"] for item in profiles}
+    saved: list[dict[str, Any]] = []
+    for index, raw_role in enumerate(raw_roles):
+        if not isinstance(raw_role, dict):
+            continue
+        profile = sanitize_role_profile({**raw_role, "source": raw_role.get("source") or source}, index)
+        if not profile:
+            continue
+        profile["role_id"] = unique_role_id(profile["role_id"], existing_ids)
+        profile["created_at"] = now_iso()
+        profile["updated_at"] = profile["created_at"]
+        existing_ids.add(profile["role_id"])
+        profiles.append(profile)
+        saved.append(profile)
+    if not saved:
+        raise HTTPException(status_code=400, detail="请先生成或填写可保存的人物草稿。")
+    save_role_profiles(profiles)
+    return saved
+
+
+def decoded_metadata_value(value: Any) -> Any:
+    if isinstance(value, (dict, list)):
+        return value
+    text = compact_text(value, 2000)
+    if not text or text[0] not in "[{":
+        return value
+    try:
+        return json.loads(text)
+    except (TypeError, ValueError):
+        return value
+
+
+def event_role_name_allowed(name: str) -> bool:
+    text = compact_text(name, 80)
+    if len(text) < 2:
+        return False
+    lowered = text.casefold()
+    blocked = {
+        "system",
+        "user",
+        "admin",
+        "ai",
+        "bot",
+        "assistant",
+        "我",
+        "你",
+        "他",
+        "她",
+        "ta",
+        "用户",
+        "系统",
+        "小手机",
+        "旁白",
+        "主播",
+        "观众",
+        "路人",
+        "版务",
+        "管理员",
+    }
+    if lowered in blocked:
+        return False
+    if re.match(r"^(观众|user|guest|路人|匿名)[\s_-]*\d+$", text, re.IGNORECASE):
+        return False
+    return True
+
+
+def event_role_split_names(value: Any) -> list[str]:
+    if isinstance(value, list):
+        raw_rows = value
+    else:
+        raw_rows = re.split(r"[,，、/|;；\n]+", compact_text(value, 500))
+    names: list[str] = []
+    seen: set[str] = set()
+    for item in raw_rows:
+        name = compact_text(item, 80)
+        key = name.casefold()
+        if event_role_name_allowed(name) and key not in seen:
+            names.append(name)
+            seen.add(key)
+    return names
+
+
+def event_role_source_label(channel: dict[str, Any], kind: str) -> str:
+    labels = {
+        "author": "内容作者",
+        "reply": "楼层回复者",
+        "mail_reply": "邮件联系人",
+        "danmaku": "直播弹幕观众",
+        "highlight": "醒目留言用户",
+        "contributor": "直播贡献者",
+        "related": "相关人物",
+    }
+    return f"{channel.get('label') or channel.get('type') or '事件'} · {labels.get(kind, kind)}"
+
+
+def event_role_profile_from_candidate(candidate: dict[str, Any], index: int, source: str) -> dict[str, Any]:
+    name = compact_text(candidate.get("name"), 80)
+    apps = sorted(candidate.get("apps") or [])
+    refs = list(candidate.get("refs") or [])[:6]
+    snippets = list(candidate.get("snippets") or [])[:4]
+    appearances = list(candidate.get("appearances") or [])[:3]
+    identity = compact_text(candidate.get("identity"), 160) or "从小手机事件中提取的边缘角色候选"
+    summary_parts = [
+        f"出现 {candidate.get('count', 1)} 次",
+        "；".join(snippets),
+    ]
+    summary = compact_text("；".join(part for part in summary_parts if part), 500)
+    generator_notes = compact_text("；".join([*refs, *snippets]), 500)
+    profile = sanitize_role_profile(
+        {
+            "role_id": normalize_id(name, f"event_role_{index + 1}"),
+            "display_name": name,
+            "source": source,
+            "source_ref": compact_text(refs[0] if refs else "mobile_chat_events", 240),
+            "aliases": [],
+            "identity": identity,
+            "appearance": "；".join(appearances),
+            "summary": summary,
+            "status": "online",
+            "chat_style": "从既有小手机事件中提取，保存前建议补充说话风格。",
+            "suitable_apps": apps,
+            "blocked_apps": [],
+            "generator_notes": generator_notes,
+            "enabled": True,
+            "auto_speak_weight": 1.0,
+        },
+        index,
+    )
+    return profile or {}
+
+
+def extract_event_role_profiles(payload: RoleEventExtractPayload | None = None, *, source: str = "event_extract") -> list[dict[str, Any]]:
+    payload = payload or RoleEventExtractPayload()
+    limit = clamp_int(payload.limit, 1, 30, 12)
+    requested_channels = {
+        normalize_id(item)
+        for item in (payload.channel_ids or [])
+        if normalize_id(item)
+    }
+    existing_names = {role_name_key(item.get("display_name")) for item in get_role_profiles(include_disabled=True)}
+    candidates: dict[str, dict[str, Any]] = {}
+
+    def add_candidate(channel: dict[str, Any], event: dict[str, Any], name: Any, kind: str, content: Any = "") -> None:
+        display_name = compact_text(name, 80)
+        if not event_role_name_allowed(display_name):
+            return
+        key = role_name_key(display_name)
+        if not key or key in existing_names:
+            return
+        row = candidates.setdefault(
+            key,
+            {
+                "name": display_name,
+                "count": 0,
+                "apps": set(),
+                "refs": [],
+                "snippets": [],
+                "appearances": [],
+                "identity": event_role_source_label(channel, kind),
+            },
+        )
+        row["count"] += 1
+        row["apps"].add(channel.get("type") or channel.get("channel_id"))
+        ref = compact_text(f"{channel.get('channel_id')}:{event.get('event_id')}:{kind}", 180)
+        if ref and ref not in row["refs"]:
+            row["refs"].append(ref)
+        snippet_source = compact_text(content, 180) or compact_text(event.get("title") or event.get("content"), 180)
+        if snippet_source and snippet_source not in row["snippets"]:
+            row["snippets"].append(snippet_source)
+
+    for channel in get_channels(include_disabled=False):
+        if requested_channels and channel["channel_id"] not in requested_channels:
+            continue
+        for event in get_channel_events(channel["channel_id"])[:80]:
+            add_candidate(channel, event, event.get("author_name"), "author", event.get("title") or event.get("content"))
+            metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+            for name in event_role_split_names(decoded_metadata_value(metadata.get("related_people"))):
+                add_candidate(channel, event, name, "related", event.get("title") or event.get("content"))
+            replies = decoded_metadata_value(metadata.get("replies"))
+            if isinstance(replies, list):
+                for reply in replies:
+                    if isinstance(reply, dict):
+                        kind = "mail_reply" if channel.get("type") == "mail" else "reply"
+                        add_candidate(channel, event, reply.get("author_name") or reply.get("speaker_name") or reply.get("author"), kind, reply.get("content"))
+            for key, kind in (("danmaku", "danmaku"), ("highlights", "highlight")):
+                rows = decoded_metadata_value(metadata.get(key))
+                if isinstance(rows, list):
+                    for item in rows:
+                        if isinstance(item, dict):
+                            add_candidate(channel, event, item.get("author_name") or item.get("speaker_name") or item.get("author"), kind, item.get("content"))
+            contributors = decoded_metadata_value(metadata.get("contributors"))
+            if isinstance(contributors, list):
+                for item in contributors:
+                    if isinstance(item, dict):
+                        add_candidate(channel, event, item.get("name") or item.get("author_name") or item.get("user"), "contributor", item.get("note") or item.get("amount"))
+
+    sorted_candidates = sorted(
+        candidates.values(),
+        key=lambda item: (-int(item.get("count") or 0), compact_text(item.get("name"), 80).casefold()),
+    )
+    drafts = [event_role_profile_from_candidate(candidate, index, source) for index, candidate in enumerate(sorted_candidates[:limit])]
+    return [draft for draft in drafts if draft]
+
+
 def role_profile_to_member(profile: dict[str, Any]) -> dict[str, str]:
     return {
         "role_id": profile["role_id"],
@@ -1269,7 +1772,20 @@ def merge_profile_update(existing: dict[str, Any] | None, updates: dict[str, Any
     }
     merged = {**base, **updates, "updated_at": now}
     if existing and preserve_manual:
-        for key in ("summary", "chat_style", "aliases", "avatar", "sticker_preferences", "auto_speak_weight", "enabled"):
+        for key in (
+            "summary",
+            "chat_style",
+            "aliases",
+            "avatar",
+            "identity",
+            "appearance",
+            "suitable_apps",
+            "blocked_apps",
+            "generator_notes",
+            "sticker_preferences",
+            "auto_speak_weight",
+            "enabled",
+        ):
             if existing.get(key) not in ("", [], None) and key in updates:
                 merged[key] = existing[key]
     if existing and existing.get("created_at"):
@@ -1308,6 +1824,10 @@ def enriched_member_for_prompt(member: dict[str, Any], profiles: dict[str, dict[
         row["chat_style"] = compact_text(profile.get("chat_style"), 500)
         row["aliases"] = profile.get("aliases", [])
         row["status"] = compact_text(profile.get("status"), 80)
+        row["identity"] = compact_text(profile.get("identity"), 160)
+        row["appearance"] = compact_text(profile.get("appearance"), 260)
+        row["suitable_apps"] = profile.get("suitable_apps", [])
+        row["blocked_apps"] = profile.get("blocked_apps", [])
         row["sticker_preferences"] = profile.get("sticker_preferences", {})
         row["auto_speak_weight"] = profile.get("auto_speak_weight", 1.0)
     return row
@@ -1721,14 +2241,167 @@ def sanitize_event_tags(value: Any) -> list[str]:
     tags: list[str] = []
     seen: set[str] = set()
     for item in value:
-        tag = normalize_id(item)
-        if not tag or tag in seen:
+        if isinstance(item, (dict, list)):
+            continue
+        tag = compact_text(item, 32).strip(" #,，;；")
+        key = tag.casefold()
+        if not tag or key in seen:
             continue
         tags.append(tag)
-        seen.add(tag)
+        seen.add(key)
         if len(tags) >= 12:
             break
     return tags
+
+
+def sanitize_event_metadata(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    metadata: dict[str, Any] = {}
+    for key, raw_value in value.items():
+        safe_key = compact_text(key, 40)
+        if not safe_key:
+            continue
+        if isinstance(raw_value, (dict, list)):
+            metadata[safe_key] = compact_text(json.dumps(raw_value, ensure_ascii=False), 500)
+        else:
+            metadata[safe_key] = compact_text(raw_value, 500)
+    return metadata
+
+
+def date_only(value: Any, fallback: str | None = None) -> str:
+    text = compact_text(value, 80)
+    if re.match(r"^\d{4}-\d{2}-\d{2}", text):
+        return text[:10]
+    if text:
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).date().isoformat()
+        except ValueError:
+            pass
+    return (fallback or now_iso())[:10]
+
+
+def normalize_author_type(value: Any, fallback: str = "role") -> str:
+    raw = normalize_id(value, fallback)
+    aliases = {
+        "passerby": "bystander",
+        "random": "bystander",
+        "路人": "bystander",
+        "moderator": "moderator",
+        "mod": "moderator",
+        "版主": "moderator",
+        "system": "system",
+        "user": "user",
+        "role": "role",
+        "character": "role",
+    }
+    return aliases.get(raw, raw if raw in {"role", "bystander", "moderator", "system", "user"} else fallback)
+
+
+def sanitize_forum_replies(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    replies: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            continue
+        content = compact_text(item.get("content") or item.get("body") or item.get("text"), 1000)
+        if not content:
+            continue
+        replies.append(
+            {
+                "reply_id": normalize_id(item.get("reply_id") or item.get("id"), f"reply_{uuid4().hex[:12]}"),
+                "floor": clamp_int(item.get("floor"), 1, 999, index + 1),
+                "author_id": normalize_id(item.get("author_id") or item.get("speaker_id"), "system"),
+                "author_name": compact_text(item.get("author_name") or item.get("speaker_name") or item.get("author"), 80) or "System",
+                "author_type": normalize_author_type(item.get("author_type") or item.get("source_type"), "role"),
+                "source": normalize_id(item.get("source"), "ai"),
+                "content": content,
+                "mood": normalize_id(item.get("mood"), ""),
+                "created_at": compact_text(item.get("created_at"), 80) or now_iso(),
+            }
+        )
+        if len(replies) >= 20:
+            break
+    return replies
+
+
+def sanitize_mail_replies(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    replies: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        content = compact_text(item.get("content") or item.get("body") or item.get("text"), 1000)
+        if not content:
+            continue
+        direction = normalize_id(item.get("direction"), "received")
+        if direction not in {"sent", "received"}:
+            direction = "received"
+        replies.append(
+            {
+                "reply_id": normalize_id(item.get("reply_id") or item.get("id"), f"mail_reply_{uuid4().hex[:12]}"),
+                "author_id": normalize_id(item.get("author_id") or item.get("speaker_id"), "system"),
+                "author_name": compact_text(item.get("author_name") or item.get("speaker_name") or item.get("author"), 80) or "System",
+                "direction": direction,
+                "content": content,
+                "mood": normalize_id(item.get("mood"), ""),
+                "source": normalize_id(item.get("source"), "ai"),
+                "created_at": compact_text(item.get("created_at"), 80) or now_iso(),
+            }
+        )
+        if len(replies) >= 40:
+            break
+    return replies
+
+
+def sanitize_live_messages(value: Any, *, limit: int = 80) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        content = compact_text(item.get("content") or item.get("body") or item.get("text"), 240)
+        if not content:
+            continue
+        rows.append(
+            {
+                "message_id": normalize_id(item.get("message_id") or item.get("id"), f"live_msg_{uuid4().hex[:12]}"),
+                "author_name": compact_text(item.get("author_name") or item.get("speaker_name") or item.get("author"), 80) or "观众",
+                "author_type": normalize_author_type(item.get("author_type") or item.get("source_type"), "bystander"),
+                "content": content,
+                "mood": normalize_id(item.get("mood"), ""),
+                "amount": compact_text(item.get("amount"), 40),
+                "created_at": compact_text(item.get("created_at"), 80) or now_iso(),
+            }
+        )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def sanitize_live_contributors(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = compact_text(item.get("name") or item.get("author_name") or item.get("user"), 80)
+        if not name:
+            continue
+        rows.append(
+            {
+                "name": name,
+                "amount": compact_text(item.get("amount") or item.get("score") or item.get("gift"), 40) or "1",
+                "note": compact_text(item.get("note") or item.get("content"), 120),
+            }
+        )
+        if len(rows) >= 12:
+            break
+    return rows
 
 
 def sanitize_channel_event(raw: Any, channel: dict[str, Any], index: int = 0) -> dict[str, Any] | None:
@@ -1739,8 +2412,34 @@ def sanitize_channel_event(raw: Any, channel: dict[str, Any], index: int = 0) ->
         return None
     event_type = normalize_id(raw.get("event_type") or raw.get("type"), channel["type"])
     if event_type not in CHANNEL_EVENT_TYPES:
-        event_type = {"feed": "post", "forum": "thread", "mail": "mail", "diary": "diary", "calendar": "calendar"}.get(channel["type"], "post")
-    metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+        event_type = {"feed": "post", "forum": "thread", "mail": "mail", "diary": "diary", "calendar": "calendar", "live": "live"}.get(channel["type"], "post")
+    metadata_source = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+    metadata = sanitize_event_metadata(metadata_source)
+    if channel["type"] in {"feed", "forum"}:
+        replies = sanitize_forum_replies(raw.get("replies") or metadata_source.get("replies"))
+        if replies:
+            metadata["replies"] = replies
+    if channel["type"] == "mail":
+        replies = sanitize_mail_replies(raw.get("replies") or metadata_source.get("replies"))
+        if replies:
+            metadata["replies"] = replies
+    if channel["type"] == "calendar":
+        metadata["date"] = date_only(metadata_source.get("date") or metadata_source.get("time") or raw.get("created_at"))
+        if metadata_source.get("time"):
+            metadata["time"] = compact_text(metadata_source.get("time"), 80)
+    if channel["type"] == "diary":
+        if metadata_source.get("mood"):
+            metadata["mood"] = compact_text(metadata_source.get("mood"), 80)
+        if metadata_source.get("related_people"):
+            metadata["related_people"] = compact_text(metadata_source.get("related_people"), 240)
+    if channel["type"] == "live":
+        metadata["danmaku"] = sanitize_live_messages(raw.get("danmaku") or metadata_source.get("danmaku"), limit=80)
+        metadata["highlights"] = sanitize_live_messages(raw.get("highlights") or metadata_source.get("highlights"), limit=12)
+        metadata["contributors"] = sanitize_live_contributors(raw.get("contributors") or metadata_source.get("contributors"))
+        metadata["viewers"] = compact_text(metadata_source.get("viewers") or raw.get("viewers"), 40) or str(900 + index * 137)
+        metadata["fans"] = compact_text(metadata_source.get("fans") or raw.get("fans"), 40)
+        metadata["live_status"] = compact_text(metadata_source.get("live_status") or raw.get("live_status"), 40) or "直播中"
+        metadata["inner_thought"] = compact_text(metadata_source.get("inner_thought") or raw.get("inner_thought"), 500)
     return {
         "event_id": normalize_id(raw.get("event_id") or raw.get("id"), f"evt_{uuid4().hex[:12]}"),
         "channel_id": channel["channel_id"],
@@ -1752,7 +2451,7 @@ def sanitize_channel_event(raw: Any, channel: dict[str, Any], index: int = 0) ->
         "author_name": compact_text(raw.get("author_name") or raw.get("speaker_name") or raw.get("author"), 80) or "System",
         "source": normalize_id(raw.get("source"), "ai"),
         "tags": sanitize_event_tags(raw.get("tags")),
-        "metadata": {compact_text(key, 40): compact_text(value, 500) for key, value in metadata.items() if compact_text(key, 40)},
+        "metadata": metadata,
         "created_at": compact_text(raw.get("created_at"), 80) or now_iso(),
         "updated_at": compact_text(raw.get("updated_at"), 80) or compact_text(raw.get("created_at"), 80) or now_iso(),
     }
@@ -1776,6 +2475,42 @@ def append_channel_events(channel_id: str, entries: list[dict[str, Any]]) -> lis
     merged = sorted([*sanitized, *existing], key=lambda item: item["created_at"], reverse=True)[:500]
     write_json(channel_events_path(channel["channel_id"]), merged)
     return sanitized
+
+
+def save_channel_events(channel_id: str, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    channel = get_channel_or_404(channel_id)
+    sanitized = [event for index, item in enumerate(events) if (event := sanitize_channel_event(item, channel, index)) is not None]
+    sanitized = sorted(sanitized, key=lambda item: item["created_at"], reverse=True)[:500]
+    write_json(channel_events_path(channel["channel_id"]), sanitized)
+    return sanitized
+
+
+def update_channel_event(channel_id: str, event: dict[str, Any]) -> dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    sanitized = sanitize_channel_event(event, channel, 0)
+    if not sanitized:
+        raise HTTPException(status_code=400, detail="Event content is empty.")
+    events = get_channel_events(channel["channel_id"])
+    changed = False
+    merged: list[dict[str, Any]] = []
+    for item in events:
+        if item["event_id"] == sanitized["event_id"]:
+            merged.append(sanitized)
+            changed = True
+        else:
+            merged.append(item)
+    if not changed:
+        merged.append(sanitized)
+    save_channel_events(channel["channel_id"], merged)
+    return sanitized
+
+
+def find_channel_event_or_404(channel_id: str, event_id: str) -> dict[str, Any]:
+    safe_event_id = normalize_id(event_id)
+    for event in get_channel_events(channel_id):
+        if event["event_id"] == safe_event_id:
+            return event
+    raise HTTPException(status_code=404, detail="频道内容不存在。")
 
 
 def summarize_mobile_context() -> dict[str, Any]:
@@ -1820,42 +2555,264 @@ def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dic
         "mobile_context": summarize_mobile_context(),
     }
     system_text = assembled_prompt_text(channel["type"]) or system_prompt_text()
+    content_limit = 280 if channel["type"] in {"diary", "live"} else 180 if channel["type"] in {"mail", "calendar"} else 140
+    output_rules = [
+        f"Generate exactly {count} event(s) for this mobile app channel.",
+        "Return compact valid JSON only, with no markdown, no explanation, and no surrounding text.",
+        "The root shape must be {\"events\":[...]} and each event must include title, content, author_name, event_type, tags and metadata.",
+        f"Use 1-3 short text tags. Keep each title <= 24 Chinese characters and each content <= {content_limit} Chinese characters.",
+        "Keep metadata small and JSON-serializable.",
+    ]
+    if channel["type"] == "forum":
+        output_rules.append(
+            "For each forum thread, put exactly 2 compact floor replies in metadata.replies; "
+            "each reply must include author_name, author_type, source, content, mood and floor. "
+            "Mix at least one bystander/random passerby reply with role/moderator replies; each reply content <= 70 Chinese characters."
+        )
+    if channel["type"] == "calendar":
+        output_rules.append(
+            "For every calendar event, metadata.date is required in YYYY-MM-DD format; "
+            "metadata should also include time, location and participants when useful."
+        )
+    if channel["type"] == "diary":
+        output_rules.append(
+            "For diary events, write a richer diary fragment with clear paragraphs; "
+            "metadata should include mood, related_people and role_id when known."
+        )
+    if channel["type"] == "live":
+        output_rules.append(
+            "For live events, event_type must be live. metadata must include live_status, viewers, fans, inner_thought, "
+            "danmaku, highlights and contributors. danmaku/highlights are arrays of compact messages with author_name, author_type, content and mood; "
+            "contributors is an array with name, amount and optional note."
+        )
     user_text = (
-        "Generate seed content for this mobile app channel. "
-        "Return JSON only in the form {\"events\":[...]}. "
-        "Each event must include title, content, author_name, event_type, tags and metadata.\n"
-        + json.dumps(context, ensure_ascii=False, indent=2)
+        "\n".join(output_rules)
+        + "\nContext JSON:\n"
+        + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
     )
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
+def channel_seed_max_tokens(channel: dict[str, Any], count: int) -> int:
+    configured = get_settings()["max_tokens"]
+    safe_count = clamp_int(count, 1, 20, 1)
+    baseline = 1100 if channel["type"] == "forum" else 1000
+    per_event = 380 if channel["type"] == "forum" else 340
+    recommended = min(4000, baseline + safe_count * per_event)
+    return max(configured, recommended)
+
+
+def build_channel_interaction_messages(channel: dict[str, Any], event: dict[str, Any], user_content: str, *, mode: str) -> list[dict[str, str]]:
+    existing_replies = sanitize_forum_replies(event.get("metadata", {}).get("replies"))
+    reply_word = "comments" if channel["type"] == "feed" else "floor replies"
+    target_count = 3 if mode == "post" else 2
+    context = {
+        "channel": channel,
+        "mode": mode,
+        "event": {
+            "title": event.get("title", ""),
+            "content": event.get("content", ""),
+            "author_name": event.get("author_name", ""),
+            "tags": event.get("tags", []),
+            "metadata": {"replies": existing_replies[-6:]},
+        },
+        "user_content": user_content,
+        "mobile_context": summarize_mobile_context(),
+    }
+    system_text = assembled_prompt_text(channel["type"]) or system_prompt_text()
+    source_rule = (
+        "Generate exactly {count} compact character {reply_word}."
+        if channel["type"] == "feed"
+        else "Generate exactly {count} compact forum floor replies mixing roles, random bystanders and optionally a moderator/System voice."
+    ).format(count=target_count, reply_word=reply_word)
+    user_text = (
+        f"The user just {'published this event' if mode == 'post' else 'replied to this event'} in the {channel['type']} app. "
+        f"{source_rule}\n"
+        "Return valid JSON only, root shape {\"replies\":[...]}. "
+        "Each reply must include author_name, author_type, source, content, mood and floor. "
+        "Keep each content <= 70 Chinese characters, in-character, varied, and directly responsive to the user's content. "
+        "Valid author_type values: role, bystander, moderator, system. Bystanders must not be treated as saved character profiles. "
+        "Do not mention system prompts or plugin internals.\n"
+        "Context JSON:\n"
+        + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+    )
+    return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
+
+
+def parse_channel_interaction_replies(raw: str, channel: dict[str, Any], start_floor: int, count: int) -> list[dict[str, Any]]:
+    raw_replies, parse_error = parse_model_json_output(
+        raw,
+        scope=f"channel_{channel['type']}_interaction",
+        schema="replies",
+        root_key="replies",
+        target_id=channel["channel_id"],
+    )
+    if parse_error:
+        return []
+    if isinstance(raw_replies, dict):
+        raw_replies = [raw_replies]
+    if not isinstance(raw_replies, list):
+        record_parser_diagnostic(f"channel_{channel['type']}_interaction", "replies", channel["channel_id"], "replies_not_list", raw)
+        raw_replies = []
+    prepared: list[dict[str, Any]] = []
+    for offset, item in enumerate(raw_replies[:count]):
+        if not isinstance(item, dict):
+            continue
+        prepared.append({**item, "floor": start_floor + offset})
+    replies = sanitize_forum_replies(prepared)
+    if replies:
+        return replies
+    record_parser_diagnostic(
+        f"channel_{channel['type']}_interaction",
+        "replies",
+        channel["channel_id"],
+        "no_valid_replies",
+        raw,
+    )
+    fallback_content = "角色暂时没有接上话，可以稍后重试生成互动。"
+    fallback = [{"floor": start_floor, "author_name": "System", "content": fallback_content, "mood": "fallback"}]
+    return sanitize_forum_replies(fallback)
+
+
+async def generate_channel_replies(channel: dict[str, Any], event: dict[str, Any], user_content: str, *, mode: str) -> list[dict[str, Any]]:
+    existing = sanitize_forum_replies(event.get("metadata", {}).get("replies"))
+    start_floor = len(existing) + 1
+    count = 3 if mode == "post" else 2
+    job = begin_generation_job(f"channel_{channel['type']}_interaction", channel["channel_id"])
+    try:
+        raw_reply = await call_chat_model(
+            build_channel_interaction_messages(channel, event, user_content, mode=mode),
+            max_tokens=min(1800, max(get_settings()["max_tokens"], 900)),
+            temperature=read_main_llm_config()["temperature"],
+        )
+    except HTTPException as exc:
+        finish_generation_job(job, "error", compact_text(exc.detail, 240))
+        raise
+    replies = parse_channel_interaction_replies(raw_reply, channel, start_floor, count)
+    if not replies:
+        finish_generation_job(job, "error", "parser_no_valid_replies")
+        raise HTTPException(status_code=502, detail="模型返回内容无法解析，请查看后台 diagnostics。")
+    finish_generation_job(job, "success")
+    return replies
+
+
+async def attach_generated_channel_replies(channel: dict[str, Any], event: dict[str, Any], user_content: str, *, mode: str) -> dict[str, Any]:
+    replies = await generate_channel_replies(channel, event, user_content, mode=mode)
+    metadata = dict(event.get("metadata") or {})
+    existing = sanitize_forum_replies(metadata.get("replies"))
+    metadata["replies"] = sanitize_forum_replies([*existing, *replies])
+    event["metadata"] = metadata
+    event["updated_at"] = now_iso()
+    return update_channel_event(channel["channel_id"], event)
+
+
+def build_mail_reply_messages(event: dict[str, Any], user_content: str) -> list[dict[str, str]]:
+    context = {
+        "mail": {
+            "title": event.get("title", ""),
+            "content": event.get("content", ""),
+            "author_name": event.get("author_name", ""),
+            "metadata": event.get("metadata", {}),
+        },
+        "user_reply": user_content,
+        "mobile_context": summarize_mobile_context(),
+        "output_schema": {
+            "replies": [
+                {
+                    "author_name": event.get("author_name", "System"),
+                    "direction": "received",
+                    "content": "short reply mail content",
+                    "mood": "calm",
+                }
+            ]
+        },
+    }
+    system_text = assembled_prompt_text("mail") or system_prompt_text()
+    user_text = (
+        "Continue this in-world email thread after the user sends a reply. "
+        "Return valid JSON only, root shape {\"replies\":[...]}. "
+        "Generate exactly 1 received reply from the original sender or a relevant mail contact. "
+        "Each reply must include author_name, direction, content and mood. Keep content <= 220 Chinese characters. "
+        "Do not mention plugins, APIs, prompts, or JSON.\n"
+        "Context JSON:\n"
+        + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+    )
+    return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
+
+
+def parse_mail_replies(raw: str, event: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_replies, parse_error = parse_model_json_output(
+        raw,
+        scope="mail_reply",
+        schema="replies",
+        root_key="replies",
+        target_id=event["event_id"],
+    )
+    if parse_error:
+        return []
+    if isinstance(raw_replies, dict):
+        raw_replies = [raw_replies]
+    if not isinstance(raw_replies, list):
+        record_parser_diagnostic("mail_reply", "replies", event["event_id"], "replies_not_list", raw)
+        return []
+    prepared = []
+    for item in raw_replies[:1]:
+        if not isinstance(item, dict):
+            continue
+        prepared.append(
+            {
+                **item,
+                "direction": "received",
+                "author_id": normalize_id(item.get("author_id") or event.get("author_id"), event.get("author_id") or "mail_sender"),
+                "author_name": compact_text(item.get("author_name") or event.get("author_name"), 80) or "System",
+                "source": "ai",
+            }
+        )
+    replies = sanitize_mail_replies(prepared)
+    if not replies:
+        record_parser_diagnostic("mail_reply", "replies", event["event_id"], "no_valid_replies", raw)
+    return replies
+
+
+async def generate_mail_reply(event: dict[str, Any], user_content: str) -> list[dict[str, Any]]:
+    job = begin_generation_job("mail_reply", event["event_id"])
+    try:
+        raw_reply = await call_chat_model(
+            build_mail_reply_messages(event, user_content),
+            max_tokens=min(1600, max(get_settings()["max_tokens"], 900)),
+            temperature=read_main_llm_config()["temperature"],
+        )
+    except HTTPException as exc:
+        finish_generation_job(job, "error", compact_text(exc.detail, 240))
+        raise
+    replies = parse_mail_replies(raw_reply, event)
+    if not replies:
+        finish_generation_job(job, "error", "parser_no_valid_replies")
+        raise HTTPException(status_code=502, detail="模型返回邮件回复无法解析，请查看后台 diagnostics。")
+    finish_generation_job(job, "success")
+    return replies
+
+
 def parse_channel_seed_events(raw: str, channel: dict[str, Any], count: int) -> list[dict[str, Any]]:
-    cleaned = strip_json_fence(raw)
-    payload: Any = None
-    for candidate in (cleaned, cleaned[cleaned.find("{") : cleaned.rfind("}") + 1] if "{" in cleaned and "}" in cleaned else ""):
-        if not candidate:
-            continue
-        try:
-            payload = json.loads(candidate)
-            break
-        except ValueError:
-            continue
-    raw_events = payload.get("events", []) if isinstance(payload, dict) else []
+    raw_events, parse_error = parse_model_json_output(
+        raw,
+        scope=f"channel_{channel['type']}_seed",
+        schema="events",
+        root_key="events",
+        target_id=channel["channel_id"],
+    )
+    if parse_error:
+        return []
+    if isinstance(raw_events, dict):
+        raw_events = [raw_events]
     if not isinstance(raw_events, list):
+        record_parser_diagnostic(f"channel_{channel['type']}_seed", "events", channel["channel_id"], "events_not_list", raw)
         raw_events = []
     events = [event for index, item in enumerate(raw_events[:count]) if (event := sanitize_channel_event(item, channel, index)) is not None]
     if events:
         return events
-    fallback = {
-        "event_type": {"feed": "post", "forum": "thread", "mail": "mail", "diary": "diary", "calendar": "calendar"}.get(channel["type"], "post"),
-        "title": f"{channel['label']} seed",
-        "content": compact_text(cleaned, 500) or "Seed content generated, but the model did not return the expected schema.",
-        "author_name": "System",
-        "source": "system",
-        "tags": ["fallback"],
-    }
-    event = sanitize_channel_event(fallback, channel, 0)
-    return [event] if event else []
+    record_parser_diagnostic(f"channel_{channel['type']}_seed", "events", channel["channel_id"], "no_valid_events", raw)
+    return []
 
 
 def sanitize_notification(raw: Any, index: int = 0) -> dict[str, Any] | None:
@@ -1955,6 +2912,8 @@ def sanitize_phone_session(raw: Any, index: int = 0) -> dict[str, Any] | None:
         "role_id": role_id,
         "role_name": compact_text(raw.get("role_name"), 80) or role_id,
         "status": normalize_id(raw.get("status"), "ongoing"),
+        "ended_by": normalize_id(raw.get("ended_by"), ""),
+        "ended_at": compact_text(raw.get("ended_at"), 80),
         "started_at": compact_text(raw.get("started_at"), 80) or now_iso(),
         "updated_at": compact_text(raw.get("updated_at"), 80) or now_iso(),
         "lines": lines[-120:],
@@ -1980,9 +2939,42 @@ def save_phone_sessions(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sanitized[:80]
 
 
+def phone_role_candidates() -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_role(role_id: Any, name: Any, summary: Any = "", avatar: Any = "", chat_style: Any = "", status: Any = "") -> None:
+        safe_id = normalize_id(role_id)
+        display_name = compact_text(name, 80)
+        if not safe_id or not display_name or safe_id in seen:
+            return
+        rows.append(
+            {
+                "role_id": safe_id,
+                "display_name": display_name,
+                "summary": compact_text(summary, 1000),
+                "avatar": safe_avatar(avatar),
+                "chat_style": compact_text(chat_style, 500),
+                "status": compact_text(status, 300),
+                "enabled": True,
+            }
+        )
+        seen.add(safe_id)
+
+    for profile in get_role_profiles(include_disabled=False):
+        add_role(profile["role_id"], profile["display_name"], profile.get("summary"), profile.get("avatar"), profile.get("chat_style"), profile.get("status"))
+    for member in available_role_members().get("roles", []):
+        add_role(member.get("role_id"), member.get("name"), member.get("summary"), member.get("avatar"))
+    for group in get_groups():
+        for member in group.get("members", []):
+            if member.get("type") == "character":
+                add_role(member.get("role_id"), member.get("name"), member.get("summary"), member.get("avatar"))
+    return sorted(rows, key=lambda item: item["display_name"].casefold())
+
+
 def get_phone_role_or_404(role_id: str) -> dict[str, Any]:
     safe_role_id = normalize_id(role_id)
-    role = next((item for item in get_role_profiles(include_disabled=False) if item["role_id"] == safe_role_id), None)
+    role = next((item for item in phone_role_candidates() if item["role_id"] == safe_role_id), None)
     if not role:
         raise HTTPException(status_code=404, detail="Phone role not found.")
     return role
@@ -2007,28 +2999,31 @@ def build_phone_call_messages(role: dict[str, Any], session: dict[str, Any], use
     system_text = assembled_prompt_text("phone") or system_prompt_text()
     user_text = (
         "Continue a simulated phone call with the target role. "
-        "Return JSON only with lines and call_state. Keep each line compact.\n"
+        "Return JSON only with lines and call_state. Return 1-3 compact role lines when the role naturally continues speaking. "
+        "If the role naturally ends the call, set call_state to ended and make the final line sound like a real phone goodbye.\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
 def parse_phone_lines(raw: str, role: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
-    cleaned = strip_json_fence(raw)
-    payload: Any = None
-    for candidate in (cleaned, cleaned[cleaned.find("{") : cleaned.rfind("}") + 1] if "{" in cleaned and "}" in cleaned else ""):
-        if not candidate:
-            continue
-        try:
-            payload = json.loads(candidate)
-            break
-        except ValueError:
-            continue
-    raw_lines = payload.get("lines", []) if isinstance(payload, dict) else []
+    payload, parse_error = parse_model_json_output(
+        raw,
+        scope="phone",
+        schema="lines",
+        root_key="lines",
+        target_id=role["role_id"],
+    )
+    if parse_error:
+        return [], "ongoing"
+    raw_lines = payload.get("lines", []) if isinstance(payload, dict) else payload
+    if isinstance(raw_lines, dict):
+        raw_lines = [raw_lines]
     if not isinstance(raw_lines, list):
+        record_parser_diagnostic("phone", "lines", role["role_id"], "lines_not_list", raw)
         raw_lines = []
     lines: list[dict[str, Any]] = []
-    for index, item in enumerate(raw_lines[:4]):
+    for index, item in enumerate(raw_lines[:3]):
         if not isinstance(item, dict):
             continue
         item = {**item, "speaker": item.get("speaker") or role["display_name"], "speaker_id": role["role_id"], "source": "ai"}
@@ -2036,16 +3031,7 @@ def parse_phone_lines(raw: str, role: dict[str, Any]) -> tuple[list[dict[str, An
         if line:
             lines.append(line)
     if not lines:
-        fallback = sanitize_phone_line(
-            {
-                "speaker": role["display_name"],
-                "speaker_id": role["role_id"],
-                "content": compact_text(cleaned, 500) or "...",
-                "source": "ai",
-            }
-        )
-        if fallback:
-            lines.append(fallback)
+        record_parser_diagnostic("phone", "lines", role["role_id"], "no_valid_lines", raw)
     call_state = normalize_id(payload.get("call_state") if isinstance(payload, dict) else "", "ongoing")
     if call_state not in {"ongoing", "ended", "missed"}:
         call_state = "ongoing"
@@ -2110,6 +3096,17 @@ def build_api_url(base_url: str, endpoint: str) -> str:
     return f"{clean_base}/{clean_endpoint}"
 
 
+def should_request_low_reasoning(model: str) -> bool:
+    normalized = compact_text(model, 160).lower()
+    return any(hint in normalized for hint in REASONING_MODEL_HINTS)
+
+
+def chat_model_extra_payload(config: dict[str, Any]) -> dict[str, Any]:
+    if should_request_low_reasoning(config.get("model", "")):
+        return {"reasoning_effort": "low"}
+    return {}
+
+
 async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, temperature: float) -> str:
     config = read_main_llm_config()
     url = build_api_url(config["base_url"], "chat/completions")
@@ -2127,9 +3124,14 @@ async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, te
         "max_tokens": max_tokens,
         "stream": False,
     }
+    payload.update(chat_model_extra_payload(config))
     try:
         async with httpx.AsyncClient(timeout=float(config["request_timeout"])) as client:
             response = await client.post(url, headers=headers, json=payload)
+            if response.status_code in {400, 422} and "reasoning_effort" in payload:
+                retry_payload = dict(payload)
+                retry_payload.pop("reasoning_effort", None)
+                response = await client.post(url, headers=headers, json=retry_payload)
             response.raise_for_status()
             data = response.json()
     except httpx.HTTPStatusError as exc:
@@ -2142,11 +3144,15 @@ async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, te
     except ValueError as exc:
         raise HTTPException(status_code=502, detail="模型服务返回的不是合法 JSON。") from exc
     try:
-        content = data["choices"][0]["message"]["content"]
+        message = data["choices"][0]["message"]
+        content = message.get("content")
+        reasoning_content = message.get("reasoning_content") or message.get("reasoning")
     except (KeyError, IndexError, TypeError) as exc:
         raise HTTPException(status_code=502, detail="模型服务返回格式不兼容 Chat Completions。") from exc
     text = str(content or "").strip()
     if not text:
+        if reasoning_content:
+            raise HTTPException(status_code=502, detail="模型只返回了推理内容，未返回可用正文；请重试或调高输出 token。")
         raise HTTPException(status_code=502, detail="模型没有返回内容。")
     return text
 
@@ -2235,26 +3241,144 @@ def strip_json_fence(text: str) -> str:
     return fenced.group(1).strip() if fenced else raw
 
 
+def escape_json_string_newlines(text: str) -> str:
+    result: list[str] = []
+    in_string = False
+    escaped = False
+    for char in text:
+        if escaped:
+            result.append(char)
+            escaped = False
+            continue
+        if char == "\\" and in_string:
+            result.append(char)
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            result.append(char)
+            continue
+        if in_string and char in "\r\n":
+            result.append("\\n")
+            continue
+        result.append(char)
+    return "".join(result)
+
+
+def json_text_candidates(text: str) -> list[str]:
+    cleaned = strip_json_fence(text)
+    candidates = [cleaned]
+    if "{" in cleaned and "}" in cleaned:
+        candidates.append(cleaned[cleaned.find("{") : cleaned.rfind("}") + 1])
+    if "[" in cleaned and "]" in cleaned:
+        candidates.append(cleaned[cleaned.find("[") : cleaned.rfind("]") + 1])
+    rows: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        candidate = candidate.strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        rows.append(candidate)
+    return rows
+
+
+def loads_json_lenient(text: str) -> Any:
+    for candidate in json_text_candidates(text):
+        variants = [
+            candidate,
+            escape_json_string_newlines(candidate),
+            re.sub(r",\s*([}\]])", r"\1", candidate),
+            re.sub(r",\s*([}\]])", r"\1", escape_json_string_newlines(candidate)),
+        ]
+        for variant in variants:
+            try:
+                return json.loads(variant)
+            except ValueError:
+                continue
+    return None
+
+
+
+def parse_payload_shape(payload: Any, root_key: str) -> Any:
+    if isinstance(payload, dict):
+        for key in (root_key, "messages", "events", "replies", "lines", "items", "data", "result", "results"):
+            value = payload.get(key)
+            if value is not None:
+                return value
+        return payload
+    return payload
+
+
+def get_parser_diagnostics() -> list[dict[str, Any]]:
+    ensure_runtime_data()
+    payload = read_json(PARSER_DIAGNOSTICS_PATH, {"schema_version": 1, "items": []})
+    rows = payload.get("items", []) if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        rows = []
+    sanitized: list[dict[str, Any]] = []
+    for row in rows[:80]:
+        if not isinstance(row, dict):
+            continue
+        sanitized.append(
+            {
+                "diagnostic_id": normalize_id(row.get("diagnostic_id"), f"parse_{uuid4().hex[:10]}"),
+                "created_at": compact_text(row.get("created_at"), 80) or now_iso(),
+                "scope": compact_text(row.get("scope"), 80),
+                "schema": compact_text(row.get("schema"), 80),
+                "target_id": compact_text(row.get("target_id"), 120),
+                "reason": compact_text(row.get("reason"), 240),
+                "raw_excerpt": compact_text(row.get("raw_excerpt"), 500),
+            }
+        )
+    return sanitized
+
+
+def record_parser_diagnostic(scope: str, schema: str, target_id: str, reason: str, raw: str) -> None:
+    rows = get_parser_diagnostics()
+    rows.insert(
+        0,
+        {
+            "diagnostic_id": make_id("parse"),
+            "created_at": now_iso(),
+            "scope": compact_text(scope, 80),
+            "schema": compact_text(schema, 80),
+            "target_id": compact_text(target_id, 120),
+            "reason": compact_text(reason, 240),
+            "raw_excerpt": compact_text(strip_json_fence(raw), 500),
+        },
+    )
+    write_json(PARSER_DIAGNOSTICS_PATH, {"schema_version": 1, "items": rows[:80]})
+
+
+def parse_model_json_output(raw: str, *, scope: str, schema: str, root_key: str, target_id: str = "") -> tuple[Any, str]:
+    cleaned = strip_json_fence(raw)
+    payload = loads_json_lenient(cleaned)
+    if payload is None:
+        record_parser_diagnostic(scope, schema, target_id, "json_parse_failed", raw)
+        return None, "json_parse_failed"
+    shaped = parse_payload_shape(payload, root_key)
+    return shaped, ""
+
+
 def first_ai_member(group: dict[str, Any]) -> dict[str, str] | None:
     return next((item for item in group["members"] if item["type"] == "character"), None)
 
 
 def parse_model_mobile_messages(raw: str, group: dict[str, Any]) -> list[dict[str, Any]]:
-    cleaned = strip_json_fence(raw)
-    payload: Any = None
-    parse_failed = False
-    for candidate in (cleaned, cleaned[cleaned.find("{") : cleaned.rfind("}") + 1] if "{" in cleaned and "}" in cleaned else ""):
-        if not candidate:
-            continue
-        try:
-            payload = json.loads(candidate)
-            break
-        except ValueError:
-            continue
-    if payload is None:
-        parse_failed = True
-    raw_messages = payload.get("messages", []) if isinstance(payload, dict) else []
+    raw_messages, parse_error = parse_model_json_output(
+        raw,
+        scope="group_chat",
+        schema="messages",
+        root_key="messages",
+        target_id=group["group_id"],
+    )
+    if parse_error:
+        return []
+    if isinstance(raw_messages, dict):
+        raw_messages = [raw_messages]
     if not isinstance(raw_messages, list):
+        record_parser_diagnostic("group_chat", "messages", group["group_id"], "messages_not_list", raw)
         raw_messages = []
     ai_members = [item for item in group["members"] if item["type"] == "character"]
     by_name = {role_name_key(item["name"]): item for item in ai_members}
@@ -2312,6 +3436,12 @@ def group_async_lock(group_id: str) -> asyncio.Lock:
 async def index(request: Request) -> HTMLResponse:
     ensure_runtime_data()
     return templates.TemplateResponse(request, "index.html", {"settings": get_settings()})
+
+
+@app.get("/chat", response_class=HTMLResponse)
+async def chat_index(request: Request) -> HTMLResponse:
+    ensure_runtime_data()
+    return templates.TemplateResponse(request, "chat.html", {"settings": get_settings()})
 
 
 @app.get("/api/settings")
@@ -2464,6 +3594,17 @@ async def api_disable_role(role_id: str) -> dict[str, Any]:
     return {"ok": True, "role": profiles[index], "roles": get_role_profiles(include_disabled=True)}
 
 
+@app.delete("/api/admin/roles/{role_id}/purge")
+async def api_delete_role(role_id: str) -> dict[str, Any]:
+    safe_role_id = normalize_id(role_id)
+    profiles = get_role_profiles(include_disabled=True)
+    next_profiles = [item for item in profiles if item["role_id"] != safe_role_id]
+    if len(next_profiles) == len(profiles):
+        raise HTTPException(status_code=404, detail="角色不存在。")
+    save_role_profiles(next_profiles)
+    return {"ok": True, "deleted_role_id": safe_role_id, "roles": get_role_profiles(include_disabled=True)}
+
+
 @app.post("/api/admin/roles/sync-current-card")
 async def api_sync_current_card_roles() -> dict[str, Any]:
     return {"ok": True, "roles": sync_current_card_profiles()}
@@ -2472,6 +3613,44 @@ async def api_sync_current_card_roles() -> dict[str, Any]:
 @app.post("/api/admin/roles/import-from-groups")
 async def api_import_group_roles() -> dict[str, Any]:
     return {"ok": True, "roles": import_group_members_to_profiles()}
+
+
+@app.post("/api/role-generator/draft")
+async def api_role_generator_draft(payload: RoleGeneratorPayload) -> dict[str, Any]:
+    drafts = generate_role_profiles(payload)
+    return {"ok": True, "draft": drafts[0] if drafts else None, "drafts": drafts}
+
+
+@app.post("/api/admin/role-generator/draft")
+async def api_admin_role_generator_draft(payload: RoleGeneratorPayload) -> dict[str, Any]:
+    drafts = generate_role_profiles(RoleGeneratorPayload(**{**payload.model_dump(), "source": "admin_role_generator"}))
+    return {"ok": True, "draft": drafts[0] if drafts else None, "drafts": drafts}
+
+
+@app.post("/api/role-generator/extract-events")
+async def api_role_generator_extract_events(payload: RoleEventExtractPayload | None = None) -> dict[str, Any]:
+    drafts = extract_event_role_profiles(payload, source="event_extract")
+    return {"ok": True, "draft": drafts[0] if drafts else None, "drafts": drafts}
+
+
+@app.post("/api/admin/role-generator/extract-events")
+async def api_admin_role_generator_extract_events(payload: RoleEventExtractPayload | None = None) -> dict[str, Any]:
+    drafts = extract_event_role_profiles(payload, source="admin_event_extract")
+    return {"ok": True, "draft": drafts[0] if drafts else None, "drafts": drafts}
+
+
+@app.post("/api/role-generator/save")
+async def api_role_generator_save(payload: RoleGeneratorSavePayload) -> dict[str, Any]:
+    raw_roles = payload.roles if isinstance(payload.roles, list) else [payload.role]
+    saved = save_generated_role_profiles(raw_roles, source="role_generator")
+    return {"ok": True, "saved": saved, "roles": get_role_profiles(include_disabled=True), "available": available_role_members()["roles"]}
+
+
+@app.post("/api/admin/role-generator/save")
+async def api_admin_role_generator_save(payload: RoleGeneratorSavePayload) -> dict[str, Any]:
+    raw_roles = payload.roles if isinstance(payload.roles, list) else [payload.role]
+    saved = save_generated_role_profiles(raw_roles, source="admin_role_generator")
+    return {"ok": True, "saved": saved, "roles": get_role_profiles(include_disabled=True), "available": available_role_members()["roles"]}
 
 
 @app.get("/api/groups")
@@ -2624,6 +3803,19 @@ async def api_generate(payload: GeneratePayload) -> JSONResponse | dict[str, Any
                 content={"ok": False, "user_message": user_message, "messages": stored_error, "error": error_message["content"]},
             )
         ai_messages = parse_model_mobile_messages(raw_reply, group)
+        if not ai_messages:
+            error_message = {
+                "message_id": make_id("msg"),
+                "speaker_id": "system",
+                "speaker_name": "系统",
+                "type": "error",
+                "content": "模型返回内容无法解析，请查看后台 diagnostics。",
+                "created_at": now_iso(),
+                "source": "system",
+            }
+            stored_error = append_group_messages(safe_group_id, [error_message])
+            finish_generation_job(job, "error", "parser_no_valid_messages")
+            return JSONResponse(status_code=502, content={"ok": False, "user_message": user_message, "messages": stored_error, "error": error_message["content"]})
         stored_messages = append_group_messages(safe_group_id, ai_messages)
         finish_generation_job(job, "success")
         return {"ok": True, "user_message": user_message, "messages": stored_messages}
@@ -2661,9 +3853,317 @@ async def api_continue(payload: ContinuePayload) -> JSONResponse | dict[str, Any
                 content={"ok": False, "messages": stored_error, "error": error_message["content"]},
             )
         ai_messages = parse_model_mobile_messages(raw_reply, group)
+        if not ai_messages:
+            error_message = {
+                "message_id": make_id("msg"),
+                "speaker_id": "system",
+                "speaker_name": "系统",
+                "type": "error",
+                "content": "模型返回内容无法解析，请查看后台 diagnostics。",
+                "created_at": now_iso(),
+                "source": "system",
+            }
+            stored_error = append_group_messages(safe_group_id, [error_message])
+            finish_generation_job(job, "error", "parser_no_valid_messages")
+            return JSONResponse(status_code=502, content={"ok": False, "messages": stored_error, "error": error_message["content"]})
         stored_messages = append_group_messages(safe_group_id, ai_messages)
         finish_generation_job(job, "success")
         return {"ok": True, "messages": stored_messages}
+
+
+def model_status_deep() -> dict[str, Any]:
+    config = read_main_llm_config()
+    route = read_route_forwarding_fallback()
+    return {
+        "provider": "route_forwarding" if route.get("base_url") and route.get("base_url") == config.get("base_url") else "main_settings",
+        "base_url": config.get("base_url", ""),
+        "model": config.get("model", ""),
+        "temperature": config.get("temperature"),
+        "request_timeout": config.get("request_timeout"),
+        "api_key_configured": bool(config.get("api_key")),
+        "reasoning_effort": chat_model_extra_payload(config).get("reasoning_effort", "default"),
+        "route_forwarding_available": bool(route.get("base_url")),
+    }
+
+
+def workbench_overview() -> dict[str, Any]:
+    return {
+        "model": model_status_deep(),
+        "settings_generation": get_settings().get("generation", {}),
+        "prompt_scopes": sorted(CHANNEL_TYPES),
+        "schemas": channel_schema_catalog(),
+        "recent_parser_diagnostics": get_parser_diagnostics()[:8],
+        "generation_state": get_generation_state(),
+    }
+
+
+def role_draft_from_source(payload: WorkbenchRoleDraftPayload) -> dict[str, Any]:
+    role_id = normalize_id(payload.role_id or "")
+    display_name = compact_text(payload.display_name, 80)
+    candidates = get_role_profiles(include_disabled=True)
+    candidates.extend(current_card_profiles())
+    selected = None
+    if role_id:
+        selected = next((item for item in candidates if normalize_id(item.get("role_id") or item.get("id")) == role_id), None)
+    if not selected and display_name:
+        selected = next((item for item in candidates if role_name_key(item.get("display_name") or item.get("name")) == role_name_key(display_name)), None)
+    if not selected and candidates:
+        selected = candidates[0]
+    source_name = selected.get("display_name") or selected.get("name") if isinstance(selected, dict) else display_name
+    source_summary = selected.get("summary") or selected.get("description") or selected.get("status") if isinstance(selected, dict) else ""
+    draft = {
+        "role_id": normalize_id(selected.get("role_id") or selected.get("id") or source_name, f"role_{uuid4().hex[:8]}") if isinstance(selected, dict) else normalize_id(source_name, f"role_{uuid4().hex[:8]}"),
+        "display_name": compact_text(source_name, 80) or "未命名角色",
+        "source": "workbench_draft",
+        "source_ref": compact_text(payload.source, 120) or "current_card",
+        "aliases": selected.get("aliases", []) if isinstance(selected, dict) and isinstance(selected.get("aliases"), list) else [],
+        "avatar": selected.get("avatar", "") if isinstance(selected, dict) else "",
+        "summary": compact_text(source_summary, 500) or "由工作台生成的角色草稿，请补充角色简介。",
+        "status": compact_text(selected.get("status"), 80) if isinstance(selected, dict) else "",
+        "chat_style": compact_text(selected.get("chat_style"), 500) if isinstance(selected, dict) else "语气自然，回应简洁，贴合角色设定。",
+        "sticker_preferences": selected.get("sticker_preferences", {"preferred_tags": [], "blocked_tags": []}) if isinstance(selected, dict) else {"preferred_tags": [], "blocked_tags": []},
+        "auto_speak_weight": clamp_float(selected.get("auto_speak_weight") if isinstance(selected, dict) else 1, 0.0, 5.0, 1.0),
+        "enabled": True,
+    }
+    return sanitize_role_profile(draft, 0) or draft
+
+
+def build_workbench_mock_payload(scope: str, user_input: str) -> dict[str, Any]:
+    now = now_iso()
+    if scope == "phone":
+        return {"lines": [{"speaker": "测试角色", "content": "电话已接通。", "mood": "calm"}], "call_state": "ongoing"}
+    if scope == "group_chat":
+        return {"messages": [{"speaker": "测试角色", "type": "text", "content": compact_text(user_input, 80) or "收到测试消息。"}]}
+    if scope in {"feed", "forum", "mail", "diary", "calendar", "live"}:
+        return {
+            "events": [
+                {
+                    "title": f"{scope} 测试内容",
+                    "content": compact_text(user_input, 120) or "这是一条工作台测试内容。",
+                    "author_name": "测试角色",
+                    "event_type": {"forum": "thread", "mail": "mail", "diary": "diary", "calendar": "calendar", "live": "live"}.get(scope, "post"),
+                    "tags": ["workbench", "test"],
+                    "metadata": {"created_at": now, "replies": [] if scope == "forum" else None},
+                }
+            ]
+        }
+    return {"result": compact_text(user_input, 200)}
+
+
+def workbench_channel_for_scope(scope: str, channel_id: str = "") -> dict[str, Any]:
+    safe_channel_id = normalize_id(channel_id)
+    if safe_channel_id:
+        channel = get_channel_or_404(safe_channel_id)
+        if channel["type"] != scope:
+            raise HTTPException(status_code=400, detail="选择的频道类型与 scope 不一致。")
+        return channel
+    channel = next((item for item in get_channels(include_disabled=False) if item["type"] == scope), None)
+    if not channel:
+        raise HTTPException(status_code=404, detail="没有可用的频道用于该 scope。")
+    return channel
+
+
+async def run_workbench_generation(payload: WorkbenchGeneratePayload) -> dict[str, Any]:
+    scope = normalize_id(payload.scope, "feed")
+    mode = normalize_id(payload.mode, "mock")
+    user_input = compact_text(payload.user_input, 1000)
+    save_result = bool(payload.save)
+    if scope not in CHANNEL_TYPES:
+        raise HTTPException(status_code=400, detail="不支持的 scope。")
+    if mode not in {"mock", "real"}:
+        raise HTTPException(status_code=400, detail="不支持的生成模式。")
+
+    channel_scopes = {"feed", "forum", "mail", "diary", "calendar", "live"}
+    if mode == "mock":
+        parsed = build_workbench_mock_payload(scope, user_input)
+        saved = False
+        channel = None
+        if save_result and scope in channel_scopes:
+            channel = workbench_channel_for_scope(scope, payload.channel_id or "")
+            events = parsed.get("events", []) if isinstance(parsed, dict) else []
+            stored = append_channel_events(channel["channel_id"], events)
+            for event in stored:
+                notification_from_event(event)
+            parsed = {"events": stored}
+            saved = bool(stored)
+        return {"mode": "mock", "scope": scope, "channel": channel, "parsed": parsed, "saved": saved}
+
+    job = begin_generation_job("workbench", scope)
+    try:
+        if scope in channel_scopes:
+            channel = workbench_channel_for_scope(scope, payload.channel_id or "")
+            raw_reply = await call_chat_model(
+                build_channel_seed_messages(channel, 1),
+                max_tokens=channel_seed_max_tokens(channel, 1),
+                temperature=read_main_llm_config()["temperature"],
+            )
+            events = parse_channel_seed_events(raw_reply, channel, 1)
+            if not events:
+                raise HTTPException(status_code=502, detail="模型返回内容无法解析，请查看后台 diagnostics。")
+            saved = False
+            if save_result:
+                stored = append_channel_events(channel["channel_id"], events)
+                for event in stored:
+                    notification_from_event(event)
+                events = stored
+                saved = bool(stored)
+            finish_generation_job(job, "success")
+            return {"mode": "real", "scope": scope, "channel": channel, "parsed": {"events": events}, "saved": saved}
+        if scope == "phone":
+            candidates = phone_role_candidates()
+            role_id = payload.role_id or (candidates[0]["role_id"] if candidates else "")
+            role = get_phone_role_or_404(role_id)
+            session = {
+                "session_id": make_id("calltest"),
+                "role_id": role["role_id"],
+                "role_name": role["display_name"],
+                "status": "ongoing",
+                "lines": [],
+            }
+            raw_reply = await call_chat_model(
+                build_phone_call_messages(role, session, user_input or "你好，可以接通吗？"),
+                max_tokens=min(get_settings()["max_tokens"], 600),
+                temperature=read_main_llm_config()["temperature"],
+            )
+            lines, call_state = parse_phone_lines(raw_reply, role)
+            finish_generation_job(job, "success")
+            return {"mode": "real", "scope": scope, "parsed": {"lines": lines, "call_state": call_state}, "saved": False}
+        raise HTTPException(status_code=400, detail="该 scope 暂不支持真实生成。")
+    except HTTPException as exc:
+        finish_generation_job(job, "error", compact_text(exc.detail, 240))
+        raise
+
+
+
+
+
+
+def channel_event_admin_rows(limit: int = 8) -> dict[str, Any]:
+    channels = get_channels(include_disabled=True)
+    rows: dict[str, Any] = {}
+    for channel in channels:
+        events = get_channel_events(channel["channel_id"])
+        fallback = [item for item in events if "fallback" in item.get("tags", []) or item.get("source") == "fallback"]
+        workbench = [item for item in events if "workbench" in item.get("tags", []) or item.get("source") == "workbench"]
+        rows[channel["channel_id"]] = {
+            "channel_id": channel["channel_id"],
+            "label": channel["label"],
+            "type": channel["type"],
+            "count": len(events),
+            "fallback_count": len(fallback),
+            "workbench_count": len(workbench),
+            "recent": [
+                {
+                    "event_id": item["event_id"],
+                    "title": item["title"],
+                    "author_name": item["author_name"],
+                    "source": item.get("source", ""),
+                    "tags": item.get("tags", []),
+                    "created_at": item.get("created_at", ""),
+                }
+                for item in events[:limit]
+            ],
+        }
+    return rows
+
+
+def notification_invalid_source_ids() -> set[str]:
+    valid_pairs = {
+        (channel["channel_id"], event["event_id"])
+        for channel in get_channels(include_disabled=True)
+        for event in get_channel_events(channel["channel_id"])
+    }
+    invalid: set[str] = set()
+    for item in get_notifications():
+        channel_id = item.get("channel_id", "")
+        event_id = item.get("event_id", "")
+        if channel_id and event_id and (channel_id, event_id) not in valid_pairs:
+            invalid.add(item["notification_id"])
+    return invalid
+
+
+def admin_data_overview() -> dict[str, Any]:
+    notifications = get_notifications()
+    sessions = get_phone_sessions()
+    invalid_ids = notification_invalid_source_ids()
+    empty_sessions = [item for item in sessions if not item.get("lines")]
+    return {
+        "channels": channel_event_admin_rows(),
+        "notifications": {
+            "count": len(notifications),
+            "unread_count": len([item for item in notifications if not item.get("read")]),
+            "invalid_source_count": len(invalid_ids),
+            "recent": notifications[:10],
+        },
+        "phone": {
+            "session_count": len(sessions),
+            "empty_session_count": len(empty_sessions),
+            "recent": [
+                {
+                    "session_id": item["session_id"],
+                    "role_name": item["role_name"],
+                    "status": item["status"],
+                    "line_count": len(item.get("lines", [])),
+                    "updated_at": item.get("updated_at", ""),
+                }
+                for item in sessions[:10]
+            ],
+        },
+        "parser_diagnostics": get_parser_diagnostics()[:12],
+        "generation_state": get_generation_state(),
+    }
+
+
+def clear_channel_test_events(channel_id: str, *, include_fallback: bool = True, include_workbench: bool = True) -> dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    events = get_channel_events(channel["channel_id"])
+    kept: list[dict[str, Any]] = []
+    removed: list[dict[str, Any]] = []
+    for event in events:
+        tags = set(event.get("tags") or [])
+        is_fallback = event.get("source") == "fallback" or "fallback" in tags
+        is_workbench = event.get("source") == "workbench" or "workbench" in tags or "test" in tags
+        if (include_fallback and is_fallback) or (include_workbench and is_workbench):
+            removed.append(event)
+        else:
+            kept.append(event)
+    save_channel_events(channel["channel_id"], kept)
+    return {"channel": channel, "removed_count": len(removed), "remaining_count": len(kept)}
+
+
+def clear_invalid_notifications() -> dict[str, Any]:
+    invalid_ids = notification_invalid_source_ids()
+    rows = get_notifications()
+    kept = [item for item in rows if item["notification_id"] not in invalid_ids]
+    save_notifications(kept)
+    return {"removed_count": len(rows) - len(kept), "remaining_count": len(kept)}
+
+
+def prune_empty_phone_sessions() -> dict[str, Any]:
+    sessions = get_phone_sessions()
+    kept = [item for item in sessions if item.get("lines")]
+    save_phone_sessions(kept)
+    return {"removed_count": len(sessions) - len(kept), "remaining_count": len(kept)}
+
+
+
+@app.get("/api/admin/workbench")
+async def api_admin_workbench() -> dict[str, Any]:
+    return {"ok": True, "workbench": workbench_overview()}
+
+
+@app.post("/api/admin/workbench/role-draft")
+async def api_admin_workbench_role_draft(payload: WorkbenchRoleDraftPayload) -> dict[str, Any]:
+    return {"ok": True, "draft": role_draft_from_source(payload)}
+
+
+@app.post("/api/admin/workbench/generate", response_model=None)
+async def api_admin_workbench_generate(payload: WorkbenchGeneratePayload) -> JSONResponse | dict[str, Any]:
+    try:
+        result = await run_workbench_generation(payload)
+        return {"ok": True, **result}
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": compact_text(exc.detail, 240)})
 
 
 @app.get("/api/admin/prompt-blocks")
@@ -2694,6 +4194,21 @@ async def api_admin_channel_schemas() -> dict[str, Any]:
     return {"ok": True, "schemas": channel_schema_catalog()}
 
 
+
+@app.get("/api/admin/generation-control")
+async def api_admin_generation_control() -> dict[str, Any]:
+    return {"ok": True, "generation_control": generation_control_payload()}
+
+
+@app.put("/api/admin/generation-control")
+async def api_admin_save_generation_control(payload: dict[str, Any]) -> dict[str, Any]:
+    current = get_settings()
+    control = sanitize_generation_control(payload.get("generation_control", payload))
+    merged = merge_settings_update(current, {"generation_control": control})
+    write_json(SETTINGS_PATH, sanitize_settings(merged))
+    return {"ok": True, "generation_control": generation_control_payload()}
+
+
 @app.get("/api/admin/generation-guard")
 async def api_admin_generation_guard() -> dict[str, Any]:
     return {"ok": True, "state": get_generation_state()}
@@ -2713,6 +4228,36 @@ async def api_admin_diagnostics() -> dict[str, Any]:
 @app.get("/api/apps")
 async def api_apps() -> dict[str, Any]:
     return {"ok": True, **get_app_registry(include_disabled=False)}
+
+
+
+@app.get("/api/admin/data-overview")
+async def api_admin_data_overview() -> dict[str, Any]:
+    return {"ok": True, "data": admin_data_overview()}
+
+
+@app.post("/api/admin/data/channels/{channel_id}/clear-test-events")
+async def api_admin_clear_channel_test_events(channel_id: str) -> dict[str, Any]:
+    return {"ok": True, **clear_channel_test_events(channel_id)}
+
+
+@app.post("/api/admin/data/notifications/read-all")
+async def api_admin_notifications_read_all() -> dict[str, Any]:
+    rows = get_notifications()
+    for item in rows:
+        item["read"] = True
+    save_notifications(rows)
+    return {"ok": True, "updated_count": len(rows), "data": admin_data_overview()}
+
+
+@app.post("/api/admin/data/notifications/clear-invalid")
+async def api_admin_clear_invalid_notifications() -> dict[str, Any]:
+    return {"ok": True, **clear_invalid_notifications(), "data": admin_data_overview()}
+
+
+@app.post("/api/admin/data/phone/prune-empty")
+async def api_admin_prune_empty_phone_sessions() -> dict[str, Any]:
+    return {"ok": True, **prune_empty_phone_sessions(), "data": admin_data_overview()}
 
 
 @app.get("/api/admin/apps")
@@ -2767,18 +4312,165 @@ async def api_create_channel_event(channel_id: str, payload: ChannelEventPayload
     return {"ok": True, "event": stored[0]}
 
 
+@app.post("/api/channels/{channel_id}/interactions", response_model=None)
+async def api_create_channel_interaction(channel_id: str, payload: ChannelInteractionPayload) -> JSONResponse | dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    if channel["type"] not in {"feed", "forum"}:
+        raise HTTPException(status_code=400, detail="This channel does not support user publishing.")
+    content = compact_text(payload.content, 1200)
+    if not content:
+        raise HTTPException(status_code=400, detail="内容不能为空。")
+    title = compact_text(payload.title, 120)
+    event = {
+        "title": title or ("新的帖子" if channel["type"] == "forum" else "新的动态"),
+        "content": content,
+        "event_type": "thread" if channel["type"] == "forum" else "post",
+        "author_id": "user",
+        "author_name": "你",
+        "tags": ["user"],
+        "metadata": {"replies": []},
+        "source": "user",
+    }
+    stored = append_channel_events(channel["channel_id"], [event])
+    if not stored:
+        raise HTTPException(status_code=400, detail="Event content is empty.")
+    try:
+        event = await attach_generated_channel_replies(channel, stored[0], content, mode="post")
+    except HTTPException as exc:
+        event = update_channel_event(channel["channel_id"], stored[0])
+        notification_from_event(event)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"ok": False, "event": event, "events": get_channel_events(channel["channel_id"]), "error": compact_text(exc.detail, 240)},
+        )
+    notification_from_event(event)
+    return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
+
+
+@app.post("/api/channels/{channel_id}/events/{event_id}/replies", response_model=None)
+async def api_reply_channel_event(channel_id: str, event_id: str, payload: ChannelReplyPayload) -> JSONResponse | dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    if channel["type"] not in {"feed", "forum"}:
+        raise HTTPException(status_code=400, detail="This channel does not support replies.")
+    content = compact_text(payload.content, 800)
+    if not content:
+        raise HTTPException(status_code=400, detail="回复不能为空。")
+    event = find_channel_event_or_404(channel["channel_id"], event_id)
+    metadata = dict(event.get("metadata") or {})
+    existing = sanitize_forum_replies(metadata.get("replies"))
+    user_reply = sanitize_forum_replies([
+        {
+            "author_id": "user",
+            "author_name": "你",
+            "content": content,
+            "mood": "user",
+            "floor": len(existing) + 1,
+            "created_at": now_iso(),
+        }
+    ])
+    metadata["replies"] = sanitize_forum_replies([*existing, *user_reply])
+    event["metadata"] = metadata
+    event["updated_at"] = now_iso()
+    event = update_channel_event(channel["channel_id"], event)
+    try:
+        event = await attach_generated_channel_replies(channel, event, content, mode="reply")
+    except HTTPException as exc:
+        notification_from_event(event)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"ok": False, "event": event, "events": get_channel_events(channel["channel_id"]), "error": compact_text(exc.detail, 240)},
+        )
+    notification_from_event(event)
+    return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
+
+
+@app.post("/api/channels/{channel_id}/events/{event_id}/mail-replies", response_model=None)
+async def api_reply_mail_event(channel_id: str, event_id: str, payload: MailReplyPayload) -> JSONResponse | dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    if channel["type"] != "mail":
+        raise HTTPException(status_code=400, detail="This channel does not support mail replies.")
+    content = compact_text(payload.content, 1000)
+    if not content:
+        raise HTTPException(status_code=400, detail="回复不能为空。")
+    event = find_channel_event_or_404(channel["channel_id"], event_id)
+    metadata = dict(event.get("metadata") or {})
+    existing = sanitize_mail_replies(metadata.get("replies"))
+    user_reply = sanitize_mail_replies([
+        {
+            "author_id": "user",
+            "author_name": "我",
+            "direction": "sent",
+            "content": content,
+            "mood": "sent",
+            "source": "user",
+            "created_at": now_iso(),
+        }
+    ])
+    metadata["replies"] = sanitize_mail_replies([*existing, *user_reply])
+    event["metadata"] = metadata
+    event["updated_at"] = now_iso()
+    event = update_channel_event(channel["channel_id"], event)
+    generated: list[dict[str, Any]] = []
+    if payload.generate_reply is not False:
+        try:
+            generated = await generate_mail_reply(event, content)
+        except HTTPException as exc:
+            notification_from_event(event)
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"ok": False, "event": event, "events": get_channel_events(channel["channel_id"]), "error": compact_text(exc.detail, 240)},
+            )
+        metadata = dict(event.get("metadata") or {})
+        metadata["replies"] = sanitize_mail_replies([*sanitize_mail_replies(metadata.get("replies")), *generated])
+        event["metadata"] = metadata
+        event["updated_at"] = now_iso()
+        event = update_channel_event(channel["channel_id"], event)
+    notification_from_event(event)
+    if generated:
+        add_notification("Mail", f"{generated[-1]['author_name']}: {generated[-1]['content'][:160]}", source="mail", channel_id=channel["channel_id"], event_id=event["event_id"])
+    return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"]), "replies": generated}
+
+
+@app.post("/api/channels/{channel_id}/events/{event_id}/live-messages")
+async def api_add_live_message(channel_id: str, event_id: str, payload: LiveMessagePayload) -> dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    if channel["type"] != "live":
+        raise HTTPException(status_code=400, detail="This channel does not support live messages.")
+    content = compact_text(payload.content, 240)
+    if not content:
+        raise HTTPException(status_code=400, detail="弹幕不能为空。")
+    event = find_channel_event_or_404(channel["channel_id"], event_id)
+    metadata = dict(event.get("metadata") or {})
+    existing = sanitize_live_messages(metadata.get("danmaku"), limit=80)
+    user_message = sanitize_live_messages([
+        {
+            "author_name": "你",
+            "author_type": "user",
+            "content": content,
+            "mood": "user",
+            "created_at": now_iso(),
+        }
+    ], limit=1)
+    metadata["danmaku"] = sanitize_live_messages([*existing, *user_message], limit=80)
+    event["metadata"] = metadata
+    event["updated_at"] = now_iso()
+    event = update_channel_event(channel["channel_id"], event)
+    return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
 async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any]:
     job = begin_generation_job(f"channel_{channel['type']}", channel["channel_id"])
     try:
         raw_reply = await call_chat_model(
             build_channel_seed_messages(channel, count),
-            max_tokens=get_settings()["max_tokens"],
+            max_tokens=channel_seed_max_tokens(channel, count),
             temperature=read_main_llm_config()["temperature"],
         )
     except HTTPException as exc:
         finish_generation_job(job, "error", compact_text(exc.detail, 240))
         raise
     events = parse_channel_seed_events(raw_reply, channel, count)
+    if not events:
+        finish_generation_job(job, "error", "parser_no_valid_events")
+        raise HTTPException(status_code=502, detail="模型返回内容无法解析，请查看后台 diagnostics。")
     stored = append_channel_events(channel["channel_id"], events)
     for event in stored:
         notification_from_event(event)
@@ -2842,7 +4534,22 @@ async def api_notifications_read_all() -> dict[str, Any]:
 
 @app.get("/api/phone/sessions")
 async def api_phone_sessions() -> dict[str, Any]:
-    return {"ok": True, "sessions": get_phone_sessions(), "roles": get_role_profiles(include_disabled=False)}
+    return {"ok": True, "sessions": get_phone_sessions(), "roles": phone_role_candidates()}
+
+
+@app.post("/api/phone/sessions/{session_id}/hangup")
+async def api_hangup_phone_session(session_id: str) -> dict[str, Any]:
+    safe_session_id = normalize_id(session_id)
+    sessions = get_phone_sessions()
+    session = next((item for item in sessions if item["session_id"] == safe_session_id), None)
+    if not session:
+        raise HTTPException(status_code=404, detail="Phone session not found.")
+    session["status"] = "ended"
+    session["ended_by"] = "user"
+    session["ended_at"] = now_iso()
+    session["updated_at"] = now_iso()
+    saved = save_phone_sessions([session, *[item for item in sessions if item["session_id"] != safe_session_id]])
+    return {"ok": True, "session": saved[0], "sessions": get_phone_sessions()}
 
 
 @app.post("/api/phone/call", response_model=None)
@@ -2850,6 +4557,8 @@ async def api_phone_call(payload: PhoneCallPayload) -> JSONResponse | dict[str, 
     role = get_phone_role_or_404(payload.role_id)
     sessions = get_phone_sessions()
     session = next((item for item in sessions if item["session_id"] == normalize_id(payload.session_id or "")), None)
+    if session and session.get("status") == "ended":
+        session = None
     if not session:
         session = {
             "session_id": make_id("call"),
@@ -2883,8 +4592,17 @@ async def api_phone_call(payload: PhoneCallPayload) -> JSONResponse | dict[str, 
         finish_generation_job(job, "error", compact_text(exc.detail, 240))
         return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": compact_text(exc.detail, 240), "session": session})
     lines, call_state = parse_phone_lines(raw_reply, role)
+    if not lines:
+        finish_generation_job(job, "error", "parser_no_valid_lines")
+        return JSONResponse(status_code=502, content={"ok": False, "error": "模型返回内容无法解析，请查看后台 diagnostics。", "session": session})
     session["lines"].extend(lines)
     session["status"] = call_state
+    if call_state == "ended":
+        session["ended_by"] = "role"
+        session["ended_at"] = now_iso()
+    elif call_state == "missed":
+        session["ended_by"] = "role"
+        session["ended_at"] = now_iso()
     session["updated_at"] = now_iso()
     remaining = [item for item in sessions if item["session_id"] != session["session_id"]]
     saved = save_phone_sessions([session, *remaining])
@@ -2965,6 +4683,7 @@ def admin_diagnostics() -> dict[str, Any]:
         "notifications": NOTIFICATIONS_PATH,
         "phone_calls": PHONE_CALLS_PATH,
         "generation_state": GENERATION_STATE_PATH,
+        "parser_diagnostics": PARSER_DIAGNOSTICS_PATH,
     }
     try:
         data_dir_label = str(DATA_DIR.relative_to(PROJECT_ROOT))
@@ -2980,6 +4699,7 @@ def admin_diagnostics() -> dict[str, Any]:
         "phone_session_count": len(phone_sessions),
         "active_generation_jobs": len(generation_state["active_jobs"]),
         "last_generation_jobs": generation_state["last_jobs"][:5],
+        "parser_diagnostics": get_parser_diagnostics()[:10],
         "isolation": {
             "writes_main_chat": False,
             "writes_role_card": False,

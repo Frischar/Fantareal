@@ -148,5 +148,18 @@
         </section>
       </div>
     </div>
+    <script>
+      (() => {
+        const backToChatTypes = new Set([
+          "fantareal:mobile-chat:back-to-chat",
+          "fantareal:plugin:back-to-chat",
+        ]);
+        window.addEventListener("message", (event) => {
+          const data = event.data;
+          if (!data || typeof data !== "object" || !backToChatTypes.has(data.type)) return;
+          window.location.href = "/chat";
+        });
+      })();
+    </script>
   </body>
 </html>
