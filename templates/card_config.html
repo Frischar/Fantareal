@@ -1104,7 +1104,7 @@
         return [...personaGridEl.querySelectorAll(".persona-card")].map((card, index) => {
           const key = String(card.dataset.personaKey || index + 1).trim();
           const name = card.querySelector(`#persona-${key}-name`)?.value.trim() || `角色${index + 1}`;
-          return { key, name, role_id: slugifyStateJournalKey(name || key, `role_${index + 1}`) };
+          return { key, name, role_id: slugifyStateJournalKey(name || key, `role_${index + 1}`), is_empty_slot: isEmptyStateJournalPersonaCard(card, key) };
         });
       }
 
@@ -1119,12 +1119,40 @@
         return Boolean((role.variables || []).length || (role.stages || []).length || (role.snapshotFields || []).length);
       }
 
+      function isPlaceholderStateJournalRoleLabel(value) {
+        const text = String(value || "").trim();
+        return /^role\s*[a-z0-9]+$/i.test(text) || /^role[_\-\s]*[a-z0-9]+$/i.test(text);
+      }
+
+      function isEmptyStateJournalPersonaCard(card, key = "") {
+        const name = card.querySelector(`#persona-${key}-name`)?.value.trim() || "";
+        if (!isPlaceholderStateJournalRoleLabel(name)) return false;
+        const fields = ["description", "personality", "scenario", "creator-notes"];
+        const hasContent = fields.some((field) => (card.querySelector(`#persona-${key}-${field}`)?.value || "").trim());
+        // Role A/B/C 这类占位多角色不作为心笺角色来源；原始 personas 仍随角色卡保存。
+        return !hasContent || isPlaceholderStateJournalRoleLabel(name);
+      }
+
+      function shouldHideStateJournalEmptyRole(role) {
+        if (!role) return false;
+        if (role.display_policy === "hide_empty" || role.is_empty_slot) return true;
+        const sourceType = String(role.source_type || role.sourceType || "").trim();
+        const source = String(role.source || "").trim();
+        return (sourceType === "multi_role_slot" || source === "persona")
+          && isPlaceholderStateJournalRoleLabel(role.role_name || role.role_id)
+          && !stateJournalRoleHasConfig(role)
+          && !role.has_state_journal_config;
+      }
+
       function stateJournalDesiredSourceRoleSeeds() {
         const mode = normalizeStateJournalRoleSourceMode(currentStateJournal?.role_source_mode || "auto");
         const personas = collectPersonaSummaries();
         if (mode === "main_card") return { detected: "main_card", roles: [collectMainCardStateJournalRole()], personas };
-        if (mode === "personas_only") return { detected: "personas_only", roles: personas.map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", variables: [], stages: [], snapshotFields: [] })), personas };
-        if (personas.length) return { detected: "personas_only", roles: personas.map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", variables: [], stages: [], snapshotFields: [] })), personas };
+        const personaRoles = personas
+          .filter((persona) => !persona.is_empty_slot)
+          .map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", source_type: "multi_role_slot", has_state_journal_config: false, is_empty_slot: false, display_policy: "show", variables: [], stages: [], snapshotFields: [] }));
+        if (mode === "personas_only") return { detected: "personas_only", roles: personaRoles, personas };
+        if (personaRoles.length) return { detected: "personas_only", roles: personaRoles, personas };
         return { detected: "main_card", roles: [collectMainCardStateJournalRole()], personas };
       }
 
@@ -1147,11 +1175,12 @@
         const desired = stateJournalDesiredSourceRoleSeeds();
         const desiredSource = desired.detected === "main_card" ? "main_card" : "persona";
         const existing = (currentStateJournal.roles || []).filter((role) => {
+          if (shouldHideStateJournalEmptyRole(role)) return false;
           const source = String(role.source || "").trim();
           if (!source || source === desiredSource) return true;
           return stateJournalRoleHasConfig(role);
         });
-        currentStateJournal.roles = mergeStateJournalRoles([...existing, ...desired.roles]);
+        currentStateJournal.roles = mergeStateJournalRoles([...existing, ...desired.roles]).filter((role) => !shouldHideStateJournalEmptyRole(role));
       }
 
       function renderStateJournalPanel() {
