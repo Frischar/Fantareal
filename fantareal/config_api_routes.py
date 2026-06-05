@@ -509,7 +509,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
     @app.post("/api/preset")
     async def api_save_preset(payload: PresetStorePayload) -> dict[str, Any]:
         active_slot = ctx.get_active_slot_id()
-        store = ctx.save_preset_store(payload.model_dump(), active_slot)
+        store = ctx.save_preset_store(payload.model_dump(exclude_none=True), active_slot)
         return {
             "ok": True,
             "active_slot": active_slot,

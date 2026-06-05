@@ -141,13 +141,19 @@
               </div>
               <div class="wb-external-tag-panel" hidden>
                 <div class="grid-two wb-wide-grid">
-                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if item.external_source == 'state_journal' %}selected{% endif %}>心笺 · 角色阶段</option></select></div>
+                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if (item.external_source or 'state_journal') == 'state_journal' %}selected{% endif %}>心笺 · 角色阶段</option><option value="preset" {% if item.external_source == 'preset' %}selected{% endif %}>预设标签</option><option value="manual" {% if item.external_source == 'manual' %}selected{% endif %}>手动标签</option></select></div>
                   <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+                </div>
+                <div class="wb-external-tags-row">
+                  <label class="wb-external-tags-label">自定义触发标签（可选）</label>
+                  <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用心笺角色 / 阶段生成标签">{{ (item.activation_tags or []) | join('&#10;') }}</textarea>
+                  <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成心笺阶段标签。</p>
                 </div>
                 <div class="wb-stage-select-row">
                   <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
                   <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
                 </div>
+                <p class="muted helper-text wb-external-stage-hint">选择心笺角色与阶段；上方标签留空时会自动生成机器标签。</p>
                 <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
                   <div class="grid-two wb-wide-grid">
                     <div><label>角色名</label><input class="wb-external-role-name" value="{{ (item.external_ref or {}).get('role_name', '') }}" placeholder="例如：苏怜烟" /></div>
@@ -221,6 +227,7 @@
                   <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="{{ item.cooldown_turns if item.cooldown_turns is not none else 0 }}" />
                 </div>
               </div>
+              <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当心笺阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
 
               <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
                 <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
@@ -467,13 +474,19 @@
           </div>
           <div class="wb-external-tag-panel" hidden>
             <div class="grid-two wb-wide-grid">
-              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">心笺 · 角色阶段</option></select></div>
+              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">心笺 · 角色阶段</option><option value="preset">预设标签</option><option value="manual">手动标签</option></select></div>
               <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+            </div>
+            <div class="wb-external-tags-row">
+              <label class="wb-external-tags-label">自定义触发标签（可选）</label>
+              <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用心笺角色 / 阶段生成标签"></textarea>
+              <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成心笺阶段标签。</p>
             </div>
             <div class="wb-stage-select-row">
               <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
               <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
             </div>
+            <p class="muted helper-text wb-external-stage-hint">选择心笺角色与阶段；上方标签留空时会自动生成机器标签。</p>
             <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
               <div class="grid-two wb-wide-grid">
                 <div><label>角色名</label><input class="wb-external-role-name" placeholder="例如：苏怜烟" /></div>
@@ -547,6 +560,7 @@
               <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="0" />
             </div>
           </div>
+          <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当心笺阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
 
           <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
             <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
@@ -1190,6 +1204,7 @@
         const order = Number(card.querySelector(".wb-order")?.value || 100);
         const injectionOrder = Number(card.querySelector(".wb-injection-order")?.value || order);
         const chance = Number(card.querySelector(".wb-chance")?.value || 100);
+        const externalRuntime = entryType === "external_tag";
 
         summary.appendChild(createSummaryChip(getEntryTypeLabel(entryType), "strong"));
         if (promptLayer === "follow_position") {
@@ -1206,7 +1221,7 @@
         }
         summary.appendChild(createSummaryChip(`顺序 ${order}`));
         summary.appendChild(createSummaryChip(`注入 ${injectionOrder}`));
-        summary.appendChild(createSummaryChip(`概率 ${chance}%`, chance <= 0 ? "warning" : ""));
+        summary.appendChild(externalRuntime ? createSummaryChip("实时标签") : createSummaryChip(`概率 ${chance}%`, chance <= 0 ? "warning" : ""));
         syncQuickEnabledSwitch(card);
       }
 
@@ -1283,7 +1298,7 @@
           if (entryType === "constant") addIssue(card, "constant");
           if (promptLayer !== "follow_position") addIssue(card, promptLayer);
           if (insertionPosition === "in_chat") addIssue(card, "in_chat");
-          if (chance <= 0) addIssue(card, "chance_zero");
+          if (entryType !== "external_tag" && chance <= 0) addIssue(card, "chance_zero");
           if (title && (titleMap.get(title) || 0) > 1) addIssue(card, "duplicate_title");
           if (trigger && (triggerMap.get(trigger) || 0) > 1) addIssue(card, "duplicate_trigger");
         });
@@ -1368,33 +1383,142 @@
         return safeRole && safeStage ? `state_journal.stage.${safeRole}.${safeStage}` : "";
       }
 
+      function parseExternalTags(value) {
+        const tags = [];
+        String(value || "")
+          .split(/[\n\r,，、\s]+/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .forEach((tag) => {
+            if (!tags.includes(tag)) tags.push(tag);
+          });
+        return tags;
+      }
+
+      function formatExternalTags(tags) {
+        return Array.isArray(tags) ? tags.map((tag) => String(tag || "").trim()).filter(Boolean).join("\n") : "";
+      }
+
+      function getManualExternalTags(card) {
+        return parseExternalTags(card.querySelector(".wb-external-tags")?.value || "");
+      }
+
+      function getExternalSource(card) {
+        return card.querySelector(".wb-external-source")?.value || "state_journal";
+      }
+
+      function getExternalActivationTags(card) {
+        const manualTags = getManualExternalTags(card);
+        if (manualTags.length) return manualTags;
+        if (getExternalSource(card) !== "state_journal") return [];
+        return [buildExternalTag(card.querySelector(".wb-external-role-id")?.value.trim(), card.querySelector(".wb-external-stage-key")?.value.trim())].filter(Boolean);
+      }
+
+      function isStateJournalGeneratedTag(tag, roleId, stageKey) {
+        return String(tag || "").trim() === buildExternalTag(roleId, stageKey);
+      }
+
+      function normalizeInitialExternalTagsField(card) {
+        const tagsInput = card.querySelector(".wb-external-tags");
+        if (!tagsInput || getExternalSource(card) !== "state_journal") return;
+        const roleId = card.querySelector(".wb-external-role-id")?.value.trim() || "";
+        const stageKey = card.querySelector(".wb-external-stage-key")?.value.trim() || "";
+        const manualTags = parseExternalTags(tagsInput.value).filter((tag) => !isStateJournalGeneratedTag(tag, roleId, stageKey));
+        tagsInput.value = formatExternalTags(manualTags);
+      }
+
+      function syncExternalSourceUi(card) {
+        const source = getExternalSource(card);
+        const stageRow = card.querySelector(".wb-stage-select-row");
+        const stageHint = card.querySelector(".wb-external-stage-hint");
+        const tagsLabel = card.querySelector(".wb-external-tags-label");
+        const tagsInput = card.querySelector(".wb-external-tags");
+        const tagsHelper = card.querySelector(".wb-external-tags-helper");
+        const stateJournalSource = source === "state_journal";
+        if (stageRow) stageRow.hidden = !stateJournalSource;
+        if (stageHint) stageHint.hidden = !stateJournalSource;
+        if (tagsLabel) {
+          if (source === "preset") tagsLabel.textContent = "监听预设标签";
+          else if (source === "manual") tagsLabel.textContent = "监听外部标签";
+          else tagsLabel.textContent = "自定义触发标签（可选）";
+        }
+        if (tagsInput) {
+          if (source === "preset") tagsInput.placeholder = "一行一个，例如 preset.style.daily-prose";
+          else if (source === "manual") tagsInput.placeholder = "一行一个，例如 runtime.custom.scene-tag";
+          else tagsInput.placeholder = "留空时自动使用心笺角色 / 阶段生成标签";
+        }
+        if (tagsHelper) {
+          if (source === "preset") tagsHelper.textContent = "只使用这里填写的预设标签；留空会保存为空，不自动生成心笺标签。";
+          else if (source === "manual") tagsHelper.textContent = "只使用这里填写的外部标签；留空会保存为空，不自动生成心笺标签。";
+          else tagsHelper.textContent = "留空时自动使用下方角色 / 阶段生成心笺阶段标签。";
+        }
+      }
+
+      function syncExternalTagRuntimeUi(card) {
+        const isExternalTag = (card.querySelector(".wb-entry-type")?.value || "keyword") === "external_tag";
+        [".wb-chance", ".wb-sticky-turns", ".wb-cooldown-turns"].forEach((selector) => {
+          const control = card.querySelector(selector);
+          if (!control) return;
+          control.disabled = isExternalTag;
+          control.title = isExternalTag ? "外部标签词条按 active tag 实时注入，不使用概率、黏性和冷却。" : "";
+        });
+        const runtimeNote = card.querySelector(".wb-external-runtime-note");
+        if (runtimeNote) runtimeNote.hidden = !isExternalTag;
+      }
+
       function updateExternalTagPreview(card) {
         const type = card.querySelector(".wb-entry-type")?.value || "keyword";
         const keywordGrid = card.querySelector(".wb-keyword-grid");
         const externalPanel = card.querySelector(".wb-external-tag-panel");
         if (keywordGrid) keywordGrid.hidden = type === "external_tag";
         if (externalPanel) externalPanel.hidden = type !== "external_tag";
+        syncExternalTagRuntimeUi(card);
+        syncExternalSourceUi(card);
+        const source = getExternalSource(card);
         const roleName = card.querySelector(".wb-external-role-name")?.value.trim() || "未选择角色";
         const roleId = card.querySelector(".wb-external-role-id")?.value.trim();
         const stageName = card.querySelector(".wb-external-stage-name")?.value.trim() || "未选择阶段";
         const stageKey = card.querySelector(".wb-external-stage-key")?.value.trim();
-        const tag = buildExternalTag(roleId, stageKey);
+        const stageTag = buildExternalTag(roleId, stageKey);
+        const tags = getExternalActivationTags(card);
+        const manualTags = getManualExternalTags(card);
         const preview = card.querySelector(".wb-external-preview");
         const status = card.querySelector(".wb-external-status");
         const activeTags = new Set((stateJournalStageCatalog.active_stage_tags || []).map((item) => String(item || "").trim()).filter(Boolean));
         const inCatalog = Boolean(findStageCatalogItem(roleId, stageKey));
-        if (preview) preview.textContent = tag ? `当「${roleName}」处于「${stageName}」阶段时触发。高级标签：${tag}` : "请选择心笺角色与阶段；机器标签会自动生成。";
+        if (preview) {
+          if (source === "preset") {
+            preview.textContent = manualTags.length
+              ? `监听预设标签：${manualTags.join(" / ")}`
+              : "未填写预设标签；保存后 activation_tags 为空，不会自动生成心笺标签。";
+          } else if (source === "manual") {
+            preview.textContent = manualTags.length
+              ? `监听外部标签：${manualTags.join(" / ")}`
+              : "未填写外部标签；保存后 activation_tags 为空，不会自动生成心笺标签。";
+          } else if (manualTags.length) {
+            preview.textContent = `使用自定义标签触发：${manualTags.join(" / ")}`;
+          } else {
+            preview.textContent = stageTag ? `当「${roleName}」处于「${stageName}」阶段时触发。机器标签：${stageTag}` : "请选择心笺角色与阶段；标签留空时会自动生成心笺阶段标签。";
+          }
+        }
         if (status) {
           status.classList.remove("is-active", "is-missing");
-          if (!tag) {
-            status.textContent = "未绑定阶段";
+          const hasActiveTag = tags.some((tag) => activeTags.has(tag));
+          if (!tags.length) {
+            status.textContent = "未绑定标签";
             status.classList.add("is-missing");
-          } else if (activeTags.has(tag)) {
+          } else if (source === "state_journal" && hasActiveTag) {
             status.textContent = "当前命中";
             status.classList.add("is-active");
-          } else if (!inCatalog && (stateJournalStageCatalog.roles || []).length) {
+          } else if (source === "state_journal" && !manualTags.length && !inCatalog && (stateJournalStageCatalog.roles || []).length) {
             status.textContent = "当前卡未找到该阶段";
             status.classList.add("is-missing");
+          } else if (source === "preset") {
+            status.textContent = "等待预设标签";
+          } else if (source === "manual") {
+            status.textContent = "等待外部标签";
+          } else if (manualTags.length) {
+            status.textContent = "等待外部标签";
           } else {
             status.textContent = "等待阶段";
           }
@@ -1414,12 +1538,17 @@
         card.querySelector(".wb-entry-type").value = item.entry_type || "keyword";
         const externalRef = item.external_ref || {};
         if (card.querySelector(".wb-external-source")) card.querySelector(".wb-external-source").value = item.external_source || "state_journal";
+        if (card.querySelector(".wb-external-tags")) {
+          const activationTags = Array.isArray(item.activation_tags) ? item.activation_tags : [];
+          card.querySelector(".wb-external-tags").value = formatExternalTags(activationTags);
+        }
         if (card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = externalRef.role_name || "";
         if (card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = externalRef.role_id || "";
         if (card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = externalRef.stage_name || "";
         if (card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = externalRef.stage_key || "";
-        card.querySelector(".wb-entry-type")?.addEventListener("change", () => { updateExternalTagPreview(card); updateCardTitle(card); });
-        card.querySelectorAll(".wb-external-tag-panel input, .wb-external-tag-panel select").forEach((input) => input.addEventListener("input", () => updateExternalTagPreview(card)));
+        normalizeInitialExternalTagsField(card);
+        card.querySelector(".wb-entry-type")?.addEventListener("change", () => { updateExternalTagPreview(card); updateCardTitle(card); applyWorldbookSearch(); });
+        card.querySelectorAll(".wb-external-tag-panel input, .wb-external-tag-panel select, .wb-external-tag-panel textarea").forEach((input) => input.addEventListener("input", () => updateExternalTagPreview(card)));
         populateExternalStageSelectors(card);
         updateExternalTagPreview(card);
         card.querySelector(".wb-prompt-layer").value = item.prompt_layer || "follow_position";
@@ -1479,7 +1608,7 @@
               stage_key: card.querySelector(".wb-external-stage-key")?.value.trim() || "",
               stage_name: card.querySelector(".wb-external-stage-name")?.value.trim() || "",
             },
-            activation_tags: [buildExternalTag(card.querySelector(".wb-external-role-id")?.value.trim(), card.querySelector(".wb-external-stage-key")?.value.trim())].filter(Boolean),
+            activation_tags: getExternalActivationTags(card),
             content: card.querySelector(".wb-content").value.trim(),
             comment: card.querySelector(".wb-comment").value.trim(),
             enabled: card.querySelector(".wb-enabled").checked,
@@ -1743,6 +1872,7 @@
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
         if (event.target.classList.contains("wb-entry-type") || event.target.closest(".wb-external-tag-panel")) {
+          if (event.target.classList.contains("wb-external-source")) syncExternalSourceUi(card);
           updateExternalTagPreview(card);
           updateCardTitle(card);
           applyWorldbookSearch();
@@ -1756,6 +1886,7 @@
 
       loadStateJournalStageCatalog().then(() => {
         document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
+          normalizeInitialExternalTagsField(card);
           populateExternalStageSelectors(card);
           updateExternalTagPreview(card);
         });
@@ -1764,6 +1895,7 @@
       document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
         attachRemoveHandler(card);
         syncInjectionUi(card);
+        normalizeInitialExternalTagsField(card);
         populateExternalStageSelectors(card);
         updateExternalTagPreview(card);
         updateCardTitle(card);

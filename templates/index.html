@@ -6,6 +6,7 @@
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
     <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-v1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=challenge-hide-v1" data-mod-hook="{{ mod.slug }}" />
@@ -481,6 +482,18 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      .prompt-segment-tag-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.38rem;
+        margin: 0.1rem 0;
+      }
+      .prompt-segment-tag-label {
+        color: var(--muted);
+        font-size: 0.76rem;
+        font-weight: 800;
+      }
       @media (max-width: 980px) {
         .prompt-segment-row {
           grid-template-columns: 2.5rem minmax(0, 1fr) auto;
@@ -770,7 +783,6 @@
         color: var(--muted);
         font-size: 0.8rem;
       }
-
       @media (max-width: 768px) {
         .worldbook-debug-toggle {
           gap: 0.75rem;
@@ -904,6 +916,7 @@
             <button type="button" class="runtime-tab" data-runtime-tab="preset" role="tab" aria-selected="false">预设</button>
             <button type="button" class="runtime-tab" data-runtime-tab="worldbook" role="tab" aria-selected="false">世界书 <span id="worldbook-rail-count" class="runtime-tab-count" hidden>0</span></button>
             <button type="button" class="runtime-tab" data-runtime-tab="prompt" role="tab" aria-selected="false">Prompt <span id="prompt-runtime-dot" class="runtime-tab-dot" hidden></span></button>
+            <button type="button" class="runtime-tab" data-runtime-tab="prompt-debug" role="tab" aria-selected="false">Prompt Debug</button>
             <button type="button" class="runtime-tab" data-runtime-tab="tts" role="tab" aria-selected="false">TTS</button>
             <button type="button" class="runtime-tab" data-runtime-tab="plugins" role="tab" aria-selected="false">插件 <span id="plugins-runtime-count" class="runtime-tab-count"{% if not registered_mods %} hidden{% endif %}>{{ (registered_mods or []) | length }}</span></button>
           </div>
@@ -1070,6 +1083,19 @@
                   <div id="prompt-package-layers" class="prompt-layer-list"></div>
                   <pre id="prompt-package-preview" class="debug-code-block"></pre>
                 </div>
+              </div>
+            </section>
+
+            <section id="runtime-tab-prompt-debug" class="runtime-tab-panel" data-runtime-panel="prompt-debug" role="tabpanel" hidden>
+              <div class="runtime-card">
+                <div class="runtime-card-head">
+                  <strong>Prompt Debug</strong>
+                  <button id="download-prompt-debug-json" type="button" class="secondary compact" disabled>下载 Debug JSON</button>
+                </div>
+                <p class="muted">集中查看 Prompt Package、Active Tags、Preset activation_tags 和 Worldbook external_tag 的调试链路。本页只观察，不改变真实 messages。</p>
+              </div>
+              <div id="prompt-debug-panel" class="prompt-debug-grid">
+                <div class="prompt-debug-empty">生成 Prompt 预览或发送一轮聊天后，这里会显示 Prompt Debug 链路。</div>
               </div>
             </section>
 
@@ -1327,6 +1353,7 @@
       </div>
     </aside>
 
+    <script src="/static/js/prompt-debug.js?v=prompt-debug-v1"></script>
     <script>
       const rootEl = document.documentElement;
       const bodyEl = document.body;
@@ -1390,9 +1417,12 @@
       const promptPackageHistorySelectEl = document.getElementById("prompt-package-history-select");
       const downloadPromptJsonBtn = document.getElementById("download-prompt-json");
       const clearPromptPreviewBtn = document.getElementById("clear-prompt-preview");
+      const promptPackageCacheScope = {{ prompt_package_cache_scope | tojson }};
       const promptSegmentPanelEl = document.getElementById("prompt-segment-panel");
       const promptSegmentSummaryEl = document.getElementById("prompt-segment-summary");
       const promptSegmentListEl = document.getElementById("prompt-segment-list");
+      const promptDebugPanelEl = document.getElementById("prompt-debug-panel");
+      const downloadPromptDebugJsonBtn = document.getElementById("download-prompt-debug-json");
       const directorNoteContentEl = document.getElementById("director-note-content");
       const directorNoteTurnsEl = document.getElementById("director-note-turns");
       const directorNotePositionEl = document.getElementById("director-note-position");
@@ -2732,7 +2762,10 @@
             content,
           });
           closeMessageEditors();
-          removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
+          const trimmedFrom = Number(data.trimmed_from ?? index);
+          const rollbackTurnNumber = getRollbackPromptPackageTurn(trimmedFrom);
+          removeDomMessagesFromIndex(trimmedFrom);
+          prunePromptPackageHistoryFromTurn(rollbackTurnNumber);
           historyMutationInFlight = false;
           await generateChatTurn(String(data.message || content), { clearInput: false, source: "edit", turnId: stateJournalTurnId || undefined });
         } catch (error) {
@@ -2769,7 +2802,10 @@
           const data = await postJson("/api/chat/history/reroll", {
             message_index: index,
           });
-          removeDomMessagesFromIndex(Number(data.trimmed_from ?? index));
+          const trimmedFrom = Number(data.trimmed_from ?? index);
+          const rollbackTurnNumber = getRollbackPromptPackageTurn(trimmedFrom);
+          removeDomMessagesFromIndex(trimmedFrom);
+          prunePromptPackageHistoryFromTurn(rollbackTurnNumber);
           historyMutationInFlight = false;
           await generateChatTurn(String(data.message || ""), { clearInput: false, source: "reroll", turnId: stateJournalTurnId || undefined });
         } catch (error) {
@@ -3141,6 +3177,18 @@
           enforced: !!debug?.enforced,
           recursiveEnabled: debug?.recursive_enabled !== undefined ? !!debug.recursive_enabled : !!debug?.recursiveEnabled,
           recursionMaxDepth: Number.isFinite(Number(debug?.recursion_max_depth)) ? Number(debug.recursion_max_depth) : (Number.isFinite(Number(debug?.recursionMaxDepth)) ? Number(debug.recursionMaxDepth) : null),
+          externalActiveTags: Array.isArray(debug?.external_active_tags)
+            ? debug.external_active_tags.map((tag) => String(tag || "").trim()).filter(Boolean)
+            : (Array.isArray(debug?.externalActiveTags) ? debug.externalActiveTags.map((tag) => String(tag || "").trim()).filter(Boolean) : []),
+          activeTagSources: Array.isArray(debug?.active_tag_sources)
+            ? debug.active_tag_sources.filter((item) => item && typeof item === "object")
+            : (Array.isArray(debug?.activeTagSources) ? debug.activeTagSources.filter((item) => item && typeof item === "object") : []),
+          externalTagDebug: debug?.external_tag_debug && typeof debug.external_tag_debug === "object"
+            ? debug.external_tag_debug
+            : (debug?.externalTagDebug && typeof debug.externalTagDebug === "object" ? debug.externalTagDebug : { entries: [] }),
+          tagRelationSummary: debug?.tag_relation_summary && typeof debug.tag_relation_summary === "object"
+            ? debug.tag_relation_summary
+            : (debug?.tagRelationSummary && typeof debug.tagRelationSummary === "object" ? debug.tagRelationSummary : {}),
         };
       }
 
@@ -3207,6 +3255,252 @@
         return "命中但未注入";
       }
 
+      function getPromptDebugTagSources(tag, debugState) {
+        return (debugState?.activeTagSources || []).filter((row) => String(row?.tag || "").trim() === tag);
+      }
+
+      function formatPromptDebugSource(row) {
+        const source = String(row?.source || "external").trim();
+        const label = String(row?.label || "").trim();
+        if (source === "preset") return label ? `预设 · ${label}` : "预设";
+        if (source === "state_journal") return label ? `心笺 · ${label}` : "心笺阶段";
+        if (source === "manual") return label ? `手动 · ${label}` : "手动";
+        return label ? `${source} · ${label}` : source;
+      }
+
+      function buildPromptDebugTagRelations(pkg, worldbookDebug) {
+        const debugState = worldbookDebug || {};
+        const externalEntries = Array.isArray(debugState?.externalTagDebug?.entries) ? debugState.externalTagDebug.entries : [];
+        const activeTags = new Set(debugState?.externalActiveTags || []);
+        const presetTags = Array.isArray(pkg?.preset_activation_tags?.tags) ? pkg.preset_activation_tags.tags : [];
+        presetTags.forEach((tag) => {
+          const value = String(tag || "").trim();
+          if (value) activeTags.add(value);
+        });
+        externalEntries.forEach((entry) => {
+          [...(entry.activation_tags || []), ...(entry.matched_tags || [])].forEach((tag) => {
+            const value = String(tag || "").trim();
+            if (value && (debugState?.externalActiveTags || []).includes(value)) activeTags.add(value);
+          });
+        });
+        return [...activeTags].map((tag) => {
+          const listeningEntries = externalEntries.filter((entry) => (entry.activation_tags || []).includes(tag));
+          const matchedEntries = listeningEntries.filter((entry) => (entry.matched_tags || []).includes(tag));
+          const injectedEntries = matchedEntries.filter((entry) => !!entry.selected_for_prompt);
+          const droppedEntries = matchedEntries.filter((entry) => !!entry.dropped_reason);
+          return {
+            tag,
+            sources: getPromptDebugTagSources(tag, debugState),
+            listeningEntries,
+            matchedEntries,
+            injectedEntries,
+            droppedEntries,
+          };
+        });
+      }
+
+      function buildPromptDebugExportPayload() {
+        return {
+          schema: "fantareal.prompt_debug.v1",
+          exported_at: new Date().toISOString(),
+          prompt_package: lastPromptPackagePayload || {},
+          worldbook_debug: lastWorldbookDebugPayload || {},
+          tag_relations: buildPromptDebugTagRelations(lastPromptPackagePayload || {}, lastWorldbookDebugPayload || {}),
+        };
+      }
+
+      function getBaseKernelMetadata(segments) {
+        const segmentList = Array.isArray(segments) ? segments : [];
+        const baseSegment = segmentList.find((segment) => {
+          const id = String(segment?.id || "").trim();
+          const metadata = segment?.metadata && typeof segment.metadata === "object" ? segment.metadata : {};
+          return id === "preset.base_system_prompt" || id === "preset.rules" || metadata.base_kernel;
+        }) || null;
+        const metadata = baseSegment?.metadata && typeof baseSegment.metadata === "object" ? baseSegment.metadata : {};
+        const baseKernel = metadata.base_kernel && typeof metadata.base_kernel === "object" ? metadata.base_kernel : null;
+        const content = String(baseSegment?.content || "").trim();
+        const markers = Array.isArray(baseKernel?.markers) ? baseKernel.markers.map((item) => String(item || "").trim()).filter(Boolean) : [];
+        const labels = Array.isArray(baseKernel?.marker_labels) ? baseKernel.marker_labels.map((item) => String(item || "").trim()).filter(Boolean) : [];
+        const charCount = Number(baseKernel?.char_count ?? baseSegment?.char_count ?? content.length) || 0;
+        return {
+          segment: baseSegment,
+          enabled: Boolean(baseKernel?.enabled ?? content),
+          charCount,
+          markers,
+          markerLabels: labels,
+        };
+      }
+
+      function appendBaseKernelCard(parent, segments) {
+        if (!parent) return;
+        const state = getBaseKernelMetadata(segments);
+        const card = document.createElement("section");
+        card.className = "prompt-debug-card prompt-debug-base-kernel";
+
+        const head = document.createElement("div");
+        head.className = "prompt-debug-card-head";
+        const title = document.createElement("strong");
+        title.className = "prompt-debug-card-title";
+        title.textContent = "BASE｜预设内核";
+        const meta = document.createElement("span");
+        meta.className = "muted";
+        meta.textContent = state.enabled ? `已进入 system · ${state.charCount} 字` : "当前预设 BASE 为空";
+        head.appendChild(title);
+        head.appendChild(meta);
+        card.appendChild(head);
+
+        const body = document.createElement("div");
+        body.className = "prompt-debug-base-kernel-body";
+        if (!state.enabled) {
+          body.appendChild(makePromptDebugLine("状态", "当前预设 BASE 为空。"));
+        } else if (state.markerLabels.length) {
+          const markerRow = document.createElement("div");
+          markerRow.className = "prompt-debug-base-marker-row";
+          state.markerLabels.forEach((label) => markerRow.appendChild(makePromptDebugBadge(label, "base")));
+          body.appendChild(markerRow);
+        } else {
+          body.appendChild(makePromptDebugLine("状态", "未检测到预设内核模板结构；仍会作为普通 BASE 规则进入 prompt。"));
+        }
+        card.appendChild(body);
+        parent.appendChild(card);
+      }
+
+      function renderPromptDebug(pkg = lastPromptPackagePayload, worldbookDebug = lastWorldbookDebugPayload) {
+        if (!promptDebugPanelEl) return;
+        const packagePayload = pkg && typeof pkg === "object" ? pkg : {};
+        const debugState = worldbookDebug && typeof worldbookDebug === "object" ? worldbookDebug : {};
+        const messages = Array.isArray(packagePayload.messages) ? packagePayload.messages : [];
+        const segments = Array.isArray(packagePayload.prompt_segments) ? packagePayload.prompt_segments : [];
+        const layers = Array.isArray(packagePayload.layers) ? packagePayload.layers : [];
+        const relations = buildPromptDebugTagRelations(packagePayload, debugState);
+        const selectedCount = Array.isArray(debugState.items) ? debugState.items.filter((item) => item.selectedForPrompt).length : 0;
+        const droppedCount = Array.isArray(debugState.items) ? debugState.items.filter((item) => !item.selectedForPrompt).length : 0;
+
+        if (!messages.length && !segments.length && !relations.length) {
+          promptDebugPanelEl.innerHTML = '<div class="prompt-debug-empty">生成 Prompt 预览或发送一轮聊天后，这里会显示 Prompt Debug 链路。</div>';
+          if (downloadPromptDebugJsonBtn) downloadPromptDebugJsonBtn.disabled = true;
+          return;
+        }
+
+        if (downloadPromptDebugJsonBtn) downloadPromptDebugJsonBtn.disabled = false;
+        const placementCounts = countBy(segments, "placement");
+        const roleCounts = countBy(messages, "role");
+        promptDebugPanelEl.innerHTML = "";
+
+        const flow = document.createElement("div");
+        flow.className = "prompt-debug-summary-flow";
+        [
+          [`Active Tags ${relations.length}`, "来自预设 / 心笺 / 手动标签"],
+          [`Matched ${relations.filter((item) => item.matchedEntries.length).length}`, "命中 external_tag 监听词条"],
+          [`Injected ${selectedCount}`, droppedCount ? `Dropped ${droppedCount}` : "本轮已进入 Prompt"],
+        ].forEach(([title, meta]) => {
+          const card = document.createElement("div");
+          card.className = "prompt-debug-flow-card";
+          const strong = document.createElement("strong");
+          strong.textContent = title;
+          const span = document.createElement("span");
+          span.textContent = meta;
+          card.appendChild(strong);
+          card.appendChild(span);
+          flow.appendChild(card);
+        });
+        promptDebugPanelEl.appendChild(flow);
+        appendBaseKernelCard(promptDebugPanelEl, segments);
+
+        const tagCard = document.createElement("section");
+        tagCard.className = "prompt-debug-card";
+        tagCard.innerHTML = '<div class="prompt-debug-card-head"><strong class="prompt-debug-card-title">Tag 激活关系</strong><span class="muted">来源 → tag → 世界书词条</span></div>';
+        const relationList = document.createElement("div");
+        relationList.className = "prompt-debug-relation-list";
+        if (!relations.length) {
+          relationList.innerHTML = '<div class="prompt-debug-empty">当前轮没有 active tag。</div>';
+        } else {
+          relations.forEach((relation) => {
+            const card = document.createElement("article");
+            card.className = "prompt-debug-relation-card";
+            const head = document.createElement("div");
+            head.className = "prompt-debug-relation-head";
+            const name = document.createElement("div");
+            name.className = "prompt-debug-tag-name";
+            name.textContent = relation.tag;
+            const badges = document.createElement("div");
+            badges.className = "prompt-debug-badge-row";
+            badges.appendChild(makePromptDebugBadge("已激活", "hit"));
+            if (relation.matchedEntries.length) badges.appendChild(makePromptDebugBadge("已命中", "hit"));
+            if (relation.injectedEntries.length) badges.appendChild(makePromptDebugBadge("已注入", "injected"));
+            if (relation.droppedEntries.length) badges.appendChild(makePromptDebugBadge("已截断", "dropped"));
+            if (!relation.listeningEntries.length) badges.appendChild(makePromptDebugBadge("未命中", "missing"));
+            if (relation.sources.length > 1) badges.appendChild(makePromptDebugBadge("多来源", ""));
+            head.appendChild(name);
+            head.appendChild(badges);
+            card.appendChild(head);
+            const meta = document.createElement("div");
+            meta.className = "prompt-debug-relation-meta";
+            const sourceText = relation.sources.length ? relation.sources.map(formatPromptDebugSource).join(" / ") : "来源未记录";
+            meta.appendChild(makePromptDebugLine("来源", sourceText));
+            if (relation.listeningEntries.length) {
+              meta.appendChild(makePromptDebugLine("监听词条", relation.listeningEntries.map((entry) => entry.title || entry.id || "未命名词条").join(" / ")));
+            } else {
+              meta.appendChild(makePromptDebugLine("监听词条", "没有世界书词条监听此 tag"));
+            }
+            if (relation.droppedEntries.length) {
+              const maxHits = debugState?.tagRelationSummary?.max_hits;
+              meta.appendChild(makePromptDebugLine("截断说明", `已命中，但受世界书 max_hits${maxHits ? `=${maxHits}` : ""} 数量限制，本轮未注入。`));
+            }
+            card.appendChild(meta);
+            relationList.appendChild(card);
+          });
+        }
+        tagCard.appendChild(relationList);
+        promptDebugPanelEl.appendChild(tagCard);
+
+        const layerCard = document.createElement("section");
+        layerCard.className = "prompt-debug-card";
+        layerCard.innerHTML = '<div class="prompt-debug-card-head"><strong class="prompt-debug-card-title">PromptSegment 分层</strong><span class="muted">当前为观察层级，不改变真实 messages 拼装。</span></div>';
+        const layerList = document.createElement("div");
+        layerList.className = "prompt-debug-layer-list";
+        Object.entries(placementCounts).forEach(([placement, count]) => {
+          const row = document.createElement("div");
+          row.className = "prompt-debug-layer-row";
+          row.appendChild(makePromptDebugLine(getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, placement, placement), `${count} 段`));
+          layerList.appendChild(row);
+        });
+        if (!Object.keys(placementCounts).length) layerList.innerHTML = '<div class="prompt-debug-empty">当前没有 PromptSegment 可展示。</div>';
+        layerCard.appendChild(layerList);
+        promptDebugPanelEl.appendChild(layerCard);
+
+        const messageCard = document.createElement("section");
+        messageCard.className = "prompt-debug-card";
+        messageCard.innerHTML = '<div class="prompt-debug-card-head"><strong class="prompt-debug-card-title">Messages / Layers 摘要</strong><span class="muted">完整内容请下载 JSON 查看。</span></div>';
+        const messageMeta = document.createElement("div");
+        messageMeta.className = "prompt-debug-relation-meta";
+        messageMeta.appendChild(makePromptDebugLine("messages", `${messages.length} 条`));
+        messageMeta.appendChild(makePromptDebugLine("roles", Object.entries(roleCounts).map(([role, count]) => `${role}: ${count}`).join(" / ") || "—"));
+        messageMeta.appendChild(makePromptDebugLine("layers", `${layers.length} 层`));
+        messageMeta.appendChild(makePromptDebugLine("segments", `${segments.length} 段`));
+        messageCard.appendChild(messageMeta);
+        promptDebugPanelEl.appendChild(messageCard);
+      }
+
+      function makePromptDebugBadge(text, extraClass = "") {
+        const badge = document.createElement("span");
+        badge.className = `prompt-debug-badge${extraClass ? ` ${extraClass}` : ""}`;
+        badge.textContent = text;
+        return badge;
+      }
+
+      function makePromptDebugLine(label, value) {
+        const line = document.createElement("div");
+        const labelEl = document.createElement("span");
+        labelEl.className = "worldbook-debug-label";
+        labelEl.textContent = `${label}: `;
+        const valueEl = document.createElement("span");
+        valueEl.textContent = value || "—";
+        line.appendChild(labelEl);
+        line.appendChild(valueEl);
+        return line;
+      }
+
       function renderWorldbookDebugSummary(debugState) {
         if (!worldbookDebugSummaryEl) return;
 
@@ -3225,6 +3519,16 @@
         }
         if (recursiveCount > 0) {
           worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`递归命中 ${recursiveCount}`));
+        }
+        const relationSummary = debugState?.tagRelationSummary || {};
+        const activeTagCount = Number(relationSummary.active_count ?? debugState?.externalActiveTags?.length ?? 0);
+        if (activeTagCount > 0) {
+          worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`Active Tags ${activeTagCount}`, true));
+          worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`External 命中 ${Number(relationSummary.matched_entry_count || 0)}`));
+          worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`External 注入 ${Number(relationSummary.injected_entry_count || 0)}`, Number(relationSummary.injected_entry_count || 0) > 0));
+          if (Number(relationSummary.dropped_entry_count || 0) > 0) {
+            worldbookDebugSummaryEl.appendChild(makeWorldbookDebugChip(`max_hits 截断 ${Number(relationSummary.dropped_entry_count || 0)}`));
+          }
         }
       }
 
@@ -3389,6 +3693,7 @@
 
         const normalized = normalizeWorldbookDebug(debug || {});
         lastWorldbookDebugPayload = normalized;
+        renderPromptDebug(lastPromptPackagePayload, normalized);
 
         const allItems = normalized.items;
         const hasDebug = allItems.length > 0 || !!normalized.prompt;
@@ -3398,7 +3703,7 @@
           worldbookDebugStatusEl.classList.remove("active");
           worldbookDebugCountEl.textContent = "暂无命中";
           worldbookDebugPromptEl.textContent = "当前轮没有可展示的 Worldbook 调试文本。点击上方箭头后，这里会显示命中详情和拼接进 Prompt 的内容。";
-          if (worldbookDebugSummaryEl) worldbookDebugSummaryEl.innerHTML = "";
+          renderWorldbookDebugSummary(normalized);
           if (worldbookDebugGroupsEl) worldbookDebugGroupsEl.innerHTML = '<div class="worldbook-debug-empty">当前轮没有可展示的 Worldbook 调试信息。</div>';
           if (worldbookDebugFiltersEl) worldbookDebugFiltersEl.hidden = true;
           setWorldbookDebugCollapsed(false);
@@ -3622,6 +3927,10 @@
 
       async function loadDirectorNotes() {
         const response = await fetch("/api/chat/director-notes");
+        if (response.status === 404) {
+          renderDirectorNotes([]);
+          return { items: [] };
+        }
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
           throw new Error(data.detail || "加载导演注失败");
@@ -3638,21 +3947,37 @@
         }
         const turns = Number(directorNoteTurnsEl?.value || 1);
         const position = directorNotePositionEl?.value || "after_char_defs";
-        const data = await postJson("/api/chat/director-notes", {
-          content,
-          remaining_turns: turns,
-          position,
-        });
-        renderDirectorNotes(data.items || []);
-        if (directorNoteContentEl) directorNoteContentEl.value = "";
-        if (directorNoteTurnsEl) directorNoteTurnsEl.value = "1";
-        return data;
+        try {
+          const data = await postJson("/api/chat/director-notes", {
+            content,
+            remaining_turns: turns,
+            position,
+          });
+          renderDirectorNotes(data.items || []);
+          if (directorNoteContentEl) directorNoteContentEl.value = "";
+          if (directorNoteTurnsEl) directorNoteTurnsEl.value = "1";
+          return data;
+        } catch (error) {
+          if (String(error.message || "").includes("404")) {
+            renderDirectorNotes([]);
+            throw new Error("当前后端未启用导演注接口");
+          }
+          throw error;
+        }
       }
 
       async function deleteDirectorNote(noteId) {
-        const data = await postJson("/api/chat/director-notes/delete", { id: noteId });
-        renderDirectorNotes(data.items || []);
-        return data;
+        try {
+          const data = await postJson("/api/chat/director-notes/delete", { id: noteId });
+          renderDirectorNotes(data.items || []);
+          return data;
+        } catch (error) {
+          if (String(error.message || "").includes("404")) {
+            renderDirectorNotes([]);
+            return { items: [] };
+          }
+          throw error;
+        }
       }
 
       function refreshDirectorNotesFromExternalEvent() {
@@ -3716,10 +4041,48 @@
         required: "必带",
       };
 
-      const PROMPT_PREVIEW_CACHE_KEY = "fantareal:lastPromptPackagePreview";
+      const PROMPT_PREVIEW_LEGACY_CACHE_KEY = "fantareal:lastPromptPackagePreview";
+      const PROMPT_PREVIEW_CACHE_SCHEMA = "prompt-package-cache-v2";
       const PROMPT_PREVIEW_HISTORY_LIMIT = 10;
-      let promptPackageHistory = { active_id: "", items: [] };
+      let promptPackageHistory = createEmptyPromptPackageHistory();
       let lastPromptPackagePayload = null;
+
+      function sanitizePromptCacheKeyPart(value, fallback = "unknown") {
+        const text = String(value || "").trim().replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80);
+        return text || fallback;
+      }
+
+      function getPromptPackageCacheScope() {
+        const scope = promptPackageCacheScope && typeof promptPackageCacheScope === "object" ? promptPackageCacheScope : {};
+        return {
+          schema: String(scope.schema || PROMPT_PREVIEW_CACHE_SCHEMA),
+          workspace_id: String(scope.workspace_id || "unknown-workspace"),
+          slot_id: String(scope.slot_id || "global"),
+          card_id: String(scope.card_id || "unknown-card"),
+        };
+      }
+
+      function getPromptPreviewCacheKey() {
+        const scope = getPromptPackageCacheScope();
+        return [
+          "fantareal",
+          "promptPackagePreview",
+          sanitizePromptCacheKeyPart(scope.schema, PROMPT_PREVIEW_CACHE_SCHEMA),
+          sanitizePromptCacheKeyPart(scope.workspace_id, "unknown-workspace"),
+          sanitizePromptCacheKeyPart(scope.slot_id, "global"),
+          sanitizePromptCacheKeyPart(scope.card_id, "unknown-card"),
+        ].join(":");
+      }
+
+      function isPromptPackageCacheScopeMatched(rawScope) {
+        if (!rawScope || typeof rawScope !== "object") return false;
+        const current = getPromptPackageCacheScope();
+        return ["schema", "workspace_id", "slot_id", "card_id"].every((key) => String(rawScope[key] || "") === String(current[key] || ""));
+      }
+
+      function createEmptyPromptPackageHistory() {
+        return { scope: getPromptPackageCacheScope(), active_id: "", items: [] };
+      }
 
       function getPromptSegmentLabel(map, value, fallback = "-") {
         const key = String(value || "").trim();
@@ -3782,14 +4145,21 @@
         return text ? directorNoteSummary(text, 18) : "Prompt 预览";
       }
 
-      function createPromptPackageHistoryItem(pkg, source = "preview") {
+      function createPromptPackageHistoryItem(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload) {
         const now = new Date();
         const timestamp = now.toISOString();
         const messageCount = Number(pkg?.message_count || 0);
         const historyTurns = Number(pkg?.recent_history_turns || 0);
-        const turnNumber = Math.max(1, Math.ceil((historyTurns + 1) / 2));
+        const conversationTurnNumber = Number(pkg?.conversation_turn_number || 0);
+        const turnNumber = conversationTurnNumber > 0 ? conversationTurnNumber : Math.max(1, Math.ceil((historyTurns + 1) / 2));
         const snippet = getPromptPackageInputSnippet(pkg);
-        const sourceLabel = source === "stream" ? "聊天" : "预览";
+        const sourceLabelMap = {
+          stream: "聊天",
+          preview: "预览",
+          reroll: "重 roll",
+          edit: "编辑",
+        };
+        const sourceLabel = sourceLabelMap[source] || source || "预览";
         return {
           id: `${source}_${timestamp.replace(/[-:.TZ]/g, "")}_${Math.random().toString(16).slice(2, 8)}`,
           label: `第 ${turnNumber} 轮`,
@@ -3799,33 +4169,35 @@
           source_label: sourceLabel,
           message_count: messageCount,
           prompt_package: pkg,
+          worldbook_debug: worldbookDebug && typeof worldbookDebug === "object" ? worldbookDebug : {},
         };
       }
 
       function normalizePromptPackageHistory(raw) {
+        if (!isPromptPackageCacheScopeMatched(raw?.scope)) return createEmptyPromptPackageHistory();
         if (raw?.items && Array.isArray(raw.items)) {
           const items = raw.items
             .filter((item) => item?.prompt_package && typeof item.prompt_package === "object")
             .slice(0, PROMPT_PREVIEW_HISTORY_LIMIT);
           return {
+            scope: getPromptPackageCacheScope(),
             active_id: raw.active_id && items.some((item) => item.id === raw.active_id) ? raw.active_id : (items[0]?.id || ""),
             items,
           };
         }
-        if (raw?.prompt_package && typeof raw.prompt_package === "object") {
-          const item = createPromptPackageHistoryItem(raw.prompt_package, "preview");
-          return { active_id: item.id, items: [item] };
-        }
-        return { active_id: "", items: [] };
+        return createEmptyPromptPackageHistory();
       }
 
       function persistPromptPackageHistory() {
+        const cacheKey = getPromptPreviewCacheKey();
+        localStorage.removeItem(PROMPT_PREVIEW_LEGACY_CACHE_KEY);
         if (!promptPackageHistory.items.length) {
-          localStorage.removeItem(PROMPT_PREVIEW_CACHE_KEY);
+          localStorage.removeItem(cacheKey);
           return;
         }
         try {
-          localStorage.setItem(PROMPT_PREVIEW_CACHE_KEY, JSON.stringify(promptPackageHistory));
+          promptPackageHistory.scope = getPromptPackageCacheScope();
+          localStorage.setItem(cacheKey, JSON.stringify(promptPackageHistory));
         } catch (error) {
           console.warn("Prompt preview history cache failed:", error);
         }
@@ -3864,21 +4236,66 @@
         const item = promptPackageHistory.items.find((entry) => entry.id === itemId);
         if (!item) return;
         promptPackageHistory.active_id = item.id;
+        lastWorldbookDebugPayload = item.worldbook_debug || lastWorldbookDebugPayload;
         persistPromptPackageHistory();
         renderPromptPackageHistorySelector();
         renderPromptPackage(item.prompt_package, { skipHistory: true });
+        renderPromptDebug(item.prompt_package, lastWorldbookDebugPayload);
       }
 
-      function addPromptPackageToHistory(pkg, source = "preview") {
+      function getPromptPackageHistoryTurn(item) {
+        const turnNumber = Number(item?.prompt_package?.conversation_turn_number || 0);
+        return Number.isFinite(turnNumber) && turnNumber > 0 ? Math.floor(turnNumber) : 0;
+      }
+
+      function getRollbackPromptPackageTurn(trimmedFrom) {
+        const rollbackIndex = Math.max(0, Number(trimmedFrom) || 0);
+        return Math.floor(rollbackIndex / 2) + 1;
+      }
+
+      function prunePromptPackageHistoryFromTurn(turnNumber) {
+        const safeTurnNumber = Math.max(1, Math.floor(Number(turnNumber) || 0));
+        if (!safeTurnNumber || !promptPackageHistory.items.length) return;
+        promptPackageHistory.items = promptPackageHistory.items.filter((item) => {
+          const itemTurn = getPromptPackageHistoryTurn(item);
+          return itemTurn > 0 && itemTurn < safeTurnNumber;
+        });
+        promptPackageHistory.active_id = promptPackageHistory.items[0]?.id || "";
+        const activeItem = getActivePromptPackageHistoryItem();
+        lastPromptPackagePayload = activeItem?.prompt_package || null;
+        lastWorldbookDebugPayload = activeItem?.worldbook_debug || lastWorldbookDebugPayload;
+        persistPromptPackageHistory();
+        renderPromptPackageHistorySelector();
+        setPromptExportButtonsEnabled(!!activeItem);
+        if (activeItem) {
+          renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
+          renderPromptDebug(activeItem.prompt_package, lastWorldbookDebugPayload);
+          return;
+        }
+        if (!activeItem) {
+          if (promptPackagePanelEl) promptPackagePanelEl.hidden = true;
+          if (promptPackageLayersEl) promptPackageLayersEl.innerHTML = "";
+          if (promptPackagePreviewEl) promptPackagePreviewEl.textContent = "";
+          if (promptSegmentPanelEl) promptSegmentPanelEl.hidden = true;
+          if (promptSegmentListEl) promptSegmentListEl.innerHTML = "";
+          if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = "尚未生成";
+          if (promptSegmentSummaryEl) promptSegmentSummaryEl.textContent = "";
+          if (promptRuntimeDotEl) promptRuntimeDotEl.hidden = true;
+          renderPromptDebug(null, lastWorldbookDebugPayload);
+        }
+      }
+
+      function addPromptPackageToHistory(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload) {
         if (!pkg || typeof pkg !== "object") {
-          promptPackageHistory = { active_id: "", items: [] };
+          promptPackageHistory = createEmptyPromptPackageHistory();
           lastPromptPackagePayload = null;
           persistPromptPackageHistory();
           renderPromptPackageHistorySelector();
           setPromptExportButtonsEnabled(false);
+          renderPromptDebug(null, worldbookDebug);
           return;
         }
-        const item = createPromptPackageHistoryItem(pkg, source);
+        const item = createPromptPackageHistoryItem(pkg, source, worldbookDebug);
         promptPackageHistory.items = [item, ...promptPackageHistory.items].slice(0, PROMPT_PREVIEW_HISTORY_LIMIT);
         promptPackageHistory.active_id = item.id;
         lastPromptPackagePayload = pkg;
@@ -3894,11 +4311,13 @@
         promptPackageHistory.active_id = promptPackageHistory.items[0]?.id || "";
         const nextItem = getActivePromptPackageHistoryItem();
         lastPromptPackagePayload = nextItem?.prompt_package || null;
+        lastWorldbookDebugPayload = nextItem?.worldbook_debug || lastWorldbookDebugPayload;
         persistPromptPackageHistory();
         renderPromptPackageHistorySelector();
         setPromptExportButtonsEnabled(!!nextItem);
         if (nextItem) {
           renderPromptPackage(nextItem.prompt_package, { skipHistory: true });
+          renderPromptDebug(nextItem.prompt_package, lastWorldbookDebugPayload);
           return;
         }
         if (promptPackagePanelEl) promptPackagePanelEl.hidden = true;
@@ -3944,6 +4363,9 @@
         const messages = Array.isArray(packagePayload.messages) ? packagePayload.messages : [];
         const promptSegments = Array.isArray(packagePayload.prompt_segments) ? packagePayload.prompt_segments : [];
         const layers = Array.isArray(packagePayload.layers) ? packagePayload.layers : [];
+        const presetActivationTags = packagePayload.preset_activation_tags && typeof packagePayload.preset_activation_tags === "object"
+          ? packagePayload.preset_activation_tags
+          : { tags: [], count: 0, segments: [] };
         return {
           schema: "fantareal.prompt_package.debug.v1",
           exported_at: new Date().toISOString(),
@@ -3966,9 +4388,12 @@
             message_count: packagePayload.message_count ?? messages.length,
             system_section_count: packagePayload.system_section_count ?? null,
             recent_history_turns: packagePayload.recent_history_turns ?? null,
+            total_history_turns: packagePayload.total_history_turns ?? null,
+            conversation_turn_number: packagePayload.conversation_turn_number ?? null,
             segment_count: promptSegments.length,
             layer_count: layers.length,
             total_segment_chars: packagePayload.prompt_segment_summary?.total_char_count ?? sumBy(promptSegments, "char_count"),
+            preset_activation_tag_count: presetActivationTags.count || 0,
             message_roles: countBy(messages, "role"),
             segment_sources: countBy(promptSegments, "source"),
             segment_placements: countBy(promptSegments, "placement"),
@@ -3982,6 +4407,11 @@
           },
           messages,
           prompt_segments: promptSegments,
+          preset_activation_tags: presetActivationTags,
+          debug_relations: {
+            worldbook_debug: activeItem?.worldbook_debug || lastWorldbookDebugPayload || {},
+            tag_relations: buildPromptDebugTagRelations(packagePayload, activeItem?.worldbook_debug || lastWorldbookDebugPayload || {}),
+          },
           layers,
         };
       }
@@ -3995,19 +4425,24 @@
         }
       }
 
-      function cachePromptPackage(pkg, source = "preview") {
-        addPromptPackageToHistory(pkg, source);
+      function cachePromptPackage(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload) {
+        addPromptPackageToHistory(pkg, source, worldbookDebug);
       }
 
       function loadCachedPromptPackage() {
+        const cacheKey = getPromptPreviewCacheKey();
+        localStorage.removeItem(PROMPT_PREVIEW_LEGACY_CACHE_KEY);
         try {
-          const raw = localStorage.getItem(PROMPT_PREVIEW_CACHE_KEY);
+          const raw = localStorage.getItem(cacheKey);
           if (!raw) {
             renderPromptPackageHistorySelector();
             setPromptExportButtonsEnabled(false);
             return;
           }
           promptPackageHistory = normalizePromptPackageHistory(JSON.parse(raw));
+          if (!promptPackageHistory.items.length) {
+            localStorage.removeItem(cacheKey);
+          }
           renderPromptPackageHistorySelector();
           const activeItem = getActivePromptPackageHistoryItem();
           if (!activeItem?.prompt_package) {
@@ -4015,14 +4450,16 @@
             return;
           }
           lastPromptPackagePayload = activeItem.prompt_package;
+          lastWorldbookDebugPayload = activeItem.worldbook_debug || lastWorldbookDebugPayload;
           renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
+          renderPromptDebug(activeItem.prompt_package, lastWorldbookDebugPayload);
           setRuntimeTab("prompt");
           setPromptExportButtonsEnabled(true);
-          setStatus("已恢复最近一次 Prompt 预览");
+          setStatus("已恢复当前会话的 Prompt 预览");
         } catch (error) {
           console.warn("Prompt preview cache load failed:", error);
-          localStorage.removeItem(PROMPT_PREVIEW_CACHE_KEY);
-          promptPackageHistory = { active_id: "", items: [] };
+          localStorage.removeItem(cacheKey);
+          promptPackageHistory = createEmptyPromptPackageHistory();
           renderPromptPackageHistorySelector();
           setPromptExportButtonsEnabled(false);
         }
@@ -4085,10 +4522,49 @@
           const detailMeta = document.createElement("p");
           detailMeta.className = "prompt-segment-snippet";
           detailMeta.textContent = `ID：${segment.id || "segment"}`;
+          const activationTags = Array.isArray(segment.activation_tags)
+            ? segment.activation_tags.map((tag) => String(tag || "").trim()).filter(Boolean)
+            : [];
           const snippet = document.createElement("p");
           snippet.className = "prompt-segment-snippet";
           snippet.textContent = directorNoteSummary(segment.content || "", 320);
           detail.appendChild(detailMeta);
+          if (activationTags.length) {
+            const tagRow = document.createElement("div");
+            tagRow.className = "prompt-segment-tag-row";
+            const tagLabel = document.createElement("span");
+            tagLabel.className = "prompt-segment-tag-label";
+            tagLabel.textContent = "Activation tags";
+            tagRow.appendChild(tagLabel);
+            activationTags.forEach((tag) => {
+              const tagChip = document.createElement("span");
+              tagChip.className = "prompt-segment-flag soft";
+              tagChip.textContent = tag;
+              tagRow.appendChild(tagChip);
+            });
+            detail.appendChild(tagRow);
+          }
+          const baseKernel = segment.metadata?.base_kernel && typeof segment.metadata.base_kernel === "object" ? segment.metadata.base_kernel : null;
+          const baseMarkerLabels = Array.isArray(baseKernel?.marker_labels) ? baseKernel.marker_labels.map((label) => String(label || "").trim()).filter(Boolean) : [];
+          if (baseKernel) {
+            const baseRow = document.createElement("div");
+            baseRow.className = "prompt-segment-tag-row";
+            const baseLabel = document.createElement("span");
+            baseLabel.className = "prompt-segment-tag-label";
+            baseLabel.textContent = "BASE 内核";
+            baseRow.appendChild(baseLabel);
+            const baseState = document.createElement("span");
+            baseState.className = "prompt-segment-flag hard";
+            baseState.textContent = baseKernel.enabled ? `${Number(baseKernel.char_count || 0)} 字` : "空";
+            baseRow.appendChild(baseState);
+            baseMarkerLabels.forEach((label) => {
+              const markerChip = document.createElement("span");
+              markerChip.className = "prompt-segment-flag soft";
+              markerChip.textContent = label;
+              baseRow.appendChild(markerChip);
+            });
+            detail.appendChild(baseRow);
+          }
           detail.appendChild(snippet);
 
           details.appendChild(row);
@@ -4108,12 +4584,13 @@
           if (promptPackagePreviewEl) promptPackagePreviewEl.textContent = "";
           if (promptSegmentPanelEl) promptSegmentPanelEl.hidden = true;
           if (promptSegmentListEl) promptSegmentListEl.innerHTML = "";
-          if (!options.skipHistory) cachePromptPackage(null);
+          if (!options.skipHistory) cachePromptPackage(null, options.source || "preview", options.worldbookDebug || lastWorldbookDebugPayload);
           return;
         }
         lastPromptPackagePayload = pkg;
         setPromptExportButtonsEnabled(true);
-        if (!options.skipHistory) cachePromptPackage(pkg, options.source || "preview");
+        const relatedWorldbookDebug = options.worldbookDebug || lastWorldbookDebugPayload;
+        if (!options.skipHistory) cachePromptPackage(pkg, options.source || "preview", relatedWorldbookDebug);
 
         const summaryBits = [];
         if (typeof pkg?.system_section_count === "number") {
@@ -4127,6 +4604,10 @@
         }
         if (segments.length) {
           summaryBits.push(`segments ${segments.length} 段`);
+        }
+        const presetTagCount = Number(pkg?.preset_activation_tags?.count || pkg?.prompt_segment_summary?.activation_tag_count || 0);
+        if (presetTagCount > 0) {
+          summaryBits.push(`preset tags ${presetTagCount} 个`);
         }
         if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = summaryBits.join(" · ") || `共 ${layers.length} 层`;
 
@@ -4171,6 +4652,7 @@
         if (promptRuntimeDotEl) {
           promptRuntimeDotEl.hidden = false;
         }
+        renderPromptDebug(pkg, relatedWorldbookDebug);
       }
 
       async function previewPromptPackage() {
@@ -4191,7 +4673,7 @@
           renderWorldbookDebug(data.worldbook_debug || {});
           renderPresetDebug(data.preset_debug || {}, presetStoreCache);
           renderDirectorNotes(data.director_notes || []);
-          renderPromptPackage(data.prompt_package || {}, { source: "preview" });
+          renderPromptPackage(data.prompt_package || {}, { source: "preview", worldbookDebug: lastWorldbookDebugPayload });
           setRuntimeTab("prompt");
           setStatus("已生成本轮 Prompt 预览");
           showToast("Prompt 预览已生成", "success");
@@ -4279,6 +4761,26 @@
         } catch (error) {
           setStatus(`下载 Prompt JSON 失败：${error.message}`, "error");
           showToast(`下载 Prompt JSON 失败：${error.message}`, "error");
+        }
+      });
+
+      downloadPromptDebugJsonBtn?.addEventListener("click", () => {
+        try {
+          const payload = buildPromptDebugExportPayload();
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `${sanitizePromptFilename("prompt-debug")}.json`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          setStatus("已下载 Prompt Debug JSON");
+          showToast("Prompt Debug JSON 已下载", "success");
+        } catch (error) {
+          setStatus(`下载 Prompt Debug JSON 失败：${error.message}`, "error");
+          showToast(`下载 Prompt Debug JSON 失败：${error.message}`, "error");
         }
       });
 
@@ -5573,7 +6075,8 @@
               renderWorldbookDebug(data.worldbook_debug || {});
               renderPresetDebug(data.preset_debug || {}, presetStoreCache);
               renderDirectorNotes(data.director_notes || []);
-              renderPromptPackage(data.prompt_package || {}, { source: "stream" });
+              const promptPackageSource = ["edit", "reroll"].includes(options.source) ? options.source : "stream";
+              renderPromptPackage(data.prompt_package || {}, { source: promptPackageSource, worldbookDebug: lastWorldbookDebugPayload });
             },
             onThinkStart() {
               assistantEntry.state.thinking = true;

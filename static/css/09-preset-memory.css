@@ -270,7 +270,300 @@ body.modern-setting-page.preset-config-page .preset-card-grid .preset-item:activ
   transform: none !important;
 }
 
-/* Memory page styles migrated from template inline CSS. */
+body.modern-setting-page.preset-config-page .preset-advanced-fields {
+  margin-top: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border) 76%);
+  border-radius: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, var(--input-bg) 92%), color-mix(in srgb, var(--input-bg) 76%, transparent 24%));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 42%, transparent 58%);
+  overflow: hidden;
+}
+
+body.modern-setting-page.preset-config-page .preset-group-item-advanced {
+  margin-top: 8px;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 11px;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-summary::-webkit-details-marker {
+  display: none;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-summary::after {
+  content: "展开";
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-strong) 62%, transparent 38%);
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-fields[open] .preset-advanced-summary::after {
+  content: "收起";
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border) 74%);
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-summary-main {
+  color: color-mix(in srgb, var(--accent) 78%, var(--text) 22%);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-summary-note {
+  min-width: 0;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-body {
+  padding: 0 11px 11px;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 72%, transparent 28%);
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-note {
+  margin: 9px 0 10px;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 9px;
+  align-items: end;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-field span,
+body.modern-setting-page.preset-config-page .preset-advanced-switch span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-field select,
+body.modern-setting-page.preset-config-page .preset-advanced-field input,
+body.modern-setting-page.preset-config-page .preset-advanced-field textarea {
+  width: 100%;
+  min-height: 34px;
+  margin: 0;
+  border-radius: 12px;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent 30%);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-strong) 54%, transparent 46%);
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-switch input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch {
+  align-self: end;
+  min-height: 34px;
+  padding: 0 4px;
+  border-color: transparent;
+  background: transparent;
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: grid;
+  place-content: center;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  border: 1px solid color-mix(in srgb, var(--muted) 58%, var(--border) 42%);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent 12%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch input::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 3px;
+  transform: scale(0);
+  transition: transform 0.12s ease;
+  background: var(--accent);
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch input:checked {
+  border-color: color-mix(in srgb, var(--accent) 76%, var(--border) 24%);
+  background: color-mix(in srgb, var(--accent) 18%, var(--input-bg) 82%);
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch input:checked::before {
+  transform: scale(1);
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch input:focus-visible {
+  outline: 2px solid rgba(92, 167, 255, 0.42);
+  outline-offset: 2px;
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch span {
+  color: color-mix(in srgb, var(--text) 82%, var(--muted) 18%);
+  white-space: nowrap;
+}
+
+body.modern-setting-page.preset-config-page .preset-required-switch input:checked + span {
+  color: color-mix(in srgb, var(--accent) 62%, var(--text) 38%);
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-switch small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-tags {
+  grid-column: 1 / -1;
+}
+
+body.modern-setting-page.preset-config-page .preset-summary-chip.advanced {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text) 28%);
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border) 54%);
+  background: linear-gradient(135deg, rgba(92, 167, 255, 0.18), color-mix(in srgb, var(--accent) 10%, var(--input-bg) 90%));
+  box-shadow: inset 0 0 0 1px rgba(92, 167, 255, 0.12);
+  font-weight: 850;
+}
+
+@media (max-width: 720px) {
+  body.modern-setting-page.preset-config-page .preset-advanced-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-advanced-summary-note {
+    margin-left: 0;
+    white-space: normal;
+  }
+}
+
+/* BASE kernel template helpers. */
+body.modern-setting-page.preset-config-page .preset-base-template-panel {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border) 78%);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 7%, var(--panel-strong) 93%),
+      color-mix(in srgb, var(--input-bg) 88%, transparent 12%));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 10px;
+  margin-bottom: 9px;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-copy strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-copy span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker {
+  display: grid;
+  gap: 6px;
+  align-items: end;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker label {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker select {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker button {
+  width: auto !important;
+  min-width: 0;
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border-radius: 999px;
+  transform: none !important;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.preset-config-page .preset-base-template-picker button:hover,
+body.modern-setting-page.preset-config-page .preset-base-template-picker button:active {
+  transform: none !important;
+}
+
+html[data-theme="dark"] body.modern-setting-page.preset-config-page .preset-base-template-panel {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border) 72%);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 10%, var(--panel-strong) 90%),
+      color-mix(in srgb, var(--input-bg) 82%, transparent 18%));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 10px 22px rgba(0, 0, 0, 0.16);
+}
+
+@media (max-width: 760px) {
+  body.modern-setting-page.preset-config-page .preset-base-template-picker {
+    grid-template-columns: 1fr;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-base-template-picker button {
+    width: 100% !important;
+  }
+}
+
 
 body.memory-config-page .config-shell.compact.memory-wide {
   width: min(1760px, calc(100vw - 32px));

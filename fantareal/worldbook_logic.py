@@ -315,7 +315,13 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
     external_source = str(raw.get("external_source", "")).strip()[:80]
     external_ref = _sanitize_external_ref(raw.get("external_ref"))
     activation_tags = _normalize_activation_tags(raw.get("activation_tags"))
-    if entry_type == "external_tag" and not activation_tags and external_ref.get("role_id") and external_ref.get("stage_key"):
+    if (
+        entry_type == "external_tag"
+        and external_source == "state_journal"
+        and not activation_tags
+        and external_ref.get("role_id")
+        and external_ref.get("stage_key")
+    ):
         activation_tags = [f"state_journal.stage.{external_ref['role_id']}.{external_ref['stage_key']}"]
 
     return {

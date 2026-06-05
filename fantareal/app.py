@@ -68,6 +68,7 @@ from .prompt_builder import (
     build_memory_recap_prompt,
     build_messages,
     build_prompt_package,
+    collect_preset_activation_tags,
     build_retrieval_prompt,
     build_sprite_prompt,
     build_user_profile_prompt,
@@ -358,8 +359,14 @@ def _copy_worldbook_debug_snapshot(snapshot: dict[str, Any] | None = None) -> di
     all_matches = source.get("all_matches", [])
     selected_ids = source.get("selected_ids", [])
     dropped_ids = source.get("dropped_ids", [])
+    external_active_tags = source.get("external_active_tags", [])
+    active_tag_sources = source.get("active_tag_sources", [])
+    external_tag_debug = source.get("external_tag_debug", {})
     return {
         "query": str(source.get("query", "") or ""),
+        "external_active_tags": [str(item) for item in external_active_tags] if isinstance(external_active_tags, list) else [],
+        "active_tag_sources": [dict(item) for item in active_tag_sources if isinstance(item, dict)] if isinstance(active_tag_sources, list) else [],
+        "external_tag_debug": dict(external_tag_debug) if isinstance(external_tag_debug, dict) else {},
         "all_matches": [dict(item) for item in all_matches if isinstance(item, dict)],
         "selected_ids": [str(item) for item in selected_ids] if isinstance(selected_ids, list) else [],
         "dropped_ids": [str(item) for item in dropped_ids] if isinstance(dropped_ids, list) else [],
@@ -851,6 +858,18 @@ def build_preset_observation_segments(slot_id: str | None = None) -> list[dict[s
     return build_preset_observation_segments_from_preset(get_active_preset(slot_id))
 
 
+def build_active_preset_context(slot_id: str | None = None) -> dict[str, Any]:
+    preset = get_active_preset(slot_id)
+    prompt = build_preset_prompt_from_preset(preset)
+    segments = build_preset_observation_segments_from_preset(preset)
+    return {
+        "preset": preset,
+        "prompt": prompt,
+        "observation_segments": segments,
+        "activation_tags": collect_preset_activation_tags(segments),
+    }
+
+
 def get_active_preset_module_labels(slot_id: str | None = None) -> list[str]:
     preset = get_active_preset(slot_id)
     modules = preset.get("modules", {}) if isinstance(preset, dict) else {}
@@ -861,15 +880,17 @@ def get_active_preset_module_labels(slot_id: str | None = None) -> list[str]:
     return labels
 
 
-def build_preset_debug_payload(slot_id: str | None = None) -> dict[str, Any]:
+def build_preset_debug_payload(slot_id: str | None = None, preset_context: dict[str, Any] | None = None) -> dict[str, Any]:
     store = get_preset_store(slot_id)
-    preset = get_active_preset_from_store(store)
-    prompt = build_preset_prompt_from_preset(preset)
+    context = preset_context if isinstance(preset_context, dict) else build_active_preset_context(slot_id)
+    preset = context.get("preset") if isinstance(context.get("preset"), dict) else get_active_preset_from_store(store)
+    prompt = str(context.get("prompt", "")).strip()
     return {
         "active_preset_id": str(store.get("active_preset_id", "")).strip(),
         "active_preset_name": str(preset.get("name", "Unnamed preset")).strip() or "Unnamed preset",
         "enabled": bool(preset.get("enabled", True)),
         "active_modules": get_active_preset_module_labels(slot_id),
+        "activation_tags": context.get("activation_tags", {"tags": [], "count": 0, "segments": []}),
         "prompt": prompt,
     }
 
@@ -3077,22 +3098,168 @@ def get_state_journal_active_stage_rows() -> list[dict[str, Any]]:
     return result
 
 
-def get_state_journal_active_stage_tags() -> list[str]:
-    return [row["activation_tag"] for row in get_state_journal_active_stage_rows() if row.get("activation_tag")]
+def get_state_journal_active_stage_tag_sources() -> list[dict[str, Any]]:
+    return [
+        {
+            "tag": row["activation_tag"],
+            "source": "state_journal",
+            "label": " · ".join([item for item in [row.get("role_name"), row.get("stage_name")] if item]) or "心笺阶段",
+            "ref": {
+                "role_id": row.get("role_id", ""),
+                "role_name": row.get("role_name", ""),
+                "stage_key": row.get("stage_key", ""),
+                "stage_name": row.get("stage_name", ""),
+                "is_active": True,
+                "updated_at": row.get("updated_at", ""),
+            },
+        }
+        for row in get_state_journal_active_stage_rows()
+        if row.get("activation_tag")
+    ]
 
 
-def match_worldbook_entries(query: str, external_active_tags: list[str] | None = None) -> list[dict[str, Any]]:
+def get_state_journal_active_stage_tags() -> list[dict[str, Any]]:
+    return get_state_journal_active_stage_tag_sources()
+
+
+def _normalize_active_tag_context(value: Any, default_source: str = "external") -> dict[str, Any]:
+    tags: list[str] = []
+    sources: list[dict[str, Any]] = []
+
+    def add_tag(tag_value: Any, *, source: str = default_source, label: str = "", ref: dict[str, Any] | None = None) -> None:
+        tag = str(tag_value or "").strip()
+        if not tag:
+            return
+        if tag not in tags:
+            tags.append(tag)
+        sources.append(
+            {
+                "tag": tag,
+                "source": str(source or default_source).strip() or default_source,
+                "label": str(label or "").strip(),
+                "ref": ref if isinstance(ref, dict) else {},
+            }
+        )
+
+    if isinstance(value, dict):
+        for row in value.get("sources", []) if isinstance(value.get("sources", []), list) else []:
+            if isinstance(row, dict):
+                add_tag(row.get("tag"), source=row.get("source", default_source), label=row.get("label", ""), ref=row.get("ref", {}))
+        for tag in value.get("tags", []) if isinstance(value.get("tags", []), list) else []:
+            if tag not in tags:
+                add_tag(tag, source=default_source)
+    elif isinstance(value, list):
+        for row in value:
+            if isinstance(row, dict):
+                add_tag(row.get("tag"), source=row.get("source", default_source), label=row.get("label", ""), ref=row.get("ref", {}))
+            else:
+                add_tag(row, source=default_source)
+    elif value is not None:
+        add_tag(value, source=default_source)
+
+    return {"tags": tags, "sources": sources}
+
+
+def _merge_active_tag_contexts(*contexts: Any) -> dict[str, Any]:
+    merged_tags: list[str] = []
+    merged_sources: list[dict[str, Any]] = []
+    for context in contexts:
+        normalized = _normalize_active_tag_context(context)
+        for tag in normalized.get("tags", []):
+            if tag not in merged_tags:
+                merged_tags.append(tag)
+        merged_sources.extend(normalized.get("sources", []))
+    return {"tags": merged_tags, "sources": merged_sources}
+
+
+def build_active_tag_context(active_stage_tags: list[Any] | None = None, preset_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    state_sources: list[dict[str, Any]] = []
+    for item in active_stage_tags or []:
+        if isinstance(item, dict):
+            tag = str(item.get("tag") or item.get("activation_tag") or "").strip()
+            if not tag:
+                continue
+            state_sources.append(
+                {
+                    "tag": tag,
+                    "source": str(item.get("source") or "state_journal").strip() or "state_journal",
+                    "label": str(item.get("label") or "心笺阶段").strip() or "心笺阶段",
+                    "ref": item.get("ref") if isinstance(item.get("ref"), dict) else {},
+                }
+            )
+        else:
+            tag = str(item or "").strip()
+            if tag:
+                state_sources.append({"tag": tag, "source": "state_journal", "label": "心笺阶段", "ref": {}})
+    state_context = {"tags": [row["tag"] for row in state_sources], "sources": state_sources}
+    preset_sources: list[dict[str, Any]] = []
+    activation = preset_context.get("activation_tags", {}) if isinstance(preset_context, dict) else {}
+    for segment in activation.get("segments", []) if isinstance(activation.get("segments", []), list) else []:
+        if not isinstance(segment, dict):
+            continue
+        for tag in segment.get("tags", []) if isinstance(segment.get("tags", []), list) else []:
+            preset_sources.append(
+                {
+                    "tag": tag,
+                    "source": "preset",
+                    "label": str(segment.get("title", "预设")).strip() or "预设",
+                    "ref": {
+                        "segment_id": str(segment.get("id", "")).strip(),
+                        "title": str(segment.get("title", "")).strip(),
+                        "placement": str(segment.get("placement", "")).strip(),
+                        "kind": str(segment.get("kind", "")).strip(),
+                    },
+                }
+            )
+    return _merge_active_tag_contexts(state_context, preset_sources)
+
+
+def _active_tag_sources_by_tag(active_tag_context: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    result: dict[str, list[dict[str, Any]]] = {}
+    for row in active_tag_context.get("sources", []) if isinstance(active_tag_context.get("sources", []), list) else []:
+        if not isinstance(row, dict):
+            continue
+        tag = str(row.get("tag", "")).strip()
+        if not tag:
+            continue
+        result.setdefault(tag, []).append(row)
+    return result
+
+
+def _source_labels_for_tags(tags: list[str], sources_by_tag: dict[str, list[dict[str, Any]]]) -> list[str]:
+    labels: list[str] = []
+    for tag in tags:
+        for row in sources_by_tag.get(tag, []):
+            source = str(row.get("source", "external")).strip() or "external"
+            if source not in labels:
+                labels.append(source)
+    return labels or ["external"]
+
+
+def match_worldbook_entries(query: str, external_active_tags: Any = None) -> list[dict[str, Any]]:
     global _LAST_WORLDBOOK_DEBUG_SNAPSHOT
 
     text = str(query or "").strip()
-    active_tag_set = {str(tag).strip() for tag in (external_active_tags or []) if str(tag).strip()}
+    active_tag_context = _normalize_active_tag_context(external_active_tags)
+    active_tag_values = [str(tag).strip() for tag in active_tag_context.get("tags", []) if str(tag).strip()]
+    active_tag_set = set(active_tag_values)
+    active_tag_sources = _active_tag_sources_by_tag(active_tag_context)
+    empty_snapshot = {
+        "query": text,
+        "external_active_tags": active_tag_values,
+        "active_tag_sources": active_tag_context.get("sources", []),
+        "external_tag_debug": {"active_count": len(active_tag_values), "matched_count": 0, "missed_count": 0, "entries": []},
+        "all_matches": [],
+        "selected_ids": [],
+        "dropped_ids": [],
+    }
     if not text and not active_tag_set:
-        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = empty_snapshot
         return []
 
     settings = get_worldbook_settings()
     if not settings.get("enabled", True):
-        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": text, "all_matches": [], "selected_ids": [], "dropped_ids": []}
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = empty_snapshot
         return []
 
     runtime_state = get_worldbook_runtime_state()
@@ -3104,6 +3271,7 @@ def match_worldbook_entries(query: str, external_active_tags: list[str] | None =
     hits: list[dict[str, Any]] = []
     hits_by_id: dict[str, dict[str, Any]] = {}
     keyword_candidates: list[dict[str, Any]] = []
+    external_tag_debug_entries: list[dict[str, Any]] = []
     seed_queue: list[dict[str, Any]] = [{"text": text, "depth": 0, "from": ""}]
     recursion_enabled = bool(settings.get("recursive_scan_enabled", False))
     recursion_max_depth = clamp_int(settings.get("recursion_max_depth", 2), 0, 5, 2)
@@ -3144,20 +3312,34 @@ def match_worldbook_entries(query: str, external_active_tags: list[str] | None =
             continue
 
         if entry_type == "external_tag":
-            activation_tags = {str(tag).strip() for tag in (item.get("activation_tags") or []) if str(tag).strip()}
-            matched_tags = sorted(activation_tags & active_tag_set)
+            activation_tags = sorted({str(tag).strip() for tag in (item.get("activation_tags") or []) if str(tag).strip()})
+            matched_tags = sorted(set(activation_tags) & active_tag_set)
+            matched_sources = _source_labels_for_tags(matched_tags, active_tag_sources) if matched_tags else []
+            debug_entry = {
+                "id": entry_id,
+                "title": str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip(),
+                "activation_tags": activation_tags,
+                "matched_tags": matched_tags,
+                "missing_tags": [tag for tag in activation_tags if tag not in active_tag_set],
+                "matched_sources": matched_sources,
+                "selected_for_prompt": False,
+                "result": "matched" if matched_tags else "miss",
+            }
             if matched_tags:
                 state_row["last_result"] = "triggered"
                 state_row["last_reason"] = "external_tag"
                 state_row["matched_text"] = ", ".join(matched_tags)[:240]
                 clean_runtime_entries[entry_id] = state_row
-                hit = _worldbook_match_payload(item=item, source="external_tag", matched_text=state_row["matched_text"], matched_depth=0, matched_from="state_journal")
+                hit = _worldbook_match_payload(item=item, source="external_tag", matched_text=state_row["matched_text"], matched_depth=0, matched_from=", ".join(matched_sources))
+                hit["matched_tags"] = matched_tags
+                hit["matched_tag_sources"] = matched_sources
                 hits.append(hit)
                 hits_by_id[entry_id] = hit
             else:
                 state_row["last_result"] = "miss"
                 state_row["last_reason"] = "external_tag"
                 clean_runtime_entries[entry_id] = state_row
+            external_tag_debug_entries.append(debug_entry)
             continue
 
         if state_row["active_until_turn"] >= current_turn and state_row["last_trigger_turn"] < current_turn:
@@ -3291,13 +3473,25 @@ def match_worldbook_entries(query: str, external_active_tags: list[str] | None =
         selected_for_prompt = entry_id in selected_ids
         row["selected_for_prompt"] = selected_for_prompt
         row["dropped_reason"] = "" if selected_for_prompt else "max_hits"
+        for debug_entry in external_tag_debug_entries:
+            if debug_entry.get("id") == entry_id:
+                debug_entry["selected_for_prompt"] = selected_for_prompt
+                debug_entry["dropped_reason"] = row["dropped_reason"]
         all_matches_sorted.append(row)
         if not selected_for_prompt and entry_id:
             dropped_ids.append(entry_id)
 
+    matched_tag_values = sorted({tag for entry in external_tag_debug_entries for tag in entry.get("matched_tags", [])})
     _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {
         "query": text,
-        "external_active_tags": sorted(active_tag_set),
+        "external_active_tags": active_tag_values,
+        "active_tag_sources": active_tag_context.get("sources", []),
+        "external_tag_debug": {
+            "active_count": len(active_tag_values),
+            "matched_count": len(matched_tag_values),
+            "missed_count": max(len(active_tag_values) - len(matched_tag_values), 0),
+            "entries": external_tag_debug_entries,
+        },
         "all_matches": all_matches_sorted,
         "selected_ids": list(selected_ids),
         "dropped_ids": dropped_ids,
@@ -3649,7 +3843,8 @@ def build_worldbook_debug_payload(
     reply_result: dict[str, Any] | None = None,
     debug_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if not get_worldbook_settings().get("debug_enabled", False):
+    settings = get_worldbook_settings()
+    if not settings.get("debug_enabled", False):
         return {}
 
     runtime_state = get_worldbook_runtime_state()
@@ -3660,6 +3855,13 @@ def build_worldbook_debug_payload(
     snapshot_matches = snapshot.get("all_matches", [])
     selected_snapshot = [item for item in snapshot_matches if item.get("selected_for_prompt")]
     dropped_snapshot = [item for item in snapshot_matches if not item.get("selected_for_prompt")]
+    external_tag_debug = snapshot.get("external_tag_debug", {}) if isinstance(snapshot.get("external_tag_debug"), dict) else {}
+    external_tag_entries = external_tag_debug.get("entries", []) if isinstance(external_tag_debug.get("entries", []), list) else []
+    external_active_tags = snapshot.get("external_active_tags", []) if isinstance(snapshot.get("external_active_tags", []), list) else []
+    active_tag_sources = snapshot.get("active_tag_sources", []) if isinstance(snapshot.get("active_tag_sources", []), list) else []
+    matched_external_entries = [item for item in external_tag_entries if item.get("matched_tags")]
+    injected_external_entries = [item for item in matched_external_entries if item.get("selected_for_prompt")]
+    dropped_external_entries = [item for item in matched_external_entries if item.get("dropped_reason")]
 
     buckets = bucket_worldbook_matches(selected_snapshot or worldbook_matches)
 
@@ -3699,6 +3901,18 @@ def build_worldbook_debug_payload(
         "selected": selected_snapshot or worldbook_matches,
         "dropped": dropped_snapshot,
         "buckets": buckets,
+        "external_active_tags": external_active_tags,
+        "active_tag_sources": active_tag_sources,
+        "external_tag_debug": external_tag_debug,
+        "tag_relation_summary": {
+            "active_count": len(external_active_tags),
+            "listening_entry_count": len(external_tag_entries),
+            "matched_entry_count": len(matched_external_entries),
+            "injected_entry_count": len(injected_external_entries),
+            "dropped_entry_count": len(dropped_external_entries),
+            "missing_count": max(len(external_active_tags) - len({tag for item in external_tag_entries for tag in item.get("matched_tags", [])}), 0),
+            "max_hits": max(1, int(settings.get("max_hits", DEFAULT_WORLDBOOK_SETTINGS["max_hits"]))),
+        },
         "entry_states": _build_worldbook_runtime_debug_entries(
             clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
             all_entries,
@@ -3866,14 +4080,17 @@ async def generate_reply(
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]], dict[str, Any], dict[str, Any]]:
     llm_config = get_runtime_chat_config(runtime_overrides)
     retrieved = await retrieve_memories(user_message, runtime_overrides)
+    preset_context = build_active_preset_context()
     active_stage_tags = get_state_journal_active_stage_tags()
-    worldbook_matches = match_worldbook_entries(user_message, external_active_tags=active_stage_tags)
+    active_tag_context = build_active_tag_context(active_stage_tags, preset_context)
+    worldbook_matches = match_worldbook_entries(user_message, external_active_tags=active_tag_context)
     worldbook_debug_snapshot = get_worldbook_debug_snapshot()
     prompt_package = build_prompt_package(
         user_message,
         retrieved,
         runtime_overrides=runtime_overrides,
         worldbook_matches=worldbook_matches,
+        preset_context=preset_context,
     )
 
     if not (llm_config["base_url"] and llm_config["model"]):
@@ -4294,6 +4511,8 @@ route_ctx = SimpleNamespace(
     apply_role_card=apply_role_card,
     archive_current_conversation=archive_current_conversation,
     build_prompt_package=build_prompt_package,
+    build_active_preset_context=build_active_preset_context,
+    build_active_tag_context=build_active_tag_context,
     build_preset_debug_payload=build_preset_debug_payload,
     build_worldbook_debug_payload=build_worldbook_debug_payload,
     conversation_path=conversation_path,
