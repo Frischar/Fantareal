@@ -8,7 +8,7 @@
     groups: ["群聊管理", "编辑群聊资料、成员和群级自动行为。"],
     roles: ["角色管理", "维护小手机独立角色资料库。"],
     "role-generator": ["人物生成", "从背景资料生成小手机边缘角色草稿。"],
-    stickers: ["表情包", "编辑本地 PNG 表情包 manifest。"],
+    stickers: ["表情包", "编辑 mod 内 PNG 表情包 manifest。"],
     automation: ["自动行为", "自动插话、空闲触发和频率限制。"],
     prompt: ["Prompt 配置", "管理小手机独立 prompt blocks 与输出契约。"],
     apps: ["应用管理", "管理小手机桌面的轻应用注册表。"],

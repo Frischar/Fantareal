@@ -1886,7 +1886,7 @@
       <div class="fmcp-sticker-app">
         <div class="fmcp-home-intro">
           <strong>贴纸包</strong>
-          <span>已读取 ${stickers.length} 个贴纸；卡提希娅文件夹里的 PNG 会自动加入。</span>
+          <span>已读取 ${stickers.length} 个贴纸；mod 目录 static/stickers 下的表情包会自动加入。</span>
         </div>
         <div class="fmcp-sticker-library">
           ${stickers.map((sticker) => `

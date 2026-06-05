@@ -46,12 +46,8 @@ PROMPT_PATH = RESOURCE_DIR / "prompts" / "mobile_chat_prompt.txt"
 
 DEFAULT_STICKER_IDS = ("happy", "sweat", "stare", "shy", "heart", "cry")
 STICKER_IDS = set(DEFAULT_STICKER_IDS)
-CUSTOM_STICKER_PACKS = {
-    "katishiya": {
-        "label": "卡提希娅",
-        "directory": PROJECT_ROOT / "卡提希娅",
-    }
-}
+STICKER_PACK_ROOT = STATIC_DIR / "stickers"
+RESERVED_STICKER_PACK_IDS = {"default"}
 MAX_CUSTOM_STICKERS_PER_PACK = 160
 MESSAGE_TYPES = {"text", "sticker", "system", "error"}
 MESSAGE_SOURCES = {"user", "ai", "system"}
@@ -506,8 +502,41 @@ def is_safe_png_filename(filename: Any) -> bool:
     return name.lower().endswith(".png")
 
 
+def is_safe_sticker_pack_id(pack_id: Any) -> bool:
+    value = compact_text(pack_id, 80)
+    if not value or value in RESERVED_STICKER_PACK_IDS:
+        return False
+    return bool(re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,79}", value))
+
+
+def custom_sticker_packs() -> dict[str, dict[str, Any]]:
+    if not STICKER_PACK_ROOT.is_dir():
+        return {}
+    packs: dict[str, dict[str, Any]] = {}
+    for directory in sorted(STICKER_PACK_ROOT.iterdir(), key=lambda path: path.name.casefold()):
+        if not directory.is_dir() or not is_safe_sticker_pack_id(directory.name):
+            continue
+        pack_id = directory.name
+        label = pack_id.replace("_", " ").replace("-", " ").title()
+        manifest = read_json(directory / "manifest.json", {})
+        if isinstance(manifest, dict):
+            label = compact_text(manifest.get("label"), 80) or label
+        packs[pack_id] = {
+            "label": label,
+            "directory": directory,
+        }
+    return packs
+
+
+def custom_sticker_pack(pack_id: Any) -> dict[str, Any] | None:
+    value = compact_text(pack_id, 80)
+    if not is_safe_sticker_pack_id(value):
+        return None
+    return custom_sticker_packs().get(value)
+
+
 def custom_sticker_path(pack_id: str, filename: str, require_exists: bool = True) -> Path | None:
-    pack = CUSTOM_STICKER_PACKS.get(compact_text(pack_id, 80))
+    pack = custom_sticker_pack(pack_id)
     if not pack or not is_safe_png_filename(filename):
         return None
     directory = pack["directory"]
@@ -530,7 +559,7 @@ def custom_sticker_sort_key(path: Path) -> tuple[int, int | str]:
 
 
 def custom_sticker_files(pack_id: str) -> list[Path]:
-    pack = CUSTOM_STICKER_PACKS.get(pack_id)
+    pack = custom_sticker_pack(pack_id)
     if not pack:
         return []
     directory = pack["directory"]
@@ -561,7 +590,7 @@ def sticker_tags(value: Any) -> list[str]:
 
 
 def custom_sticker_manifest(pack_id: str) -> dict[str, dict[str, Any]]:
-    pack = CUSTOM_STICKER_PACKS.get(pack_id)
+    pack = custom_sticker_pack(pack_id)
     if not pack:
         return {}
     manifest_path = pack["directory"] / "manifest.json"
@@ -613,7 +642,7 @@ def sticker_catalog() -> list[dict[str, Any]]:
         }
         for sticker_id in DEFAULT_STICKER_IDS
     ]
-    for pack_id, pack in CUSTOM_STICKER_PACKS.items():
+    for pack_id, pack in custom_sticker_packs().items():
         manifest = custom_sticker_manifest(pack_id)
         for path in custom_sticker_files(pack_id):
             meta = manifest.get(path.name, {})
@@ -644,7 +673,7 @@ def sticker_pack_summaries() -> list[dict[str, Any]]:
             "directory": "",
         }
     ]
-    for pack_id, pack in CUSTOM_STICKER_PACKS.items():
+    for pack_id, pack in custom_sticker_packs().items():
         files = custom_sticker_files(pack_id)
         manifest = custom_sticker_manifest(pack_id)
         packs.append(
@@ -662,7 +691,7 @@ def sticker_pack_summaries() -> list[dict[str, Any]]:
 
 
 def sticker_manifest_rows(pack_id: str) -> list[dict[str, Any]]:
-    if pack_id not in CUSTOM_STICKER_PACKS:
+    if not custom_sticker_pack(pack_id):
         raise HTTPException(status_code=404, detail="表情包不存在。")
     manifest = custom_sticker_manifest(pack_id)
     rows: list[dict[str, Any]] = []
@@ -712,16 +741,19 @@ def sanitize_manifest_rows(value: Any) -> list[dict[str, Any]]:
 
 
 def save_sticker_manifest(pack_id: str, rows: list[dict[str, Any]]) -> None:
-    pack = CUSTOM_STICKER_PACKS.get(pack_id)
+    pack = custom_sticker_pack(pack_id)
     if not pack:
         raise HTTPException(status_code=404, detail="表情包不存在。")
     existing_files = {path.name for path in custom_sticker_files(pack_id)}
     sanitized = [row for row in sanitize_manifest_rows(rows) if row["file"] in existing_files]
+    existing_manifest = read_json(pack["directory"] / "manifest.json", {})
     payload = {
         "schema_version": 1,
         "updated_at": now_iso(),
         "stickers": sanitized,
     }
+    if isinstance(existing_manifest, dict) and compact_text(existing_manifest.get("label"), 80):
+        payload["label"] = compact_text(existing_manifest.get("label"), 80)
     write_json(pack["directory"] / "manifest.json", payload)
 
 
@@ -1375,7 +1407,7 @@ def sanitize_role_app_scope(value: Any) -> list[str]:
 def sanitize_sticker_preferences(value: Any) -> dict[str, Any]:
     source = value if isinstance(value, dict) else {}
     default_pack = compact_text(source.get("default_pack"), 80) or DEFAULT_STICKERS_SETTINGS["default_pack"]
-    if default_pack != "default" and default_pack not in CUSTOM_STICKER_PACKS:
+    if default_pack != "default" and not custom_sticker_pack(default_pack):
         default_pack = DEFAULT_STICKERS_SETTINGS["default_pack"]
     return {
         "default_pack": default_pack,
