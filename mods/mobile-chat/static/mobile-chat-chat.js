@@ -204,6 +204,10 @@
     return state.groups.find((item) => item.group_id === state.currentGroupId) || null;
   }
 
+  function groupHasUser(group) {
+    return Boolean(group && Array.isArray(group.members) && group.members.some((item) => item.type === "user"));
+  }
+
   function formatDate(value) {
     if (!value) return "";
     const date = new Date(value);
@@ -1706,7 +1710,7 @@
   }
 
   function createMarkup() {
-    const roles = [...state.roles, ...(state.user ? [state.user] : [])];
+    const roles = state.roles;
     return `
       <form class="fmcp-form" data-form="create-group">
         <label class="fmcp-field">
@@ -1717,29 +1721,33 @@
           <span>群聊简介</span>
           <textarea class="fmcp-textarea" name="description" maxlength="500" placeholder="可选：这群人通常聊些什么"></textarea>
         </label>
-        <div class="fmcp-import-card">
+        <button class="fmcp-import-card" type="button" data-action="import-current-card-roles" ${state.loading ? "disabled" : ""}>
           ${icon("import")}
           <span>从当前角色卡导入</span>
           ${icon("chevron")}
-        </div>
+        </button>
         <div class="fmcp-field">
-          <span>已选择角色 <em>(${roles.length})</em></span>
+          <span>可选角色 <em>(${roles.length})</em></span>
           ${state.loading ? '<div class="fmcp-loading">正在读取当前角色卡...</div>' : ""}
-          ${!state.loading && !state.roles.length ? '<div class="fmcp-help">当前角色卡暂未提取到角色，请先在主程序载入角色卡。</div>' : ""}
+          ${!state.loading && !state.roles.length ? '<div class="fmcp-help">点击上方导入按钮，从当前角色卡刷新候选角色。</div>' : ""}
           <div class="fmcp-role-list">
             ${roles.map((role) => `
               <label class="fmcp-role-row">
                 ${avatarMarkup(role, "fmcp-role-avatar")}
                 <span class="fmcp-role-copy">
                   <strong>${esc(role.name)}</strong>
-                  <span class="fmcp-help">${role.type === "user" ? "当前用户" : "角色"}</span>
+                  <span class="fmcp-help">角色</span>
                 </span>
-                <input type="checkbox" name="member" value="${esc(role.role_id)}" ${role.type === "user" || state.roles.length ? "checked" : ""}>
+                <input type="checkbox" name="member" value="${esc(role.role_id)}">
               </label>
             `).join("")}
           </div>
         </div>
         <div class="fmcp-create-options">
+          <label class="fmcp-settings-row">
+            <span class="fmcp-settings-copy"><strong>我也加入群聊</strong><small>关闭后只观察角色之间的对话</small></span>
+            <span class="fmcp-switch"><input type="checkbox" name="include_user"><i></i></span>
+          </label>
           <label class="fmcp-settings-row">
             <span class="fmcp-settings-copy"><strong>角色互相回复</strong><small>角色之间可以自然接话</small></span>
             <span class="fmcp-switch"><input type="checkbox" name="allow_role_to_role_reply" ${(state.settings || defaults).allow_role_to_role_reply !== false ? "checked" : ""}><i></i></span>
@@ -1786,9 +1794,10 @@
   function chatMarkup() {
     const group = currentGroup();
     if (!group) return '<div class="fmcp-loading">群聊不存在或正在读取...</div>';
+    const emptyText = groupHasUser(group) ? "群聊刚刚建立，发一句话试试。" : "观察位已开启，点续聊让角色自然展开对话。";
     return `
       <div class="fmcp-chat-body" data-role="messages">
-        ${state.messages.length ? state.messages.map(messageMarkup).join("") : '<div class="fmcp-empty"><div>群聊刚刚建立，发一句话试试。</div></div>'}
+        ${state.messages.length ? state.messages.map(messageMarkup).join("") : `<div class="fmcp-empty"><div>${esc(emptyText)}</div></div>`}
         ${state.generating ? '<div class="fmcp-loading">角色正在回复...</div>' : ""}
       </div>
     `;
@@ -1796,6 +1805,33 @@
 
   function composerMarkup() {
     if (state.page !== "chat") return "";
+    const group = currentGroup();
+    const observerOnly = group && !groupHasUser(group);
+    if (observerOnly) {
+      return `
+        <div class="fmcp-composer">
+          ${state.showExtensions ? `
+            <div class="fmcp-extension-panel">
+              <button class="fmcp-extension-item" type="button" data-action="continue-chat">
+                ${icon("refresh")}
+                <span><strong>角色续聊一轮</strong><small>观察位不会替用户发言</small></span>
+              </button>
+              <button class="fmcp-extension-item" type="button" data-action="clear-messages">
+                ${icon("trash")}
+                <span><strong>清空当前群聊</strong><small>仅清除这个小手机群聊的消息</small></span>
+              </button>
+            </div>
+          ` : ""}
+          <div class="fmcp-composer-row">
+            <button class="fmcp-composer-icon" type="button" data-action="toggle-extensions" aria-label="打开更多功能">${icon("plus")}</button>
+            <div class="fmcp-composer-input">
+              <input value="观察位：你不在这个群聊中" disabled>
+            </div>
+            <button class="fmcp-composer-icon fmcp-continue-button" type="button" data-action="continue-chat" aria-label="让角色继续聊天" ${state.generating ? "disabled" : ""}>${icon("refresh")}</button>
+          </div>
+        </div>
+      `;
+    }
     return `
       <form class="fmcp-composer" data-form="send-message">
         ${state.showExtensions ? `
@@ -2367,6 +2403,15 @@
 
   async function openCreate() {
     state.page = "create";
+    state.error = "";
+    state.roles = [];
+    state.user = null;
+    render();
+  }
+
+  async function importCurrentCardRoles() {
+    if (state.loading) return;
+    state.page = "create";
     state.loading = true;
     state.error = "";
     render();
@@ -2611,7 +2656,8 @@
   async function createGroup(form) {
     const data = new FormData(form);
     const selectedIds = new Set(data.getAll("member").map(String));
-    const members = [...state.roles, ...(state.user ? [state.user] : [])].filter((item) => selectedIds.has(item.role_id));
+    const members = state.roles.filter((item) => selectedIds.has(item.role_id));
+    if (data.has("include_user") && state.user) members.push(state.user);
     state.loading = true;
     state.error = "";
     render();
@@ -3405,6 +3451,7 @@
     }
     if (action === "open-app") void openAppPage(button.dataset.page || "home");
     if (action === "create") void openCreate();
+    if (action === "import-current-card-roles") void importCurrentCardRoles();
     if (action === "open-group") void openGroup(button.dataset.groupId || "");
     if (action === "delete-group") void deleteGroup(button.dataset.groupId || "");
     if (action === "toggle-stickers") {
