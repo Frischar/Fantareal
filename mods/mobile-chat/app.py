@@ -1367,12 +1367,18 @@ def role_name_key(value: Any) -> str:
     return compact_text(value, 120).casefold()
 
 
+def placeholder_role_name(value: Any) -> bool:
+    text = role_name_key(value)
+    compact = re.sub(r"[\s_-]+", "", text)
+    return bool(compact and (compact.isdecimal() or re.fullmatch(r"(?:role|角色|persona|personas|char|character)\d+", compact)))
+
+
 def sanitize_member(raw: Any, index: int = 0) -> dict[str, str] | None:
     if not isinstance(raw, dict):
         return None
     member_type = "user" if str(raw.get("type", "")).strip().lower() == "user" else "character"
     name = compact_text(raw.get("name"), 80)
-    if not name:
+    if not name or (member_type == "character" and placeholder_role_name(name)):
         return None
     fallback = "user" if member_type == "user" else f"role_{index + 1}"
     role_id = normalize_id(raw.get("role_id") or raw.get("id"), fallback)
@@ -1990,11 +1996,11 @@ def merge_profile_update(existing: dict[str, Any] | None, updates: dict[str, Any
 
 def available_role_members() -> dict[str, Any]:
     profiles = get_role_profiles(include_disabled=False)
-    members = [role_profile_to_member(profile) for profile in profiles]
+    members = [role_profile_to_member(profile) for profile in profiles if not placeholder_role_name(profile.get("display_name"))]
     seen = {item["role_id"] for item in members}
     current = extract_current_card_roles()
     for role in current.get("roles", []):
-        if role.get("role_id") in seen:
+        if role.get("role_id") in seen or placeholder_role_name(role.get("name")):
             continue
         members.append(role)
         seen.add(role.get("role_id"))
@@ -2059,6 +2065,23 @@ def summarize_persona(raw: dict[str, Any]) -> str:
     return compact_text("；".join(parts), 360)
 
 
+def declared_persona_name(raw: dict[str, Any], fallback: Any = "") -> str:
+    explicit = compact_text(raw.get("name"), 80)
+    fallback_text = compact_text(fallback, 80)
+    if explicit and not placeholder_role_name(explicit):
+        return explicit
+    for key in ("description", "personality", "scenario", "creator_notes"):
+        text = compact_text(raw.get(key), 1000)
+        if not text:
+            continue
+        match = re.search(r"(?:\[|【)?姓名\s*[:：]\s*([^\]\[】；;，,\n\r]+)", text)
+        if match:
+            name = compact_text(match.group(1), 80).strip("。.!！?？")
+            if name and not placeholder_role_name(name):
+                return name
+    return "" if placeholder_role_name(fallback_text) else fallback_text
+
+
 def extract_current_card_roles() -> dict[str, Any]:
     payload = read_json(CURRENT_ROLE_CARD_PATH, {})
     if not isinstance(payload, dict):
@@ -2085,15 +2108,36 @@ def extract_current_card_roles() -> dict[str, Any]:
         role_indexes[key] = len(roles)
         roles.append(member)
 
+    main_name = declared_persona_name(raw, raw.get("name"))
+    if main_name:
+        upsert(
+            {
+                "role_id": raw.get("role_id") or raw.get("id") or normalize_id(main_name, "main_role"),
+                "name": main_name,
+                "summary": summarize_persona(raw),
+                "avatar": raw.get("avatar") or raw.get("avatar_url") or "",
+                "type": "character",
+            },
+            0,
+        )
+
     state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
     state_roles = state_journal.get("roles") if isinstance(state_journal.get("roles"), list) else []
     for index, item in enumerate(state_roles):
         if not isinstance(item, dict) or item.get("enabled") is False:
             continue
+        state_role_name = declared_persona_name(
+            {
+                "name": item.get("role_name") or item.get("name"),
+                "description": item.get("summary") or item.get("description"),
+            }
+        )
+        if not state_role_name:
+            continue
         upsert(
             {
                 "role_id": item.get("role_id") or item.get("id"),
-                "name": item.get("role_name") or item.get("name"),
+                "name": state_role_name,
                 "summary": item.get("summary") or "",
                 "type": "character",
             },
@@ -2110,11 +2154,10 @@ def extract_current_card_roles() -> dict[str, Any]:
     for index, (persona_key, persona) in enumerate(persona_items):
         if not isinstance(persona, dict):
             continue
-        explicit_name = compact_text(persona.get("name"), 80)
         persona_summary = summarize_persona(persona)
-        if explicit_name == compact_text(persona_key, 80) and explicit_name.isdecimal() and not persona_summary:
+        name = declared_persona_name(persona, persona_key)
+        if not name:
             continue
-        name = explicit_name or compact_text(persona_key, 80)
         upsert(
             {
                 "role_id": persona.get("role_id") or persona.get("id") or normalize_id(name, f"role_{index + 1}"),
@@ -2126,17 +2169,6 @@ def extract_current_card_roles() -> dict[str, Any]:
             index,
         )
 
-    main_name = compact_text(raw.get("name"), 80)
-    if not roles and main_name:
-        upsert(
-            {
-                "role_id": raw.get("role_id") or raw.get("id") or normalize_id(main_name, "main_role"),
-                "name": main_name,
-                "summary": summarize_persona(raw),
-                "type": "character",
-            },
-            0,
-        )
     return {"ok": True, "source_name": source_name, "roles": roles, "user": current_user_member()}
 
 
@@ -2236,7 +2268,7 @@ def sanitize_group(raw: Any) -> dict[str, Any] | None:
         "group_id": group_id,
         "name": name,
         "description": compact_text(raw.get("description"), 500),
-        "members": sanitize_members(raw.get("members")),
+        "members": sanitize_members(raw.get("members"), ensure_user=False),
         "allow_role_to_role_reply": bool(raw.get("allow_role_to_role_reply", settings["allow_role_to_role_reply"])),
         "allow_auto_interject": bool(raw.get("allow_auto_interject", settings["allow_auto_interject"])),
         "reply_count": "1" if str(raw.get("reply_count", settings["reply_count"])).strip() == "1" else "1-2",
@@ -4038,7 +4070,7 @@ async def api_create_group(payload: GroupCreatePayload) -> dict[str, Any]:
     name = compact_text(payload.name, 80)
     if not name:
         raise HTTPException(status_code=400, detail="请填写群聊名称。")
-    members = sanitize_members(payload.members)
+    members = sanitize_members(payload.members, ensure_user=False)
     if not any(item["type"] == "character" for item in members):
         raise HTTPException(status_code=400, detail="请至少选择一个角色。")
     settings = get_settings()
@@ -4092,7 +4124,7 @@ async def api_patch_group(group_id: str, payload: GroupPatchPayload) -> dict[str
             raise HTTPException(status_code=404, detail="群聊不存在。")
         merged = {**groups[index], **updates, "group_id": safe_group_id, "updated_at": now_iso()}
         if "members" in updates:
-            merged["members"] = sanitize_members(updates["members"])
+            merged["members"] = sanitize_members(updates["members"], ensure_user=False)
         group = sanitize_group(merged)
         if not group or not any(item["type"] == "character" for item in group["members"]):
             raise HTTPException(status_code=400, detail="群聊至少需要一个角色。")

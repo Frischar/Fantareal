@@ -2005,17 +2005,27 @@
 }
 
 .fmcp-import-card {
+  width: 100%;
   display: flex;
   min-height: 48px;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   color: rgba(236, 243, 255, 0.86);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
 }
 
 .fmcp-import-card > .fmcp-glyph:last-child {
   margin-left: auto;
   color: rgba(216, 226, 242, 0.58);
+}
+
+.fmcp-import-card:disabled {
+  cursor: wait;
+  opacity: 0.68;
 }
 
 .fmcp-generator-app {
