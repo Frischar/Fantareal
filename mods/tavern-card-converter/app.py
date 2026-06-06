@@ -4,12 +4,15 @@ import json
 import struct
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+import re
+
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 
 MOD_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = MOD_DIR.parent.parent
@@ -62,6 +65,7 @@ app = FastAPI()
 
 MAX_CARD_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024
 MAX_WORLDBOOK_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
+MAX_PORTRAIT_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024
 
 
 async def read_upload_bytes(file: UploadFile, *, max_bytes: int, label: str) -> bytes:
@@ -613,6 +617,268 @@ def convert_worldbook_to_xuqi(tavern_wb: dict) -> tuple[dict, dict]:
 
 
 # ═══════════════════════════════════════════════════
+#  Reverse conversion (Fantareal → Tavern PNG)
+# ═══════════════════════════════════════════════════
+
+def normalize_fantareal_card(raw: dict) -> dict:
+    """Normalize various Fantareal card shapes into a flat card dict."""
+    if not isinstance(raw, dict):
+        return {}
+
+    # Unwrap known wrappers
+    if "persona_card" in raw and isinstance(raw["persona_card"], dict):
+        raw = raw["persona_card"]
+    elif "card" in raw and isinstance(raw["card"], dict):
+        raw = raw["card"]
+
+    card = {k: v for k, v in raw.items()}
+
+    # Normalize tags: string → list
+    tags = card.get("tags")
+    if isinstance(tags, str):
+        card["tags"] = [t.strip() for t in re.split(r'[,，]', tags) if t.strip()]
+    elif not isinstance(tags, list):
+        card["tags"] = []
+
+    # Ensure key fields are strings
+    for field in ("name", "description", "personality", "scenario",
+                  "first_mes", "mes_example", "creator_notes",
+                  "system_prompt", "post_history_instructions",
+                  "creator", "character_version"):
+        card.setdefault(field, "")
+
+    return card
+
+
+def validate_tavern_generation(card: dict, has_image: bool) -> tuple[list[dict], list[dict]]:
+    """Validate inputs for tavern PNG generation. Returns (errors, warnings)."""
+    errors: list[dict] = []
+    warnings: list[dict] = []
+
+    if not has_image:
+        errors.append({"field": "image", "message": "请上传角色立绘图片"})
+
+    name = str(card.get("name") or "").strip()
+    if not name:
+        errors.append({"field": "name", "message": "请填写角色名"})
+
+    first_mes = str(card.get("first_mes") or "").strip()
+    if not first_mes:
+        errors.append({"field": "first_mes", "message": "请填写开场白"})
+
+    # Suggested but non-blocking
+    if not str(card.get("description") or "").strip():
+        warnings.append({"field": "description", "message": "建议填写角色描述"})
+    if not str(card.get("personality") or "").strip():
+        warnings.append({"field": "personality", "message": "建议填写性格/口吻"})
+    if not str(card.get("scenario") or "").strip():
+        warnings.append({"field": "scenario", "message": "建议填写场景"})
+    if not str(card.get("mes_example") or "").strip():
+        warnings.append({"field": "mes_example", "message": "缺少示例对话，不影响生成"})
+    if not str(card.get("creator_notes") or "").strip():
+        warnings.append({"field": "creator_notes", "message": "缺少作者备注，不影响生成"})
+    tags = card.get("tags")
+    if not tags or (isinstance(tags, list) and not any(tags)):
+        warnings.append({"field": "tags", "message": "缺少标签，不影响生成"})
+
+    return errors, warnings
+
+
+def build_tavern_v2_card(card: dict) -> dict:
+    """Build a chara_card_v2 spec dict from a normalized Fantareal card."""
+    data: dict = {
+        "name": str(card.get("name") or "").strip(),
+        "description": str(card.get("description") or "").strip(),
+        "personality": str(card.get("personality") or "").strip(),
+        "scenario": str(card.get("scenario") or "").strip(),
+        "first_mes": str(card.get("first_mes") or "").strip(),
+        "mes_example": str(card.get("mes_example") or "").strip(),
+        "creator_notes": str(card.get("creator_notes") or "").strip(),
+        "tags": card.get("tags") if isinstance(card.get("tags"), list) else [],
+    }
+
+    # Optional fields
+    for opt_field in ("alternate_greetings", "creator", "character_version",
+                      "system_prompt", "post_history_instructions"):
+        val = card.get(opt_field)
+        if val is not None and val != "" and val != []:
+            data[opt_field] = val
+
+    # Preserve Fantareal-specific info in extensions
+    extensions: dict = {}
+    personas = card.get("personas")
+    if personas and isinstance(personas, dict):
+        extensions["fantareal"] = {"personas": personas}
+    workshop = card.get("creativeWorkshop")
+    if workshop and isinstance(workshop, dict):
+        extensions.setdefault("fantareal", {})["creativeWorkshop"] = workshop
+    if extensions:
+        data["extensions"] = extensions
+
+    return {
+        "spec": "chara_card_v2",
+        "spec_version": "2.0",
+        "data": data,
+    }
+
+
+def render_tavern_png(image_bytes: bytes, tavern_payload: dict) -> bytes:
+    """Embed tavern V2 JSON as 'chara' tEXt metadata into an image, output PNG."""
+    img = Image.open(io.BytesIO(image_bytes))
+    json_str = json.dumps(tavern_payload, ensure_ascii=False)
+    chara_b64 = base64.b64encode(json_str.encode("utf-8")).decode("ascii")
+
+    pnginfo = PngInfo()
+    pnginfo.add_text("chara", chara_b64)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", pnginfo=pnginfo)
+    img.close()
+    return buf.getvalue()
+
+
+def safe_card_filename(name: str) -> str:
+    """Clean a character name into a safe PNG filename."""
+    safe = re.sub(r'[\\/:*?"<>|]', "", str(name or "未命名角色").strip())
+    safe = safe.strip() or "未命名角色"
+    return f"{safe}_tavern.png"
+
+
+def convert_xuqi_wb_to_tavern(xuqi_wb: dict) -> tuple[dict, dict]:
+    """Convert a Fantareal worldbook dict to SillyTavern worldbook format.
+
+    Returns (tavern_wb, conversion_info).
+    """
+    raw_entries = xuqi_wb.get("entries", [])
+    if isinstance(raw_entries, dict):
+        entry_list = list(raw_entries.values())
+    elif isinstance(raw_entries, list):
+        entry_list = raw_entries
+    else:
+        entry_list = []
+
+    settings = xuqi_wb.get("settings", {})
+
+    position_map = {
+        "before_char_defs": "0",
+        "after_char_defs": "1",
+        "in_chat": "2",
+    }
+
+    converted: list[dict] = []
+    for idx, entry in enumerate(entry_list):
+        if not isinstance(entry, dict):
+            continue
+
+        # keys array from trigger + secondary_trigger
+        keys: list[str] = []
+        trigger = str(entry.get("trigger") or "").strip()
+        if trigger:
+            keys.append(trigger)
+        secondary = str(entry.get("secondary_trigger") or "").strip()
+        if secondary:
+            keys.extend([k.strip() for k in secondary.split(",") if k.strip()])
+
+        entry_type = str(entry.get("entry_type") or "").strip()
+        constant = entry_type == "constant"
+
+        order = entry.get("order")
+        try:
+            priority = int(order) if order is not None else 100
+        except (TypeError, ValueError):
+            priority = 100
+
+        depth = entry.get("injection_depth")
+        try:
+            depth = int(depth) if depth is not None else 0
+        except (TypeError, ValueError):
+            depth = 0
+
+        chance = entry.get("chance")
+        try:
+            probability = int(chance) if chance is not None else 100
+        except (TypeError, ValueError):
+            probability = 100
+
+        enabled = entry.get("enabled")
+        disable = False if enabled is None else not bool(enabled)
+
+        position = position_map.get(
+            str(entry.get("insertion_position") or "").strip(), "1"
+        )
+
+        name_val = str(entry.get("title") or "").strip()
+        comment_val = str(entry.get("comment") or entry.get("note") or "").strip()
+
+        tavern_entry: dict = {
+            "uid": idx,
+            "key": keys,
+            "keysecondary": [],
+            "comment": comment_val,
+            "content": str(entry.get("content") or "").strip(),
+            "constant": constant,
+            "selective": False,
+            "selectiveLogic": 0,
+            "addMemo": True,
+            "order": priority,
+            "position": position,
+            "disable": disable,
+            "excludeRecursion": False,
+            "preventRecursion": False,
+            "delayUntilRecursion": False,
+            "probability": probability,
+            "useProbability": probability < 100,
+            "depth": depth,
+            "group": "",
+            "groupOverride": False,
+            "groupWeight": 100,
+            "scanDepth": None,
+            "caseSensitive": None,
+            "matchWholeWords": None,
+            "useGroupScoring": None,
+            "automationId": "",
+            "role": None,
+            "sticky": None,
+            "cooldown": None,
+            "delayUntil": None,
+            "displayIndex": idx,
+            "name": name_val,
+            "extensions": {},
+        }
+        converted.append(tavern_entry)
+
+    tavern_wb: dict = {"entries": converted}
+    if settings.get("recursive_scan_enabled"):
+        tavern_wb["recursive_scanning"] = True
+    recursion_max = settings.get("recursion_max_depth")
+    if isinstance(recursion_max, (int, float)) and int(recursion_max) > 0:
+        tavern_wb["scan_depth"] = int(recursion_max)
+
+    conversion_info = {
+        "input_entries": len(entry_list),
+        "output_entries": len(converted),
+        "fields_mapped": [
+            "trigger→keys[0]", "secondary_trigger→keys[1:]",
+            "entry_type→constant", "enabled→disable(反转)",
+            "order→priority", "injection_depth→depth",
+            "chance→probability", "insertion_position→position",
+            "comment/note→comment", "title→name",
+        ],
+        "tavern_defaults_added": [
+            "uid", "selective", "selectiveLogic", "addMemo",
+            "displayIndex", "useProbability", "extensions",
+        ],
+        "fields_not_preserved": [
+            "match_mode", "secondary_mode", "group_operator",
+            "sticky_turns", "cooldown_turns", "injection_order",
+            "injection_role", "prompt_layer", "recursive_enabled",
+        ],
+    }
+
+    return tavern_wb, conversion_info
+
+
+# ═══════════════════════════════════════════════════
 #  Routes
 # ═══════════════════════════════════════════════════
 
@@ -826,6 +1092,202 @@ async def save_worldbook(payload: SaveWorldbookPayload):
         raise HTTPException(400, f"JSON 格式无效: {exc}")
     except OSError as exc:
         raise HTTPException(500, f"写入文件失败: {exc}")
+
+
+# ── Reverse conversion: Fantareal → Tavern PNG ──
+
+@app.post("/api/convert/fantareal-to-tavern")
+async def fantareal_to_tavern(
+    image: UploadFile = File(...),
+    card_json: str = Form(""),
+    manual_fields: str = Form(""),
+):
+    if not image.filename:
+        raise HTTPException(400, "未提供立绘文件")
+
+    try:
+        image_bytes = await read_upload_bytes(image, max_bytes=MAX_PORTRAIT_UPLOAD_SIZE_BYTES, label="立绘图片")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "读取立绘文件失败")
+
+    # Validate image
+    try:
+        test_img = Image.open(io.BytesIO(image_bytes))
+        test_img.verify()
+        test_img.close()
+    except Exception:
+        raise HTTPException(400, "立绘文件不是有效的图片，请上传 PNG/JPEG/WebP 格式")
+
+    # Build card from inputs
+    card: dict = {}
+
+    # Parse card_json if provided
+    if card_json and card_json.strip():
+        parsed = None
+        try:
+            parsed = json.loads(card_json)
+        except json.JSONDecodeError:
+            raise HTTPException(400, "card_json 不是有效的 JSON")
+        if isinstance(parsed, dict):
+            card = normalize_fantareal_card(parsed)
+
+    # Parse manual_fields if provided, merge (manual overrides json)
+    if manual_fields and manual_fields.strip():
+        manual = None
+        try:
+            manual = json.loads(manual_fields)
+        except json.JSONDecodeError:
+            raise HTTPException(400, "manual_fields 不是有效的 JSON")
+        if isinstance(manual, dict):
+            for k, v in manual.items():
+                if v is not None and str(v).strip():
+                    card[k] = v
+
+    # Validate
+    errors, warnings = validate_tavern_generation(card, has_image=True)
+    if errors:
+        return JSONResponse(
+            status_code=422,
+            content={"success": False, "errors": errors, "warnings": warnings},
+        )
+
+    # Build and render
+    tavern_card = build_tavern_v2_card(card)
+    png_bytes = render_tavern_png(image_bytes, tavern_card)
+    filename = safe_card_filename(card.get("name", ""))
+    png_b64 = base64.b64encode(png_bytes).decode("ascii")
+
+    return JSONResponse({
+        "success": True,
+        "filename": filename,
+        "png_base64": png_b64,
+        "tavern_json": json.dumps(tavern_card, ensure_ascii=False, indent=2),
+        "card": tavern_card,
+        "warnings": warnings,
+    })
+
+
+# ── Reverse worldbook conversion: Fantareal → Tavern worldbook ──
+
+@app.post("/api/convert/worldbook-to-tavern")
+async def worldbook_to_tavern(file: UploadFile = File(default=None)):
+    # Accept either multipart file upload or JSON body
+    raw_json = ""
+    if file and file.filename:
+        try:
+            data = await read_upload_bytes(file, max_bytes=MAX_WORLDBOOK_UPLOAD_SIZE_BYTES, label="世界书")
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, "读取上传文件失败")
+        raw_json = data.decode("utf-8", errors="ignore")
+    else:
+        raise HTTPException(400, "请上传 Fantareal 世界书 JSON 文件")
+
+    try:
+        xuqi_wb = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(400, f"JSON 解析失败: {exc}")
+
+    tavern_wb, conversion_info = convert_xuqi_wb_to_tavern(xuqi_wb)
+    tavern_json = json.dumps(tavern_wb, ensure_ascii=False, indent=2)
+
+    entry_count = len(tavern_wb.get("entries", []))
+    wb_name = str(xuqi_wb.get("name") or "未命名世界书").strip()
+
+    return JSONResponse({
+        "success": True,
+        "tavern_wb": tavern_wb,
+        "tavern_json": tavern_json,
+        "entry_count": entry_count,
+        "filename": f"{wb_name}_tavern_worldbook.json",
+        "conversion_info": conversion_info,
+    })
+
+
+# ── Card Writer import endpoints ──
+
+_CARD_WRITER_DATA_DIR = PROJECT_ROOT / "data" / "card_writer"
+_CARD_WRITER_PROJECTS_DIR = _CARD_WRITER_DATA_DIR / "projects"
+_CARD_WRITER_WORKSPACE = _CARD_WRITER_DATA_DIR / "workspace.cardwork.json"
+
+
+def _read_cardwork_file(path: Path) -> dict | None:
+    """Read a .cardwork.json file, returning the parsed dict or None."""
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+@app.get("/api/card-writer/imports")
+async def list_card_writer_imports():
+    sources: list[dict] = []
+
+    # Workspace
+    ws = _read_cardwork_file(_CARD_WRITER_WORKSPACE)
+    if ws and isinstance(ws, dict):
+        pc = ws.get("persona_card", {})
+        sources.append({
+            "id": "workspace",
+            "type": "workspace",
+            "filename": "workspace.cardwork.json",
+            "title": ws.get("title") or "当前工作区",
+            "character_name": pc.get("name", "") if isinstance(pc, dict) else "",
+            "updated_at": ws.get("updated_at", ""),
+        })
+
+    # Projects
+    if _CARD_WRITER_PROJECTS_DIR.is_dir():
+        for f in sorted(_CARD_WRITER_PROJECTS_DIR.glob("*.cardwork.json")):
+            proj = _read_cardwork_file(f)
+            if not proj or not isinstance(proj, dict):
+                continue
+            pc = proj.get("persona_card", {})
+            sources.append({
+                "id": f.stem,
+                "type": "project",
+                "filename": f.name,
+                "title": proj.get("title") or f.stem,
+                "character_name": pc.get("name", "") if isinstance(pc, dict) else "",
+                "updated_at": proj.get("updated_at", ""),
+            })
+
+    return JSONResponse({"success": True, "sources": sources})
+
+
+@app.get("/api/card-writer/imports/{source_id}")
+async def get_card_writer_import(source_id: str):
+    if source_id == "workspace":
+        path = _CARD_WRITER_WORKSPACE
+    else:
+        path = _CARD_WRITER_PROJECTS_DIR / f"{source_id}.cardwork.json"
+
+    proj = _read_cardwork_file(path)
+    if not proj:
+        raise HTTPException(404, f"未找到缃笺项目: {source_id}")
+
+    pc = proj.get("persona_card")
+    if not isinstance(pc, dict):
+        raise HTTPException(400, "该项目没有 persona_card 数据")
+
+    card = normalize_fantareal_card(pc)
+    # Also attach personas and creativeWorkshop if present
+    if "personas" in proj.get("persona_card", {}):
+        card["personas"] = proj["persona_card"]["personas"]
+    cw = proj.get("persona_card", {}).get("creativeWorkshop")
+    if cw:
+        card["creativeWorkshop"] = cw
+
+    return JSONResponse({
+        "success": True,
+        "card": card,
+        "title": proj.get("title", ""),
+    })
 
 
 # ── Static files ──
