@@ -148,6 +148,30 @@ ALLOWED_FONT_SUFFIXES = {".ttf", ".otf", ".woff", ".woff2"}
 MAX_FONT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 REQUEST_RETRY_ATTEMPTS = 5
 REQUEST_RETRY_BASE_DELAY_SECONDS = 1.0
+STREAM_FALLBACK_STATUS_CODES = {400, 422}
+STREAM_FALLBACK_MARKERS = (
+    "stream",
+    "streaming",
+    "stream_options",
+    "sse",
+    "event stream",
+    "invalid stream",
+    "流式",
+    "不支持流",
+)
+CONTENT_REJECTION_MARKERS = (
+    "input_sensitive",
+    "output_sensitive",
+    "sensitive",
+    "moderation",
+    "content policy",
+    "policy_violation",
+    "safety",
+    "审核",
+    "敏感",
+    "安全",
+)
+NON_STREAM_CHAT_COMPAT_KEYS: set[str] = set()
 DEFAULT_SPRITE_BASE_PATH = "/static/sprites"
 DEFAULT_BACKGROUND_IMAGE_URL = "/assets/default.jpg"
 GLOBAL_RUNTIME_ID = "global_workspace"
@@ -1492,7 +1516,7 @@ def normalize_legacy_message_content(role: str, content: str) -> str:
         return text
 
     stripped = text.lstrip()
-    if stripped.startswith("??????"):
+    if stripped.startswith("?") and is_replacement_marker_text(stripped.split(":", 1)[0].strip()):
         remainder = stripped.lstrip("?").lstrip(":").lstrip()
         return f"Error: {remainder}" if remainder else "Error."
     return text
@@ -2445,6 +2469,85 @@ def should_retry_status_code(status_code: int) -> bool:
     return status_code >= 500
 
 
+async def safe_response_text(response: httpx.Response | None, *, limit: int = 1200) -> str:
+    if response is None:
+        return ""
+    try:
+        await response.aread()
+    except Exception:
+        pass
+    try:
+        return response.text.strip()[:limit]
+    except Exception:
+        return ""
+
+
+def summarize_upstream_error(raw_text: str, *, limit: int = 600) -> str:
+    text = str(raw_text or "").strip()
+    if not text:
+        return ""
+
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        return text[:limit]
+
+    if not isinstance(payload, dict):
+        return text[:limit]
+
+    parts: list[str] = []
+
+    def append_part(label: str, value: Any) -> None:
+        content = str(value or "").strip()
+        if content:
+            parts.append(f"{label}: {content[:240]}")
+
+    error = payload.get("error")
+    if isinstance(error, dict):
+        for field in ("message", "msg", "detail", "type", "code", "param"):
+            append_part(field, error.get(field))
+    else:
+        append_part("error", error)
+
+    for field in ("message", "msg", "detail", "reason", "code", "status_msg"):
+        append_part(field, payload.get(field))
+
+    base_resp = payload.get("base_resp")
+    if isinstance(base_resp, dict):
+        append_part("base_status_code", base_resp.get("status_code"))
+        append_part("base_status_msg", base_resp.get("status_msg"))
+
+    if payload.get("input_sensitive"):
+        append_part("input_sensitive", payload.get("input_sensitive_type") or True)
+    if payload.get("output_sensitive"):
+        append_part("output_sensitive", payload.get("output_sensitive_type") or True)
+
+    deduped: list[str] = []
+    for part in parts:
+        if part not in deduped:
+            deduped.append(part)
+
+    return ("; ".join(deduped) or text)[:limit]
+
+
+def stream_compat_key(llm_config: dict[str, Any]) -> str:
+    return "|".join(
+        [
+            str(llm_config.get("base_url", "") or "").strip().lower(),
+            str(llm_config.get("model", "") or "").strip().lower(),
+        ]
+    )
+
+
+def should_retry_without_stream(status_code: int, error_detail: str) -> bool:
+    if status_code not in STREAM_FALLBACK_STATUS_CODES:
+        return False
+    lowered = str(error_detail or "").lower()
+    if any(marker in lowered for marker in CONTENT_REJECTION_MARKERS):
+        return False
+    return any(marker in lowered for marker in STREAM_FALLBACK_MARKERS)
+
+
 async def request_json(
     *,
     url: str,
@@ -2468,8 +2571,7 @@ async def request_json(
                 logger.warning("上游 JSON 解析失败，第 %s/%s 次：%s", attempt, REQUEST_RETRY_ATTEMPTS, url)
         except httpx.HTTPStatusError as exc:
             last_error = exc
-            response_text = exc.response.text.strip() if exc.response is not None else ""
-            last_error_detail = response_text[:500]
+            last_error_detail = summarize_upstream_error(await safe_response_text(exc.response))
             logger.warning("上游请求失败，第 %s/%s 次：%s | 返回=%s", attempt, REQUEST_RETRY_ATTEMPTS, url, last_error_detail or "<空>")
             status_code = exc.response.status_code if exc.response is not None else 0
             if 400 <= status_code < 500 and not should_retry_status_code(status_code):
@@ -2483,9 +2585,9 @@ async def request_json(
             await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
 
     if isinstance(last_error, ValueError):
-        raise HTTPException(status_code=502, detail="妯″瀷杩斿洖鐨勪笉鏄悎娉?JSON") from last_error
+        raise HTTPException(status_code=502, detail="模型服务返回的内容不是合法 JSON。") from last_error
 
-    detail = f"妯″瀷璇锋眰澶辫触: {last_error}"
+    detail = f"模型服务请求失败：{last_error}"
     if last_error_detail:
         detail = f"{detail} | upstream={last_error_detail}"
     raise HTTPException(status_code=502, detail=detail) from last_error
@@ -2506,8 +2608,8 @@ async def fetch_available_models(
             response = await client.get(url, headers=build_headers(api_key))
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        response_text = exc.response.text.strip() if exc.response is not None else ""
-        detail = response_text[:500] if response_text else str(exc)
+        response_text = summarize_upstream_error(await safe_response_text(exc.response))
+        detail = response_text if response_text else str(exc)
         raise HTTPException(status_code=502, detail=f"Failed to fetch model list: {detail}") from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Failed to fetch model list: {exc}") from exc
@@ -3836,6 +3938,20 @@ async def request_model_reply(
     }
 
 
+def iter_non_stream_reply_events(reply_result: dict[str, Any]):
+    think_text = str(reply_result.get("think", "") or "").strip()
+    if think_text:
+        yield {"type": "think_start"}
+        yield {"type": "think_chunk", "delta": think_text}
+        yield {"type": "think_end"}
+
+    reply_text = str(reply_result.get("reply", "") or "")
+    if reply_text:
+        yield {"type": "chunk", "delta": reply_text}
+
+    yield {"type": "done", **reply_result}
+
+
 def build_worldbook_debug_payload(
     user_message: str,
     worldbook_matches: list[dict[str, str]],
@@ -3941,6 +4057,18 @@ async def stream_model_reply(
         "temperature": llm_config["temperature"],
         "stream": True,
     }
+    compat_key = stream_compat_key(llm_config)
+    if compat_key in NON_STREAM_CHAT_COMPAT_KEYS:
+        reply_result = await request_model_reply(
+            user_message,
+            retrieved_items,
+            runtime_overrides=runtime_overrides,
+            worldbook_matches=worldbook_matches,
+            prompt_package=package,
+        )
+        for item in iter_non_stream_reply_events(reply_result):
+            yield item
+        return
 
     accumulated_raw = ""
     accumulated_visible = ""
@@ -3962,6 +4090,8 @@ async def stream_model_reply(
                     headers=build_headers(llm_config["api_key"]),
                     json=payload,
                 ) as response:
+                    if response.status_code >= 400:
+                        last_error_detail = summarize_upstream_error(await safe_response_text(response))
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line:
@@ -4028,8 +4158,8 @@ async def stream_model_reply(
             break
         except httpx.HTTPStatusError as exc:
             last_error = exc
-            response_text = exc.response.text.strip() if exc.response is not None else ""
-            last_error_detail = response_text[:500]
+            if not last_error_detail:
+                last_error_detail = summarize_upstream_error(await safe_response_text(exc.response))
             status_code = exc.response.status_code if exc.response is not None else 0
             logger.warning(
                 "Upstream stream request failed on attempt %s/%s for %s: %s | body=%s",
@@ -4039,6 +4169,24 @@ async def stream_model_reply(
                 exc,
                 last_error_detail or "<empty>",
             )
+            if not stream_started and should_retry_without_stream(status_code, last_error_detail):
+                NON_STREAM_CHAT_COMPAT_KEYS.add(compat_key)
+                logger.info(
+                    "Falling back to non-stream chat completions for %s after HTTP %s: %s",
+                    llm_config.get("model", ""),
+                    status_code,
+                    last_error_detail or "<empty>",
+                )
+                reply_result = await request_model_reply(
+                    user_message,
+                    retrieved_items,
+                    runtime_overrides=runtime_overrides,
+                    worldbook_matches=worldbook_matches,
+                    prompt_package=package,
+                )
+                for item in iter_non_stream_reply_events(reply_result):
+                    yield item
+                return
             if stream_started or (400 <= status_code < 500 and not should_retry_status_code(status_code)):
                 break
         except httpx.HTTPError as exc:
@@ -4058,7 +4206,7 @@ async def stream_model_reply(
             await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
 
     if last_error and not accumulated_raw and not accumulated_visible and not accumulated_think:
-        detail = f"妯″瀷娴佸紡璇锋眰澶辫触: {last_error}"
+        detail = f"模型服务流式请求失败：{last_error}"
         if last_error_detail:
             detail = f"{detail} | upstream={last_error_detail}"
         raise HTTPException(status_code=502, detail=detail) from last_error

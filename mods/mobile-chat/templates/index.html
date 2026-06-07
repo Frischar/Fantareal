@@ -106,6 +106,45 @@
             <label class="fmca-row"><span>最大输出 tokens</span><input id="fmca-max-tokens" type="number" min="64" max="32000"></label>
             <label class="fmca-row"><span>保留最近消息</span><input id="fmca-recent-limit" type="number" min="1" max="80"></label>
             <fieldset class="fmca-panel fmca-token-policy">
+              <legend>小手机 API 设置</legend>
+              <p>默认跟随主程序；切换为独立配置后，群聊、频道、电话和工作台都会使用这里的模型。</p>
+              <div class="fmca-api-preset-row">
+                <label>
+                  <span>快捷导入</span>
+                  <select id="fmca-api-preset">
+                    <option value="openai">GPT / OpenAI 官方</option>
+                    <option value="gemini">Gemini 官方</option>
+                    <option value="claude">Claude 官方</option>
+                    <option value="minimax">MiniMax 国内官方</option>
+                    <option value="glm">GLM / 智谱官方</option>
+                    <option value="deepseek">DeepSeek 官方</option>
+                    <option value="siliconflow">SiliconFlow</option>
+                  </select>
+                </label>
+                <button class="fmca-button" id="fmca-apply-api-preset" type="button">一键填入 URL</button>
+              </div>
+              <label class="fmca-row fmca-api-row">
+                <span>模型来源</span>
+                <select id="fmca-model-source">
+                  <option value="main">跟随主程序</option>
+                  <option value="custom">小手机独立配置</option>
+                </select>
+              </label>
+              <label class="fmca-row fmca-api-row"><span>Base URL</span><input id="fmca-api-base-url" type="url" placeholder="https://api.example.com/v1"></label>
+              <label class="fmca-row fmca-api-row"><span>API Key</span><input id="fmca-api-key" type="password" autocomplete="new-password" placeholder="留空保留已保存 Key"></label>
+              <div class="fmca-row fmca-api-row fmca-model-row">
+                <span>Model</span>
+                <div class="fmca-model-combo">
+                  <input id="fmca-api-model" type="text" placeholder="MiniMax-M3 / glm-5.1 / gemini-3.5-flash" autocomplete="off">
+                  <button class="fmca-button fmca-model-menu-toggle" id="fmca-toggle-model-menu" type="button">▼</button>
+                  <button class="fmca-button" id="fmca-fetch-models" type="button">拉取模型</button>
+                  <div class="fmca-model-menu" id="fmca-model-menu" hidden></div>
+                </div>
+              </div>
+              <label class="fmca-row fmca-api-row"><span>Temperature</span><input id="fmca-api-temp" type="number" min="0" max="2" step="0.01"></label>
+              <label class="fmca-row fmca-api-row"><span>Timeout 秒</span><input id="fmca-api-timeout" type="number" min="10" max="600"></label>
+            </fieldset>
+            <fieldset class="fmca-panel fmca-token-policy">
               <legend>频道生成 max_tokens</legend>
               <p>按应用类型设置 seed 生成的初次与重试 token 下限；不同模型可以自行调大。</p>
               <div id="fmca-channel-token-settings" class="fmca-form-grid"></div>
@@ -215,11 +254,7 @@
         <section class="fmca-tab" data-panel="prompt">
           <article class="fmca-panel">
             <h3>Prompt 配置</h3>
-            <p>这里管理小手机自己的 prompt blocks 和输出契约。默认不影响正文，也不写回角色卡。</p>
-            <div class="fmca-actions">
-              <button class="fmca-button" type="button" data-action="refresh-prompt-preview">刷新预览</button>
-              <button class="fmca-button fmca-danger" type="button" data-action="reset-prompt-blocks">重置 blocks</button>
-            </div>
+            <p>为小手机各入口编写自定义提示词。这里的内容只影响小手机生成，不写回主聊天、角色卡或世界书。</p>
           </article>
           <article class="fmca-panel" id="fmca-prompt-blocks"></article>
           <article class="fmca-panel">
