@@ -1,4 +1,4 @@
-/* 酒馆卡转换器 v0.2.1 · 纯角色卡混合内容提示 */
+/* 酒馆卡转换器 v0.3.0 · 反向模式（Fantareal → 酒馆卡） */
 
 :root {
   --tcc-bg: #0b1018;
@@ -722,4 +722,236 @@ button { user-select: none; }
   .tcc-topbar { align-items: flex-start; flex-direction: column; }
   .tcc-upload-panel, .tcc-result-panel { padding: 16px; }
   .tcc-result-head { flex-direction: column; }
+}
+
+/* ── Mode switch bar ── */
+
+.tcc-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.tcc-mode-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 18px;
+  border: 1px solid rgba(241, 198, 106, .36);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(241, 198, 106, .12), rgba(127, 184, 255, .08));
+  color: var(--tcc-accent-2);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.tcc-mode-switch-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(241, 198, 106, .56);
+  background: linear-gradient(135deg, rgba(241, 198, 106, .20), rgba(127, 184, 255, .14));
+}
+.tcc-mode-label {
+  color: var(--tcc-muted-2);
+  font-size: 12px;
+}
+
+/* ── Sub-tabs (reverse workbench) ── */
+
+.tcc-sub-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.tcc-sub-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid rgba(168, 199, 236, .14);
+  border-radius: 14px;
+  color: var(--tcc-muted);
+  background: rgba(12, 21, 34, .64);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.tcc-sub-tab:hover {
+  border-color: rgba(127, 184, 255, .28);
+  color: var(--tcc-text);
+  background: rgba(16, 29, 45, .84);
+}
+.tcc-sub-tab.active {
+  border-color: rgba(127, 184, 255, .46);
+  color: var(--tcc-text);
+  background: rgba(127, 184, 255, .10);
+}
+.tcc-rv-panel { display: none; }
+.tcc-rv-panel.active { display: block; }
+
+/* ── Import sections ── */
+
+.tcc-import-section {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(168, 199, 236, .10);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .025);
+  transition: border-color .16s ease, background .16s ease;
+}
+.tcc-json-drop-area.is-drag-over {
+  border-color: rgba(127, 184, 255, .42);
+  background: rgba(127, 184, 255, .08);
+}
+.tcc-import-title {
+  margin: 0 0 8px;
+  color: var(--tcc-text);
+  font-size: 13px;
+}
+.tcc-import-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.tcc-file-label { cursor: pointer; }
+
+.tcc-textarea {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(168, 199, 236, .14);
+  border-radius: 10px;
+  background: rgba(4, 10, 17, .48);
+  color: var(--tcc-text);
+  font-family: var(--tcc-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.tcc-textarea:focus {
+  outline: none;
+  border-color: rgba(127, 184, 255, .40);
+}
+
+/* ── Card Writer import list ── */
+
+.tcc-cw-import-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  max-height: 200px;
+  overflow: auto;
+}
+.tcc-cw-import-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(168, 199, 236, .10);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  font-size: 12px;
+}
+.tcc-cw-import-item-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tcc-cw-import-item-name {
+  color: var(--tcc-text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tcc-cw-import-item-meta {
+  color: var(--tcc-muted-2);
+  font-size: 11px;
+}
+
+/* ── Form grid ── */
+
+.tcc-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.tcc-form-group { display: flex; flex-direction: column; gap: 4px; }
+.tcc-form-group-half { }
+@media (min-width: 640px) {
+  .tcc-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .tcc-form-group-full { grid-column: 1 / -1; }
+}
+.tcc-form-label {
+  color: var(--tcc-muted);
+  font-size: 12px;
+}
+.tcc-form-input {
+  padding: 7px 10px;
+  border: 1px solid rgba(168, 199, 236, .14);
+  border-radius: 10px;
+  background: rgba(4, 10, 17, .48);
+  color: var(--tcc-text);
+  font-size: 13px;
+}
+.tcc-form-input:focus {
+  outline: none;
+  border-color: rgba(127, 184, 255, .40);
+}
+
+.tcc-required-mark {
+  color: var(--tcc-danger);
+  font-weight: 700;
+}
+.tcc-suggested-mark {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--tcc-accent-2);
+  background: rgba(241, 198, 106, .10);
+  border: 1px solid rgba(241, 198, 106, .18);
+  font-size: 10px;
+}
+.tcc-optional-mark {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--tcc-muted-2);
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .07);
+  font-size: 10px;
+}
+
+/* ── Validation area ── */
+
+.tcc-validation-area {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+.tcc-validation-error {
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--tcc-danger);
+  border: 1px solid rgba(243, 154, 163, .22);
+  background: rgba(243, 154, 163, .08);
+  font-size: 12px;
+}
+.tcc-validation-warning {
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: var(--tcc-accent-2);
+  border: 1px solid rgba(241, 198, 106, .16);
+  background: rgba(241, 198, 106, .06);
+  font-size: 12px;
 }
