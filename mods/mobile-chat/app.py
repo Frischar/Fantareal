@@ -118,6 +118,7 @@ DEFAULT_PROMPT_SETTINGS = {
     "editable_blocks": True,
     "use_block_prompt": False,
     "use_custom_prompt": False,
+    "prompt_mode": "default",
     "append_json_contract": True,
     "custom_prompts": {scope: "" for scope in PROMPT_SCOPE_ORDER},
     "last_preview_channel": "group_chat",
@@ -286,6 +287,7 @@ DEFAULT_GENERATION_STATE = {
     "schema_version": 1,
     "active_jobs": {},
     "last_jobs": [],
+    "recent_live_ticks": [],
 }
 CHANNEL_TYPES = set(PROMPT_SCOPE_ORDER)
 CHANNEL_EVENT_TYPES = {"post", "thread", "reply", "notice", "mail", "diary", "calendar", "call_line", "live", "system"}
@@ -370,6 +372,7 @@ class RoleProfilePayload(BaseModel):
     chat_style: str | None = Field(default=None, max_length=500)
     suitable_apps: list[Any] | None = None
     blocked_apps: list[Any] | None = None
+    app_roles: dict[str, Any] | None = None
     generator_notes: str | None = Field(default=None, max_length=500)
     sticker_preferences: dict[str, Any] | None = None
     auto_speak_weight: float | None = None
@@ -389,6 +392,7 @@ class RoleProfilePatchPayload(BaseModel):
     chat_style: str | None = Field(default=None, max_length=500)
     suitable_apps: list[Any] | None = None
     blocked_apps: list[Any] | None = None
+    app_roles: dict[str, Any] | None = None
     generator_notes: str | None = Field(default=None, max_length=500)
     sticker_preferences: dict[str, Any] | None = None
     auto_speak_weight: float | None = None
@@ -407,6 +411,7 @@ class RoleGeneratorPayload(BaseModel):
     speech_style: str | None = Field(default="", max_length=240)
     suitable_apps: list[Any] | None = None
     blocked_apps: list[Any] | None = None
+    app_roles: dict[str, Any] | None = None
     count: int | None = None
     source: str | None = Field(default="role_generator", max_length=40)
 
@@ -675,8 +680,27 @@ def custom_sticker_pack(pack_id: Any) -> dict[str, Any] | None:
     return custom_sticker_packs().get(value)
 
 
+def default_sticker_directory() -> Path:
+    return STICKER_PACK_ROOT / "default"
+
+
+def default_sticker_files() -> list[Path]:
+    directory = default_sticker_directory()
+    if not directory.is_dir():
+        return []
+    files = [
+        path
+        for path in directory.iterdir()
+        if path.is_file() and is_safe_png_filename(path.name)
+    ]
+    return sorted(files, key=custom_sticker_sort_key)[:MAX_CUSTOM_STICKERS_PER_PACK]
+
+
 def custom_sticker_path(pack_id: str, filename: str, require_exists: bool = True) -> Path | None:
-    pack = custom_sticker_pack(pack_id)
+    safe_pack_id = compact_text(pack_id, 80)
+    pack = custom_sticker_pack(safe_pack_id)
+    if safe_pack_id == "default":
+        pack = {"label": "默认", "directory": default_sticker_directory()}
     if not pack or not is_safe_png_filename(filename):
         return None
     directory = pack["directory"]
@@ -699,6 +723,8 @@ def custom_sticker_sort_key(path: Path) -> tuple[int, int | str]:
 
 
 def custom_sticker_files(pack_id: str) -> list[Path]:
+    if compact_text(pack_id, 80) == "default":
+        return default_sticker_files()
     pack = custom_sticker_pack(pack_id)
     if not pack:
         return []
@@ -730,6 +756,8 @@ def sticker_tags(value: Any) -> list[str]:
 
 
 def custom_sticker_manifest(pack_id: str) -> dict[str, dict[str, Any]]:
+    if compact_text(pack_id, 80) == "default":
+        return {}
     pack = custom_sticker_pack(pack_id)
     if not pack:
         return {}
@@ -782,13 +810,27 @@ def sticker_catalog() -> list[dict[str, Any]]:
         }
         for sticker_id in DEFAULT_STICKER_IDS
     ]
+    for path in default_sticker_files():
+        stickers.append(
+            {
+                "id": f"default:{path.name}",
+                "type": "image",
+                "pack_id": "default",
+                "pack_label": "默认",
+                "label": path.stem,
+                "tags": [path.stem],
+                "description": "",
+                "filename": path.name,
+                "url_path": f"/stickers/default/{quote(path.name)}",
+            }
+        )
     for pack_id, pack in custom_sticker_packs().items():
         manifest = custom_sticker_manifest(pack_id)
         for path in custom_sticker_files(pack_id):
             meta = manifest.get(path.name, {})
             stickers.append(
                 {
-                    "id": f"{pack_id}:{path.name}",
+                    "id": f"{safe_pack_id}:{path.name}",
                     "type": "image",
                     "pack_id": pack_id,
                     "pack_label": pack["label"],
@@ -796,7 +838,7 @@ def sticker_catalog() -> list[dict[str, Any]]:
                     "tags": meta.get("tags", []),
                     "description": compact_text(meta.get("description"), 120),
                     "filename": path.name,
-                    "url_path": f"/stickers/{pack_id}/{quote(path.name)}",
+                    "url_path": f"/stickers/{safe_pack_id}/{quote(path.name)}",
                 }
             )
     return stickers
@@ -808,7 +850,7 @@ def sticker_pack_summaries() -> list[dict[str, Any]]:
             "pack_id": "default",
             "label": "默认",
             "type": "builtin",
-            "count": len(DEFAULT_STICKER_IDS),
+            "count": len(DEFAULT_STICKER_IDS) + len(default_sticker_files()),
             "manifest_editable": False,
             "directory": "",
         }
@@ -831,11 +873,12 @@ def sticker_pack_summaries() -> list[dict[str, Any]]:
 
 
 def sticker_manifest_rows(pack_id: str) -> list[dict[str, Any]]:
-    if not custom_sticker_pack(pack_id):
+    safe_pack_id = compact_text(pack_id, 80)
+    if safe_pack_id != "default" and not custom_sticker_pack(safe_pack_id):
         raise HTTPException(status_code=404, detail="表情包不存在。")
-    manifest = custom_sticker_manifest(pack_id)
+    manifest = custom_sticker_manifest(safe_pack_id)
     rows: list[dict[str, Any]] = []
-    for path in custom_sticker_files(pack_id):
+    for path in custom_sticker_files(safe_pack_id):
         meta = manifest.get(path.name, {})
         rows.append(
             {
@@ -1034,7 +1077,7 @@ def sanitize_generation_control(raw: Any) -> dict[str, Any]:
 def generation_kind_scope(kind: str) -> str:
     safe = compact_text(kind, 80)
     if safe.startswith("channel_"):
-        return safe.replace("channel_", "", 1).replace("_interaction", "")
+        return safe.replace("channel_", "", 1).replace("_interaction", "").replace("_tick", "")
     if safe == "group_chat":
         return "group_chat"
     if safe == "phone":
@@ -1048,13 +1091,14 @@ def assert_generation_allowed(kind: str) -> None:
     control = get_settings().get("generation_control", DEFAULT_GENERATION_CONTROL_SETTINGS)
     scope = generation_kind_scope(kind)
     if control.get("paused"):
-        raise HTTPException(status_code=423, detail="Mobile chat generation is paused in admin settings.")
+        raise HTTPException(status_code=423, detail="\u751f\u6210\u5df2\u5728\u540e\u53f0\u5168\u5c40\u6682\u505c\uff0c\u8bf7\u5728\u540e\u53f0\u6062\u590d\u540e\u91cd\u8bd5\u3002")
     if control.get("app_enabled", {}).get(scope, True) is False:
-        raise HTTPException(status_code=423, detail=f"Generation for {scope} is disabled in admin settings.")
+        label = PROMPT_SCOPE_LABELS.get(scope, scope)
+        raise HTTPException(status_code=423, detail=f"{label} \u751f\u6210\u5f00\u5173\u5df2\u5173\u95ed\uff0c\u8bf7\u5728\u540e\u53f0\u5f00\u542f\u540e\u91cd\u8bd5\u3002")
     hourly_limit = clamp_int(control.get("hourly_limit"), 1, 240, DEFAULT_GENERATION_CONTROL_SETTINGS["hourly_limit"])
     recent = [item for item in get_generation_state().get("last_jobs", []) if compact_text(item.get("finished_at"), 13) == compact_text(now_iso(), 13)]
     if len(recent) >= hourly_limit:
-        raise HTTPException(status_code=429, detail="Mobile chat hourly generation budget has been reached.")
+        raise HTTPException(status_code=429, detail="\u672c\u5c0f\u65f6\u751f\u6210\u9884\u7b97\u5df2\u7528\u5c3d\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u6216\u5728\u540e\u53f0\u8c03\u9ad8\u9884\u7b97\u3002")
 
 
 def generation_control_payload() -> dict[str, Any]:
@@ -1125,14 +1169,26 @@ def normalize_prompt_scope(value: Any) -> str:
     return scope if scope in CHANNEL_TYPES else DEFAULT_PROMPT_SETTINGS["last_preview_channel"]
 
 
+def normalize_prompt_mode(value: Any, *, use_custom_prompt: bool = False) -> str:
+    mode = normalize_id(value, "")
+    if mode in {"additive", "override"}:
+        return mode
+    if use_custom_prompt:
+        return "override"
+    return "default"
+
+
 def sanitize_prompt_settings(raw: Any) -> dict[str, Any]:
     source = raw if isinstance(raw, dict) else {}
     last_preview = normalize_prompt_scope(source.get("last_preview_channel", DEFAULT_PROMPT_SETTINGS["last_preview_channel"]))
+    use_custom = bool(source.get("use_custom_prompt", DEFAULT_PROMPT_SETTINGS["use_custom_prompt"]))
+    prompt_mode = normalize_prompt_mode(source.get("prompt_mode"), use_custom_prompt=use_custom)
     return {
         "preset": compact_text(source.get("preset"), 40) or DEFAULT_PROMPT_SETTINGS["preset"],
         "editable_blocks": bool(source.get("editable_blocks", DEFAULT_PROMPT_SETTINGS["editable_blocks"])),
         "use_block_prompt": bool(source.get("use_block_prompt", DEFAULT_PROMPT_SETTINGS["use_block_prompt"])),
-        "use_custom_prompt": bool(source.get("use_custom_prompt", DEFAULT_PROMPT_SETTINGS["use_custom_prompt"])),
+        "use_custom_prompt": prompt_mode != "default",
+        "prompt_mode": prompt_mode,
         "append_json_contract": bool(source.get("append_json_contract", DEFAULT_PROMPT_SETTINGS["append_json_contract"])),
         "custom_prompts": sanitize_custom_prompts(source.get("custom_prompts")),
         "last_preview_channel": last_preview,
@@ -1352,22 +1408,62 @@ def prompt_blocks_for_scope(scope: str, *, locked_only: bool = False) -> list[di
     return rows
 
 
+def prompt_mode_for_settings(settings: dict[str, Any] | None = None) -> str:
+    prompt_settings = (settings or get_settings()).get("prompt", {})
+    return normalize_prompt_mode(prompt_settings.get("prompt_mode"), use_custom_prompt=bool(prompt_settings.get("use_custom_prompt")))
+
+
 def custom_prompt_for_scope(scope: str, settings: dict[str, Any] | None = None) -> str:
     prompt_settings = (settings or get_settings()).get("prompt", {})
-    if not prompt_settings.get("use_custom_prompt"):
+    if prompt_mode_for_settings(settings) == "default":
         return ""
     prompts = prompt_settings.get("custom_prompts") if isinstance(prompt_settings.get("custom_prompts"), dict) else {}
     return clean_multiline_text(prompts.get(normalize_prompt_scope(scope)), 12000)
 
 
+def default_prompt_text(scope: str) -> str:
+    target = normalize_prompt_scope(scope)
+    blocks = prompt_blocks_for_scope(target)
+    return "\n\n".join(item["content"] for item in blocks).strip()
+
+
+def locked_prompt_contract_text(scope: str) -> str:
+    target = normalize_prompt_scope(scope)
+    return "\n\n".join(item["content"] for item in prompt_blocks_for_scope(target, locked_only=True)).strip()
+
+
+def strip_locked_prompt_contract(text: str, scope: str) -> str:
+    body = clean_multiline_text(text, 12000)
+    contract = locked_prompt_contract_text(scope)
+    if body and contract and body.endswith(contract):
+        body = body[: -len(contract)].strip()
+    return body
+
+
+def editable_default_prompt_text(scope: str) -> str:
+    target = normalize_prompt_scope(scope)
+    return "\n\n".join(item["content"] for item in prompt_blocks_for_scope(target) if not item.get("locked")).strip()
+
+
+def prompt_body_preview_text(scope: str, settings: dict[str, Any] | None = None) -> str:
+    target = normalize_prompt_scope(scope)
+    active_settings = settings or get_settings()
+    custom_prompt = custom_prompt_for_scope(target, active_settings)
+    if prompt_mode_for_settings(active_settings) == "override" and custom_prompt:
+        return strip_locked_prompt_contract(custom_prompt, target)
+    return editable_default_prompt_text(target)
+
+
 def custom_prompt_user_section(scope: str, settings: dict[str, Any] | None = None) -> str:
+    if prompt_mode_for_settings(settings) != "additive":
+        return ""
     target = normalize_prompt_scope(scope)
     custom_prompt = custom_prompt_for_scope(target, settings)
     if not custom_prompt:
         return ""
     label = PROMPT_SCOPE_LABELS.get(target, target)
     return (
-        f"Admin custom prompt for {label} ({target}). Follow it as a high-priority task instruction. "
+        f"Admin extra instructions for {label} ({target}). Follow them as high-priority task instructions. "
         "Do not mention this section in the output.\n"
         f"{custom_prompt}"
     )
@@ -1384,15 +1480,14 @@ def assembled_prompt_text(scope: str) -> str:
     target = normalize_prompt_scope(scope)
     settings = get_settings()
     custom_prompt = custom_prompt_for_scope(target, settings)
-    if custom_prompt:
-        parts = [custom_prompt]
+    if prompt_mode_for_settings(settings) == "override" and custom_prompt:
+        parts = [strip_locked_prompt_contract(custom_prompt, target)]
         if settings.get("prompt", {}).get("append_json_contract", True):
-            contract = "\n\n".join(item["content"] for item in prompt_blocks_for_scope(target, locked_only=True)).strip()
+            contract = locked_prompt_contract_text(target)
             if contract:
                 parts.append(contract)
         return "\n\n".join(parts).strip()
-    blocks = prompt_blocks_for_scope(target)
-    return "\n\n".join(item["content"] for item in blocks).strip()
+    return default_prompt_text(target)
 
 
 def channel_schema_catalog() -> list[dict[str, Any]]:
@@ -1485,6 +1580,7 @@ def prompt_preview_payload(scope: str = "group_chat", group_id: str = "") -> dic
         "contract_block_count": len(contract_blocks),
         "use_custom_prompt": bool(prompt_settings.get("use_custom_prompt")),
         "custom_prompt_configured": bool(custom_prompt),
+        "prompt_mode": prompt_mode_for_settings(settings),
         "role_count": len(get_role_profiles(include_disabled=False)),
         "sticker_count": len(sticker_catalog()),
     }
@@ -1504,6 +1600,10 @@ def prompt_preview_payload(scope: str = "group_chat", group_id: str = "") -> dic
         "blocks": blocks,
         "contract_blocks": contract_blocks,
         "custom_prompt": custom_prompt,
+        "default_prompt": default_prompt_text(target_scope),
+        "editable_default_prompt": editable_default_prompt_text(target_scope),
+        "prompt_body": prompt_body_preview_text(target_scope, settings),
+        "locked_contract_text": locked_prompt_contract_text(target_scope),
         "assembled_prompt": assembled_prompt_text(target_scope),
         "context_preview": context,
         "schemas": [item for item in channel_schema_catalog() if item["type"] == target_scope],
@@ -1542,7 +1642,29 @@ def sanitize_generation_state(raw: Any) -> dict[str, Any]:
                 "error": compact_text(item.get("error"), 240),
             }
         )
-    return {"schema_version": 1, "active_jobs": sanitized_active, "last_jobs": sanitized_last}
+    recent_live_source = source.get("recent_live_ticks") if isinstance(source.get("recent_live_ticks"), list) else []
+    recent_live_ticks: list[dict[str, Any]] = []
+    for item in recent_live_source[:20]:
+        if not isinstance(item, dict):
+            continue
+        recent_live_ticks.append(
+            {
+                "recorded_at": compact_text(item.get("recorded_at"), 80),
+                "status": compact_text(item.get("status"), 40),
+                "channel_id": normalize_id(item.get("channel_id")),
+                "event_id": normalize_id(item.get("event_id")),
+                "live_tick": compact_text(item.get("live_tick"), 40),
+                "title": compact_text(item.get("title"), 120),
+                "content_preview": compact_text(item.get("content_preview"), 180),
+                "danmaku_count": live_metric_int(item.get("danmaku_count"), 0),
+                "highlight_count": live_metric_int(item.get("highlight_count"), 0),
+                "contributor_count": live_metric_int(item.get("contributor_count"), 0),
+                "viewers": compact_text(item.get("viewers"), 40),
+                "likes": compact_text(item.get("likes"), 40),
+                "error": compact_text(item.get("error"), 240),
+            }
+        )
+    return {"schema_version": 1, "active_jobs": sanitized_active, "last_jobs": sanitized_last, "recent_live_ticks": recent_live_ticks}
 
 
 def get_generation_state() -> dict[str, Any]:
@@ -1593,6 +1715,28 @@ def finish_generation_job(job: dict[str, str], status: str, error: str = "") -> 
         },
         *state.get("last_jobs", []),
     ][:30]
+    save_generation_state(state)
+
+
+def record_live_tick_diagnostic(channel: dict[str, Any], event: dict[str, Any], *, status: str, error: str = "") -> None:
+    metadata = dict(event.get("metadata") or {})
+    row = {
+        "recorded_at": now_iso(),
+        "status": compact_text(status, 40) or "unknown",
+        "channel_id": normalize_id(channel.get("channel_id")),
+        "event_id": normalize_id(event.get("event_id")),
+        "live_tick": compact_text(metadata.get("live_tick"), 40),
+        "title": compact_text(event.get("title"), 120),
+        "content_preview": compact_text(event.get("content"), 180),
+        "danmaku_count": len(sanitize_live_messages(metadata.get("danmaku"), limit=80)),
+        "highlight_count": len(sanitize_live_messages(metadata.get("highlights"), limit=12)),
+        "contributor_count": len(sanitize_live_contributors(metadata.get("contributors"))),
+        "viewers": compact_text(metadata.get("viewers"), 40),
+        "likes": compact_text(metadata.get("likes"), 40),
+        "error": compact_text(error, 240),
+    }
+    state = get_generation_state()
+    state["recent_live_ticks"] = [row, *state.get("recent_live_ticks", [])][:20]
     save_generation_state(state)
 
 
@@ -1657,7 +1801,8 @@ def safe_avatar(value: Any) -> str:
 
 
 def role_name_key(value: Any) -> str:
-    return compact_text(value, 120).casefold()
+    cleaned = clean_extracted_role_name(value, limit=120)
+    return (cleaned or compact_text(value, 120)).casefold()
 
 
 def placeholder_role_name(value: Any) -> bool:
@@ -1737,8 +1882,105 @@ def split_compact_values(value: Any, *, limit: int = 12, item_limit: int = 80) -
     return values
 
 
+def normalize_app_alias(value: Any) -> str:
+    text = compact_text(value, 40).strip().casefold()
+    if not text:
+        return ""
+    normalized = normalize_id(text, "")
+    aliases = {
+        "\u7fa4\u804a": "group_chat", "group": "group_chat", "chat": "group_chat",
+        "\u52a8\u6001": "feed", "\u670b\u53cb\u5708": "feed", "feed": "feed",
+        "\u8bba\u575b": "forum", "\u5e16\u5b50": "forum", "forum": "forum",
+        "\u76f4\u64ad": "live", "live": "live",
+        "\u7535\u8bdd": "phone", "phone": "phone",
+        "\u90ae\u7bb1": "mail", "\u90ae\u4ef6": "mail", "mail": "mail",
+        "\u65e5\u8bb0": "diary", "diary": "diary",
+        "\u65e5\u7a0b": "calendar", "\u65e5\u5386": "calendar", "calendar": "calendar",
+        "\u901a\u77e5": "notifications", "notification": "notifications", "notifications": "notifications",
+    }
+    return aliases.get(text) or aliases.get(normalized) or normalized
+
+
 def sanitize_role_app_scope(value: Any) -> list[str]:
-    return split_compact_values(value, limit=12, item_limit=40)
+    allowed = {app.get("app_id") for app in sanitize_app_registry(read_json(APP_REGISTRY_PATH, DEFAULT_APP_REGISTRY)).get("apps", []) if isinstance(app, dict)}
+    allowed.update(CHANNEL_TYPES)
+    allowed.discard("assist")
+    rows = split_compact_values(value, limit=12, item_limit=40)
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in rows:
+        app_id = normalize_app_alias(item)
+        if app_id and app_id not in seen and (not allowed or app_id in allowed):
+            seen.add(app_id)
+            result.append(app_id)
+    return result
+
+def sanitize_role_app_roles(value: Any) -> dict[str, list[str]]:
+    source = value if isinstance(value, dict) else {}
+    allowed_apps = {app.get("app_id") for app in sanitize_app_registry(read_json(APP_REGISTRY_PATH, DEFAULT_APP_REGISTRY)).get("apps", []) if isinstance(app, dict)}
+    allowed_apps.update(CHANNEL_TYPES)
+    allowed_apps.discard("assist")
+    result: dict[str, list[str]] = {}
+    for app_id, roles in source.items():
+        safe_app = normalize_app_alias(app_id)
+        if not safe_app or (allowed_apps and safe_app not in allowed_apps):
+            continue
+        values = split_compact_values(roles, limit=8, item_limit=40)
+        values = [normalize_id(item, "") for item in values if normalize_id(item, "")]
+        if values:
+            result[safe_app] = values
+    return result
+
+
+def role_app_allowed(profile: dict[str, Any], app_id: str, *, strict_suitable: bool = False) -> bool:
+    target = normalize_id(app_id, "")
+    if not target:
+        return True
+    blocked = set(sanitize_role_app_scope(profile.get("blocked_apps")))
+    if target in blocked or "*" in blocked:
+        return False
+    suitable = set(sanitize_role_app_scope(profile.get("suitable_apps")))
+    if strict_suitable and suitable and target not in suitable and "*" not in suitable:
+        return False
+    return True
+
+
+def role_app_usage(profile: dict[str, Any], app_id: str) -> list[str]:
+    roles = sanitize_role_app_roles(profile.get("app_roles"))
+    return roles.get(normalize_id(app_id, ""), [])
+
+
+def role_profiles_for_app(app_id: str, *, limit: int = 20) -> list[dict[str, Any]]:
+    target = normalize_id(app_id, "")
+    profiles = [profile for profile in get_role_profiles(include_disabled=False) if role_app_allowed(profile, target)]
+    preferred = [profile for profile in profiles if target and target in set(profile.get("suitable_apps") or [])]
+    neutral = [profile for profile in profiles if profile not in preferred]
+    return [*preferred, *neutral][:limit]
+
+
+def role_app_generation_policy(app_id: str) -> dict[str, Any]:
+    target = normalize_app_alias(app_id)
+    labels = {
+        "group_chat": ["active_chat_member", "friend", "topic_starter"],
+        "feed": ["poster", "commenter", "friend", "bystander"],
+        "forum": ["thread_author", "floor_reply", "moderator", "bystander"],
+        "live": ["streamer", "viewer", "highlight_sender", "contributor"],
+        "mail": ["sender", "recipient", "contact", "organization", "system_notice"],
+        "diary": ["writer", "related_person", "memory_subject"],
+        "calendar": ["participant", "organizer", "location_contact", "organization"],
+        "phone": ["caller", "callee", "phone_contact"],
+        "notifications": ["source", "system_notice", "related_person"],
+    }
+    return {
+        "target_app": target,
+        "preferred_usages": labels.get(target, ["related_person"]),
+        "selection_rules": [
+            "Exclude roles whose blocked_apps contains target_app.",
+            "Prefer roles whose suitable_apps contains target_app.",
+            "Use usage_in_target_app/app_roles to decide whether a role should be author, participant, viewer, sender, or bystander.",
+            "If no suitable saved role exists, keep generated bystanders as event metadata only; do not invent saved role IDs.",
+        ],
+    }
 
 
 def sanitize_sticker_preferences(value: Any) -> dict[str, Any]:
@@ -1781,6 +2023,7 @@ def sanitize_role_profile(raw: Any, index: int = 0) -> dict[str, Any] | None:
         "chat_style": compact_text(raw.get("chat_style"), 500),
         "suitable_apps": sanitize_role_app_scope(raw.get("suitable_apps")),
         "blocked_apps": sanitize_role_app_scope(raw.get("blocked_apps")),
+        "app_roles": sanitize_role_app_roles(raw.get("app_roles")),
         "generator_notes": compact_text(raw.get("generator_notes"), 500),
         "sticker_preferences": sanitize_sticker_preferences(raw.get("sticker_preferences")),
         "auto_speak_weight": auto_weight,
@@ -1822,6 +2065,39 @@ def role_generator_display_name(raw: dict[str, Any], index: int, count: int) -> 
     return compact_text(f"{base_name} {index + 1}", 80)
 
 
+def default_app_roles_for_profile(apps: list[str], raw: dict[str, Any] | None = None) -> dict[str, list[str]]:
+    source = raw or {}
+    hint = " ".join(
+        compact_text(source.get(key), 300)
+        for key in ("identity", "impression", "known_info", "overall_request", "speech_style", "nickname", "real_name")
+    ).lower()
+    result: dict[str, list[str]] = {}
+    for app_id in apps:
+        safe_app = normalize_id(app_id, "")
+        if safe_app == "feed":
+            result[safe_app] = ["poster"]
+        elif safe_app == "forum":
+            result[safe_app] = ["thread_author", "reply_user"]
+        elif safe_app == "live":
+            roles = ["viewer"]
+            if any(word in hint for word in ("??", "??", "anchor", "streamer", "??", "??", "??")):
+                roles.insert(0, "anchor")
+            else:
+                roles.append("donor")
+            result[safe_app] = roles
+        elif safe_app == "mail":
+            result[safe_app] = ["sender", "reply_contact"]
+        elif safe_app == "phone":
+            result[safe_app] = ["caller"]
+        elif safe_app == "diary":
+            result[safe_app] = ["related_person"]
+        elif safe_app == "calendar":
+            result[safe_app] = ["participant"]
+        elif safe_app in {"notification", "notifications"}:
+            result[safe_app] = ["source"]
+    return result
+
+
 def role_generator_notes(raw: dict[str, Any]) -> str:
     rows = [
         ("已知信息", compact_text(raw.get("known_info"), 1000)),
@@ -1859,6 +2135,7 @@ def role_generator_profile(raw: dict[str, Any], index: int, count: int) -> dict[
     )
     suitable_apps = sanitize_role_app_scope(raw.get("suitable_apps"))
     blocked_apps = sanitize_role_app_scope(raw.get("blocked_apps"))
+    app_roles = sanitize_role_app_roles(raw.get("app_roles")) or default_app_roles_for_profile(suitable_apps, raw)
     alias_candidates = [item for item in [real_name, nickname] if item and item != display_name]
     summary_parts = [
         identity,
@@ -1889,6 +2166,7 @@ def role_generator_profile(raw: dict[str, Any], index: int, count: int) -> dict[
             "chat_style": "；".join(part for part in style_parts if part),
             "suitable_apps": suitable_apps,
             "blocked_apps": blocked_apps,
+            "app_roles": app_roles,
             "generator_notes": role_generator_notes(raw),
             "enabled": True,
             "auto_speak_weight": 1.0,
@@ -1949,8 +2227,34 @@ def decoded_metadata_value(value: Any) -> Any:
         return value
 
 
+
+def clean_extracted_role_name(value: Any, *, limit: int = 80) -> str:
+    """Normalize role names extracted from loose JSON/list-looking text."""
+    if isinstance(value, (list, tuple, set)):
+        rows = list(value)
+        if len(rows) == 1:
+            value = rows[0]
+        else:
+            value = " ".join(compact_text(item, limit) for item in rows)
+    text = compact_text(value, limit)
+    if not text:
+        return ""
+    text = text.replace("\u200b", "").replace("\ufeff", "")
+    text = re.sub(r"^[\\/]+|[\\/]+$", "", text)
+    wrapper_chars = " \t\r\n,\uFF0C\u3001;\uFF1B\u3002.!\uFF01?\uFF1F:\uFF1A|[](){}<>\u300A\u300B\u3010\u3011\uFF08\uFF09'\"`\u201C\u201D\u2018\u2019\u300C\u300D\u300E\u300F"
+    for _ in range(4):
+        trimmed = text.strip(wrapper_chars)
+        if trimmed == text:
+            break
+        text = trimmed
+    text = re.sub(r"^\s*(?:name|\u89d2\u8272|\u4eba\u7269|\u6635\u79f0)\s*[:\uFF1A]\s*", "", text, flags=re.IGNORECASE)
+    text = text.strip(wrapper_chars)
+    if re.search(r"[\[\]{}]", text):
+        text = text.replace("[", "").replace("]", "").replace("{", "").replace("}", "").strip(wrapper_chars)
+    return compact_text(text, limit)
+
 def event_role_name_allowed(name: str) -> bool:
-    text = compact_text(name, 80)
+    text = clean_extracted_role_name(name, limit=80)
     if len(text) < 2:
         return False
     lowered = text.casefold()
@@ -1993,17 +2297,16 @@ def event_role_split_names(value: Any) -> list[str]:
     if isinstance(value, list):
         raw_rows = value
     else:
-        raw_rows = re.split(r"[,，、/|;；\n]+", compact_text(value, 500))
+        raw_rows = re.split(r"[,\uFF0C\u3001;\uFF1B\n]+", compact_text(value, 500))
     names: list[str] = []
     seen: set[str] = set()
     for item in raw_rows:
-        name = compact_text(item, 80)
-        key = name.casefold()
+        name = clean_extracted_role_name(item, limit=80)
+        key = role_name_key(name)
         if event_role_name_allowed(name) and key not in seen:
             names.append(name)
             seen.add(key)
     return names
-
 
 def event_role_source_label(channel: dict[str, Any], kind: str) -> str:
     labels = {
@@ -2019,7 +2322,7 @@ def event_role_source_label(channel: dict[str, Any], kind: str) -> str:
 
 
 def event_role_profile_from_candidate(candidate: dict[str, Any], index: int, source: str) -> dict[str, Any]:
-    name = compact_text(candidate.get("name"), 80)
+    name = clean_extracted_role_name(candidate.get("name"), limit=80)
     apps = sorted(candidate.get("apps") or [])
     refs = list(candidate.get("refs") or [])[:6]
     snippets = list(candidate.get("snippets") or [])[:4]
@@ -2066,7 +2369,7 @@ def extract_event_role_profiles(payload: RoleEventExtractPayload | None = None, 
     candidates: dict[str, dict[str, Any]] = {}
 
     def add_candidate(channel: dict[str, Any], event: dict[str, Any], name: Any, kind: str, content: Any = "") -> None:
-        display_name = compact_text(name, 80)
+        display_name = clean_extracted_role_name(name, limit=80)
         if not event_role_name_allowed(display_name):
             return
         key = role_name_key(display_name)
@@ -2127,7 +2430,7 @@ def extract_event_role_profiles(payload: RoleEventExtractPayload | None = None, 
     return [draft for draft in drafts if draft]
 
 
-CHAT_SPEAKER_LABEL_RE = re.compile(r"(?:^|\n)\s*([A-Za-z\u4e00-\u9fff][A-Za-z0-9\u4e00-\u9fff·._ -]{1,23})\s*[：:](?=\S)")
+CHAT_SPEAKER_LABEL_RE = re.compile(r"(?:^|\n)\s*([A-Za-z\u4e00-\u9fff][A-Za-z0-9\u4e00-\u9fff·._ -]{1,23})\s*[：:]\s*(?=\S)")
 CHAT_TTS_LABEL_RE = re.compile(r"\[TTSVoice:([^:\]\n]{2,40})")
 CHAT_MENTION_RE = re.compile(r"(?:看着|望向|想起|提到|遇见|听见|联系|拨给|写给|收到|名叫|叫做)([A-Za-z\u4e00-\u9fff·]{2,12})")
 
@@ -2181,8 +2484,8 @@ def main_chat_candidate_names(text: str) -> list[tuple[str, str]]:
     seen: set[str] = set()
 
     def add(name: Any, kind: str) -> None:
-        cleaned = compact_text(name, 80).strip("“”\"'（）()[]【】「」『』，,。.!！？?；;：:")
-        cleaned = re.sub(r"(?:的|吧|吗|呢)$", "", cleaned)
+        cleaned = clean_extracted_role_name(name, limit=80)
+        cleaned = re.sub(r"(?:\u7684|\u5411|\u7ed9|\u53eb|\u5462)$", "", cleaned)
         key = role_name_key(cleaned)
         if event_role_name_allowed(cleaned) and key not in seen:
             seen.add(key)
@@ -2195,7 +2498,6 @@ def main_chat_candidate_names(text: str) -> list[tuple[str, str]]:
     for match in CHAT_MENTION_RE.finditer(text):
         add(match.group(1), "mention")
     return candidates
-
 
 def extract_main_chat_role_profiles(payload: RoleChatExtractPayload | None = None, *, source: str = "chat_extract") -> list[dict[str, Any]]:
     payload = payload or RoleChatExtractPayload()
@@ -2275,6 +2577,7 @@ def merge_profile_update(existing: dict[str, Any] | None, updates: dict[str, Any
             "appearance",
             "suitable_apps",
             "blocked_apps",
+            "app_roles",
             "generator_notes",
             "sticker_preferences",
             "auto_speak_weight",
@@ -2322,6 +2625,8 @@ def enriched_member_for_prompt(member: dict[str, Any], profiles: dict[str, dict[
         row["appearance"] = compact_text(profile.get("appearance"), 260)
         row["suitable_apps"] = profile.get("suitable_apps", [])
         row["blocked_apps"] = profile.get("blocked_apps", [])
+        row["app_roles"] = profile.get("app_roles", {})
+        row["usage_in_group_chat"] = role_app_usage(profile, "group_chat")
         row["sticker_preferences"] = profile.get("sticker_preferences", {})
         row["auto_speak_weight"] = profile.get("auto_speak_weight", 1.0)
     return row
@@ -2982,6 +3287,79 @@ def sanitize_live_contributors(value: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def live_contributor_key(value: Any) -> str:
+    return compact_text(value, 80).casefold().strip()
+
+
+def merge_live_contributors(existing: Any, incoming: Any, *, limit: int = 12) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    order = 0
+    for source, is_new in ((existing, False), (incoming, True)):
+        for item in sanitize_live_contributors(source):
+            key = live_contributor_key(item.get("name"))
+            if not key:
+                continue
+            amount = live_metric_int(item.get("amount"), 0)
+            if key not in merged:
+                merged[key] = {
+                    "name": item["name"],
+                    "amount_value": 0,
+                    "note": "",
+                    "order": order,
+                }
+                order += 1
+            merged[key]["amount_value"] = live_metric_int(merged[key].get("amount_value"), 0) + max(0, amount)
+            if is_new and item.get("note"):
+                merged[key]["note"] = item["note"]
+            elif not merged[key].get("note") and item.get("note"):
+                merged[key]["note"] = item["note"]
+    rows = sorted(merged.values(), key=lambda item: (-live_metric_int(item.get("amount_value"), 0), item.get("order", 0)))
+    return [
+        {
+            "name": compact_text(item.get("name"), 80),
+            "amount": live_metric_text(item.get("amount_value"), 0),
+            "note": compact_text(item.get("note"), 120),
+        }
+        for item in rows[:limit]
+        if compact_text(item.get("name"), 80)
+    ]
+
+
+def live_metric_int(value: Any, fallback: int = 0) -> int:
+    if isinstance(value, (int, float)):
+        return max(0, int(value))
+    text = compact_text(value, 40).casefold().replace(",", "").strip()
+    if not text:
+        return max(0, int(fallback))
+    multiplier = 1
+    if text.endswith("k"):
+        multiplier = 1000
+        text = text[:-1]
+    elif text.endswith("w"):
+        multiplier = 10000
+        text = text[:-1]
+    elif text.endswith("\u4e07"):
+        multiplier = 10000
+        text = text[:-1]
+    match = re.search(r"\d+(?:\.\d+)?", text)
+    if not match:
+        return max(0, int(fallback))
+    return max(0, int(float(match.group(0)) * multiplier))
+
+
+def live_metric_text(value: Any, fallback: int = 0) -> str:
+    number = live_metric_int(value, fallback)
+    if number >= 10000:
+        label = f"{number / 10000:.1f}".rstrip("0").rstrip(".")
+        return f"{label}\u4e07"
+    return str(number)
+
+
+def next_live_metric(value: Any, fallback: int, step: int) -> str:
+    current = live_metric_int(value, fallback)
+    return live_metric_text(current + max(1, step), fallback)
+
+
 def sanitize_channel_event(raw: Any, channel: dict[str, Any], index: int = 0) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
@@ -3017,6 +3395,7 @@ def sanitize_channel_event(raw: Any, channel: dict[str, Any], index: int = 0) ->
         metadata["highlights"] = sanitize_live_messages(raw.get("highlights") or metadata_source.get("highlights"), limit=12)
         metadata["contributors"] = sanitize_live_contributors(raw.get("contributors") or metadata_source.get("contributors"))
         metadata["viewers"] = compact_text(metadata_source.get("viewers") or raw.get("viewers"), 40) or str(900 + index * 137)
+        metadata["likes"] = compact_text(metadata_source.get("likes") or raw.get("likes"), 40) or str(120 + index * 23)
         metadata["fans"] = compact_text(metadata_source.get("fans") or raw.get("fans"), 40)
         metadata["live_status"] = compact_text(metadata_source.get("live_status") or raw.get("live_status"), 40) or "直播中"
         metadata["inner_thought"] = compact_text(metadata_source.get("inner_thought") or raw.get("inner_thought"), 500)
@@ -3093,10 +3472,13 @@ def find_channel_event_or_404(channel_id: str, event_id: str) -> dict[str, Any]:
     raise HTTPException(status_code=404, detail="频道内容不存在。")
 
 
-def summarize_mobile_context() -> dict[str, Any]:
-    roles = get_role_profiles(include_disabled=False)[:20]
+def summarize_mobile_context(app_id: str = "") -> dict[str, Any]:
+    target_app = normalize_id(app_id, "")
+    roles = (role_profiles_for_app(target_app, limit=20) if target_app else get_role_profiles(include_disabled=False)[:20])
     groups = get_groups()[:20]
     return {
+        "target_app": target_app,
+        "role_app_policy": role_app_generation_policy(target_app),
         "roles": [
             {
                 "role_id": item["role_id"],
@@ -3104,6 +3486,10 @@ def summarize_mobile_context() -> dict[str, Any]:
                 "summary": item.get("summary", ""),
                 "status": item.get("status", ""),
                 "chat_style": item.get("chat_style", ""),
+                "suitable_apps": item.get("suitable_apps", []),
+                "blocked_apps": item.get("blocked_apps", []),
+                "app_roles": item.get("app_roles", {}),
+                "usage_in_target_app": role_app_usage(item, target_app) if target_app else [],
             }
             for item in roles
         ],
@@ -3127,9 +3513,13 @@ def summarize_mobile_context() -> dict[str, Any]:
 
 
 def summarize_mobile_seed_context(channel: dict[str, Any]) -> dict[str, Any]:
-    roles = get_role_profiles(include_disabled=False)[:12]
+    target_app = normalize_id(channel.get("type") or channel.get("app_id"), "")
+    roles = role_profiles_for_app(target_app, limit=12)
     groups = get_groups()[:8]
     return {
+        "target_app": target_app,
+        "role_app_policy": role_app_generation_policy(target_app),
+        "role_filter": {"blocked_apps_excluded": True, "preferred_apps_first": True},
         "roles": [
             {
                 "role_id": item["role_id"],
@@ -3137,6 +3527,10 @@ def summarize_mobile_seed_context(channel: dict[str, Any]) -> dict[str, Any]:
                 "summary": compact_text(item.get("summary"), 160),
                 "status": compact_text(item.get("status"), 80),
                 "chat_style": compact_text(item.get("chat_style"), 120),
+                "suitable_apps": item.get("suitable_apps", []),
+                "blocked_apps": item.get("blocked_apps", []),
+                "app_roles": item.get("app_roles", {}),
+                "usage_in_target_app": role_app_usage(item, target_app),
             }
             for item in roles
         ],
@@ -3181,6 +3575,7 @@ def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dic
         f"Use 1-3 short text tags. Keep each title <= 24 Chinese characters and each content <= {content_limit} Chinese characters.",
         "Keep metadata small and JSON-serializable.",
         "Use Context JSON current_date/current_datetime as the present time unless the provided world context explicitly sets a different in-world date.",
+        "Follow Context JSON mobile_context.role_app_policy: exclude blocked roles, prefer suitable roles, and use usage_in_target_app/app_roles for authors, participants, viewers, senders and bystanders.",
     ]
     if channel["type"] == "forum":
         output_rules.append(
@@ -3247,6 +3642,7 @@ def build_channel_seed_retry_messages(channel: dict[str, Any], count: int) -> li
         "Root shape: {\"events\":[...]}. "
         "Each event requires title, content, author_name, event_type, tags and metadata. "
         "Keep titles <= 24 Chinese characters, content <= 520 Chinese characters, tags <= 3. "
+        "Follow mobile_context.role_app_policy when choosing authors and metadata participants. "
         f"{reply_rule}\nContext JSON:\n"
         + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
     )
@@ -3284,7 +3680,7 @@ def build_channel_interaction_messages(channel: dict[str, Any], event: dict[str,
             "metadata": {"replies": existing_replies[-6:]},
         },
         "user_content": user_content,
-        "mobile_context": summarize_mobile_context(),
+        "mobile_context": summarize_mobile_context(channel["type"]),
     }
     system_text = assembled_prompt_text(channel["type"]) or system_prompt_text()
     source_rule = (
@@ -3296,6 +3692,7 @@ def build_channel_interaction_messages(channel: dict[str, Any], event: dict[str,
         f"The user just {'published this event' if mode == 'post' else 'replied to this event'} in the {channel['type']} app. "
         f"{source_rule}\n"
         "Return valid JSON only, root shape {\"replies\":[...]}. "
+        "Follow mobile_context.role_app_policy when choosing role/moderator replies; bystanders must stay metadata-only. "
         "Each reply must include author_name, author_type, source, content, mood and floor. "
         "Keep each content <= 70 Chinese characters, in-character, varied, and directly responsive to the user's content. "
         "Valid author_type values: role, bystander, moderator, system. Bystanders must not be treated as saved character profiles. "
@@ -3374,6 +3771,135 @@ async def attach_generated_channel_replies(channel: dict[str, Any], event: dict[
     return update_channel_event(channel["channel_id"], event)
 
 
+def build_live_tick_messages(channel: dict[str, Any], event: dict[str, Any]) -> list[dict[str, str]]:
+    metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+    context = {
+        "channel": channel,
+        "event": {
+            "title": event.get("title", ""),
+            "content": event.get("content", ""),
+            "author_name": event.get("author_name", ""),
+            "tags": event.get("tags", []),
+            "metadata": {
+                "live_status": metadata.get("live_status", "直播中"),
+                "viewers": metadata.get("viewers", ""),
+                "likes": metadata.get("likes", ""),
+                "fans": metadata.get("fans", ""),
+                "inner_thought": metadata.get("inner_thought", ""),
+                "recent_danmaku": sanitize_live_messages(metadata.get("danmaku"), limit=80)[-12:],
+                "recent_highlights": sanitize_live_messages(metadata.get("highlights"), limit=12)[:6],
+                "contributors": sanitize_live_contributors(metadata.get("contributors"))[:8],
+                "live_tick": metadata.get("live_tick", "0"),
+            },
+        },
+        "current_datetime": now_iso(),
+        "mobile_context": summarize_mobile_context("live"),
+        "output_schema": {
+            "tick": {
+                "title": "optional updated live segment title",
+                "content": "next streamer segment, <= 120 Chinese characters",
+                "live_status": "直播中",
+                "viewers": "viewer count text",
+                "likes": "like count text",
+                "fans": "fan count text",
+                "inner_thought": "optional inner thought, <= 80 Chinese characters",
+                "danmaku": [{"author_name": "观众名", "author_type": "bystander", "content": "弹幕", "mood": "excited"}],
+                "highlights": [{"author_name": "用户", "author_type": "bystander", "content": "醒目留言", "mood": "supportive", "amount": "6"}],
+                "contributors": [{"name": "用户", "amount": "6", "note": "optional"}],
+                "notification": "optional short notification text",
+            }
+        },
+    }
+    system_text = assembled_prompt_text("live") or system_prompt_text()
+    user_text = (
+        "Continue the current live room with one new live segment. "
+        "Do not create a new live room. Update the existing stream only. "
+        "Return valid JSON only, root shape {\"tick\":{...}}. "
+        "The tick must include content, danmaku, highlights, contributors, viewers, likes and live_status. "
+        "Keep output short: content <=120 Chinese characters, inner_thought <=80, notification <=40. "
+        "Generate exactly 2 compact danmaku messages, 0-1 highlight message, and 0-2 contributor updates. "
+        "Follow mobile_context.role_app_policy: streamer should match the current author if possible; viewers/highlight senders/contributors can be saved roles suitable for live or metadata-only bystanders. "
+        "Keep the next segment concrete, in-world, and responsive to the previous content. "
+        "Do not mention plugins, APIs, prompts, or JSON.\n"
+        "Context JSON:\n"
+        + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
+    )
+    user_text = apply_custom_prompt_to_user_text("live", user_text)
+    return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
+
+
+def parse_live_tick(raw: str, event: dict[str, Any]) -> dict[str, Any]:
+    tick, parse_error = parse_model_json_output(
+        raw,
+        scope="channel_live_tick",
+        schema="tick",
+        root_key="tick",
+        target_id=event["event_id"],
+    )
+    if parse_error:
+        return {}
+    if isinstance(tick, dict) and isinstance(tick.get("tick"), dict):
+        tick = tick["tick"]
+    if not isinstance(tick, dict):
+        record_parser_diagnostic("channel_live_tick", "tick", event["event_id"], "tick_not_object", raw)
+        return {}
+    content = compact_text(tick.get("content") or tick.get("body") or tick.get("text"), 1000)
+    if not content:
+        record_parser_diagnostic("channel_live_tick", "tick", event["event_id"], "tick_missing_content", raw)
+        return {}
+    return tick
+
+
+def apply_live_tick(event: dict[str, Any], tick: dict[str, Any]) -> dict[str, Any]:
+    metadata = dict(event.get("metadata") or {})
+    existing_danmaku = sanitize_live_messages(metadata.get("danmaku"), limit=80)
+    new_danmaku = sanitize_live_messages(tick.get("danmaku") or tick.get("messages"), limit=12)
+    existing_highlights = sanitize_live_messages(metadata.get("highlights"), limit=12)
+    new_highlights = sanitize_live_messages(tick.get("highlights") or tick.get("highlight_messages"), limit=4)
+    existing_contributors = sanitize_live_contributors(metadata.get("contributors"))
+    new_contributors = sanitize_live_contributors(tick.get("contributors"))
+    metadata["danmaku"] = sanitize_live_messages([*existing_danmaku, *new_danmaku], limit=80)
+    metadata["highlights"] = sanitize_live_messages([*new_highlights, *existing_highlights], limit=12)
+    metadata["contributors"] = merge_live_contributors(existing_contributors, new_contributors)
+    metadata["viewers"] = compact_text(tick.get("viewers"), 40) or next_live_metric(metadata.get("viewers"), 900, 37 + len(new_danmaku) * 5)
+    metadata["likes"] = compact_text(tick.get("likes"), 40) or next_live_metric(metadata.get("likes"), 120, 8 + len(new_danmaku))
+    metadata["fans"] = compact_text(tick.get("fans"), 40) or metadata.get("fans") or next_live_metric(metadata.get("viewers"), 900, 12)
+    metadata["live_status"] = compact_text(tick.get("live_status"), 40) or metadata.get("live_status") or "直播中"
+    metadata["inner_thought"] = compact_text(tick.get("inner_thought"), 500) or metadata.get("inner_thought", "")
+    metadata["live_tick"] = str(live_metric_int(metadata.get("live_tick"), 0) + 1)
+    metadata["refreshed_at"] = now_iso()
+    event["metadata"] = metadata
+    event["title"] = compact_text(tick.get("title"), 120) or event.get("title") or "直播"
+    event["content"] = compact_text(tick.get("content") or tick.get("body") or tick.get("text"), 2000) or event.get("content", "")
+    if tick.get("tags"):
+        event["tags"] = sanitize_tags(tick.get("tags"))
+    event["updated_at"] = now_iso()
+    return event
+
+
+async def advance_live_event(channel: dict[str, Any], event: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    job = begin_generation_job("channel_live_tick", event["event_id"])
+    try:
+        raw_reply = await call_chat_model(
+            build_live_tick_messages(channel, event),
+            max_tokens=min(2200, max(get_settings()["max_tokens"], 1200)),
+            temperature=read_mobile_llm_config()["temperature"],
+        )
+    except HTTPException as exc:
+        finish_generation_job(job, "error", compact_text(exc.detail, 240))
+        raise
+    tick = parse_live_tick(raw_reply, event)
+    if not tick:
+        finish_generation_job(job, "error", "parser_no_valid_live_tick")
+        raise HTTPException(status_code=502, detail="模型返回的直播续写无法解析，请查看后台 diagnostics。")
+    updated = update_channel_event(channel["channel_id"], apply_live_tick({**event}, tick))
+    notification_text = compact_text(tick.get("notification"), 160) or f"{updated['author_name']} 的直播有新内容：{updated['content'][:80]}"
+    notification = add_notification("直播更新", notification_text, source="live", channel_id=channel["channel_id"], event_id=updated["event_id"])
+    record_live_tick_diagnostic(channel, updated, status="success")
+    finish_generation_job(job, "success")
+    return updated, notification
+
+
 def build_mail_reply_messages(event: dict[str, Any], user_content: str) -> list[dict[str, str]]:
     context = {
         "mail": {
@@ -3383,7 +3909,7 @@ def build_mail_reply_messages(event: dict[str, Any], user_content: str) -> list[
             "metadata": event.get("metadata", {}),
         },
         "user_reply": user_content,
-        "mobile_context": summarize_mobile_context(),
+        "mobile_context": summarize_mobile_context("mail"),
         "output_schema": {
             "replies": [
                 {
@@ -3400,6 +3926,7 @@ def build_mail_reply_messages(event: dict[str, Any], user_content: str) -> list[
         "Continue this in-world email thread after the user sends a reply. "
         "Return valid JSON only, root shape {\"replies\":[...]}. "
         "Generate exactly 1 received reply from the original sender or a relevant mail contact. "
+        "Follow mobile_context.role_app_policy when choosing relevant mail contacts; prefer saved roles suitable for mail and never use roles blocked from mail. "
         "Each reply must include author_name, direction, content and mood. Keep content <= 220 Chinese characters. "
         "Do not mention plugins, APIs, prompts, or JSON.\n"
         "Context JSON:\n"
@@ -3636,12 +4163,21 @@ def phone_role_candidates() -> list[dict[str, Any]]:
         seen.add(safe_id)
 
     for profile in get_role_profiles(include_disabled=False):
+        if not role_app_allowed(profile, "phone"):
+            continue
         add_role(profile["role_id"], profile["display_name"], profile.get("summary"), profile.get("avatar"), profile.get("chat_style"), profile.get("status"))
+    profiles_by_id = profile_lookup()
     for member in available_role_members().get("roles", []):
+        profile = profiles_by_id.get(normalize_id(member.get("role_id"), ""))
+        if profile and not role_app_allowed(profile, "phone"):
+            continue
         add_role(member.get("role_id"), member.get("name"), member.get("summary"), member.get("avatar"))
     for group in get_groups():
         for member in group.get("members", []):
             if member.get("type") == "character":
+                profile = profiles_by_id.get(normalize_id(member.get("role_id"), ""))
+                if profile and not role_app_allowed(profile, "phone"):
+                    continue
                 add_role(member.get("role_id"), member.get("name"), member.get("summary"), member.get("avatar"))
     return sorted(rows, key=lambda item: item["display_name"].casefold())
 
@@ -3662,7 +4198,9 @@ def build_phone_call_messages(role: dict[str, Any], session: dict[str, Any], use
             "summary": role.get("summary", ""),
             "status": role.get("status", ""),
             "chat_style": role.get("chat_style", ""),
+            "usage_in_phone": role_app_usage(role, "phone"),
         },
+        "mobile_context": summarize_mobile_context("phone"),
         "recent_lines": session.get("lines", [])[-20:],
         "user_line": user_line,
         "output_schema": {
@@ -3674,6 +4212,7 @@ def build_phone_call_messages(role: dict[str, Any], session: dict[str, Any], use
     user_text = (
         "Continue a simulated phone call with the target role. "
         "Return JSON only with lines and call_state. Return 1-3 compact role lines when the role naturally continues speaking. "
+        "The target role is already filtered for the phone app; keep the conversation consistent with role.usage_in_phone and mobile_context.role_app_policy. "
         "If the role naturally ends the call, set call_state to ended and make the final line sound like a real phone goodbye.\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
@@ -4066,10 +4605,12 @@ def build_mobile_model_messages(
         "reply_count": group["reply_count"],
         "allow_role_to_role_reply": group["allow_role_to_role_reply"],
         "allow_auto_interject": group["allow_auto_interject"],
+        "role_app_policy": role_app_generation_policy("group_chat"),
         "available_stickers": sticker_prompt_catalog(),
     }
     user_text = (
         "请根据以下群聊上下文生成本轮回复，只返回 JSON：\n"
+        "Follow role_app_policy and each member usage_in_group_chat/app_roles; avoid choosing members explicitly blocked from group_chat.\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
     user_text = apply_custom_prompt_to_user_text("group_chat", user_text)
@@ -4505,6 +5046,45 @@ async def api_restore_mobile_role(role_id: str) -> dict[str, Any]:
 @app.get("/api/admin/roles")
 async def api_admin_roles() -> dict[str, Any]:
     return {"ok": True, "roles": get_role_profiles(include_disabled=True), "available": available_role_members()["roles"], "user": current_user_member()}
+
+
+@app.get("/api/admin/role-app-pools")
+async def api_admin_role_app_pools() -> dict[str, Any]:
+    content_app_ids = set(CHANNEL_TYPES) | {"notifications"}
+    apps = [
+        app
+        for app in sanitize_app_registry(read_json(APP_REGISTRY_PATH, DEFAULT_APP_REGISTRY)).get("apps", [])
+        if normalize_id(app.get("app_id"), "") in content_app_ids and app.get("app_id") != "assist"
+    ]
+    pools: dict[str, Any] = {}
+    all_roles = get_role_profiles(include_disabled=False)
+    for app in apps:
+        app_id = normalize_id(app.get("app_id"), "")
+        if not app_id:
+            continue
+        roles = role_profiles_for_app(app_id, limit=80)
+        suitable_count = sum(1 for role in roles if app_id in set(role.get("suitable_apps") or []))
+        blocked_count = sum(1 for role in all_roles if not role_app_allowed(role, app_id))
+        pools[app_id] = {
+            "app_id": app_id,
+            "label": compact_text(app.get("label"), 80) or app_id,
+            "count": len(roles),
+            "suitable_count": suitable_count,
+            "neutral_count": max(0, len(roles) - suitable_count),
+            "blocked_count": blocked_count,
+            "policy": role_app_generation_policy(app_id),
+            "roles": [
+                {
+                    "role_id": role["role_id"],
+                    "display_name": role["display_name"],
+                    "suitable_apps": role.get("suitable_apps", []),
+                    "blocked_apps": role.get("blocked_apps", []),
+                    "usage": role_app_usage(role, app_id),
+                }
+                for role in roles
+            ],
+        }
+    return {"ok": True, "pools": pools}
 
 
 @app.post("/api/admin/roles")
@@ -5573,6 +6153,22 @@ async def api_add_live_message(channel_id: str, event_id: str, payload: LiveMess
     event["updated_at"] = now_iso()
     event = update_channel_event(channel["channel_id"], event)
     return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
+
+
+@app.post("/api/channels/{channel_id}/events/{event_id}/live-tick", response_model=None)
+async def api_advance_live_event(channel_id: str, event_id: str) -> JSONResponse | dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    if channel["type"] != "live":
+        raise HTTPException(status_code=400, detail="This channel does not support live tick generation.")
+    event = find_channel_event_or_404(channel["channel_id"], event_id)
+    try:
+        updated, notification = await advance_live_event(channel, event)
+    except HTTPException as exc:
+        record_live_tick_diagnostic(channel, event, status="error", error=compact_text(exc.detail, 240))
+        return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc, extra={"event": event, "events": get_channel_events(channel["channel_id"])}))
+    return {"ok": True, "event": updated, "events": get_channel_events(channel["channel_id"]), "notification": notification}
+
+
 async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any]:
     count = effective_channel_seed_count(channel, count)
     job = begin_generation_job(f"channel_{channel['type']}", channel["channel_id"])
@@ -5830,6 +6426,7 @@ def admin_diagnostics() -> dict[str, Any]:
         "phone_session_count": len(phone_sessions),
         "active_generation_jobs": len(generation_state["active_jobs"]),
         "last_generation_jobs": generation_state["last_jobs"][:5],
+        "recent_live_ticks": generation_state.get("recent_live_ticks", [])[:10],
         "parser_diagnostics": get_parser_diagnostics()[:10],
         "isolation": {
             "writes_main_chat": False,
