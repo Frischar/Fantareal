@@ -1,14 +1,14 @@
 {
   "label": "小手机",
   "description": "独立于主 Chat 的小手机群聊与轻应用插件。",
-  "version": "4.2.8-alpha.1",
+  "version": "4.4.0-alpha.2",
   "hooks": {
     "chat_styles": [
-      "/static/mobile-chat-ui.css?v=mobile-chat-v4-2-8-alpha-1",
-      "/static/mobile-chat-chat.css?v=mobile-chat-v4-2-8-alpha-1"
+      "/static/mobile-chat-ui.css?v=mobile-chat-v4-4-0-alpha-2",
+      "/static/mobile-chat-chat.css?v=mobile-chat-v4-4-0-alpha-2"
     ],
     "chat_scripts": [
-      "/static/mobile-chat-chat.js?v=mobile-chat-v4-2-8-alpha-1"
+      "/static/mobile-chat-chat.js?v=mobile-chat-v4-4-0-alpha-2"
     ]
   }
 }

@@ -99,6 +99,7 @@
     roleGeneratorBusy: false,
     roleGeneratorNotice: "",
     liveFollows: {},
+    liveTickRetries: {},
     revealedLiveThoughts: {},
     stickers: fallbackStickers,
     stickerPacks: [],
@@ -1246,9 +1247,13 @@
     const followed = !!state.liveFollows[event.event_id];
     const status = metadataValueText(metadata.live_status) || "直播中";
     const viewers = metadataValueText(metadata.viewers) || "1.2k";
+    const likes = metadataValueText(metadata.likes) || "0";
+    const tickIndex = Number.parseInt(metadataValueText(metadata.live_tick) || "0", 10) || 0;
     const topContributor = contributors[0];
     const innerThought = metadataValueText(metadata.inner_thought);
     const thoughtRevealed = !!state.revealedLiveThoughts[event.event_id];
+    const tickBusy = state.generating && state.generationTask?.type === "live-tick" && state.generationTask?.targetId === event.event_id;
+    const retryMessage = state.liveTickRetries[event.event_id] || "";
     return eventDetailShell(channel, event, `
       <article class="fmcp-live-room fmcp-live-theater${isFallbackEvent(event) ? " is-fallback" : ""}">
         <div class="fmcp-live-room-head">
@@ -1257,12 +1262,17 @@
             <strong>${esc(event.author_name || "主播")}</strong>
             <small>${metadataValueText(metadata.fans) ? `${esc(metadataValueText(metadata.fans))} 粉丝` : `${esc(viewers)} 观看`}</small>
           </div>
-          <button class="fmcp-live-follow ${followed ? "is-active" : ""}" type="button" data-action="toggle-live-follow" data-event-id="${esc(event.event_id)}">${followed ? "已关注" : "+ 关注"}</button>
+          <div class="fmcp-live-room-actions">
+            <button class="fmcp-live-next" type="button" data-action="advance-live-event" data-channel-id="${esc(channel.channel_id)}" data-event-id="${esc(event.event_id)}" ${state.generating ? "disabled" : ""}>${tickBusy ? "续写中..." : (retryMessage ? "重试下一段" : "下一段直播")}</button>
+            <button class="fmcp-live-follow ${followed ? "is-active" : ""}" type="button" data-action="toggle-live-follow" data-event-id="${esc(event.event_id)}">${followed ? "已关注" : "+ 关注"}</button>
+          </div>
         </div>
+        ${retryMessage ? `<div class="fmcp-live-retry-notice"><strong>\u76f4\u64ad\u7eed\u5199\u5931\u8d25</strong><span>${esc(retryMessage)}</span><button class="fmcp-button fmcp-button-primary" type="button" data-action="advance-live-event" data-channel-id="${esc(channel.channel_id)}" data-event-id="${esc(event.event_id)}" ${state.generating ? "disabled" : ""}>\u91cd\u8bd5\u4e0b\u4e00\u6bb5\u76f4\u64ad</button></div>` : ""}
         <section class="fmcp-live-player">
           <div class="fmcp-live-player-top">
             <span class="fmcp-live-badge">${icon("live")} ${esc(status)}</span>
             <span>${esc(viewers)} 观看</span>
+            <span>${esc(likes)} 喜欢</span>
           </div>
           <div class="fmcp-live-player-copy">
             <h3>${esc(event.title)}</h3>
@@ -1277,7 +1287,7 @@
             `).join("") : '<p class="fmcp-live-muted"><span>还没有弹幕。</span></p>'}
           </div>
           <div class="fmcp-live-player-foot">
-            <span>直播内容</span><b>1/5</b>
+            <span>直播内容</span><b>${esc(String(tickIndex + 1))}</b>
             ${topContributor ? `<span class="fmcp-live-top-gift">#1 ${esc(topContributor.name)} ${esc(topContributor.amount)}</span>` : ""}
           </div>
         </section>
@@ -1293,6 +1303,7 @@
             </label>
           ` : ""}
           ${contributors.length ? `<div class="fmcp-live-note-card"><strong>贡献榜</strong><p>${contributors.slice(0, 3).map((item, index) => `#${index + 1} ${esc(item.name)} ${esc(item.amount)}`).join(" · ")}</p></div>` : ""}
+          <div class="fmcp-live-note-card fmcp-live-stats-card"><strong>实时数据</strong><p>${esc(viewers)} 观看 · ${esc(likes)} 喜欢${metadataValueText(metadata.refreshed_at) ? ` · 已刷新 ${esc(String(tickIndex))} 次` : ""}</p></div>
         </section>
         <form class="fmcp-live-input" data-form="live-message" data-channel-id="${esc(channel.channel_id)}" data-event-id="${esc(event.event_id)}">
           <input name="content" maxlength="240" placeholder="发送弹幕">
@@ -3008,6 +3019,45 @@
     render();
   }
 
+  async function advanceLiveEvent(channelId, eventId) {
+    if (!channelId || !eventId || state.generating) return;
+    state.generating = true;
+    state.generationTask = {
+      type: "live-tick",
+      targetId: eventId,
+      message: "正在推进直播内容...",
+      cancelLabel: "停止等待",
+    };
+    state.error = "";
+    const controller = new AbortController();
+    activeGenerationAbort = controller;
+    render();
+    try {
+      const payload = await request(`/channels/${encodeURIComponent(channelId)}/events/${encodeURIComponent(eventId)}/live-tick`, {
+        method: "POST",
+        signal: controller.signal,
+      });
+      state.channelEvents[channelId] = payload.events || [];
+      state.currentChannelEventId = payload.event?.event_id || eventId;
+      state.liveTickRetries = { ...state.liveTickRetries, [eventId]: "" };
+      await loadNotifications().catch(() => {});
+    } catch (error) {
+      const message = error.name === "AbortError"
+        ? "已停止等待直播续写；如果模型请求已在后台完成，稍后刷新直播间可能会看到新内容。"
+        : error.message;
+      state.error = message;
+      state.liveTickRetries = { ...state.liveTickRetries, [eventId]: message };
+      if (error.payload?.events) state.channelEvents[channelId] = error.payload.events || [];
+      if (error.payload?.event?.event_id) state.currentChannelEventId = error.payload.event.event_id;
+    } finally {
+      if (activeGenerationAbort === controller) activeGenerationAbort = null;
+      state.generating = false;
+      state.generationTask = null;
+      await loadChannelEvents(channelId).catch((error) => { state.error = error.message; });
+      render();
+    }
+  }
+
   async function seedCurrentChannel() {
     if (!state.currentChannelId || state.generating) return;
     const channel = currentChannel();
@@ -3703,6 +3753,9 @@
       state.liveFollows = { ...state.liveFollows, [eventId]: !state.liveFollows[eventId] };
       state.error = "";
       render();
+    }
+    if (action === "advance-live-event") {
+      void advanceLiveEvent(button.dataset.channelId || state.currentChannelId, button.dataset.eventId || state.currentChannelEventId);
     }
   }
 

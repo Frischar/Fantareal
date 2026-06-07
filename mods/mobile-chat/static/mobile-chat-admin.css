@@ -751,6 +751,8 @@ code {
   }
 
   .fmca-form-grid,
+  .fmca-role-app-scope-grid,
+  .fmca-role-app-usage-grid,
   .fmca-manifest-row {
     grid-template-columns: 1fr;
   }
@@ -782,4 +784,301 @@ code {
 .fmca-prompt-test-result {
   margin-top: 12px;
   max-height: 520px;
+}
+
+.fmca-role-app-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.fmca-role-app-summary span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.fmca-role-app-pools {
+  margin-top: 16px;
+}
+
+.fmca-role-app-pools h4 {
+  margin: 0 0 4px;
+}
+
+.fmca-role-app-pools p {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.fmca-role-app-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.fmca-role-app-pool-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.fmca-role-app-pool-stats {
+  margin: 8px 0;
+  color: rgba(100, 116, 139, 0.95);
+  font-size: 12px;
+}
+
+.fmca-role-app-pools-head,
+.fmca-role-filter-notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.fmca-role-filter-notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1e3a8a;
+}
+
+.fmca-role-app-pool-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.fmca-role-app-pool-card:hover,
+.fmca-role-app-pool-card:focus-visible,
+.fmca-role-app-pool-card.is-active {
+  border-color: rgba(37, 99, 235, 0.65);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.12);
+}
+
+.fmca-role-app-pool-card.is-active {
+  background: rgba(239, 246, 255, 0.96);
+}
+
+.fmca-prompt-block-help {
+  margin: 6px 0 10px;
+  color: #93a4b8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fmca-prompt-details > p {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f8fafc;
+}
+
+.fmca-role-app-bind-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(94, 234, 212, 0.38);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.fmca-role-app-bind-panel header {
+  display: grid;
+  gap: 4px;
+}
+
+.fmca-role-app-bind-panel header strong {
+  color: #e2f8ff;
+  font-size: 15px;
+}
+
+.fmca-role-app-bind-panel header span {
+  color: rgba(219, 231, 241, 0.82);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.fmca-role-app-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fmca-role-app-scope-group,
+.fmca-role-app-usage-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.32);
+}
+
+.fmca-role-app-scope-group > strong,
+.fmca-role-app-usage-panel strong {
+  color: #f4fbff;
+  font-size: 13px;
+}
+
+.fmca-role-app-scope-group p,
+.fmca-role-app-usage-panel p {
+  margin: 0;
+  color: rgba(219, 231, 241, 0.68);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fmca-role-app-check:has(input:checked) {
+  border-color: rgba(94, 234, 212, 0.58);
+  background: rgba(20, 184, 166, 0.16);
+  color: #f8ffff;
+}
+
+.fmca-role-app-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.fmca-role-app-usage-row {
+  display: grid;
+  grid-template-columns: minmax(74px, 112px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fmca-role-app-usage-row span {
+  color: rgba(219, 231, 241, 0.76);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.fmca-role-app-usage-row input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 8px 10px;
+}
+
+.fmca-field input::placeholder,
+.fmca-field textarea::placeholder,
+.fmca-form-grid > label input::placeholder,
+.fmca-form-grid > label textarea::placeholder,
+.fmca-role-app-usage-row input::placeholder {
+  color: rgba(226, 232, 240, 0.58);
+}
+
+.fmca-prompt-test {
+  border-color: rgba(94, 234, 212, 0.34);
+  background: rgba(15, 23, 42, 0.78);
+  color: #e5eef8;
+}
+
+.fmca-prompt-test h4 {
+  color: #8fdcff;
+}
+
+.fmca-prompt-test p {
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.fmca-prompt-test select,
+.fmca-prompt-test textarea,
+.fmca-prompt-test .fmca-prompt-test-result {
+  background: rgba(2, 6, 23, 0.78);
+  color: #edf6ff;
+  border-color: rgba(148, 163, 184, 0.42);
+}
+
+.fmca-prompt-test textarea::placeholder {
+  color: rgba(226, 232, 240, 0.62);
+}
+
+
+.fmca-role-app-pool-card.is-active {
+  background: rgba(30, 64, 175, 0.42);
+  border-color: rgba(125, 211, 252, 0.85);
+  color: #f8fbff;
+  box-shadow: 0 12px 30px rgba(14, 165, 233, 0.18);
+}
+
+.fmca-role-app-pool-card.is-active header strong,
+.fmca-role-app-pool-card.is-active header span {
+  color: #ffffff;
+}
+
+.fmca-role-app-pool-card.is-active .fmca-chip-line span {
+  background: rgba(15, 23, 42, 0.58);
+  color: #f8fbff;
+  border: 1px solid rgba(186, 230, 253, 0.45);
+}
+
+.fmca-sticker-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.fmca-sticker-preview-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.fmca-sticker-preview-card strong {
+  color: #f8fafc;
+}
+
+.fmca-sticker-preview-card span {
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+
+/* BUG-029/030 admin UX contrast fixes */
+.fmca-role-app-pool-card.is-active {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.92), rgba(30, 64, 175, 0.92));
+  border-color: rgba(186, 230, 253, 0.95);
+  box-shadow: 0 14px 34px rgba(14, 116, 144, 0.28);
+}
+
+.fmca-role-app-pool-card.is-active header strong,
+.fmca-role-app-pool-card.is-active header span,
+.fmca-role-app-pool-card.is-active em,
+.fmca-role-app-pool-card.is-active .fmca-role-app-pool-stats {
+  color: #ffffff;
+}
+
+.fmca-role-app-pool-card.is-active .fmca-chip-line span {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #ffffff;
+}
+
+.fmca-list-card.is-selected {
+  border-color: rgba(94, 234, 212, 0.55);
+  box-shadow: 0 10px 28px rgba(20, 184, 166, 0.14);
+}
+
+.fmca-sticker-preview-thumb {
+  display: grid;
+  place-items: center;
+  min-height: 70px;
 }

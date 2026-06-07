@@ -62,14 +62,60 @@
           </div>
 
           <div class="fmca-two-col">
-            <article class="fmca-panel">
-              <h3>模型状态</h3>
-              <dl class="fmca-facts">
-                <div><dt>模型</dt><dd id="fmca-model-name">-</dd></div>
+            <article class="fmca-panel fmca-overview-api-form">
+              <h3>&#23567;&#25163;&#26426; API &#35774;&#32622;</h3>
+              <p>&#36825;&#37324;&#26159;&#23567;&#25163;&#26426;&#27169;&#22411; / API &#30340;&#21807;&#19968;&#37197;&#32622;&#20837;&#21475;&#65307;&#29983;&#25104;&#35774;&#32622;&#21644;&#24037;&#20316;&#21488;&#19981;&#20877;&#25552;&#20379; API &#35774;&#32622;&#12290;</p>
+              <dl class="fmca-facts fmca-api-status">
+                <div><dt>&#27169;&#22411;</dt><dd id="fmca-model-name">-</dd></div>
                 <div><dt>API URL</dt><dd id="fmca-model-url">-</dd></div>
                 <div><dt>API Key</dt><dd id="fmca-model-key">-</dd></div>
                 <div><dt>Temperature</dt><dd id="fmca-model-temp">-</dd></div>
               </dl>
+              <form class="fmca-form" id="fmca-api-settings-form">
+                <fieldset class="fmca-panel fmca-token-policy">
+                  <legend>小手机 API 设置</legend>
+                  <p>默认跟随主程序；切换为独立配置后，群聊、频道、电话和工作台都会使用这里的模型。</p>
+                  <div class="fmca-api-preset-row">
+                    <label>
+                      <span>快捷导入</span>
+                      <select id="fmca-api-preset">
+                        <option value="openai">GPT / OpenAI 官方</option>
+                        <option value="gemini">Gemini 官方</option>
+                        <option value="claude">Claude 官方</option>
+                        <option value="minimax">MiniMax 国内官方</option>
+                        <option value="glm">GLM / 智谱官方</option>
+                        <option value="deepseek">DeepSeek 官方</option>
+                        <option value="siliconflow">SiliconFlow</option>
+                      </select>
+                    </label>
+                    <button class="fmca-button" id="fmca-apply-api-preset" type="button">一键填入 URL</button>
+                  </div>
+                  <label class="fmca-row fmca-api-row">
+                    <span>模型来源</span>
+                    <select id="fmca-model-source">
+                      <option value="main">跟随主程序</option>
+                      <option value="custom">小手机独立配置</option>
+                    </select>
+                  </label>
+                  <label class="fmca-row fmca-api-row"><span>Base URL</span><input id="fmca-api-base-url" type="url" placeholder="https://api.example.com/v1"></label>
+                  <label class="fmca-row fmca-api-row"><span>API Key</span><input id="fmca-api-key" type="password" autocomplete="new-password" placeholder="留空保留已保存 Key"></label>
+                  <div class="fmca-row fmca-api-row fmca-model-row">
+                    <span>Model</span>
+                    <div class="fmca-model-combo">
+                      <input id="fmca-api-model" type="text" placeholder="MiniMax-M3 / glm-5.1 / gemini-3.5-flash" autocomplete="off">
+                      <button class="fmca-button fmca-model-menu-toggle" id="fmca-toggle-model-menu" type="button">▼</button>
+                      <button class="fmca-button" id="fmca-fetch-models" type="button">拉取模型</button>
+                      <div class="fmca-model-menu" id="fmca-model-menu" hidden></div>
+                    </div>
+                  </div>
+                  <label class="fmca-row fmca-api-row"><span>Temperature</span><input id="fmca-api-temp" type="number" min="0" max="2" step="0.01"></label>
+                  <label class="fmca-row fmca-api-row"><span>Timeout 秒</span><input id="fmca-api-timeout" type="number" min="10" max="600"></label>
+                </fieldset>
+                <div class="fmca-actions">
+                  <button class="fmca-button fmca-primary" type="submit">&#20445;&#23384; API &#35774;&#32622;</button>
+                  <button class="fmca-button" id="fmca-reset-api-form" type="button">&#24674;&#22797;&#24403;&#21069;&#20540;</button>
+                </div>
+              </form>
             </article>
 
             <article class="fmca-panel">
@@ -106,45 +152,6 @@
             <label class="fmca-row"><span>最大输出 tokens</span><input id="fmca-max-tokens" type="number" min="64" max="32000"></label>
             <label class="fmca-row"><span>保留最近消息</span><input id="fmca-recent-limit" type="number" min="1" max="80"></label>
             <fieldset class="fmca-panel fmca-token-policy">
-              <legend>小手机 API 设置</legend>
-              <p>默认跟随主程序；切换为独立配置后，群聊、频道、电话和工作台都会使用这里的模型。</p>
-              <div class="fmca-api-preset-row">
-                <label>
-                  <span>快捷导入</span>
-                  <select id="fmca-api-preset">
-                    <option value="openai">GPT / OpenAI 官方</option>
-                    <option value="gemini">Gemini 官方</option>
-                    <option value="claude">Claude 官方</option>
-                    <option value="minimax">MiniMax 国内官方</option>
-                    <option value="glm">GLM / 智谱官方</option>
-                    <option value="deepseek">DeepSeek 官方</option>
-                    <option value="siliconflow">SiliconFlow</option>
-                  </select>
-                </label>
-                <button class="fmca-button" id="fmca-apply-api-preset" type="button">一键填入 URL</button>
-              </div>
-              <label class="fmca-row fmca-api-row">
-                <span>模型来源</span>
-                <select id="fmca-model-source">
-                  <option value="main">跟随主程序</option>
-                  <option value="custom">小手机独立配置</option>
-                </select>
-              </label>
-              <label class="fmca-row fmca-api-row"><span>Base URL</span><input id="fmca-api-base-url" type="url" placeholder="https://api.example.com/v1"></label>
-              <label class="fmca-row fmca-api-row"><span>API Key</span><input id="fmca-api-key" type="password" autocomplete="new-password" placeholder="留空保留已保存 Key"></label>
-              <div class="fmca-row fmca-api-row fmca-model-row">
-                <span>Model</span>
-                <div class="fmca-model-combo">
-                  <input id="fmca-api-model" type="text" placeholder="MiniMax-M3 / glm-5.1 / gemini-3.5-flash" autocomplete="off">
-                  <button class="fmca-button fmca-model-menu-toggle" id="fmca-toggle-model-menu" type="button">▼</button>
-                  <button class="fmca-button" id="fmca-fetch-models" type="button">拉取模型</button>
-                  <div class="fmca-model-menu" id="fmca-model-menu" hidden></div>
-                </div>
-              </div>
-              <label class="fmca-row fmca-api-row"><span>Temperature</span><input id="fmca-api-temp" type="number" min="0" max="2" step="0.01"></label>
-              <label class="fmca-row fmca-api-row"><span>Timeout 秒</span><input id="fmca-api-timeout" type="number" min="10" max="600"></label>
-            </fieldset>
-            <fieldset class="fmca-panel fmca-token-policy">
               <legend>频道生成 max_tokens</legend>
               <p>按应用类型设置 seed 生成的初次与重试 token 下限；不同模型可以自行调大。</p>
               <div id="fmca-channel-token-settings" class="fmca-form-grid"></div>
@@ -161,9 +168,8 @@
 
         <section class="fmca-tab" data-panel="workbench">
           <article class="fmca-panel">
-            <h3>&#27169;&#22411;&#24037;&#20316;&#21488;</h3>
-            <p>&#25226;&#35282;&#33394;&#29983;&#25104;&#12289;Prompt &#39044;&#35272;&#21644;&#27169;&#22411;&#27979;&#35797;&#25918;&#22312;&#25554;&#20214;&#21518;&#21488;&#22788;&#29702;&#65292;&#36991;&#20813;&#23567;&#25163;&#26426;&#21069;&#31471;&#25215;&#25285;&#37197;&#32622;&#24037;&#20316;&#12290;</p>
-            <dl class="fmca-facts" id="fmca-workbench-model"></dl>
+            <h3>&#24037;&#20316;&#21488;&#29366;&#24577;</h3>
+            <p>&#26412;&#39029;&#21482;&#20570;&#27979;&#35797;&#21644;&#39044;&#35272;&#65307;&#27169;&#22411; / API &#37197;&#32622;&#32479;&#19968;&#21040;&#8220;&#24635;&#35272;&#8221;&#20462;&#25913;&#12290;</p>
           </article>
 
           <div class="fmca-two-col">

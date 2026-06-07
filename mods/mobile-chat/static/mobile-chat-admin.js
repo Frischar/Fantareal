@@ -106,6 +106,8 @@
     roleGeneratorSaved: [],
     roleGeneratorSelectedIndex: 0,
     roleGeneratorBusy: false,
+    roleAppPools: null,
+    roleAppFilter: "",
     fetchedModels: [],
     selectedGroupId: "",
     selectedRoleId: "",
@@ -129,6 +131,49 @@
     return Array.isArray(tags) ? tags.join(", ") : "";
   }
 
+  function appAliasMap() {
+    const rows = roleGeneratorAppOptions();
+    const aliases = new Map([
+      ["\u7fa4\u804a", "group_chat"], ["\u804a\u5929", "group_chat"],
+      ["\u52a8\u6001", "feed"], ["\u670b\u53cb\u5708", "feed"],
+      ["\u8bba\u575b", "forum"], ["\u5e16\u5b50", "forum"],
+      ["\u76f4\u64ad", "live"],
+      ["\u7535\u8bdd", "phone"],
+      ["\u90ae\u7bb1", "mail"], ["\u90ae\u4ef6", "mail"],
+      ["\u65e5\u8bb0", "diary"],
+      ["\u65e5\u7a0b", "calendar"], ["\u65e5\u5386", "calendar"],
+      ["\u901a\u77e5", "notifications"],
+    ]);
+    rows.forEach((app) => {
+      aliases.set(String(app.app_id || "").toLowerCase(), app.app_id);
+      if (app.label) aliases.set(String(app.label).trim().toLowerCase(), app.app_id);
+    });
+    return aliases;
+  }
+
+  function normalizeAppInput(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const aliases = appAliasMap();
+    const key = raw.toLowerCase();
+    if (aliases.has(key)) return aliases.get(key);
+    return key.replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+  }
+
+  function appScopeToTags(value) {
+    const seen = new Set();
+    return String(value || "")
+      .split(/[,\uFF0C\u3001\s]+/)
+      .map(normalizeAppInput)
+      .filter((item) => {
+        if (!item || seen.has(item)) return false;
+        seen.add(item);
+        return true;
+      })
+      .slice(0, 12);
+  }
+
+
   function textToTags(value) {
     return String(value || "")
       .split(/[,，\s]+/)
@@ -138,10 +183,12 @@
   }
 
   function roleGeneratorAppOptions() {
+    const scopeAppIds = new Set(["group_chat", "feed", "forum", "live", "notifications", "phone", "mail", "diary", "calendar"]);
     const fallback = [
       { app_id: "group_chat", label: "群聊" },
       { app_id: "feed", label: "动态" },
       { app_id: "forum", label: "论坛" },
+      { app_id: "live", label: "直播" },
       { app_id: "notifications", label: "通知" },
       { app_id: "phone", label: "电话" },
       { app_id: "mail", label: "邮箱" },
@@ -151,13 +198,141 @@
     const rows = Array.isArray(state.apps) && state.apps.length ? state.apps : fallback;
     const seen = new Set();
     return rows
-      .filter((app) => app && app.app_id !== "assist" && app.page !== "assist")
+      .filter((app) => app && scopeAppIds.has(String(app.app_id || "")) && app.app_id !== "assist" && app.page !== "assist")
       .map((app) => ({ app_id: String(app.app_id || ""), label: String(app.label || app.app_id || "") }))
       .filter((app) => {
         if (!app.app_id || seen.has(app.app_id)) return false;
         seen.add(app.app_id);
         return true;
       });
+  }
+
+  function appLabelMap() {
+    const rows = roleGeneratorAppOptions();
+    return new Map(rows.map((app) => [app.app_id, app.label || app.app_id]));
+  }
+
+  function appDisplayLabel(appId) {
+    const safeAppId = normalizeAppInput(appId);
+    const labels = appLabelMap();
+    return labels.get(safeAppId) || safeAppId || "";
+  }
+
+  function appScopeLabelText(values, emptyText) {
+    const rows = Array.isArray(values) ? values : [];
+    return rows.length ? rows.map(appDisplayLabel).filter(Boolean).join("、") : emptyText;
+  }
+
+  function roleAppBindingOptions(role) {
+    const labels = appLabelMap();
+    const seen = new Set();
+    const extras = [
+      ...(Array.isArray(role?.suitable_apps) ? role.suitable_apps : []),
+      ...(Array.isArray(role?.blocked_apps) ? role.blocked_apps : []),
+      ...Object.keys(role?.app_roles && typeof role.app_roles === "object" ? role.app_roles : {}),
+    ];
+    const rows = [...roleGeneratorAppOptions(), ...extras.map((appId) => {
+      const safeAppId = normalizeAppInput(appId);
+      return { app_id: safeAppId, label: labels.get(safeAppId) || safeAppId };
+    })];
+    return rows.filter((app) => {
+      if (!app?.app_id || seen.has(app.app_id)) return false;
+      seen.add(app.app_id);
+      return true;
+    });
+  }
+
+  function roleAppSelectedSet(role, field) {
+    return new Set(Array.isArray(role?.[field]) ? role[field].map(normalizeAppInput).filter(Boolean) : []);
+  }
+
+  function roleAppScopeControls(role, field) {
+    const selected = roleAppSelectedSet(role, field);
+    const oppositeSelected = roleAppSelectedSet(role, field === "suitable_apps" ? "blocked_apps" : "suitable_apps");
+    return roleAppBindingOptions(role).map((app) => `
+      <label class="fmca-check fmca-chip-check fmca-role-app-check${oppositeSelected.has(app.app_id) ? " is-conflict-peer" : ""}">
+        <input type="checkbox" name="${esc(field)}" value="${esc(app.app_id)}" data-role-app-scope="${esc(field)}" ${selected.has(app.app_id) ? "checked" : ""}>
+        <span>${esc(app.label || app.app_id)}</span>
+      </label>
+    `).join("");
+  }
+
+  const fallbackRoleUsageHints = {
+    group_chat: ["active_chat_member", "friend", "topic_starter"],
+    feed: ["poster", "commenter", "friend", "bystander"],
+    forum: ["thread_author", "floor_reply", "moderator", "bystander"],
+    live: ["streamer", "viewer", "highlight_sender", "contributor"],
+    mail: ["sender", "recipient", "contact", "organization", "system_notice"],
+    diary: ["writer", "related_person", "memory_subject"],
+    calendar: ["participant", "organizer", "location_contact", "organization"],
+    phone: ["caller", "callee", "phone_contact"],
+    notifications: ["source", "system_notice", "related_person"],
+  };
+
+  const roleUsageAliasMap = new Map([
+    ["活跃成员", "active_chat_member"], ["活跃群成员", "active_chat_member"], ["好友", "friend"], ["话题发起人", "topic_starter"],
+    ["发动态", "poster"], ["发布动态", "poster"], ["发布者", "poster"], ["评论者", "commenter"], ["路人", "bystander"], ["旁观者", "bystander"], ["路人 / 旁观者", "bystander"],
+    ["发帖人", "thread_author"], ["楼层回复", "floor_reply"], ["楼层回复者", "floor_reply"], ["回复者", "floor_reply"], ["版主", "moderator"],
+    ["主播", "streamer"], ["观众", "viewer"], ["醒目留言", "highlight_sender"], ["醒目留言发送者", "highlight_sender"], ["打赏者", "contributor"], ["打赏", "contributor"], ["贡献者", "contributor"], ["打赏 / 贡献者", "contributor"],
+    ["发件人", "sender"], ["收件人", "recipient"], ["联系人", "contact"], ["组织", "organization"], ["系统通知", "system_notice"],
+    ["作者", "writer"], ["记录者", "writer"], ["相关人物", "related_person"], ["记忆对象", "memory_subject"],
+    ["参与者", "participant"], ["组织者", "organizer"], ["地点联系人", "location_contact"],
+    ["呼叫方", "caller"], ["接听方", "callee"], ["通话联系人", "phone_contact"],
+    ["来源", "source"], ["通知来源", "source"],
+  ]);
+
+  const roleUsageLabelMap = new Map([
+    ["active_chat_member", "活跃群成员"], ["friend", "好友"], ["topic_starter", "话题发起人"],
+    ["poster", "发布动态"], ["commenter", "评论者"], ["bystander", "路人 / 旁观者"],
+    ["thread_author", "发帖人"], ["floor_reply", "楼层回复者"], ["moderator", "版主"],
+    ["streamer", "主播"], ["viewer", "观众"], ["highlight_sender", "醒目留言发送者"], ["contributor", "打赏 / 贡献者"],
+    ["sender", "发件人"], ["recipient", "收件人"], ["contact", "联系人"], ["organization", "组织"], ["system_notice", "系统通知"],
+    ["writer", "记录者"], ["related_person", "相关人物"], ["memory_subject", "记忆对象"],
+    ["participant", "参与者"], ["organizer", "组织者"], ["location_contact", "地点联系人"],
+    ["caller", "呼叫方"], ["callee", "接听方"], ["phone_contact", "通话联系人"],
+    ["source", "通知来源"],
+  ]);
+
+  function roleUsageDisplay(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const normalized = normalizeRoleUsageInput(raw);
+    return roleUsageLabelMap.get(normalized) || raw;
+  }
+
+  function roleUsageListDisplay(values, separator = "、") {
+    const rows = Array.isArray(values) ? values : [];
+    return rows.map(roleUsageDisplay).filter(Boolean).join(separator);
+  }
+
+  function roleAppUsagePlaceholder(appId) {
+    const safeAppId = normalizeAppInput(appId);
+    const policyUsages = state.roleAppPools?.pools?.[safeAppId]?.policy?.preferred_usages;
+    const usages = Array.isArray(policyUsages) && policyUsages.length ? policyUsages : fallbackRoleUsageHints[safeAppId];
+    return Array.isArray(usages) ? roleUsageListDisplay(usages) : "相关人物";
+  }
+
+  function roleAppUsageText(role, appId) {
+    const rows = role?.app_roles && typeof role.app_roles === "object" ? role.app_roles : {};
+    const values = rows[normalizeAppInput(appId)];
+    return Array.isArray(values) ? roleUsageListDisplay(values) : roleUsageDisplay(values);
+  }
+
+  function roleAppUsageInputs(role) {
+    return roleAppBindingOptions(role).map((app) => `
+      <label class="fmca-role-app-usage-row">
+        <span>${esc(app.label || app.app_id)}：</span>
+        <input data-role-app-usage="${esc(app.app_id)}" value="${esc(roleAppUsageText(role, app.app_id))}" placeholder="${esc(roleAppUsagePlaceholder(app.app_id))}">
+      </label>
+    `).join("");
+  }
+
+  function normalizeRoleUsageInput(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const alias = roleUsageAliasMap.get(raw) || roleUsageAliasMap.get(raw.toLowerCase());
+    if (alias) return alias;
+    return raw.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
   }
 
   function roleGeneratorField(name) {
@@ -352,17 +527,26 @@
     const contractBlocks = (preview.contract_blocks || []).map((item) => `${item.label || item.block_id} (${item.block_id})`).join(", ") || "-";
     const schema = (preview.schemas || [])[0] || {};
     const context = preview.context_preview || {};
-    const useCustom = Boolean(preview.settings?.use_custom_prompt && preview.custom_prompt);
-    return [
+    const mode = preview.settings?.prompt_mode || (preview.settings?.use_custom_prompt ? "override" : "default");
+    const modeLabel = mode === "override" ? "\u7f16\u8f91\u5b8c\u6574 Prompt" : mode === "additive" ? "\u8ffd\u52a0\u8bf4\u660e" : "\u9ed8\u8ba4\u63d0\u793a\u8bcd";
+    const bodyPrompt = preview.prompt_body || preview.editable_default_prompt || preview.custom_prompt || "";
+    const lockedContract = preview.locked_contract_text || "";
+    const sections = [
       `Scope: ${preview.scope_label || preview.scope || "-"}`,
-      `Mode: ${useCustom ? "自定义提示词" : "默认提示词"}`,
+      `Mode: ${modeLabel}`,
       `Active blocks: ${blocks}`,
       `Locked contract: ${contractBlocks}`,
       `Context: ${context.role_count ?? 0} enabled roles, ${context.sticker_count ?? 0} stickers, ${context.block_count ?? 0} prompt blocks.`,
       `Output contract: root=${schema.root || "-"}; required=${(schema.required_fields || []).join(", ") || "-"}; notes=${schema.notes || "-"}`,
-      `Final prompt:\n${preview.assembled_prompt || "-"}`,
-    ].join("\n\n");
+      `\u6700\u7ec8\u4f1a\u7ed9\u6a21\u578b\u7684 Prompt\uff1a\n\n--- \u4f60\u7f16\u8f91\u7684\u4e3b\u4f53 Prompt ---\n${bodyPrompt || "-"}`,
+    ];
+    if (lockedContract) {
+      sections.push(`--- \u7cfb\u7edf\u9501\u5b9a\u8f93\u51fa\u5951\u7ea6\uff08\u4f1a\u81ea\u52a8\u8ffd\u52a0\uff0c\u4e0d\u9700\u8981\u5728\u4e0a\u9762\u91cd\u590d\u5199\uff09---\n${lockedContract}`);
+    }
+    sections.push(`--- \u5408\u6210\u540e\u5b9e\u9645\u53d1\u9001\u7ed9\u6a21\u578b ---\n${preview.assembled_prompt || "-"}`);
+    return sections.join("\n\n");
   }
+
 
   function readablePromptTest(result) {
     if (!result) return "\u5c1a\u672a\u6d4b\u8bd5\u3002";
@@ -514,19 +698,73 @@
     `;
   }
 
+
+  function displayPackLabel(pack) {
+    if (!pack) return "";
+    if (pack.pack_id === "default") return "\u9ed8\u8ba4\u5185\u7f6e\u8868\u60c5\u5305";
+    return pack.label || pack.pack_id || "";
+  }
+
+  function stickersForPack(packId) {
+    return (state.stickers || []).filter((item) => String(item.pack_id || "") === String(packId || ""));
+  }
+
+  function selectedRoleAppPool() {
+    const pools = state.roleAppPools?.pools || {};
+    return state.roleAppFilter ? pools[state.roleAppFilter] || null : null;
+  }
+
+  function renderRoleAppPools() {
+    const pools = state.roleAppPools?.pools || {};
+    const entries = Object.values(pools);
+    const selected = state.roleAppFilter || "";
+    if (!entries.length) return '<div class="fmca-empty">暂无 App 角色池数据。</div>';
+    return `
+      <section class="fmca-role-app-pools">
+        <div class="fmca-role-app-pools-head">
+          <div>
+            <h4>App 角色池</h4>
+            <p>点击 App 卡片可过滤左侧角色列表；再次查看全部可取消筛选。</p>
+          </div>
+          <button class="fmca-button" type="button" data-action="filter-role-app" data-app-id="" ${selected ? "" : "disabled"}>全部角色</button>
+        </div>
+        <div class="fmca-role-app-pool-grid">
+          ${entries.map((pool) => `
+            <button class="fmca-mini-card fmca-role-app-pool-card${selected === pool.app_id ? " is-active" : ""}" type="button" data-action="filter-role-app" data-app-id="${esc(pool.app_id)}" title="${esc(roleUsageListDisplay(pool.policy?.preferred_usages || []) || '相关人物')}">
+              <header><strong>${esc(pool.label || pool.app_id)}</strong><span>${esc(pool.count || 0)} 个候选</span></header>
+              <p class="fmca-role-app-pool-stats">适合 ${esc(pool.suitable_count || 0)} · 可用 ${esc(pool.neutral_count || 0)} · 排除 ${esc(pool.blocked_count || 0)}</p>
+              <div class="fmca-chip-line">
+                ${(pool.roles || []).slice(0, 8).map((role) => `<span title="${esc(roleUsageListDisplay(role.usage || []) || '未指定用途')}">${esc(role.display_name)}${(role.usage || []).length ? ` · ${esc(roleUsageListDisplay(role.usage, '/'))}` : ''}</span>`).join('') || '<em>暂无候选</em>'}
+              </div>
+            </button>
+          `).join('')}
+        </div>
+      </section>
+    `;
+  }
+
   function renderRoles() {
     const container = byId("fmca-role-list");
     if (!container) return;
-    if (!state.roles.length) {
-      container.innerHTML = '<div class="fmca-empty">角色库为空。可以同步当前角色卡，或手动新建角色。</div>';
+    const selectedPool = selectedRoleAppPool();
+    const roleById = new Map(state.roles.map((role) => [role.role_id, role]));
+    const poolRoles = selectedPool?.roles || [];
+    const visibleRoles = selectedPool
+      ? poolRoles.map((poolRole) => roleById.get(poolRole.role_id)).filter(Boolean)
+      : state.roles;
+    const filterNotice = selectedPool
+      ? `<div class="fmca-role-filter-notice"><strong>当前筛选：${esc(selectedPool.label || selectedPool.app_id)}</strong><span>${esc(poolRoles.length)} 个候选角色</span></div>`
+      : "";
+    if (!visibleRoles.length) {
+      container.innerHTML = `${filterNotice}<div class="fmca-empty">${selectedPool ? "该 App 暂无候选角色。" : "角色库为空。可以同步当前角色卡，或手动新建角色。"}</div>${renderRoleAppPools()}`;
     } else {
-      container.innerHTML = state.roles
+      container.innerHTML = `${filterNotice}${visibleRoles
         .map((role) => `
           <article class="fmca-list-card${role.enabled ? "" : " is-disabled"}">
             <header>
               <div>
                 <strong>${esc(role.display_name)}</strong>
-                <span>${esc(role.role_id)} · ${esc(role.source)} · ${role.enabled ? "启用" : "禁用"}</span>
+                <span>${esc(role.role_id)} ? ${esc(role.source)} ? ${role.enabled ? "启用" : "禁用"}</span>
               </div>
               <div class="fmca-actions">
                 ${role.enabled ? "" : `<button class="fmca-button" type="button" data-action="restore-role" data-role-id="${esc(role.role_id)}">恢复</button>`}
@@ -534,9 +772,13 @@
               </div>
             </header>
             <p>${esc(role.summary || "暂无摘要。")}</p>
+            <div class="fmca-role-app-summary">
+              <span>适合：${esc(appScopeLabelText(role.suitable_apps, "未限定"))}</span>
+              <span>避免：${esc(appScopeLabelText(role.blocked_apps, "无"))}</span>
+            </div>
           </article>
         `)
-        .join("");
+        .join("")}${renderRoleAppPools()}`;
     }
     renderRoleEditor();
   }
@@ -578,6 +820,31 @@
           <span>聊天风格</span>
           <textarea name="chat_style" maxlength="500">${esc(role?.chat_style || "")}</textarea>
         </label>
+        <section class="fmca-role-app-bind-panel">
+          <header>
+            <strong>\u89d2\u8272 / App \u7ed1\u5b9a</strong>
+            <span>\u52fe\u9009\u89d2\u8272\u9002\u5408\u6216\u6392\u9664\u7684 App\uff1b\u4e0b\u65b9\u7684\u7528\u9014\u5c0f\u6846\u53ef\u9009\uff0c\u76f4\u63a5\u5199\u4e2d\u6587\u5373\u53ef\uff0c\u4e5f\u53ef\u5148\u7559\u7a7a\u3002</span>
+          </header>
+          <div class="fmca-role-app-scope-grid">
+            <div class="fmca-role-app-scope-group">
+              <strong>\u9002\u5408\u51fa\u73b0\u7684 App</strong>
+              <p>\u52fe\u9009\u540e\uff0c\u751f\u6210\u65f6\u4f1a\u4f18\u5148\u8ba9\u8fd9\u4e2a\u89d2\u8272\u5728\u8be5 App \u51fa\u573a\u3002</p>
+              <div class="fmca-chip-checks">${roleAppScopeControls(role, "suitable_apps")}</div>
+            </div>
+            <div class="fmca-role-app-scope-group">
+              <strong>\u6392\u9664 / \u4e0d\u8981\u51fa\u73b0\u7684 App</strong>
+              <p>\u52fe\u9009\u540e\uff0c\u8be5\u89d2\u8272\u4f1a\u4ece\u5bf9\u5e94 App \u7684\u5019\u9009\u6c60\u91cc\u6392\u9664\u3002</p>
+              <div class="fmca-chip-checks">${roleAppScopeControls(role, "blocked_apps")}</div>
+            </div>
+          </div>
+          <div class="fmca-role-app-usage-panel">
+            <div>
+              <strong>App \u5185\u7528\u9014</strong>
+              <p>\u4f8b\u5982\u76f4\u64ad\u5199\u201c\u4e3b\u64ad\u3001\u89c2\u4f17\u201d\uff0c\u8bba\u575b\u5199\u201c\u53d1\u5e16\u4eba\u3001\u697c\u5c42\u56de\u590d\u8005\u201d\u3002\u8fd9\u4e0d\u662f\u5fc5\u586b\uff0c\u53ea\u662f\u5e2e AI \u7406\u89e3\u201c\u8fd9\u4e2a\u4eba\u5728\u8fd9\u4e2a App \u91cc\u5e72\u4ec0\u4e48\u201d\u3002</p>
+            </div>
+            <div class="fmca-role-app-usage-grid">${roleAppUsageInputs(role)}</div>
+          </div>
+        </section>
         <label class="fmca-field">
           <span>偏好 tags</span>
           <input name="preferred_tags" value="${esc(tagsToText(role?.sticker_preferences?.preferred_tags || []))}" placeholder="happy, shy, soft">
@@ -705,12 +972,12 @@
     container.innerHTML = `
       <div class="fmca-editor-header">
         <div>
-          <h3>人物生成</h3>
-          <p>从已知信息、身份、外观和应用范围生成小手机边缘角色；保存后只进入独立角色库。</p>
+          <h3>AI \u751f\u6210\u89d2\u8272\u8349\u7a3f</h3>
+          <p>\u4e0a\u534a\u533a\u7528\u4e8e\u586b\u5199\u751f\u6210\u6761\u4ef6\uff0cAI \u4f1a\u5148\u751f\u6210\u4e00\u4e2a\u6216\u591a\u4e2a\u5019\u9009\u8349\u7a3f\uff1b\u8349\u7a3f\u4e0d\u4f1a\u76f4\u63a5\u5165\u5e93\uff0c\u9700\u8981\u5728\u4e0b\u65b9\u5ba1\u6838\u5e76\u4fdd\u5b58\u3002</p>
         </div>
         <div class="fmca-actions">
-          <button class="fmca-button" type="button" data-action="extract-event-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>从事件提取候选</button>
-          <button class="fmca-button" type="button" data-action="extract-chat-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>从主 Chat 提取候选</button>
+          <button class="fmca-button" type="button" data-action="extract-event-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>\u4ece\u4e8b\u4ef6\u63d0\u53d6\u8349\u7a3f</button>
+          <button class="fmca-button" type="button" data-action="extract-chat-role-drafts" ${state.roleGeneratorBusy ? "disabled" : ""}>\u4ece\u4e3b Chat \u63d0\u53d6\u8349\u7a3f</button>
           <button class="fmca-button" type="button" data-action="clear-role-generator" ${state.roleGeneratorBusy ? "disabled" : ""}>清空</button>
         </div>
       </div>
@@ -734,18 +1001,20 @@
           <div class="fmca-chip-checks">${roleGeneratorScopeControls("blocked_apps")}</div>
         </div>
         <div class="fmca-actions fmca-wide">
-          <button class="fmca-button fmca-primary" type="submit" ${state.roleGeneratorBusy ? "disabled" : ""}>${state.roleGeneratorBusy ? "生成中..." : "生成草稿"}</button>
+          <button class="fmca-button fmca-primary" type="submit" ${state.roleGeneratorBusy ? "disabled" : ""}>${state.roleGeneratorBusy ? "\u751f\u6210\u4e2d..." : "\u6839\u636e\u4e0a\u65b9\u4fe1\u606f\u751f\u6210\u8349\u7a3f"}</button>
           <button class="fmca-button" type="button" data-action="save-role-generator-selected" ${!selectedDraft || state.roleGeneratorBusy ? "disabled" : ""}>保存选中</button>
           <button class="fmca-button" type="button" data-action="save-role-generator-all" ${!drafts.length || state.roleGeneratorBusy ? "disabled" : ""}>全部保存</button>
         </div>
       </form>
       <div class="fmca-two-col fmca-role-generator-result">
         <section>
-          <h3>草稿列表</h3>
+          <h3>\u5f85\u786e\u8ba4\u8349\u7a3f</h3>
+          <p class="fmca-muted">\u8fd9\u91cc\u5c55\u793a AI \u751f\u6210\u6216\u4ece\u5386\u53f2\u5185\u5bb9\u63d0\u53d6\u51fa\u7684\u89d2\u8272\u8349\u7a3f\u3002\u786e\u8ba4\u65e0\u8bef\u540e\u518d\u4fdd\u5b58\u5230\u89d2\u8272\u5e93\u3002</p>
           <div class="fmca-list">${drafts.length ? drafts.map((draft, index) => roleGeneratorDraftCard(draft, index, selectedIndex)).join("") : '<div class="fmca-empty">暂无草稿。</div>'}</div>
         </section>
         <section>
-          <h3>编辑选中草稿</h3>
+          <h3>\u5ba1\u6838\u5e76\u7f16\u8f91\u8349\u7a3f</h3>
+          <p class="fmca-muted">\u8fd9\u91cc\u7528\u4e8e\u4fee\u6539\u9009\u4e2d\u8349\u7a3f\u3002\u70b9\u51fb\u201c\u4fdd\u5b58\u9009\u4e2d\u201d\u6216\u201c\u5168\u90e8\u4fdd\u5b58\u201d\u540e\uff0c\u624d\u4f1a\u8fdb\u5165\u5c0f\u624b\u673a\u72ec\u7acb\u89d2\u8272\u5e93\u3002</p>
           ${roleGeneratorDraftEditor(selectedDraft, selectedIndex)}
         </section>
       </div>
@@ -762,18 +1031,18 @@
     }
     container.innerHTML = state.stickerPacks
       .map((pack) => `
-        <article class="fmca-list-card">
+        <article class="fmca-list-card${state.selectedPackId === pack.pack_id ? " is-selected" : ""}">
           <header>
             <div>
-              <strong>${esc(pack.label)}</strong>
-              <span>${esc(pack.pack_id)} · ${esc(pack.type)} · ${pack.count || 0} 个贴纸</span>
+              <strong>${esc(displayPackLabel(pack))}</strong>
+              <span>${esc(pack.pack_id)} ? ${esc(pack.type)} ? ${pack.count || 0} \u4e2a\u8d34\u7eb8</span>
             </div>
-            <button class="fmca-button" type="button" data-action="edit-pack" data-pack-id="${esc(pack.pack_id)}">${pack.manifest_editable ? "编辑" : "查看"}</button>
+            <button class="fmca-button" type="button" data-action="edit-pack" data-pack-id="${esc(pack.pack_id)}">${pack.manifest_editable ? "\u7f16\u8f91 manifest" : "\u67e5\u770b\u8d34\u7eb8"}</button>
           </header>
-          <p>${pack.manifest_editable ? `manifest ${pack.manifest_count || 0} 条 · ${esc(pack.directory || "")}` : "内置贴纸，不写 manifest。"}</p>
+          <p>${pack.manifest_editable ? `\u53ef\u7f16\u8f91 manifest\uff1a${pack.manifest_count || 0} \u6761 ? ${esc(pack.directory || "")}` : "\u5185\u7f6e\u53ea\u8bfb\u8d34\u7eb8\u5305\uff1a\u53ef\u67e5\u770b\u8d34\u7eb8\u9884\u89c8\uff0c\u4e0d\u4f1a\u5199 manifest\u3002"}</p>
         </article>
       `)
-      .join("") || '<div class="fmca-empty">暂无表情包。</div>';
+      .join("") || '<div class="fmca-empty">\u6682\u65e0\u8868\u60c5\u5305\u3002</div>';
     renderStickerEditor();
   }
 
@@ -786,13 +1055,31 @@
       return;
     }
     if (!pack.manifest_editable) {
-      container.innerHTML = '<h3>Manifest 编辑</h3><div class="fmca-placeholder">内置表情包不支持 manifest 写入。</div>';
+      const rows = stickersForPack(pack.pack_id);
+      container.innerHTML = `
+        <div class="fmca-editor-header">
+          <div>
+            <h3>${esc(displayPackLabel(pack))} \u8d34\u7eb8\u9884\u89c8</h3>
+            <p>\u8fd9\u662f\u5185\u7f6e\u53ea\u8bfb\u8868\u60c5\u5305\uff1b\u4e0d\u652f\u6301\u5199\u5165 manifest\uff0c\u4f46\u53ef\u4ee5\u67e5\u770b\u5f53\u524d\u53ef\u7528\u8d34\u7eb8\u3002\u5982\u9700\u7f16\u8f91\uff0c\u8bf7\u5728 stickers \u76ee\u5f55\u4e0b\u65b0\u5efa\u81ea\u5b9a\u4e49\u5305\u5e76\u7ef4\u62a4 manifest.json\u3002</p>
+          </div>
+        </div>
+        <div class="fmca-sticker-preview-grid">
+          ${rows.map((item) => `
+            <article class="fmca-sticker-preview-card">
+              <div class="fmca-sticker-preview-thumb">${item.url_path ? `<img class="fmca-sticker-thumb" src="./api${esc(item.url_path)}" alt="${esc(item.label || item.id)}" loading="lazy">` : `<span>${esc(item.id || item.label || "-")}</span>`}</div>
+              <strong>${esc(item.label || item.id)}</strong>
+              <span>ID: ${esc(item.id || "-")}</span>
+              <span>Tags: ${esc((item.tags || []).join(", ") || "-")}</span>
+            </article>
+          `).join("") || '<div class="fmca-empty">\u6682\u65e0\u53ef\u9884\u89c8\u8d34\u7eb8\u3002</div>'}
+        </div>
+      `;
       return;
     }
     container.innerHTML = `
       <div class="fmca-editor-header">
         <div>
-          <h3>${esc(pack.label)} manifest</h3>
+          <h3>${esc(displayPackLabel(pack))} manifest</h3>
           <p>${esc(pack.directory || "")}</p>
         </div>
         <button class="fmca-button" type="button" data-action="scan-pack" data-pack-id="${esc(pack.pack_id)}">重扫</button>
@@ -901,79 +1188,118 @@
     return prompts[scope] || "";
   }
 
+  function selectedPromptMode() {
+    const settings = currentPromptSettings();
+    if (settings.prompt_mode) return settings.prompt_mode;
+    return settings.use_custom_prompt ? "override" : "default";
+  }
+
+  function stripLockedPromptContract(text) {
+    let value = String(text || "").trim();
+    const contract = String(state.promptPreview?.locked_contract_text || "").trim();
+    if (value && contract && value.endsWith(contract)) {
+      value = value.slice(0, -contract.length).trim();
+    }
+    return value;
+  }
+
+  function editableDefaultPrompt() {
+    return stripLockedPromptContract(state.promptPreview?.editable_default_prompt || state.promptPreview?.default_prompt || "");
+  }
+
+  function promptBlockHelp(block) {
+    const id = block?.block_id || "";
+    const help = {
+      base_contract: "基础边界：说明小手机是独立插件，不能改写主 Chat。普通用户不建议修改。",
+      role_context: "角色上下文：要求模型按角色资料、状态和当前频道行动。普通用户不建议修改。",
+      channel_behavior: "App 生成规则：控制动态、论坛、邮箱、直播等内容保持紧凑可信。普通用户不建议修改。",
+      sticker_contract: "贴纸规则：限制群聊贴纸只能使用可用 sticker id。普通用户不建议修改。",
+      json_output: "JSON 输出契约：保证模型只返回可解析 JSON。通常必须保持启用。",
+    };
+    return help[id] || "底层提示块：影响模型基础行为。仅建议高级用户修改。";
+  }
+
   function renderPromptTools() {
     const blocksBox = byId("fmca-prompt-blocks");
     const previewBox = byId("fmca-prompt-preview");
     const settings = currentPromptSettings();
     const scope = selectedPromptScope();
-    const customValue = promptCustomValue(scope);
+    const customValue = stripLockedPromptContract(promptCustomValue(scope));
+    const promptMode = selectedPromptMode();
+    const editorValue = promptMode === "override" && !customValue.trim() ? editableDefaultPrompt() : customValue;
     if (blocksBox) {
       blocksBox.innerHTML = `
-        <h3>自定义提示词</h3>
-        <p>选择一个入口，写它的系统提示词。留空会继续使用默认提示词；保存后会影响对应入口的真实生成。</p>
+        <h3>Prompt \u7f16\u8f91</h3>
+        <p>\u5148\u9009\u62e9\u5165\u53e3\u548c\u6a21\u5f0f\uff1a\u201c\u9ed8\u8ba4\u201d\u4f7f\u7528\u7cfb\u7edf Prompt\uff1b\u201c\u8ffd\u52a0\u8bf4\u660e\u201d\u628a\u4f60\u5199\u7684\u5185\u5bb9\u52a0\u5230\u9ed8\u8ba4 Prompt \u4e4b\u540e\uff1b\u201c\u7f16\u8f91\u5b8c\u6574 Prompt\u201d\u76f4\u63a5\u7f16\u8f91\u9ed8\u8ba4\u4e3b\u4f53\u3002\u9501\u5b9a\u7684 JSON \u8f93\u51fa\u5951\u7ea6\u4f1a\u5355\u72ec\u663e\u793a\u5e76\u81ea\u52a8\u8ffd\u52a0\u3002</p>
         <form class="fmca-prompt-editor" data-form="prompt-custom">
           <div class="fmca-prompt-toolbar">
             <label>
-              <span>编辑范围</span>
+              <span>\u7f16\u8f91\u8303\u56f4</span>
               <select id="fmca-prompt-scope" name="scope">
                 ${promptScopes.map(([value, label]) => `<option value="${esc(value)}" ${value === scope ? "selected" : ""}>${esc(label)}</option>`).join("")}
               </select>
             </label>
-            <label class="fmca-check fmca-prompt-switch">
-              <input type="checkbox" name="use_custom_prompt" ${settings.use_custom_prompt ? "checked" : ""}>
-              <span>启用自定义提示词</span>
+            <label>
+              <span>\u7f16\u8f91\u6a21\u5f0f</span>
+              <select name="prompt_mode" id="fmca-prompt-mode">
+                <option value="default" ${promptMode === "default" ? "selected" : ""}>\u9ed8\u8ba4\uff1a\u4f7f\u7528\u7cfb\u7edf Prompt</option>
+                <option value="additive" ${promptMode === "additive" ? "selected" : ""}>\u8ffd\u52a0\uff1a\u8865\u5145\u81ea\u7136\u8bed\u8a00\u8981\u6c42</option>
+                <option value="override" ${promptMode === "override" ? "selected" : ""}>\u7f16\u8f91\u5b8c\u6574 Prompt\uff1a\u4fee\u6539\u9ed8\u8ba4\u4e3b\u4f53</option>
+              </select>
             </label>
           </div>
           <label class="fmca-field is-wide fmca-prompt-textarea">
-            <span>${esc(promptScopeLabel(scope))}提示词</span>
-            <textarea id="fmca-custom-prompt" name="custom_prompt" rows="15" placeholder="在这里写给模型的提示词。建议说明角色语气、场景边界、回复风格，并提醒不要透露系统或插件内部信息。">${esc(customValue)}</textarea>
+            <span>${promptMode === "override" ? "\u7f16\u8f91\u5b8c\u6574 Prompt" : "\u8ffd\u52a0\u81ea\u7136\u8bed\u8a00\u8bf4\u660e"} · ${esc(promptScopeLabel(scope))}</span>
+            <textarea id="fmca-custom-prompt" name="custom_prompt" rows="15" placeholder="\u8ffd\u52a0\u6a21\u5f0f\uff1a\u53ef\u5199\u4e00\u53e5\u81ea\u7136\u8bed\u8a00\u8981\u6c42\u3002\u7f16\u8f91\u5b8c\u6574 Prompt \u6a21\u5f0f\uff1a\u6587\u672c\u6846\u4f1a\u81ea\u52a8\u8f7d\u5165\u9ed8\u8ba4\u4e3b\u4f53\uff0c\u53ef\u76f4\u63a5\u5728\u91cc\u9762\u4fee\u6539\u3002">${esc(editorValue)}</textarea>
           </label>
-          <div class="fmca-prompt-note">锁定的 JSON 输出契约会自动追加到最终提示词末尾，避免模型返回内容无法解析。</div>
+          <div class="fmca-prompt-note">\u9ed8\u8ba4\u6a21\u5f0f\u4e0d\u4f7f\u7528\u6587\u672c\u6846\u5185\u5bb9\uff1b\u8ffd\u52a0\u6a21\u5f0f\u4f1a\u628a\u6587\u672c\u4f5c\u4e3a\u9ad8\u4f18\u5148\u7ea7\u8865\u5145\u8bf4\u660e\uff1b\u7f16\u8f91\u5b8c\u6574 Prompt \u6a21\u5f0f\u4f1a\u7528\u6587\u672c\u6846\u5185\u5bb9\u66ff\u6362\u9ed8\u8ba4\u4e3b\u4f53\u3002JSON \u8f93\u51fa\u5951\u7ea6\u662f\u7cfb\u7edf\u9501\u5b9a\u6bb5\uff0c\u9884\u89c8\u91cc\u4f1a\u5355\u72ec\u5217\u51fa\uff0c\u4e0d\u9700\u8981\u5728\u4e3b\u4f53 Prompt \u91cc\u91cd\u590d\u5199\u3002</div>
           <div class="fmca-actions">
-            <button class="fmca-button fmca-primary" type="submit">保存提示词</button>
-            <button class="fmca-button" type="button" data-action="clear-current-prompt">清空当前范围</button>
-            <button class="fmca-button" type="button" data-action="refresh-prompt-preview">刷新预览</button>
+            <button class="fmca-button fmca-primary" type="submit">\u4fdd\u5b58 Prompt \u8bbe\u7f6e</button>
+            <button class="fmca-button" type="button" data-action="load-default-prompt">\u8f7d\u5165\u9ed8\u8ba4\u4e3b\u4f53 Prompt</button>
+            <button class="fmca-button" type="button" data-action="clear-current-prompt">\u6e05\u7a7a\u5f53\u524d\u8303\u56f4</button>
+            <button class="fmca-button" type="button" data-action="refresh-prompt-preview">\u5237\u65b0\u9884\u89c8</button>
           </div>
         </form>
         <section class="fmca-prompt-test">
-          <h4>Prompt 测试工作台</h4>
-          <p>用于检查最终 prompt、user message、Provider 策略、raw reply 和解析结果。真实模式会调用模型，但本测试固定 save=false。</p>
+          <h4>Prompt \u6d4b\u8bd5\u5de5\u4f5c\u53f0</h4>
+          <p>\u7528\u4e8e\u68c0\u67e5\u6700\u7ec8 prompt\u3001user message\u3001Provider \u7b56\u7565\u3001raw reply \u548c\u89e3\u6790\u7ed3\u679c\u3002\u771f\u5b9e\u6a21\u5f0f\u4f1a\u8c03\u7528\u6a21\u578b\uff0c\u4f46\u672c\u6d4b\u8bd5\u56fa\u5b9a save=false\u3002</p>
           <form class="fmca-form-grid" data-form="prompt-test">
             <label class="fmca-field">
-              <span>测试模式</span>
+              <span>\u6d4b\u8bd5\u6a21\u5f0f</span>
               <select name="mode">
-                <option value="dry-run">dry-run：只组装 Prompt</option>
-                <option value="mock">mock：模拟模型返回并测试解析</option>
-                <option value="real">real：调用真实模型（save=false）</option>
+                <option value="dry-run">dry-run\uff1a\u53ea\u7ec4\u88c5 Prompt</option>
+                <option value="mock">mock\uff1a\u6a21\u62df\u6a21\u578b\u8fd4\u56de\u5e76\u6d4b\u8bd5\u89e3\u6790</option>
+                <option value="real">real\uff1a\u8c03\u7528\u771f\u5b9e\u6a21\u578b\uff08save=false\uff09</option>
               </select>
             </label>
             <label class="fmca-field is-wide">
-              <span>测试上下文</span>
-              <textarea name="user_input" rows="4" placeholder="可写入想验证的场景、关键词或边界条件。"></textarea>
+              <span>\u6d4b\u8bd5\u4e0a\u4e0b\u6587</span>
+              <textarea name="user_input" rows="4" placeholder="\u53ef\u5199\u5165\u60f3\u9a8c\u8bc1\u7684\u573a\u666f\u3001\u5173\u952e\u8bcd\u6216\u8fb9\u754c\u6761\u4ef6\u3002"></textarea>
             </label>
             <div class="fmca-actions">
-              <button class="fmca-button fmca-primary" type="submit" ${state.promptTestBusy ? "disabled" : ""}>${state.promptTestBusy ? "测试中..." : "运行测试"}</button>
-              <button class="fmca-button" type="button" data-action="clear-prompt-test">清空结果</button>
+              <button class="fmca-button fmca-primary" type="submit" ${state.promptTestBusy ? "disabled" : ""}>${state.promptTestBusy ? "\u6d4b\u8bd5\u4e2d..." : "\u8fd0\u884c\u6d4b\u8bd5"}</button>
+              <button class="fmca-button" type="button" data-action="clear-prompt-test">\u6e05\u7a7a\u7ed3\u679c</button>
             </div>
           </form>
           <pre class="fmca-pre fmca-prompt-test-result">${esc(readablePromptTest(state.promptTestResult))}</pre>
         </section>
         <details class="fmca-prompt-details">
-          <summary>高级：默认 Prompt Blocks</summary>
-          <p>这里是旧版 blocks 配置和锁定契约。普通用户只需要编辑上面的自定义提示词。</p>
+          <summary>\u9ad8\u7ea7\uff1a\u5e95\u5c42 Prompt Blocks\uff08\u4e0d\u5efa\u8bae\u666e\u901a\u7528\u6237\u4fee\u6539\uff09</summary>
+          <p>\u8fd9\u91cc\u662f\u7ed9\u6a21\u578b\u770b\u7684\u5e95\u5c42\u7cfb\u7edf\u5951\u7ea6\uff0c\u5185\u5bb9\u4fdd\u7559\u82f1\u6587\u662f\u4e3a\u4e86\u7a33\u5b9a JSON \u548c\u6a21\u578b\u517c\u5bb9\u6027\u3002\u666e\u901a\u7528\u6237\u8bf7\u4f18\u5148\u7f16\u8f91\u4e0a\u65b9\u201c\u81ea\u5b9a\u4e49\u63d0\u793a\u8bcd\u201d\uff1b\u9664\u975e\u77e5\u9053\u5f71\u54cd\u8303\u56f4\uff0c\u5426\u5219\u4e0d\u8981\u4fee\u6539\u8fd9\u91cc\u3002</p>
           <form class="fmca-form-grid" data-form="prompt-blocks">
             ${(state.promptBlocks || []).map((block, index) => `
               <article class="fmca-mini-card">
                 <label class="fmca-check">
                   <input type="checkbox" name="enabled_${index}" ${block.enabled ? "checked" : ""} ${block.locked ? "disabled" : ""}>
-                  <span><strong>${esc(block.label)}</strong> · ${esc(block.block_id)} · order ${esc(block.order)}</span>
+                  <span><strong>${esc(block.label)}</strong> ? ${esc(block.block_id)} ? order ${esc(block.order)}</span>
                 </label>
+                <p class="fmca-prompt-block-help">${esc(promptBlockHelp(block))}</p>
                 <label class="fmca-field is-wide">
-                  <span>Scope</span>
+                  <span>\u9002\u7528\u8303\u56f4 Scope</span>
                   <input name="scope_${index}" value="${esc(tagsToText(block.scope || []))}" ${block.locked ? "readonly" : ""}>
                 </label>
                 <label class="fmca-field is-wide">
-                  <span>Content</span>
+                  <span>\u5e95\u5c42\u5185\u5bb9 Content\uff08\u7ed9\u6a21\u578b\u770b\u7684\u82f1\u6587\u5951\u7ea6\uff09</span>
                   <textarea name="content_${index}" rows="4" ${block.locked ? "readonly" : ""}>${esc(block.content || "")}</textarea>
                 </label>
                 <input type="hidden" name="block_id_${index}" value="${esc(block.block_id)}">
@@ -981,10 +1307,10 @@
                 <input type="hidden" name="order_${index}" value="${esc(block.order)}">
                 <input type="hidden" name="locked_${index}" value="${block.locked ? "1" : "0"}">
               </article>
-            `).join("") || '<div class="fmca-empty">暂无 prompt blocks。</div>'}
+            `).join("") || '<div class="fmca-empty">\u6682\u65e0 prompt blocks\u3002</div>'}
             <div class="fmca-actions">
-              <button class="fmca-button fmca-primary" type="submit">保存 blocks</button>
-              <button class="fmca-button fmca-danger" type="button" data-action="reset-prompt-blocks">重置 blocks</button>
+              <button class="fmca-button fmca-primary" type="submit">\u4fdd\u5b58 blocks</button>
+              <button class="fmca-button fmca-danger" type="button" data-action="reset-prompt-blocks">\u91cd\u7f6e blocks</button>
             </div>
           </form>
         </details>
@@ -1097,16 +1423,6 @@
 
   function renderWorkbench() {
     const workbench = state.workbench || {};
-    const model = workbench.model || {};
-    renderFacts("fmca-workbench-model", [
-      ["Provider", model.provider || "-"],
-      ["Model", model.model || "-"],
-      ["Base URL", model.base_url ? "已配置" : "未配置"],
-      ["API Key", model.api_key_configured ? "已配置（不显示）" : "未配置"],
-      ["Temperature", model.temperature ?? "-"],
-      ["Timeout", model.request_timeout ?? "-"],
-      ["Reasoning", model.reasoning_effort || "default"],
-    ]);
     const roleBox = byId("fmca-workbench-role-draft");
     if (roleBox) roleBox.textContent = state.workbenchRoleDraft ? JSON.stringify(state.workbenchRoleDraft, null, 2) : "-";
     const previewBox = byId("fmca-workbench-preview");
@@ -1286,10 +1602,11 @@
   async function refresh() {
     setError();
     try {
-      const [summary, groups, roles, stickers, automation, promptBlocks, promptPreview, apps, channels, diagnostics, workbench, dataOverview, generationControl] = await Promise.all([
+      const [summary, groups, roles, roleAppPools, stickers, automation, promptBlocks, promptPreview, apps, channels, diagnostics, workbench, dataOverview, generationControl] = await Promise.all([
         request("/admin/summary"),
         request("/groups"),
         request("/admin/roles"),
+        request("/admin/role-app-pools"),
         request("/admin/sticker-packs"),
         request("/admin/automation"),
         request("/admin/prompt-blocks"),
@@ -1306,6 +1623,7 @@
       state.roles = roles.roles || [];
       state.availableRoles = roles.available || [];
       state.user = roles.user || null;
+      state.roleAppPools = roleAppPools || null;
       state.stickerPacks = stickers.packs || [];
       state.stickers = stickers.stickers || [];
       state.automation = automation;
@@ -1397,8 +1715,70 @@
     }
   }
 
+  function roleAppRolesValue(role) {
+    const rows = role?.app_roles && typeof role.app_roles === "object" ? role.app_roles : {};
+    return Object.entries(rows).map(([appId, values]) => `${appId}: ${Array.isArray(values) ? values.join(", ") : values}`).join("\n");
+  }
+
+  function parseRoleAppRoles(text) {
+    const result = {};
+    String(text || "").split(/\n+/).forEach((line) => {
+      const [rawApp, ...rest] = line.split(":");
+      const appId = normalizeAppInput(rawApp);
+      const values = rest.join(":").split(/[,\uFF0C\u3001\s]+/).map(normalizeRoleUsageInput).filter(Boolean);
+      if (appId && values.length) result[appId] = values;
+    });
+    return result;
+  }
+
+  function appScopeValuesFromData(data, name) {
+    const seen = new Set();
+    return data.getAll(name)
+      .flatMap((value) => appScopeToTags(value))
+      .filter((item) => {
+        if (!item || seen.has(item)) return false;
+        seen.add(item);
+        return true;
+      });
+  }
+
+  function roleAppRolesFromForm(form) {
+    const result = parseRoleAppRoles(new FormData(form).get("app_roles"));
+    form.querySelectorAll("[data-role-app-usage]").forEach((input) => {
+      const appId = normalizeAppInput(input.dataset.roleAppUsage || "");
+      if (!appId) return;
+      const seen = new Set();
+      const values = String(input.value || "")
+        .split(/[,\uFF0C\u3001\s]+/)
+        .map(normalizeRoleUsageInput)
+        .filter((item) => {
+          if (!item || seen.has(item)) return false;
+          seen.add(item);
+          return true;
+        })
+        .slice(0, 8);
+      if (values.length) result[appId] = values;
+      else delete result[appId];
+    });
+    return result;
+  }
+
+  function handleRoleAppScopeChange(input) {
+    if (!input?.checked) return;
+    const form = input.closest('form[data-form="role"]');
+    if (!form) return;
+    const field = input.dataset.roleAppScope || "";
+    const opposite = field === "suitable_apps" ? "blocked_apps" : "suitable_apps";
+    [...form.querySelectorAll(`[data-role-app-scope="${opposite}"]`)].forEach((peer) => {
+      if (peer.value === input.value) peer.checked = false;
+    });
+  }
+
   function rolePayloadFrom(form) {
     const data = new FormData(form);
+    const blockedApps = appScopeValuesFromData(data, "blocked_apps");
+    const blockedSet = new Set(blockedApps);
+    const suitableApps = appScopeValuesFromData(data, "suitable_apps").filter((appId) => !blockedSet.has(appId));
     return {
       role_id: data.get("role_id") || undefined,
       display_name: data.get("display_name"),
@@ -1406,6 +1786,9 @@
       status: data.get("status"),
       summary: data.get("summary"),
       chat_style: data.get("chat_style"),
+      suitable_apps: suitableApps,
+      blocked_apps: blockedApps,
+      app_roles: roleAppRolesFromForm(form),
       auto_speak_weight: Number.parseFloat(data.get("auto_speak_weight") || "1"),
       enabled: data.has("enabled"),
       sticker_preferences: {
@@ -1605,14 +1988,17 @@
     const scope = promptScopes.some(([value]) => value === data.get("scope")) ? String(data.get("scope")) : "group_chat";
     state.promptScope = scope;
     const current = currentPromptSettings();
-    const custom_prompts = { ...(current.custom_prompts || {}), [scope]: data.get("custom_prompt") || "" };
+    const promptMode = String(data.get("prompt_mode") || "default");
+    const customPrompt = promptMode === "override" ? stripLockedPromptContract(data.get("custom_prompt")) : String(data.get("custom_prompt") || "");
+    const custom_prompts = { ...(current.custom_prompts || {}), [scope]: customPrompt };
     try {
       const result = await request("/settings", {
         method: "POST",
         body: JSON.stringify({
           prompt: {
             ...current,
-            use_custom_prompt: data.has("use_custom_prompt"),
+            use_custom_prompt: promptMode !== "default",
+            prompt_mode: promptMode,
             append_json_contract: true,
             custom_prompts,
             last_preview_channel: scope,
@@ -1664,6 +2050,24 @@
     if (textarea) textarea.value = "";
     const form = textarea?.closest("form");
     if (form) await savePromptCustom(form);
+  }
+
+  function loadDefaultPromptIntoEditor() {
+    const textarea = byId("fmca-custom-prompt");
+    const mode = byId("fmca-prompt-mode");
+    if (!textarea) return;
+    textarea.value = editableDefaultPrompt();
+    if (mode) mode.value = "override";
+    setToast("\u5df2\u8f7d\u5165\u9ed8\u8ba4\u4e3b\u4f53 Prompt\uff0cJSON \u8f93\u51fa\u5951\u7ea6\u4f1a\u5728\u9884\u89c8\u4e2d\u5355\u72ec\u663e\u793a\u5e76\u81ea\u52a8\u8ffd\u52a0\u3002");
+  }
+
+  function handlePromptModeChange(select) {
+    const textarea = byId("fmca-custom-prompt");
+    if (!textarea) return;
+    if (select.value === "override" && !textarea.value.trim()) {
+      textarea.value = editableDefaultPrompt();
+      setToast("\u5df2\u81ea\u52a8\u8f7d\u5165\u9ed8\u8ba4\u4e3b\u4f53 Prompt\uff0c\u53ef\u76f4\u63a5\u5728\u6587\u672c\u6846\u5185\u4fee\u6539\u3002");
+    }
   }
 
 
@@ -1994,6 +2398,9 @@
       if (action === "refresh-prompt-preview") {
         await refreshPromptPreview();
       }
+      if (action === "load-default-prompt") {
+        loadDefaultPromptIntoEditor();
+      }
       if (action === "clear-current-prompt") {
         if (!window.confirm("确定清空当前范围的自定义提示词？")) return;
         await clearCurrentPrompt();
@@ -2008,6 +2415,11 @@
         const result = await request("/admin/prompt-blocks/reset", { method: "POST" });
         state.promptBlocks = result.blocks || [];
         await refreshPromptPreview();
+      }
+      if (action === "filter-role-app") {
+        state.roleAppFilter = button.dataset.appId || "";
+        renderRoles();
+        setToast(state.roleAppFilter ? "\u5df2\u6309 App \u89d2\u8272\u6c60\u7b5b\u9009\u89d2\u8272\u5217\u8868\u3002" : "\u5df2\u663e\u793a\u5168\u90e8\u89d2\u8272\u3002");
       }
       if (action === "save-apps") {
         await saveApps();
@@ -2080,6 +2492,16 @@
       void refreshPromptPreview(state.promptScope);
       return;
     }
+    const promptMode = event.target.closest("#fmca-prompt-mode");
+    if (promptMode) {
+      handlePromptModeChange(promptMode);
+      return;
+    }
+    const roleAppScope = event.target.closest("[data-role-app-scope]");
+    if (roleAppScope) {
+      handleRoleAppScopeChange(roleAppScope);
+      return;
+    }
     const scope = event.target.closest("[data-role-generator-draft-scope]");
     if (!scope) return;
     const index = Number.parseInt(scope.dataset.index || String(state.roleGeneratorSelectedIndex || 0), 10);
@@ -2092,6 +2514,7 @@
   byId("fmca-refresh").addEventListener("click", refresh);
   byId("fmca-back-chat")?.addEventListener("click", backToChat);
   byId("fmca-settings-form").addEventListener("submit", saveSettings);
+  byId("fmca-api-settings-form")?.addEventListener("submit", saveSettings);
   byId("fmca-apply-api-preset")?.addEventListener("click", applyApiPreset);
   byId("fmca-fetch-models")?.addEventListener("click", () => { void fetchModelList(); });
   byId("fmca-toggle-model-menu")?.addEventListener("click", (event) => {
@@ -2105,6 +2528,9 @@
     }
   });
   byId("fmca-reset-form").addEventListener("click", () => {
+    if (state.summary?.settings) applySettingsForm(state.summary.settings);
+  });
+  byId("fmca-reset-api-form")?.addEventListener("click", () => {
     if (state.summary?.settings) applySettingsForm(state.summary.settings);
   });
   byId("fmca-reset-position").addEventListener("click", resetPosition);

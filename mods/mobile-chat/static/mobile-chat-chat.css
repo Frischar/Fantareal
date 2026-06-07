@@ -4543,6 +4543,31 @@
   color: rgba(226, 232, 240, 0.68);
 }
 
+.fmcp-live-room-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.fmcp-live-next {
+  min-height: 32px;
+  border: 1px solid rgba(125, 211, 252, 0.42);
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.16);
+  color: #e0f2fe;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 840;
+  padding: 0 12px;
+}
+
+.fmcp-live-next:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .fmcp-live-follow {
   min-height: 32px;
   border: 0;
@@ -4589,6 +4614,7 @@
 .fmcp-live-player-top,
 .fmcp-live-player-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -5064,4 +5090,29 @@
   font-weight: 840;
   padding: 0 13px;
   box-shadow: 0 10px 20px rgba(49, 95, 203, 0.24);
+}
+
+
+.fmcp-live-retry-notice {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 122, 122, 0.35);
+  border-radius: 16px;
+  background: rgba(255, 242, 242, 0.92);
+  color: #7f1d1d;
+}
+
+.fmcp-live-retry-notice strong {
+  font-size: 13px;
+}
+
+.fmcp-live-retry-notice span {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fmcp-live-retry-notice .fmcp-button {
+  justify-self: start;
 }
