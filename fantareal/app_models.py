@@ -20,6 +20,16 @@ class ChatHistoryRerollRequest(BaseModel):
     message_index: int = Field(ge=0)
 
 
+class DirectorNotePayload(BaseModel):
+    content: str = Field(default="", max_length=12000)
+    remaining_turns: int = Field(default=1, ge=1, le=20)
+    position: str = "after_char_defs"
+
+
+class DirectorNoteDeletePayload(BaseModel):
+    id: str = ""
+
+
 class PersonaPayload(BaseModel):
     name: str
     system_prompt: str
@@ -33,6 +43,7 @@ class SettingsPayload(BaseModel):
     theme: str = "dark"
     temperature: float = 0.85
     history_limit: int = 20
+    prompt_budget_token_limit: int = 100000
     request_timeout: int = 120
     demo_mode: bool = False
     ui_opacity: float = 0.84

@@ -131,6 +131,7 @@ LEGACY_CURRENT_CARD_PATH = DATA_DIR / "current_role_card.json"
 GLOBAL_PRESET_PATH = DATA_DIR / "preset.json"
 GLOBAL_WORKSHOP_STATE_PATH = DATA_DIR / "creative_workshop_state.json"
 GLOBAL_USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
+GLOBAL_DIRECTOR_NOTES_PATH = DATA_DIR / "director_notes.json"
 GLOBAL_WORLDBOOK_RUNTIME_STATE_PATH = DATA_DIR / "worldbook_runtime_state.json"
 GLOBAL_ROUTE_FORWARDING_PATH = DATA_DIR / "route_forwarding.json"
 SLOT_MIGRATION_MARKER_PATH = DATA_DIR / ".slot_migration_done"
@@ -432,6 +433,7 @@ DEFAULT_SETTINGS = {
     "theme": "dark",
     "temperature": 0.85,
     "history_limit": 20,
+    "prompt_budget_token_limit": 100000,
     "request_timeout": 120,
     "demo_mode": False,
     "ui_opacity": 0.84,
@@ -454,6 +456,7 @@ DEFAULT_SETTINGS = {
     "rerank_top_n": 3,
     "sprite_enabled": False,
     "sprite_base_path": DEFAULT_SPRITE_BASE_PATH,
+    "layered_prompt_injection_enabled": False,
     "memory_summary_length": "medium",
     "memory_summary_max_chars": 520,
 }
@@ -788,6 +791,112 @@ def default_user_profile() -> dict[str, Any]:
     }
 
 
+DIRECTOR_NOTE_POSITIONS = {"before_char_defs", "after_char_defs", "before_user_input"}
+
+
+def normalize_director_note_position(value: Any) -> str:
+    text = str(value or "").strip()
+    return text if text in DIRECTOR_NOTE_POSITIONS else "after_char_defs"
+
+
+def sanitize_director_note(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    content = str(raw.get("content", "") or "").strip()
+    if not content:
+        return None
+    note_id = str(raw.get("id", "") or "").strip()
+    if not note_id:
+        seed = f"{content}|{raw.get('created_at', '')}|{random.random()}"
+        note_id = "director_note_" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:12]
+    remaining_turns = clamp_int(raw.get("remaining_turns"), 1, 20, 1)
+    created_at = str(raw.get("created_at", "") or "").strip()
+    updated_at = str(raw.get("updated_at", "") or "").strip()
+    return {
+        "id": note_id,
+        "content": content[:12000],
+        "remaining_turns": remaining_turns,
+        "position": normalize_director_note_position(raw.get("position")),
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
+
+
+def sanitize_director_notes(raw: Any) -> list[dict[str, Any]]:
+    source = raw.get("items", []) if isinstance(raw, dict) else raw
+    if not isinstance(source, list):
+        return []
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw_item in source:
+        item = sanitize_director_note(raw_item)
+        if not item:
+            continue
+        note_id = item["id"]
+        if note_id in seen:
+            continue
+        seen.add(note_id)
+        items.append(item)
+    return items[:50]
+
+
+def get_director_notes(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return sanitize_director_notes(read_json(director_notes_path(slot_id), []))
+
+
+def save_director_notes(items: list[dict[str, Any]], slot_id: str | None = None) -> list[dict[str, Any]]:
+    sanitized = sanitize_director_notes(items)
+    persist_json(
+        director_notes_path(slot_id),
+        sanitized,
+        detail="Director notes save failed. Please check disk space or file permissions.",
+    )
+    return sanitized
+
+
+def create_director_note(payload: dict[str, Any], slot_id: str | None = None) -> list[dict[str, Any]]:
+    content = str(payload.get("content", "") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="导演注内容不能为空。")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    seed = f"{now}|{content}|{random.random()}"
+    note = {
+        "id": "director_note_" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:12],
+        "content": content[:12000],
+        "remaining_turns": clamp_int(payload.get("remaining_turns"), 1, 20, 1),
+        "position": normalize_director_note_position(payload.get("position")),
+        "created_at": now,
+        "updated_at": now,
+    }
+    items = get_director_notes(slot_id)
+    items.append(note)
+    return save_director_notes(items, slot_id)
+
+
+def delete_director_note(note_id: str, slot_id: str | None = None) -> list[dict[str, Any]]:
+    target_id = str(note_id or "").strip()
+    items = [item for item in get_director_notes(slot_id) if str(item.get("id", "")) != target_id]
+    return save_director_notes(items, slot_id)
+
+
+def consume_director_notes_turn(slot_id: str | None = None) -> list[dict[str, Any]]:
+    changed = False
+    items: list[dict[str, Any]] = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for item in get_director_notes(slot_id):
+        remaining = max(0, int(item.get("remaining_turns", 1) or 1) - 1)
+        if remaining <= 0:
+            changed = True
+            continue
+        if remaining != item.get("remaining_turns"):
+            item = dict(item)
+            item["remaining_turns"] = remaining
+            item["updated_at"] = now
+            changed = True
+        items.append(item)
+    return save_director_notes(items, slot_id) if changed else items
+
+
 def default_creative_workshop() -> dict[str, Any]:
     return json.loads(json.dumps(default_role_card()["creativeWorkshop"], ensure_ascii=False))
 
@@ -1059,6 +1168,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "theme": "dark" if str(settings.get("theme", "dark")).strip() == "dark" else "light",
         "temperature": clamp_float(settings.get("temperature"), 0.0, 2.0, 0.85),
         "history_limit": clamp_int(settings.get("history_limit"), 1, 100, 20),
+        "prompt_budget_token_limit": clamp_int(settings.get("prompt_budget_token_limit"), 0, 200000, 100000),
         "request_timeout": clamp_int(settings.get("request_timeout"), 10, 600, 120),
         "demo_mode": parse_bool(settings.get("demo_mode"), False),
         "ui_opacity": clamp_float(settings.get("ui_opacity"), 0.2, 1.0, 0.84),
@@ -1077,6 +1187,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "font_color": sanitize_font_color(settings.get("font_color", "")),
         "sprite_enabled": parse_bool(settings.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
+        "layered_prompt_injection_enabled": parse_bool(settings.get("layered_prompt_injection_enabled"), False),
         "embedding_base_url": str(settings.get("embedding_base_url", "")).strip(),
         "embedding_api_key": str(settings.get("embedding_api_key", "")).strip(),
         "embedding_model": str(settings.get("embedding_model", "")).strip(),
@@ -1290,6 +1401,11 @@ def workshop_state_path(slot_id: str | None = None) -> Path:
 def user_profile_path(slot_id: str | None = None) -> Path:
     return GLOBAL_USER_PROFILE_PATH
     return get_slot_dir(slot_id) / "user_profile.json"
+
+
+def director_notes_path(slot_id: str | None = None) -> Path:
+    return GLOBAL_DIRECTOR_NOTES_PATH
+    return get_slot_dir(slot_id) / "director_notes.json"
 
 
 def route_forwarding_path() -> Path:
@@ -2303,6 +2419,7 @@ def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
         "llm_model": str(source.get("llm_model", "")).strip(),
         "temperature": clamp_float(source.get("temperature"), 0.0, 2.0, 0.85),
         "history_limit": clamp_int(source.get("history_limit"), 1, 100, 20),
+        "prompt_budget_token_limit": clamp_int(source.get("prompt_budget_token_limit"), 0, 200000, 100000),
         "request_timeout": clamp_int(source.get("request_timeout"), 10, 600, 120),
         "demo_mode": parse_bool(source.get("demo_mode"), False),
         "embedding_base_url": str(source.get("embedding_base_url", "")).strip(),
@@ -2317,6 +2434,7 @@ def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
         "rerank_top_n": clamp_int(source.get("rerank_top_n"), 1, 12, 3),
         "sprite_enabled": parse_bool(source.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
+        "layered_prompt_injection_enabled": parse_bool(source.get("layered_prompt_injection_enabled"), False),
     }
 
 
@@ -2377,10 +2495,12 @@ def get_runtime_chat_config(runtime_overrides: dict[str, Any] | None = None) -> 
         "model": model or route_defaults["model"],
         "temperature": overrides.get("temperature") if runtime_overrides else settings.get("temperature", 0.85),
         "history_limit": overrides.get("history_limit") if runtime_overrides else settings.get("history_limit", 20),
+        "prompt_budget_token_limit": overrides.get("prompt_budget_token_limit") if runtime_overrides else settings.get("prompt_budget_token_limit", 100000),
         "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
         "demo_mode": overrides.get("demo_mode") if runtime_overrides else settings.get("demo_mode", False),
         "sprite_enabled": overrides.get("sprite_enabled") if runtime_overrides else settings.get("sprite_enabled", False),
         "sprite_base_path": overrides.get("sprite_base_path") if runtime_overrides else settings.get("sprite_base_path", DEFAULT_SPRITE_BASE_PATH),
+        "layered_prompt_injection_enabled": overrides.get("layered_prompt_injection_enabled") if runtime_overrides else settings.get("layered_prompt_injection_enabled", False),
     }
 
 
@@ -4609,6 +4729,7 @@ configure_prompt_builder(
     normalize_worldbook_injection_role=_normalize_worldbook_injection_role,
     build_preset_prompt=build_preset_prompt,
     build_preset_observation_segments=build_preset_observation_segments,
+    get_director_notes=get_director_notes,
 )
 
 load_env_file()
@@ -4669,6 +4790,10 @@ route_ctx = SimpleNamespace(
     delete_preset_from_store=delete_preset_from_store,
     duplicate_preset_in_store=duplicate_preset_in_store,
     evaluate_creative_workshop=evaluate_creative_workshop,
+    create_director_note=create_director_note,
+    delete_director_note=delete_director_note,
+    consume_director_notes_turn=consume_director_notes_turn,
+    director_notes_path=director_notes_path,
     fetch_available_models=fetch_available_models,
     fetch_embeddings=fetch_embeddings,
     generate_reply=generate_reply,
@@ -4677,6 +4802,7 @@ route_ctx = SimpleNamespace(
     get_active_slot_id=get_active_slot_id,
     get_conversation=get_conversation,
     get_current_card=get_current_card,
+    get_director_notes=get_director_notes,
     get_memories=get_memories,
     get_mod=lambda slug: next(
         (mod.to_dict() for mod in registered_mods if mod.slug == slug), None
