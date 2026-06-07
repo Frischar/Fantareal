@@ -252,6 +252,9 @@ code {
 }
 
 .fmca-row input[type="number"],
+.fmca-row input[type="text"],
+.fmca-row input[type="password"],
+.fmca-row input[type="url"],
 .fmca-row select {
   width: 100%;
   min-height: 38px;
@@ -260,6 +263,91 @@ code {
   background: rgba(7, 13, 21, 0.58);
   color: #eef5f5;
   padding: 7px 10px;
+}
+
+.fmca-api-preset-row,
+.fmca-api-row {
+  grid-template-columns: minmax(150px, 180px) minmax(0, 1fr);
+}
+
+.fmca-api-preset-row {
+  display: grid;
+  align-items: end;
+  gap: 12px;
+  padding: 6px 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fmca-api-preset-row label {
+  display: grid;
+  gap: 7px;
+}
+
+.fmca-api-preset-row label span {
+  color: rgba(219, 231, 241, 0.72);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.fmca-api-preset-row select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 7px 10px;
+}
+
+.fmca-model-combo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.fmca-model-menu-toggle {
+  min-width: 42px;
+  padding-inline: 0;
+}
+
+.fmca-model-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(10, 18, 29, 0.98);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+  padding: 6px;
+}
+
+.fmca-model-menu-item {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(237, 245, 251, 0.9);
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.fmca-model-menu-item:hover,
+.fmca-model-menu-item:focus-visible {
+  background: rgba(88, 210, 189, 0.15);
+  color: #fff;
+}
+
+.fmca-model-menu-empty {
+  padding: 10px;
+  color: rgba(219, 231, 241, 0.62);
+  font-size: 13px;
 }
 
 .fmca-facts {
@@ -398,6 +486,65 @@ code {
 .fmca-form-grid > label textarea {
   min-height: 92px;
   resize: vertical;
+}
+
+.fmca-prompt-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.fmca-prompt-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.fmca-prompt-toolbar label:first-child {
+  display: grid;
+  gap: 7px;
+}
+
+.fmca-prompt-toolbar label:first-child span,
+.fmca-prompt-note {
+  color: rgba(219, 231, 241, 0.68);
+  font-size: 13px;
+}
+
+.fmca-prompt-toolbar select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 8px 10px;
+}
+
+.fmca-prompt-switch {
+  min-height: 40px;
+  align-self: end;
+}
+
+.fmca-prompt-textarea textarea {
+  min-height: 340px;
+  line-height: 1.55;
+}
+
+.fmca-prompt-details {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fmca-prompt-details summary {
+  cursor: pointer;
+  color: #d9edf8;
+  font-weight: 800;
+}
+
+.fmca-prompt-details[open] summary {
+  margin-bottom: 10px;
 }
 
 .fmca-check {
@@ -592,6 +739,17 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .fmca-api-preset-row,
+  .fmca-model-combo,
+  .fmca-prompt-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .fmca-model-menu {
+    position: static;
+    margin-top: 8px;
+  }
+
   .fmca-form-grid,
   .fmca-manifest-row {
     grid-template-columns: 1fr;
@@ -600,4 +758,28 @@ code {
   .fmca-row input[type="checkbox"] {
     justify-self: start;
   }
+}
+
+.fmca-prompt-test {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.fmca-prompt-test h4 {
+  margin: 0 0 6px;
+  color: #1d4ed8;
+}
+
+.fmca-prompt-test p {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.fmca-prompt-test-result {
+  margin-top: 12px;
+  max-height: 520px;
 }

@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   "use strict";
 
   const tabMeta = {
@@ -28,6 +28,55 @@
     ["diary", "日记"],
     ["calendar", "日程"],
   ];
+  const promptScopes = [
+    ["group_chat", "群聊"],
+    ["feed", "动态"],
+    ["forum", "论坛"],
+    ["live", "直播"],
+    ["mail", "邮箱"],
+    ["diary", "日记"],
+    ["calendar", "日程"],
+    ["phone", "电话"],
+    ["notification", "通知"],
+  ];
+  const apiPresets = {
+    openai: {
+      base_url: "https://api.openai.com/v1",
+      model: "gpt-4.1-mini",
+      hint: "OpenAI 官方 OpenAI-compatible Base URL。",
+    },
+    gemini: {
+      base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
+      model: "gemini-3.5-flash",
+      hint: "Google Gemini 官方 OpenAI-compatible Base URL。",
+    },
+    claude: {
+      base_url: "https://api.anthropic.com/v1",
+      model: "claude-sonnet-4-6",
+      hint: "Claude 官方 OpenAI-compatible Base URL。",
+    },
+    minimax: {
+      base_url: "https://api.minimaxi.com/v1",
+      model: "MiniMax-M3",
+      hint: "MiniMax 国内官方 OpenAI-compatible Base URL。",
+    },
+    glm: {
+      base_url: "https://open.bigmodel.cn/api/paas/v4",
+      model: "glm-5.1",
+      hint: "智谱 GLM 官方 OpenAI-compatible Base URL。",
+    },
+    deepseek: {
+      base_url: "https://api.deepseek.com/v1",
+      model: "deepseek-chat",
+      hint: "DeepSeek 官方 OpenAI-compatible Base URL。",
+    },
+    siliconflow: {
+      base_url: "https://api.siliconflow.cn/v1",
+      model: "",
+      hint: "SiliconFlow OpenAI-compatible Base URL。",
+    },
+  };
+
   const state = {
     summary: null,
     groups: [],
@@ -40,6 +89,9 @@
     automation: null,
     promptBlocks: [],
     promptPreview: null,
+    promptScope: "group_chat",
+    promptTestResult: null,
+    promptTestBusy: false,
     apps: [],
     channels: [],
     diagnostics: null,
@@ -54,6 +106,7 @@
     roleGeneratorSaved: [],
     roleGeneratorSelectedIndex: 0,
     roleGeneratorBusy: false,
+    fetchedModels: [],
     selectedGroupId: "",
     selectedRoleId: "",
     selectedPackId: "",
@@ -225,8 +278,43 @@
       ...options,
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.detail || payload.error || `请求失败 (${response.status})`);
+    if (!response.ok) throw new Error(formatApiError(payload, response.status));
     return payload;
+  }
+
+  function formatApiError(payload = {}, status = 0) {
+    const raw = String(payload.detail || payload.error || `请求失败 (${status})`).trim();
+    const lower = raw.toLowerCase();
+    const lines = [];
+    const suggestions = [];
+    const context = payload.model_context || {};
+    const structuredSuggestions = Array.isArray(payload.suggestions) ? payload.suggestions.filter(Boolean) : [];
+    let title = raw || `请求失败 (${status})`;
+    if (/模型服务返回\s*http\s*\d+/i.test(raw) || /拉取模型列表失败/i.test(raw) || lower.includes("upstream=")) {
+      const matched = raw.match(/HTTP\s*\d+/i);
+      title = matched ? `模型上游拒绝：${matched[0].toUpperCase()}` : "模型上游拒绝请求";
+      suggestions.push("检查 API Key、Base URL 和模型名是否匹配当前供应商。", "先点击模型列表拉取，确认当前配置可访问。", "如果是 422/400，尝试降低 max_tokens、temperature 或切换模型。");
+    } else if (lower.includes("超时") || lower.includes("timeout")) {
+      title = "请求超时";
+      suggestions.push("调大 Timeout 或稍后重试。", "如果是真实生成，可降低输出 token。");
+    } else if (lower.includes("无法连接") || lower.includes("network") || lower.includes("connect")) {
+      title = "无法连接服务";
+      suggestions.push("检查 Base URL 、网络、代理和供应商状态。", "确认小手机独立 API 是否已启用。");
+    } else if (lower.includes("无法解析") || lower.includes("不是合法 json") || lower.includes("parser")) {
+      title = "返回内容无法解析";
+      suggestions.push("查看 diagnostics 中的 raw/parse 摘要。", "保留 Prompt JSON contract，或降低 temperature。");
+    }
+    lines.push(title);
+    if (raw && raw !== title) lines.push(`诊断：${raw}`);
+    const contextParts = [];
+    if (context.model_source) contextParts.push(`\u6765\u6e90=${context.model_source}`);
+    if (context.provider) contextParts.push(`Provider=${context.provider}`);
+    if (context.model) contextParts.push(`Model=${context.model}`);
+    if (context.base_url_host) contextParts.push(`Host=${context.base_url_host}`);
+    if (contextParts.length) lines.push(`\u6a21\u578b\u4e0a\u4e0b\u6587\uff1a${contextParts.join(" / ")}`);
+    const finalSuggestions = structuredSuggestions.length ? structuredSuggestions : suggestions;
+    if (finalSuggestions.length) lines.push(`\u5efa\u8bae\uff1a${finalSuggestions.join(" ")}`);
+    return lines.join("\n");
   }
 
   function setTab(name) {
@@ -261,15 +349,37 @@
   function readablePromptPreview(preview) {
     if (!preview) return "-";
     const blocks = (preview.blocks || []).map((item) => `${item.label || item.block_id} (${item.block_id})`).join(", ") || "-";
+    const contractBlocks = (preview.contract_blocks || []).map((item) => `${item.label || item.block_id} (${item.block_id})`).join(", ") || "-";
     const schema = (preview.schemas || [])[0] || {};
     const context = preview.context_preview || {};
+    const useCustom = Boolean(preview.settings?.use_custom_prompt && preview.custom_prompt);
     return [
-      `Scope: ${preview.scope || "-"}`,
+      `Scope: ${preview.scope_label || preview.scope || "-"}`,
+      `Mode: ${useCustom ? "自定义提示词" : "默认提示词"}`,
       `Active blocks: ${blocks}`,
+      `Locked contract: ${contractBlocks}`,
       `Context: ${context.role_count ?? 0} enabled roles, ${context.sticker_count ?? 0} stickers, ${context.block_count ?? 0} prompt blocks.`,
       `Output contract: root=${schema.root || "-"}; required=${(schema.required_fields || []).join(", ") || "-"}; notes=${schema.notes || "-"}`,
-      `Assembled prompt:\n${preview.assembled_prompt || "-"}`,
+      `Final prompt:\n${preview.assembled_prompt || "-"}`,
     ].join("\n\n");
+  }
+
+  function readablePromptTest(result) {
+    if (!result) return "\u5c1a\u672a\u6d4b\u8bd5\u3002";
+    const sections = [
+      `Mode: ${result.mode || "-"}`,
+      `Scope: ${result.scope_label || result.scope || "-"}`,
+      `Root key: ${result.root_key || "-"}`,
+      `Saved: ${result.save ? "yes" : "no"}`,
+      `Provider strategy:\n${JSON.stringify(result.provider_strategy || {}, null, 2)}`,
+      `Model context:\n${JSON.stringify(result.model_context || {}, null, 2)}`,
+      `Messages:\n${JSON.stringify(result.messages || [], null, 2)}`,
+    ];
+    if (result.raw_reply) sections.push(`Raw reply:\n${result.raw_reply}`);
+    if (Object.prototype.hasOwnProperty.call(result, "parsed")) sections.push(`Parsed JSON:\n${JSON.stringify(result.parsed, null, 2)}`);
+    if (result.parse_error) sections.push(`Parse error: ${result.parse_error}`);
+    if (result.diagnostics) sections.push(`Recent diagnostics:\n${JSON.stringify(result.diagnostics, null, 2)}`);
+    return sections.join("\n\n---\n\n");
   }
 
   function readableWorkbenchPreview(preview) {
@@ -771,37 +881,113 @@
     `;
   }
 
+  function currentPromptSettings() {
+    return state.summary?.settings?.prompt || state.promptPreview?.settings || {};
+  }
+
+  function promptScopeLabel(scope) {
+    return (promptScopes.find(([value]) => value === scope) || [scope, scope])[1];
+  }
+
+  function selectedPromptScope() {
+    const settings = currentPromptSettings();
+    const scope = state.promptScope || state.promptPreview?.scope || settings.last_preview_channel || "group_chat";
+    return promptScopes.some(([value]) => value === scope) ? scope : "group_chat";
+  }
+
+  function promptCustomValue(scope) {
+    const settings = currentPromptSettings();
+    const prompts = settings.custom_prompts || {};
+    return prompts[scope] || "";
+  }
+
   function renderPromptTools() {
     const blocksBox = byId("fmca-prompt-blocks");
     const previewBox = byId("fmca-prompt-preview");
+    const settings = currentPromptSettings();
+    const scope = selectedPromptScope();
+    const customValue = promptCustomValue(scope);
     if (blocksBox) {
       blocksBox.innerHTML = `
-        <h3>Prompt Blocks</h3>
-        <form class="fmca-form-grid" data-form="prompt-blocks">
-          ${(state.promptBlocks || []).map((block, index) => `
-            <article class="fmca-mini-card">
-              <label class="fmca-check">
-                <input type="checkbox" name="enabled_${index}" ${block.enabled ? "checked" : ""} ${block.locked ? "disabled" : ""}>
-                <span><strong>${esc(block.label)}</strong> · ${esc(block.block_id)} · order ${esc(block.order)}</span>
-              </label>
-              <label class="fmca-field is-wide">
-                <span>Scope</span>
-                <input name="scope_${index}" value="${esc(tagsToText(block.scope || []))}" ${block.locked ? "readonly" : ""}>
-              </label>
-              <label class="fmca-field is-wide">
-                <span>Content</span>
-                <textarea name="content_${index}" rows="4" ${block.locked ? "readonly" : ""}>${esc(block.content || "")}</textarea>
-              </label>
-              <input type="hidden" name="block_id_${index}" value="${esc(block.block_id)}">
-              <input type="hidden" name="label_${index}" value="${esc(block.label)}">
-              <input type="hidden" name="order_${index}" value="${esc(block.order)}">
-              <input type="hidden" name="locked_${index}" value="${block.locked ? "1" : "0"}">
-            </article>
-          `).join("") || '<div class="fmca-empty">暂无 prompt blocks。</div>'}
+        <h3>自定义提示词</h3>
+        <p>选择一个入口，写它的系统提示词。留空会继续使用默认提示词；保存后会影响对应入口的真实生成。</p>
+        <form class="fmca-prompt-editor" data-form="prompt-custom">
+          <div class="fmca-prompt-toolbar">
+            <label>
+              <span>编辑范围</span>
+              <select id="fmca-prompt-scope" name="scope">
+                ${promptScopes.map(([value, label]) => `<option value="${esc(value)}" ${value === scope ? "selected" : ""}>${esc(label)}</option>`).join("")}
+              </select>
+            </label>
+            <label class="fmca-check fmca-prompt-switch">
+              <input type="checkbox" name="use_custom_prompt" ${settings.use_custom_prompt ? "checked" : ""}>
+              <span>启用自定义提示词</span>
+            </label>
+          </div>
+          <label class="fmca-field is-wide fmca-prompt-textarea">
+            <span>${esc(promptScopeLabel(scope))}提示词</span>
+            <textarea id="fmca-custom-prompt" name="custom_prompt" rows="15" placeholder="在这里写给模型的提示词。建议说明角色语气、场景边界、回复风格，并提醒不要透露系统或插件内部信息。">${esc(customValue)}</textarea>
+          </label>
+          <div class="fmca-prompt-note">锁定的 JSON 输出契约会自动追加到最终提示词末尾，避免模型返回内容无法解析。</div>
           <div class="fmca-actions">
-            <button class="fmca-button fmca-primary" type="submit">保存 blocks</button>
+            <button class="fmca-button fmca-primary" type="submit">保存提示词</button>
+            <button class="fmca-button" type="button" data-action="clear-current-prompt">清空当前范围</button>
+            <button class="fmca-button" type="button" data-action="refresh-prompt-preview">刷新预览</button>
           </div>
         </form>
+        <section class="fmca-prompt-test">
+          <h4>Prompt 测试工作台</h4>
+          <p>用于检查最终 prompt、user message、Provider 策略、raw reply 和解析结果。真实模式会调用模型，但本测试固定 save=false。</p>
+          <form class="fmca-form-grid" data-form="prompt-test">
+            <label class="fmca-field">
+              <span>测试模式</span>
+              <select name="mode">
+                <option value="dry-run">dry-run：只组装 Prompt</option>
+                <option value="mock">mock：模拟模型返回并测试解析</option>
+                <option value="real">real：调用真实模型（save=false）</option>
+              </select>
+            </label>
+            <label class="fmca-field is-wide">
+              <span>测试上下文</span>
+              <textarea name="user_input" rows="4" placeholder="可写入想验证的场景、关键词或边界条件。"></textarea>
+            </label>
+            <div class="fmca-actions">
+              <button class="fmca-button fmca-primary" type="submit" ${state.promptTestBusy ? "disabled" : ""}>${state.promptTestBusy ? "测试中..." : "运行测试"}</button>
+              <button class="fmca-button" type="button" data-action="clear-prompt-test">清空结果</button>
+            </div>
+          </form>
+          <pre class="fmca-pre fmca-prompt-test-result">${esc(readablePromptTest(state.promptTestResult))}</pre>
+        </section>
+        <details class="fmca-prompt-details">
+          <summary>高级：默认 Prompt Blocks</summary>
+          <p>这里是旧版 blocks 配置和锁定契约。普通用户只需要编辑上面的自定义提示词。</p>
+          <form class="fmca-form-grid" data-form="prompt-blocks">
+            ${(state.promptBlocks || []).map((block, index) => `
+              <article class="fmca-mini-card">
+                <label class="fmca-check">
+                  <input type="checkbox" name="enabled_${index}" ${block.enabled ? "checked" : ""} ${block.locked ? "disabled" : ""}>
+                  <span><strong>${esc(block.label)}</strong> · ${esc(block.block_id)} · order ${esc(block.order)}</span>
+                </label>
+                <label class="fmca-field is-wide">
+                  <span>Scope</span>
+                  <input name="scope_${index}" value="${esc(tagsToText(block.scope || []))}" ${block.locked ? "readonly" : ""}>
+                </label>
+                <label class="fmca-field is-wide">
+                  <span>Content</span>
+                  <textarea name="content_${index}" rows="4" ${block.locked ? "readonly" : ""}>${esc(block.content || "")}</textarea>
+                </label>
+                <input type="hidden" name="block_id_${index}" value="${esc(block.block_id)}">
+                <input type="hidden" name="label_${index}" value="${esc(block.label)}">
+                <input type="hidden" name="order_${index}" value="${esc(block.order)}">
+                <input type="hidden" name="locked_${index}" value="${block.locked ? "1" : "0"}">
+              </article>
+            `).join("") || '<div class="fmca-empty">暂无 prompt blocks。</div>'}
+            <div class="fmca-actions">
+              <button class="fmca-button fmca-primary" type="submit">保存 blocks</button>
+              <button class="fmca-button fmca-danger" type="button" data-action="reset-prompt-blocks">重置 blocks</button>
+            </div>
+          </form>
+        </details>
       `;
     }
     if (previewBox) {
@@ -954,6 +1140,81 @@
     });
     return rows;
   }
+
+  function modelRequestPayload() {
+    return {
+      base_url: byId("fmca-api-base-url").value.trim(),
+      api_key: byId("fmca-api-key").value.trim(),
+      request_timeout: Number.parseInt(byId("fmca-api-timeout").value, 10) || 120,
+    };
+  }
+
+  function renderModelMenu() {
+    const menu = byId("fmca-model-menu");
+    if (!menu) return;
+    const currentValue = byId("fmca-api-model").value.trim();
+    const models = Array.from(new Set((state.fetchedModels || []).filter(Boolean)));
+    menu.innerHTML = "";
+    if (!models.length) {
+      menu.innerHTML = '<div class="fmca-model-menu-empty">还没有模型列表，先点“拉取模型”。</div>';
+      return;
+    }
+    const ordered = currentValue && !models.includes(currentValue) ? [currentValue, ...models] : models;
+    ordered.forEach((modelName) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "fmca-model-menu-item";
+      button.textContent = modelName;
+      button.addEventListener("click", () => {
+        byId("fmca-api-model").value = modelName;
+        hideModelMenu();
+      });
+      menu.appendChild(button);
+    });
+  }
+
+  function showModelMenu() {
+    renderModelMenu();
+    byId("fmca-model-menu").hidden = false;
+  }
+
+  function hideModelMenu() {
+    const menu = byId("fmca-model-menu");
+    if (menu) menu.hidden = true;
+  }
+
+  function applyApiPreset() {
+    const preset = apiPresets[byId("fmca-api-preset").value] || apiPresets.openai;
+    byId("fmca-model-source").value = "custom";
+    byId("fmca-api-base-url").value = preset.base_url || "";
+    if (preset.model) byId("fmca-api-model").value = preset.model;
+    setToast(preset.hint || "已填入 API URL。");
+  }
+
+  async function fetchModelList() {
+    const button = byId("fmca-fetch-models");
+    const oldText = button.textContent;
+    button.disabled = true;
+    button.textContent = "拉取中...";
+    setError();
+    try {
+      const payload = await request("/admin/models", {
+        method: "POST",
+        body: JSON.stringify(modelRequestPayload()),
+      });
+      state.fetchedModels = payload.items || [];
+      if (payload.preferred_model) byId("fmca-api-model").value = payload.preferred_model;
+      renderModelMenu();
+      showModelMenu();
+      setToast(state.fetchedModels.length ? `已拉取 ${state.fetchedModels.length} 个模型。` : "模型列表为空，可以继续手动填写。");
+    } catch (error) {
+      setError(`拉取模型失败：${error.message}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = oldText;
+    }
+  }
+
   function applySettingsForm(settings) {
     byId("fmca-enabled").checked = Boolean(settings.enabled);
     byId("fmca-show-fab").checked = Boolean(settings.show_floating_button);
@@ -961,6 +1222,14 @@
     byId("fmca-reply-count").value = settings.reply_count === "1" ? "1" : "1-2";
     byId("fmca-max-tokens").value = settings.max_tokens || 500;
     byId("fmca-recent-limit").value = settings.recent_message_limit || 30;
+    const apiConfig = settings.api_config || {};
+    byId("fmca-model-source").value = settings.model_source === "custom" ? "custom" : "main";
+    byId("fmca-api-base-url").value = apiConfig.base_url || "";
+    byId("fmca-api-key").value = "";
+    byId("fmca-api-model").value = apiConfig.model || "";
+    byId("fmca-api-temp").value = apiConfig.temperature ?? 0.85;
+    byId("fmca-api-timeout").value = apiConfig.request_timeout || 120;
+    byId("fmca-api-key").placeholder = apiConfig.api_key_configured ? "已保存，留空不修改" : "未配置";
     byId("fmca-role-reply").checked = settings.allow_role_to_role_reply !== false;
     renderChannelTokenSettings(settings);
   }
@@ -980,7 +1249,8 @@
     setText("fmca-channel-events", String(summary.channel_event_count ?? 0));
     setText("fmca-notifications", String(summary.notification_count ?? 0));
     setText("fmca-data-dir", summary.data_dir || "data/mobile_chat");
-    setText("fmca-model-name", model.model || "未配置");
+    const modelSourceLabel = model.model_source === "custom" ? "小手机独立" : (model.provider === "route_forwarding" ? "路由转发" : "主程序");
+    setText("fmca-model-name", model.model ? `${model.model} · ${modelSourceLabel}` : `未配置 · ${modelSourceLabel}`);
     setText("fmca-model-url", model.base_url_configured ? "已配置" : "未配置");
     setText("fmca-model-key", model.api_key_configured ? "已配置（已脱敏）" : "未配置");
     setText("fmca-model-temp", String(model.temperature ?? "-"));
@@ -1041,6 +1311,7 @@
       state.automation = automation;
       state.promptBlocks = promptBlocks.blocks || [];
       state.promptPreview = promptPreview;
+      state.promptScope = promptPreview.scope || summary.settings?.prompt?.last_preview_channel || state.promptScope;
       state.apps = apps.apps || [];
       state.channels = channels.channels || [];
       state.diagnostics = diagnostics.diagnostics || null;
@@ -1082,7 +1353,16 @@
       recent_message_limit: Number.parseInt(byId("fmca-recent-limit").value, 10),
       allow_role_to_role_reply: byId("fmca-role-reply").checked,
       channel_token_settings: collectChannelTokenSettings(),
+      model_source: byId("fmca-model-source").value === "custom" ? "custom" : "main",
+      api_config: {
+        base_url: byId("fmca-api-base-url").value.trim(),
+        model: byId("fmca-api-model").value.trim(),
+        temperature: Number.parseFloat(byId("fmca-api-temp").value),
+        request_timeout: Number.parseInt(byId("fmca-api-timeout").value, 10),
+      },
     };
+    const apiKey = byId("fmca-api-key").value.trim();
+    if (apiKey) payload.api_config.api_key = apiKey;
     try {
       await request("/settings", { method: "POST", body: JSON.stringify(payload) });
       await refresh();
@@ -1312,9 +1592,37 @@
     try {
       const result = await request("/admin/prompt-blocks", { method: "PUT", body: JSON.stringify({ blocks }) });
       state.promptBlocks = result.blocks || [];
-      state.promptPreview = await request("/admin/prompt-preview?scope=group_chat");
+      state.promptPreview = await request(`/admin/prompt-preview?scope=${encodeURIComponent(selectedPromptScope())}`);
       renderPromptTools();
       setToast("Prompt blocks 已保存。");
+    } catch (error) {
+      setError(error.message);
+    }
+  }
+
+  async function savePromptCustom(form) {
+    const data = new FormData(form);
+    const scope = promptScopes.some(([value]) => value === data.get("scope")) ? String(data.get("scope")) : "group_chat";
+    state.promptScope = scope;
+    const current = currentPromptSettings();
+    const custom_prompts = { ...(current.custom_prompts || {}), [scope]: data.get("custom_prompt") || "" };
+    try {
+      const result = await request("/settings", {
+        method: "POST",
+        body: JSON.stringify({
+          prompt: {
+            ...current,
+            use_custom_prompt: data.has("use_custom_prompt"),
+            append_json_contract: true,
+            custom_prompts,
+            last_preview_channel: scope,
+          },
+        }),
+      });
+      if (state.summary) state.summary.settings = result.settings || state.summary.settings;
+      state.promptPreview = await request(`/admin/prompt-preview?scope=${encodeURIComponent(scope)}`);
+      renderPromptTools();
+      setToast("提示词已保存。");
     } catch (error) {
       setError(error.message);
     }
@@ -1337,17 +1645,52 @@
     }
   }
 
-  async function refreshPromptPreview() {
+  async function refreshPromptPreview(scope = selectedPromptScope()) {
     try {
-      state.promptPreview = await request("/admin/prompt-preview?scope=group_chat");
+      state.promptScope = scope;
+      state.promptPreview = await request(`/admin/prompt-preview?scope=${encodeURIComponent(scope)}`);
+      if (state.summary?.settings?.prompt && state.promptPreview?.settings) {
+        state.summary.settings.prompt = state.promptPreview.settings;
+      }
       renderPromptTools();
-      setToast("Prompt preview 已刷新。");
+      setToast("Prompt 预览已刷新。");
     } catch (error) {
       setError(error.message);
     }
   }
 
+  async function clearCurrentPrompt() {
+    const textarea = byId("fmca-custom-prompt");
+    if (textarea) textarea.value = "";
+    const form = textarea?.closest("form");
+    if (form) await savePromptCustom(form);
+  }
 
+
+
+
+
+  async function runPromptTest(form) {
+    const data = new FormData(form);
+    const mode = String(data.get("mode") || "dry-run");
+    const user_input = String(data.get("user_input") || "");
+    state.promptTestBusy = true;
+    renderPromptTools();
+    try {
+      const result = await request("/admin/prompt-test", {
+        method: "POST",
+        body: JSON.stringify({ scope: selectedPromptScope(), mode, user_input }),
+      });
+      state.promptTestResult = result;
+      renderPromptTools();
+      setToast(mode === "real" ? "真实模型 Prompt 测试完成（save=false）。" : "Prompt 测试完成。");
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      state.promptTestBusy = false;
+      renderPromptTools();
+    }
+  }
 
   async function saveGenerationControl(form) {
     const data = new FormData(form);
@@ -1651,6 +1994,15 @@
       if (action === "refresh-prompt-preview") {
         await refreshPromptPreview();
       }
+      if (action === "clear-current-prompt") {
+        if (!window.confirm("确定清空当前范围的自定义提示词？")) return;
+        await clearCurrentPrompt();
+      }
+      if (action === "clear-prompt-test") {
+        state.promptTestResult = null;
+        renderPromptTools();
+        setToast("Prompt 测试结果已清空。");
+      }
       if (action === "reset-prompt-blocks") {
     if (!window.confirm("这个操作会修改小手机运行数据，确定继续？")) return;
         const result = await request("/admin/prompt-blocks/reset", { method: "POST" });
@@ -1706,7 +2058,9 @@
     if (form.dataset.form === "manifest") void saveManifest(form);
     if (form.dataset.form === "automation") void saveAutomation(form);
     if (form.dataset.form === "automation-test") void testAutomation(form);
+    if (form.dataset.form === "prompt-custom") void savePromptCustom(form);
     if (form.dataset.form === "prompt-blocks") void savePromptBlocks(form);
+    if (form.dataset.form === "prompt-test") void runPromptTest(form);
     if (form.dataset.form === "workbench-role-draft") void draftWorkbenchRole(form);
     if (form.dataset.form === "workbench-generate") void generateWorkbench(form);
     if (form.dataset.form === "generation-control") void saveGenerationControl(form);
@@ -1720,6 +2074,12 @@
   }
 
   function onChange(event) {
+    const promptScope = event.target.closest("#fmca-prompt-scope");
+    if (promptScope) {
+      state.promptScope = promptScope.value || "group_chat";
+      void refreshPromptPreview(state.promptScope);
+      return;
+    }
     const scope = event.target.closest("[data-role-generator-draft-scope]");
     if (!scope) return;
     const index = Number.parseInt(scope.dataset.index || String(state.roleGeneratorSelectedIndex || 0), 10);
@@ -1732,6 +2092,18 @@
   byId("fmca-refresh").addEventListener("click", refresh);
   byId("fmca-back-chat")?.addEventListener("click", backToChat);
   byId("fmca-settings-form").addEventListener("submit", saveSettings);
+  byId("fmca-apply-api-preset")?.addEventListener("click", applyApiPreset);
+  byId("fmca-fetch-models")?.addEventListener("click", () => { void fetchModelList(); });
+  byId("fmca-toggle-model-menu")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const menu = byId("fmca-model-menu");
+    if (menu.hidden) {
+      showModelMenu();
+    } else {
+      hideModelMenu();
+    }
+  });
   byId("fmca-reset-form").addEventListener("click", () => {
     if (state.summary?.settings) applySettingsForm(state.summary.settings);
   });
@@ -1739,6 +2111,9 @@
   byId("fmca-clear").addEventListener("click", clearGroups);
   byId("fmca-clear-data").addEventListener("click", clearGroups);
   document.addEventListener("click", (event) => { void onClick(event); });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".fmca-model-combo")) hideModelMenu();
+  });
   document.addEventListener("submit", onSubmit);
   document.addEventListener("input", onInput);
   document.addEventListener("change", onChange);

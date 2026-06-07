@@ -131,6 +131,7 @@ LEGACY_CURRENT_CARD_PATH = DATA_DIR / "current_role_card.json"
 GLOBAL_PRESET_PATH = DATA_DIR / "preset.json"
 GLOBAL_WORKSHOP_STATE_PATH = DATA_DIR / "creative_workshop_state.json"
 GLOBAL_USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
+GLOBAL_DIRECTOR_NOTES_PATH = DATA_DIR / "director_notes.json"
 GLOBAL_WORLDBOOK_RUNTIME_STATE_PATH = DATA_DIR / "worldbook_runtime_state.json"
 GLOBAL_ROUTE_FORWARDING_PATH = DATA_DIR / "route_forwarding.json"
 SLOT_MIGRATION_MARKER_PATH = DATA_DIR / ".slot_migration_done"
@@ -148,6 +149,30 @@ ALLOWED_FONT_SUFFIXES = {".ttf", ".otf", ".woff", ".woff2"}
 MAX_FONT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 REQUEST_RETRY_ATTEMPTS = 5
 REQUEST_RETRY_BASE_DELAY_SECONDS = 1.0
+STREAM_FALLBACK_STATUS_CODES = {400, 422}
+STREAM_FALLBACK_MARKERS = (
+    "stream",
+    "streaming",
+    "stream_options",
+    "sse",
+    "event stream",
+    "invalid stream",
+    "流式",
+    "不支持流",
+)
+CONTENT_REJECTION_MARKERS = (
+    "input_sensitive",
+    "output_sensitive",
+    "sensitive",
+    "moderation",
+    "content policy",
+    "policy_violation",
+    "safety",
+    "审核",
+    "敏感",
+    "安全",
+)
+NON_STREAM_CHAT_COMPAT_KEYS: set[str] = set()
 DEFAULT_SPRITE_BASE_PATH = "/static/sprites"
 DEFAULT_BACKGROUND_IMAGE_URL = "/assets/default.jpg"
 GLOBAL_RUNTIME_ID = "global_workspace"
@@ -408,6 +433,7 @@ DEFAULT_SETTINGS = {
     "theme": "dark",
     "temperature": 0.85,
     "history_limit": 20,
+    "prompt_budget_token_limit": 100000,
     "request_timeout": 120,
     "demo_mode": False,
     "ui_opacity": 0.84,
@@ -430,6 +456,7 @@ DEFAULT_SETTINGS = {
     "rerank_top_n": 3,
     "sprite_enabled": False,
     "sprite_base_path": DEFAULT_SPRITE_BASE_PATH,
+    "layered_prompt_injection_enabled": False,
     "memory_summary_length": "medium",
     "memory_summary_max_chars": 520,
 }
@@ -764,6 +791,112 @@ def default_user_profile() -> dict[str, Any]:
     }
 
 
+DIRECTOR_NOTE_POSITIONS = {"before_char_defs", "after_char_defs", "before_user_input"}
+
+
+def normalize_director_note_position(value: Any) -> str:
+    text = str(value or "").strip()
+    return text if text in DIRECTOR_NOTE_POSITIONS else "after_char_defs"
+
+
+def sanitize_director_note(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    content = str(raw.get("content", "") or "").strip()
+    if not content:
+        return None
+    note_id = str(raw.get("id", "") or "").strip()
+    if not note_id:
+        seed = f"{content}|{raw.get('created_at', '')}|{random.random()}"
+        note_id = "director_note_" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:12]
+    remaining_turns = clamp_int(raw.get("remaining_turns"), 1, 20, 1)
+    created_at = str(raw.get("created_at", "") or "").strip()
+    updated_at = str(raw.get("updated_at", "") or "").strip()
+    return {
+        "id": note_id,
+        "content": content[:12000],
+        "remaining_turns": remaining_turns,
+        "position": normalize_director_note_position(raw.get("position")),
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
+
+
+def sanitize_director_notes(raw: Any) -> list[dict[str, Any]]:
+    source = raw.get("items", []) if isinstance(raw, dict) else raw
+    if not isinstance(source, list):
+        return []
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw_item in source:
+        item = sanitize_director_note(raw_item)
+        if not item:
+            continue
+        note_id = item["id"]
+        if note_id in seen:
+            continue
+        seen.add(note_id)
+        items.append(item)
+    return items[:50]
+
+
+def get_director_notes(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return sanitize_director_notes(read_json(director_notes_path(slot_id), []))
+
+
+def save_director_notes(items: list[dict[str, Any]], slot_id: str | None = None) -> list[dict[str, Any]]:
+    sanitized = sanitize_director_notes(items)
+    persist_json(
+        director_notes_path(slot_id),
+        sanitized,
+        detail="Director notes save failed. Please check disk space or file permissions.",
+    )
+    return sanitized
+
+
+def create_director_note(payload: dict[str, Any], slot_id: str | None = None) -> list[dict[str, Any]]:
+    content = str(payload.get("content", "") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="导演注内容不能为空。")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    seed = f"{now}|{content}|{random.random()}"
+    note = {
+        "id": "director_note_" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:12],
+        "content": content[:12000],
+        "remaining_turns": clamp_int(payload.get("remaining_turns"), 1, 20, 1),
+        "position": normalize_director_note_position(payload.get("position")),
+        "created_at": now,
+        "updated_at": now,
+    }
+    items = get_director_notes(slot_id)
+    items.append(note)
+    return save_director_notes(items, slot_id)
+
+
+def delete_director_note(note_id: str, slot_id: str | None = None) -> list[dict[str, Any]]:
+    target_id = str(note_id or "").strip()
+    items = [item for item in get_director_notes(slot_id) if str(item.get("id", "")) != target_id]
+    return save_director_notes(items, slot_id)
+
+
+def consume_director_notes_turn(slot_id: str | None = None) -> list[dict[str, Any]]:
+    changed = False
+    items: list[dict[str, Any]] = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for item in get_director_notes(slot_id):
+        remaining = max(0, int(item.get("remaining_turns", 1) or 1) - 1)
+        if remaining <= 0:
+            changed = True
+            continue
+        if remaining != item.get("remaining_turns"):
+            item = dict(item)
+            item["remaining_turns"] = remaining
+            item["updated_at"] = now
+            changed = True
+        items.append(item)
+    return save_director_notes(items, slot_id) if changed else items
+
+
 def default_creative_workshop() -> dict[str, Any]:
     return json.loads(json.dumps(default_role_card()["creativeWorkshop"], ensure_ascii=False))
 
@@ -1035,6 +1168,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "theme": "dark" if str(settings.get("theme", "dark")).strip() == "dark" else "light",
         "temperature": clamp_float(settings.get("temperature"), 0.0, 2.0, 0.85),
         "history_limit": clamp_int(settings.get("history_limit"), 1, 100, 20),
+        "prompt_budget_token_limit": clamp_int(settings.get("prompt_budget_token_limit"), 0, 200000, 100000),
         "request_timeout": clamp_int(settings.get("request_timeout"), 10, 600, 120),
         "demo_mode": parse_bool(settings.get("demo_mode"), False),
         "ui_opacity": clamp_float(settings.get("ui_opacity"), 0.2, 1.0, 0.84),
@@ -1053,6 +1187,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "font_color": sanitize_font_color(settings.get("font_color", "")),
         "sprite_enabled": parse_bool(settings.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
+        "layered_prompt_injection_enabled": parse_bool(settings.get("layered_prompt_injection_enabled"), False),
         "embedding_base_url": str(settings.get("embedding_base_url", "")).strip(),
         "embedding_api_key": str(settings.get("embedding_api_key", "")).strip(),
         "embedding_model": str(settings.get("embedding_model", "")).strip(),
@@ -1266,6 +1401,11 @@ def workshop_state_path(slot_id: str | None = None) -> Path:
 def user_profile_path(slot_id: str | None = None) -> Path:
     return GLOBAL_USER_PROFILE_PATH
     return get_slot_dir(slot_id) / "user_profile.json"
+
+
+def director_notes_path(slot_id: str | None = None) -> Path:
+    return GLOBAL_DIRECTOR_NOTES_PATH
+    return get_slot_dir(slot_id) / "director_notes.json"
 
 
 def route_forwarding_path() -> Path:
@@ -1492,7 +1632,7 @@ def normalize_legacy_message_content(role: str, content: str) -> str:
         return text
 
     stripped = text.lstrip()
-    if stripped.startswith("??????"):
+    if stripped.startswith("?") and is_replacement_marker_text(stripped.split(":", 1)[0].strip()):
         remainder = stripped.lstrip("?").lstrip(":").lstrip()
         return f"Error: {remainder}" if remainder else "Error."
     return text
@@ -2279,6 +2419,7 @@ def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
         "llm_model": str(source.get("llm_model", "")).strip(),
         "temperature": clamp_float(source.get("temperature"), 0.0, 2.0, 0.85),
         "history_limit": clamp_int(source.get("history_limit"), 1, 100, 20),
+        "prompt_budget_token_limit": clamp_int(source.get("prompt_budget_token_limit"), 0, 200000, 100000),
         "request_timeout": clamp_int(source.get("request_timeout"), 10, 600, 120),
         "demo_mode": parse_bool(source.get("demo_mode"), False),
         "embedding_base_url": str(source.get("embedding_base_url", "")).strip(),
@@ -2293,6 +2434,7 @@ def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
         "rerank_top_n": clamp_int(source.get("rerank_top_n"), 1, 12, 3),
         "sprite_enabled": parse_bool(source.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
+        "layered_prompt_injection_enabled": parse_bool(source.get("layered_prompt_injection_enabled"), False),
     }
 
 
@@ -2353,10 +2495,12 @@ def get_runtime_chat_config(runtime_overrides: dict[str, Any] | None = None) -> 
         "model": model or route_defaults["model"],
         "temperature": overrides.get("temperature") if runtime_overrides else settings.get("temperature", 0.85),
         "history_limit": overrides.get("history_limit") if runtime_overrides else settings.get("history_limit", 20),
+        "prompt_budget_token_limit": overrides.get("prompt_budget_token_limit") if runtime_overrides else settings.get("prompt_budget_token_limit", 100000),
         "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
         "demo_mode": overrides.get("demo_mode") if runtime_overrides else settings.get("demo_mode", False),
         "sprite_enabled": overrides.get("sprite_enabled") if runtime_overrides else settings.get("sprite_enabled", False),
         "sprite_base_path": overrides.get("sprite_base_path") if runtime_overrides else settings.get("sprite_base_path", DEFAULT_SPRITE_BASE_PATH),
+        "layered_prompt_injection_enabled": overrides.get("layered_prompt_injection_enabled") if runtime_overrides else settings.get("layered_prompt_injection_enabled", False),
     }
 
 
@@ -2445,6 +2589,85 @@ def should_retry_status_code(status_code: int) -> bool:
     return status_code >= 500
 
 
+async def safe_response_text(response: httpx.Response | None, *, limit: int = 1200) -> str:
+    if response is None:
+        return ""
+    try:
+        await response.aread()
+    except Exception:
+        pass
+    try:
+        return response.text.strip()[:limit]
+    except Exception:
+        return ""
+
+
+def summarize_upstream_error(raw_text: str, *, limit: int = 600) -> str:
+    text = str(raw_text or "").strip()
+    if not text:
+        return ""
+
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        return text[:limit]
+
+    if not isinstance(payload, dict):
+        return text[:limit]
+
+    parts: list[str] = []
+
+    def append_part(label: str, value: Any) -> None:
+        content = str(value or "").strip()
+        if content:
+            parts.append(f"{label}: {content[:240]}")
+
+    error = payload.get("error")
+    if isinstance(error, dict):
+        for field in ("message", "msg", "detail", "type", "code", "param"):
+            append_part(field, error.get(field))
+    else:
+        append_part("error", error)
+
+    for field in ("message", "msg", "detail", "reason", "code", "status_msg"):
+        append_part(field, payload.get(field))
+
+    base_resp = payload.get("base_resp")
+    if isinstance(base_resp, dict):
+        append_part("base_status_code", base_resp.get("status_code"))
+        append_part("base_status_msg", base_resp.get("status_msg"))
+
+    if payload.get("input_sensitive"):
+        append_part("input_sensitive", payload.get("input_sensitive_type") or True)
+    if payload.get("output_sensitive"):
+        append_part("output_sensitive", payload.get("output_sensitive_type") or True)
+
+    deduped: list[str] = []
+    for part in parts:
+        if part not in deduped:
+            deduped.append(part)
+
+    return ("; ".join(deduped) or text)[:limit]
+
+
+def stream_compat_key(llm_config: dict[str, Any]) -> str:
+    return "|".join(
+        [
+            str(llm_config.get("base_url", "") or "").strip().lower(),
+            str(llm_config.get("model", "") or "").strip().lower(),
+        ]
+    )
+
+
+def should_retry_without_stream(status_code: int, error_detail: str) -> bool:
+    if status_code not in STREAM_FALLBACK_STATUS_CODES:
+        return False
+    lowered = str(error_detail or "").lower()
+    if any(marker in lowered for marker in CONTENT_REJECTION_MARKERS):
+        return False
+    return any(marker in lowered for marker in STREAM_FALLBACK_MARKERS)
+
+
 async def request_json(
     *,
     url: str,
@@ -2468,8 +2691,7 @@ async def request_json(
                 logger.warning("上游 JSON 解析失败，第 %s/%s 次：%s", attempt, REQUEST_RETRY_ATTEMPTS, url)
         except httpx.HTTPStatusError as exc:
             last_error = exc
-            response_text = exc.response.text.strip() if exc.response is not None else ""
-            last_error_detail = response_text[:500]
+            last_error_detail = summarize_upstream_error(await safe_response_text(exc.response))
             logger.warning("上游请求失败，第 %s/%s 次：%s | 返回=%s", attempt, REQUEST_RETRY_ATTEMPTS, url, last_error_detail or "<空>")
             status_code = exc.response.status_code if exc.response is not None else 0
             if 400 <= status_code < 500 and not should_retry_status_code(status_code):
@@ -2483,9 +2705,9 @@ async def request_json(
             await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
 
     if isinstance(last_error, ValueError):
-        raise HTTPException(status_code=502, detail="妯″瀷杩斿洖鐨勪笉鏄悎娉?JSON") from last_error
+        raise HTTPException(status_code=502, detail="模型服务返回的内容不是合法 JSON。") from last_error
 
-    detail = f"妯″瀷璇锋眰澶辫触: {last_error}"
+    detail = f"模型服务请求失败：{last_error}"
     if last_error_detail:
         detail = f"{detail} | upstream={last_error_detail}"
     raise HTTPException(status_code=502, detail=detail) from last_error
@@ -2506,8 +2728,8 @@ async def fetch_available_models(
             response = await client.get(url, headers=build_headers(api_key))
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        response_text = exc.response.text.strip() if exc.response is not None else ""
-        detail = response_text[:500] if response_text else str(exc)
+        response_text = summarize_upstream_error(await safe_response_text(exc.response))
+        detail = response_text if response_text else str(exc)
         raise HTTPException(status_code=502, detail=f"Failed to fetch model list: {detail}") from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Failed to fetch model list: {exc}") from exc
@@ -3836,6 +4058,20 @@ async def request_model_reply(
     }
 
 
+def iter_non_stream_reply_events(reply_result: dict[str, Any]):
+    think_text = str(reply_result.get("think", "") or "").strip()
+    if think_text:
+        yield {"type": "think_start"}
+        yield {"type": "think_chunk", "delta": think_text}
+        yield {"type": "think_end"}
+
+    reply_text = str(reply_result.get("reply", "") or "")
+    if reply_text:
+        yield {"type": "chunk", "delta": reply_text}
+
+    yield {"type": "done", **reply_result}
+
+
 def build_worldbook_debug_payload(
     user_message: str,
     worldbook_matches: list[dict[str, str]],
@@ -3941,6 +4177,18 @@ async def stream_model_reply(
         "temperature": llm_config["temperature"],
         "stream": True,
     }
+    compat_key = stream_compat_key(llm_config)
+    if compat_key in NON_STREAM_CHAT_COMPAT_KEYS:
+        reply_result = await request_model_reply(
+            user_message,
+            retrieved_items,
+            runtime_overrides=runtime_overrides,
+            worldbook_matches=worldbook_matches,
+            prompt_package=package,
+        )
+        for item in iter_non_stream_reply_events(reply_result):
+            yield item
+        return
 
     accumulated_raw = ""
     accumulated_visible = ""
@@ -3962,6 +4210,8 @@ async def stream_model_reply(
                     headers=build_headers(llm_config["api_key"]),
                     json=payload,
                 ) as response:
+                    if response.status_code >= 400:
+                        last_error_detail = summarize_upstream_error(await safe_response_text(response))
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line:
@@ -4028,8 +4278,8 @@ async def stream_model_reply(
             break
         except httpx.HTTPStatusError as exc:
             last_error = exc
-            response_text = exc.response.text.strip() if exc.response is not None else ""
-            last_error_detail = response_text[:500]
+            if not last_error_detail:
+                last_error_detail = summarize_upstream_error(await safe_response_text(exc.response))
             status_code = exc.response.status_code if exc.response is not None else 0
             logger.warning(
                 "Upstream stream request failed on attempt %s/%s for %s: %s | body=%s",
@@ -4039,6 +4289,24 @@ async def stream_model_reply(
                 exc,
                 last_error_detail or "<empty>",
             )
+            if not stream_started and should_retry_without_stream(status_code, last_error_detail):
+                NON_STREAM_CHAT_COMPAT_KEYS.add(compat_key)
+                logger.info(
+                    "Falling back to non-stream chat completions for %s after HTTP %s: %s",
+                    llm_config.get("model", ""),
+                    status_code,
+                    last_error_detail or "<empty>",
+                )
+                reply_result = await request_model_reply(
+                    user_message,
+                    retrieved_items,
+                    runtime_overrides=runtime_overrides,
+                    worldbook_matches=worldbook_matches,
+                    prompt_package=package,
+                )
+                for item in iter_non_stream_reply_events(reply_result):
+                    yield item
+                return
             if stream_started or (400 <= status_code < 500 and not should_retry_status_code(status_code)):
                 break
         except httpx.HTTPError as exc:
@@ -4058,7 +4326,7 @@ async def stream_model_reply(
             await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
 
     if last_error and not accumulated_raw and not accumulated_visible and not accumulated_think:
-        detail = f"妯″瀷娴佸紡璇锋眰澶辫触: {last_error}"
+        detail = f"模型服务流式请求失败：{last_error}"
         if last_error_detail:
             detail = f"{detail} | upstream={last_error_detail}"
         raise HTTPException(status_code=502, detail=detail) from last_error
@@ -4461,6 +4729,7 @@ configure_prompt_builder(
     normalize_worldbook_injection_role=_normalize_worldbook_injection_role,
     build_preset_prompt=build_preset_prompt,
     build_preset_observation_segments=build_preset_observation_segments,
+    get_director_notes=get_director_notes,
 )
 
 load_env_file()
@@ -4521,6 +4790,10 @@ route_ctx = SimpleNamespace(
     delete_preset_from_store=delete_preset_from_store,
     duplicate_preset_in_store=duplicate_preset_in_store,
     evaluate_creative_workshop=evaluate_creative_workshop,
+    create_director_note=create_director_note,
+    delete_director_note=delete_director_note,
+    consume_director_notes_turn=consume_director_notes_turn,
+    director_notes_path=director_notes_path,
     fetch_available_models=fetch_available_models,
     fetch_embeddings=fetch_embeddings,
     generate_reply=generate_reply,
@@ -4529,6 +4802,7 @@ route_ctx = SimpleNamespace(
     get_active_slot_id=get_active_slot_id,
     get_conversation=get_conversation,
     get_current_card=get_current_card,
+    get_director_notes=get_director_notes,
     get_memories=get_memories,
     get_mod=lambda slug: next(
         (mod.to_dict() for mod in registered_mods if mod.slug == slug), None

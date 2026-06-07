@@ -94,6 +94,7 @@
     roleGeneratorForm: {},
     roleGeneratorDrafts: [],
     roleGeneratorSaved: [],
+    disabledRoles: [],
     roleGeneratorSelectedIndex: 0,
     roleGeneratorBusy: false,
     roleGeneratorNotice: "",
@@ -1586,11 +1587,48 @@
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(payload.error || payload.detail || `请求失败 (${response.status})`);
+      const error = new Error(formatApiError(payload, response.status));
       error.payload = payload;
+      error.status = response.status;
       throw error;
     }
     return payload;
+  }
+
+  function formatApiError(payload = {}, status = 0) {
+    const raw = String(payload.error || payload.detail || `请求失败 (${status})`).trim();
+    const lower = raw.toLowerCase();
+    const lines = [];
+    const suggestions = [];
+    const context = payload.model_context || {};
+    const structuredSuggestions = Array.isArray(payload.suggestions) ? payload.suggestions.filter(Boolean) : [];
+    let title = raw || `请求失败 (${status})`;
+    if (/模型服务返回\s*http\s*\d+/i.test(raw) || lower.includes("upstream=")) {
+      const matched = raw.match(/模型服务返回\s*(HTTP\s*\d+)/i);
+      title = matched ? `模型上游拒绝：${matched[1].toUpperCase()}` : "模型上游拒绝请求";
+      suggestions.push("检查 API Key、Base URL 和模型名是否匹配当前供应商。", "尝试拉取模型列表或切换到已确认可用的模型。", "如果是 422/400，可尝试降低 max_tokens、temperature，或关闭/更换不兼容参数。", "如果是流式失败，可改用非流式或换供应商兼容网关。");
+    } else if (lower.includes("超时") || lower.includes("timeout")) {
+      title = "模型请求超时";
+      suggestions.push("稍后重试，或调大 Timeout。", "降低输出 token，减少本次生成内容。", "检查供应商状态和本地网络。");
+    } else if (lower.includes("无法连接") || lower.includes("network") || lower.includes("connect")) {
+      title = "无法连接模型服务";
+      suggestions.push("检查 Base URL 是否完整且以 /v1 等兼容路径结尾。", "检查网络、代理或供应商服务状态。", "确认小手机独立 API 设置是否覆盖了主程序配置。");
+    } else if (lower.includes("无法解析") || lower.includes("不是合法 json") || lower.includes("格式不兼容") || lower.includes("parser")) {
+      title = "模型返回格式无法解析";
+      suggestions.push("重试一次，或切换更稳定的模型。", "降低 temperature，让模型更严格输出 JSON。", "在后台 Prompt 中保留 JSON contract，避免删除结构要求。");
+    }
+    lines.push(title);
+    if (raw && raw !== title) lines.push(`诊断：${raw}`);
+    const contextParts = [];
+    if (context.model_source) contextParts.push(`\u6765\u6e90=${context.model_source}`);
+    if (context.provider) contextParts.push(`Provider=${context.provider}`);
+    if (context.model) contextParts.push(`Model=${context.model}`);
+    if (context.base_url_host) contextParts.push(`Host=${context.base_url_host}`);
+    if (contextParts.length) lines.push(`\u6a21\u578b\u4e0a\u4e0b\u6587\uff1a${contextParts.join(" / ")}`);
+    const finalSuggestions = structuredSuggestions.length ? structuredSuggestions : suggestions;
+    if (finalSuggestions.length) lines.push(`\u5efa\u8bae\uff1a${finalSuggestions.join(" ")}`);
+    if (payload.job_id) lines.push(`任务：${payload.job_id}`);
+    return lines.join("\n");
   }
 
   function pageTitle() {
@@ -1627,7 +1665,7 @@
   }
 
   function errorMarkup() {
-    return state.error ? `<div class="fmcp-error">${esc(state.error)}</div>` : "";
+    return state.error ? `<div class="fmcp-error">${esc(state.error).replace(/\\n/g, "<br>")}</div>` : "";
   }
 
   function headerMarkup() {
@@ -1866,6 +1904,11 @@
 
   function settingsMarkup() {
     const settings = state.settings || defaults;
+    const apiConfig = settings.api_config || {};
+    const modelSourceLabel = settings.model_source === "custom" ? "小手机独立配置" : "跟随主程序";
+    const modelStatus = settings.model_source === "custom"
+      ? `${apiConfig.model || "未填写模型"} · ${apiConfig.base_url ? "URL 已配置" : "URL 未配置"} · ${apiConfig.api_key_configured ? "Key 已配置" : "Key 未配置"}`
+      : "使用主程序聊天模型";
     return `
       <form class="fmcp-form" data-form="settings">
         <div class="fmcp-settings-section">
@@ -1916,7 +1959,7 @@
         <div class="fmcp-settings-section">
           <div class="fmcp-section-title">模型设置</div>
           <div class="fmcp-settings-card">
-            <div class="fmcp-settings-row"><span class="fmcp-settings-copy"><strong>模型来源</strong><small>API Key 只在后端读取</small></span><span class="fmcp-setting-value">跟随主程序 ${icon("chevron")}</span></div>
+            <div class="fmcp-settings-row"><span class="fmcp-settings-copy"><strong>模型来源</strong><small>${esc(modelStatus)}</small></span><span class="fmcp-setting-value">${esc(modelSourceLabel)} ${icon("chevron")}</span></div>
           </div>
         </div>
         <div class="fmcp-settings-section">
@@ -2118,6 +2161,32 @@
     `;
   }
 
+
+  function disabledRoleRestoreMarkup() {
+    const roles = state.disabledRoles || [];
+    if (!roles.length) {
+      return `
+        <section class="fmcp-generator-result fmcp-disabled-role-restore">
+          <div class="fmcp-phone-section-title">\u7981\u7528\u89d2\u8272\u6062\u590d</div>
+          <div class="fmcp-empty">\u6682\u65e0\u88ab\u7981\u7528\u7684\u5c0f\u624b\u673a\u89d2\u8272\u3002</div>
+        </section>
+      `;
+    }
+    return `
+      <section class="fmcp-generator-result fmcp-disabled-role-restore">
+        <div class="fmcp-phone-section-title">\u7981\u7528\u89d2\u8272\u6062\u590d</div>
+        <p class="fmcp-generator-copy">\u8fd9\u91cc\u53ea\u6062\u590d\u5c0f\u624b\u673a\u72ec\u7acb\u89d2\u8272\u5e93\uff0c\u4e0d\u4f1a\u4fee\u6539\u4e3b\u89d2\u8272\u5361\u3002</p>
+        <div class="fmcp-generator-draft-tabs">
+          ${roles.map((role) => `
+            <button class="fmcp-generator-draft-chip" type="button" data-action="restore-disabled-role" data-role-id="${esc(role.role_id)}" ${state.roleGeneratorBusy ? "disabled" : ""} title="\u6062\u590d ${esc(role.display_name)}">
+              ${esc(role.display_name || role.role_id)}
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  }
+
   function assistMarkup() {
     const drafts = state.roleGeneratorDrafts || [];
     const selectedIndex = Math.max(0, Math.min(state.roleGeneratorSelectedIndex || 0, Math.max(0, drafts.length - 1)));
@@ -2184,6 +2253,7 @@
           </div>
         </form>
         ${state.roleGeneratorNotice ? `<div class="fmcp-generator-notice">${esc(state.roleGeneratorNotice)}</div>` : ""}
+        ${disabledRoleRestoreMarkup()}
         <section class="fmcp-generator-result">
           <div class="fmcp-phone-section-title">草稿预览</div>
           ${drafts.length > 1 ? `
@@ -2472,7 +2542,7 @@
     if (target === "assist") {
       state.page = "assist";
       state.currentChannelEventId = "";
-      render();
+      await loadDisabledRoles();
       return;
     }
     if (target === "notifications") {
@@ -2497,6 +2567,40 @@
     }
     state.page = "home";
     render();
+  }
+
+
+  async function loadDisabledRoles() {
+    try {
+      const payload = await request("/roles/disabled");
+      state.disabledRoles = payload.roles || [];
+    } catch (error) {
+      state.disabledRoles = [];
+      state.error = error.message;
+    }
+    render();
+  }
+
+  async function restoreDisabledRole(roleId) {
+    const safeRoleId = String(roleId || "");
+    if (!safeRoleId || state.roleGeneratorBusy) return;
+    const scrollTop = currentBodyScrollTop();
+    state.roleGeneratorBusy = true;
+    state.roleGeneratorNotice = "";
+    state.error = "";
+    renderKeepingBodyScroll(scrollTop);
+    try {
+      const result = await request(`/roles/${encodeURIComponent(safeRoleId)}/restore`, { method: "POST" });
+      state.disabledRoles = result.roles || [];
+      state.roles = result.available || state.roles;
+      const restoredName = result.role?.display_name || safeRoleId;
+      state.roleGeneratorNotice = `\u5df2\u6062\u590d ${restoredName}\uff0c\u4ec5\u5f71\u54cd\u5c0f\u624b\u673a\u89d2\u8272\u5e93\u3002`;
+    } catch (error) {
+      state.error = error.message;
+    } finally {
+      state.roleGeneratorBusy = false;
+      renderKeepingBodyScroll(scrollTop);
+    }
   }
 
   async function generateRoleDrafts(form) {
@@ -3585,6 +3689,7 @@
     if (action === "clear-role-generator") clearRoleGenerator();
     if (action === "extract-event-role-drafts") void extractEventRoleDrafts();
     if (action === "extract-chat-role-drafts") void extractChatRoleDrafts();
+    if (action === "restore-disabled-role") void restoreDisabledRole(button.dataset.roleId || "");
     if (action === "save-mail-draft") {
       const eventId = button.dataset.eventId || state.currentChannelEventId;
       const form = button.closest("form");

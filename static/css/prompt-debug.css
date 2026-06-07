@@ -92,9 +92,23 @@
   border-color: color-mix(in srgb, var(--accent) 36%, var(--border) 64%);
   background: color-mix(in srgb, var(--accent) 12%, var(--panel) 88%);
 }
+.prompt-debug-badge.thinking,
+.prompt-segment-flag.thinking {
+  color: var(--text);
+  border-color: rgba(154, 130, 255, 0.45);
+  background: rgba(154, 130, 255, 0.12);
+}
 .prompt-debug-base-kernel {
   border-color: color-mix(in srgb, var(--accent) 26%, var(--border) 74%);
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 7%, var(--panel) 93%), var(--panel));
+}
+.prompt-debug-layered-mode.is-enabled {
+  border-color: rgba(104, 214, 158, 0.42);
+  background: linear-gradient(135deg, rgba(54, 154, 105, 0.12), var(--panel));
+}
+.prompt-debug-layered-mode.is-fallback {
+  border-color: rgba(255, 184, 108, 0.45);
+  background: linear-gradient(135deg, rgba(255, 184, 108, 0.1), var(--panel));
 }
 .prompt-debug-base-kernel-body {
   display: grid;
@@ -111,6 +125,47 @@
   gap: 0.28rem;
   color: var(--muted);
   font-size: 0.79rem;
+}
+.prompt-debug-budget-card {
+  border-color: rgba(104, 214, 158, 0.28);
+  background: linear-gradient(135deg, rgba(54, 154, 105, 0.08), var(--panel));
+}
+.prompt-debug-budget-card.is-over-budget {
+  border-color: rgba(255, 92, 92, 0.45);
+  background: linear-gradient(135deg, rgba(255, 92, 92, 0.1), var(--panel));
+}
+.prompt-debug-budget-section-title {
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.prompt-debug-budget-list {
+  display: grid;
+  gap: 0.38rem;
+}
+.prompt-debug-budget-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--input-bg);
+  padding: 0.45rem 0.6rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+.prompt-debug-budget-row span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.prompt-debug-budget-row span:last-child {
+  white-space: nowrap;
 }
 .prompt-debug-layer-row {
   grid-template-columns: minmax(0, 1fr) auto;
