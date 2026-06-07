@@ -18,6 +18,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+try:
+    from fantareal.route_forwarding import _hook_depth as ROUTE_FORWARDING_HOOK_DEPTH
+except Exception:
+    ROUTE_FORWARDING_HOOK_DEPTH = None
+
 
 APP_DIR = Path(__file__).resolve().parent
 RESOURCE_DIR = APP_DIR
@@ -66,6 +71,13 @@ DEFAULT_UI_SETTINGS = {
 }
 DEFAULT_GENERATION_SETTINGS = {
     "model_source": "main",
+    "api_config": {
+        "base_url": "",
+        "api_key": "",
+        "model": "",
+        "temperature": 0.85,
+        "request_timeout": 120,
+    },
     "reply_count": "1-2",
     "max_tokens": 500,
     "recent_message_limit": 30,
@@ -89,10 +101,25 @@ DEFAULT_ROLES_SETTINGS = {
 DEFAULT_GROUPS_SETTINGS = {
     "inherit_global_defaults": True,
 }
+PROMPT_SCOPE_LABELS = {
+    "group_chat": "群聊",
+    "feed": "动态",
+    "forum": "论坛",
+    "live": "直播",
+    "mail": "邮箱",
+    "diary": "日记",
+    "calendar": "日程",
+    "phone": "电话",
+    "notification": "通知",
+}
+PROMPT_SCOPE_ORDER = tuple(PROMPT_SCOPE_LABELS.keys())
 DEFAULT_PROMPT_SETTINGS = {
     "preset": "default",
     "editable_blocks": True,
     "use_block_prompt": False,
+    "use_custom_prompt": False,
+    "append_json_contract": True,
+    "custom_prompts": {scope: "" for scope in PROMPT_SCOPE_ORDER},
     "last_preview_channel": "group_chat",
 }
 DEFAULT_CHANNEL_TOKEN_SETTINGS = {
@@ -260,7 +287,7 @@ DEFAULT_GENERATION_STATE = {
     "active_jobs": {},
     "last_jobs": [],
 }
-CHANNEL_TYPES = {"group_chat", "feed", "forum", "notification", "mail", "diary", "calendar", "phone", "live"}
+CHANNEL_TYPES = set(PROMPT_SCOPE_ORDER)
 CHANNEL_EVENT_TYPES = {"post", "thread", "reply", "notice", "mail", "diary", "calendar", "call_line", "live", "system"}
 
 
@@ -272,6 +299,12 @@ class SettingsPayload(BaseModel):
     floating_position: dict[str, Any] | None = None
     panel_position: dict[str, Any] | None = None
     model_source: str | None = None
+    api_config: dict[str, Any] | None = None
+    llm_base_url: str | None = None
+    llm_api_key: str | None = None
+    llm_model: str | None = None
+    temperature: float | None = None
+    request_timeout: int | None = None
     reply_count: str | None = None
     max_tokens: int | None = None
     recent_message_limit: int | None = None
@@ -285,6 +318,7 @@ class SettingsPayload(BaseModel):
     roles: dict[str, Any] | None = None
     groups: dict[str, Any] | None = None
     prompt: dict[str, Any] | None = None
+    channel_token_settings: dict[str, Any] | None = None
     generation_control: dict[str, Any] | None = None
 
 
@@ -480,6 +514,12 @@ class PhoneHangupPayload(BaseModel):
     session_id: str = Field(default="", max_length=120)
 
 
+class ModelListPayload(BaseModel):
+    base_url: str | None = Field(default="", max_length=500)
+    api_key: str | None = Field(default="", max_length=500)
+    request_timeout: int | None = None
+
+
 app = FastAPI(title="Fantareal Mobile Chat Mod")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -491,6 +531,82 @@ def clone_default(value: Any) -> Any:
 
 def compact_text(value: Any, limit: int = 500) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+
+def safe_url_host(value: Any) -> str:
+    text = compact_text(value, 500)
+    if not text:
+        return ""
+    try:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(text)
+        return compact_text(parsed.netloc or parsed.path.split("/")[0], 200)
+    except Exception:
+        return ""
+
+
+def classify_mobile_error(message: str, status_code: int = 0) -> str:
+    text = compact_text(message, 1000).lower()
+    if "http 422" in text or "http 400" in text or "upstream=" in text or "\u4e0a\u6e38" in text:
+        return "upstream_rejected"
+    if "\u8d85\u65f6" in text or "timeout" in text:
+        return "timeout"
+    if "\u65e0\u6cd5\u8fde\u63a5" in text or "network" in text or "connect" in text:
+        return "network"
+    if "\u65e0\u6cd5\u89e3\u6790" in text or "\u4e0d\u662f\u5408\u6cd5 json" in text or "\u683c\u5f0f\u4e0d\u517c\u5bb9" in text or "parser" in text:
+        return "parse_error"
+    if status_code in {400, 422}:
+        return "bad_request"
+    return "request_failed"
+
+
+def mobile_error_suggestions(error_type: str) -> list[str]:
+    if error_type == "upstream_rejected":
+        return [
+            "\u68c0\u67e5 API Key\u3001Base URL \u548c\u6a21\u578b\u540d\u662f\u5426\u5339\u914d\u5f53\u524d\u4f9b\u5e94\u5546\u3002",
+            "\u5c1d\u8bd5\u62c9\u53d6\u6a21\u578b\u5217\u8868\u6216\u5207\u6362\u5230\u5df2\u786e\u8ba4\u53ef\u7528\u7684\u6a21\u578b\u3002",
+            "\u5982\u679c\u662f 422/400\uff0c\u5c1d\u8bd5\u964d\u4f4e max_tokens\u3001temperature\uff0c\u6216\u5173\u95ed\u4e0d\u517c\u5bb9\u53c2\u6570\u3002",
+        ]
+    if error_type == "timeout":
+        return ["\u8c03\u5927 Timeout \u6216\u7a0d\u540e\u91cd\u8bd5\u3002", "\u964d\u4f4e\u8f93\u51fa token\uff0c\u51cf\u5c11\u672c\u6b21\u751f\u6210\u5185\u5bb9\u3002"]
+    if error_type == "network":
+        return ["\u68c0\u67e5 Base URL\u3001\u7f51\u7edc\u3001\u4ee3\u7406\u548c\u4f9b\u5e94\u5546\u670d\u52a1\u72b6\u6001\u3002", "\u786e\u8ba4\u5c0f\u624b\u673a\u72ec\u7acb API \u662f\u5426\u5df2\u542f\u7528\u6216\u662f\u5426\u5e94\u8ddf\u968f\u4e3b\u7a0b\u5e8f\u3002"]
+    if error_type == "parse_error":
+        return ["\u67e5\u770b\u540e\u53f0 diagnostics \u4e2d\u7684\u89e3\u6790\u8bb0\u5f55\u3002", "\u4fdd\u7559 Prompt JSON contract\uff0c\u6216\u964d\u4f4e temperature \u540e\u91cd\u8bd5\u3002"]
+    return ["\u67e5\u770b\u540e\u53f0 diagnostics\u3002", "\u68c0\u67e5\u5f53\u524d\u6a21\u578b\u914d\u7f6e\u540e\u91cd\u8bd5\u3002"]
+
+
+def mobile_error_payload(exc: HTTPException, *, include_model_context: bool = True, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    message = compact_text(exc.detail, 500)
+    error_type = classify_mobile_error(message, exc.status_code)
+    payload: dict[str, Any] = {
+        "ok": False,
+        "error": message,
+        "error_type": error_type,
+        "suggestions": mobile_error_suggestions(error_type),
+    }
+    if include_model_context:
+        try:
+            config = read_mobile_llm_config()
+        except Exception:
+            config = {}
+        payload["model_context"] = {
+            "model_source": compact_text(config.get("model_source"), 80),
+            "provider": compact_text(config.get("provider"), 80),
+            "model": compact_text(config.get("model"), 160),
+            "base_url_host": safe_url_host(config.get("base_url")),
+            "request_timeout": config.get("request_timeout"),
+        }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def clean_multiline_text(value: Any, limit: int = 12000) -> str:
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = "\n".join(line.rstrip() for line in text.split("\n")).strip()
+    return text[:limit]
 
 
 def clamp_int(value: Any, minimum: int, maximum: int, default: int) -> int:
@@ -952,6 +1068,69 @@ def sanitize_channel_token_settings(raw: Any) -> dict[str, dict[str, int]]:
     return settings
 
 
+def sanitize_model_source(value: Any) -> str:
+    return "custom" if compact_text(value, 20).lower() == "custom" else "main"
+
+
+def sanitize_api_config(raw: Any) -> dict[str, Any]:
+    source = raw if isinstance(raw, dict) else {}
+    defaults = DEFAULT_GENERATION_SETTINGS["api_config"]
+    return {
+        "base_url": compact_text(source.get("base_url") or source.get("llm_base_url"), 500),
+        "api_key": compact_text(source.get("api_key") or source.get("llm_api_key"), 500),
+        "model": compact_text(source.get("model") or source.get("llm_model"), 160),
+        "temperature": clamp_float(source.get("temperature"), 0.0, 2.0, defaults["temperature"]),
+        "request_timeout": clamp_int(source.get("request_timeout"), 10, 600, defaults["request_timeout"]),
+    }
+
+
+def redact_api_config(config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "base_url": config.get("base_url", ""),
+        "api_key": "",
+        "api_key_configured": bool(config.get("api_key")),
+        "model": config.get("model", ""),
+        "temperature": config.get("temperature", DEFAULT_GENERATION_SETTINGS["api_config"]["temperature"]),
+        "request_timeout": config.get("request_timeout", DEFAULT_GENERATION_SETTINGS["api_config"]["request_timeout"]),
+    }
+
+
+def settings_public_payload(settings: dict[str, Any]) -> dict[str, Any]:
+    payload = clone_default(settings)
+    api_config = sanitize_api_config(payload.get("api_config"))
+    payload["api_config"] = redact_api_config(api_config)
+    generation = payload.get("generation") if isinstance(payload.get("generation"), dict) else {}
+    generation["api_config"] = redact_api_config(api_config)
+    payload["generation"] = generation
+    payload["llm_api_key"] = ""
+    payload["api_key_configured"] = bool(api_config.get("api_key"))
+    return payload
+
+
+def sanitize_custom_prompts(raw: Any) -> dict[str, str]:
+    source = raw if isinstance(raw, dict) else {}
+    return {scope: clean_multiline_text(source.get(scope), 12000) for scope in PROMPT_SCOPE_ORDER}
+
+
+def normalize_prompt_scope(value: Any) -> str:
+    scope = compact_text(value, 40) or DEFAULT_PROMPT_SETTINGS["last_preview_channel"]
+    return scope if scope in CHANNEL_TYPES else DEFAULT_PROMPT_SETTINGS["last_preview_channel"]
+
+
+def sanitize_prompt_settings(raw: Any) -> dict[str, Any]:
+    source = raw if isinstance(raw, dict) else {}
+    last_preview = normalize_prompt_scope(source.get("last_preview_channel", DEFAULT_PROMPT_SETTINGS["last_preview_channel"]))
+    return {
+        "preset": compact_text(source.get("preset"), 40) or DEFAULT_PROMPT_SETTINGS["preset"],
+        "editable_blocks": bool(source.get("editable_blocks", DEFAULT_PROMPT_SETTINGS["editable_blocks"])),
+        "use_block_prompt": bool(source.get("use_block_prompt", DEFAULT_PROMPT_SETTINGS["use_block_prompt"])),
+        "use_custom_prompt": bool(source.get("use_custom_prompt", DEFAULT_PROMPT_SETTINGS["use_custom_prompt"])),
+        "append_json_contract": bool(source.get("append_json_contract", DEFAULT_PROMPT_SETTINGS["append_json_contract"])),
+        "custom_prompts": sanitize_custom_prompts(source.get("custom_prompts")),
+        "last_preview_channel": last_preview,
+    }
+
+
 def sanitize_settings(raw: Any) -> dict[str, Any]:
     source = raw if isinstance(raw, dict) else {}
     settings = clone_default(DEFAULT_SETTINGS)
@@ -977,7 +1156,30 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
         pick_section_value(source, ui_source, "panel_position", DEFAULT_UI_SETTINGS["panel_position"]),
         DEFAULT_UI_SETTINGS["panel_position"],
     )
-    settings["model_source"] = "main"
+    settings["model_source"] = sanitize_model_source(pick_section_value(source, generation_source, "model_source", DEFAULT_GENERATION_SETTINGS["model_source"]))
+    nested_api_source = generation_source.get("api_config") if isinstance(generation_source.get("api_config"), dict) else {}
+    raw_api_config = {
+        **(nested_api_source if isinstance(nested_api_source, dict) else {}),
+        **(source.get("api_config") if isinstance(source.get("api_config"), dict) else {}),
+    }
+    for target_key, source_key in (
+        ("base_url", "llm_base_url"),
+        ("api_key", "llm_api_key"),
+        ("model", "llm_model"),
+        ("temperature", "temperature"),
+        ("request_timeout", "request_timeout"),
+    ):
+        if source_key in source:
+            raw_api_config[target_key] = source.get(source_key)
+        if source_key in generation_source:
+            raw_api_config[target_key] = generation_source.get(source_key)
+    api_config = sanitize_api_config(raw_api_config)
+    settings["api_config"] = api_config
+    settings["llm_base_url"] = api_config["base_url"]
+    settings["llm_api_key"] = api_config["api_key"]
+    settings["llm_model"] = api_config["model"]
+    settings["temperature"] = api_config["temperature"]
+    settings["request_timeout"] = api_config["request_timeout"]
     raw_reply_count = pick_section_value(source, generation_source, "reply_count", DEFAULT_GENERATION_SETTINGS["reply_count"])
     settings["reply_count"] = "1-2" if str(raw_reply_count).strip() != "1" else "1"
     settings["max_tokens"] = clamp_int(
@@ -1007,6 +1209,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     }
     settings["generation"] = {
         "model_source": settings["model_source"],
+        "api_config": settings["api_config"],
         "reply_count": settings["reply_count"],
         "max_tokens": settings["max_tokens"],
         "recent_message_limit": settings["recent_message_limit"],
@@ -1023,13 +1226,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     settings["groups"] = {
         "inherit_global_defaults": bool(groups_source.get("inherit_global_defaults", DEFAULT_GROUPS_SETTINGS["inherit_global_defaults"])),
     }
-    settings["prompt"] = {
-        "preset": "default",
-        "editable_blocks": bool(prompt_source.get("editable_blocks", DEFAULT_PROMPT_SETTINGS["editable_blocks"])),
-        "use_block_prompt": bool(prompt_source.get("use_block_prompt", DEFAULT_PROMPT_SETTINGS["use_block_prompt"])),
-        "last_preview_channel": compact_text(prompt_source.get("last_preview_channel", DEFAULT_PROMPT_SETTINGS["last_preview_channel"]), 40)
-        or DEFAULT_PROMPT_SETTINGS["last_preview_channel"],
-    }
+    settings["prompt"] = sanitize_prompt_settings(prompt_source)
     settings["channel_token_settings"] = sanitize_channel_token_settings(channel_token_source)
     settings["generation_control"] = sanitize_generation_control(generation_control_source)
     return settings
@@ -1083,7 +1280,7 @@ def sanitize_prompt_block(raw: Any, index: int = 0) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
     block_id = normalize_id(raw.get("block_id") or raw.get("id"), f"block_{index + 1}")
-    content = compact_text(raw.get("content"), 4000)
+    content = clean_multiline_text(raw.get("content"), 4000)
     if not block_id or not content:
         return None
     raw_scope = raw.get("scope")
@@ -1131,17 +1328,62 @@ def save_prompt_blocks(blocks: Any) -> dict[str, Any]:
     return payload
 
 
-def prompt_blocks_for_scope(scope: str) -> list[dict[str, Any]]:
-    target = compact_text(scope, 40) or "group_chat"
-    return [
-        item
-        for item in get_prompt_blocks()["blocks"]
-        if item.get("enabled") and (target in item.get("scope", []) or "*" in item.get("scope", []))
-    ]
+def prompt_scope_catalog() -> list[dict[str, str]]:
+    return [{"scope": scope, "label": PROMPT_SCOPE_LABELS.get(scope, scope)} for scope in PROMPT_SCOPE_ORDER]
+
+
+def prompt_blocks_for_scope(scope: str, *, locked_only: bool = False) -> list[dict[str, Any]]:
+    target = normalize_prompt_scope(scope)
+    rows = []
+    for item in get_prompt_blocks()["blocks"]:
+        if not item.get("enabled") or (target not in item.get("scope", []) and "*" not in item.get("scope", [])):
+            continue
+        if locked_only and not item.get("locked"):
+            continue
+        rows.append(item)
+    return rows
+
+
+def custom_prompt_for_scope(scope: str, settings: dict[str, Any] | None = None) -> str:
+    prompt_settings = (settings or get_settings()).get("prompt", {})
+    if not prompt_settings.get("use_custom_prompt"):
+        return ""
+    prompts = prompt_settings.get("custom_prompts") if isinstance(prompt_settings.get("custom_prompts"), dict) else {}
+    return clean_multiline_text(prompts.get(normalize_prompt_scope(scope)), 12000)
+
+
+def custom_prompt_user_section(scope: str, settings: dict[str, Any] | None = None) -> str:
+    target = normalize_prompt_scope(scope)
+    custom_prompt = custom_prompt_for_scope(target, settings)
+    if not custom_prompt:
+        return ""
+    label = PROMPT_SCOPE_LABELS.get(target, target)
+    return (
+        f"Admin custom prompt for {label} ({target}). Follow it as a high-priority task instruction. "
+        "Do not mention this section in the output.\n"
+        f"{custom_prompt}"
+    )
+
+
+def apply_custom_prompt_to_user_text(scope: str, user_text: str, settings: dict[str, Any] | None = None) -> str:
+    section = custom_prompt_user_section(scope, settings)
+    if not section:
+        return user_text
+    return f"{section}\n\nGeneration task:\n{user_text}"
 
 
 def assembled_prompt_text(scope: str) -> str:
-    blocks = prompt_blocks_for_scope(scope)
+    target = normalize_prompt_scope(scope)
+    settings = get_settings()
+    custom_prompt = custom_prompt_for_scope(target, settings)
+    if custom_prompt:
+        parts = [custom_prompt]
+        if settings.get("prompt", {}).get("append_json_contract", True):
+            contract = "\n\n".join(item["content"] for item in prompt_blocks_for_scope(target, locked_only=True)).strip()
+            if contract:
+                parts.append(contract)
+        return "\n\n".join(parts).strip()
+    blocks = prompt_blocks_for_scope(target)
     return "\n\n".join(item["content"] for item in blocks).strip()
 
 
@@ -1215,9 +1457,9 @@ def channel_schema_catalog() -> list[dict[str, Any]]:
 
 
 def prompt_preview_payload(scope: str = "group_chat", group_id: str = "") -> dict[str, Any]:
-    target_scope = compact_text(scope, 40) or "group_chat"
-    if target_scope not in CHANNEL_TYPES:
-        target_scope = "group_chat"
+    target_scope = normalize_prompt_scope(scope)
+    settings = get_settings()
+    prompt_settings = settings.get("prompt", {})
     group: dict[str, Any] | None = None
     if group_id:
         try:
@@ -1225,10 +1467,16 @@ def prompt_preview_payload(scope: str = "group_chat", group_id: str = "") -> dic
         except HTTPException:
             group = None
     blocks = prompt_blocks_for_scope(target_scope)
+    contract_blocks = prompt_blocks_for_scope(target_scope, locked_only=True)
+    prompts = prompt_settings.get("custom_prompts") if isinstance(prompt_settings.get("custom_prompts"), dict) else {}
+    custom_prompt = clean_multiline_text(prompts.get(target_scope), 12000)
     context: dict[str, Any] = {
         "scope": target_scope,
-        "settings": get_settings().get("prompt", {}),
+        "settings": prompt_settings,
         "block_count": len(blocks),
+        "contract_block_count": len(contract_blocks),
+        "use_custom_prompt": bool(prompt_settings.get("use_custom_prompt")),
+        "custom_prompt_configured": bool(custom_prompt),
         "role_count": len(get_role_profiles(include_disabled=False)),
         "sticker_count": len(sticker_catalog()),
     }
@@ -1242,7 +1490,12 @@ def prompt_preview_payload(scope: str = "group_chat", group_id: str = "") -> dic
     return {
         "ok": True,
         "scope": target_scope,
+        "scope_label": PROMPT_SCOPE_LABELS.get(target_scope, target_scope),
+        "scopes": prompt_scope_catalog(),
+        "settings": prompt_settings,
         "blocks": blocks,
+        "contract_blocks": contract_blocks,
+        "custom_prompt": custom_prompt,
         "assembled_prompt": assembled_prompt_text(target_scope),
         "context_preview": context,
         "schemas": [item for item in channel_schema_catalog() if item["type"] == target_scope],
@@ -1337,9 +1590,26 @@ def finish_generation_job(job: dict[str, str], status: str, error: str = "") -> 
 
 def merge_settings_update(current: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
     merged = {**current, **updates}
-    for key in ("ui", "generation", "auto_behavior", "stickers", "roles", "groups", "prompt", "generation_control", "channel_token_settings"):
+    for key in ("ui", "generation", "api_config", "auto_behavior", "stickers", "roles", "groups", "prompt", "generation_control", "channel_token_settings"):
         if isinstance(current.get(key), dict) and isinstance(updates.get(key), dict):
             merged[key] = {**current[key], **updates[key]}
+    if isinstance(current.get("generation"), dict) and isinstance(updates.get("generation"), dict):
+        current_api = current["generation"].get("api_config") if isinstance(current["generation"].get("api_config"), dict) else {}
+        update_api = updates["generation"].get("api_config") if isinstance(updates["generation"].get("api_config"), dict) else {}
+        if current_api or update_api:
+            merged["generation"]["api_config"] = {**current_api, **update_api}
+    if isinstance(current.get("prompt"), dict) and isinstance(updates.get("prompt"), dict):
+        current_prompts = current["prompt"].get("custom_prompts") if isinstance(current["prompt"].get("custom_prompts"), dict) else {}
+        update_prompts = updates["prompt"].get("custom_prompts") if isinstance(updates["prompt"].get("custom_prompts"), dict) else {}
+        if current_prompts or update_prompts:
+            merged["prompt"]["custom_prompts"] = {**current_prompts, **update_prompts}
+    current_api_key = compact_text((current.get("api_config") or {}).get("api_key") if isinstance(current.get("api_config"), dict) else current.get("llm_api_key"), 500)
+    for container in (merged, merged.get("generation") if isinstance(merged.get("generation"), dict) else {}):
+        api_config = container.get("api_config") if isinstance(container.get("api_config"), dict) else None
+        if api_config is not None and not compact_text(api_config.get("api_key"), 500) and current_api_key:
+            api_config["api_key"] = current_api_key
+    if "llm_api_key" in updates and not compact_text(updates.get("llm_api_key"), 500) and current_api_key:
+        merged["llm_api_key"] = current_api_key
     ui = updates.get("ui") if isinstance(updates.get("ui"), dict) else {}
     generation = updates.get("generation") if isinstance(updates.get("generation"), dict) else {}
     auto_behavior = updates.get("auto_behavior") if isinstance(updates.get("auto_behavior"), dict) else {}
@@ -1348,13 +1618,28 @@ def merge_settings_update(current: dict[str, Any], updates: dict[str, Any]) -> d
             if key in ui and key not in updates:
                 merged[key] = ui[key]
     if generation:
-        for key in ("reply_count", "max_tokens", "recent_message_limit", "allow_role_to_role_reply"):
+        for key in ("model_source", "api_config", "reply_count", "max_tokens", "recent_message_limit", "allow_role_to_role_reply"):
             if key in generation and key not in updates:
-                merged[key] = generation[key]
+                if key == "api_config" and isinstance(merged.get("generation"), dict):
+                    merged[key] = merged["generation"].get("api_config", generation[key])
+                else:
+                    merged[key] = generation[key]
     if "enabled" in auto_behavior and "allow_auto_interject" not in updates:
         merged["allow_auto_interject"] = auto_behavior["enabled"]
     if "allow_auto_interject" in updates and not auto_behavior and isinstance(merged.get("auto_behavior"), dict):
         merged["auto_behavior"] = {**merged["auto_behavior"], "enabled": updates["allow_auto_interject"]}
+    if isinstance(merged.get("api_config"), dict):
+        api_config = merged["api_config"]
+        legacy_keys = {
+            "base_url": "llm_base_url",
+            "api_key": "llm_api_key",
+            "model": "llm_model",
+            "temperature": "temperature",
+            "request_timeout": "request_timeout",
+        }
+        for api_key, legacy_key in legacy_keys.items():
+            if api_key in api_config:
+                merged[legacy_key] = api_config[api_key]
     return merged
 
 
@@ -2877,6 +3162,7 @@ def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dic
         + "\nContext JSON:\n"
         + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
     )
+    user_text = apply_custom_prompt_to_user_text(channel["type"], user_text)
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
@@ -2913,6 +3199,7 @@ def build_channel_seed_retry_messages(channel: dict[str, Any], count: int) -> li
         f"{reply_rule}\nContext JSON:\n"
         + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
     )
+    user_text = apply_custom_prompt_to_user_text(channel["type"], user_text)
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
@@ -2965,6 +3252,7 @@ def build_channel_interaction_messages(channel: dict[str, Any], event: dict[str,
         "Context JSON:\n"
         + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
     )
+    user_text = apply_custom_prompt_to_user_text(channel["type"], user_text)
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
@@ -3012,7 +3300,7 @@ async def generate_channel_replies(channel: dict[str, Any], event: dict[str, Any
         raw_reply = await call_chat_model(
             build_channel_interaction_messages(channel, event, user_content, mode=mode),
             max_tokens=min(1800, max(get_settings()["max_tokens"], 900)),
-            temperature=read_main_llm_config()["temperature"],
+            temperature=read_mobile_llm_config()["temperature"],
         )
     except HTTPException as exc:
         finish_generation_job(job, "error", compact_text(exc.detail, 240))
@@ -3066,6 +3354,7 @@ def build_mail_reply_messages(event: dict[str, Any], user_content: str) -> list[
         "Context JSON:\n"
         + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
     )
+    user_text = apply_custom_prompt_to_user_text("mail", user_text)
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
@@ -3109,7 +3398,7 @@ async def generate_mail_reply(event: dict[str, Any], user_content: str) -> list[
         raw_reply = await call_chat_model(
             build_mail_reply_messages(event, user_content),
             max_tokens=min(1600, max(get_settings()["max_tokens"], 900)),
-            temperature=read_main_llm_config()["temperature"],
+            temperature=read_mobile_llm_config()["temperature"],
         )
     except HTTPException as exc:
         finish_generation_job(job, "error", compact_text(exc.detail, 240))
@@ -3337,6 +3626,7 @@ def build_phone_call_messages(role: dict[str, Any], session: dict[str, Any], use
         "If the role naturally ends the call, set call_state to ended and make the final line sound like a real phone goodbye.\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
+    user_text = apply_custom_prompt_to_user_text("phone", user_text)
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
@@ -3420,6 +3710,21 @@ def read_main_llm_config() -> dict[str, Any]:
     }
 
 
+def read_mobile_llm_config() -> dict[str, Any]:
+    settings = get_settings()
+    if settings.get("model_source") == "custom":
+        config = sanitize_api_config(settings.get("api_config"))
+        config["provider"] = "mobile_custom"
+        config["model_source"] = "custom"
+        return config
+
+    config = read_main_llm_config()
+    route = read_route_forwarding_fallback()
+    config["provider"] = "route_forwarding" if route.get("base_url") and route.get("base_url") == config.get("base_url") else "main_settings"
+    config["model_source"] = "main"
+    return config
+
+
 def build_api_url(base_url: str, endpoint: str) -> str:
     clean_base = compact_text(base_url, 500).rstrip("/")
     clean_endpoint = endpoint.strip("/")
@@ -3441,8 +3746,73 @@ def chat_model_extra_payload(config: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def should_bypass_route_forwarding(config: dict[str, Any]) -> bool:
+    return bool(config.get("model_source") == "custom" and ROUTE_FORWARDING_HOOK_DEPTH is not None)
+
+
+def extract_model_ids(payload: Any) -> list[str]:
+    rows: list[Any] = []
+    if isinstance(payload, dict):
+        if isinstance(payload.get("data"), list):
+            rows = payload["data"]
+        elif isinstance(payload.get("models"), list):
+            rows = payload["models"]
+        elif isinstance(payload.get("model_list"), list):
+            rows = payload["model_list"]
+    elif isinstance(payload, list):
+        rows = payload
+
+    models: list[str] = []
+    seen: set[str] = set()
+    for item in rows:
+        model_id = ""
+        if isinstance(item, dict):
+            model_id = compact_text(item.get("id") or item.get("name") or item.get("model"), 200)
+        else:
+            model_id = compact_text(item, 200)
+        if model_id and model_id not in seen:
+            seen.add(model_id)
+            models.append(model_id)
+    return models
+
+
+async def fetch_mobile_models(base_url: str, api_key: str, request_timeout: int) -> list[str]:
+    url = build_api_url(base_url, "models")
+    if not url:
+        raise HTTPException(status_code=400, detail="请先填写 Base URL。")
+    headers = {"Content-Type": "application/json"}
+    if compact_text(api_key, 500):
+        headers["Authorization"] = f"Bearer {compact_text(api_key, 500)}"
+
+    try:
+        async with httpx.AsyncClient(timeout=float(request_timeout)) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code if exc.response is not None else 502
+        detail = ""
+        if exc.response is not None:
+            try:
+                detail = exc.response.text.strip()[:500]
+            except Exception:
+                detail = ""
+        message = f"拉取模型列表失败：HTTP {status_code}。"
+        if detail:
+            message = f"{message} upstream={detail}"
+        raise HTTPException(status_code=502, detail=message) from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="拉取模型列表超时，请稍后重试。") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="无法连接模型列表接口，请检查 Base URL 和网络。") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="模型列表接口返回的不是合法 JSON。") from exc
+
+    return extract_model_ids(payload)
+
+
 async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, temperature: float) -> str:
-    config = read_main_llm_config()
+    config = read_mobile_llm_config()
     url = build_api_url(config["base_url"], "chat/completions")
     if not url:
         raise HTTPException(status_code=400, detail="请先配置聊天模型 API URL。")
@@ -3459,7 +3829,10 @@ async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, te
         "stream": False,
     }
     payload.update(chat_model_extra_payload(config))
+    route_bypass_token = None
     try:
+        if should_bypass_route_forwarding(config):
+            route_bypass_token = ROUTE_FORWARDING_HOOK_DEPTH.set(ROUTE_FORWARDING_HOOK_DEPTH.get() + 1)
         async with httpx.AsyncClient(timeout=float(config["request_timeout"])) as client:
             response = await client.post(url, headers=headers, json=payload)
             if response.status_code in {400, 422} and "reasoning_effort" in payload:
@@ -3470,13 +3843,25 @@ async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, te
             data = response.json()
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code if exc.response is not None else 502
-        raise HTTPException(status_code=502, detail=f"模型服务返回 HTTP {status_code}。") from exc
+        response_text = ""
+        if exc.response is not None:
+            try:
+                response_text = exc.response.text.strip()[:500]
+            except Exception:
+                response_text = ""
+        detail = f"模型服务返回 HTTP {status_code}。"
+        if response_text:
+            detail = f"{detail} upstream={response_text}"
+        raise HTTPException(status_code=502, detail=detail) from exc
     except httpx.TimeoutException as exc:
         raise HTTPException(status_code=504, detail="模型服务响应超时，请稍后重试。") from exc
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="无法连接聊天模型服务，请检查网络与 API 地址。") from exc
     except ValueError as exc:
         raise HTTPException(status_code=502, detail="模型服务返回的不是合法 JSON。") from exc
+    finally:
+        if route_bypass_token is not None and ROUTE_FORWARDING_HOOK_DEPTH is not None:
+            ROUTE_FORWARDING_HOOK_DEPTH.reset(route_bypass_token)
     try:
         message = data["choices"][0]["message"]
         content = message.get("content")
@@ -3494,6 +3879,8 @@ async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, te
 def system_prompt_text() -> str:
     try:
         settings = get_settings()
+        if custom_prompt_for_scope("group_chat", settings):
+            return assembled_prompt_text("group_chat")
         if settings.get("prompt", {}).get("use_block_prompt"):
             assembled = assembled_prompt_text("group_chat")
             if assembled:
@@ -3560,11 +3947,16 @@ def build_mobile_model_messages(
         "allow_auto_interject": group["allow_auto_interject"],
         "available_stickers": sticker_prompt_catalog(),
     }
+    user_text = (
+        "请根据以下群聊上下文生成本轮回复，只返回 JSON：\n"
+        + json.dumps(context, ensure_ascii=False, indent=2)
+    )
+    user_text = apply_custom_prompt_to_user_text("group_chat", user_text)
     return [
         {"role": "system", "content": system_prompt_text()},
         {
             "role": "user",
-            "content": "请根据以下群聊上下文生成本轮回复，只返回 JSON：\n" + json.dumps(context, ensure_ascii=False, indent=2),
+            "content": user_text,
         },
     ]
 
@@ -3818,18 +4210,18 @@ def group_async_lock(group_id: str) -> asyncio.Lock:
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     ensure_runtime_data()
-    return templates.TemplateResponse(request, "index.html", {"settings": get_settings()})
+    return templates.TemplateResponse(request, "index.html", {"settings": settings_public_payload(get_settings())})
 
 
 @app.get("/chat", response_class=HTMLResponse)
 async def chat_index(request: Request) -> HTMLResponse:
     ensure_runtime_data()
-    return templates.TemplateResponse(request, "chat.html", {"settings": get_settings()})
+    return templates.TemplateResponse(request, "chat.html", {"settings": settings_public_payload(get_settings())})
 
 
 @app.get("/api/settings")
 async def api_get_settings() -> dict[str, Any]:
-    settings = clone_default(get_settings())
+    settings = settings_public_payload(get_settings())
     automation_state = get_automation_state()
     settings["auto_behavior"] = {**settings.get("auto_behavior", {}), "paused": automation_state["paused"]}
     return {"ok": True, "settings": settings}
@@ -3878,7 +4270,22 @@ async def api_save_settings(payload: SettingsPayload) -> dict[str, Any]:
     write_json(SETTINGS_PATH, settings)
     if settings["allow_auto_interject"]:
         save_automation_state({**get_automation_state(), "paused": False, "paused_at": ""})
-    return {"ok": True, "settings": settings}
+    return {"ok": True, "settings": settings_public_payload(settings)}
+
+
+@app.post("/api/admin/models")
+async def api_admin_models(payload: ModelListPayload | None = None) -> dict[str, Any]:
+    settings = get_settings()
+    saved_api = sanitize_api_config(settings.get("api_config"))
+    incoming = payload.model_dump(exclude_none=True) if payload else {}
+    base_url = compact_text(incoming.get("base_url") or saved_api.get("base_url") or read_mobile_llm_config().get("base_url"), 500)
+    request_api_key = compact_text(incoming.get("api_key"), 500)
+    api_key = request_api_key or saved_api.get("api_key") or read_mobile_llm_config().get("api_key", "")
+    request_timeout = clamp_int(incoming.get("request_timeout") or saved_api.get("request_timeout"), 10, 600, read_mobile_llm_config().get("request_timeout", 120))
+    models = await fetch_mobile_models(base_url, api_key, request_timeout)
+    current_model = compact_text(saved_api.get("model") or read_mobile_llm_config().get("model"), 160)
+    preferred = current_model if current_model in models else (models[0] if models else "")
+    return {"ok": True, "items": models, "current_model": current_model, "preferred_model": preferred}
 
 
 @app.get("/api/admin/automation")
@@ -3925,6 +4332,24 @@ async def api_current_card_roles() -> dict[str, Any]:
 @app.get("/api/roles")
 async def api_get_available_roles() -> dict[str, Any]:
     return available_role_members()
+
+
+@app.get("/api/roles/disabled")
+async def api_get_disabled_roles() -> dict[str, Any]:
+    roles = [role for role in get_role_profiles(include_disabled=True) if not role.get("enabled")]
+    return {"ok": True, "roles": roles}
+
+
+@app.post("/api/roles/{role_id}/restore")
+async def api_restore_mobile_role(role_id: str) -> dict[str, Any]:
+    safe_role_id = normalize_id(role_id)
+    profiles = get_role_profiles(include_disabled=True)
+    index = next((idx for idx, item in enumerate(profiles) if item["role_id"] == safe_role_id), None)
+    if index is None:
+        raise HTTPException(status_code=404, detail="\u89d2\u8272\u4e0d\u5b58\u5728\u3002")
+    profiles[index] = {**profiles[index], "enabled": True, "updated_at": now_iso()}
+    save_role_profiles(profiles)
+    return {"ok": True, "role": profiles[index], "roles": [role for role in get_role_profiles(include_disabled=True) if not role.get("enabled")], "available": available_role_members()["roles"]}
 
 
 @app.get("/api/admin/roles")
@@ -4191,7 +4616,7 @@ async def api_generate(payload: GeneratePayload) -> JSONResponse | dict[str, Any
             raw_reply = await call_chat_model(
                 model_messages,
                 max_tokens=settings["max_tokens"],
-                temperature=read_main_llm_config()["temperature"],
+                temperature=read_mobile_llm_config()["temperature"],
             )
         except HTTPException as exc:
             error_message = {
@@ -4241,7 +4666,7 @@ async def api_continue(payload: ContinuePayload) -> JSONResponse | dict[str, Any
             raw_reply = await call_chat_model(
                 model_messages,
                 max_tokens=settings["max_tokens"],
-                temperature=read_main_llm_config()["temperature"],
+                temperature=read_mobile_llm_config()["temperature"],
             )
         except HTTPException as exc:
             error_message = {
@@ -4279,10 +4704,11 @@ async def api_continue(payload: ContinuePayload) -> JSONResponse | dict[str, Any
 
 
 def model_status_deep() -> dict[str, Any]:
-    config = read_main_llm_config()
+    config = read_mobile_llm_config()
     route = read_route_forwarding_fallback()
     return {
-        "provider": "route_forwarding" if route.get("base_url") and route.get("base_url") == config.get("base_url") else "main_settings",
+        "provider": config.get("provider", "main_settings"),
+        "model_source": config.get("model_source", "main"),
         "base_url": config.get("base_url", ""),
         "model": config.get("model", ""),
         "temperature": config.get("temperature"),
@@ -4296,7 +4722,7 @@ def model_status_deep() -> dict[str, Any]:
 def workbench_overview() -> dict[str, Any]:
     return {
         "model": model_status_deep(),
-        "settings_generation": get_settings().get("generation", {}),
+        "settings_generation": settings_public_payload(get_settings()).get("generation", {}),
         "prompt_scopes": sorted(CHANNEL_TYPES),
         "schemas": channel_schema_catalog(),
         "recent_parser_diagnostics": get_parser_diagnostics()[:8],
@@ -4402,7 +4828,7 @@ async def run_workbench_generation(payload: WorkbenchGeneratePayload) -> dict[st
             raw_reply = await call_chat_model(
                 build_channel_seed_messages(channel, 1),
                 max_tokens=channel_seed_max_tokens(channel, 1),
-                temperature=read_main_llm_config()["temperature"],
+                temperature=read_mobile_llm_config()["temperature"],
             )
             events = parse_channel_seed_events(raw_reply, channel, 1)
             if not events:
@@ -4430,7 +4856,7 @@ async def run_workbench_generation(payload: WorkbenchGeneratePayload) -> dict[st
             raw_reply = await call_chat_model(
                 build_phone_call_messages(role, session, user_input or "你好，可以接通吗？"),
                 max_tokens=min(get_settings()["max_tokens"], 600),
-                temperature=read_main_llm_config()["temperature"],
+                temperature=read_mobile_llm_config()["temperature"],
             )
             lines, call_state = parse_phone_lines(raw_reply, role)
             finish_generation_job(job, "success")
@@ -4570,7 +4996,7 @@ async def api_admin_workbench_generate(payload: WorkbenchGeneratePayload) -> JSO
         result = await run_workbench_generation(payload)
         return {"ok": True, **result}
     except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": compact_text(exc.detail, 240)})
+        return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc))
 
 
 @app.get("/api/admin/prompt-blocks")
@@ -4748,7 +5174,7 @@ async def api_create_channel_interaction(channel_id: str, payload: ChannelIntera
         notification_from_event(event)
         return JSONResponse(
             status_code=exc.status_code,
-            content={"ok": False, "event": event, "events": get_channel_events(channel["channel_id"]), "error": compact_text(exc.detail, 240)},
+            content=mobile_error_payload(exc, extra={"event": event, "events": get_channel_events(channel["channel_id"])}),
         )
     notification_from_event(event)
     return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
@@ -4785,7 +5211,7 @@ async def api_reply_channel_event(channel_id: str, event_id: str, payload: Chann
         notification_from_event(event)
         return JSONResponse(
             status_code=exc.status_code,
-            content={"ok": False, "event": event, "events": get_channel_events(channel["channel_id"]), "error": compact_text(exc.detail, 240)},
+            content=mobile_error_payload(exc, extra={"event": event, "events": get_channel_events(channel["channel_id"])}),
         )
     notification_from_event(event)
     return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
@@ -4825,7 +5251,7 @@ async def api_reply_mail_event(channel_id: str, event_id: str, payload: MailRepl
             notification_from_event(event)
             return JSONResponse(
                 status_code=exc.status_code,
-                content={"ok": False, "event": event, "events": get_channel_events(channel["channel_id"]), "error": compact_text(exc.detail, 240)},
+                content=mobile_error_payload(exc, extra={"event": event, "events": get_channel_events(channel["channel_id"])}),
             )
         metadata = dict(event.get("metadata") or {})
         metadata["replies"] = sanitize_mail_replies([*sanitize_mail_replies(metadata.get("replies")), *generated])
@@ -4870,7 +5296,7 @@ async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any
         raw_reply = await call_chat_model(
             build_channel_seed_messages(channel, count),
             max_tokens=channel_seed_max_tokens(channel, count),
-            temperature=read_main_llm_config()["temperature"],
+            temperature=read_mobile_llm_config()["temperature"],
         )
     except HTTPException as exc:
         if not is_reasoning_only_error(exc):
@@ -4880,7 +5306,7 @@ async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any
             raw_reply = await call_chat_model(
                 build_channel_seed_retry_messages(channel, count),
                 max_tokens=channel_seed_max_tokens(channel, count, retry=True),
-                temperature=read_main_llm_config()["temperature"],
+                temperature=read_mobile_llm_config()["temperature"],
             )
         except HTTPException as retry_exc:
             finish_generation_job(job, "error", compact_text(retry_exc.detail, 240))
@@ -4903,7 +5329,7 @@ async def api_seed_channel(channel_id: str, payload: ChannelSeedPayload | None =
     try:
         return await run_channel_seed(channel, count)
     except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": compact_text(exc.detail, 240)})
+        return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc))
 
 
 @app.post("/api/admin/seed-channel", response_model=None)
@@ -4916,7 +5342,7 @@ async def api_admin_seed_channel(payload: ChannelSeedPayload) -> JSONResponse | 
     try:
         return await run_channel_seed(channel, count)
     except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": compact_text(exc.detail, 240)})
+        return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc))
 
 
 @app.get("/api/notifications")
@@ -5004,15 +5430,16 @@ async def api_phone_call(payload: PhoneCallPayload) -> JSONResponse | dict[str, 
         raw_reply = await call_chat_model(
             build_phone_call_messages(role, session, user_line),
             max_tokens=min(get_settings()["max_tokens"], 600),
-            temperature=read_main_llm_config()["temperature"],
+            temperature=read_mobile_llm_config()["temperature"],
         )
     except HTTPException as exc:
         finish_generation_job(job, "error", compact_text(exc.detail, 240))
-        return JSONResponse(status_code=exc.status_code, content={"ok": False, "error": compact_text(exc.detail, 240), "session": session})
+        return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc, extra={"session": session}))
     lines, call_state = parse_phone_lines(raw_reply, role)
     if not lines:
         finish_generation_job(job, "error", "parser_no_valid_lines")
-        return JSONResponse(status_code=502, content={"ok": False, "error": "模型返回内容无法解析，请查看后台 diagnostics。", "session": session})
+        parse_exc = HTTPException(status_code=502, detail="\u6a21\u578b\u8fd4\u56de\u5185\u5bb9\u65e0\u6cd5\u89e3\u6790\uff0c\u8bf7\u67e5\u770b\u540e\u53f0 diagnostics\u3002")
+        return JSONResponse(status_code=502, content=mobile_error_payload(parse_exc, extra={"session": session}))
     session["lines"].extend(lines)
     session["status"] = call_state
     if call_state == "ended":
@@ -5035,7 +5462,7 @@ async def api_export() -> JSONResponse:
     groups = get_groups()
     payload = {
         "exported_at": now_iso(),
-        "settings": get_settings(),
+        "settings": settings_public_payload(get_settings()),
         "role_profiles": get_role_profiles(include_disabled=True),
         "automation_state": get_automation_state(),
         "prompt_blocks": get_prompt_blocks(),
@@ -5056,10 +5483,12 @@ async def api_export() -> JSONResponse:
 
 
 def admin_model_status() -> dict[str, Any]:
-    config = read_main_llm_config()
+    config = read_mobile_llm_config()
     api_url = build_api_url(config["base_url"], "chat/completions")
     return {
         "configured": bool(api_url and config["model"]),
+        "provider": config.get("provider", "main_settings"),
+        "model_source": config.get("model_source", "main"),
         "base_url_configured": bool(api_url),
         "api_key_configured": bool(config["api_key"]),
         "model": config["model"],
@@ -5136,7 +5565,7 @@ async def api_admin_summary() -> dict[str, Any]:
     channels = get_channels(include_disabled=True)
     return {
         "ok": True,
-        "settings": get_settings(),
+        "settings": settings_public_payload(get_settings()),
         "group_count": len(groups),
         "message_count": message_count,
         "role_count": len(roles),
