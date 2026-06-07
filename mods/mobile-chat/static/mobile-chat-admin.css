@@ -759,3 +759,27 @@ code {
     justify-self: start;
   }
 }
+
+.fmca-prompt-test {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.fmca-prompt-test h4 {
+  margin: 0 0 6px;
+  color: #1d4ed8;
+}
+
+.fmca-prompt-test p {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.fmca-prompt-test-result {
+  margin-top: 12px;
+  max-height: 520px;
+}

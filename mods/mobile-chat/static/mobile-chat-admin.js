@@ -90,6 +90,8 @@
     promptBlocks: [],
     promptPreview: null,
     promptScope: "group_chat",
+    promptTestResult: null,
+    promptTestBusy: false,
     apps: [],
     channels: [],
     diagnostics: null,
@@ -360,6 +362,24 @@
       `Output contract: root=${schema.root || "-"}; required=${(schema.required_fields || []).join(", ") || "-"}; notes=${schema.notes || "-"}`,
       `Final prompt:\n${preview.assembled_prompt || "-"}`,
     ].join("\n\n");
+  }
+
+  function readablePromptTest(result) {
+    if (!result) return "\u5c1a\u672a\u6d4b\u8bd5\u3002";
+    const sections = [
+      `Mode: ${result.mode || "-"}`,
+      `Scope: ${result.scope_label || result.scope || "-"}`,
+      `Root key: ${result.root_key || "-"}`,
+      `Saved: ${result.save ? "yes" : "no"}`,
+      `Provider strategy:\n${JSON.stringify(result.provider_strategy || {}, null, 2)}`,
+      `Model context:\n${JSON.stringify(result.model_context || {}, null, 2)}`,
+      `Messages:\n${JSON.stringify(result.messages || [], null, 2)}`,
+    ];
+    if (result.raw_reply) sections.push(`Raw reply:\n${result.raw_reply}`);
+    if (Object.prototype.hasOwnProperty.call(result, "parsed")) sections.push(`Parsed JSON:\n${JSON.stringify(result.parsed, null, 2)}`);
+    if (result.parse_error) sections.push(`Parse error: ${result.parse_error}`);
+    if (result.diagnostics) sections.push(`Recent diagnostics:\n${JSON.stringify(result.diagnostics, null, 2)}`);
+    return sections.join("\n\n---\n\n");
   }
 
   function readableWorkbenchPreview(preview) {
@@ -915,6 +935,29 @@
             <button class="fmca-button" type="button" data-action="refresh-prompt-preview">刷新预览</button>
           </div>
         </form>
+        <section class="fmca-prompt-test">
+          <h4>Prompt 测试工作台</h4>
+          <p>用于检查最终 prompt、user message、Provider 策略、raw reply 和解析结果。真实模式会调用模型，但本测试固定 save=false。</p>
+          <form class="fmca-form-grid" data-form="prompt-test">
+            <label class="fmca-field">
+              <span>测试模式</span>
+              <select name="mode">
+                <option value="dry-run">dry-run：只组装 Prompt</option>
+                <option value="mock">mock：模拟模型返回并测试解析</option>
+                <option value="real">real：调用真实模型（save=false）</option>
+              </select>
+            </label>
+            <label class="fmca-field is-wide">
+              <span>测试上下文</span>
+              <textarea name="user_input" rows="4" placeholder="可写入想验证的场景、关键词或边界条件。"></textarea>
+            </label>
+            <div class="fmca-actions">
+              <button class="fmca-button fmca-primary" type="submit" ${state.promptTestBusy ? "disabled" : ""}>${state.promptTestBusy ? "测试中..." : "运行测试"}</button>
+              <button class="fmca-button" type="button" data-action="clear-prompt-test">清空结果</button>
+            </div>
+          </form>
+          <pre class="fmca-pre fmca-prompt-test-result">${esc(readablePromptTest(state.promptTestResult))}</pre>
+        </section>
         <details class="fmca-prompt-details">
           <summary>高级：默认 Prompt Blocks</summary>
           <p>这里是旧版 blocks 配置和锁定契约。普通用户只需要编辑上面的自定义提示词。</p>
@@ -1625,6 +1668,30 @@
 
 
 
+
+
+  async function runPromptTest(form) {
+    const data = new FormData(form);
+    const mode = String(data.get("mode") || "dry-run");
+    const user_input = String(data.get("user_input") || "");
+    state.promptTestBusy = true;
+    renderPromptTools();
+    try {
+      const result = await request("/admin/prompt-test", {
+        method: "POST",
+        body: JSON.stringify({ scope: selectedPromptScope(), mode, user_input }),
+      });
+      state.promptTestResult = result;
+      renderPromptTools();
+      setToast(mode === "real" ? "真实模型 Prompt 测试完成（save=false）。" : "Prompt 测试完成。");
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      state.promptTestBusy = false;
+      renderPromptTools();
+    }
+  }
+
   async function saveGenerationControl(form) {
     const data = new FormData(form);
     const app_enabled = {};
@@ -1931,6 +1998,11 @@
         if (!window.confirm("确定清空当前范围的自定义提示词？")) return;
         await clearCurrentPrompt();
       }
+      if (action === "clear-prompt-test") {
+        state.promptTestResult = null;
+        renderPromptTools();
+        setToast("Prompt 测试结果已清空。");
+      }
       if (action === "reset-prompt-blocks") {
     if (!window.confirm("这个操作会修改小手机运行数据，确定继续？")) return;
         const result = await request("/admin/prompt-blocks/reset", { method: "POST" });
@@ -1988,6 +2060,7 @@
     if (form.dataset.form === "automation-test") void testAutomation(form);
     if (form.dataset.form === "prompt-custom") void savePromptCustom(form);
     if (form.dataset.form === "prompt-blocks") void savePromptBlocks(form);
+    if (form.dataset.form === "prompt-test") void runPromptTest(form);
     if (form.dataset.form === "workbench-role-draft") void draftWorkbenchRole(form);
     if (form.dataset.form === "workbench-generate") void generateWorkbench(form);
     if (form.dataset.form === "generation-control") void saveGenerationControl(form);
