@@ -2571,6 +2571,49 @@ def sanitize_group(raw: Any) -> dict[str, Any] | None:
     }
 
 
+def default_group() -> dict[str, Any]:
+    user = current_user_member()
+    roles = available_role_members().get("roles", [])
+    members = [user]
+    if roles:
+        members.append(roles[0])
+    else:
+        members.append(
+            {
+                "role_id": "review_character",
+                "name": "Review Character",
+                "type": "character",
+                "summary": "Temporary character for prompt tests.",
+                "avatar": "",
+            }
+        )
+    return sanitize_group(
+        {
+            "group_id": "group_prompt_test",
+            "name": "Prompt Test Group",
+            "description": "Temporary group for prompt tests only.",
+            "members": members,
+            "allow_role_to_role_reply": True,
+            "allow_auto_interject": False,
+            "reply_count": "1",
+            "sticker_pack": "default",
+            "created_at": now_iso(),
+            "updated_at": now_iso(),
+        }
+    ) or {
+        "group_id": "group_prompt_test",
+        "name": "Prompt Test Group",
+        "description": "Temporary group for prompt tests only.",
+        "members": members,
+        "allow_role_to_role_reply": True,
+        "allow_auto_interject": False,
+        "reply_count": "1",
+        "sticker_pack": "default",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+
+
 def get_groups() -> list[dict[str, Any]]:
     ensure_runtime_data()
     stored = read_json(GROUPS_PATH, [])
@@ -4887,10 +4930,12 @@ def prompt_test_messages(scope: str, user_input: str, channel_id: str = "", role
     target = normalize_prompt_scope(scope)
     context: dict[str, Any] = {"scope": target}
     if target == "group_chat":
-        group = get_groups()[0] if get_groups() else default_group()
+        groups = get_groups()
+        group = groups[0] if groups else default_group()
+        recent_messages = get_messages(group["group_id"])[-8:] if groups else []
         text = compact_text(user_input, 1200) or "\u8bf7\u751f\u6210\u4e00\u8f6e\u5c0f\u624b\u673a\u7fa4\u804a\u6d4b\u8bd5\u56de\u590d\u3002"
         context["group_id"] = group.get("group_id")
-        return build_mobile_model_messages(group, get_messages(group["group_id"])[-8:], text), context
+        return build_mobile_model_messages(group, recent_messages, text), context
     if target == "phone":
         candidates = phone_role_candidates()
         selected_role_id = normalize_id(role_id or (candidates[0]["role_id"] if candidates else ""))
