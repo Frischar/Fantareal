@@ -500,6 +500,14 @@ class WorkbenchGeneratePayload(BaseModel):
     save: bool | None = False
 
 
+class PromptTestPayload(BaseModel):
+    scope: str = Field(default="feed", max_length=40)
+    mode: str = Field(default="dry-run", max_length=20)
+    channel_id: str | None = Field(default=None, max_length=120)
+    role_id: str | None = Field(default=None, max_length=120)
+    user_input: str | None = Field(default="", max_length=1200)
+
+
 class NotificationPatchPayload(BaseModel):
     read: bool | None = None
 
@@ -3735,13 +3743,83 @@ def build_api_url(base_url: str, endpoint: str) -> str:
     return f"{clean_base}/{clean_endpoint}"
 
 
+def provider_strategy_for_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    source = config or read_mobile_llm_config()
+    base_url = compact_text(source.get("base_url"), 500).lower()
+    model = compact_text(source.get("model"), 160).lower()
+    provider = compact_text(source.get("provider"), 80)
+
+    strategy = {
+        "provider": provider or "openai_compatible",
+        "profile": "openai_compatible",
+        "label": "OpenAI-compatible",
+        "supports_stream": True,
+        "supports_model_list": True,
+        "model_list_endpoint": "models",
+        "chat_endpoint": "chat/completions",
+        "error_detail_paths": ["error.message", "message", "detail"],
+        "prompt_injection_strategy": "system_and_user_when_custom",
+        "parser_profile": "json_lenient",
+        "send_reasoning_effort": should_request_low_reasoning(source.get("model", "")),
+        "notes": "Default OpenAI-compatible strategy.",
+    }
+
+    hints = [base_url, model, provider.lower()]
+    joined = " ".join(hints)
+    if "minimax" in joined or "abab" in joined:
+        strategy.update({
+            "profile": "minimax",
+            "label": "MiniMax",
+            "supports_stream": False,
+            "error_detail_paths": ["base_resp.status_msg", "error.message", "message"],
+            "prompt_injection_strategy": "system_and_user_when_custom",
+            "parser_profile": "json_lenient_think_fence",
+            "notes": "MiniMax-M3 has been verified with custom prompt mirrored into the final user message.",
+        })
+    elif "bigmodel" in joined or "glm" in joined:
+        strategy.update({
+            "profile": "glm",
+            "label": "GLM / BigModel",
+            "error_detail_paths": ["error.message", "msg", "message"],
+            "parser_profile": "json_lenient_think_fence",
+            "notes": "GLM-compatible endpoint; keep model-list and error shape visible in diagnostics.",
+        })
+    elif "generativelanguage" in joined or "gemini" in joined:
+        strategy.update({
+            "profile": "gemini",
+            "label": "Gemini compatible",
+            "supports_stream": False,
+            "error_detail_paths": ["error.message", "message", "detail"],
+            "parser_profile": "json_lenient_think_fence",
+            "notes": "Gemini OpenAI-compatible paths can vary by gateway; verify with Prompt test before release.",
+        })
+    elif "anthropic" in joined or "claude" in joined:
+        strategy.update({
+            "profile": "claude",
+            "label": "Claude compatible",
+            "error_detail_paths": ["error.message", "message", "detail"],
+            "parser_profile": "json_lenient_think_fence",
+            "notes": "Claude-compatible gateway strategy; direct Anthropic Messages API is not used here.",
+        })
+    elif "deepseek" in joined:
+        strategy.update({
+            "profile": "deepseek",
+            "label": "DeepSeek compatible",
+            "error_detail_paths": ["error.message", "message", "detail"],
+            "parser_profile": "json_lenient_think_fence",
+            "notes": "DeepSeek OpenAI-compatible strategy.",
+        })
+    return strategy
+
+
 def should_request_low_reasoning(model: str) -> bool:
     normalized = compact_text(model, 160).lower()
     return any(hint in normalized for hint in REASONING_MODEL_HINTS)
 
 
 def chat_model_extra_payload(config: dict[str, Any]) -> dict[str, Any]:
-    if should_request_low_reasoning(config.get("model", "")):
+    strategy = provider_strategy_for_config(config)
+    if strategy.get("send_reasoning_effort"):
         return {"reasoning_effort": "low"}
     return {}
 
@@ -3961,9 +4039,18 @@ def build_mobile_model_messages(
     ]
 
 
+def strip_thinking_sections(text: str) -> str:
+    raw = str(text or "")
+    previous = None
+    while previous != raw:
+        previous = raw
+        raw = re.sub(r"<think>[\s\S]*?</think>", "", raw, flags=re.IGNORECASE).strip()
+    return raw
+
+
 def strip_json_fence(text: str) -> str:
-    raw = str(text or "").strip()
-    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw, re.IGNORECASE)
+    raw = strip_thinking_sections(text).strip()
+    fenced = re.search(r"```(?:json|JSON)?\s*([\s\S]*?)```", raw, re.IGNORECASE)
     return fenced.group(1).strip() if fenced else raw
 
 
@@ -4009,20 +4096,38 @@ def json_text_candidates(text: str) -> list[str]:
     return rows
 
 
-def loads_json_lenient(text: str) -> Any:
-    for candidate in json_text_candidates(text):
+def loads_json_lenient_with_reason(text: str) -> tuple[Any, str]:
+    original = str(text or "")
+    cleaned = strip_json_fence(original)
+    think_stripped = strip_thinking_sections(original) != original
+    for candidate_index, candidate in enumerate(json_text_candidates(original)):
         variants = [
-            candidate,
-            escape_json_string_newlines(candidate),
-            re.sub(r",\s*([}\]])", r"\1", candidate),
-            re.sub(r",\s*([}\]])", r"\1", escape_json_string_newlines(candidate)),
+            (candidate, "direct"),
+            (escape_json_string_newlines(candidate), "escaped_newlines"),
+            (re.sub(r",\s*([}\]])", r"\1", candidate), "trimmed_trailing_commas"),
+            (re.sub(r",\s*([}\]])", r"\1", escape_json_string_newlines(candidate)), "escaped_newlines_trimmed_trailing_commas"),
         ]
-        for variant in variants:
+        for variant, reason in variants:
             try:
-                return json.loads(variant)
+                payload = json.loads(variant)
+                notes: list[str] = []
+                if think_stripped:
+                    notes.append("think_stripped")
+                if strip_json_fence(original) != original.strip():
+                    notes.append("fence_or_wrapper_stripped")
+                if candidate_index > 0 or candidate.strip() != cleaned.strip():
+                    notes.append("json_substring_extracted")
+                if reason != "direct":
+                    notes.append(reason)
+                return payload, "+".join(notes) if notes else "direct"
             except ValueError:
                 continue
-    return None
+    return None, "json_parse_failed"
+
+
+def loads_json_lenient(text: str) -> Any:
+    payload, _reason = loads_json_lenient_with_reason(text)
+    return payload
 
 
 def recover_json_array_items(text: str, root_key: str, *, limit: int = 20) -> list[dict[str, Any]]:
@@ -4124,7 +4229,7 @@ def record_parser_diagnostic(scope: str, schema: str, target_id: str, reason: st
 
 def parse_model_json_output(raw: str, *, scope: str, schema: str, root_key: str, target_id: str = "") -> tuple[Any, str]:
     cleaned = strip_json_fence(raw)
-    payload = loads_json_lenient(cleaned)
+    payload, recovery_reason = loads_json_lenient_with_reason(raw)
     if payload is None:
         recovered = recover_json_array_items(cleaned, root_key)
         if recovered:
@@ -4132,6 +4237,8 @@ def parse_model_json_output(raw: str, *, scope: str, schema: str, root_key: str,
             return recovered, ""
         record_parser_diagnostic(scope, schema, target_id, "json_parse_failed", raw)
         return None, "json_parse_failed"
+    if recovery_reason and recovery_reason != "direct":
+        record_parser_diagnostic(scope, schema, target_id, f"json_recovered:{recovery_reason}", raw)
     shaped = parse_payload_shape(payload, root_key)
     return shaped, ""
 
@@ -4761,6 +4868,123 @@ def role_draft_from_source(payload: WorkbenchRoleDraftPayload) -> dict[str, Any]
     return sanitize_role_profile(draft, 0) or draft
 
 
+def prompt_test_root_key(scope: str) -> str:
+    schema = next((item for item in channel_schema_catalog() if item["type"] == scope), None)
+    return compact_text(schema.get("root") if schema else "", 40) or {
+        "group_chat": "messages",
+        "phone": "lines",
+        "notification": "notifications",
+    }.get(scope, "events")
+
+
+def prompt_test_mock_raw(scope: str, user_input: str) -> str:
+    payload = build_workbench_mock_payload(scope, user_input)
+    # Intentionally wrap the JSON to exercise lenient parser paths used by real models.
+    return "<think>mock reasoning should be stripped</think>\n```json\n" + json.dumps(payload, ensure_ascii=False) + "\n```"
+
+
+def prompt_test_messages(scope: str, user_input: str, channel_id: str = "", role_id: str = "") -> tuple[list[dict[str, str]], dict[str, Any]]:
+    target = normalize_prompt_scope(scope)
+    context: dict[str, Any] = {"scope": target}
+    if target == "group_chat":
+        group = get_groups()[0] if get_groups() else default_group()
+        text = compact_text(user_input, 1200) or "\u8bf7\u751f\u6210\u4e00\u8f6e\u5c0f\u624b\u673a\u7fa4\u804a\u6d4b\u8bd5\u56de\u590d\u3002"
+        context["group_id"] = group.get("group_id")
+        return build_mobile_model_messages(group, get_messages(group["group_id"])[-8:], text), context
+    if target == "phone":
+        candidates = phone_role_candidates()
+        selected_role_id = normalize_id(role_id or (candidates[0]["role_id"] if candidates else ""))
+        role = get_phone_role_or_404(selected_role_id)
+        session = {
+            "session_id": make_id("prompttest"),
+            "role_id": role["role_id"],
+            "role_name": role["display_name"],
+            "status": "ongoing",
+            "lines": [],
+        }
+        text = compact_text(user_input, 1200) or "\u4f60\u597d\uff0c\u8bf7\u7528\u7535\u8bdd\u53e3\u543b\u56de\u590d\u4e00\u53e5\u3002"
+        context["role_id"] = role["role_id"]
+        return build_phone_call_messages(role, session, text), context
+    channel_scopes = {"feed", "forum", "mail", "diary", "calendar", "live"}
+    if target in channel_scopes:
+        channel = workbench_channel_for_scope(target, channel_id)
+        messages = build_channel_seed_messages(channel, 1)
+        custom_text = compact_text(user_input, 1200)
+        if custom_text:
+            messages = [*messages, {"role": "user", "content": apply_custom_prompt_to_user_text(target, f"Prompt test extra context: {custom_text}")}]
+        context["channel_id"] = channel["channel_id"]
+        return messages, context
+    preview = prompt_preview_payload(target)
+    text = compact_text(user_input, 1200) or f"Generate a {target} JSON payload for prompt testing."
+    return [
+        {"role": "system", "content": preview["assembled_prompt"] or system_prompt_text()},
+        {"role": "user", "content": apply_custom_prompt_to_user_text(target, text)},
+    ], context
+
+
+def redact_prompt_test_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    return [
+        {"role": compact_text(item.get("role"), 40), "content": compact_text(item.get("content"), 12000)}
+        for item in messages
+        if isinstance(item, dict)
+    ]
+
+
+async def run_prompt_test(payload: PromptTestPayload) -> dict[str, Any]:
+    scope = normalize_prompt_scope(payload.scope)
+    mode = normalize_id(payload.mode, "dry-run")
+    if mode not in {"dry-run", "mock", "real"}:
+        raise HTTPException(status_code=400, detail="\u4e0d\u652f\u6301\u7684 Prompt \u6d4b\u8bd5\u6a21\u5f0f\u3002")
+
+    user_input = compact_text(payload.user_input, 1200)
+    preview = prompt_preview_payload(scope)
+    config = read_mobile_llm_config()
+    strategy = provider_strategy_for_config(config)
+    messages, context = prompt_test_messages(scope, user_input, payload.channel_id or "", payload.role_id or "")
+    root_key = prompt_test_root_key(scope)
+    result: dict[str, Any] = {
+        "mode": mode,
+        "scope": scope,
+        "scope_label": PROMPT_SCOPE_LABELS.get(scope, scope),
+        "assembled_prompt": preview.get("assembled_prompt", ""),
+        "messages": redact_prompt_test_messages(messages),
+        "root_key": root_key,
+        "provider_strategy": strategy,
+        "model_context": {
+            "model_source": config.get("model_source", ""),
+            "provider": config.get("provider", ""),
+            "model": config.get("model", ""),
+            "base_url_host": safe_url_host(config.get("base_url", "")),
+            "request_timeout": config.get("request_timeout"),
+        },
+        "save": False,
+        "context": context,
+    }
+    if mode == "dry-run":
+        return result
+
+    raw_reply = prompt_test_mock_raw(scope, user_input) if mode == "mock" else await call_chat_model(
+        messages,
+        max_tokens=min(get_settings()["max_tokens"], 1200),
+        temperature=read_mobile_llm_config()["temperature"],
+    )
+    parsed, parse_error = parse_model_json_output(
+        raw_reply,
+        scope=f"prompt_test_{scope}",
+        schema=root_key,
+        root_key=root_key,
+        target_id=compact_text(context.get("channel_id") or context.get("role_id") or context.get("group_id"), 120),
+    )
+    parsed_output = {root_key: parsed} if isinstance(parsed, list) else parsed
+    result.update({
+        "raw_reply": compact_text(raw_reply, 12000),
+        "parsed": parsed_output,
+        "parse_error": parse_error,
+        "diagnostics": get_parser_diagnostics()[:5],
+    })
+    return result
+
+
 def build_workbench_mock_payload(scope: str, user_input: str) -> dict[str, Any]:
     now = now_iso()
     if scope == "phone":
@@ -4997,6 +5221,21 @@ async def api_admin_workbench_generate(payload: WorkbenchGeneratePayload) -> JSO
         return {"ok": True, **result}
     except HTTPException as exc:
         return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc))
+
+
+@app.post("/api/admin/prompt-test", response_model=None)
+async def api_admin_prompt_test(payload: PromptTestPayload) -> JSONResponse | dict[str, Any]:
+    try:
+        result = await run_prompt_test(payload)
+        return {"ok": True, **result}
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc))
+
+
+@app.get("/api/admin/provider-strategy")
+async def api_admin_provider_strategy() -> dict[str, Any]:
+    config = read_mobile_llm_config()
+    return {"ok": True, "strategy": provider_strategy_for_config(config), "model_context": mobile_error_payload(HTTPException(status_code=200, detail="ok")).get("model_context", {})}
 
 
 @app.get("/api/admin/prompt-blocks")
