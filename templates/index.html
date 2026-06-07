@@ -70,7 +70,7 @@
         }
       }
     </style>
-  
+
     <style>
       .preset-toolbar {
         display: flex;
@@ -1092,7 +1092,12 @@
                   <strong>Prompt Debug</strong>
                   <button id="download-prompt-debug-json" type="button" class="secondary compact" disabled>下载 Debug JSON</button>
                 </div>
-                <p class="muted">集中查看 Prompt Package、Active Tags、Preset activation_tags 和 Worldbook external_tag 的调试链路。本页只观察，不改变真实 messages。</p>
+                <p class="muted">集中查看 Prompt Package、Active Tags、Preset activation_tags 和 Worldbook external_tag 的调试链路。</p>
+                <label class="checkbox-row prompt-layered-switch-row">
+                  <input id="prompt-layered-injection-enabled" type="checkbox" />
+                  <span>启用预设分层注入实验模式</span>
+                </label>
+                <p class="muted">实验功能：开启后仅让系统核心、系统格式、历史前、输出守卫四类预设片段真实生效；关闭后回到旧拼装逻辑。</p>
               </div>
               <div id="prompt-debug-panel" class="prompt-debug-grid">
                 <div class="prompt-debug-empty">生成 Prompt 预览或发送一轮聊天后，这里会显示 Prompt Debug 链路。</div>
@@ -1213,12 +1218,15 @@
               <input id="drawer-history-limit" type="number" min="1" max="100" step="1" />
             </div>
             <div>
-              <label class="checkbox-row offset-top">
-                <input id="drawer-demo-mode" type="checkbox" />
-                <span>未配置模型时允许演示模式</span>
-              </label>
+              <label for="drawer-prompt-budget-token-limit">上下文预算上限（估算 tokens）</label>
+              <input id="drawer-prompt-budget-token-limit" type="number" min="0" max="200000" step="1000" />
+              <p class="muted tiny">仅用于 Prompt Debug 告警，不会传给模型；0 表示不限制。</p>
             </div>
           </div>
+          <label class="checkbox-row offset-top">
+            <input id="drawer-demo-mode" type="checkbox" />
+            <span>未配置模型时允许演示模式</span>
+          </label>
         </section>
 
         <section class="drawer-section">
@@ -1535,8 +1543,10 @@
         "drawer-llm-model",
         "drawer-temperature",
         "drawer-history-limit",
+        "drawer-prompt-budget-token-limit",
         "drawer-request-timeout",
         "drawer-demo-mode",
+        "prompt-layered-injection-enabled",
         "drawer-embedding-base-url",
         "drawer-embedding-api-key",
         "drawer-embedding-model",
@@ -1561,6 +1571,7 @@
         llm_model: {{ settings.llm_model | tojson }},
         temperature: {{ settings.temperature | tojson }},
         history_limit: {{ settings.history_limit | tojson }},
+        prompt_budget_token_limit: {{ settings.prompt_budget_token_limit | tojson }},
         request_timeout: {{ settings.request_timeout | tojson }},
         demo_mode: {{ settings.demo_mode | tojson }},
         embedding_base_url: {{ settings.embedding_base_url | tojson }},
@@ -1573,6 +1584,7 @@
         rerank_api_key: {{ settings.rerank_api_key | tojson }},
         rerank_model: {{ settings.rerank_model | tojson }},
         rerank_top_n: {{ settings.rerank_top_n | tojson }},
+        layered_prompt_injection_enabled: {{ settings.layered_prompt_injection_enabled | tojson }},
         theme: {{ settings.theme | tojson }},
         ui_opacity: {{ settings.ui_opacity | tojson }},
         background_image_url: {{ settings.background_image_url | tojson }},
@@ -1605,6 +1617,8 @@
       function normalizeRuntimeState(state) {
         const normalized = { ...(state || {}) };
         normalized.embedding_fields = Array.isArray(normalized.embedding_fields) ? normalized.embedding_fields : [];
+        normalized.layered_prompt_injection_enabled = Boolean(normalized.layered_prompt_injection_enabled);
+        normalized.prompt_budget_token_limit = Math.max(0, Math.min(200000, Number(normalized.prompt_budget_token_limit ?? 100000) || 0));
         return normalized;
       }
 
@@ -1746,8 +1760,10 @@
         drawerInput("drawer-llm-model").value = runtimeState.llm_model || "";
         drawerInput("drawer-temperature").value = runtimeState.temperature ?? 0.85;
         drawerInput("drawer-history-limit").value = runtimeState.history_limit ?? 20;
+        drawerInput("drawer-prompt-budget-token-limit").value = runtimeState.prompt_budget_token_limit ?? 100000;
         drawerInput("drawer-request-timeout").value = runtimeState.request_timeout ?? 120;
         drawerInput("drawer-demo-mode").checked = !!runtimeState.demo_mode;
+        drawerInput("prompt-layered-injection-enabled").checked = !!runtimeState.layered_prompt_injection_enabled;
         drawerInput("drawer-embedding-base-url").value = runtimeState.embedding_base_url || "";
         drawerInput("drawer-embedding-api-key").value = runtimeState.embedding_api_key || "";
         drawerInput("drawer-embedding-model").value = runtimeState.embedding_model || "";
@@ -1788,8 +1804,10 @@
           llm_model: drawerInput("drawer-llm-model").value.trim(),
           temperature: Number(drawerInput("drawer-temperature").value || 0.85),
           history_limit: Number(drawerInput("drawer-history-limit").value || 20),
+          prompt_budget_token_limit: Number(drawerInput("drawer-prompt-budget-token-limit").value || 0),
           request_timeout: Number(drawerInput("drawer-request-timeout").value || 120),
           demo_mode: drawerInput("drawer-demo-mode").checked,
+          layered_prompt_injection_enabled: drawerInput("prompt-layered-injection-enabled").checked,
           embedding_base_url: drawerInput("drawer-embedding-base-url").value.trim(),
           embedding_api_key: drawerInput("drawer-embedding-api-key").value.trim(),
           embedding_model: drawerInput("drawer-embedding-model").value.trim(),
@@ -3319,6 +3337,7 @@
         }) || null;
         const metadata = baseSegment?.metadata && typeof baseSegment.metadata === "object" ? baseSegment.metadata : {};
         const baseKernel = metadata.base_kernel && typeof metadata.base_kernel === "object" ? metadata.base_kernel : null;
+        const thinkingProtocol = metadata.thinking_protocol && typeof metadata.thinking_protocol === "object" ? metadata.thinking_protocol : null;
         const content = String(baseSegment?.content || "").trim();
         const markers = Array.isArray(baseKernel?.markers) ? baseKernel.markers.map((item) => String(item || "").trim()).filter(Boolean) : [];
         const labels = Array.isArray(baseKernel?.marker_labels) ? baseKernel.marker_labels.map((item) => String(item || "").trim()).filter(Boolean) : [];
@@ -3329,6 +3348,7 @@
           charCount,
           markers,
           markerLabels: labels,
+          thinkingProtocol,
         };
       }
 
@@ -3357,12 +3377,192 @@
         } else if (state.markerLabels.length) {
           const markerRow = document.createElement("div");
           markerRow.className = "prompt-debug-base-marker-row";
+          if (state.thinkingProtocol?.enabled) {
+            markerRow.appendChild(makePromptDebugBadge("兼任 thinking_protocol", "thinking"));
+            markerRow.appendChild(makePromptDebugBadge("后台创作协议", "thinking"));
+          }
           state.markerLabels.forEach((label) => markerRow.appendChild(makePromptDebugBadge(label, "base")));
           body.appendChild(markerRow);
         } else {
+          if (state.thinkingProtocol?.enabled) {
+            const markerRow = document.createElement("div");
+            markerRow.className = "prompt-debug-base-marker-row";
+            markerRow.appendChild(makePromptDebugBadge("兼任 thinking_protocol", "thinking"));
+            markerRow.appendChild(makePromptDebugBadge("后台创作协议", "thinking"));
+            body.appendChild(markerRow);
+          }
           body.appendChild(makePromptDebugLine("状态", "未检测到预设内核模板结构；仍会作为普通 BASE 规则进入 prompt。"));
         }
         card.appendChild(body);
+        parent.appendChild(card);
+      }
+
+      function getLayeredInjectionState(pkg) {
+        const state = pkg?.layered_injection && typeof pkg.layered_injection === "object" ? pkg.layered_injection : {};
+        const status = String(state.status || state.mode || (state.enabled ? "layered" : "legacy")).trim() || "legacy";
+        const segmentEffects = state.segment_effects && typeof state.segment_effects === "object" ? state.segment_effects : {};
+        return {
+          enabled: Boolean(state.enabled),
+          mode: String(state.mode || (state.enabled ? "layered" : "legacy")),
+          status,
+          statusLabel: LAYERED_INJECTION_STATUS_LABELS[status] || LAYERED_INJECTION_STATUS_LABELS[state.mode] || status,
+          fallback: Boolean(state.fallback),
+          fallbackReason: String(state.fallback_reason || "").trim(),
+          appliedCount: Array.isArray(state.applied_segment_ids) ? state.applied_segment_ids.length : Object.values(segmentEffects).filter((item) => item?.applied).length,
+          observedCount: Array.isArray(state.observed_segment_ids) ? state.observed_segment_ids.length : Object.values(segmentEffects).filter((item) => !item?.applied).length,
+          effectivePlacements: Array.isArray(state.effective_placements) ? state.effective_placements : [],
+          observationOnlyPlacements: Array.isArray(state.observation_only_placements) ? state.observation_only_placements : [],
+        };
+      }
+
+      function appendLayeredInjectionCard(parent, pkg) {
+        if (!parent) return;
+        const state = getLayeredInjectionState(pkg || {});
+        const card = document.createElement("section");
+        card.className = `prompt-debug-card prompt-debug-layered-mode ${state.enabled ? "is-enabled" : ""} ${state.fallback ? "is-fallback" : ""}`;
+        const head = document.createElement("div");
+        head.className = "prompt-debug-card-head";
+        const title = document.createElement("strong");
+        title.className = "prompt-debug-card-title";
+        title.textContent = "分层注入模式";
+        const meta = document.createElement("span");
+        meta.className = "muted";
+        meta.textContent = state.statusLabel;
+        head.appendChild(title);
+        head.appendChild(meta);
+        card.appendChild(head);
+
+        const body = document.createElement("div");
+        body.className = "prompt-debug-relation-meta";
+        if (state.fallback) {
+          body.appendChild(makePromptDebugLine("状态", state.fallbackReason ? `构造失败，已回退 legacy：${state.fallbackReason}` : "构造失败，已回退 legacy。"));
+        } else if (state.enabled) {
+          body.appendChild(makePromptDebugLine("状态", `已开启实验模式，${state.appliedCount} 个预设片段真实生效，${state.observedCount} 个片段仅观察。`));
+        } else {
+          body.appendChild(makePromptDebugLine("状态", "实验开关关闭，PromptSegment 仅用于观察，不改变真实 messages。"));
+        }
+        body.appendChild(makePromptDebugLine("真实生效", state.effectivePlacements.map((item) => getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, item, item)).join(" / ") || "—"));
+        body.appendChild(makePromptDebugLine("仅观察", state.observationOnlyPlacements.map((item) => getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, item, item)).join(" / ") || "—"));
+        card.appendChild(body);
+        parent.appendChild(card);
+      }
+
+      function formatPromptBudgetTokens(value) {
+        const number = Number(value || 0);
+        if (!Number.isFinite(number) || number <= 0) return "约 0 tokens";
+        return `约 ${Math.round(number).toLocaleString()} tokens`;
+      }
+
+      function formatPromptBudgetChars(value) {
+        const number = Number(value || 0);
+        if (!Number.isFinite(number) || number <= 0) return "0 字";
+        return `${Math.round(number).toLocaleString()} 字`;
+      }
+
+      function formatPromptBudgetPair(chars, tokens) {
+        return `${formatPromptBudgetChars(chars)} / ${formatPromptBudgetTokens(tokens)}`;
+      }
+
+      function formatPromptBudgetRowLabel(row, key = "placement") {
+        const raw = String(row?.[key] || "unknown");
+        if (key === "source") return getPromptSegmentLabel(PROMPT_SEGMENT_SOURCE_LABELS, raw, raw);
+        if (key === "placement") return getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, raw, raw);
+        return raw;
+      }
+
+      function appendPromptBudgetList(parent, rows, options = {}) {
+        const list = document.createElement("div");
+        list.className = "prompt-debug-budget-list";
+        const limit = Number(options.limit || 6);
+        const key = options.key || "placement";
+        const items = Array.isArray(rows) ? rows.slice(0, limit) : [];
+        if (!items.length) {
+          list.innerHTML = '<div class="prompt-debug-empty">暂无预算数据。</div>';
+          parent.appendChild(list);
+          return;
+        }
+        items.forEach((row) => {
+          const item = document.createElement("div");
+          item.className = "prompt-debug-budget-row";
+          const title = document.createElement("span");
+          title.textContent = options.title ? options.title(row) : formatPromptBudgetRowLabel(row, key);
+          const meta = document.createElement("span");
+          meta.textContent = formatPromptBudgetPair(row.char_count, row.estimated_tokens);
+          item.appendChild(title);
+          item.appendChild(meta);
+          list.appendChild(item);
+        });
+        parent.appendChild(list);
+      }
+
+      function appendPromptBudgetCard(parent, pkg) {
+        if (!parent) return;
+        const budget = pkg?.budget_dry_run && typeof pkg.budget_dry_run === "object" ? pkg.budget_dry_run : null;
+        if (!budget?.enabled) return;
+        const card = document.createElement("section");
+        card.className = `prompt-debug-card prompt-debug-budget-card ${budget.over_budget ? "is-over-budget" : ""}`;
+        const head = document.createElement("div");
+        head.className = "prompt-debug-card-head";
+        const title = document.createElement("strong");
+        title.className = "prompt-debug-card-title";
+        title.textContent = "预算观察 · dry-run";
+        const meta = document.createElement("span");
+        meta.className = "muted";
+        meta.textContent = "仅估算，不裁剪 messages";
+        head.appendChild(title);
+        head.appendChild(meta);
+        card.appendChild(head);
+
+        const body = document.createElement("div");
+        body.className = "prompt-debug-relation-meta";
+        const budgetLimit = Number(budget.budget_limit || 0);
+        const actualTokens = Number(budget.actual_message_estimated_tokens || 0);
+        if (budgetLimit > 0) {
+          const status = budget.over_budget
+            ? `超出约 ${Math.round(Number(budget.over_by_estimated_tokens || 0)).toLocaleString()} tokens`
+            : "未超出";
+          body.appendChild(makePromptDebugLine("上下文预算", `${formatPromptBudgetTokens(actualTokens)} / ${formatPromptBudgetTokens(budgetLimit)} · ${status}`));
+        } else {
+          body.appendChild(makePromptDebugLine("上下文预算", `${formatPromptBudgetTokens(actualTokens)} · 未设置上限`));
+        }
+        body.appendChild(makePromptDebugLine("真实 messages", formatPromptBudgetPair(budget.actual_message_chars, budget.actual_message_estimated_tokens)));
+        body.appendChild(makePromptDebugLine("PromptSegment", formatPromptBudgetPair(budget.total_segment_chars, budget.total_segment_estimated_tokens)));
+        body.appendChild(makePromptDebugLine("required", formatPromptBudgetPair(budget.required_chars, budget.required_estimated_tokens)));
+        body.appendChild(makePromptDebugLine("soft", formatPromptBudgetPair(budget.soft_chars, budget.soft_estimated_tokens)));
+        body.appendChild(makePromptDebugLine("说明", budget.notes || "估算仅用于调试；本阶段不真实裁剪。"));
+        card.appendChild(body);
+
+        const sectionTitle = document.createElement("div");
+        sectionTitle.className = "prompt-debug-budget-section-title";
+        sectionTitle.textContent = "来源占用";
+        card.appendChild(sectionTitle);
+        appendPromptBudgetList(card, budget.source_totals, { key: "source", limit: 6 });
+
+        const placementTitle = document.createElement("div");
+        placementTitle.className = "prompt-debug-budget-section-title";
+        placementTitle.textContent = "层级占用";
+        card.appendChild(placementTitle);
+        appendPromptBudgetList(card, budget.placement_totals, { key: "placement", limit: 6 });
+
+        const largestTitle = document.createElement("div");
+        largestTitle.className = "prompt-debug-budget-section-title";
+        largestTitle.textContent = "最大片段";
+        card.appendChild(largestTitle);
+        appendPromptBudgetList(card, budget.largest_segments, {
+          limit: 6,
+          title: (row) => row.title || row.id || "segment",
+        });
+
+        if (Array.isArray(budget.would_trim) && budget.would_trim.length) {
+          const trimTitle = document.createElement("div");
+          trimTitle.className = "prompt-debug-budget-section-title";
+          trimTitle.textContent = "手动优化参考";
+          card.appendChild(trimTitle);
+          appendPromptBudgetList(card, budget.would_trim, {
+            limit: 5,
+            title: (row) => `${row.title || row.id || "segment"} · ${row.reason || "可检查"}`,
+          });
+        }
         parent.appendChild(card);
       }
 
@@ -3406,7 +3606,9 @@
           flow.appendChild(card);
         });
         promptDebugPanelEl.appendChild(flow);
+        appendLayeredInjectionCard(promptDebugPanelEl, packagePayload);
         appendBaseKernelCard(promptDebugPanelEl, segments);
+        appendPromptBudgetCard(promptDebugPanelEl, packagePayload);
 
         const tagCard = document.createElement("section");
         tagCard.className = "prompt-debug-card";
@@ -3457,7 +3659,8 @@
 
         const layerCard = document.createElement("section");
         layerCard.className = "prompt-debug-card";
-        layerCard.innerHTML = '<div class="prompt-debug-card-head"><strong class="prompt-debug-card-title">PromptSegment 分层</strong><span class="muted">当前为观察层级，不改变真实 messages 拼装。</span></div>';
+        const layeredState = getLayeredInjectionState(packagePayload);
+        layerCard.innerHTML = `<div class="prompt-debug-card-head"><strong class="prompt-debug-card-title">PromptSegment 分层</strong><span class="muted">${layeredState.enabled && !layeredState.fallback ? "真实分层实验已开启；仅部分预设 placement 生效。" : "当前为观察层级，不改变真实 messages 拼装。"}</span></div>`;
         const layerList = document.createElement("div");
         layerList.className = "prompt-debug-layer-list";
         Object.entries(placementCounts).forEach(([placement, count]) => {
@@ -4041,6 +4244,11 @@
         soft: "软提示",
         required: "必带",
       };
+      const LAYERED_INJECTION_STATUS_LABELS = {
+        legacy: "观察模式",
+        layered: "真实分层模式",
+        fallback: "已回退 legacy",
+      };
 
       const PROMPT_PREVIEW_LEGACY_CACHE_KEY = "fantareal:lastPromptPackagePreview";
       const PROMPT_PREVIEW_CACHE_SCHEMA = "prompt-package-cache-v2";
@@ -4394,6 +4602,9 @@
             segment_count: promptSegments.length,
             layer_count: layers.length,
             total_segment_chars: packagePayload.prompt_segment_summary?.total_char_count ?? sumBy(promptSegments, "char_count"),
+            total_estimated_tokens: packagePayload.prompt_segment_summary?.total_estimated_tokens ?? sumBy(promptSegments, "estimated_tokens"),
+            layered_injection: packagePayload.layered_injection || { enabled: false, mode: "legacy" },
+            budget_dry_run: packagePayload.budget_dry_run || { enabled: false },
             preset_activation_tag_count: presetActivationTags.count || 0,
             message_roles: countBy(messages, "role"),
             segment_sources: countBy(promptSegments, "source"),
@@ -4403,11 +4614,15 @@
           },
           notes: {
             messages: "Actual model request messages sent to the provider.",
-            prompt_segments: "Debug-only observation segments. They do not replace messages unless layered injection mode is enabled in a future version.",
+            prompt_segments: "PromptSegment observation list. Preset segments can drive messages only when layered injection mode is enabled.",
+            layered_injection: "Experimental status for preset placement-driven message assembly.",
+            budget_dry_run: "Estimated Prompt Package budget. Dry-run only; it does not trim or change messages.",
             layers: "Human-readable prompt preview layers for inspection.",
           },
           messages,
           prompt_segments: promptSegments,
+          layered_injection: packagePayload.layered_injection || { enabled: false, mode: "legacy" },
+          budget_dry_run: packagePayload.budget_dry_run || { enabled: false },
           preset_activation_tags: presetActivationTags,
           debug_relations: {
             worldbook_debug: activeItem?.worldbook_debug || lastWorldbookDebugPayload || {},
@@ -4479,7 +4694,8 @@
         const summary = pkg?.prompt_segment_summary || {};
         const summaryBits = [`${segments.length} 段`];
         if (typeof summary.total_char_count === "number") {
-          summaryBits.push(`约 ${summary.total_char_count} 字符`);
+          const tokenText = typeof summary.total_estimated_tokens === "number" ? ` / ${formatPromptBudgetTokens(summary.total_estimated_tokens)}` : "";
+          summaryBits.push(`约 ${summary.total_char_count} 字符${tokenText}`);
         }
         if (Array.isArray(summary.placements) && summary.placements.length) {
           summaryBits.push(summary.placements.map((item) => getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, item)).join(" / "));
@@ -4503,9 +4719,10 @@
             getPromptSegmentLabel(PROMPT_SEGMENT_KIND_LABELS, segment.kind),
           ].filter((item) => item && item !== "-").join(" · ");
           const charCountText = typeof segment.char_count === "number" ? `${segment.char_count} 字符` : "";
+          const tokenCountText = typeof segment.estimated_tokens === "number" ? formatPromptBudgetTokens(segment.estimated_tokens) : "";
           row.appendChild(createPromptSegmentText(
             "prompt-segment-placement",
-            [placementText, roleKindText, charCountText].filter((item) => item && item !== "-").join(" · ")
+            [placementText, roleKindText, charCountText, tokenCountText].filter((item) => item && item !== "-").join(" · ")
           ));
 
           const flags = document.createElement("span");
@@ -4546,7 +4763,44 @@
             detail.appendChild(tagRow);
           }
           const baseKernel = segment.metadata?.base_kernel && typeof segment.metadata.base_kernel === "object" ? segment.metadata.base_kernel : null;
+          const thinkingProtocol = segment.metadata?.thinking_protocol && typeof segment.metadata.thinking_protocol === "object" ? segment.metadata.thinking_protocol : null;
           const baseMarkerLabels = Array.isArray(baseKernel?.marker_labels) ? baseKernel.marker_labels.map((label) => String(label || "").trim()).filter(Boolean) : [];
+          const layeredEffect = segment.metadata?.layered_injection && typeof segment.metadata.layered_injection === "object" ? segment.metadata.layered_injection : null;
+          if (layeredEffect) {
+            const layeredRow = document.createElement("div");
+            layeredRow.className = "prompt-segment-tag-row";
+            const layeredLabel = document.createElement("span");
+            layeredLabel.className = "prompt-segment-tag-label";
+            layeredLabel.textContent = "分层注入";
+            layeredRow.appendChild(layeredLabel);
+            const layeredState = document.createElement("span");
+            layeredState.className = `prompt-segment-flag ${layeredEffect.applied ? "hard" : "soft"}`;
+            const placementLabel = getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, layeredEffect.final_position, layeredEffect.final_position || "legacy");
+            layeredState.textContent = layeredEffect.applied ? `已生效 · ${placementLabel}` : `仅观察 · ${placementLabel}`;
+            layeredRow.appendChild(layeredState);
+            const layeredReason = document.createElement("span");
+            layeredReason.className = "prompt-segment-flag soft";
+            layeredReason.textContent = layeredEffect.reason || (layeredEffect.applied ? "已进入真实编排" : "未改变真实 messages");
+            layeredRow.appendChild(layeredReason);
+            detail.appendChild(layeredRow);
+          }
+          if (thinkingProtocol?.enabled) {
+            const thinkingRow = document.createElement("div");
+            thinkingRow.className = "prompt-segment-tag-row";
+            const thinkingLabel = document.createElement("span");
+            thinkingLabel.className = "prompt-segment-tag-label";
+            thinkingLabel.textContent = "thinking_protocol";
+            thinkingRow.appendChild(thinkingLabel);
+            const thinkingState = document.createElement("span");
+            thinkingState.className = "prompt-segment-flag thinking";
+            thinkingState.textContent = "兼任后台创作协议";
+            thinkingRow.appendChild(thinkingState);
+            const thinkingMode = document.createElement("span");
+            thinkingMode.className = "prompt-segment-flag soft";
+            thinkingMode.textContent = thinkingProtocol.mode || "base_as_thinking_protocol";
+            thinkingRow.appendChild(thinkingMode);
+            detail.appendChild(thinkingRow);
+          }
           if (baseKernel) {
             const baseRow = document.createElement("div");
             baseRow.className = "prompt-segment-tag-row";
@@ -4565,6 +4819,26 @@
               baseRow.appendChild(markerChip);
             });
             detail.appendChild(baseRow);
+          }
+          const budget = segment.metadata?.budget && typeof segment.metadata.budget === "object" ? segment.metadata.budget : null;
+          if (budget) {
+            const budgetRow = document.createElement("div");
+            budgetRow.className = "prompt-segment-tag-row";
+            const budgetLabel = document.createElement("span");
+            budgetLabel.className = "prompt-segment-tag-label";
+            budgetLabel.textContent = "预算估算";
+            budgetRow.appendChild(budgetLabel);
+            const budgetSize = document.createElement("span");
+            budgetSize.className = "prompt-segment-flag soft";
+            budgetSize.textContent = formatPromptBudgetPair(budget.char_count, budget.estimated_tokens);
+            budgetRow.appendChild(budgetSize);
+            if (budget.token_budget) {
+              const budgetLimit = document.createElement("span");
+              budgetLimit.className = `prompt-segment-flag ${budget.over_segment_budget ? "hard" : "soft"}`;
+              budgetLimit.textContent = budget.over_segment_budget ? `超过预算 ${budget.token_budget}` : `预算 ${budget.token_budget}`;
+              budgetRow.appendChild(budgetLimit);
+            }
+            detail.appendChild(budgetRow);
           }
           detail.appendChild(snippet);
 
@@ -6001,6 +6275,8 @@
           rerank_model: runtimeState.rerank_model,
           rerank_top_n: runtimeState.rerank_top_n,
           sprite_enabled: false,
+          layered_prompt_injection_enabled: Boolean(runtimeState.layered_prompt_injection_enabled),
+          prompt_budget_token_limit: Number(runtimeState.prompt_budget_token_limit || 0),
         };
       }
 
@@ -6098,6 +6374,9 @@
             },
             onDone(data) {
               finalReply = typeof data.reply === "string" ? data.reply : finalReply;
+              if (Array.isArray(data.director_notes)) {
+                renderDirectorNotes(data.director_notes);
+              }
               const workshopDynamicParse = extractWorkshopDynamicEvents(finalReply);
               finalReply = processAssistantStatusPanelText(workshopDynamicParse.cleanedText, {
                 source: "chat_done",
@@ -6108,7 +6387,9 @@
               triggerDynamicScenesByRound(workshopRoundCount);
               ensureFinalVisible(assistantEntry, finalReply);
               assistantEntry.wrapper.dataset.messageContent = finalReply;
-              loadDirectorNotes().catch((error) => console.warn("Director notes refresh failed:", error));
+              if (!Array.isArray(data.director_notes)) {
+                loadDirectorNotes().catch((error) => console.warn("Director notes refresh failed:", error));
+              }
               if (typeof data.think === "string") {
                 assistantEntry.state.think = data.think;
               }
@@ -6253,7 +6534,7 @@
       document.getElementById("close-drawer")?.addEventListener("click", closeDrawer);
       drawerOverlayEl?.addEventListener("click", closeDrawer);
 
-      document.querySelectorAll("#config-drawer input, #config-drawer select").forEach((element) => {
+      document.querySelectorAll("#config-drawer input, #config-drawer select, #runtime-tab-prompt-debug input").forEach((element) => {
         element.addEventListener("input", syncStateFromDrawer);
         element.addEventListener("change", syncStateFromDrawer);
       });

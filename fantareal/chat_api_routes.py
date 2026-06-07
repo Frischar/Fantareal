@@ -5,13 +5,34 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from .app_models import ChatHistoryEditRequest, ChatHistoryRerollRequest, ChatRequest, SlotSummaryBufferPayload
+from .app_models import (
+    ChatHistoryEditRequest,
+    ChatHistoryRerollRequest,
+    ChatRequest,
+    DirectorNoteDeletePayload,
+    DirectorNotePayload,
+    SlotSummaryBufferPayload,
+)
 
 
 def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
     @app.get("/api/history")
     async def api_get_history() -> list[dict[str, Any]]:
         return ctx.get_conversation()
+
+    @app.get("/api/chat/director-notes")
+    async def api_get_director_notes() -> dict[str, Any]:
+        return {"items": ctx.get_director_notes(ctx.get_active_slot_id())}
+
+    @app.post("/api/chat/director-notes")
+    async def api_create_director_note(payload: DirectorNotePayload) -> dict[str, Any]:
+        items = ctx.create_director_note(payload.model_dump(), ctx.get_active_slot_id())
+        return {"items": items}
+
+    @app.post("/api/chat/director-notes/delete")
+    async def api_delete_director_note(payload: DirectorNoteDeletePayload) -> dict[str, Any]:
+        items = ctx.delete_director_note(payload.id, ctx.get_active_slot_id())
+        return {"items": items}
 
 
     @app.post("/api/chat/history/message-meta")
@@ -215,6 +236,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         if reply.strip():
             entries.append(("assistant", reply))
         ctx.append_messages(entries)
+        director_notes = ctx.consume_director_notes_turn(ctx.get_active_slot_id())
 
         worldbook_debug = ctx.build_worldbook_debug_payload(
             message,
@@ -233,6 +255,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             "memory_item": None,
             "preset_debug": preset_debug,
             "prompt_package": prompt_package,
+            "director_notes": director_notes,
         }
 
     @app.post("/api/chat/prompt-preview")
@@ -265,6 +288,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             ),
             "preset_debug": ctx.build_preset_debug_payload(preset_context=preset_context),
             "prompt_package": prompt_package,
+            "director_notes": ctx.get_director_notes(ctx.get_active_slot_id()),
         }
 
     @app.post("/api/chat/stream")
@@ -311,9 +335,11 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                     "worldbook_debug": worldbook_debug,
                     "preset_debug": preset_debug,
                     "prompt_package": prompt_package,
+                    "director_notes": ctx.get_director_notes(ctx.get_active_slot_id()),
                 }
                 yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
-                done = {"type": "done", "reply": "", "sprite_tag": "", "worldbook_enforced": False}
+                director_notes = ctx.consume_director_notes_turn(ctx.get_active_slot_id())
+                done = {"type": "done", "reply": "", "sprite_tag": "", "worldbook_enforced": False, "director_notes": director_notes}
                 yield f"data: {json.dumps(done, ensure_ascii=False)}\n\n"
 
             return StreamingResponse(demo_event_stream(), media_type="text/event-stream")
@@ -326,6 +352,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 "worldbook_debug": worldbook_debug,
                 "preset_debug": preset_debug,
                 "prompt_package": prompt_package,
+                "director_notes": ctx.get_director_notes(ctx.get_active_slot_id()),
             }
             yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
 
@@ -340,6 +367,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 ):
                     if item.get("type") == "done":
                         final_reply_result = item
+                        continue
                     yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
             except HTTPException as exc:
                 error_event = {"type": "error", "detail": exc.detail if isinstance(exc.detail, str) else str(exc.detail)}
@@ -357,6 +385,11 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             if stored_reply_text:
                 entries.append(("assistant", stored_reply_text))
             ctx.append_messages(entries)
+            director_notes = ctx.consume_director_notes_turn(ctx.get_active_slot_id())
+            done_payload = dict(final_reply_result or {})
+            done_payload.setdefault("type", "done")
+            done_payload["director_notes"] = director_notes
+            yield f"data: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
 
         return StreamingResponse(
             event_stream(),
