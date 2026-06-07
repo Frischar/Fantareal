@@ -7,13 +7,18 @@ from typing import Any, Callable
 _DEPS: dict[str, Callable[..., Any]] = {}
 
 V4F_OUTPUT_GUARD_MARKER = "[[RUNTIME_ONLY:V4F_OUTPUT_GUARD]]"
-LAYERED_PRESET_EFFECTIVE_PLACEMENTS = {"system_core", "system_format", "before_history", "output_guard"}
-LAYERED_PRESET_OBSERVATION_ONLY_PLACEMENTS = {
+LAYERED_PRESET_EFFECTIVE_PLACEMENTS = {
+    "system_core",
     "before_character",
     "after_character",
     "lore_context",
     "memory_context",
+    "system_format",
+    "before_history",
     "near_latest_user",
+    "output_guard",
+}
+LAYERED_PRESET_OBSERVATION_ONLY_PLACEMENTS = {
     "at_depth",
 }
 V4F_OUTPUT_GUARD_PROMPT = (
@@ -222,6 +227,18 @@ def _build_layered_messages(
     applied_by_placement: dict[str, list[dict[str, Any]]] = {placement: [] for placement in LAYERED_PRESET_EFFECTIVE_PLACEMENTS}
     legacy_preset_sections: list[str] = []
 
+    placement_reasons = {
+        "system_core": "实验开关开启：该预设片段已插入系统核心区。",
+        "before_character": "实验开关开启：该预设片段已插入角色卡前置说明区。",
+        "after_character": "实验开关开启：该预设片段已插入角色卡后补充规则区。",
+        "lore_context": "实验开关开启：该预设片段已插入世界观 / 设定上下文区。",
+        "memory_context": "实验开关开启：该预设片段已插入记忆上下文区。",
+        "system_format": "实验开关开启：该预设片段已插入输出格式区。",
+        "before_history": "实验开关开启：该预设片段已插入聊天历史前说明区。",
+        "near_latest_user": "实验开关开启：该预设片段已插入本轮用户输入前提醒区。",
+        "output_guard": "实验开关开启：该预设片段已插入最终输出守卫区。",
+    }
+
     for segment in prompt_segments:
         placement = str(segment.get("placement", "")).strip()
         if not _is_layerable_preset_segment(segment):
@@ -230,7 +247,7 @@ def _build_layered_messages(
         if placement in LAYERED_PRESET_EFFECTIVE_PLACEMENTS or is_base_thinking_protocol:
             final_placement = "system_core" if is_base_thinking_protocol else placement
             applied_by_placement.setdefault(final_placement, []).append(segment)
-            reason = "实验开关开启：该预设 placement 已进入真实分层编排。"
+            reason = placement_reasons.get(final_placement, "实验开关开启：该预设 placement 已进入真实分层编排。")
             if is_base_thinking_protocol:
                 reason = "BASE 兼任 thinking_protocol，已作为系统核心优先进入真实分层编排。"
             _set_layered_effect(
@@ -245,13 +262,16 @@ def _build_layered_messages(
             text = str(segment.get("content", "")).strip()
             if text:
                 legacy_preset_sections.append(text)
+            observation_reason = "该 preset placement 尚未纳入真实分层编排，仅保留观察。"
+            if placement == "at_depth":
+                observation_reason = "预设 at_depth 需要明确 depth 元数据，本阶段暂不真实插入聊天历史中间。"
             _set_layered_effect(
                 state,
                 segment,
                 applied=False,
                 final_role=str(segment.get("role", "system") or "system"),
                 final_position="legacy_observation",
-                reason="阶段 7 第一版暂不让该 placement 真实生效，仅保留观察。",
+                reason=observation_reason,
             )
 
     def preset_sections(placement: str) -> list[str]:
@@ -275,14 +295,18 @@ def _build_layered_messages(
         "system",
         [
             worldbook_before_char_defs_prompt,
+            *preset_sections("before_character"),
             *_director_note_sections(director_note_buckets, "before_character"),
             system_prompt,
             worldbook_stable_prompt,
             worldbook_after_char_defs_prompt,
+            *preset_sections("after_character"),
             *_director_note_sections(director_note_buckets, "after_character"),
             memory_recap_prompt,
             user_profile_prompt,
+            *preset_sections("memory_context"),
             worldbook_current_state_prompt,
+            *preset_sections("lore_context"),
             retrieval_prompt,
             worldbook_dynamic_prompt,
             worldbook_answer_guard,
@@ -323,6 +347,7 @@ def _build_layered_messages(
 
     append_in_chat_bucket(0)
     _append_joined_message(messages, "system", preset_sections("output_guard") + [worldbook_output_guard_prompt])
+    _append_joined_message(messages, "system", preset_sections("near_latest_user"))
     _append_joined_message(messages, "system", _director_note_sections(director_note_buckets, "near_latest_user"))
     message = _message("user", clean_user_message)
     if message:
