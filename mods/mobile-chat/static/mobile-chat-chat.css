@@ -3035,6 +3035,7 @@
 }
 
 .fmcp-channel-compose input,
+.fmcp-channel-compose select,
 .fmcp-channel-compose textarea,
 .fmcp-channel-reply-form textarea {
   width: 100%;
@@ -3052,6 +3053,11 @@
   padding: 0 10px;
 }
 
+.fmcp-channel-compose select {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
 .fmcp-channel-compose textarea,
 .fmcp-channel-reply-form textarea {
   min-height: 82px;
@@ -3064,6 +3070,27 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.fmcp-mail-draft-save {
+  border-color: #8da3c8;
+  background: #f5f8ff;
+  color: #26466f;
+  font-weight: 800;
+}
+
+.fmcp-mail-draft-save:hover,
+.fmcp-mail-draft-save:focus-visible {
+  border-color: #5276b8;
+  background: #e7efff;
+  color: #183c78;
+}
+
+.fmcp-mail-draft-save:disabled {
+  border-color: #c9d3e4;
+  background: #edf2f8;
+  color: #708199;
+  opacity: 1;
 }
 
 .fmcp-mail-client {
@@ -3096,6 +3123,29 @@
 .fmcp-mail-topbar span {
   color: rgba(232, 239, 249, 0.78);
   font-size: 12px;
+}
+
+.fmcp-mail-topbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.fmcp-mail-compose-button {
+  min-height: 34px;
+  border-color: rgba(197, 215, 244, 0.42);
+  background: rgba(255, 255, 255, 0.11);
+  color: #f8fbff;
+}
+
+.fmcp-mail-compose-button .fmcp-glyph {
+  width: 15px;
+  height: 15px;
+}
+
+.fmcp-mail-compose-form {
+  margin: 0 12px;
 }
 
 .fmcp-mail-search {
@@ -3720,6 +3770,48 @@
   border-color: rgba(255, 230, 225, 0.42);
   background: rgba(96, 28, 24, 0.34);
   box-shadow: none;
+}
+
+#fantareal-mobile-chat-root .fmcp-mail-topbar .fmcp-mail-compose-button {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: #243b5f;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(35, 42, 58, 0.28);
+}
+
+#fantareal-mobile-chat-root .fmcp-mail-topbar .fmcp-mail-compose-button span {
+  color: #ffffff;
+  font-weight: 850;
+}
+
+#fantareal-mobile-chat-root .fmcp-mail-topbar .fmcp-mail-compose-button:hover,
+#fantareal-mobile-chat-root .fmcp-mail-topbar .fmcp-mail-compose-button:focus-visible {
+  border-color: #ffffff;
+  background: #1a3154;
+  color: #ffffff;
+}
+
+#fantareal-mobile-chat-root .fmcp-mail-draft .fmcp-mail-draft-save {
+  border: 1px solid #6f89b5;
+  background: #e5edfb;
+  color: #183f75;
+  font-weight: 850;
+  opacity: 1;
+}
+
+#fantareal-mobile-chat-root .fmcp-mail-draft .fmcp-mail-draft-save:hover,
+#fantareal-mobile-chat-root .fmcp-mail-draft .fmcp-mail-draft-save:focus-visible {
+  border-color: #3f66a5;
+  background: #d7e5fb;
+  color: #12386d;
+}
+
+#fantareal-mobile-chat-root .fmcp-mail-draft .fmcp-mail-draft-save:disabled {
+  border-color: #b9c8dc;
+  background: #edf2f8;
+  color: #5c718e;
+  opacity: 1;
 }
 
 /* 4.1 experience fixes and live app */
@@ -5115,4 +5207,73 @@
 
 .fmcp-live-retry-notice .fmcp-button {
   justify-self: start;
+}
+
+
+.fmcp-mail-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.fmcp-mail-search span {
+  color: #617089;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.fmcp-mail-search input {
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+}
+
+.fmcp-mail-search button {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(96, 112, 137, 0.12);
+  color: #617089;
+  cursor: pointer;
+}
+
+.fmcp-mail-card.is-unread {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.14);
+}
+
+.fmcp-mail-card.is-unread strong::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: #3b82f6;
+  vertical-align: 1px;
+}
+
+
+.fmcp-mail-retry-status {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 12px;
+  background: rgba(254, 242, 242, 0.92);
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fmcp-mail-retry-status strong {
+  display: block;
+  color: #7f1d1d;
 }
