@@ -70,6 +70,20 @@ DEFAULT_UI_SETTINGS = {
     "remember_position": True,
     "floating_position": {"right": 28, "bottom": 150},
     "panel_position": {"right": 28, "bottom": 92},
+    "ui_theme": "modern",
+}
+WORLD_THEME_IDS = {"modern", "xianxia", "apocalypse"}
+DEFAULT_WORLD_THEME = "modern"
+WORLD_THEME_PROMPTS = {
+    "modern": "",
+    "xianxia": (
+        "World style layer: keep the phone UI and JSON schema modern internally, but let wording and character behavior fit a xianxia or classical fantasy setting. "
+        "Use display concepts such as transmission, letter, voice transmission and sightings when natural. Keep replies light, fragmented and conversational; do not force archaic prose."
+    ),
+    "apocalypse": (
+        "World style layer: keep the phone UI and JSON schema modern internally, but let wording and character behavior fit an apocalypse or survival network. "
+        "Characters may care about risk, supplies, routes and signal status. Use channel, message, call and broadcast concepts when natural, without retelling long main-chat plot."
+    ),
 }
 DEFAULT_GENERATION_SETTINGS = {
     "model_source": "main",
@@ -157,6 +171,8 @@ DEFAULT_SETTINGS = {
     "remember_position": DEFAULT_UI_SETTINGS["remember_position"],
     "floating_position": DEFAULT_UI_SETTINGS["floating_position"],
     "panel_position": DEFAULT_UI_SETTINGS["panel_position"],
+    "ui_theme": DEFAULT_UI_SETTINGS["ui_theme"],
+    "world_theme": DEFAULT_WORLD_THEME,
     "model_source": DEFAULT_GENERATION_SETTINGS["model_source"],
     "reply_count": DEFAULT_GENERATION_SETTINGS["reply_count"],
     "max_tokens": DEFAULT_GENERATION_SETTINGS["max_tokens"],
@@ -303,6 +319,8 @@ class SettingsPayload(BaseModel):
     remember_position: bool | None = None
     floating_position: dict[str, Any] | None = None
     panel_position: dict[str, Any] | None = None
+    ui_theme: str | None = None
+    world_theme: str | None = None
     model_source: str | None = None
     api_config: dict[str, Any] | None = None
     llm_base_url: str | None = None
@@ -1255,6 +1273,11 @@ def normalize_prompt_mode(value: Any, *, use_custom_prompt: bool = False) -> str
     return "default"
 
 
+def sanitize_world_theme(value: Any) -> str:
+    theme = normalize_id(value, DEFAULT_WORLD_THEME)
+    return theme if theme in WORLD_THEME_IDS else DEFAULT_WORLD_THEME
+
+
 def sanitize_prompt_settings(raw: Any) -> dict[str, Any]:
     source = raw if isinstance(raw, dict) else {}
     last_preview = normalize_prompt_scope(source.get("last_preview_channel", DEFAULT_PROMPT_SETTINGS["last_preview_channel"]))
@@ -1289,6 +1312,8 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     settings["enabled"] = bool(source.get("enabled", DEFAULT_SETTINGS["enabled"]))
     settings["show_floating_button"] = bool(pick_section_value(source, ui_source, "show_floating_button", DEFAULT_UI_SETTINGS["show_floating_button"]))
     settings["remember_position"] = bool(pick_section_value(source, ui_source, "remember_position", DEFAULT_UI_SETTINGS["remember_position"]))
+    settings["ui_theme"] = sanitize_world_theme(pick_section_value(source, ui_source, "ui_theme", source.get("world_theme", DEFAULT_WORLD_THEME)))
+    settings["world_theme"] = settings["ui_theme"]
     settings["floating_position"] = sanitize_position(
         pick_section_value(source, ui_source, "floating_position", DEFAULT_UI_SETTINGS["floating_position"]),
         DEFAULT_UI_SETTINGS["floating_position"],
@@ -1347,6 +1372,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
         "remember_position": settings["remember_position"],
         "floating_position": settings["floating_position"],
         "panel_position": settings["panel_position"],
+        "ui_theme": settings["ui_theme"],
     }
     settings["generation"] = {
         "model_source": settings["model_source"],
@@ -1531,6 +1557,11 @@ def prompt_body_preview_text(scope: str, settings: dict[str, Any] | None = None)
     return editable_default_prompt_text(target)
 
 
+def world_theme_prompt_section(settings: dict[str, Any] | None = None) -> str:
+    theme = sanitize_world_theme((settings or get_settings()).get("world_theme"))
+    return WORLD_THEME_PROMPTS.get(theme, "")
+
+
 def custom_prompt_user_section(scope: str, settings: dict[str, Any] | None = None) -> str:
     if prompt_mode_for_settings(settings) != "additive":
         return ""
@@ -1557,14 +1588,20 @@ def assembled_prompt_text(scope: str) -> str:
     target = normalize_prompt_scope(scope)
     settings = get_settings()
     custom_prompt = custom_prompt_for_scope(target, settings)
+    theme_section = world_theme_prompt_section(settings)
     if prompt_mode_for_settings(settings) == "override" and custom_prompt:
         parts = [strip_locked_prompt_contract(custom_prompt, target)]
+        if theme_section:
+            parts.append(theme_section)
         if settings.get("prompt", {}).get("append_json_contract", True):
             contract = locked_prompt_contract_text(target)
             if contract:
                 parts.append(contract)
         return "\n\n".join(parts).strip()
-    return default_prompt_text(target)
+    parts = [default_prompt_text(target)]
+    if theme_section:
+        parts.append(theme_section)
+    return "\n\n".join(part for part in parts if part).strip()
 
 
 def channel_schema_catalog() -> list[dict[str, Any]]:
@@ -1885,9 +1922,13 @@ def merge_settings_update(current: dict[str, Any], updates: dict[str, Any]) -> d
     generation = updates.get("generation") if isinstance(updates.get("generation"), dict) else {}
     auto_behavior = updates.get("auto_behavior") if isinstance(updates.get("auto_behavior"), dict) else {}
     if ui:
-        for key in ("show_floating_button", "remember_position", "floating_position", "panel_position"):
+        for key in ("show_floating_button", "remember_position", "floating_position", "panel_position", "ui_theme"):
             if key in ui and key not in updates:
                 merged[key] = ui[key]
+    if "ui_theme" in updates and isinstance(merged.get("ui"), dict):
+        merged["ui"] = {**merged["ui"], "ui_theme": updates["ui_theme"]}
+    if "world_theme" in updates and "ui_theme" not in updates and isinstance(merged.get("ui"), dict):
+        merged["ui"] = {**merged["ui"], "ui_theme": updates["world_theme"]}
     if generation:
         for key in ("model_source", "api_config", "reply_count", "max_tokens", "recent_message_limit", "allow_role_to_role_reply"):
             if key in generation and key not in updates:
