@@ -56,6 +56,8 @@
     remember_position: true,
     floating_position: { right: 28, bottom: 150 },
     panel_position: { right: 28, bottom: 92 },
+    ui_theme: "modern",
+    world_theme: "modern",
   };
   const state = {
     settings: defaults,
@@ -277,6 +279,65 @@
     return "通话";
   }
 
+  function currentTheme() {
+    const theme = state.settings?.ui_theme || state.settings?.world_theme || "modern";
+    return ["modern", "xianxia", "apocalypse"].includes(theme) ? theme : "modern";
+  }
+
+  function themedLabel(kind, value) {
+    const theme = currentTheme();
+    const maps = {
+      app: {
+        modern: { group_chat: "群聊", settings: "详细设置", stickers: "贴纸包", assist: "辅助功能", feed: "动态", forum: "论坛", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
+        xianxia: { group_chat: "传讯", settings: "设定", stickers: "贴纸", assist: "造像", feed: "见闻", forum: "论道", live: "留影", notifications: "灵讯", phone: "传音", mail: "书信", diary: "札记", calendar: "行程" },
+        apocalypse: { group_chat: "频道", settings: "终端", stickers: "物资", assist: "档案", feed: "公告", forum: "情报板", live: "监控", notifications: "警报", phone: "通话", mail: "信件", diary: "日志", calendar: "排班" },
+      },
+      subtitle: {
+        modern: { group_chat: "角色卡群聊", settings: "偏好与模型", stickers: "内置资源", assist: "人物生成", feed: "角色近况", forum: "世界讨论板", live: "弹幕与醒目留言", notifications: "系统与角色提醒", phone: "模拟通话 RP", mail: "角色邮件往来", diary: "角色日记", calendar: "日程安排" },
+        xianxia: { group_chat: "角色传讯", settings: "灵机设定", stickers: "符贴资源", assist: "人物造像", feed: "山门见闻", forum: "论道闲谈", live: "留影弹幕", notifications: "系统灵讯", phone: "模拟传音 RP", mail: "角色书信", diary: "随身札记", calendar: "行程安排" },
+        apocalypse: { group_chat: "避难频道", settings: "终端参数", stickers: "贴标物资", assist: "人物档案", feed: "态势公告", forum: "情报交换", live: "监控画面", notifications: "风险警报", phone: "模拟通话 RP", mail: "角色信件", diary: "行动日志", calendar: "值班排程" },
+      },
+      channel: {
+        modern: { feed: "动态", forum: "论坛", mail: "邮箱", diary: "日记", calendar: "日程", live: "直播", phone: "电话" },
+        xianxia: { feed: "见闻", forum: "论道", mail: "书信", diary: "札记", calendar: "行程", live: "留影", phone: "传音" },
+        apocalypse: { feed: "公告", forum: "情报板", mail: "信件", diary: "日志", calendar: "排班", live: "监控", phone: "通话" },
+      },
+      event: {
+        modern: { post: "动态", thread: "帖子", reply: "回复", mail: "邮件", diary: "日记", calendar: "日程", live: "直播" },
+        xianxia: { post: "见闻", thread: "论帖", reply: "回帖", mail: "书信", diary: "札记", calendar: "行程", live: "留影" },
+        apocalypse: { post: "公告", thread: "情报", reply: "回报", mail: "信件", diary: "日志", calendar: "排班", live: "监控" },
+      },
+    };
+    return maps[kind]?.[theme]?.[value] || maps[kind]?.modern?.[value] || value || "";
+  }
+
+  function themedAppCopy(app) {
+    const appId = String(app?.app_id || "");
+    return {
+      ...app,
+      label: themedLabel("app", appId) || app?.label || appId,
+      subtitle: themedLabel("subtitle", appId) || app?.subtitle || app?.stage || "",
+    };
+  }
+
+  function themedHomeCopy() {
+    const copies = {
+      modern: {
+        title: "我的小手机",
+        subtitle: "选择一个应用进入。后续可以继续扩展新的小应用。",
+      },
+      xianxia: {
+        title: "书札匣",
+        subtitle: "选择一道书札。角色会按主线近况调整行动，语气保持私下通信。",
+      },
+      apocalypse: {
+        title: "随身终端",
+        subtitle: "选择一个频道。正文态势会压缩同步，角色会按当前风险和记忆行动。",
+      },
+    };
+    return copies[currentTheme()] || copies.modern;
+  }
+
   function metadataValueText(value) {
     if (value === null || value === undefined) return "";
     if (Array.isArray(value) || typeof value === "object") {
@@ -333,13 +394,11 @@
   }
 
   function channelTypeLabel(type) {
-    const labels = { feed: "动态", forum: "论坛", mail: "邮箱", diary: "日记", calendar: "日程", live: "直播" };
-    return labels[type] || type || "频道";
+    return themedLabel("channel", type) || "频道";
   }
 
   function eventTypeLabel(type) {
-    const labels = { post: "动态", thread: "帖子", reply: "回复", mail: "邮件", diary: "日记", calendar: "日程", live: "直播" };
-    return labels[type] || type || "内容";
+    return themedLabel("event", type) || "内容";
   }
 
   function isFallbackEvent(event) {
@@ -706,7 +765,10 @@
     const seen = new Set();
     return rows
       .filter((app) => app && app.app_id !== "assist" && app.page !== "assist")
-      .map((app) => ({ app_id: String(app.app_id || ""), label: String(app.label || app.app_id || "") }))
+      .map((app) => {
+        const appId = String(app.app_id || "");
+        return { app_id: appId, label: themedLabel("app", appId) || String(app.label || appId || "") };
+      })
       .filter((app) => {
         if (!app.app_id || seen.has(app.app_id)) return false;
         seen.add(app.app_id);
@@ -1685,7 +1747,14 @@
   }
 
   function pageTitle() {
-    if (state.page === "home") return ["小手机", "应用桌面"];
+    if (state.page === "home") {
+      const titles = {
+        modern: ["小手机", "应用桌面"],
+        xianxia: ["随身书札", "书信与见闻"],
+        apocalypse: ["随身终端", "频道桌面"],
+      };
+      return titles[currentTheme()] || titles.modern;
+    }
     if (state.page === "create") return ["创建群聊", "从当前角色卡选择成员"];
     if (state.page === "settings") return ["详细设置", "小手机偏好"];
     if (state.page === "stickers") return ["贴纸包", "默认表情资源"];
@@ -1695,8 +1764,9 @@
     if (state.page.startsWith("channel-")) {
       const channel = currentChannel();
       const event = currentChannelEvent();
-      if (event) return [event.title || channel?.label || "详情", `${channel?.label || "频道"} · ${event.author_name || "System"}`];
-      return [channel ? channel.label : "轻应用", channel ? channel.description || channel.type : "频道内容"];
+      const channelLabel = themedLabel("channel", channel?.type) || channel?.label || "频道";
+      if (event) return [event.title || channelLabel || "详情", `${channelLabel} · ${event.author_name || "System"}`];
+      return [channel ? channelLabel : "轻应用", channel ? channel.description || channel.type : "频道内容"];
     }
     if (state.page === "chat") {
       const group = currentGroup();
@@ -1748,12 +1818,12 @@
       { app_id: "settings", label: "详细设置", subtitle: "偏好与模型", icon: "settings", page: "settings" },
       { app_id: "stickers", label: "贴纸包", subtitle: "内置资源", icon: "smile", page: "stickers" },
     ];
-    const apps = Array.isArray(state.apps) && state.apps.length ? state.apps : fallbackApps;
+    const apps = (Array.isArray(state.apps) && state.apps.length ? state.apps : fallbackApps).map(themedAppCopy);
     return `
       <div class="fmcp-home">
         <div class="fmcp-home-intro">
-          <strong>我的小手机</strong>
-          <span>选择一个应用进入。后续可以继续扩展新的小应用。</span>
+          <strong>${esc(themedHomeCopy().title)}</strong>
+          <span>${esc(themedHomeCopy().subtitle)}</span>
         </div>
         <div class="fmcp-app-grid">
           ${apps.map((app) => `
@@ -1978,6 +2048,14 @@
             <label class="fmcp-settings-row">
               <span class="fmcp-settings-copy"><strong>记住位置</strong></span>
               <span class="fmcp-switch"><input type="checkbox" name="remember_position" ${settings.remember_position ? "checked" : ""}><i></i></span>
+            </label>
+            <label class="fmcp-settings-row">
+              <span class="fmcp-settings-copy"><strong>主题风格</strong><small>影响小手机显示名和生成语境</small></span>
+              <select class="fmcp-select fmcp-theme-select" name="ui_theme">
+                <option value="modern" ${currentTheme() === "modern" ? "selected" : ""}>现代</option>
+                <option value="xianxia" ${currentTheme() === "xianxia" ? "selected" : ""}>古风</option>
+                <option value="apocalypse" ${currentTheme() === "apocalypse" ? "selected" : ""}>末世</option>
+              </select>
             </label>
           </div>
         </div>
@@ -2344,6 +2422,7 @@
   function render() {
     if (!root) return;
     const settings = state.settings || defaults;
+    root.dataset.theme = currentTheme();
     const showFab = settings.enabled && settings.show_floating_button;
     if (!showFab && !state.open) {
       root.innerHTML = "";
@@ -2810,6 +2889,8 @@
           enabled: formData.has("enabled"),
           show_floating_button: formData.has("show_floating_button"),
           remember_position: formData.has("remember_position"),
+          ui_theme: formData.get("ui_theme") || "modern",
+          world_theme: formData.get("ui_theme") || "modern",
           reply_count: formData.get("reply_count"),
           max_tokens: formData.get("max_tokens"),
           recent_message_limit: formData.get("recent_message_limit"),
@@ -2819,7 +2900,7 @@
       });
       state.settings = payload.settings;
       restartAutomationTimer();
-      state.page = "home";
+      state.page = "settings";
       render();
     } catch (error) {
       state.error = error.message;
