@@ -76,7 +76,7 @@
           <span class="slot-badge">Card</span>
           <div class="slot-meta">
             <strong>当前编辑的是角色卡</strong>
-            <p class="slot-hint">切换角色卡只会更换人设与工坊规则，不会清空当前记忆、世界书、预设和聊天记录。</p>
+            <p class="slot-hint">切换角色卡会切换到该卡自己的记忆库；世界书、预设和聊天记录仍按当前全局规则保留。</p>
           </div>
         </div>
       </div>
@@ -1104,7 +1104,7 @@
         return [...personaGridEl.querySelectorAll(".persona-card")].map((card, index) => {
           const key = String(card.dataset.personaKey || index + 1).trim();
           const name = card.querySelector(`#persona-${key}-name`)?.value.trim() || `角色${index + 1}`;
-          return { key, name, role_id: slugifyStateJournalKey(name || key, `role_${index + 1}`), is_empty_slot: isEmptyStateJournalPersonaCard(card, key) };
+          return { key, name, role_id: slugifyStateJournalKey(`current_card_${key}_${name}`, `current_card_role_${index + 1}`), is_empty_slot: isEmptyStateJournalPersonaCard(card, key) };
         });
       }
 
@@ -1121,7 +1121,7 @@
 
       function isPlaceholderStateJournalRoleLabel(value) {
         const text = String(value || "").trim();
-        return /^role\s*[a-z0-9]+$/i.test(text) || /^role[_\-\s]*[a-z0-9]+$/i.test(text);
+        return /^\d+$/.test(text) || /^role\s*[a-z0-9]+$/i.test(text) || /^role[_\-\s]*[a-z0-9]+$/i.test(text);
       }
 
       function isEmptyStateJournalPersonaCard(card, key = "") {
@@ -1152,8 +1152,8 @@
           .filter((persona) => !persona.is_empty_slot)
           .map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", source_type: "multi_role_slot", has_state_journal_config: false, is_empty_slot: false, display_policy: "show", variables: [], stages: [], snapshotFields: [] }));
         if (mode === "personas_only") return { detected: "personas_only", roles: personaRoles, personas };
-        if (personaRoles.length) return { detected: "personas_only", roles: personaRoles, personas };
-        return { detected: "main_card", roles: [collectMainCardStateJournalRole()], personas };
+        const mainRole = collectMainCardStateJournalRole();
+        return { detected: personaRoles.length ? "auto" : "main_card", roles: [mainRole, ...personaRoles].filter(Boolean), personas };
       }
 
       function renderStateJournalRoleSourceHint() {
@@ -1638,7 +1638,7 @@
         await refreshCardList(data.filename || filename);
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
         notifyWorkshopRoleCardChanged("save", data);
-        const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const slotSummary = `当前角色卡记忆库：记忆 ${data.current_memory_count ?? 0} 条；世界书 ${data.current_worldbook_count ?? 0} 条。`;
         const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
         setStatus(data.workshop?.triggered
           ? `角色卡已保存并加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`
@@ -1657,7 +1657,7 @@
         await refreshCardList(data.filename || filename);
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
         notifyWorkshopRoleCardChanged("load", data);
-        const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const slotSummary = `当前角色卡记忆库：记忆 ${data.current_memory_count ?? 0} 条；世界书 ${data.current_worldbook_count ?? 0} 条。`;
         setStatus(data.workshop?.triggered
           ? `角色卡已加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
           : `角色卡已加载：${data.filename}。${slotSummary}`);
@@ -1685,7 +1685,7 @@
         await refreshCardList(data.filename || file.name || "");
         applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
         notifyWorkshopRoleCardChanged("import", data);
-        const slotSummary = `当前全局记忆保持不变：记忆 ${data.current_memory_count ?? 0} 条，世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const slotSummary = `当前角色卡记忆库：记忆 ${data.current_memory_count ?? 0} 条；世界书 ${data.current_worldbook_count ?? 0} 条。`;
         const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
         setStatus(data.workshop?.triggered
           ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`

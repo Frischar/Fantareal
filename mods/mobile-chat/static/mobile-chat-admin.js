@@ -1411,13 +1411,43 @@
     const channelBox = byId("fmca-data-channel-tools");
     if (channelBox) {
       const rows = Object.values(overview.channels || {});
-      channelBox.innerHTML = rows.map((row) => `
+      channelBox.innerHTML = `
         <article class="fmca-mini-card">
-          <strong>${esc(row.label)} / ${esc(row.channel_id)}</strong>
-          <p>${esc(row.type)} · ${esc(row.count)} events · fallback ${esc(row.fallback_count)} · workbench ${esc(row.workbench_count)}</p>
-          <button class="fmca-button fmca-danger" type="button" data-action="clear-channel-test-events" data-channel-id="${esc(row.channel_id)}">清理测试/fallback</button>
+          <strong>全局测试数据</strong>
+          <p>清理所有频道中带 fallback、workbench 或 test 标记的内容。</p>
+          <button class="fmca-button fmca-danger" type="button" data-action="clear-all-channel-test-events">清理全部测试/fallback</button>
         </article>
-      `).join("") || '<div class="fmca-empty">暂无频道数据。</div>';
+        ${rows.map((row) => `
+          <article class="fmca-mini-card">
+            <strong>${esc(row.label)} / ${esc(row.channel_id)}</strong>
+            <p>${esc(row.type)} · ${esc(row.count)} events · fallback ${esc(row.fallback_count)} · workbench ${esc(row.workbench_count)}</p>
+            <button class="fmca-button fmca-danger" type="button" data-action="clear-channel-test-events" data-channel-id="${esc(row.channel_id)}">清理测试/fallback</button>
+            ${(row.recent || []).length ? `<div class="fmca-data-mini-list">${(row.recent || []).slice(0, 4).map((event) => `
+              <div>
+                <span>${esc(event.title || event.event_id)}</span>
+                <button class="fmca-button fmca-danger" type="button" data-action="delete-channel-event" data-channel-id="${esc(row.channel_id)}" data-event-id="${esc(event.event_id)}">删除</button>
+              </div>
+            `).join("")}</div>` : ""}
+          </article>
+        `).join("") || '<div class="fmca-empty">暂无频道数据。</div>'}
+      `;
+    }
+    const phone = overview.phone || {};
+    if (channelBox && phone.recent) {
+      channelBox.insertAdjacentHTML("beforeend", `
+        <article class="fmca-mini-card">
+          <strong>通话记录</strong>
+          <p>${esc(phone.session_count || 0)} sessions · empty ${esc(phone.empty_session_count || 0)}</p>
+          <button class="fmca-button fmca-danger" type="button" data-action="prune-empty-phone">清理空通话</button>
+          <button class="fmca-button fmca-danger" type="button" data-action="prune-ended-phone">清理已结束通话</button>
+          ${(phone.recent || []).length ? `<div class="fmca-data-mini-list">${(phone.recent || []).slice(0, 5).map((session) => `
+            <div>
+              <span>${esc(session.role_name || session.session_id)} · ${esc(session.status)} · ${esc(session.line_count)} lines</span>
+              <button class="fmca-button fmca-danger" type="button" data-action="delete-phone-session" data-session-id="${esc(session.session_id)}">删除</button>
+            </div>
+          `).join("")}</div>` : ""}
+        </article>
+      `);
     }
   }
 
@@ -2145,13 +2175,17 @@
     }
   }
 
-  async function runDataAction(action, channelId = "") {
+  async function runDataAction(action, channelId = "", eventId = "", sessionId = "") {
     const actionMap = {
       "refresh-data-overview": ["/admin/data-overview", "GET", "数据概览已刷新。"],
       "notifications-read-all": ["/admin/data/notifications/read-all", "POST", "通知已全部标记为已读。"],
       "clear-invalid-notifications": ["/admin/data/notifications/clear-invalid", "POST", "无效通知已清理。"],
       "prune-empty-phone": ["/admin/data/phone/prune-empty", "POST", "空通话记录已清理。"],
+      "prune-ended-phone": ["/admin/data/phone/prune-ended", "POST", "已结束通话记录已清理。"],
+      "clear-all-channel-test-events": ["/admin/data/channels/clear-test-events", "POST", "全部测试/fallback 内容已清理。"],
       "clear-channel-test-events": [`/admin/data/channels/${encodeURIComponent(channelId)}/clear-test-events`, "POST", "测试/fallback 内容已清理。"],
+      "delete-channel-event": [`/admin/data/channels/${encodeURIComponent(channelId)}/events/${encodeURIComponent(eventId || "")}`, "DELETE", "频道内容已删除。"],
+      "delete-phone-session": [`/admin/data/phone/sessions/${encodeURIComponent(sessionId || "")}`, "DELETE", "通话记录已删除。"],
     };
     const config = actionMap[action];
     if (!config) return;
@@ -2445,8 +2479,8 @@
         state.diagnostics = { ...(state.diagnostics || {}), generation_state: result.state };
         await refreshDiagnostics();
       }
-      if (["refresh-data-overview", "notifications-read-all", "clear-invalid-notifications", "prune-empty-phone", "clear-channel-test-events"].includes(action)) {
-        await runDataAction(action, button.dataset.channelId || "");
+      if (["refresh-data-overview", "notifications-read-all", "clear-invalid-notifications", "prune-empty-phone", "prune-ended-phone", "clear-all-channel-test-events", "clear-channel-test-events", "delete-channel-event", "delete-phone-session"].includes(action)) {
+        await runDataAction(action, button.dataset.channelId || "", button.dataset.eventId || "", button.dataset.sessionId || "");
       }
       if (action === "pause-generation-all") {
         await setGenerationPaused(true);
