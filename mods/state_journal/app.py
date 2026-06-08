@@ -2177,8 +2177,7 @@ def current_card_uid() -> str:
     raw = current_role_card_payload()
     if not raw:
         return "global"
-    state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
-    for value in (state_journal.get("card_uid"), raw.get("card_uid"), raw.get("uid"), raw.get("id")):
+    for value in (raw.get("card_uid"), raw.get("uid"), raw.get("id")):
         text = str(value or "").strip()
         if text:
             return normalize_role_state_key(text, "global")
@@ -2464,7 +2463,7 @@ PLACEHOLDER_PERSONA_HINTS = (
 
 def is_placeholder_role_label(value: Any) -> bool:
     text = str(value or "").strip()
-    return bool(text and (PLACEHOLDER_ROLE_NAME_RE.match(text) or PLACEHOLDER_ROLE_ID_RE.match(text)))
+    return bool(text and (text.isdigit() or PLACEHOLDER_ROLE_NAME_RE.match(text) or PLACEHOLDER_ROLE_ID_RE.match(text)))
 
 
 def is_placeholder_role_state_role(role: dict[str, Any]) -> bool:
@@ -2652,7 +2651,7 @@ def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
         if is_placeholder_persona(str(persona_key), persona) or is_empty_persona_slot(str(persona_key), persona):
             continue
         name = str(persona.get("name") or f"角色{index}").strip()
-        role_id = normalize_role_state_key(persona.get("role_id") or persona.get("id") or name or persona_key, f"role_{index}")
+        role_id = normalize_role_state_key(persona.get("role_id") or persona.get("id") or f"current_card_{persona_key}_{name}", f"current_card_role_{index}")
         aliases: list[str] = []
         key_text = str(persona_key or "").strip()
         if key_text and key_text != role_id:
@@ -2660,6 +2659,78 @@ def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
         roles.append({"role_id": role_id, "role_name": name, "aliases": aliases, "enabled": True, "mode": "default", "stateJournalMode": "default", "use_default_variables": True, "variables": [], "stages": [], "snapshotFields": [], "initial_stage": "stage_a", "source": "persona", "source_type": "multi_role_slot", "has_state_journal_config": False, "is_empty_slot": False, "display_policy": "show"})
     return roles
 
+
+
+def current_card_role_identity_roles(raw_card: dict[str, Any], source_mode: str = "auto") -> list[dict[str, Any]]:
+    safe_mode = normalize_role_source_mode(source_mode)
+    main_role = role_state_main_card_role(raw_card)
+    persona_roles = role_state_persona_roles(raw_card)
+    if safe_mode == "main_card":
+        return [main_role] if main_role else []
+    if safe_mode == "personas_only":
+        return persona_roles
+    roles: list[dict[str, Any]] = []
+    if main_role:
+        roles.append(main_role)
+    roles.extend(persona_roles)
+    return roles
+
+
+def current_card_allowed_role_tokens(raw_card: dict[str, Any], source_mode: str = "auto") -> set[str]:
+    tokens: set[str] = set()
+    for role in current_card_role_identity_roles(raw_card, source_mode):
+        tokens.update(role_state_role_tokens(role))
+    return {token for token in tokens if token and not token.isdigit()}
+
+
+def overlay_role_state_config(identity: dict[str, Any], configured: dict[str, Any]) -> dict[str, Any]:
+    merged = json.loads(json.dumps(identity, ensure_ascii=False))
+    for key in ("variables", "stages", "snapshotFields"):
+        if configured.get(key):
+            merged[key] = configured.get(key)
+    for key in ("settings",):
+        if isinstance(configured.get(key), dict):
+            merged[key] = configured.get(key)
+    for key in ("enabled", "mode", "stateJournalMode", "use_default_variables", "initial_stage", "has_state_journal_config", "display_policy"):
+        if key in configured:
+            merged[key] = configured.get(key)
+    alias_set: list[str] = []
+    for value in identity.get("aliases") or []:
+        text = str(value or "").strip()
+        if text and text != merged.get("role_name") and not text.isdigit() and text not in alias_set:
+            alias_set.append(text)
+    merged["aliases"] = alias_set
+    merged["role_id"] = identity.get("role_id") or merged.get("role_id") or ""
+    merged["role_name"] = identity.get("role_name") or merged.get("role_name") or merged.get("role_id") or ""
+    merged["source"] = identity.get("source") or merged.get("source") or "current_card"
+    merged["source_type"] = identity.get("source_type") or merged.get("source_type") or "current_card"
+    return normalize_role_state_role(merged, 1) or merged
+
+
+def filter_roles_to_current_card(roles: list[dict[str, Any]], raw_card: dict[str, Any], source_mode: str = "auto") -> list[dict[str, Any]]:
+    identities = current_card_role_identity_roles(raw_card, source_mode)
+    if not identities:
+        return roles
+    filtered: list[dict[str, Any]] = []
+    used_indexes: set[int] = set()
+    for identity in identities:
+        identity_tokens = {token for token in role_state_role_tokens(identity) if token and not token.isdigit()}
+        matched: dict[str, Any] | None = None
+        matched_index = -1
+        for index, role in enumerate(roles):
+            if index in used_indexes:
+                continue
+            role_tokens = {token for token in role_state_role_tokens(role) if token and not token.isdigit()}
+            if identity_tokens.intersection(role_tokens):
+                matched = role
+                matched_index = index
+                break
+        if matched is not None:
+            filtered.append(overlay_role_state_config(identity, matched))
+            used_indexes.add(matched_index)
+        else:
+            filtered.append(identity)
+    return filtered
 
 def role_source_summary(mode: str, detected: str, roles: list[dict[str, Any]], has_personas: bool, main_role_name: str = "") -> dict[str, Any]:
     safe_mode = normalize_role_source_mode(mode)
@@ -2711,6 +2782,7 @@ def role_state_config_from_current_card() -> dict[str, Any]:
     has_personas = bool(persona_roles)
     if config.get("roles"):
         filtered_roles = [role for role in (config.get("roles") or []) if not is_placeholder_role_state_role(role)]
+        filtered_roles = filter_roles_to_current_card(filtered_roles, raw_card, source_mode)
         if not filtered_roles:
             config["roles"] = []
         else:
@@ -2726,12 +2798,11 @@ def role_state_config_from_current_card() -> dict[str, Any]:
     elif source_mode == "personas_only":
         roles = persona_roles
         detected_mode = "personas_only"
-    elif persona_roles:
-        roles = persona_roles
-        detected_mode = "personas_only"
-    elif main_role:
-        roles = [main_role]
-        detected_mode = "main_card"
+    else:
+        if main_role:
+            roles.append(main_role)
+        roles.extend(persona_roles)
+        detected_mode = "auto" if persona_roles and main_role else "personas_only" if persona_roles else "main_card"
     config = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": source_mode, "roles": roles})
     config["card_uid"] = current_card_uid()
     config["card"] = current_card_summary()
@@ -3494,7 +3565,9 @@ def load_role_state_config(conn: sqlite3.Connection, card_uid: str | None = None
         })
     raw_card = current_role_card_payload()
     raw_state_journal = raw_card.get("stateJournal") if isinstance(raw_card.get("stateJournal"), dict) else {}
-    normalized = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": raw_state_journal.get("role_source_mode") or raw_state_journal.get("roleSourceMode"), "roles": roles})
+    source_mode = normalize_role_source_mode(raw_state_journal.get("role_source_mode") or raw_state_journal.get("roleSourceMode"))
+    roles = filter_roles_to_current_card(roles, raw_card, source_mode)
+    normalized = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": source_mode, "roles": roles})
     normalized["card_uid"] = safe_card_uid
     normalized["card"] = current_card_summary()
     personas = raw_card.get("personas") if isinstance(raw_card.get("personas"), dict) else {}
@@ -3508,6 +3581,8 @@ def save_role_state_config(conn: sqlite3.Connection, config: dict[str, Any], car
     init_meta_tables(conn)
     safe_card_uid = normalize_role_state_key(card_uid or (config or {}).get("card_uid") or current_card_uid(), "global")
     normalized = normalize_role_state_config(config, include_hidden_empty=False)
+    raw_card = current_role_card_payload()
+    normalized["roles"] = filter_roles_to_current_card(normalized.get("roles") or [], raw_card, normalized.get("role_source_mode") or "auto")
     normalized["card_uid"] = safe_card_uid
     normalized["card"] = current_card_summary()
     now = now_string()

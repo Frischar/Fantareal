@@ -122,6 +122,7 @@ RESOURCE_CARDS_DIR = RESOURCE_DIR / "cards"
 ROLE_CARD_EXTENSIONS = {".json", ".txt"}
 SLOT_META_PATH = DATA_DIR / "save_slots.json"
 EXPORT_DIR = BASE_DIR / "exports"
+CARD_RUNTIME_DIR = DATA_DIR / "card_runtime" / "cards"
 LEGACY_PERSONA_PATH = DATA_DIR / "persona.json"
 LEGACY_CONVERSATION_PATH = DATA_DIR / "conversations.json"
 LEGACY_SETTINGS_PATH = DATA_DIR / "settings.json"
@@ -1371,8 +1372,50 @@ def settings_path(slot_id: str | None = None) -> Path:
 
 
 def memories_path(slot_id: str | None = None) -> Path:
-    return LEGACY_MEMORIES_PATH
-    return get_slot_dir(slot_id) / "memories.json"
+    return card_runtime_dir(current_memory_card_uid(slot_id)) / "memories.json"
+
+
+def card_runtime_dir(card_uid: str) -> Path:
+    safe_uid = _normalize_card_runtime_key(card_uid, "global")
+    return CARD_RUNTIME_DIR / safe_uid
+
+
+def _normalize_card_runtime_key(value: Any, fallback: str = "global") -> str:
+    text = str(value or "").strip() or fallback
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+
+def current_memory_card_uid(slot_id: str | None = None) -> str:
+    stored = read_json(global_current_card_path(), {})
+    if not isinstance(stored, dict):
+        return "global"
+    identity_raw = stored.get("raw", {}) if isinstance(stored.get("raw", {}), dict) else {}
+    current_card = get_current_card(slot_id)
+    raw = current_card.get("raw", {}) if isinstance(current_card, dict) else {}
+    if not isinstance(raw, dict) or not raw:
+        return "global"
+    default_card = default_role_card()
+    source_name = str(current_card.get("source_name", "")).strip() if isinstance(current_card, dict) else ""
+    has_identity = any(str(identity_raw.get(key, "") or "").strip() for key in ("card_uid", "uid", "id"))
+    has_card_name = bool(str(raw.get("name") or raw.get("role_name") or "").strip())
+    if not source_name and not has_identity and not has_card_name:
+        return "global"
+
+    for key in ("card_uid", "uid", "id"):
+        text = str(identity_raw.get(key, "") or "").strip()
+        if text:
+            return _normalize_card_runtime_key(text, "global")
+
+    fingerprint_payload = {
+        "source_name": source_name,
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
 
 
 def worldbook_path(slot_id: str | None = None) -> Path:
