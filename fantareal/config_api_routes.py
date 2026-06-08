@@ -1443,7 +1443,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 if include_memories:
                     archive.writestr(
                         f"{bundle_label}的记忆.json",
-                        json.dumps({"items": ctx.get_memories()}, ensure_ascii=False, indent=2),
+                        json.dumps({"items": ctx.get_memories(ctx.get_active_slot_id())}, ensure_ascii=False, indent=2),
                     )
                 if include_worldbook:
                     archive.writestr(

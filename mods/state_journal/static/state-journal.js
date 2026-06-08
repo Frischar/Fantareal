@@ -1711,9 +1711,12 @@
 
   function shouldShowRoleStateRole(role) {
     if (!role) return false;
-    if (role.display_policy === "hide_empty") return false;
-    if (role.source_type === "multi_role_slot" && !role.has_state_journal_config && !(role.variables || []).length && !(role.stages || []).length && !(role.snapshotFields || []).length) return false;
+    if (role.display_policy === "hide_empty" || role.is_empty_slot) return false;
     return true;
+  }
+
+  function roleStateUnconfiguredCount(roles) {
+    return (roles || []).filter((role) => shouldShowRoleStateRole(role) && role.source_type === "multi_role_slot" && !role.has_state_journal_config && !(role.variables || []).length && !(role.stages || []).length && !(role.snapshotFields || []).length).length;
   }
 
   function currentRoleState() {
@@ -1956,11 +1959,11 @@
     if (!list || !detail) return;
     const allRoles = state.roleStateConfig.roles || [];
     const roles = allRoles.filter(shouldShowRoleStateRole);
-    const hiddenEmptyCount = allRoles.length - roles.length;
+    const unconfiguredCount = roleStateUnconfiguredCount(allRoles);
     if (!state.currentRoleStateId && roles[0]) state.currentRoleStateId = roles[0].role_id;
     if (state.currentRoleStateId && !roles.some((role) => role.role_id === state.currentRoleStateId) && roles[0]) state.currentRoleStateId = roles[0].role_id;
     const sourceInfo = roleSourceSummary(state.roleStateConfig);
-    const hiddenHintHtml = hiddenEmptyCount > 0 ? `<div class="role-state-source-hint muted"><span class="micro-badge">已隐藏</span><strong>${hiddenEmptyCount} 个空多角色槽位</strong><small>这些槽位没有变量、阶段或快照配置，不会写入心笺角色配置。</small></div>` : "";
+    const hiddenHintHtml = unconfiguredCount > 0 ? `<div class="role-state-source-hint muted"><span class="micro-badge">???</span><strong>${unconfiguredCount} ????????</strong><small>??????????????????????????????????</small></div>` : "";
     const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>${hiddenHintHtml}`;
     renderStoryTimePanel();
     list.innerHTML = sourceHintHtml + (roles.length ? roles.map((role) => {

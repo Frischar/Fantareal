@@ -1082,3 +1082,24 @@ code {
   place-items: center;
   min-height: 70px;
 }
+
+
+.fmca-data-mini-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fmca-data-mini-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fmca-data-mini-list span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

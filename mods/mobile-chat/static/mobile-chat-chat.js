@@ -56,6 +56,8 @@
     remember_position: true,
     floating_position: { right: 28, bottom: 150 },
     panel_position: { right: 28, bottom: 92 },
+    ui_theme: "modern",
+    world_theme: "modern",
   };
   const state = {
     settings: defaults,
@@ -71,6 +73,8 @@
     channelTabs: {},
     channelAuthorFilters: {},
     mailDrafts: {},
+    mailSearches: {},
+    mailComposeOpen: {},
     channelComposerOpen: {},
     channelReplyOpen: {},
     diaryRoleId: "",
@@ -275,6 +279,65 @@
     return "通话";
   }
 
+  function currentTheme() {
+    const theme = state.settings?.ui_theme || state.settings?.world_theme || "modern";
+    return ["modern", "xianxia", "apocalypse"].includes(theme) ? theme : "modern";
+  }
+
+  function themedLabel(kind, value) {
+    const theme = currentTheme();
+    const maps = {
+      app: {
+        modern: { group_chat: "群聊", settings: "详细设置", stickers: "贴纸包", assist: "辅助功能", feed: "动态", forum: "论坛", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
+        xianxia: { group_chat: "传讯", settings: "设定", stickers: "贴纸", assist: "造像", feed: "见闻", forum: "论道", live: "留影", notifications: "灵讯", phone: "传音", mail: "书信", diary: "札记", calendar: "行程" },
+        apocalypse: { group_chat: "频道", settings: "终端", stickers: "物资", assist: "档案", feed: "公告", forum: "情报板", live: "监控", notifications: "警报", phone: "通话", mail: "信件", diary: "日志", calendar: "排班" },
+      },
+      subtitle: {
+        modern: { group_chat: "角色卡群聊", settings: "偏好与模型", stickers: "内置资源", assist: "人物生成", feed: "角色近况", forum: "世界讨论板", live: "弹幕与醒目留言", notifications: "系统与角色提醒", phone: "模拟通话 RP", mail: "角色邮件往来", diary: "角色日记", calendar: "日程安排" },
+        xianxia: { group_chat: "角色传讯", settings: "灵机设定", stickers: "符贴资源", assist: "人物造像", feed: "山门见闻", forum: "论道闲谈", live: "留影弹幕", notifications: "系统灵讯", phone: "模拟传音 RP", mail: "角色书信", diary: "随身札记", calendar: "行程安排" },
+        apocalypse: { group_chat: "避难频道", settings: "终端参数", stickers: "贴标物资", assist: "人物档案", feed: "态势公告", forum: "情报交换", live: "监控画面", notifications: "风险警报", phone: "模拟通话 RP", mail: "角色信件", diary: "行动日志", calendar: "值班排程" },
+      },
+      channel: {
+        modern: { feed: "动态", forum: "论坛", mail: "邮箱", diary: "日记", calendar: "日程", live: "直播", phone: "电话" },
+        xianxia: { feed: "见闻", forum: "论道", mail: "书信", diary: "札记", calendar: "行程", live: "留影", phone: "传音" },
+        apocalypse: { feed: "公告", forum: "情报板", mail: "信件", diary: "日志", calendar: "排班", live: "监控", phone: "通话" },
+      },
+      event: {
+        modern: { post: "动态", thread: "帖子", reply: "回复", mail: "邮件", diary: "日记", calendar: "日程", live: "直播" },
+        xianxia: { post: "见闻", thread: "论帖", reply: "回帖", mail: "书信", diary: "札记", calendar: "行程", live: "留影" },
+        apocalypse: { post: "公告", thread: "情报", reply: "回报", mail: "信件", diary: "日志", calendar: "排班", live: "监控" },
+      },
+    };
+    return maps[kind]?.[theme]?.[value] || maps[kind]?.modern?.[value] || value || "";
+  }
+
+  function themedAppCopy(app) {
+    const appId = String(app?.app_id || "");
+    return {
+      ...app,
+      label: themedLabel("app", appId) || app?.label || appId,
+      subtitle: themedLabel("subtitle", appId) || app?.subtitle || app?.stage || "",
+    };
+  }
+
+  function themedHomeCopy() {
+    const copies = {
+      modern: {
+        title: "我的小手机",
+        subtitle: "选择一个应用进入。后续可以继续扩展新的小应用。",
+      },
+      xianxia: {
+        title: "书札匣",
+        subtitle: "选择一道书札。角色会按主线近况调整行动，语气保持私下通信。",
+      },
+      apocalypse: {
+        title: "随身终端",
+        subtitle: "选择一个频道。正文态势会压缩同步，角色会按当前风险和记忆行动。",
+      },
+    };
+    return copies[currentTheme()] || copies.modern;
+  }
+
   function metadataValueText(value) {
     if (value === null || value === undefined) return "";
     if (Array.isArray(value) || typeof value === "object") {
@@ -331,13 +394,11 @@
   }
 
   function channelTypeLabel(type) {
-    const labels = { feed: "动态", forum: "论坛", mail: "邮箱", diary: "日记", calendar: "日程", live: "直播" };
-    return labels[type] || type || "频道";
+    return themedLabel("channel", type) || "频道";
   }
 
   function eventTypeLabel(type) {
-    const labels = { post: "动态", thread: "帖子", reply: "回复", mail: "邮件", diary: "日记", calendar: "日程", live: "直播" };
-    return labels[type] || type || "内容";
+    return themedLabel("event", type) || "内容";
   }
 
   function isFallbackEvent(event) {
@@ -541,12 +602,11 @@
     }
     if (channel?.type === "mail") {
       if (tab === "unread") {
-        return rows.filter((event, index) => isMailUnread(event, index, rows));
+        rows = rows.filter((event, index) => isMailUnread(event, index, rows));
+      } else if (tab === "draft") {
+        rows = rows.filter((event) => state.mailDrafts[event.event_id]);
       }
-      if (tab === "draft") {
-        return rows.filter((event) => state.mailDrafts[event.event_id]);
-      }
-      return rows;
+      return filterMailSearch(channel, rows);
     }
     if (channel?.type === "calendar" && tab === "today") {
       const today = new Date().toISOString().slice(0, 10);
@@ -586,6 +646,24 @@
       ...(Array.isArray(event?.tags) ? event.tags : []),
       ...eventMetadataRows(event).map(([, value]) => value),
     ].map((item) => String(item || "")).join(" ");
+  }
+
+  function mailSearchText(event) {
+    return [
+      eventSearchText(event),
+      ...mailReplies(event).flatMap((reply) => [reply.author_name, reply.content, reply.direction]),
+    ].map((item) => String(item || "")).join(" ").toLowerCase();
+  }
+
+  function filterMailSearch(channel, rows) {
+    const query = String(state.mailSearches[channel?.channel_id || ""] || "").trim().toLowerCase();
+    if (!query) return rows;
+    const parts = query.split(/\s+/).filter(Boolean);
+    if (!parts.length) return rows;
+    return rows.filter((event) => {
+      const haystack = mailSearchText(event);
+      return parts.every((part) => haystack.includes(part));
+    });
   }
 
   function eventSocialScore(event) {
@@ -687,7 +765,10 @@
     const seen = new Set();
     return rows
       .filter((app) => app && app.app_id !== "assist" && app.page !== "assist")
-      .map((app) => ({ app_id: String(app.app_id || ""), label: String(app.label || app.app_id || "") }))
+      .map((app) => {
+        const appId = String(app.app_id || "");
+        return { app_id: appId, label: themedLabel("app", appId) || String(app.label || appId || "") };
+      })
       .filter((app) => {
         if (!app.app_id || seen.has(app.app_id)) return false;
         seen.add(app.app_id);
@@ -1194,7 +1275,7 @@
           <label>回复邮件</label>
           <textarea name="content" maxlength="1000" placeholder="写下回复，发送后会写入邮箱线程，并尝试生成对方回信。">${esc(draft)}</textarea>
           <div class="fmcp-compose-actions">
-            <button class="fmcp-button" type="button" data-action="save-mail-draft" data-event-id="${esc(event.event_id)}">暂存</button>
+            <button class="fmcp-button fmcp-mail-draft-save" type="button" data-action="save-mail-draft" data-event-id="${esc(event.event_id)}">暂存</button>
             <button class="fmcp-button fmcp-button-primary" type="submit" ${state.generating ? "disabled" : ""}>发送并等待回信</button>
           </div>
           ${draft ? '<p class="fmcp-mail-draft-status">草稿已暂存在本次小手机会话中。</p>' : ""}
@@ -1382,6 +1463,8 @@
     const activeTab = currentChannelTab(channel);
     const unread = events.filter((item, index) => isMailUnread(item, index, events)).length;
     const draftCount = Object.keys(state.mailDrafts).length;
+    const composeOpen = !!state.mailComposeOpen[channel.channel_id];
+    const mailRoles = state.roles || [];
     const folderButton = (id, label, count) => `
       <button class="${activeTab === id ? "is-active" : ""}" type="button" data-action="channel-tab" data-channel-id="${esc(channel.channel_id)}" data-tab-id="${esc(id)}">
         ${esc(label)} <b>${count}</b>
@@ -1391,10 +1474,28 @@
       <div class="fmcp-channel-app fmcp-channel-${esc(channel.type)} fmcp-mail-client">
         <div class="fmcp-mail-topbar">
           <div><strong>${esc(channel.label)}</strong><span>${esc(channel.description || "角色邮箱")}</span></div>
-          ${seedButtonMarkup("收取邮件")}
+          <div class="fmcp-mail-topbar-actions">
+            <button class="fmcp-button fmcp-mail-compose-button" type="button" data-action="toggle-mail-compose" data-channel-id="${esc(channel.channel_id)}">${icon("plus")}<span>写邮件</span></button>
+            ${seedButtonMarkup("收取邮件")}
+          </div>
         </div>
         ${channelDepthSummaryMarkup(channel, events)}
-        <div class="fmcp-mail-search">搜索邮件、角色或关键词</div>
+        ${composeOpen ? `
+          <form class="fmcp-channel-compose fmcp-mail-compose-form" data-form="mail-compose" data-channel-id="${esc(channel.channel_id)}">
+            <label>写邮件给角色</label>
+            <select name="recipient_id" required ${mailRoles.length ? "" : "disabled"}>
+              ${mailRoles.length ? mailRoles.map((role) => `<option value="${esc(role.role_id)}">${esc(role.display_name || role.name || role.role_id)}</option>`).join("") : '<option value="">暂无角色</option>'}
+            </select>
+            <input name="title" maxlength="120" placeholder="主题，可留空">
+            <textarea name="content" maxlength="1200" required placeholder="写下要寄出的邮件，发送后会保存到邮箱，并尝试等待对方回信。"></textarea>
+            ${mailRoles.length ? "" : '<p class="fmcp-mail-draft-status">请先在群聊创建页刷新/导入当前角色卡角色。</p>'}
+            <div class="fmcp-compose-actions">
+              <button class="fmcp-button" type="button" data-action="toggle-mail-compose" data-channel-id="${esc(channel.channel_id)}">取消</button>
+              <button class="fmcp-button fmcp-button-primary" type="submit" ${state.generating || !mailRoles.length ? "disabled" : ""}>发送并等待回信</button>
+            </div>
+          </form>
+        ` : ""}
+        <div class="fmcp-mail-search"><span>搜索</span><input data-mail-search="${esc(channel.channel_id)}" value="${esc(state.mailSearches[channel.channel_id] || "")}" placeholder="邮件、角色或关键词"><button type="button" data-action="clear-mail-search" data-channel-id="${esc(channel.channel_id)}" title="清空搜索">×</button></div>
         <div class="fmcp-mail-folders">
           ${folderButton("inbox", "收件箱", events.length)}
           ${folderButton("unread", "未读", unread)}
@@ -1624,6 +1725,9 @@
     } else if (lower.includes("无法连接") || lower.includes("network") || lower.includes("connect")) {
       title = "无法连接模型服务";
       suggestions.push("检查 Base URL 是否完整且以 /v1 等兼容路径结尾。", "检查网络、代理或供应商服务状态。", "确认小手机独立 API 设置是否覆盖了主程序配置。");
+    } else if (lower.includes("generation_interrupted")) {
+      title = "生成请求被中断";
+      suggestions.push("请稍等几秒后重试，避免连续点击发送或在生成中刷新/关闭小手机。", "如果经常发生，请打开后台诊断查看 generation guard 的最近错误类型。");
     } else if (lower.includes("无法解析") || lower.includes("不是合法 json") || lower.includes("格式不兼容") || lower.includes("parser")) {
       title = "模型返回格式无法解析";
       suggestions.push("重试一次，或切换更稳定的模型。", "降低 temperature，让模型更严格输出 JSON。", "在后台 Prompt 中保留 JSON contract，避免删除结构要求。");
@@ -1643,7 +1747,14 @@
   }
 
   function pageTitle() {
-    if (state.page === "home") return ["小手机", "应用桌面"];
+    if (state.page === "home") {
+      const titles = {
+        modern: ["小手机", "应用桌面"],
+        xianxia: ["随身书札", "书信与见闻"],
+        apocalypse: ["随身终端", "频道桌面"],
+      };
+      return titles[currentTheme()] || titles.modern;
+    }
     if (state.page === "create") return ["创建群聊", "从当前角色卡选择成员"];
     if (state.page === "settings") return ["详细设置", "小手机偏好"];
     if (state.page === "stickers") return ["贴纸包", "默认表情资源"];
@@ -1653,8 +1764,9 @@
     if (state.page.startsWith("channel-")) {
       const channel = currentChannel();
       const event = currentChannelEvent();
-      if (event) return [event.title || channel?.label || "详情", `${channel?.label || "频道"} · ${event.author_name || "System"}`];
-      return [channel ? channel.label : "轻应用", channel ? channel.description || channel.type : "频道内容"];
+      const channelLabel = themedLabel("channel", channel?.type) || channel?.label || "频道";
+      if (event) return [event.title || channelLabel || "详情", `${channelLabel} · ${event.author_name || "System"}`];
+      return [channel ? channelLabel : "轻应用", channel ? channel.description || channel.type : "频道内容"];
     }
     if (state.page === "chat") {
       const group = currentGroup();
@@ -1706,12 +1818,12 @@
       { app_id: "settings", label: "详细设置", subtitle: "偏好与模型", icon: "settings", page: "settings" },
       { app_id: "stickers", label: "贴纸包", subtitle: "内置资源", icon: "smile", page: "stickers" },
     ];
-    const apps = Array.isArray(state.apps) && state.apps.length ? state.apps : fallbackApps;
+    const apps = (Array.isArray(state.apps) && state.apps.length ? state.apps : fallbackApps).map(themedAppCopy);
     return `
       <div class="fmcp-home">
         <div class="fmcp-home-intro">
-          <strong>我的小手机</strong>
-          <span>选择一个应用进入。后续可以继续扩展新的小应用。</span>
+          <strong>${esc(themedHomeCopy().title)}</strong>
+          <span>${esc(themedHomeCopy().subtitle)}</span>
         </div>
         <div class="fmcp-app-grid">
           ${apps.map((app) => `
@@ -1936,6 +2048,14 @@
             <label class="fmcp-settings-row">
               <span class="fmcp-settings-copy"><strong>记住位置</strong></span>
               <span class="fmcp-switch"><input type="checkbox" name="remember_position" ${settings.remember_position ? "checked" : ""}><i></i></span>
+            </label>
+            <label class="fmcp-settings-row">
+              <span class="fmcp-settings-copy"><strong>主题风格</strong><small>影响小手机显示名和生成语境</small></span>
+              <select class="fmcp-select fmcp-theme-select" name="ui_theme">
+                <option value="modern" ${currentTheme() === "modern" ? "selected" : ""}>现代</option>
+                <option value="xianxia" ${currentTheme() === "xianxia" ? "selected" : ""}>古风</option>
+                <option value="apocalypse" ${currentTheme() === "apocalypse" ? "selected" : ""}>末世</option>
+              </select>
             </label>
           </div>
         </div>
@@ -2302,6 +2422,7 @@
   function render() {
     if (!root) return;
     const settings = state.settings || defaults;
+    root.dataset.theme = currentTheme();
     const showFab = settings.enabled && settings.show_floating_button;
     if (!showFab && !state.open) {
       root.innerHTML = "";
@@ -2427,6 +2548,23 @@
     }
   }
 
+  async function markMailEventRead(channelId, eventId) {
+    const events = state.channelEvents[channelId] || [];
+    const event = events.find((item) => item.event_id === eventId);
+    if (!event || event.channel_type !== "mail" || !isMailUnread(event, events.indexOf(event), events)) return;
+    try {
+      const payload = await request(`/channels/${encodeURIComponent(channelId)}/events/${encodeURIComponent(eventId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ read: true }),
+      });
+      state.channelEvents = { ...state.channelEvents, [channelId]: payload.events || events };
+      render();
+    } catch (error) {
+      state.error = error.message;
+      render();
+    }
+  }
+
   async function loadNotifications() {
     state.loading = true;
     state.error = "";
@@ -2497,7 +2635,7 @@
     state.error = "";
     render();
     try {
-      const payload = await request("/roles");
+      const payload = await request("/current-card-roles");
       state.roles = payload.roles || [];
       state.user = payload.user || null;
     } catch (error) {
@@ -2751,6 +2889,8 @@
           enabled: formData.has("enabled"),
           show_floating_button: formData.has("show_floating_button"),
           remember_position: formData.has("remember_position"),
+          ui_theme: formData.get("ui_theme") || "modern",
+          world_theme: formData.get("ui_theme") || "modern",
           reply_count: formData.get("reply_count"),
           max_tokens: formData.get("max_tokens"),
           recent_message_limit: formData.get("recent_message_limit"),
@@ -2760,7 +2900,7 @@
       });
       state.settings = payload.settings;
       restartAutomationTimer();
-      state.page = "home";
+      state.page = "settings";
       render();
     } catch (error) {
       state.error = error.message;
@@ -2985,6 +3125,50 @@
       await loadNotifications().catch(() => {});
     } catch (error) {
       state.error = error.name === "AbortError" ? "已停止等待邮件回信；你的回复可能已经写入。" : error.message;
+    } finally {
+      if (activeGenerationAbort === controller) activeGenerationAbort = null;
+      state.generating = false;
+      state.generationTask = null;
+      await loadChannelEvents(channelId).catch((error) => { state.error = error.message; });
+      render();
+    }
+  }
+
+  async function composeMail(form) {
+    const channelId = form.dataset.channelId || state.currentChannelId;
+    if (!channelId || state.generating) return;
+    const data = new FormData(form);
+    const recipientId = String(data.get("recipient_id") || "").trim();
+    const title = String(data.get("title") || "").trim();
+    const content = String(data.get("content") || "").trim();
+    if (!recipientId || !content) {
+      state.error = "请选择收件人并填写正文。";
+      render();
+      return;
+    }
+    state.generating = true;
+    state.generationTask = {
+      type: "mail-compose",
+      targetId: channelId,
+      message: "正在发送邮件并等待对方回信...",
+      cancelLabel: "停止等待",
+    };
+    state.error = "";
+    const controller = new AbortController();
+    activeGenerationAbort = controller;
+    render();
+    try {
+      const payload = await request(`/channels/${encodeURIComponent(channelId)}/outgoing-mails`, {
+        method: "POST",
+        body: JSON.stringify({ recipient_id: recipientId, title, content, generate_reply: true }),
+        signal: controller.signal,
+      });
+      state.channelEvents[channelId] = payload.events || [];
+      state.mailComposeOpen = { ...state.mailComposeOpen, [channelId]: false };
+      state.currentChannelEventId = payload.event?.event_id || "";
+      await loadNotifications().catch(() => {});
+    } catch (error) {
+      state.error = error.name === "AbortError" ? "已停止等待邮件回信；邮件可能已经发送。" : error.message;
     } finally {
       if (activeGenerationAbort === controller) activeGenerationAbort = null;
       state.generating = false;
@@ -3629,6 +3813,12 @@
       state.error = "";
       render();
     }
+    if (action === "clear-mail-search") {
+      const channelId = button.dataset.channelId || state.currentChannelId;
+      state.mailSearches = { ...state.mailSearches, [channelId]: "" };
+      state.error = "";
+      render();
+    }
     if (action === "channel-author-filter") {
       const channelId = button.dataset.channelId || state.currentChannelId;
       state.channelAuthorFilters = { ...state.channelAuthorFilters, [channelId]: button.dataset.author || "" };
@@ -3639,6 +3829,12 @@
     if (action === "toggle-channel-compose") {
       const channelId = button.dataset.channelId || state.currentChannelId;
       state.channelComposerOpen = { ...state.channelComposerOpen, [channelId]: !state.channelComposerOpen[channelId] };
+      state.error = "";
+      render();
+    }
+    if (action === "toggle-mail-compose") {
+      const channelId = button.dataset.channelId || state.currentChannelId;
+      state.mailComposeOpen = { ...state.mailComposeOpen, [channelId]: !state.mailComposeOpen[channelId] };
       state.error = "";
       render();
     }
@@ -3667,6 +3863,7 @@
       state.currentChannelEventId = button.dataset.eventId || "";
       state.error = "";
       render();
+      void markMailEventRead(state.currentChannelId, state.currentChannelEventId);
     }
     if (action === "show-channel-list") {
       const scrollTop = state.channelListScrollTops[state.currentChannelId];
@@ -3772,6 +3969,7 @@
     if (form.dataset.form === "channel-post") void createChannelPost(form);
     if (form.dataset.form === "channel-reply") void replyChannelEvent(form);
     if (form.dataset.form === "mail-reply") void replyMailEvent(form);
+    if (form.dataset.form === "mail-compose") void composeMail(form);
     if (form.dataset.form === "live-message") void sendLiveMessage(form);
     if (form.dataset.form === "mail-draft") {
       const eventId = form.dataset.eventId || state.currentChannelEventId;
@@ -3783,6 +3981,15 @@
   }
 
   function onInput(event) {
+    const mailSearch = event.target.closest("[data-mail-search]");
+    if (mailSearch) {
+      const channelId = mailSearch.dataset.mailSearch || state.currentChannelId;
+      state.mailSearches = { ...state.mailSearches, [channelId]: mailSearch.value || "" };
+      state.currentChannelEventId = "";
+      state.error = "";
+      renderKeepingBodyScroll();
+      return;
+    }
     const field = event.target.closest("[data-role-draft-field]");
     if (!field) return;
     const index = Number.parseInt(field.dataset.draftIndex || String(state.roleGeneratorSelectedIndex || 0), 10);

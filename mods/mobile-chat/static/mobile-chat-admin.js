@@ -1411,13 +1411,43 @@
     const channelBox = byId("fmca-data-channel-tools");
     if (channelBox) {
       const rows = Object.values(overview.channels || {});
-      channelBox.innerHTML = rows.map((row) => `
+      channelBox.innerHTML = `
         <article class="fmca-mini-card">
-          <strong>${esc(row.label)} / ${esc(row.channel_id)}</strong>
-          <p>${esc(row.type)} · ${esc(row.count)} events · fallback ${esc(row.fallback_count)} · workbench ${esc(row.workbench_count)}</p>
-          <button class="fmca-button fmca-danger" type="button" data-action="clear-channel-test-events" data-channel-id="${esc(row.channel_id)}">清理测试/fallback</button>
+          <strong>全局测试数据</strong>
+          <p>清理所有频道中带 fallback、workbench 或 test 标记的内容。</p>
+          <button class="fmca-button fmca-danger" type="button" data-action="clear-all-channel-test-events">清理全部测试/fallback</button>
         </article>
-      `).join("") || '<div class="fmca-empty">暂无频道数据。</div>';
+        ${rows.map((row) => `
+          <article class="fmca-mini-card">
+            <strong>${esc(row.label)} / ${esc(row.channel_id)}</strong>
+            <p>${esc(row.type)} · ${esc(row.count)} events · fallback ${esc(row.fallback_count)} · workbench ${esc(row.workbench_count)}</p>
+            <button class="fmca-button fmca-danger" type="button" data-action="clear-channel-test-events" data-channel-id="${esc(row.channel_id)}">清理测试/fallback</button>
+            ${(row.recent || []).length ? `<div class="fmca-data-mini-list">${(row.recent || []).slice(0, 4).map((event) => `
+              <div>
+                <span>${esc(event.title || event.event_id)}</span>
+                <button class="fmca-button fmca-danger" type="button" data-action="delete-channel-event" data-channel-id="${esc(row.channel_id)}" data-event-id="${esc(event.event_id)}">删除</button>
+              </div>
+            `).join("")}</div>` : ""}
+          </article>
+        `).join("") || '<div class="fmca-empty">暂无频道数据。</div>'}
+      `;
+    }
+    const phone = overview.phone || {};
+    if (channelBox && phone.recent) {
+      channelBox.insertAdjacentHTML("beforeend", `
+        <article class="fmca-mini-card">
+          <strong>通话记录</strong>
+          <p>${esc(phone.session_count || 0)} sessions · empty ${esc(phone.empty_session_count || 0)}</p>
+          <button class="fmca-button fmca-danger" type="button" data-action="prune-empty-phone">清理空通话</button>
+          <button class="fmca-button fmca-danger" type="button" data-action="prune-ended-phone">清理已结束通话</button>
+          ${(phone.recent || []).length ? `<div class="fmca-data-mini-list">${(phone.recent || []).slice(0, 5).map((session) => `
+            <div>
+              <span>${esc(session.role_name || session.session_id)} · ${esc(session.status)} · ${esc(session.line_count)} lines</span>
+              <button class="fmca-button fmca-danger" type="button" data-action="delete-phone-session" data-session-id="${esc(session.session_id)}">删除</button>
+            </div>
+          `).join("")}</div>` : ""}
+        </article>
+      `);
     }
   }
 
@@ -1429,6 +1459,10 @@
     if (previewBox) previewBox.textContent = readableWorkbenchPreview(state.workbenchPreview);
     const resultBox = byId("fmca-workbench-result");
     if (resultBox) resultBox.textContent = state.workbenchResult ? JSON.stringify(state.workbenchResult, null, 2) : "-";
+  }
+
+  function themeLabel(value) {
+    return { modern: "现代沉浸", xianxia: "古风 / 修仙", apocalypse: "末世 / 生存" }[value] || "现代沉浸";
   }
 
 
@@ -1535,6 +1569,7 @@
     byId("fmca-enabled").checked = Boolean(settings.enabled);
     byId("fmca-show-fab").checked = Boolean(settings.show_floating_button);
     byId("fmca-remember-position").checked = Boolean(settings.remember_position);
+    byId("fmca-ui-theme").value = ["modern", "xianxia", "apocalypse"].includes(settings.ui_theme) ? settings.ui_theme : "modern";
     byId("fmca-reply-count").value = settings.reply_count === "1" ? "1" : "1-2";
     byId("fmca-max-tokens").value = settings.max_tokens || 500;
     byId("fmca-recent-limit").value = settings.recent_message_limit || 30;
@@ -1584,6 +1619,7 @@
       ["每小时上限", `${settings.auto_behavior?.max_generations_per_hour || 6} 次`],
     ]);
     renderFacts("fmca-ui-facts", [
+      ["主题风格", themeLabel(settings.ui_theme)],
       ["悬浮球", settings.show_floating_button ? "显示" : "隐藏"],
       ["记住位置", settings.remember_position ? "开启" : "关闭"],
       ["悬浮球位置", `right ${settings.floating_position?.right ?? 28}, bottom ${settings.floating_position?.bottom ?? 150}`],
@@ -1662,25 +1698,34 @@
   async function saveSettings(event) {
     event.preventDefault();
     setError();
-    const payload = {
-      enabled: byId("fmca-enabled").checked,
-      show_floating_button: byId("fmca-show-fab").checked,
-      remember_position: byId("fmca-remember-position").checked,
-      reply_count: byId("fmca-reply-count").value,
-      max_tokens: Number.parseInt(byId("fmca-max-tokens").value, 10),
-      recent_message_limit: Number.parseInt(byId("fmca-recent-limit").value, 10),
-      allow_role_to_role_reply: byId("fmca-role-reply").checked,
-      channel_token_settings: collectChannelTokenSettings(),
-      model_source: byId("fmca-model-source").value === "custom" ? "custom" : "main",
-      api_config: {
-        base_url: byId("fmca-api-base-url").value.trim(),
-        model: byId("fmca-api-model").value.trim(),
-        temperature: Number.parseFloat(byId("fmca-api-temp").value),
-        request_timeout: Number.parseInt(byId("fmca-api-timeout").value, 10),
-      },
-    };
-    const apiKey = byId("fmca-api-key").value.trim();
-    if (apiKey) payload.api_config.api_key = apiKey;
+    const isUiForm = event.currentTarget?.id === "fmca-ui-settings-form";
+    const payload = isUiForm
+      ? {
+          ui_theme: byId("fmca-ui-theme").value,
+          world_theme: byId("fmca-ui-theme").value,
+          ui: { ui_theme: byId("fmca-ui-theme").value },
+        }
+      : {
+          enabled: byId("fmca-enabled").checked,
+          show_floating_button: byId("fmca-show-fab").checked,
+          remember_position: byId("fmca-remember-position").checked,
+          reply_count: byId("fmca-reply-count").value,
+          max_tokens: Number.parseInt(byId("fmca-max-tokens").value, 10),
+          recent_message_limit: Number.parseInt(byId("fmca-recent-limit").value, 10),
+          allow_role_to_role_reply: byId("fmca-role-reply").checked,
+          channel_token_settings: collectChannelTokenSettings(),
+          model_source: byId("fmca-model-source").value === "custom" ? "custom" : "main",
+          api_config: {
+            base_url: byId("fmca-api-base-url").value.trim(),
+            model: byId("fmca-api-model").value.trim(),
+            temperature: Number.parseFloat(byId("fmca-api-temp").value),
+            request_timeout: Number.parseInt(byId("fmca-api-timeout").value, 10),
+          },
+        };
+    if (!isUiForm) {
+      const apiKey = byId("fmca-api-key").value.trim();
+      if (apiKey) payload.api_config.api_key = apiKey;
+    }
     try {
       await request("/settings", { method: "POST", body: JSON.stringify(payload) });
       await refresh();
@@ -2145,13 +2190,17 @@
     }
   }
 
-  async function runDataAction(action, channelId = "") {
+  async function runDataAction(action, channelId = "", eventId = "", sessionId = "") {
     const actionMap = {
       "refresh-data-overview": ["/admin/data-overview", "GET", "数据概览已刷新。"],
       "notifications-read-all": ["/admin/data/notifications/read-all", "POST", "通知已全部标记为已读。"],
       "clear-invalid-notifications": ["/admin/data/notifications/clear-invalid", "POST", "无效通知已清理。"],
       "prune-empty-phone": ["/admin/data/phone/prune-empty", "POST", "空通话记录已清理。"],
+      "prune-ended-phone": ["/admin/data/phone/prune-ended", "POST", "已结束通话记录已清理。"],
+      "clear-all-channel-test-events": ["/admin/data/channels/clear-test-events", "POST", "全部测试/fallback 内容已清理。"],
       "clear-channel-test-events": [`/admin/data/channels/${encodeURIComponent(channelId)}/clear-test-events`, "POST", "测试/fallback 内容已清理。"],
+      "delete-channel-event": [`/admin/data/channels/${encodeURIComponent(channelId)}/events/${encodeURIComponent(eventId || "")}`, "DELETE", "频道内容已删除。"],
+      "delete-phone-session": [`/admin/data/phone/sessions/${encodeURIComponent(sessionId || "")}`, "DELETE", "通话记录已删除。"],
     };
     const config = actionMap[action];
     if (!config) return;
@@ -2445,8 +2494,8 @@
         state.diagnostics = { ...(state.diagnostics || {}), generation_state: result.state };
         await refreshDiagnostics();
       }
-      if (["refresh-data-overview", "notifications-read-all", "clear-invalid-notifications", "prune-empty-phone", "clear-channel-test-events"].includes(action)) {
-        await runDataAction(action, button.dataset.channelId || "");
+      if (["refresh-data-overview", "notifications-read-all", "clear-invalid-notifications", "prune-empty-phone", "prune-ended-phone", "clear-all-channel-test-events", "clear-channel-test-events", "delete-channel-event", "delete-phone-session"].includes(action)) {
+        await runDataAction(action, button.dataset.channelId || "", button.dataset.eventId || "", button.dataset.sessionId || "");
       }
       if (action === "pause-generation-all") {
         await setGenerationPaused(true);
@@ -2514,6 +2563,7 @@
   byId("fmca-refresh").addEventListener("click", refresh);
   byId("fmca-back-chat")?.addEventListener("click", backToChat);
   byId("fmca-settings-form").addEventListener("submit", saveSettings);
+  byId("fmca-ui-settings-form")?.addEventListener("submit", saveSettings);
   byId("fmca-api-settings-form")?.addEventListener("submit", saveSettings);
   byId("fmca-apply-api-preset")?.addEventListener("click", applyApiPreset);
   byId("fmca-fetch-models")?.addEventListener("click", () => { void fetchModelList(); });
@@ -2531,6 +2581,9 @@
     if (state.summary?.settings) applySettingsForm(state.summary.settings);
   });
   byId("fmca-reset-api-form")?.addEventListener("click", () => {
+    if (state.summary?.settings) applySettingsForm(state.summary.settings);
+  });
+  byId("fmca-reset-ui-form")?.addEventListener("click", () => {
     if (state.summary?.settings) applySettingsForm(state.summary.settings);
   });
   byId("fmca-reset-position").addEventListener("click", resetPosition);

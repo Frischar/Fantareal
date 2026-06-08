@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -28,6 +29,7 @@ APP_DIR = Path(__file__).resolve().parent
 RESOURCE_DIR = APP_DIR
 PROJECT_ROOT = APP_DIR.parent.parent if APP_DIR.parent.name.lower() == "mods" else APP_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data" / "mobile_chat"
+CARDS_DIR = DATA_DIR / "cards"
 SETTINGS_PATH = DATA_DIR / "settings.json"
 GROUPS_PATH = DATA_DIR / "groups.json"
 ROLE_PROFILES_PATH = DATA_DIR / "role_profiles.json"
@@ -68,6 +70,20 @@ DEFAULT_UI_SETTINGS = {
     "remember_position": True,
     "floating_position": {"right": 28, "bottom": 150},
     "panel_position": {"right": 28, "bottom": 92},
+    "ui_theme": "modern",
+}
+WORLD_THEME_IDS = {"modern", "xianxia", "apocalypse"}
+DEFAULT_WORLD_THEME = "modern"
+WORLD_THEME_PROMPTS = {
+    "modern": "",
+    "xianxia": (
+        "World style layer: keep the phone UI and JSON schema modern internally, but let wording and character behavior fit a xianxia or classical fantasy setting. "
+        "Use display concepts such as transmission, letter, voice transmission and sightings when natural. Keep replies light, fragmented and conversational; do not force archaic prose."
+    ),
+    "apocalypse": (
+        "World style layer: keep the phone UI and JSON schema modern internally, but let wording and character behavior fit an apocalypse or survival network. "
+        "Characters may care about risk, supplies, routes and signal status. Use channel, message, call and broadcast concepts when natural, without retelling long main-chat plot."
+    ),
 }
 DEFAULT_GENERATION_SETTINGS = {
     "model_source": "main",
@@ -134,7 +150,7 @@ DEFAULT_CHANNEL_TOKEN_SETTINGS = {
 }
 DEFAULT_GENERATION_CONTROL_SETTINGS = {
     "paused": False,
-    "hourly_limit": 24,
+    "hourly_limit": 200,
     "retry_limit": 1,
     "cost_notice": True,
     "app_enabled": {
@@ -155,6 +171,8 @@ DEFAULT_SETTINGS = {
     "remember_position": DEFAULT_UI_SETTINGS["remember_position"],
     "floating_position": DEFAULT_UI_SETTINGS["floating_position"],
     "panel_position": DEFAULT_UI_SETTINGS["panel_position"],
+    "ui_theme": DEFAULT_UI_SETTINGS["ui_theme"],
+    "world_theme": DEFAULT_WORLD_THEME,
     "model_source": DEFAULT_GENERATION_SETTINGS["model_source"],
     "reply_count": DEFAULT_GENERATION_SETTINGS["reply_count"],
     "max_tokens": DEFAULT_GENERATION_SETTINGS["max_tokens"],
@@ -289,6 +307,7 @@ DEFAULT_GENERATION_STATE = {
     "last_jobs": [],
     "recent_live_ticks": [],
 }
+GENERATION_ACTIVE_JOB_TTL_SECONDS = 15 * 60
 CHANNEL_TYPES = set(PROMPT_SCOPE_ORDER)
 CHANNEL_EVENT_TYPES = {"post", "thread", "reply", "notice", "mail", "diary", "calendar", "call_line", "live", "system"}
 
@@ -300,6 +319,8 @@ class SettingsPayload(BaseModel):
     remember_position: bool | None = None
     floating_position: dict[str, Any] | None = None
     panel_position: dict[str, Any] | None = None
+    ui_theme: str | None = None
+    world_theme: str | None = None
     model_source: str | None = None
     api_config: dict[str, Any] | None = None
     llm_base_url: str | None = None
@@ -466,6 +487,9 @@ class ChannelEventPayload(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
+class ChannelEventPatchPayload(BaseModel):
+    read: bool | None = None
+
 class ChannelSeedPayload(BaseModel):
     channel_id: str = ""
     count: int | None = None
@@ -483,6 +507,13 @@ class ChannelReplyPayload(BaseModel):
 
 class MailReplyPayload(BaseModel):
     content: str = Field(default="", max_length=1000)
+    generate_reply: bool | None = True
+
+
+class MailOutgoingPayload(BaseModel):
+    recipient_id: str = Field(default="", max_length=120)
+    title: str | None = Field(default=None, max_length=120)
+    content: str = Field(default="", max_length=1200)
     generate_reply: bool | None = True
 
 
@@ -962,6 +993,68 @@ def make_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex[:12]}"
 
 
+def current_role_card_payload() -> dict[str, Any]:
+    payload = read_json(CURRENT_ROLE_CARD_PATH, {})
+    if not isinstance(payload, dict):
+        return {}
+    raw = payload.get("raw") if isinstance(payload.get("raw"), dict) else {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def current_mobile_card_uid() -> str:
+    raw = current_role_card_payload()
+    if not raw:
+        return "global"
+    for value in (raw.get("card_uid"), raw.get("uid"), raw.get("id")):
+        safe_uid = normalize_id(value, "")
+        if safe_uid:
+            return safe_uid
+    personas = raw.get("personas") if isinstance(raw.get("personas"), (dict, list)) else {}
+    fingerprint_payload = {
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": personas,
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
+
+
+def current_mobile_card_dir() -> Path:
+    safe_uid = normalize_id(current_mobile_card_uid(), "global")
+    return CARDS_DIR / safe_uid
+
+
+def card_groups_path() -> Path:
+    return current_mobile_card_dir() / "groups.json"
+
+
+def card_role_profiles_path() -> Path:
+    return current_mobile_card_dir() / "role_profiles.json"
+
+
+def card_messages_dir() -> Path:
+    return current_mobile_card_dir() / "messages"
+
+
+def card_events_dir() -> Path:
+    return current_mobile_card_dir() / "events"
+
+
+def card_notifications_path() -> Path:
+    return current_mobile_card_dir() / "notifications.json"
+
+
+def card_phone_calls_path() -> Path:
+    return current_mobile_card_dir() / "phone_calls.json"
+
+
+def card_generation_state_path() -> Path:
+    return current_mobile_card_dir() / "generation_state.json"
+
+
+def card_parser_diagnostics_path() -> Path:
+    return current_mobile_card_dir() / "parser_diagnostics.json"
+
+
 def _read_json_unlocked(path: Path, default: Any) -> Any:
     if not path.exists():
         return clone_default(default)
@@ -999,12 +1092,14 @@ def ensure_runtime_data() -> None:
     with STORAGE_LOCK:
         MESSAGES_DIR.mkdir(parents=True, exist_ok=True)
         EVENTS_DIR.mkdir(parents=True, exist_ok=True)
+        card_messages_dir().mkdir(parents=True, exist_ok=True)
+        card_events_dir().mkdir(parents=True, exist_ok=True)
         if not SETTINGS_PATH.exists():
             _write_json_unlocked(SETTINGS_PATH, DEFAULT_SETTINGS)
-        if not GROUPS_PATH.exists():
-            _write_json_unlocked(GROUPS_PATH, [])
-        if not ROLE_PROFILES_PATH.exists():
-            _write_json_unlocked(ROLE_PROFILES_PATH, DEFAULT_ROLE_PROFILES)
+        if not card_groups_path().exists():
+            _write_json_unlocked(card_groups_path(), [])
+        if not card_role_profiles_path().exists():
+            _write_json_unlocked(card_role_profiles_path(), DEFAULT_ROLE_PROFILES)
         if not AUTOMATION_STATE_PATH.exists():
             _write_json_unlocked(AUTOMATION_STATE_PATH, DEFAULT_AUTOMATION_STATE)
         if not PROMPT_BLOCKS_PATH.exists():
@@ -1013,14 +1108,14 @@ def ensure_runtime_data() -> None:
             _write_json_unlocked(APP_REGISTRY_PATH, DEFAULT_APP_REGISTRY)
         if not CHANNELS_PATH.exists():
             _write_json_unlocked(CHANNELS_PATH, DEFAULT_CHANNELS)
-        if not NOTIFICATIONS_PATH.exists():
-            _write_json_unlocked(NOTIFICATIONS_PATH, DEFAULT_NOTIFICATIONS)
-        if not PHONE_CALLS_PATH.exists():
-            _write_json_unlocked(PHONE_CALLS_PATH, DEFAULT_PHONE_CALLS)
-        if not GENERATION_STATE_PATH.exists():
-            _write_json_unlocked(GENERATION_STATE_PATH, DEFAULT_GENERATION_STATE)
-        if not PARSER_DIAGNOSTICS_PATH.exists():
-            _write_json_unlocked(PARSER_DIAGNOSTICS_PATH, {"schema_version": 1, "items": []})
+        if not card_notifications_path().exists():
+            _write_json_unlocked(card_notifications_path(), DEFAULT_NOTIFICATIONS)
+        if not card_phone_calls_path().exists():
+            _write_json_unlocked(card_phone_calls_path(), DEFAULT_PHONE_CALLS)
+        if not card_generation_state_path().exists():
+            _write_json_unlocked(card_generation_state_path(), DEFAULT_GENERATION_STATE)
+        if not card_parser_diagnostics_path().exists():
+            _write_json_unlocked(card_parser_diagnostics_path(), {"schema_version": 1, "items": []})
 
 
 def sanitize_position(raw: Any, default: dict[str, int]) -> dict[str, int]:
@@ -1067,7 +1162,7 @@ def sanitize_generation_control(raw: Any) -> dict[str, Any]:
     }
     return {
         "paused": bool(source.get("paused", defaults["paused"])),
-        "hourly_limit": clamp_int(source.get("hourly_limit"), 1, 240, defaults["hourly_limit"]),
+        "hourly_limit": clamp_int(source.get("hourly_limit"), 1, 500, defaults["hourly_limit"]),
         "retry_limit": clamp_int(source.get("retry_limit"), 0, 5, defaults["retry_limit"]),
         "cost_notice": bool(source.get("cost_notice", defaults["cost_notice"])),
         "app_enabled": app_enabled,
@@ -1095,7 +1190,7 @@ def assert_generation_allowed(kind: str) -> None:
     if control.get("app_enabled", {}).get(scope, True) is False:
         label = PROMPT_SCOPE_LABELS.get(scope, scope)
         raise HTTPException(status_code=423, detail=f"{label} \u751f\u6210\u5f00\u5173\u5df2\u5173\u95ed\uff0c\u8bf7\u5728\u540e\u53f0\u5f00\u542f\u540e\u91cd\u8bd5\u3002")
-    hourly_limit = clamp_int(control.get("hourly_limit"), 1, 240, DEFAULT_GENERATION_CONTROL_SETTINGS["hourly_limit"])
+    hourly_limit = clamp_int(control.get("hourly_limit"), 1, 500, DEFAULT_GENERATION_CONTROL_SETTINGS["hourly_limit"])
     recent = [item for item in get_generation_state().get("last_jobs", []) if compact_text(item.get("finished_at"), 13) == compact_text(now_iso(), 13)]
     if len(recent) >= hourly_limit:
         raise HTTPException(status_code=429, detail="\u672c\u5c0f\u65f6\u751f\u6210\u9884\u7b97\u5df2\u7528\u5c3d\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5\u6216\u5728\u540e\u53f0\u8c03\u9ad8\u9884\u7b97\u3002")
@@ -1178,6 +1273,11 @@ def normalize_prompt_mode(value: Any, *, use_custom_prompt: bool = False) -> str
     return "default"
 
 
+def sanitize_world_theme(value: Any) -> str:
+    theme = normalize_id(value, DEFAULT_WORLD_THEME)
+    return theme if theme in WORLD_THEME_IDS else DEFAULT_WORLD_THEME
+
+
 def sanitize_prompt_settings(raw: Any) -> dict[str, Any]:
     source = raw if isinstance(raw, dict) else {}
     last_preview = normalize_prompt_scope(source.get("last_preview_channel", DEFAULT_PROMPT_SETTINGS["last_preview_channel"]))
@@ -1212,6 +1312,8 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     settings["enabled"] = bool(source.get("enabled", DEFAULT_SETTINGS["enabled"]))
     settings["show_floating_button"] = bool(pick_section_value(source, ui_source, "show_floating_button", DEFAULT_UI_SETTINGS["show_floating_button"]))
     settings["remember_position"] = bool(pick_section_value(source, ui_source, "remember_position", DEFAULT_UI_SETTINGS["remember_position"]))
+    settings["ui_theme"] = sanitize_world_theme(pick_section_value(source, ui_source, "ui_theme", source.get("world_theme", DEFAULT_WORLD_THEME)))
+    settings["world_theme"] = settings["ui_theme"]
     settings["floating_position"] = sanitize_position(
         pick_section_value(source, ui_source, "floating_position", DEFAULT_UI_SETTINGS["floating_position"]),
         DEFAULT_UI_SETTINGS["floating_position"],
@@ -1270,6 +1372,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
         "remember_position": settings["remember_position"],
         "floating_position": settings["floating_position"],
         "panel_position": settings["panel_position"],
+        "ui_theme": settings["ui_theme"],
     }
     settings["generation"] = {
         "model_source": settings["model_source"],
@@ -1454,6 +1557,11 @@ def prompt_body_preview_text(scope: str, settings: dict[str, Any] | None = None)
     return editable_default_prompt_text(target)
 
 
+def world_theme_prompt_section(settings: dict[str, Any] | None = None) -> str:
+    theme = sanitize_world_theme((settings or get_settings()).get("world_theme"))
+    return WORLD_THEME_PROMPTS.get(theme, "")
+
+
 def custom_prompt_user_section(scope: str, settings: dict[str, Any] | None = None) -> str:
     if prompt_mode_for_settings(settings) != "additive":
         return ""
@@ -1480,14 +1588,20 @@ def assembled_prompt_text(scope: str) -> str:
     target = normalize_prompt_scope(scope)
     settings = get_settings()
     custom_prompt = custom_prompt_for_scope(target, settings)
+    theme_section = world_theme_prompt_section(settings)
     if prompt_mode_for_settings(settings) == "override" and custom_prompt:
         parts = [strip_locked_prompt_contract(custom_prompt, target)]
+        if theme_section:
+            parts.append(theme_section)
         if settings.get("prompt", {}).get("append_json_contract", True):
             contract = locked_prompt_contract_text(target)
             if contract:
                 parts.append(contract)
         return "\n\n".join(parts).strip()
-    return default_prompt_text(target)
+    parts = [default_prompt_text(target)]
+    if theme_section:
+        parts.append(theme_section)
+    return "\n\n".join(part for part in parts if part).strip()
 
 
 def channel_schema_catalog() -> list[dict[str, Any]]:
@@ -1669,16 +1783,58 @@ def sanitize_generation_state(raw: Any) -> dict[str, Any]:
 
 def get_generation_state() -> dict[str, Any]:
     ensure_runtime_data()
-    payload = sanitize_generation_state(read_json(GENERATION_STATE_PATH, DEFAULT_GENERATION_STATE))
-    if payload != read_json(GENERATION_STATE_PATH, DEFAULT_GENERATION_STATE):
-        write_json(GENERATION_STATE_PATH, payload)
+    payload = sanitize_generation_state(read_json(card_generation_state_path(), DEFAULT_GENERATION_STATE))
+    if payload != read_json(card_generation_state_path(), DEFAULT_GENERATION_STATE):
+        write_json(card_generation_state_path(), payload)
     return payload
 
 
 def save_generation_state(state: dict[str, Any]) -> dict[str, Any]:
     payload = sanitize_generation_state(state)
-    write_json(GENERATION_STATE_PATH, payload)
+    write_json(card_generation_state_path(), payload)
     return payload
+
+
+def active_job_age_seconds(job: dict[str, Any]) -> float:
+    started_at = compact_text(job.get("started_at"), 80)
+    if not started_at:
+        return 0
+    try:
+        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=datetime.now(timezone.utc).astimezone().tzinfo)
+    return max(0.0, (datetime.now(timezone.utc).astimezone() - started).total_seconds())
+
+
+def prune_stale_generation_jobs(state: dict[str, Any]) -> dict[str, Any]:
+    active = state.get("active_jobs") if isinstance(state.get("active_jobs"), dict) else {}
+    stale: list[dict[str, Any]] = []
+    for key, job in list(active.items()):
+        if isinstance(job, dict) and active_job_age_seconds(job) > GENERATION_ACTIVE_JOB_TTL_SECONDS:
+            stale.append(job)
+            active.pop(key, None)
+    if stale:
+        state["active_jobs"] = active
+        state["last_jobs"] = [
+            {
+                **job,
+                "finished_at": now_iso(),
+                "status": "error",
+                "error": "stale_active_job_pruned",
+            }
+            for job in stale
+        ] + state.get("last_jobs", [])
+        state["last_jobs"] = state["last_jobs"][:30]
+        save_generation_state(state)
+    return state
+
+
+def interrupted_generation_error(exc: BaseException | None = None) -> str:
+    if exc is None:
+        return "generation_interrupted"
+    return compact_text(f"generation_interrupted:{exc.__class__.__name__}:{exc}", 240) or "generation_interrupted"
 
 
 def begin_generation_job(kind: str, target_id: str) -> dict[str, str]:
@@ -1686,7 +1842,7 @@ def begin_generation_job(kind: str, target_id: str) -> dict[str, str]:
     safe_target = compact_text(target_id, 120) or "default"
     key = f"{safe_kind}:{safe_target}"
     assert_generation_allowed(safe_kind)
-    state = get_generation_state()
+    state = prune_stale_generation_jobs(get_generation_state())
     if key in state["active_jobs"]:
         raise HTTPException(status_code=409, detail="A generation task is already running for this target.")
     job = {
@@ -1766,9 +1922,13 @@ def merge_settings_update(current: dict[str, Any], updates: dict[str, Any]) -> d
     generation = updates.get("generation") if isinstance(updates.get("generation"), dict) else {}
     auto_behavior = updates.get("auto_behavior") if isinstance(updates.get("auto_behavior"), dict) else {}
     if ui:
-        for key in ("show_floating_button", "remember_position", "floating_position", "panel_position"):
+        for key in ("show_floating_button", "remember_position", "floating_position", "panel_position", "ui_theme"):
             if key in ui and key not in updates:
                 merged[key] = ui[key]
+    if "ui_theme" in updates and isinstance(merged.get("ui"), dict):
+        merged["ui"] = {**merged["ui"], "ui_theme": updates["ui_theme"]}
+    if "world_theme" in updates and "ui_theme" not in updates and isinstance(merged.get("ui"), dict):
+        merged["ui"] = {**merged["ui"], "ui_theme": updates["world_theme"]}
     if generation:
         for key in ("model_source", "api_config", "reply_count", "max_tokens", "recent_message_limit", "allow_role_to_role_reply"):
             if key in generation and key not in updates:
@@ -2035,7 +2195,7 @@ def sanitize_role_profile(raw: Any, index: int = 0) -> dict[str, Any] | None:
 
 def get_role_profiles(*, include_disabled: bool = True) -> list[dict[str, Any]]:
     ensure_runtime_data()
-    stored = read_json(ROLE_PROFILES_PATH, DEFAULT_ROLE_PROFILES)
+    stored = read_json(card_role_profiles_path(), DEFAULT_ROLE_PROFILES)
     rows = stored.get("roles", []) if isinstance(stored, dict) else stored
     if not isinstance(rows, list):
         rows = []
@@ -2047,7 +2207,7 @@ def get_role_profiles(*, include_disabled: bool = True) -> list[dict[str, Any]]:
 
 def save_role_profiles(profiles: list[dict[str, Any]]) -> None:
     sanitized = [profile for index, item in enumerate(profiles) if (profile := sanitize_role_profile(item, index)) is not None]
-    write_json(ROLE_PROFILES_PATH, {"schema_version": 1, "roles": sanitized})
+    write_json(card_role_profiles_path(), {"schema_version": 1, "roles": sanitized})
 
 
 def role_generator_display_name(raw: dict[str, Any], index: int, count: int) -> str:
@@ -2464,6 +2624,17 @@ def iter_main_chat_messages(payload: Any) -> list[dict[str, Any]]:
     return messages
 
 
+def read_main_chat_conversation_payload() -> Any:
+    try:
+        from fantareal.app import conversation_path as main_conversation_path
+        from fantareal.app import get_active_slot_id as main_get_active_slot_id
+
+        path = main_conversation_path(main_get_active_slot_id())
+        return read_json(path, [])
+    except Exception:
+        return read_json(MAIN_CONVERSATIONS_PATH, [])
+
+
 def main_chat_message_text(message: dict[str, Any]) -> str:
     parts = [
         compact_text(message.get("raw_content"), 4000),
@@ -2499,11 +2670,89 @@ def main_chat_candidate_names(text: str) -> list[tuple[str, str]]:
         add(match.group(1), "mention")
     return candidates
 
+
+def clean_main_story_text(value: Any, limit: int = 360) -> str:
+    text = re.sub(r"<think>[\s\S]*?</think>", "", str(value or ""), flags=re.IGNORECASE)
+    text = re.sub(r"\[TTSVoice:[^\]]+\]", "", text)
+    return compact_text(text, limit)
+
+
+def summarize_main_story_messages(messages: list[dict[str, Any]], limit: int = 620) -> str:
+    rows: list[str] = []
+    for item in messages:
+        if not isinstance(item, dict):
+            continue
+        role = compact_text(item.get("role"), 24) or compact_text(item.get("source"), 24) or "story"
+        content = clean_main_story_text(item.get("assistant_clean_text") or item.get("raw_content") or item.get("content"), 180)
+        if content:
+            rows.append(f"{role}: {content}")
+    if not rows:
+        return ""
+    return compact_text(" | ".join(rows), limit)
+
+
+def current_card_memory_items(limit: int = 6) -> list[dict[str, str]]:
+    try:
+        from fantareal.app import get_memories as main_get_memories
+    except Exception:
+        main_get_memories = None
+    if main_get_memories is not None:
+        try:
+            raw_items = main_get_memories()
+        except Exception:
+            raw_items = []
+    else:
+        raw_items = []
+    rows: list[dict[str, str]] = []
+    for item in raw_items[-limit:] if isinstance(raw_items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        title = compact_text(item.get("title"), 80)
+        content = compact_text(item.get("content") or item.get("notes"), 260)
+        if not title and not content:
+            continue
+        rows.append(
+            {
+                "title": title,
+                "content": content,
+                "tags": ", ".join(compact_text(tag, 24) for tag in item.get("tags", [])[:6]) if isinstance(item.get("tags"), list) else "",
+            }
+        )
+    return rows
+
+
+def main_story_context_payload(recent_limit: int = 8, memory_limit: int = 6) -> dict[str, Any]:
+    conversations = read_main_chat_conversation_payload()
+    messages = iter_main_chat_messages(conversations)[-recent_limit:]
+    main_chat_summary = summarize_main_story_messages(messages)
+    recent_messages: list[dict[str, str]] = []
+    for item in messages[-2:]:
+        if not isinstance(item, dict):
+            continue
+        content = clean_main_story_text(item.get("assistant_clean_text") or item.get("raw_content") or item.get("content"), 180)
+        if not content:
+            continue
+        recent_messages.append(
+            {
+                "role": compact_text(item.get("role"), 40) or compact_text(item.get("source"), 40),
+                "content": content,
+                "turn_id": compact_text(item.get("turn_id") or item.get("message_id"), 80),
+            }
+        )
+    return {
+        "enabled": True,
+        "source": "summarized_main_chat_and_current_card_memories",
+        "instruction": "Use main_chat_summary and current_card_memories as latest canon for relationship stage, plot phase, location, promises, injuries, secrets and emotional continuity. recent_main_chat only gives a tiny tail excerpt for tone. Do not roll back events already established here.",
+        "main_chat_summary": main_chat_summary,
+        "recent_main_chat": recent_messages,
+        "current_card_memories": current_card_memory_items(memory_limit),
+    }
+
 def extract_main_chat_role_profiles(payload: RoleChatExtractPayload | None = None, *, source: str = "chat_extract") -> list[dict[str, Any]]:
     payload = payload or RoleChatExtractPayload()
     limit = clamp_int(payload.limit, 1, 30, 12)
     recent_messages = clamp_int(payload.recent_messages, 20, 300, 120)
-    conversations = read_json(MAIN_CONVERSATIONS_PATH, [])
+    conversations = read_main_chat_conversation_payload()
     messages = iter_main_chat_messages(conversations)[-recent_messages:]
     existing_names = main_chat_existing_name_keys()
     candidates: dict[str, dict[str, Any]] = {}
@@ -2719,28 +2968,6 @@ def extract_current_card_roles() -> dict[str, Any]:
             0,
         )
 
-    state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
-    state_roles = state_journal.get("roles") if isinstance(state_journal.get("roles"), list) else []
-    for index, item in enumerate(state_roles):
-        if not isinstance(item, dict) or item.get("enabled") is False:
-            continue
-        state_role_name = declared_persona_name(
-            {
-                "name": item.get("role_name") or item.get("name"),
-                "description": item.get("summary") or item.get("description"),
-            }
-        )
-        if not state_role_name:
-            continue
-        upsert(
-            {
-                "role_id": item.get("role_id") or item.get("id"),
-                "name": state_role_name,
-                "summary": item.get("summary") or "",
-                "type": "character",
-            },
-            index,
-        )
 
     personas = raw.get("personas")
     if isinstance(personas, dict):
@@ -2758,7 +2985,7 @@ def extract_current_card_roles() -> dict[str, Any]:
             continue
         upsert(
             {
-                "role_id": persona.get("role_id") or persona.get("id") or normalize_id(name, f"role_{index + 1}"),
+                "role_id": persona.get("role_id") or persona.get("id") or normalize_id(f"current_card_{persona_key}_{name}", f"current_card_role_{index + 1}"),
                 "name": name,
                 "summary": persona_summary,
                 "avatar": persona.get("avatar") or persona.get("avatar_url") or "",
@@ -2845,8 +3072,9 @@ def validate_group_id(value: Any) -> str:
 
 def messages_path(group_id: str) -> Path:
     safe_group_id = validate_group_id(group_id)
-    target = (MESSAGES_DIR / f"{safe_group_id}.json").resolve()
-    if target.parent != MESSAGES_DIR.resolve():
+    messages_dir = card_messages_dir()
+    target = (messages_dir / f"{safe_group_id}.json").resolve()
+    if target.parent != messages_dir.resolve():
         raise HTTPException(status_code=400, detail="群聊 ID 路径错误。")
     return target
 
@@ -2921,7 +3149,7 @@ def default_group() -> dict[str, Any]:
 
 def get_groups() -> list[dict[str, Any]]:
     ensure_runtime_data()
-    stored = read_json(GROUPS_PATH, [])
+    stored = read_json(card_groups_path(), [])
     rows = stored.get("groups", []) if isinstance(stored, dict) else stored
     if not isinstance(rows, list):
         rows = []
@@ -2930,7 +3158,7 @@ def get_groups() -> list[dict[str, Any]]:
 
 
 def save_groups(groups: list[dict[str, Any]]) -> None:
-    write_json(GROUPS_PATH, groups)
+    write_json(card_groups_path(), groups)
 
 
 def get_group_or_404(group_id: str) -> dict[str, Any]:
@@ -3103,7 +3331,7 @@ def channel_events_path(channel_id: str) -> Path:
     safe_channel_id = normalize_id(channel_id)
     if not safe_channel_id:
         raise HTTPException(status_code=400, detail="Invalid channel id.")
-    return EVENTS_DIR / f"{safe_channel_id}.json"
+    return card_events_dir() / f"{safe_channel_id}.json"
 
 
 def sanitize_event_tags(value: Any) -> list[str]:
@@ -3133,8 +3361,12 @@ def sanitize_event_metadata(value: Any) -> dict[str, Any]:
         safe_key = compact_text(key, 40)
         if not safe_key:
             continue
-        if isinstance(raw_value, (dict, list)):
-            metadata[safe_key] = compact_text(json.dumps(raw_value, ensure_ascii=False), 500)
+        if isinstance(raw_value, bool):
+            metadata[safe_key] = raw_value
+        elif isinstance(raw_value, (int, float)):
+            metadata[safe_key] = raw_value
+        elif isinstance(raw_value, (dict, list)):
+            metadata[safe_key] = raw_value
         else:
             metadata[safe_key] = compact_text(raw_value, 500)
     return metadata
@@ -3509,6 +3741,7 @@ def summarize_mobile_context(app_id: str = "") -> dict[str, Any]:
             ]
             for channel in get_channels(include_disabled=False)
         },
+        "main_story_context": main_story_context_payload(),
     }
 
 
@@ -3545,6 +3778,7 @@ def summarize_mobile_seed_context(channel: dict[str, Any]) -> dict[str, Any]:
             {"title": event["title"], "author_name": event["author_name"], "content": event["content"][:120]}
             for event in get_channel_events(channel["channel_id"])[:3]
         ],
+        "main_story_context": main_story_context_payload(recent_limit=6, memory_limit=5),
     }
 
 
@@ -3575,6 +3809,7 @@ def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dic
         f"Use 1-3 short text tags. Keep each title <= 24 Chinese characters and each content <= {content_limit} Chinese characters.",
         "Keep metadata small and JSON-serializable.",
         "Use Context JSON current_date/current_datetime as the present time unless the provided world context explicitly sets a different in-world date.",
+        "Honor mobile_context.main_story_context as latest canon from the main story and current-card memories; do not roll back established plot or relationship stages.",
         "Follow Context JSON mobile_context.role_app_policy: exclude blocked roles, prefer suitable roles, and use usage_in_target_app/app_roles for authors, participants, viewers, senders and bystanders.",
     ]
     if channel["type"] == "forum":
@@ -3642,6 +3877,7 @@ def build_channel_seed_retry_messages(channel: dict[str, Any], count: int) -> li
         "Root shape: {\"events\":[...]}. "
         "Each event requires title, content, author_name, event_type, tags and metadata. "
         "Keep titles <= 24 Chinese characters, content <= 520 Chinese characters, tags <= 3. "
+        "Honor mobile_context.main_story_context as latest canon from the main story and current-card memories. "
         "Follow mobile_context.role_app_policy when choosing authors and metadata participants. "
         f"{reply_rule}\nContext JSON:\n"
         + json.dumps(context, ensure_ascii=False, separators=(",", ":"))
@@ -3692,6 +3928,7 @@ def build_channel_interaction_messages(channel: dict[str, Any], event: dict[str,
         f"The user just {'published this event' if mode == 'post' else 'replied to this event'} in the {channel['type']} app. "
         f"{source_rule}\n"
         "Return valid JSON only, root shape {\"replies\":[...]}. "
+        "Honor mobile_context.main_story_context as latest canon from the main story and current-card memories. "
         "Follow mobile_context.role_app_policy when choosing role/moderator replies; bystanders must stay metadata-only. "
         "Each reply must include author_name, author_type, source, content, mood and floor. "
         "Keep each content <= 70 Chinese characters, in-character, varied, and directly responsive to the user's content. "
@@ -3818,6 +4055,7 @@ def build_live_tick_messages(channel: dict[str, Any], event: dict[str, Any]) -> 
         "The tick must include content, danmaku, highlights, contributors, viewers, likes and live_status. "
         "Keep output short: content <=120 Chinese characters, inner_thought <=80, notification <=40. "
         "Generate exactly 2 compact danmaku messages, 0-1 highlight message, and 0-2 contributor updates. "
+        "Honor mobile_context.main_story_context as latest canon from the main story and current-card memories. "
         "Follow mobile_context.role_app_policy: streamer should match the current author if possible; viewers/highlight senders/contributors can be saved roles suitable for live or metadata-only bystanders. "
         "Keep the next segment concrete, in-world, and responsive to the previous content. "
         "Do not mention plugins, APIs, prompts, or JSON.\n"
@@ -3926,6 +4164,7 @@ def build_mail_reply_messages(event: dict[str, Any], user_content: str) -> list[
         "Continue this in-world email thread after the user sends a reply. "
         "Return valid JSON only, root shape {\"replies\":[...]}. "
         "Generate exactly 1 received reply from the original sender or a relevant mail contact. "
+        "Honor mobile_context.main_story_context as latest canon from the main story and current-card memories. "
         "Follow mobile_context.role_app_policy when choosing relevant mail contacts; prefer saved roles suitable for mail and never use roles blocked from mail. "
         "Each reply must include author_name, direction, content and mood. Keep content <= 220 Chinese characters. "
         "Do not mention plugins, APIs, prompts, or JSON.\n"
@@ -4037,7 +4276,7 @@ def sanitize_notification(raw: Any, index: int = 0) -> dict[str, Any] | None:
 
 def get_notifications() -> list[dict[str, Any]]:
     ensure_runtime_data()
-    payload = read_json(NOTIFICATIONS_PATH, DEFAULT_NOTIFICATIONS)
+    payload = read_json(card_notifications_path(), DEFAULT_NOTIFICATIONS)
     rows = payload.get("items", []) if isinstance(payload, dict) else payload
     if not isinstance(rows, list):
         rows = []
@@ -4050,7 +4289,7 @@ def get_notifications() -> list[dict[str, Any]]:
 
 def save_notifications(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sanitized = [item for index, row in enumerate(items) if (item := sanitize_notification(row, index)) is not None]
-    write_json(NOTIFICATIONS_PATH, {"schema_version": 1, "items": sanitized[:300]})
+    write_json(card_notifications_path(), {"schema_version": 1, "items": sanitized[:300]})
     return sanitized[:300]
 
 
@@ -4123,7 +4362,7 @@ def sanitize_phone_session(raw: Any, index: int = 0) -> dict[str, Any] | None:
 
 def get_phone_sessions() -> list[dict[str, Any]]:
     ensure_runtime_data()
-    payload = read_json(PHONE_CALLS_PATH, DEFAULT_PHONE_CALLS)
+    payload = read_json(card_phone_calls_path(), DEFAULT_PHONE_CALLS)
     rows = payload.get("sessions", []) if isinstance(payload, dict) else []
     if not isinstance(rows, list):
         rows = []
@@ -4136,7 +4375,7 @@ def get_phone_sessions() -> list[dict[str, Any]]:
 
 def save_phone_sessions(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sanitized = [item for index, row in enumerate(sessions) if (item := sanitize_phone_session(row, index)) is not None]
-    write_json(PHONE_CALLS_PATH, {"schema_version": 1, "sessions": sanitized[:80]})
+    write_json(card_phone_calls_path(), {"schema_version": 1, "sessions": sanitized[:80]})
     return sanitized[:80]
 
 
@@ -4213,6 +4452,7 @@ def build_phone_call_messages(role: dict[str, Any], session: dict[str, Any], use
         "Continue a simulated phone call with the target role. "
         "Return JSON only with lines and call_state. Return 1-3 compact role lines when the role naturally continues speaking. "
         "The target role is already filtered for the phone app; keep the conversation consistent with role.usage_in_phone and mobile_context.role_app_policy. "
+        "Honor mobile_context.main_story_context as latest canon from the main story and current-card memories. "
         "If the role naturally ends the call, set call_state to ended and make the final line sound like a real phone goodbye.\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
@@ -4607,10 +4847,12 @@ def build_mobile_model_messages(
         "allow_auto_interject": group["allow_auto_interject"],
         "role_app_policy": role_app_generation_policy("group_chat"),
         "available_stickers": sticker_prompt_catalog(),
+        "main_story_context": main_story_context_payload(),
     }
     user_text = (
         "请根据以下群聊上下文生成本轮回复，只返回 JSON：\n"
         "Follow role_app_policy and each member usage_in_group_chat/app_roles; avoid choosing members explicitly blocked from group_chat.\n"
+        "Honor main_story_context as latest canon from the main story and current-card memories; do not roll back relationship or plot stages already established there.\n"
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
     user_text = apply_custom_prompt_to_user_text("group_chat", user_text)
@@ -4772,7 +5014,7 @@ def parse_payload_shape(payload: Any, root_key: str) -> Any:
 
 def get_parser_diagnostics() -> list[dict[str, Any]]:
     ensure_runtime_data()
-    payload = read_json(PARSER_DIAGNOSTICS_PATH, {"schema_version": 1, "items": []})
+    payload = read_json(card_parser_diagnostics_path(), {"schema_version": 1, "items": []})
     rows = payload.get("items", []) if isinstance(payload, dict) else payload
     if not isinstance(rows, list):
         rows = []
@@ -4808,7 +5050,7 @@ def record_parser_diagnostic(scope: str, schema: str, target_id: str, reason: st
             "raw_excerpt": compact_text(strip_json_fence(raw), 500),
         },
     )
-    write_json(PARSER_DIAGNOSTICS_PATH, {"schema_version": 1, "items": rows[:80]})
+    write_json(card_parser_diagnostics_path(), {"schema_version": 1, "items": rows[:80]})
 
 
 def parse_model_json_output(raw: str, *, scope: str, schema: str, root_key: str, target_id: str = "") -> tuple[Any, str]:
@@ -4854,10 +5096,24 @@ def parse_model_mobile_messages(raw: str, group: dict[str, Any]) -> list[dict[st
     for item in raw_messages:
         if not isinstance(item, dict):
             continue
-        speaker_value = compact_text(item.get("speaker") or item.get("speaker_name") or item.get("speaker_id"), 80)
+        speaker_value = compact_text(
+            item.get("speaker")
+            or item.get("speaker_name")
+            or item.get("speaker_id")
+            or item.get("role_id")
+            or item.get("name")
+            or item.get("author")
+            or item.get("author_name")
+            or item.get("author_id"),
+            80,
+        )
         member = by_name.get(role_name_key(speaker_value)) or by_id.get(normalize_id(speaker_value))
         message_type = compact_text(item.get("type"), 20).lower()
-        content = compact_text(item.get("content"), 280)
+        if not message_type and any(item.get(key) for key in ("content", "text", "body")):
+            message_type = "text"
+        if message_type in {"message", "reply"}:
+            message_type = "text"
+        content = compact_text(item.get("sticker") if message_type == "sticker" else item.get("content") or item.get("text") or item.get("body"), 280)
         if not member or message_type not in {"text", "sticker"} or not content:
             continue
         if message_type == "sticker" and not is_valid_sticker_id(content, require_exists=True):
@@ -4875,20 +5131,6 @@ def parse_model_mobile_messages(raw: str, group: dict[str, Any]) -> list[dict[st
         )
         if len(parsed) >= reply_limit:
             break
-    fallback_member = first_ai_member(group)
-    if not parsed and fallback_member:
-        fallback_text = compact_text(cleaned if parse_failed else "我看到了。", 280) or "我看到了。"
-        parsed.append(
-            {
-                "message_id": make_id("msg"),
-                "speaker_id": fallback_member["role_id"],
-                "speaker_name": fallback_member["name"],
-                "type": "text",
-                "content": fallback_text,
-                "created_at": now_iso(),
-                "source": "ai",
-            }
-        )
     return parsed
 
 
@@ -5336,101 +5578,127 @@ async def api_generate(payload: GeneratePayload) -> JSONResponse | dict[str, Any
     if not user_text:
         raise HTTPException(status_code=400, detail="消息不能为空。")
     job = begin_generation_job("group_chat", safe_group_id)
+    job_finished = False
     async with group_async_lock(safe_group_id):
-        group = get_group_or_404(safe_group_id)
-        recent = get_messages(safe_group_id)
-        user_message = append_group_messages(safe_group_id, [user_message_for(group, user_text)])[0]
-        model_messages = build_mobile_model_messages(group, recent, user_text)
-        settings = get_settings()
         try:
-            raw_reply = await call_chat_model(
-                model_messages,
-                max_tokens=settings["max_tokens"],
-                temperature=read_mobile_llm_config()["temperature"],
-            )
-        except HTTPException as exc:
-            error_message = {
-                "message_id": make_id("msg"),
-                "speaker_id": "system",
-                "speaker_name": "系统",
-                "type": "error",
-                "content": compact_text(exc.detail, 240) or "模型生成失败，请稍后重试。",
-                "created_at": now_iso(),
-                "source": "system",
-            }
-            stored_error = append_group_messages(safe_group_id, [error_message])
-            finish_generation_job(job, "error", compact_text(exc.detail, 240))
-            return JSONResponse(
-                status_code=exc.status_code,
-                content={"ok": False, "user_message": user_message, "messages": stored_error, "error": error_message["content"]},
-            )
-        ai_messages = parse_model_mobile_messages(raw_reply, group)
-        if not ai_messages:
-            error_message = {
-                "message_id": make_id("msg"),
-                "speaker_id": "system",
-                "speaker_name": "系统",
-                "type": "error",
-                "content": "模型返回内容无法解析，请查看后台 diagnostics。",
-                "created_at": now_iso(),
-                "source": "system",
-            }
-            stored_error = append_group_messages(safe_group_id, [error_message])
-            finish_generation_job(job, "error", "parser_no_valid_messages")
-            return JSONResponse(status_code=502, content={"ok": False, "user_message": user_message, "messages": stored_error, "error": error_message["content"]})
-        stored_messages = append_group_messages(safe_group_id, ai_messages)
-        finish_generation_job(job, "success")
-        return {"ok": True, "user_message": user_message, "messages": stored_messages}
+            group = get_group_or_404(safe_group_id)
+            recent = get_messages(safe_group_id)
+            user_message = append_group_messages(safe_group_id, [user_message_for(group, user_text)])[0]
+            model_messages = build_mobile_model_messages(group, recent, user_text)
+            settings = get_settings()
+            try:
+                raw_reply = await call_chat_model(
+                    model_messages,
+                    max_tokens=settings["max_tokens"],
+                    temperature=read_mobile_llm_config()["temperature"],
+                )
+            except HTTPException as exc:
+                error_message = {
+                    "message_id": make_id("msg"),
+                    "speaker_id": "system",
+                    "speaker_name": "系统",
+                    "type": "error",
+                    "content": compact_text(exc.detail, 240) or "模型生成失败，请稍后重试。",
+                    "created_at": now_iso(),
+                    "source": "system",
+                }
+                stored_error = append_group_messages(safe_group_id, [error_message])
+                finish_generation_job(job, "error", compact_text(exc.detail, 240))
+                job_finished = True
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content={"ok": False, "user_message": user_message, "messages": stored_error, "error": error_message["content"]},
+                )
+            ai_messages = parse_model_mobile_messages(raw_reply, group)
+            if not ai_messages:
+                error_message = {
+                    "message_id": make_id("msg"),
+                    "speaker_id": "system",
+                    "speaker_name": "系统",
+                    "type": "error",
+                    "content": "模型返回内容无法解析，请查看后台 diagnostics。",
+                    "created_at": now_iso(),
+                    "source": "system",
+                }
+                stored_error = append_group_messages(safe_group_id, [error_message])
+                finish_generation_job(job, "error", "parser_no_valid_messages")
+                job_finished = True
+                return JSONResponse(status_code=502, content={"ok": False, "user_message": user_message, "messages": stored_error, "error": error_message["content"]})
+            stored_messages = append_group_messages(safe_group_id, ai_messages)
+            finish_generation_job(job, "success")
+            job_finished = True
+            return {"ok": True, "user_message": user_message, "messages": stored_messages}
+        except BaseException as exc:
+            if not job_finished:
+                finish_generation_job(job, "error", interrupted_generation_error(exc))
+                job_finished = True
+            raise
+        finally:
+            if not job_finished:
+                finish_generation_job(job, "error", interrupted_generation_error())
 
 
 @app.post("/api/continue", response_model=None)
 async def api_continue(payload: ContinuePayload) -> JSONResponse | dict[str, Any]:
     safe_group_id = validate_group_id(payload.group_id)
     job = begin_generation_job("group_chat", safe_group_id)
+    job_finished = False
     async with group_async_lock(safe_group_id):
-        group = get_group_or_404(safe_group_id)
-        recent = get_messages(safe_group_id)
-        model_messages = build_mobile_model_messages(group, recent, "", generation_mode="role_continue")
-        settings = get_settings()
         try:
-            raw_reply = await call_chat_model(
-                model_messages,
-                max_tokens=settings["max_tokens"],
-                temperature=read_mobile_llm_config()["temperature"],
-            )
-        except HTTPException as exc:
-            error_message = {
-                "message_id": make_id("msg"),
-                "speaker_id": "system",
-                "speaker_name": "系统",
-                "type": "error",
-                "content": compact_text(exc.detail, 240) or "角色续聊失败，请稍后重试。",
-                "created_at": now_iso(),
-                "source": "system",
-            }
-            stored_error = append_group_messages(safe_group_id, [error_message])
-            finish_generation_job(job, "error", compact_text(exc.detail, 240))
-            return JSONResponse(
-                status_code=exc.status_code,
-                content={"ok": False, "messages": stored_error, "error": error_message["content"]},
-            )
-        ai_messages = parse_model_mobile_messages(raw_reply, group)
-        if not ai_messages:
-            error_message = {
-                "message_id": make_id("msg"),
-                "speaker_id": "system",
-                "speaker_name": "系统",
-                "type": "error",
-                "content": "模型返回内容无法解析，请查看后台 diagnostics。",
-                "created_at": now_iso(),
-                "source": "system",
-            }
-            stored_error = append_group_messages(safe_group_id, [error_message])
-            finish_generation_job(job, "error", "parser_no_valid_messages")
-            return JSONResponse(status_code=502, content={"ok": False, "messages": stored_error, "error": error_message["content"]})
-        stored_messages = append_group_messages(safe_group_id, ai_messages)
-        finish_generation_job(job, "success")
-        return {"ok": True, "messages": stored_messages}
+            group = get_group_or_404(safe_group_id)
+            recent = get_messages(safe_group_id)
+            model_messages = build_mobile_model_messages(group, recent, "", generation_mode="role_continue")
+            settings = get_settings()
+            try:
+                raw_reply = await call_chat_model(
+                    model_messages,
+                    max_tokens=settings["max_tokens"],
+                    temperature=read_mobile_llm_config()["temperature"],
+                )
+            except HTTPException as exc:
+                error_message = {
+                    "message_id": make_id("msg"),
+                    "speaker_id": "system",
+                    "speaker_name": "系统",
+                    "type": "error",
+                    "content": compact_text(exc.detail, 240) or "角色续聊失败，请稍后重试。",
+                    "created_at": now_iso(),
+                    "source": "system",
+                }
+                stored_error = append_group_messages(safe_group_id, [error_message])
+                finish_generation_job(job, "error", compact_text(exc.detail, 240))
+                job_finished = True
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content={"ok": False, "messages": stored_error, "error": error_message["content"]},
+                )
+            ai_messages = parse_model_mobile_messages(raw_reply, group)
+            if not ai_messages:
+                error_message = {
+                    "message_id": make_id("msg"),
+                    "speaker_id": "system",
+                    "speaker_name": "系统",
+                    "type": "error",
+                    "content": "模型返回内容无法解析，请查看后台 diagnostics。",
+                    "created_at": now_iso(),
+                    "source": "system",
+                }
+                stored_error = append_group_messages(safe_group_id, [error_message])
+                finish_generation_job(job, "error", "parser_no_valid_messages")
+                job_finished = True
+                return JSONResponse(status_code=502, content={"ok": False, "messages": stored_error, "error": error_message["content"]})
+            stored_messages = append_group_messages(safe_group_id, ai_messages)
+            finish_generation_job(job, "success")
+            job_finished = True
+            return {"ok": True, "messages": stored_messages}
+        except BaseException as exc:
+            if not job_finished:
+                finish_generation_job(job, "error", interrupted_generation_error(exc))
+                job_finished = True
+            raise
+        finally:
+            if not job_finished:
+                finish_generation_job(job, "error", interrupted_generation_error())
 
 
 def model_status_deep() -> dict[str, Any]:
@@ -5829,6 +6097,38 @@ def prune_empty_phone_sessions() -> dict[str, Any]:
 
 
 
+def prune_ended_phone_sessions() -> dict[str, Any]:
+    sessions = get_phone_sessions()
+    kept = [item for item in sessions if item.get("status") != "ended"]
+    save_phone_sessions(kept)
+    return {"removed_count": len(sessions) - len(kept), "remaining_count": len(kept)}
+
+
+def delete_phone_session(session_id: str) -> dict[str, Any]:
+    safe_session_id = normalize_id(session_id, "")
+    if not safe_session_id:
+        raise HTTPException(status_code=400, detail="Phone session id is required.")
+    sessions = get_phone_sessions()
+    kept = [item for item in sessions if item.get("session_id") != safe_session_id]
+    if len(kept) == len(sessions):
+        raise HTTPException(status_code=404, detail="Phone session not found.")
+    save_phone_sessions(kept)
+    return {"deleted_session_id": safe_session_id, "remaining_count": len(kept)}
+
+
+def delete_channel_event(channel_id: str, event_id: str) -> dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    safe_event_id = normalize_id(event_id, "")
+    if not safe_event_id:
+        raise HTTPException(status_code=400, detail="Event id is required.")
+    events = get_channel_events(channel["channel_id"])
+    kept = [item for item in events if item.get("event_id") != safe_event_id]
+    if len(kept) == len(events):
+        raise HTTPException(status_code=404, detail="Event not found.")
+    save_channel_events(channel["channel_id"], kept)
+    return {"channel": channel, "deleted_event_id": safe_event_id, "remaining_count": len(kept)}
+
+
 @app.get("/api/admin/workbench")
 async def api_admin_workbench() -> dict[str, Any]:
     return {"ok": True, "workbench": workbench_overview()}
@@ -5913,7 +6213,7 @@ async def api_admin_generation_guard() -> dict[str, Any]:
 
 @app.post("/api/admin/generation-guard/reset")
 async def api_admin_reset_generation_guard() -> dict[str, Any]:
-    write_json(GENERATION_STATE_PATH, DEFAULT_GENERATION_STATE)
+    write_json(card_generation_state_path(), DEFAULT_GENERATION_STATE)
     return {"ok": True, "state": get_generation_state()}
 
 
@@ -5956,6 +6256,27 @@ async def api_admin_clear_invalid_notifications() -> dict[str, Any]:
 async def api_admin_prune_empty_phone_sessions() -> dict[str, Any]:
     return {"ok": True, **prune_empty_phone_sessions(), "data": admin_data_overview()}
 
+
+
+@app.post("/api/admin/data/channels/clear-test-events")
+async def api_admin_clear_all_channel_test_events() -> dict[str, Any]:
+    results = [clear_channel_test_events(channel["channel_id"]) for channel in get_channels(include_disabled=True)]
+    return {"ok": True, "results": results, "removed_count": sum(item.get("removed_count", 0) for item in results), "data": admin_data_overview()}
+
+
+@app.delete("/api/admin/data/channels/{channel_id}/events/{event_id}")
+async def api_admin_delete_channel_event(channel_id: str, event_id: str) -> dict[str, Any]:
+    return {"ok": True, **delete_channel_event(channel_id, event_id), "data": admin_data_overview()}
+
+
+@app.post("/api/admin/data/phone/prune-ended")
+async def api_admin_prune_ended_phone_sessions() -> dict[str, Any]:
+    return {"ok": True, **prune_ended_phone_sessions(), "data": admin_data_overview()}
+
+
+@app.delete("/api/admin/data/phone/sessions/{session_id}")
+async def api_admin_delete_phone_session(session_id: str) -> dict[str, Any]:
+    return {"ok": True, **delete_phone_session(session_id), "data": admin_data_overview()}
 
 @app.get("/api/admin/apps")
 async def api_admin_apps() -> dict[str, Any]:
@@ -6008,6 +6329,26 @@ async def api_create_channel_event(channel_id: str, payload: ChannelEventPayload
     notification_from_event(stored[0])
     return {"ok": True, "event": stored[0]}
 
+
+@app.patch("/api/channels/{channel_id}/events/{event_id}")
+async def api_patch_channel_event(channel_id: str, event_id: str, payload: ChannelEventPatchPayload) -> dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    if channel["type"] != "mail":
+        raise HTTPException(status_code=400, detail="Only mail events support read-state updates.")
+    event = find_channel_event_or_404(channel["channel_id"], event_id)
+    if payload.read is not None:
+        metadata = dict(event.get("metadata") or {})
+        read_state = bool(payload.read)
+        event["read"] = read_state
+        metadata["read"] = read_state
+        metadata["unread"] = not read_state
+        metadata["status"] = "已读" if read_state else "未读"
+        if read_state:
+            metadata["read_at"] = now_iso()
+        event["metadata"] = metadata
+        event["updated_at"] = now_iso()
+        event = update_channel_event(channel["channel_id"], event)
+    return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"])}
 
 @app.post("/api/channels/{channel_id}/interactions", response_model=None)
 async def api_create_channel_interaction(channel_id: str, payload: ChannelInteractionPayload) -> JSONResponse | dict[str, Any]:
@@ -6111,6 +6452,70 @@ async def api_reply_mail_event(channel_id: str, event_id: str, payload: MailRepl
     if payload.generate_reply is not False:
         try:
             generated = await generate_mail_reply(event, content)
+        except HTTPException as exc:
+            notification_from_event(event)
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=mobile_error_payload(exc, extra={"event": event, "events": get_channel_events(channel["channel_id"])}),
+            )
+        metadata = dict(event.get("metadata") or {})
+        metadata["replies"] = sanitize_mail_replies([*sanitize_mail_replies(metadata.get("replies")), *generated])
+        event["metadata"] = metadata
+        event["updated_at"] = now_iso()
+        event = update_channel_event(channel["channel_id"], event)
+    notification_from_event(event)
+    if generated:
+        add_notification("Mail", f"{generated[-1]['author_name']}: {generated[-1]['content'][:160]}", source="mail", channel_id=channel["channel_id"], event_id=event["event_id"])
+    return {"ok": True, "event": event, "events": get_channel_events(channel["channel_id"]), "replies": generated}
+
+
+@app.post("/api/channels/{channel_id}/outgoing-mails", response_model=None)
+async def api_create_outgoing_mail(channel_id: str, payload: MailOutgoingPayload) -> JSONResponse | dict[str, Any]:
+    channel = get_channel_or_404(channel_id)
+    if channel["type"] != "mail":
+        raise HTTPException(status_code=400, detail="This channel does not support outgoing mail.")
+    content = compact_text(payload.content, 1200)
+    if not content:
+        raise HTTPException(status_code=400, detail="邮件正文不能为空。")
+    recipient_id = normalize_id(payload.recipient_id, "")
+    recipient = next((role for role in available_role_members().get("roles", []) if normalize_id(role.get("role_id"), "") == recipient_id), None)
+    if not recipient:
+        raise HTTPException(status_code=400, detail="请选择当前角色卡里的收件人。")
+    recipient_name = compact_text(recipient.get("name") or recipient.get("display_name"), 80) or "对方"
+    title = compact_text(payload.title, 120) or f"写给{recipient_name}的邮件"
+    event = {
+        "title": title,
+        "content": content,
+        "event_type": "mail",
+        "author_id": "user",
+        "author_name": "我",
+        "tags": ["sent"],
+        "metadata": {
+            "direction": "sent",
+            "folder": "sent",
+            "recipient_id": recipient_id,
+            "recipient_name": recipient_name,
+            "read": True,
+            "unread": False,
+            "status": "已发送",
+            "replies": [],
+        },
+        "source": "user",
+    }
+    stored = append_channel_events(channel["channel_id"], [event])
+    if not stored:
+        raise HTTPException(status_code=400, detail="Event content is empty.")
+    event = stored[0]
+    generated: list[dict[str, Any]] = []
+    if payload.generate_reply is not False:
+        reply_seed = {
+            **event,
+            "author_id": recipient_id,
+            "author_name": recipient_name,
+            "content": f"我发给{recipient_name}的邮件：{content}",
+        }
+        try:
+            generated = await generate_mail_reply(reply_seed, content)
         except HTTPException as exc:
             notification_from_event(event)
             return JSONResponse(
@@ -6401,16 +6806,16 @@ def admin_diagnostics() -> dict[str, Any]:
     generation_state = get_generation_state()
     expected_files = {
         "settings": SETTINGS_PATH,
-        "groups": GROUPS_PATH,
-        "roles": ROLE_PROFILES_PATH,
+        "groups": card_groups_path(),
+        "roles": card_role_profiles_path(),
         "automation": AUTOMATION_STATE_PATH,
         "prompt_blocks": PROMPT_BLOCKS_PATH,
         "app_registry": APP_REGISTRY_PATH,
         "channels": CHANNELS_PATH,
-        "notifications": NOTIFICATIONS_PATH,
-        "phone_calls": PHONE_CALLS_PATH,
-        "generation_state": GENERATION_STATE_PATH,
-        "parser_diagnostics": PARSER_DIAGNOSTICS_PATH,
+        "notifications": card_notifications_path(),
+        "phone_calls": card_phone_calls_path(),
+        "generation_state": card_generation_state_path(),
+        "parser_diagnostics": card_parser_diagnostics_path(),
     }
     try:
         data_dir_label = str(DATA_DIR.relative_to(PROJECT_ROOT))
@@ -6419,7 +6824,9 @@ def admin_diagnostics() -> dict[str, Any]:
     return {
         "data_dir": data_dir_label,
         "files": {key: path.exists() for key, path in expected_files.items()},
-        "events_dir_exists": EVENTS_DIR.exists(),
+        "card_uid": current_mobile_card_uid(),
+        "card_data_dir": str(current_mobile_card_dir()),
+        "events_dir_exists": card_events_dir().exists(),
         "channel_event_counts": {channel["channel_id"]: len(get_channel_events(channel["channel_id"])) for channel in channels},
         "notification_count": len(notifications),
         "unread_notification_count": len([item for item in notifications if not item["read"]]),
@@ -6433,6 +6840,7 @@ def admin_diagnostics() -> dict[str, Any]:
             "writes_role_card": False,
             "writes_worldbook": False,
             "plugin_data_root": "data/mobile_chat",
+            "card_data_root": "data/mobile_chat/cards/{card_uid}",
         },
     }
 

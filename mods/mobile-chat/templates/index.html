@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>小手机后台管理</title>
-    <link rel="stylesheet" href="./static/mobile-chat-admin.css?v=mobile-chat-v4-2-2-alpha-1">
+    <link rel="stylesheet" href="./static/mobile-chat-admin.css?v=mobile-chat-v4-5-0-alpha-1">
   </head>
   <body>
     <main class="fmca-shell">
@@ -35,7 +35,7 @@
       <section class="fmca-main">
         <header class="fmca-topbar">
           <div>
-            <p class="fmca-kicker">v4.2.2 Console</p>
+            <p class="fmca-kicker">v4.5.0 Console</p>
             <h2 id="fmca-page-title">总览</h2>
             <p id="fmca-page-copy">插件运行状态、数据摘要和快捷操作。</p>
           </div>
@@ -290,11 +290,23 @@
         </section>
 
         <section class="fmca-tab" data-panel="ui">
-          <article class="fmca-panel">
+          <form class="fmca-panel fmca-form" id="fmca-ui-settings-form">
             <h3>UI 设置</h3>
             <p>这里将承载悬浮球、展开面板、主题和尺寸设置。</p>
+            <label class="fmca-row">
+              <span>主题风格</span>
+              <select id="fmca-ui-theme">
+                <option value="modern">现代沉浸</option>
+                <option value="xianxia">古风 / 修仙</option>
+                <option value="apocalypse">末世 / 生存</option>
+              </select>
+            </label>
             <dl class="fmca-facts" id="fmca-ui-facts"></dl>
-          </article>
+            <div class="fmca-actions">
+              <button class="fmca-button fmca-primary" type="submit">保存 UI 设置</button>
+              <button class="fmca-button" id="fmca-reset-ui-form" type="button">恢复当前值</button>
+            </div>
+          </form>
         </section>
 
         <section class="fmca-tab" data-panel="diagnostics">
@@ -339,6 +351,6 @@
         </section>
       </section>
     </main>
-    <script src="./static/mobile-chat-admin.js?v=mobile-chat-v4-2-2-alpha-1"></script>
+    <script src="./static/mobile-chat-admin.js?v=mobile-chat-v4-5-0-alpha-1"></script>
   </body>
 </html>
