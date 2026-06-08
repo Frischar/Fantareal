@@ -69,6 +69,354 @@
           min-width: 38px;
         }
       }
+      .fr-rich-blocks {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        width: 100%;
+      }
+      .fr-render-card {
+        width: min(100%, 720px);
+        box-sizing: border-box;
+        border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
+        border-radius: 1rem;
+        background:
+          linear-gradient(145deg, color-mix(in srgb, var(--panel-strong) 72%, transparent 28%), color-mix(in srgb, var(--panel) 54%, transparent 46%));
+        box-shadow: 0 16px 42px color-mix(in srgb, #000 22%, transparent 78%);
+        backdrop-filter: blur(16px);
+        overflow: hidden;
+      }
+      .fr-render-card + .fr-render-card {
+        margin-top: 0.1rem;
+      }
+      .fr-title-card {
+        padding: 1rem 1.1rem;
+        border-color: color-mix(in srgb, var(--accent) 32%, var(--border) 68%);
+      }
+      .fr-title-kicker,
+      .fr-card-subtitle {
+        color: var(--muted);
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+      .fr-title-kicker {
+        margin-bottom: 0.35rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .fr-card-title {
+        margin: 0;
+        color: var(--text);
+        font-size: 1.08rem;
+        line-height: 1.35;
+        font-weight: 800;
+      }
+      .fr-title-card .fr-card-title {
+        font-size: clamp(1.16rem, 2.6vw, 1.55rem);
+      }
+      .fr-card-subtitle {
+        margin-top: 0.45rem;
+      }
+      .fr-card-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.38rem;
+        margin-top: 0.75rem;
+      }
+      .fr-card-tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 1.45rem;
+        padding: 0.18rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border) 76%);
+        background: color-mix(in srgb, var(--accent) 10%, transparent 90%);
+        color: color-mix(in srgb, var(--text) 88%, var(--muted) 12%);
+        font-size: 0.75rem;
+        line-height: 1.2;
+      }
+      .fr-panel-card,
+      .fr-block-card,
+      .fr-choices-card {
+        padding: 0.95rem 1rem;
+      }
+      .fr-card-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.65rem;
+      }
+      .fr-card-head .fr-card-title {
+        font-size: 0.98rem;
+      }
+      .fr-card-head .fr-card-subtitle {
+        margin-top: 0;
+        flex: 0 0 auto;
+        font-size: 0.78rem;
+      }
+      .fr-card-body {
+        color: var(--text);
+        font-size: 0.95rem;
+        line-height: 1.72;
+        white-space: pre-wrap;
+      }
+      .fr-card-items,
+      .fr-choice-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        margin: 0.55rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .fr-card-item,
+      .fr-choice-item {
+        border-radius: 0.72rem;
+        color: var(--text);
+        line-height: 1.55;
+      }
+      .fr-card-item {
+        padding: 0.48rem 0.62rem;
+        border: 1px solid color-mix(in srgb, var(--border) 64%, transparent 36%);
+        background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+      }
+      .fr-choice-button {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: flex-start;
+        gap: 0.55rem;
+        width: 100%;
+        min-height: 2.55rem;
+        padding: 0.55rem 0.65rem;
+        border-radius: 0.72rem;
+        border: 1px solid color-mix(in srgb, var(--border) 64%, transparent 36%);
+        background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+        color: var(--text);
+        font: inherit;
+        line-height: 1.55;
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+      }
+      .fr-choice-button:hover,
+      .fr-choice-button:focus-visible {
+        border-color: color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
+        background: color-mix(in srgb, var(--accent) 10%, var(--input-bg) 90%);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent 88%);
+        outline: none;
+      }
+      .fr-choice-text {
+        min-width: 0;
+      }
+      .fr-choice-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.45rem;
+        height: 1.45rem;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--accent) 18%, transparent 82%);
+        color: color-mix(in srgb, var(--text) 90%, var(--accent) 10%);
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+      .fr-html-card {
+        width: min(100%, 760px);
+        padding: 1rem;
+      }
+      .fr-html-scope {
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        max-width: 100%;
+        color: var(--text);
+        font-size: 0.95rem;
+        line-height: 1.72;
+        overflow-wrap: anywhere;
+      }
+      .fr-html-scope :is(section, article, div, header, footer) {
+        box-sizing: border-box;
+        max-width: 100%;
+      }
+      .fr-html-scope :is(h2, h3, h4, p, blockquote, ul, ol) {
+        margin: 0;
+      }
+      .fr-html-scope :is(h2, h3, h4) {
+        color: var(--text);
+        line-height: 1.35;
+        font-weight: 800;
+      }
+      .fr-html-scope h2,
+      .fr-html-scope .fr-title-main {
+        font-size: clamp(1.2rem, 2.8vw, 1.7rem);
+      }
+      .fr-html-scope h3,
+      .fr-html-scope .fr-title-sub {
+        font-size: clamp(1.02rem, 2.2vw, 1.28rem);
+      }
+      .fr-html-scope h4 {
+        font-size: 0.98rem;
+      }
+      .fr-html-scope :is(ul, ol) {
+        padding-left: 1.25rem;
+      }
+      .fr-html-scope li + li {
+        margin-top: 0.25rem;
+      }
+      .fr-html-scope blockquote {
+        padding: 0.65rem 0.8rem;
+        border-left: 3px solid color-mix(in srgb, var(--accent) 44%, var(--border) 56%);
+        border-radius: 0.75rem;
+        background: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
+        color: color-mix(in srgb, var(--text) 88%, var(--muted) 12%);
+      }
+      .fr-html-scope hr {
+        width: 100%;
+        border: none;
+        border-top: 1px dashed color-mix(in srgb, var(--border) 72%, transparent 28%);
+        margin: 0.2rem 0;
+      }
+      .fr-html-scope .fr-scene,
+      .fr-html-scope .fr-profile-card,
+      .fr-html-scope .fr-note {
+        padding: 0.9rem;
+        border: 1px solid color-mix(in srgb, var(--border) 64%, transparent 36%);
+        border-radius: 0.95rem;
+        background: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
+      }
+      .fr-html-scope .fr-prose {
+        white-space: pre-wrap;
+      }
+      .fr-html-scope .fr-muted {
+        color: var(--muted);
+      }
+      .fr-html-scope .fr-pill,
+      .fr-html-scope .fr-badge,
+      .fr-html-scope .fr-profile-tab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        width: fit-content;
+        max-width: 100%;
+        border: 1px solid color-mix(in srgb, var(--border) 68%, transparent 32%);
+        background: color-mix(in srgb, var(--panel-strong) 68%, transparent 32%);
+        color: var(--text);
+      }
+      .fr-html-scope .fr-pill {
+        min-height: 2.35rem;
+        padding: 0.42rem 1.15rem;
+        border-radius: 999px;
+        letter-spacing: 0.04em;
+      }
+      .fr-html-scope .fr-badge,
+      .fr-html-scope .fr-profile-tab {
+        min-height: 1.8rem;
+        padding: 0.25rem 0.72rem;
+        border-radius: 0.55rem;
+      }
+      .fr-html-scope .fr-divider,
+      .fr-html-scope .fr-choice-banner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 4.5rem;
+        padding: 0.85rem;
+        border-radius: 0.75rem;
+        border: 1px solid color-mix(in srgb, var(--border) 58%, transparent 42%);
+        background: color-mix(in srgb, var(--panel) 48%, transparent 52%);
+        text-align: center;
+      }
+      .fr-html-scope .fr-grid,
+      .fr-html-scope .fr-grid-2,
+      .fr-html-scope .fr-grid-3 {
+        display: grid;
+        gap: 0.65rem;
+      }
+      .fr-html-scope .fr-grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .fr-html-scope .fr-grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .fr-html-scope .fr-table-wrap {
+        max-width: 100%;
+        overflow-x: auto;
+        border: 1px solid color-mix(in srgb, var(--border) 62%, transparent 38%);
+        border-radius: 0.75rem;
+      }
+      .fr-html-scope table,
+      .fr-html-scope .fr-data-table {
+        width: 100%;
+        min-width: 32rem;
+        border-collapse: collapse;
+        background: color-mix(in srgb, var(--panel-strong) 32%, transparent 68%);
+      }
+      .fr-html-scope div.fr-data-table {
+        min-width: 0;
+        padding: 0.65rem;
+        border: 1px solid color-mix(in srgb, var(--border) 62%, transparent 38%);
+        border-radius: 0.75rem;
+        overflow-x: auto;
+      }
+      .fr-html-scope div.fr-data-table > .fr-grid {
+        min-width: 0;
+      }
+      .fr-html-scope div.fr-data-table .fr-note {
+        padding: 0.55rem 0.65rem;
+        border: 1px solid var(--border);
+        border-radius: 0.55rem;
+        background: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
+      }
+      .fr-html-scope :is(th, td) {
+        padding: 0.55rem 0.65rem;
+        border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
+        text-align: left;
+        vertical-align: top;
+      }
+      .fr-html-scope th {
+        color: color-mix(in srgb, var(--text) 92%, var(--accent) 8%);
+        background: color-mix(in srgb, var(--accent) 10%, transparent 90%);
+        font-weight: 800;
+      }
+      .fr-html-scope .fr-style-strawberry :is(.fr-title-main, .fr-title-sub, h2, h3) {
+        color: #ffc1d6;
+      }
+      .fr-html-scope .fr-style-strawberry .fr-pill,
+      .fr-html-scope .fr-style-strawberry .fr-badge,
+      .fr-html-scope .fr-style-strawberry .fr-profile-tab {
+        border-color: color-mix(in srgb, #ff7aa8 42%, var(--border) 58%);
+        background: color-mix(in srgb, #ff7aa8 14%, var(--panel-strong) 86%);
+      }
+      .fr-html-scope .fr-style-noir {
+        background: color-mix(in srgb, #05060b 58%, var(--panel) 42%);
+      }
+      .fr-html-scope .fr-style-paradise .fr-pill {
+        background: #050507;
+        color: #fff4dc;
+        border-color: color-mix(in srgb, #fff4dc 16%, transparent 84%);
+      }
+      @media (max-width: 768px) {
+        .fr-render-card {
+          width: 100%;
+          border-radius: 0.9rem;
+        }
+        .fr-card-head {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+        .fr-html-card {
+          padding: 0.85rem;
+        }
+        .fr-html-scope .fr-grid-2,
+        .fr-html-scope .fr-grid-3 {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
 
     <style>
@@ -1723,6 +2071,17 @@
         inputEl.style.height = `${nextHeight}px`;
       }
 
+      function applyFantarealChoiceText(choiceText) {
+        const text = String(choiceText || "").trim();
+        if (!text || !inputEl) return;
+        const trimmedCurrent = inputEl.value.trim();
+        inputEl.value = trimmedCurrent ? `${inputEl.value.replace(/\s+$/g, "")}\n${text}` : text;
+        inputEl.focus();
+        inputEl.setSelectionRange?.(inputEl.value.length, inputEl.value.length);
+        inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+        syncComposerState();
+      }
+
       function isMessagesNearBottom(threshold = 96) {
         if (!messagesEl) return true;
         return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <= threshold;
@@ -2037,6 +2396,13 @@
             .replace(new RegExp(`^[ \\t]*\`\`\`[ \\t]*${escaped}[^\\n]*\\n([\\s\\S]*?)(?:\\n)?^[ \\t]*\`\`\``, "gim"), "<think>$1</think>");
         }
 
+        // Gemini / OpenAI-compatible thinking streams may surface as pipe markers.
+        // Convert only fully paired blocks; unclosed markers remain visible for diagnosis.
+        normalized = normalized.replace(
+          /<\s*\|\s*begin_of_(?:thinking|thought)\s*\|\s*>\s*([\s\S]*?)\s*<\s*\|\s*end_of_(?:thinking|thought)\s*\|\s*>/gi,
+          "<think>$1</think>"
+        );
+
         if (/<\s*think\b/i.test(normalized)) {
           return normalized;
         }
@@ -2310,6 +2676,323 @@
         return s;
       }
 
+      const FR_SHORTCODE_PATTERN = /\[(fr-title|fr-panel|fr-block|fr-choices|fantareal-html)\]([\s\S]*?)\[\/\1\]/gi;
+
+      function splitFantarealShortcodes(text) {
+        const source = String(text || "");
+        if (!source) return [];
+        const pieces = [];
+        const fencePattern = /^[ \t]*```[\s\S]*?^[ \t]*```[ \t]*$/gm;
+        let cursor = 0;
+        let fenceMatch;
+
+        function appendWithShortcodes(segment) {
+          FR_SHORTCODE_PATTERN.lastIndex = 0;
+          let localCursor = 0;
+          let match;
+          while ((match = FR_SHORTCODE_PATTERN.exec(segment)) !== null) {
+            if (match.index > localCursor) {
+              pieces.push({ type: "text", text: segment.slice(localCursor, match.index) });
+            }
+            pieces.push({ type: "shortcode", shortcodeType: match[1].toLowerCase(), content: match[2] || "" });
+            localCursor = FR_SHORTCODE_PATTERN.lastIndex;
+          }
+          if (localCursor < segment.length) {
+            pieces.push({ type: "text", text: segment.slice(localCursor) });
+          }
+        }
+
+        while ((fenceMatch = fencePattern.exec(source)) !== null) {
+          if (fenceMatch.index > cursor) appendWithShortcodes(source.slice(cursor, fenceMatch.index));
+          pieces.push({ type: "text", text: fenceMatch[0] });
+          cursor = fencePattern.lastIndex;
+        }
+        if (cursor < source.length) appendWithShortcodes(source.slice(cursor));
+        return pieces.length ? pieces : [{ type: "text", text: source }];
+      }
+
+      function splitFantarealTags(value) {
+        return String(value || "")
+          .split(/[|，、,]/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+
+      function parseFantarealShortcodeBlock(type, rawContent) {
+        const lines = String(rawContent || "").replace(/\r\n/g, "\n").split("\n");
+        const data = { type, fields: {}, items: [], choices: [] };
+        let currentField = "";
+
+        for (const originalLine of lines) {
+          const line = originalLine.replace(/[ \t]+$/g, "");
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          const fieldMatch = trimmed.match(/^([\w一-鿿-]+)\s*[:：]\s*(.*)$/);
+          const choiceMatch = trimmed.match(/^(?:(\d+)\s*[\.、]\s*|[-*]\s+)(.+)$/);
+          const itemMatch = trimmed.match(/^[-*]\s+(.+)$/);
+
+          if (type === "fr-choices" && choiceMatch) {
+            data.choices.push({ index: choiceMatch[1] || String(data.choices.length + 1), text: choiceMatch[2].trim() });
+            currentField = "";
+          } else if (fieldMatch) {
+            const key = fieldMatch[1].trim().toLowerCase();
+            const value = fieldMatch[2].trim();
+            data.fields[key] = value;
+            currentField = key;
+          } else if (currentField === "body") {
+            data.fields.body = [data.fields.body, line.trim()].filter(Boolean).join("\n");
+          } else if (currentField === "items" || (type === "fr-block" && itemMatch)) {
+            data.items.push((itemMatch ? itemMatch[1] : trimmed).trim());
+          } else if (type === "fr-choices") {
+            data.choices.push({ index: String(data.choices.length + 1), text: trimmed });
+          } else {
+            data.fields.body = [data.fields.body, trimmed].filter(Boolean).join("\n");
+          }
+        }
+
+        if (data.fields.tags) data.tags = splitFantarealTags(data.fields.tags);
+        return data;
+      }
+
+      function appendFantarealTags(card, tags) {
+        if (!Array.isArray(tags) || !tags.length) return;
+        const wrap = document.createElement("div");
+        wrap.className = "fr-card-tags";
+        for (const tagText of tags) {
+          const tag = document.createElement("span");
+          tag.className = "fr-card-tag";
+          tag.textContent = tagText;
+          wrap.appendChild(tag);
+        }
+        card.appendChild(wrap);
+      }
+
+      function createFantarealCardHead(data) {
+        const title = data.fields.title || "";
+        const subtitle = data.fields.subtitle || "";
+        if (!title && !subtitle) return null;
+        const head = document.createElement("div");
+        head.className = "fr-card-head";
+        if (title) {
+          const titleEl = document.createElement("h3");
+          titleEl.className = "fr-card-title";
+          titleEl.textContent = title;
+          head.appendChild(titleEl);
+        }
+        if (subtitle) {
+          const subtitleEl = document.createElement("div");
+          subtitleEl.className = "fr-card-subtitle";
+          subtitleEl.textContent = subtitle;
+          head.appendChild(subtitleEl);
+        }
+        return head;
+      }
+
+      function createFantarealTitleCard(data) {
+        const card = document.createElement("section");
+        card.className = "fr-render-card fr-title-card";
+        if (data.fields.kicker) {
+          const kicker = document.createElement("div");
+          kicker.className = "fr-title-kicker";
+          kicker.textContent = data.fields.kicker;
+          card.appendChild(kicker);
+        }
+        const title = document.createElement("h2");
+        title.className = "fr-card-title";
+        title.textContent = data.fields.title || "未命名标题";
+        card.appendChild(title);
+        if (data.fields.subtitle) {
+          const subtitle = document.createElement("div");
+          subtitle.className = "fr-card-subtitle";
+          subtitle.textContent = data.fields.subtitle;
+          card.appendChild(subtitle);
+        }
+        appendFantarealTags(card, data.tags);
+        return card;
+      }
+
+      function createFantarealPanelCard(data) {
+        const card = document.createElement("section");
+        card.className = "fr-render-card fr-panel-card";
+        const head = createFantarealCardHead(data);
+        if (head) card.appendChild(head);
+        if (data.fields.body) {
+          const body = document.createElement("div");
+          body.className = "fr-card-body";
+          body.textContent = data.fields.body;
+          card.appendChild(body);
+        }
+        appendFantarealTags(card, data.tags);
+        return card;
+      }
+
+      function createFantarealBlockCard(data) {
+        const card = document.createElement("section");
+        card.className = "fr-render-card fr-block-card";
+        const head = createFantarealCardHead(data);
+        if (head) card.appendChild(head);
+        if (data.items.length) {
+          const list = document.createElement("ul");
+          list.className = "fr-card-items";
+          for (const itemText of data.items) {
+            const item = document.createElement("li");
+            item.className = "fr-card-item";
+            item.textContent = itemText;
+            list.appendChild(item);
+          }
+          card.appendChild(list);
+        }
+        if (data.fields.body) {
+          const body = document.createElement("div");
+          body.className = "fr-card-body";
+          body.textContent = data.fields.body;
+          card.appendChild(body);
+        }
+        appendFantarealTags(card, data.tags);
+        return card;
+      }
+
+      function createFantarealChoicesCard(data) {
+        const card = document.createElement("section");
+        card.className = "fr-render-card fr-choices-card";
+        const head = createFantarealCardHead(data);
+        if (head) card.appendChild(head);
+        const list = document.createElement("ol");
+        list.className = "fr-choice-list";
+        for (const choice of data.choices) {
+          const choiceText = String(choice.text || "").trim();
+          if (!choiceText) continue;
+          const item = document.createElement("li");
+          item.className = "fr-choice-item";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "fr-choice-button";
+          button.dataset.choiceText = choiceText;
+          button.setAttribute("aria-label", `填入选项：${choiceText}`);
+          const index = document.createElement("span");
+          index.className = "fr-choice-index";
+          index.setAttribute("aria-hidden", "true");
+          index.textContent = choice.index || String(list.children.length + 1);
+          const textEl = document.createElement("span");
+          textEl.className = "fr-choice-text";
+          textEl.textContent = choiceText;
+          button.appendChild(index);
+          button.appendChild(textEl);
+          button.addEventListener("click", () => applyFantarealChoiceText(choiceText));
+          item.appendChild(button);
+          list.appendChild(item);
+        }
+        if (list.children.length) card.appendChild(list);
+        return card;
+      }
+
+      const FR_HTML_ALLOWED_TAGS = new Set([
+        "section", "article", "div", "header", "footer",
+        "h2", "h3", "h4", "p", "span", "strong", "em", "small",
+        "ul", "ol", "li", "blockquote", "hr", "br",
+        "table", "thead", "tbody", "tr", "th", "td"
+      ]);
+      const FR_HTML_ALLOWED_ATTRS = new Set(["class", "title", "aria-label"]);
+      const FR_HTML_DROP_CONTENT_TAGS = new Set(["script", "style", "iframe", "object", "embed", "svg", "canvas"]);
+
+      function filterFantarealHtmlClass(value) {
+        return String(value || "")
+          .split(/\s+/)
+          .map((className) => className.trim())
+          .filter((className) => /^(?:fr|fantareal)-[a-z0-9_-]+$/i.test(className))
+          .join(" ");
+      }
+
+      function rebuildFantarealHtmlNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          return document.createTextNode(node.textContent || "");
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return null;
+
+        const tagName = node.tagName.toLowerCase();
+        if (FR_HTML_DROP_CONTENT_TAGS.has(tagName)) return null;
+
+        if (!FR_HTML_ALLOWED_TAGS.has(tagName)) {
+          const fragment = document.createDocumentFragment();
+          for (const child of Array.from(node.childNodes)) {
+            const safeChild = rebuildFantarealHtmlNode(child);
+            if (safeChild) fragment.appendChild(safeChild);
+          }
+          return fragment;
+        }
+
+        const safeEl = document.createElement(tagName);
+        for (const attr of Array.from(node.attributes || [])) {
+          const attrName = attr.name.toLowerCase();
+          if (!FR_HTML_ALLOWED_ATTRS.has(attrName)) continue;
+          if (attrName === "class") {
+            const safeClass = filterFantarealHtmlClass(attr.value);
+            if (safeClass) safeEl.className = safeClass;
+          } else {
+            safeEl.setAttribute(attrName, attr.value);
+          }
+        }
+
+        for (const child of Array.from(node.childNodes)) {
+          const safeChild = rebuildFantarealHtmlNode(child);
+          if (safeChild) safeEl.appendChild(safeChild);
+        }
+
+        if (tagName === "table") {
+          safeEl.classList.add("fr-data-table");
+          const wrap = document.createElement("div");
+          wrap.className = "fr-table-wrap";
+          wrap.appendChild(safeEl);
+          return wrap;
+        }
+        return safeEl;
+      }
+
+      function createFantarealHtmlCard(rawContent) {
+        const card = document.createElement("section");
+        card.className = "fr-render-card fr-html-card";
+        const scope = document.createElement("div");
+        scope.className = "fr-html-scope";
+        const parsed = new DOMParser().parseFromString(String(rawContent || ""), "text/html");
+        for (const child of Array.from(parsed.body.childNodes)) {
+          const safeChild = rebuildFantarealHtmlNode(child);
+          if (safeChild) scope.appendChild(safeChild);
+        }
+        if (!scope.childNodes.length) {
+          const fallback = document.createElement("p");
+          fallback.className = "fr-muted";
+          fallback.textContent = "HTML 内容已被安全过滤。";
+          scope.appendChild(fallback);
+        }
+        card.appendChild(scope);
+        return card;
+      }
+
+      function createFantarealShortcodeCard(piece) {
+        if (piece.shortcodeType === "fantareal-html") return createFantarealHtmlCard(piece.content);
+        const data = parseFantarealShortcodeBlock(piece.shortcodeType, piece.content);
+        if (piece.shortcodeType === "fr-title") return createFantarealTitleCard(data);
+        if (piece.shortcodeType === "fr-panel") return createFantarealPanelCard(data);
+        if (piece.shortcodeType === "fr-block") return createFantarealBlockCard(data);
+        if (piece.shortcodeType === "fr-choices") return createFantarealChoicesCard(data);
+        return null;
+      }
+
+      function appendTtsVoicePieces(target, text) {
+        const parsed = parseTtsVoiceRichText(text);
+        for (const piece of parsed.pieces) {
+          if (piece.type === "voice") {
+            target.appendChild(createTtsVoiceCard(piece));
+          } else if (piece.text) {
+            const span = document.createElement("span");
+            span.innerHTML = formatInlineMarkup(piece.text);
+            target.appendChild(span);
+          }
+        }
+        return parsed;
+      }
+
       function renderTtsVoiceBody(body, sourceText) {
         const source = String(sourceText || "");
         if (body._ttsVoiceSource === source) return;
@@ -2332,19 +3015,29 @@
           bubble.classList.toggle("has-ttsvoice", parsed.voices.length > 0);
         }
 
-        if (!parsed.pieces.length) {
+        const shortcodePieces = splitFantarealShortcodes(source);
+        if (!shortcodePieces.length) {
           body.textContent = "";
           return;
         }
 
-        for (const piece of parsed.pieces) {
-          if (piece.type === "voice") {
-            body.appendChild(createTtsVoiceCard(piece));
+        const hasShortcode = shortcodePieces.some((piece) => piece.type === "shortcode");
+        const target = hasShortcode ? document.createElement("div") : body;
+        if (hasShortcode) {
+          target.className = "fr-rich-blocks";
+        }
+
+        for (const piece of shortcodePieces) {
+          if (piece.type === "shortcode") {
+            const card = createFantarealShortcodeCard(piece);
+            if (card) target.appendChild(card);
           } else if (piece.text) {
-            const span = document.createElement("span");
-            span.innerHTML = formatInlineMarkup(piece.text);
-            body.appendChild(span);
+            appendTtsVoicePieces(target, piece.text);
           }
+        }
+
+        if (hasShortcode) {
+          body.appendChild(target);
         }
       }
 
