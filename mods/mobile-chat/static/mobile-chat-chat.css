@@ -2411,6 +2411,10 @@
   padding: 0 7px;
 }
 
+.fmcp-theme-select {
+  width: 94px;
+}
+
 .fmcp-number-input {
   width: 74px;
   height: 33px;
@@ -5276,4 +5280,290 @@
 .fmcp-mail-retry-status strong {
   display: block;
   color: #7f1d1d;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] {
+  --fmcp-panel: rgba(232, 206, 157, 0.97);
+  --fmcp-panel-strong: rgba(210, 164, 99, 0.98);
+  --fmcp-card: rgba(255, 236, 198, 0.34);
+  --fmcp-card-strong: rgba(255, 242, 210, 0.5);
+  --fmcp-border: rgba(126, 86, 43, 0.3);
+  --fmcp-border-soft: rgba(126, 86, 43, 0.17);
+  --fmcp-muted: rgba(73, 51, 30, 0.66);
+  --fmcp-text: #3c2a18;
+  --fmcp-blue: #b97639;
+  --fmcp-blue-strong: #8f5529;
+  --fmcp-blue-soft: rgba(149, 91, 44, 0.2);
+  --fmcp-green: #687f58;
+  --fmcp-danger: #9b3f32;
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] {
+  --fmcp-panel: rgba(19, 23, 20, 0.96);
+  --fmcp-panel-strong: rgba(13, 16, 14, 0.98);
+  --fmcp-card: rgba(222, 232, 216, 0.06);
+  --fmcp-card-strong: rgba(222, 232, 216, 0.1);
+  --fmcp-border: rgba(157, 176, 141, 0.25);
+  --fmcp-border-soft: rgba(157, 176, 141, 0.14);
+  --fmcp-muted: rgba(210, 222, 202, 0.62);
+  --fmcp-text: #eef4e8;
+  --fmcp-blue: #6f9361;
+  --fmcp-blue-strong: #4f7548;
+  --fmcp-blue-soft: rgba(111, 147, 97, 0.24);
+  --fmcp-green: #b5a15d;
+  --fmcp-danger: #f28b72;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-panel {
+  border-color: rgba(126, 86, 43, 0.34);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(122, 80, 35, 0.08), transparent 20%),
+    radial-gradient(circle at 82% 26%, rgba(94, 132, 83, 0.1), transparent 18%),
+    repeating-linear-gradient(12deg, rgba(80, 48, 18, 0.035) 0 1px, transparent 1px 11px),
+    linear-gradient(145deg, #ead6aa, #d1a970 58%, #aa793f),
+    var(--fmcp-panel);
+  box-shadow: 0 24px 62px rgba(61, 38, 16, 0.36);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-panel {
+  border-color: rgba(162, 176, 148, 0.24);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.024) 0 1px, transparent 1px 13px),
+    linear-gradient(180deg, rgba(120, 139, 105, 0.13), transparent 36%),
+    linear-gradient(145deg, rgba(25, 29, 25, 0.92), rgba(10, 12, 11, 0.98)),
+    var(--fmcp-panel);
+  box-shadow: 0 24px 62px rgba(0, 0, 0, 0.52);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-header {
+  border-bottom-color: rgba(126, 86, 43, 0.24);
+  background: rgba(91, 57, 25, 0.12);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-header {
+  background: linear-gradient(180deg, rgba(215, 102, 82, 0.12), rgba(255, 255, 255, 0.018));
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-title,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-home-intro strong,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-title,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-home-intro strong {
+  color: var(--fmcp-text);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-subtitle,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-card small,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-home-intro span,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-help,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-settings-copy small,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-group-meta,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-message-meta {
+  color: var(--fmcp-muted);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-button,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-tab,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-select,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-number-input,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-composer-input,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-settings-card,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-group-card,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-import-card {
+  border-color: var(--fmcp-border);
+  background: rgba(255, 242, 205, 0.32);
+  color: var(--fmcp-text);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-button:hover,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-button:focus-visible,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-tab:hover,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-tab:focus-visible {
+  border-color: rgba(142, 91, 38, 0.56);
+  background: rgba(255, 242, 210, 0.52);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-composer,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-sticker-panel {
+  border-top-color: rgba(126, 86, 43, 0.22);
+  background: rgba(166, 112, 55, 0.18);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-composer input,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-composer textarea {
+  background: rgba(255, 242, 210, 0.5);
+  color: var(--fmcp-text);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-composer input::placeholder,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-composer textarea::placeholder {
+  color: rgba(73, 51, 30, 0.48);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-message-bubble {
+  border-color: rgba(126, 86, 43, 0.24);
+  background: rgba(255, 242, 210, 0.48);
+  color: var(--fmcp-text);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-message.is-user .fmcp-message-bubble {
+  border-color: rgba(143, 85, 41, 0.42);
+  background: linear-gradient(135deg, #b97639, #d19249);
+  color: #fff8ec;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-device-mark,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-icon-btn {
+  border-color: rgba(126, 86, 43, 0.26);
+  background: rgba(255, 242, 205, 0.36);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-device-mark,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-icon-btn {
+  border-color: rgba(222, 232, 216, 0.15);
+  background: rgba(236, 239, 230, 0.052);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-home-intro {
+  border-color: rgba(126, 86, 43, 0.28);
+  background:
+    radial-gradient(circle at 84% 18%, rgba(94, 132, 83, 0.12), transparent 42%),
+    rgba(255, 236, 195, 0.42);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-home-intro {
+  border-color: rgba(215, 102, 82, 0.28);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 12px),
+    radial-gradient(circle at 86% 18%, rgba(215, 102, 82, 0.14), transparent 42%),
+    rgba(236, 239, 230, 0.05);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-card,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-card {
+  min-height: 122px;
+  border-radius: 15px;
+  background: var(--fmcp-card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-card:hover,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-card:focus-visible {
+  border-color: rgba(142, 91, 38, 0.52);
+  background: rgba(255, 242, 210, 0.56);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-card:hover,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-card:focus-visible {
+  border-color: rgba(215, 102, 82, 0.54);
+  background: rgba(215, 102, 82, 0.12);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-card strong,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-card strong {
+  font-size: 13px;
+  font-weight: 820;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon .fmcp-glyph,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon .fmcp-glyph {
+  width: 23px;
+  height: 23px;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-message,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-spark,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-toolbox {
+  background: linear-gradient(145deg, #c99a56, #876136);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-settings,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-stickers {
+  background: linear-gradient(145deg, #8f9b76, #5e6f52);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-forum,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-diary {
+  background: linear-gradient(145deg, #8d7ad8, #6951b7);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-bell,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-mail {
+  background: linear-gradient(145deg, #cf9c4e, #a66d38);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-phone,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-calendar,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-icon.is-live {
+  background: linear-gradient(145deg, #65b8a3, #397f78);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-message,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-spark,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-toolbox {
+  background: linear-gradient(145deg, #d76652, #8f3d33);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-settings,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-stickers {
+  background: linear-gradient(145deg, #82916d, #4b6248);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-forum,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-diary {
+  background: linear-gradient(145deg, #7e8790, #4c555e);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-bell,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-mail {
+  background: linear-gradient(145deg, #d76652, #a34c3e);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-phone,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-calendar,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-icon.is-live {
+  background: linear-gradient(145deg, #51a99c, #336f68);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-fab,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-tab.is-active,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-button-primary,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-feed-compose-pivot {
+  background: linear-gradient(135deg, #c49a5c, #8f6937) !important;
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-fab,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-tab.is-active,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-button-primary,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-feed-compose-pivot {
+  background: linear-gradient(135deg, #7d9555, #3f6d58) !important;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-channel-feed,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-channel-mail,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-feed-app,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-feed-detail-page {
+  background: #f7f0df;
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-channel-feed,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-channel-mail,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-feed-app,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-feed-detail-page {
+  background: #e8ece0;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-mail-topbar {
+  background: linear-gradient(135deg, #6f4c2e, #a97942);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-mail-topbar {
+  background: linear-gradient(135deg, #2f4638, #6f7545);
 }
