@@ -226,9 +226,9 @@
 
 
   const ROLE_SOURCE_MODES = {
-    auto: { label: "自动识别", desc: "没有多角色时读取主卡；有多角色时默认读取多角色。" },
+    auto: { label: "自动识别", desc: "自动识别主卡和有内容的多角色；空占位子角色会自动隐藏。" },
     main_card: { label: "主卡就是角色", desc: "适合普通单角色卡，心笺会把主卡作为唯一角色记录。" },
-    personas_only: { label: "主卡是旁白，只读取多角色", desc: "适合双女主、多角色卡，主卡只作为旁白或总设定。" },
+    personas_only: { label: "主卡旁白，多角色展开", desc: "适合旁白卡、多角色卡；只显示有内容的多角色，不显示主卡。" },
   };
 
   const STORY_TIME_FIELDS = [
@@ -1686,7 +1686,9 @@
       const sourceType = String(role.source_type || role.sourceType || (source === "persona" ? "multi_role_slot" : source || "manual")).trim();
       const mode = normalizeRoleStateMode(role.mode || role.stateJournalMode, { ...role, variables, stages, snapshotFields });
       const hasStateJournalConfig = !!(role.has_state_journal_config || role.hasStateJournalConfig || variables.length || stages.length || snapshotFields.length || ["snapshot_only", "full"].includes(mode));
-      const isEmptySlot = !!(role.is_empty_slot || role.isEmptySlot || (sourceType === "multi_role_slot" && !hasStateJournalConfig && !variables.length && !stages.length && !snapshotFields.length));
+      const displayPolicy = String(role.display_policy || role.displayPolicy || "").trim();
+      const explicitShow = displayPolicy === "show";
+      const isEmptySlot = !!(role.is_empty_slot || role.isEmptySlot || (!explicitShow && sourceType === "multi_role_slot" && !hasStateJournalConfig && !variables.length && !stages.length && !snapshotFields.length));
       return {
         role_id: safeTemplateId(role.role_id || role.id || `role_${index + 1}`),
         role_name: String(role.role_name || role.name || `角色${index + 1}`).trim(),
@@ -1699,7 +1701,7 @@
         source_type: sourceType,
         has_state_journal_config: hasStateJournalConfig,
         is_empty_slot: isEmptySlot,
-        display_policy: String(role.display_policy || role.displayPolicy || (isEmptySlot ? "hide_empty" : "show")).trim(),
+        display_policy: displayPolicy || (isEmptySlot ? "hide_empty" : "show"),
         initial_stage: safeTemplateId(role.initial_stage || "stage_a"),
         variables,
         stages,
@@ -1713,10 +1715,6 @@
     if (!role) return false;
     if (role.display_policy === "hide_empty" || role.is_empty_slot) return false;
     return true;
-  }
-
-  function roleStateUnconfiguredCount(roles) {
-    return (roles || []).filter((role) => shouldShowRoleStateRole(role) && role.source_type === "multi_role_slot" && !role.has_state_journal_config && !(role.variables || []).length && !(role.stages || []).length && !(role.snapshotFields || []).length).length;
   }
 
   function currentRoleState() {
@@ -1959,12 +1957,10 @@
     if (!list || !detail) return;
     const allRoles = state.roleStateConfig.roles || [];
     const roles = allRoles.filter(shouldShowRoleStateRole);
-    const unconfiguredCount = roleStateUnconfiguredCount(allRoles);
     if (!state.currentRoleStateId && roles[0]) state.currentRoleStateId = roles[0].role_id;
     if (state.currentRoleStateId && !roles.some((role) => role.role_id === state.currentRoleStateId) && roles[0]) state.currentRoleStateId = roles[0].role_id;
     const sourceInfo = roleSourceSummary(state.roleStateConfig);
-    const hiddenHintHtml = unconfiguredCount > 0 ? `<div class="role-state-source-hint muted"><span class="micro-badge">???</span><strong>${unconfiguredCount} ????????</strong><small>??????????????????????????????????</small></div>` : "";
-    const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>${hiddenHintHtml}`;
+    const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>`;
     renderStoryTimePanel();
     list.innerHTML = sourceHintHtml + (roles.length ? roles.map((role) => {
       const stageName = roleCurrentStageName(role);

@@ -1971,7 +1971,7 @@ def placeholder_role_name(value: Any) -> bool:
     return bool(compact and (compact.isdecimal() or re.fullmatch(r"(?:role|角色|persona|personas|char|character)\d+", compact)))
 
 
-def sanitize_member(raw: Any, index: int = 0) -> dict[str, str] | None:
+def sanitize_member(raw: Any, index: int = 0) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
     member_type = "user" if str(raw.get("type", "")).strip().lower() == "user" else "character"
@@ -1988,6 +1988,7 @@ def sanitize_member(raw: Any, index: int = 0) -> dict[str, str] | None:
         "type": member_type,
         "summary": compact_text(raw.get("summary"), 360),
         "avatar": safe_avatar(raw.get("avatar")),
+        "aliases": sanitize_aliases(raw.get("aliases")),
     }
 
 
@@ -2006,11 +2007,15 @@ def current_user_member() -> dict[str, str]:
 
 
 def sanitize_aliases(value: Any) -> list[str]:
-    if not isinstance(value, list):
+    if isinstance(value, str):
+        source = re.split(r"[\n,，、;；|]+", value)
+    elif isinstance(value, list):
+        source = value
+    else:
         return []
     aliases: list[str] = []
     seen: set[str] = set()
-    for item in value:
+    for item in source:
         alias = compact_text(item, 40)
         key = role_name_key(alias)
         if not alias or key in seen:
@@ -2935,7 +2940,7 @@ def extract_current_card_roles() -> dict[str, Any]:
         payload = {}
     raw = payload.get("raw") if isinstance(payload.get("raw"), dict) else {}
     source_name = compact_text(payload.get("source_name"), 240)
-    roles: list[dict[str, str]] = []
+    roles: list[dict[str, Any]] = []
     role_indexes: dict[str, int] = {}
 
     def upsert(candidate: dict[str, Any], index: int) -> None:
@@ -2963,6 +2968,7 @@ def extract_current_card_roles() -> dict[str, Any]:
                 "name": main_name,
                 "summary": summarize_persona(raw),
                 "avatar": raw.get("avatar") or raw.get("avatar_url") or "",
+                "aliases": raw.get("aliases") or [],
                 "type": "character",
             },
             0,
@@ -2989,6 +2995,7 @@ def extract_current_card_roles() -> dict[str, Any]:
                 "name": name,
                 "summary": persona_summary,
                 "avatar": persona.get("avatar") or persona.get("avatar_url") or "",
+                "aliases": [persona_key, *sanitize_aliases(persona.get("aliases"))],
                 "type": "character",
             },
             index,

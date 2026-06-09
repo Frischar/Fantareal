@@ -2101,7 +2101,7 @@ def role_source_mode_label(mode: str) -> str:
     return {
         "auto": "自动识别",
         "main_card": "主卡就是角色",
-        "personas_only": "主卡是旁白，只读取多角色",
+        "personas_only": "主卡旁白，多角色展开",
     }.get(normalize_role_source_mode(mode), "自动识别")
 
 
@@ -2398,10 +2398,11 @@ def normalize_role_state_role(raw: Any, index: int = 1) -> dict[str, Any] | None
         or snapshot_fields
         or mode in {"snapshot_only", "full"}
     )
-    is_empty_slot = bool(raw.get("is_empty_slot") or raw.get("isEmptySlot"))
-    if not is_empty_slot and source_type == "multi_role_slot" and not has_state_journal_config and not variables and not stages and not snapshot_fields:
-        is_empty_slot = True
     display_policy = str(raw.get("display_policy") or raw.get("displayPolicy") or "").strip()
+    is_empty_slot = bool(raw.get("is_empty_slot") or raw.get("isEmptySlot"))
+    explicit_show = display_policy == "show"
+    if not is_empty_slot and not explicit_show and source_type == "multi_role_slot" and not has_state_journal_config and not variables and not stages and not snapshot_fields:
+        is_empty_slot = True
     if not display_policy:
         display_policy = "hide_empty" if is_empty_slot else "show"
     return {
@@ -2448,6 +2449,7 @@ def role_state_role_score(role: dict[str, Any]) -> int:
 
 PLACEHOLDER_ROLE_NAME_RE = re.compile(r"^role\s*[a-z0-9]+$", re.I)
 PLACEHOLDER_ROLE_ID_RE = re.compile(r"^role[_\-\s]*[a-z0-9]+$", re.I)
+PLACEHOLDER_CN_ROLE_RE = re.compile(r"^(?:子?角色|多角色|人物|persona|char|character)\s*[0-9一二三四五六七八九十]+$", re.I)
 PLACEHOLDER_PERSONA_HINTS = (
     "main emotional anchor",
     "secondary analytical voice",
@@ -2463,7 +2465,7 @@ PLACEHOLDER_PERSONA_HINTS = (
 
 def is_placeholder_role_label(value: Any) -> bool:
     text = str(value or "").strip()
-    return bool(text and (text.isdigit() or PLACEHOLDER_ROLE_NAME_RE.match(text) or PLACEHOLDER_ROLE_ID_RE.match(text)))
+    return bool(text and (text.isdigit() or PLACEHOLDER_ROLE_NAME_RE.match(text) or PLACEHOLDER_ROLE_ID_RE.match(text) or PLACEHOLDER_CN_ROLE_RE.match(text)))
 
 
 def is_placeholder_role_state_role(role: dict[str, Any]) -> bool:
@@ -2651,11 +2653,27 @@ def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
         if is_placeholder_persona(str(persona_key), persona) or is_empty_persona_slot(str(persona_key), persona):
             continue
         name = str(persona.get("name") or f"角色{index}").strip()
-        role_id = normalize_role_state_key(persona.get("role_id") or persona.get("id") or f"current_card_{persona_key}_{name}", f"current_card_role_{index}")
+        raw_role_id = str(persona.get("role_id") or persona.get("id") or "").strip()
+        if not raw_role_id or raw_role_id.startswith("item_"):
+            raw_role_id = f"current_card_{persona_key}_{name}"
+        role_id = normalize_role_state_key(raw_role_id, f"current_card_role_{index}")
+        if any(role.get("role_id") == role_id for role in roles):
+            role_id = normalize_role_state_key(f"current_card_{persona_key}_{name}", f"current_card_role_{index}")
         aliases: list[str] = []
         key_text = str(persona_key or "").strip()
         if key_text and key_text != role_id:
             aliases.append(key_text)
+        raw_aliases = persona.get("aliases", [])
+        if isinstance(raw_aliases, str):
+            alias_items = re.split(r"[\n,，、;；|]+", raw_aliases)
+        elif isinstance(raw_aliases, list):
+            alias_items = raw_aliases
+        else:
+            alias_items = []
+        for alias in alias_items:
+            alias_text = str(alias or "").strip()
+            if alias_text and alias_text != name and alias_text not in aliases:
+                aliases.append(alias_text)
         roles.append({"role_id": role_id, "role_name": name, "aliases": aliases, "enabled": True, "mode": "default", "stateJournalMode": "default", "use_default_variables": True, "variables": [], "stages": [], "snapshotFields": [], "initial_stage": "stage_a", "source": "persona", "source_type": "multi_role_slot", "has_state_journal_config": False, "is_empty_slot": False, "display_policy": "show"})
     return roles
 
@@ -2667,12 +2685,11 @@ def current_card_role_identity_roles(raw_card: dict[str, Any], source_mode: str 
     persona_roles = role_state_persona_roles(raw_card)
     if safe_mode == "main_card":
         return [main_role] if main_role else []
-    if safe_mode == "personas_only":
-        return persona_roles
     roles: list[dict[str, Any]] = []
-    if main_role:
+    if safe_mode == "auto" and main_role:
         roles.append(main_role)
-    roles.extend(persona_roles)
+    if safe_mode in {"auto", "personas_only"}:
+        roles.extend(persona_roles)
     return roles
 
 
@@ -2736,15 +2753,15 @@ def role_source_summary(mode: str, detected: str, roles: list[dict[str, Any]], h
     safe_mode = normalize_role_source_mode(mode)
     safe_detected = normalize_role_source_mode(detected)
     if safe_detected == "main_card":
-        message = f"未检测到多角色，已将主卡「{main_role_name or '主卡角色'}」作为唯一心笺角色。"
+        message = f"已将主卡「{main_role_name or '主卡角色'}」作为心笺角色。"
     elif safe_detected == "personas_only":
-        message = f"已识别 {len(roles)} 个多角色，主卡未作为心笺角色参与记录。"
+        message = f"已识别 {len(roles)} 个多角色，主卡不作为心笺角色参与记录。"
     else:
-        message = "尚未识别到可用心笺角色。"
+        message = f"已自动识别 {len(roles)} 个角色，主卡与有内容的多角色都会作为心笺角色参与记录。" if roles else "尚未识别到可用心笺角色。"
     if safe_mode == "main_card":
         message = f"当前设置为“主卡就是角色”，心笺会把主卡「{main_role_name or '主卡角色'}」作为角色。"
     elif safe_mode == "personas_only" and not has_personas:
-        message = "当前设置为“只读取多角色”，但这张卡没有多角色。可在角色卡页面改为“主卡就是角色”。"
+        message = "当前设置为“主卡旁白，多角色展开”，但这张卡没有可用多角色。"
     return {
         "mode": safe_mode,
         "mode_label": role_source_mode_label(safe_mode),
@@ -2796,13 +2813,13 @@ def role_state_config_from_current_card() -> dict[str, Any]:
         roles = [main_role] if main_role else []
         detected_mode = "main_card"
     elif source_mode == "personas_only":
-        roles = persona_roles
+        roles.extend(persona_roles)
         detected_mode = "personas_only"
     else:
         if main_role:
             roles.append(main_role)
         roles.extend(persona_roles)
-        detected_mode = "auto" if persona_roles and main_role else "personas_only" if persona_roles else "main_card"
+        detected_mode = "auto" if persona_roles else "main_card"
     config = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": source_mode, "roles": roles})
     config["card_uid"] = current_card_uid()
     config["card"] = current_card_summary()

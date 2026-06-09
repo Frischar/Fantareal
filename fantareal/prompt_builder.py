@@ -997,11 +997,13 @@ def build_prompt_package(
     build_preset_observation_segments = _optional_dep("build_preset_observation_segments")
     build_preset_output_guard = _optional_dep("build_preset_output_guard")
     get_director_notes = _optional_dep("get_director_notes")
+    get_current_card = _optional_dep("get_current_card")
 
     persona = get_persona()
     history = get_conversation()
     memories = get_memories()
     user_profile = get_user_profile()
+    role_card = get_current_card() if get_current_card else {}
     director_notes = get_director_notes() if get_director_notes else []
     director_note_buckets = _bucket_director_notes(director_notes)
     llm_config = get_runtime_chat_config(runtime_overrides)
@@ -1434,7 +1436,7 @@ def build_prompt_package(
         metadata={"layer_id": "user_input", "char_count": len(clean_user_message)},
     )
 
-    macro_context = build_macro_context(persona=persona, user_profile=user_profile)
+    macro_context = build_macro_context(persona=persona, user_profile=user_profile, role_card=role_card)
     prompt_segments, macro_variables = render_prompt_segments_with_macros(prompt_segments, macro_context)
     content_by_segment_id = _segment_map(prompt_segments)
 
