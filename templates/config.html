@@ -135,16 +135,20 @@
             <input id="history-limit" type="number" min="1" max="100" step="1" value="{{ settings.history_limit }}" />
           </div>
           <div>
-            <label class="fr-setting-switch-row offset-top">
-              <span>没有模型时允许演示模式</span>
-              <input id="demo-mode" type="checkbox" {% if settings.demo_mode %}checked{% endif %} />
-            </label>
+            <label for="prompt-budget-token-limit">最大上下文预算</label>
+            <input id="prompt-budget-token-limit" type="number" min="1000" max="1000000" step="1000" value="{{ settings.prompt_budget_token_limit }}" />
+            <p class="muted helper-text">单位 tokens，用于 Prompt Debug 估算与超限提醒，不会自动裁剪。</p>
           </div>
         </div>
 
-        <div class="button-row">
-          <button id="save-settings">立即保存聊天模型</button>
-          <button id="test-connection" class="secondary">测试连接</button>
+        <label class="fr-setting-switch-row config-demo-mode-row">
+          <span>没有模型时允许演示模式</span>
+          <input id="demo-mode" type="checkbox" {% if settings.demo_mode %}checked{% endif %} />
+        </label>
+
+        <div class="button-row config-model-actions">
+          <button id="save-settings" class="compact">保存聊天模型</button>
+          <button id="test-connection" class="secondary compact">测试连接</button>
         </div>
       </section>
 
@@ -698,6 +702,30 @@
         setStatus(data.items?.length ? `已拉取 ${data.items.length} 个模型，点右侧箭头可查看完整列表。` : "模型列表为空，可继续手动输入。");
       }
 
+      const PROMPT_BUDGET_MIN = 1000;
+      const PROMPT_BUDGET_MAX = 1000000;
+      const PROMPT_BUDGET_DEFAULT = 200000;
+
+      function normalizePromptBudgetInput(input, notify = false) {
+        const raw = Number(input?.value || PROMPT_BUDGET_DEFAULT);
+        const normalized = Number.isFinite(raw)
+          ? Math.max(PROMPT_BUDGET_MIN, Math.min(PROMPT_BUDGET_MAX, Math.round(raw)))
+          : PROMPT_BUDGET_DEFAULT;
+        if (input && String(input.value) !== String(normalized)) {
+          input.value = String(normalized);
+          if (notify) {
+            const message = normalized === PROMPT_BUDGET_MAX
+              ? "\u6700\u5927\u4e0a\u4e0b\u6587\u9884\u7b97\u5df2\u81ea\u52a8\u8c03\u6574\u5230\u4e0a\u9650 1000000 tokens"
+              : normalized === PROMPT_BUDGET_MIN
+                ? "\u6700\u5927\u4e0a\u4e0b\u6587\u9884\u7b97\u5df2\u81ea\u52a8\u8c03\u6574\u5230\u4e0b\u9650 1000 tokens"
+                : "\u6700\u5927\u4e0a\u4e0b\u6587\u9884\u7b97\u5df2\u81ea\u52a8\u8c03\u6574\u4e3a 200000 tokens";
+            setStatus(message, "busy");
+            showToast(message, "info");
+          }
+        }
+        return normalized;
+      }
+
       function settingsPayload() {
         return {
           llm_base_url: document.getElementById("llm-base-url").value.trim(),
@@ -706,6 +734,7 @@
           theme: themeSelectEl.value,
           temperature: Number(document.getElementById("temperature").value || 0.85),
           history_limit: Number(document.getElementById("history-limit").value || 20),
+          prompt_budget_token_limit: normalizePromptBudgetInput(document.getElementById("prompt-budget-token-limit"), true),
           request_timeout: Number(document.getElementById("request-timeout").value || 120),
           demo_mode: document.getElementById("demo-mode").checked,
           ui_opacity: Number(uiOpacityEl.value || 0.84),
@@ -783,6 +812,10 @@
         applyBackground(DEFAULT_BACKGROUND_PRESET.url, DEFAULT_BACKGROUND_PRESET.overlay);
         await saveSettings("默认背景预设已应用并自动保存");
       }
+
+      document.getElementById("prompt-budget-token-limit")?.addEventListener("change", (event) => {
+        normalizePromptBudgetInput(event.currentTarget, true);
+      });
 
       document.getElementById("save-settings").addEventListener("click", async () => {
         try {

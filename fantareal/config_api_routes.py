@@ -664,7 +664,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         if "prompt_budget_token_limit" not in payload.model_fields_set:
             raw_settings["prompt_budget_token_limit"] = ctx.get_settings(active_slot).get(
                 "prompt_budget_token_limit",
-                100000,
+                200000,
             )
         settings = ctx.sanitize_settings(raw_settings, strict=True, slot_id=active_slot)
         ctx.persist_json(

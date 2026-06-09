@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
-    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-sidebar-drawer-v1" />
     <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-v1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
@@ -1144,12 +1144,17 @@
 
   </head>
   <body class="chat-page chat-visual-shell">
-    <div class="topbar topbar-chat">
+    <div id="chat-left-sidebar" class="topbar topbar-chat">
       <div class="topbar-left">
         <a class="brand chat-brand" href="/chat">Fantareal</a>
       </div>
       {% include "_grouped_nav.html" %}
       </div>
+
+    <button id="toggle-left-sidebar" type="button" class="left-sidebar-handle" aria-expanded="true" aria-controls="chat-left-sidebar" title="收起左侧栏">
+      <span id="left-sidebar-handle-icon" class="left-sidebar-handle-icon" aria-hidden="true">«</span>
+      <span class="sr-only">左侧导航</span>
+    </button>
 
     <div class="chat-shell">
       <div id="chat-layout" class="chat-layout runtime-panel-collapsed">
@@ -1566,9 +1571,9 @@
               <input id="drawer-history-limit" type="number" min="1" max="100" step="1" />
             </div>
             <div>
-              <label for="drawer-prompt-budget-token-limit">上下文预算上限（估算 tokens）</label>
-              <input id="drawer-prompt-budget-token-limit" type="number" min="0" max="200000" step="1000" />
-              <p class="muted tiny">仅用于 Prompt Debug 告警，不会传给模型；0 表示不限制。</p>
+              <label for="drawer-prompt-budget-token-limit">最大上下文预算</label>
+              <input id="drawer-prompt-budget-token-limit" type="number" min="1000" max="1000000" step="1000" />
+              <p class="muted tiny">单位 tokens，用于 Prompt Debug 估算与超限提醒，不会自动裁剪。</p>
             </div>
           </div>
           <label class="checkbox-row offset-top">
@@ -1723,6 +1728,9 @@
       const toastHostEl = document.getElementById("toast-host");
       const statusEl = document.getElementById("status-text");
       const themePillEl = document.getElementById("theme-pill");
+      const leftSidebarEl = document.getElementById("chat-left-sidebar");
+      const leftSidebarToggleEl = document.getElementById("toggle-left-sidebar");
+      const leftSidebarHandleIconEl = document.getElementById("left-sidebar-handle-icon");
       const chatLayoutEl = document.getElementById("chat-layout");
       const runtimePanelEl = document.getElementById("runtime-panel");
       const runtimePanelToggleEl = document.getElementById("toggle-runtime-panel");
@@ -1956,17 +1964,43 @@
       let historyMutationInFlight = false;
       let worldbookDebugFilter = "all";
       let lastWorldbookDebugPayload = null;
+      const PROMPT_BUDGET_MIN = 1000;
+      const PROMPT_BUDGET_MAX = 1000000;
+      const PROMPT_BUDGET_DEFAULT = 200000;
       let serverState = normalizeRuntimeState(initialState);
       let runtimeState = { ...serverState };
       let worldbookEntries = [];
       const streamingEntries = new Set();
       let drawerSettingsSaveTimer = null;
 
+      function normalizePromptBudgetValue(value) {
+        const raw = Number(value ?? PROMPT_BUDGET_DEFAULT);
+        if (!Number.isFinite(raw)) return PROMPT_BUDGET_DEFAULT;
+        return Math.max(PROMPT_BUDGET_MIN, Math.min(PROMPT_BUDGET_MAX, Math.round(raw)));
+      }
+
+      function normalizeDrawerPromptBudgetInput(input, notify = false) {
+        const normalized = normalizePromptBudgetValue(input?.value);
+        if (input && String(input.value) !== String(normalized)) {
+          input.value = String(normalized);
+          if (notify) {
+            const message = normalized === PROMPT_BUDGET_MAX
+              ? "最大上下文预算已自动调整到上限 1000000 tokens"
+              : normalized === PROMPT_BUDGET_MIN
+                ? "最大上下文预算已自动调整到下限 1000 tokens"
+                : "最大上下文预算已自动调整为 200000 tokens";
+            setStatus(message, "busy");
+            showToast(message, "info");
+          }
+        }
+        return normalized;
+      }
+
       function normalizeRuntimeState(state) {
         const normalized = { ...(state || {}) };
         normalized.embedding_fields = Array.isArray(normalized.embedding_fields) ? normalized.embedding_fields : [];
         normalized.layered_prompt_injection_enabled = Boolean(normalized.layered_prompt_injection_enabled);
-        normalized.prompt_budget_token_limit = Math.max(0, Math.min(200000, Number(normalized.prompt_budget_token_limit ?? 100000) || 0));
+        normalized.prompt_budget_token_limit = normalizePromptBudgetValue(normalized.prompt_budget_token_limit);
         return normalized;
       }
 
@@ -2119,7 +2153,7 @@
         drawerInput("drawer-llm-model").value = runtimeState.llm_model || "";
         drawerInput("drawer-temperature").value = runtimeState.temperature ?? 0.85;
         drawerInput("drawer-history-limit").value = runtimeState.history_limit ?? 20;
-        drawerInput("drawer-prompt-budget-token-limit").value = runtimeState.prompt_budget_token_limit ?? 100000;
+        drawerInput("drawer-prompt-budget-token-limit").value = runtimeState.prompt_budget_token_limit ?? 200000;
         drawerInput("drawer-request-timeout").value = runtimeState.request_timeout ?? 120;
         drawerInput("drawer-demo-mode").checked = !!runtimeState.demo_mode;
         drawerInput("prompt-layered-injection-enabled").checked = !!runtimeState.layered_prompt_injection_enabled;
@@ -2163,7 +2197,7 @@
           llm_model: drawerInput("drawer-llm-model").value.trim(),
           temperature: Number(drawerInput("drawer-temperature").value || 0.85),
           history_limit: Number(drawerInput("drawer-history-limit").value || 20),
-          prompt_budget_token_limit: Number(drawerInput("drawer-prompt-budget-token-limit").value || 0),
+          prompt_budget_token_limit: normalizeDrawerPromptBudgetInput(drawerInput("drawer-prompt-budget-token-limit"), event?.target?.id === "drawer-prompt-budget-token-limit"),
           request_timeout: Number(drawerInput("drawer-request-timeout").value || 120),
           demo_mode: drawerInput("drawer-demo-mode").checked,
           layered_prompt_injection_enabled: drawerInput("prompt-layered-injection-enabled").checked,
@@ -2235,6 +2269,30 @@
           openDrawer();
         }
       }
+      const LEFT_SIDEBAR_STORAGE_KEY = "fantareal.chat.leftSidebarCollapsed";
+
+      function isLeftSidebarCollapsed() {
+        return localStorage.getItem(LEFT_SIDEBAR_STORAGE_KEY) === "true";
+      }
+
+      function setLeftSidebarCollapsed(collapsed, { persist = true } = {}) {
+        const shouldCollapse = !!collapsed;
+        document.body.classList.toggle("left-sidebar-collapsed", shouldCollapse);
+        leftSidebarEl?.setAttribute("aria-hidden", String(shouldCollapse));
+        leftSidebarToggleEl?.setAttribute("aria-expanded", String(!shouldCollapse));
+        if (leftSidebarToggleEl) {
+          leftSidebarToggleEl.setAttribute("title", shouldCollapse ? "展开左侧栏" : "收起左侧栏");
+          leftSidebarToggleEl.setAttribute("aria-label", shouldCollapse ? "展开左侧栏" : "收起左侧栏");
+        }
+        if (leftSidebarHandleIconEl) {
+          leftSidebarHandleIconEl.textContent = shouldCollapse ? "»" : "«";
+        }
+        if (persist) {
+          localStorage.setItem(LEFT_SIDEBAR_STORAGE_KEY, String(shouldCollapse));
+        }
+      }
+
+      setLeftSidebarCollapsed(isLeftSidebarCollapsed(), { persist: false });
 
       function updateThemeBadge() {
         const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
@@ -4259,6 +4317,44 @@
         parent.appendChild(card);
       }
 
+      function appendMacroVariablesCard(parent, pkg) {
+        if (!parent) return;
+        const state = pkg?.macro_variables && typeof pkg.macro_variables === "object" ? pkg.macro_variables : null;
+        if (!state?.enabled) return;
+        const used = Array.isArray(state.used) ? state.used : [];
+        const unresolved = Array.isArray(state.unresolved) ? state.unresolved : [];
+        const replacements = Number(state.replacement_count || 0);
+        if (!used.length && !unresolved.length && !replacements) return;
+
+        const card = document.createElement("section");
+        card.className = `prompt-debug-card prompt-debug-macro-card ${unresolved.length ? "is-warning" : ""}`;
+        const head = document.createElement("div");
+        head.className = "prompt-debug-card-head";
+        const title = document.createElement("strong");
+        title.className = "prompt-debug-card-title";
+        title.textContent = "Macro Variables";
+        const meta = document.createElement("span");
+        meta.className = "muted";
+        meta.textContent = `${replacements} 次替换`;
+        head.appendChild(title);
+        head.appendChild(meta);
+        card.appendChild(head);
+
+        const body = document.createElement("div");
+        body.className = "prompt-debug-relation-meta";
+        const resolved = state.resolved && typeof state.resolved === "object" ? state.resolved : {};
+        const resolvedText = Object.entries(resolved)
+          .map(([key, value]) => `${key} → ${value}`)
+          .join(" / ");
+        body.appendChild(makePromptDebugLine("已解析", resolvedText || "—"));
+        body.appendChild(makePromptDebugLine("本轮使用", used.join(" / ") || "—"));
+        if (unresolved.length) {
+          body.appendChild(makePromptDebugLine("未知/缺失", unresolved.join(" / ")));
+        }
+        card.appendChild(body);
+        parent.appendChild(card);
+      }
+
       function renderPromptDebug(pkg = lastPromptPackagePayload, worldbookDebug = lastWorldbookDebugPayload) {
         if (!promptDebugPanelEl) return;
         const packagePayload = pkg && typeof pkg === "object" ? pkg : {};
@@ -4302,6 +4398,7 @@
         appendLayeredInjectionCard(promptDebugPanelEl, packagePayload);
         appendBaseKernelCard(promptDebugPanelEl, segments);
         appendPromptBudgetCard(promptDebugPanelEl, packagePayload);
+        appendMacroVariablesCard(promptDebugPanelEl, packagePayload);
 
         const tagCard = document.createElement("section");
         tagCard.className = "prompt-debug-card";
@@ -5298,6 +5395,7 @@
             total_estimated_tokens: packagePayload.prompt_segment_summary?.total_estimated_tokens ?? sumBy(promptSegments, "estimated_tokens"),
             layered_injection: packagePayload.layered_injection || { enabled: false, mode: "legacy" },
             budget_dry_run: packagePayload.budget_dry_run || { enabled: false },
+            macro_variables: packagePayload.macro_variables || { enabled: false },
             preset_activation_tag_count: presetActivationTags.count || 0,
             message_roles: countBy(messages, "role"),
             segment_sources: countBy(promptSegments, "source"),
@@ -5362,7 +5460,7 @@
           lastWorldbookDebugPayload = activeItem.worldbook_debug || lastWorldbookDebugPayload;
           renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
           renderPromptDebug(activeItem.prompt_package, lastWorldbookDebugPayload);
-          setRuntimeTab("prompt");
+          setRuntimeTab("prompt", { openPanel: false });
           setPromptExportButtonsEnabled(true);
           setStatus("已恢复当前会话的 Prompt 预览");
         } catch (error) {
@@ -7226,6 +7324,9 @@
       document.getElementById("open-drawer-secondary")?.addEventListener("click", toggleDrawer);
       document.getElementById("close-drawer")?.addEventListener("click", closeDrawer);
       drawerOverlayEl?.addEventListener("click", closeDrawer);
+      leftSidebarToggleEl?.addEventListener("click", () => {
+        setLeftSidebarCollapsed(!document.body.classList.contains("left-sidebar-collapsed"));
+      });
 
       document.querySelectorAll("#config-drawer input, #config-drawer select, #runtime-tab-prompt-debug input").forEach((element) => {
         element.addEventListener("input", syncStateFromDrawer);
