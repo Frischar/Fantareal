@@ -130,6 +130,35 @@ body.modern-setting-page #test-embedding {
   min-height: 44px;
 }
 
+body.modern-setting-page .config-demo-mode-row {
+  margin-top: 10px;
+}
+
+body.modern-setting-page .config-model-actions {
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+body.modern-setting-page .config-model-actions #save-settings,
+body.modern-setting-page .config-model-actions #test-connection {
+  width: auto;
+  min-width: 132px;
+  min-height: 38px;
+  padding: 8px 18px;
+}
+
+@media (max-width: 640px) {
+  body.modern-setting-page .config-model-actions {
+    justify-content: stretch;
+  }
+
+  body.modern-setting-page .config-model-actions #save-settings,
+  body.modern-setting-page .config-model-actions #test-connection {
+    flex: 1 1 160px;
+  }
+}
+
 /* Config workbench v2: align with Chat feedback language */
 body.modern-setting-page .config-sticky-actions {
   position: sticky;

@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from .macro_variables import build_macro_context, render_messages_with_macros, render_prompt_segments_with_macros
+
 _DEPS: dict[str, Callable[..., Any]] = {}
 
 V4F_OUTPUT_GUARD_MARKER = "[[RUNTIME_ONLY:V4F_OUTPUT_GUARD]]"
@@ -121,6 +123,86 @@ def _append_joined_message(messages: list[dict[str, str]], role: str, sections: 
     message = _message(role, content)
     if message:
         messages.append(message)
+
+
+def _segment_map(prompt_segments: list[dict[str, Any]]) -> dict[str, str]:
+    return {
+        str(segment.get("id", "") or ""): str(segment.get("content", "") or "")
+        for segment in prompt_segments
+        if str(segment.get("id", "") or "")
+    }
+
+
+def _segment_contents_by(
+    prompt_segments: list[dict[str, Any]],
+    *,
+    kind: str | None = None,
+    placement: str | None = None,
+    id_prefix: str | None = None,
+) -> list[str]:
+    rows: list[dict[str, Any]] = []
+    for segment in prompt_segments:
+        if kind is not None and str(segment.get("kind", "") or "") != kind:
+            continue
+        if placement is not None and str(segment.get("placement", "") or "") != placement:
+            continue
+        segment_id = str(segment.get("id", "") or "")
+        if id_prefix is not None and not segment_id.startswith(id_prefix):
+            continue
+        content = str(segment.get("content", "") or "").strip()
+        if content:
+            rows.append(segment)
+    rows.sort(key=lambda item: int(item.get("order", 0) or 0))
+    return [str(item.get("content", "") or "").strip() for item in rows]
+
+
+def _build_legacy_messages_from_segments(prompt_segments: list[dict[str, Any]]) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = []
+    system_sections: list[str] = []
+
+    for segment in prompt_segments:
+        segment_id = str(segment.get("id", "") or "")
+        role = str(segment.get("role", "system") or "system").strip() or "system"
+        content = str(segment.get("content", "") or "").strip()
+        if not content:
+            continue
+
+        if segment_id.startswith("history."):
+            _append_joined_message(messages, "system", system_sections)
+            system_sections = []
+            messages.append({"role": role, "content": content})
+            continue
+
+        if str(segment.get("placement", "") or "") == "output_guard":
+            continue
+        if str(segment.get("kind", "") or "") == "director_note" and str(segment.get("placement", "") or "") == "near_latest_user":
+            continue
+        if segment_id == "runtime.user_input":
+            continue
+
+        if role == "system":
+            system_sections.append(content)
+        else:
+            _append_joined_message(messages, "system", system_sections)
+            system_sections = []
+            messages.append({"role": role, "content": content})
+
+    _append_joined_message(messages, "system", system_sections)
+
+    output_guard_sections = _segment_contents_by(prompt_segments, placement="output_guard")
+    if output_guard_sections:
+        messages.append({"role": "system", "content": "\n\n".join(output_guard_sections)})
+
+    near_user_director_sections = _segment_contents_by(prompt_segments, kind="director_note", placement="near_latest_user")
+    if near_user_director_sections:
+        messages.append({"role": "system", "content": "\n\n".join(near_user_director_sections)})
+
+    user_input = next(
+        (str(segment.get("content", "") or "").strip() for segment in prompt_segments if str(segment.get("id", "") or "") == "runtime.user_input"),
+        "",
+    )
+    messages.append({"role": "user", "content": user_input})
+    return messages
 
 
 def _director_note_placement(position: Any) -> str:
@@ -513,7 +595,7 @@ def _build_prompt_budget_dry_run(
     messages: list[dict[str, str]],
     prompt_segments: list[dict[str, Any]],
     layers: list[dict[str, Any]],
-    token_limit: int = 100000,
+    token_limit: int = 200000,
 ) -> dict[str, Any]:
     segment_rows: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
@@ -620,7 +702,7 @@ def _build_prompt_budget_dry_run(
     soft_rows = [row for row in segment_rows if row["strength"] != "hard"]
     actual_message_chars = sum(row["char_count"] for row in message_rows)
     actual_message_estimated_tokens = sum(row["estimated_tokens"] for row in message_rows)
-    normalized_token_limit = max(0, min(200000, int(token_limit or 0)))
+    normalized_token_limit = max(1000, min(1000000, int(token_limit or 200000)))
     over_budget = bool(normalized_token_limit and actual_message_estimated_tokens > normalized_token_limit)
     over_by_estimated_tokens = max(0, actual_message_estimated_tokens - normalized_token_limit) if normalized_token_limit else 0
     usage_ratio = (actual_message_estimated_tokens / normalized_token_limit) if normalized_token_limit else None
@@ -1352,6 +1434,52 @@ def build_prompt_package(
         metadata={"layer_id": "user_input", "char_count": len(clean_user_message)},
     )
 
+    macro_context = build_macro_context(persona=persona, user_profile=user_profile)
+    prompt_segments, macro_variables = render_prompt_segments_with_macros(prompt_segments, macro_context)
+    content_by_segment_id = _segment_map(prompt_segments)
+
+    preset_prompt = content_by_segment_id.get("preset.rules", preset_prompt)
+    worldbook_before_char_defs_prompt = content_by_segment_id.get("worldbook.before_char_defs", worldbook_before_char_defs_prompt)
+    system_prompt = content_by_segment_id.get("character.definition", system_prompt)
+    worldbook_stable_prompt = content_by_segment_id.get("worldbook.stable", worldbook_stable_prompt)
+    worldbook_after_char_defs_prompt = content_by_segment_id.get("worldbook.after_char_defs", worldbook_after_char_defs_prompt)
+    memory_recap_prompt = content_by_segment_id.get("memory.recap", memory_recap_prompt)
+    user_profile_prompt = content_by_segment_id.get("user_profile.current", user_profile_prompt)
+    worldbook_current_state_prompt = content_by_segment_id.get("worldbook.current_state", worldbook_current_state_prompt)
+    retrieval_prompt = content_by_segment_id.get("memory.retrieval", retrieval_prompt)
+    worldbook_dynamic_prompt = content_by_segment_id.get("worldbook.dynamic", worldbook_dynamic_prompt)
+    worldbook_answer_guard = content_by_segment_id.get("worldbook.answer_guard", worldbook_answer_guard)
+    sprite_prompt = content_by_segment_id.get("runtime.sprite", sprite_prompt)
+    preset_output_guard_prompt = content_by_segment_id.get("preset.output_guard", preset_output_guard_prompt)
+    worldbook_output_guard_prompt = content_by_segment_id.get("worldbook.output_guard", worldbook_output_guard_prompt)
+    clean_user_message = content_by_segment_id.get("runtime.user_input", clean_user_message)
+    before_character_director_sections = _segment_contents_by(prompt_segments, kind="director_note", placement="before_character")
+    after_character_director_sections = _segment_contents_by(prompt_segments, kind="director_note", placement="after_character")
+    near_user_director_sections = _segment_contents_by(prompt_segments, kind="director_note", placement="near_latest_user")
+
+    actual_system_sections = [
+        prompt
+        for prompt in [
+            preset_prompt,
+            worldbook_before_char_defs_prompt,
+            *before_character_director_sections,
+            system_prompt,
+            worldbook_stable_prompt,
+            worldbook_after_char_defs_prompt,
+            *after_character_director_sections,
+            memory_recap_prompt,
+            user_profile_prompt,
+            worldbook_current_state_prompt,
+            retrieval_prompt,
+            worldbook_dynamic_prompt,
+            worldbook_answer_guard,
+            sprite_prompt,
+        ]
+        if str(prompt or "").strip()
+    ]
+
+    messages = _build_legacy_messages_from_segments(prompt_segments)
+
     layered_enabled = bool(llm_config.get("layered_prompt_injection_enabled", False))
     layered_injection = _empty_layered_injection_state(layered_enabled)
     if layered_enabled:
@@ -1406,6 +1534,16 @@ def build_prompt_package(
                     reason="实验开关关闭：PromptSegment 仅用于观察，不改变真实 messages。",
                 )
 
+    messages, message_macro_debug = render_messages_with_macros(messages, macro_context, skip_roles={"user"})
+    if message_macro_debug.get("replacements") or message_macro_debug.get("unresolved"):
+        existing_used = set(str(item) for item in macro_variables.get("used", []) if item)
+        existing_unresolved = set(str(item) for item in macro_variables.get("unresolved", []) if item)
+        existing_used.update(str(item) for item in message_macro_debug.get("used", []) if item)
+        existing_unresolved.update(str(item) for item in message_macro_debug.get("unresolved", []) if item)
+        macro_variables["used"] = sorted(existing_used)
+        macro_variables["unresolved"] = sorted(existing_unresolved)
+        macro_variables["replacement_count"] = int(macro_variables.get("replacement_count", 0) or 0) + int(message_macro_debug.get("replacements", 0) or 0)
+
     layers: list[dict[str, Any]] = []
 
     def append_layer(layer_id: str, title: str, sections: list[str], **meta: Any) -> None:
@@ -1421,11 +1559,19 @@ def build_prompt_package(
             layer["meta"] = meta
         layers.append(layer)
 
+    preset_rule_sections = [
+        str(segment.get("content", "") or "").strip()
+        for segment in sorted(prompt_segments, key=lambda item: int(item.get("order", 0) or 0))
+        if str(segment.get("source", "") or "") == "preset"
+        and str(segment.get("placement", "") or "") != "output_guard"
+        and str(segment.get("content", "") or "").strip()
+    ]
+
     append_layer(
         "preset_rules",
         "预设规则：基础系统规则 / 常用模块",
-        [preset_prompt],
-        preset_section_count=1 if preset_prompt else 0,
+        preset_rule_sections or [preset_prompt],
+        preset_section_count=len(preset_rule_sections) if preset_rule_sections else (1 if preset_prompt else 0),
     )
     append_layer(
         "worldbook_before_char_defs",
@@ -1545,7 +1691,7 @@ def build_prompt_package(
         messages=messages,
         prompt_segments=prompt_segments,
         layers=layers,
-        token_limit=llm_config.get("prompt_budget_token_limit", 100000),
+        token_limit=llm_config.get("prompt_budget_token_limit", 200000),
     )
 
     return {
@@ -1554,6 +1700,7 @@ def build_prompt_package(
         "prompt_segments": prompt_segments,
         "preset_activation_tags": preset_activation_tags,
         "layered_injection": layered_injection,
+        "macro_variables": macro_variables,
         "budget_dry_run": budget_dry_run,
         "prompt_segment_summary": {
             "segment_count": len(prompt_segments),

@@ -802,3 +802,39 @@ body.app-sidebar-shell:not(.chat-page) .slot-toolbar {
   }
 }
 
+
+/* Chat left sidebar drawer final override: loaded after 01-chat.css so the rail moves away like the runtime panel. */
+@media (min-width: 821px) {
+  body.chat-page #chat-left-sidebar.topbar.topbar-chat {
+    transition: transform 0.22s ease, opacity 0.18s ease;
+    will-change: transform;
+  }
+
+  body.chat-page.left-sidebar-collapsed #chat-left-sidebar.topbar.topbar-chat {
+    transform: translateX(calc(-1 * var(--app-sidebar-width, 286px))) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  body.chat-page.left-sidebar-collapsed .chat-shell {
+    padding-left: 32px !important;
+  }
+
+  body.chat-page .left-sidebar-handle {
+    left: calc(var(--app-sidebar-width, 286px) - 6px) !important;
+  }
+
+  body.chat-page .left-sidebar-handle:hover,
+  body.chat-page .left-sidebar-handle:focus-visible {
+    left: calc(var(--app-sidebar-width, 286px) - 4px) !important;
+  }
+
+  body.chat-page.left-sidebar-collapsed .left-sidebar-handle {
+    left: 0 !important;
+  }
+
+  body.chat-page.left-sidebar-collapsed .left-sidebar-handle:hover,
+  body.chat-page.left-sidebar-collapsed .left-sidebar-handle:focus-visible {
+    left: 2px !important;
+  }
+}

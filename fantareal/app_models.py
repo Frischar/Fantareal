@@ -43,7 +43,7 @@ class SettingsPayload(BaseModel):
     theme: str = "dark"
     temperature: float = 0.85
     history_limit: int = 20
-    prompt_budget_token_limit: int = 100000
+    prompt_budget_token_limit: int = 200000
     request_timeout: int = 120
     demo_mode: bool = False
     ui_opacity: float = 0.84

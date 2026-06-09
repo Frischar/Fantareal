@@ -2,8 +2,8 @@
    原始大文件已拆到 static/css/*.css。
    v161: 配置页界面与背景面板加宽，兼容消息编辑与重 roll；styles.css 仍只做入口。 */
 @import url("./css/00-base.css?v=v161");
-@import url("./css/01-chat.css?v=ui-debug-icon-1");
-@import url("./css/02-sidebar.css?v=ui-debug-icon-1");
+@import url("./css/01-chat.css?v=ui-sidebar-drawer-v1");
+@import url("./css/02-sidebar.css?v=ui-sidebar-drawer-v1");
 @import url("./css/16-pe-shell.css?v=ui-v170-pe-shell");
 @import url("./css/03-config-global.css?v=v161");
 @import url("./css/04-user-workshop.css?v=v161");
