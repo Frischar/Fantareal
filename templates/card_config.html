@@ -189,6 +189,12 @@
             <label for="persona-{{ key }}-name">name <span class="field-note">（该角色显示名）</span></label>
             <input id="persona-{{ key }}-name" value="{{ persona.name }}" />
 
+            <label for="persona-{{ key }}-role-id">role_id <span class="field-note">（用于角色宏的稳定代号，例如 role:su_lianyan）</span></label>
+            <input id="persona-{{ key }}-role-id" value="{{ persona.role_id or persona.id or '' }}" placeholder="su_lianyan" />
+
+            <label for="persona-{{ key }}-aliases">aliases <span class="field-note">（别名 / 小名，可用逗号或换行分隔）</span></label>
+            <textarea id="persona-{{ key }}-aliases" rows="2">{{ (persona.aliases or [])|join('\n') }}</textarea>
+
             <label for="persona-{{ key }}-description">description <span class="field-note">（身份 / 背景简介）</span></label>
             <textarea id="persona-{{ key }}-description" rows="3">{{ persona.description }}</textarea>
 
@@ -220,7 +226,7 @@
               <select id="state-journal-role-source-mode">
                 <option value="auto">自动识别</option>
                 <option value="main_card">主卡就是角色</option>
-                <option value="personas_only">主卡是旁白，只读取多角色</option>
+                <option value="personas_only">主卡旁白，多角色展开</option>
               </select>
             </label>
             <p id="state-journal-role-source-hint" class="card-state-journal-source-hint">没有多角色时读取主卡；有多角色时默认读取多角色。</p>
@@ -827,6 +833,12 @@
           <label for="persona-${key}-name">name <span class="field-note">${PERSONA_LABELS.name}</span></label>
           <input id="persona-${key}-name" />
 
+          <label for="persona-${key}-role-id">role_id <span class="field-note">（用于角色宏的稳定代号，例如 role:su_lianyan）</span></label>
+          <input id="persona-${key}-role-id" placeholder="su_lianyan" />
+
+          <label for="persona-${key}-aliases">aliases <span class="field-note">（别名 / 小名，可用逗号或换行分隔）</span></label>
+          <textarea id="persona-${key}-aliases" rows="2"></textarea>
+
           <label for="persona-${key}-description">description <span class="field-note">${PERSONA_LABELS.description}</span></label>
           <textarea id="persona-${key}-description" rows="3"></textarea>
 
@@ -849,6 +861,8 @@
           if (target) target.textContent = event.target.value.trim() || `角色${formatPersonaIndex(key)}`;
         });
         wrapper.querySelector(`#persona-${key}-description`).value = persona.description || "";
+        wrapper.querySelector(`#persona-${key}-role-id`).value = persona.role_id || persona.id || "";
+        wrapper.querySelector(`#persona-${key}-aliases`).value = formatPersonaAliases(persona.aliases);
         wrapper.querySelector(`#persona-${key}-personality`).value = persona.personality || "";
         wrapper.querySelector(`#persona-${key}-scenario`).value = persona.scenario || "";
         wrapper.querySelector(`#persona-${key}-creator-notes`).value = persona.creator_notes || "";
@@ -863,6 +877,23 @@
         const text = String(value || fallback || "").trim().toLowerCase();
         const normalized = text.replace(/\s+/g, "_").replace(/[^a-z0-9_\-]+/g, "").replace(/[_\-]{2,}/g, "_").replace(/^[_\-]+|[_\-]+$/g, "");
         return normalized || fallback || `item_${Date.now()}`;
+      }
+
+      function slugifyOptionalStateJournalKey(value) {
+        const text = String(value || "").trim().toLowerCase();
+        if (!text) return "";
+        return text.replace(/\s+/g, "_").replace(/[^a-z0-9_\-]+/g, "").replace(/[_\-]{2,}/g, "_").replace(/^[_\-]+|[_\-]+$/g, "");
+      }
+
+      function parsePersonaAliases(value) {
+        if (Array.isArray(value)) {
+          return [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 24);
+        }
+        return [...new Set(String(value || "").split(/[\n,，、;；|]+/).map((item) => item.trim()).filter(Boolean))].slice(0, 24);
+      }
+
+      function formatPersonaAliases(value) {
+        return parsePersonaAliases(value).join("\n");
       }
 
       function createStateJournalTempId(prefix = "tmp") {
@@ -923,15 +954,15 @@
       const STATE_JOURNAL_ROLE_SOURCE_MODES = {
         auto: {
           label: "自动识别",
-          desc: "没有多角色时读取主卡；有多角色时默认只读取多角色，主卡视为旁白或总设定。",
+          desc: "自动识别主卡和有内容的多角色；空占位子角色会自动隐藏。",
         },
         main_card: {
           label: "主卡就是角色",
           desc: "适合普通单角色卡，心笺会把主卡作为唯一角色记录。",
         },
         personas_only: {
-          label: "主卡是旁白，只读取多角色",
-          desc: "适合双女主、多角色卡，主卡只作为旁白或总设定。",
+          label: "主卡旁白，多角色展开",
+          desc: "适合旁白卡、多角色卡；只显示有内容的多角色，不显示主卡。",
         },
       };
 
@@ -1104,7 +1135,10 @@
         return [...personaGridEl.querySelectorAll(".persona-card")].map((card, index) => {
           const key = String(card.dataset.personaKey || index + 1).trim();
           const name = card.querySelector(`#persona-${key}-name`)?.value.trim() || `角色${index + 1}`;
-          return { key, name, role_id: slugifyStateJournalKey(`current_card_${key}_${name}`, `current_card_role_${index + 1}`), is_empty_slot: isEmptyStateJournalPersonaCard(card, key) };
+          const roleIdInput = card.querySelector(`#persona-${key}-role-id`)?.value.trim() || "";
+          const role_id = slugifyStateJournalKey(roleIdInput || `current_card_${key}_${name}`, `current_card_role_${index + 1}`);
+          const aliases = parsePersonaAliases(card.querySelector(`#persona-${key}-aliases`)?.value || "");
+          return { key, name, role_id, aliases, is_empty_slot: isEmptyStateJournalPersonaCard(card, key) };
         });
       }
 
@@ -1150,9 +1184,9 @@
         if (mode === "main_card") return { detected: "main_card", roles: [collectMainCardStateJournalRole()], personas };
         const personaRoles = personas
           .filter((persona) => !persona.is_empty_slot)
-          .map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", source_type: "multi_role_slot", has_state_journal_config: false, is_empty_slot: false, display_policy: "show", variables: [], stages: [], snapshotFields: [] }));
-        if (mode === "personas_only") return { detected: "personas_only", roles: personaRoles, personas };
+          .map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key, ...(persona.aliases || [])].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", source_type: "multi_role_slot", has_state_journal_config: false, is_empty_slot: false, display_policy: "show", variables: [], stages: [], snapshotFields: [] }));
         const mainRole = collectMainCardStateJournalRole();
+        if (mode === "personas_only") return { detected: "personas_only", roles: personaRoles, personas };
         return { detected: personaRoles.length ? "auto" : "main_card", roles: [mainRole, ...personaRoles].filter(Boolean), personas };
       }
 
@@ -1173,11 +1207,15 @@
         ensureStateJournalConfigReady();
         currentStateJournal.role_source_mode = normalizeStateJournalRoleSourceMode(currentStateJournal.role_source_mode || "auto");
         const desired = stateJournalDesiredSourceRoleSeeds();
-        const desiredSource = desired.detected === "main_card" ? "main_card" : "persona";
+        const desiredIds = new Set((desired.roles || []).map((role) => String(role.role_id || "").trim()).filter(Boolean));
+        const desiredSources = new Set((desired.roles || []).map((role) => String(role.source || "").trim()).filter(Boolean));
         const existing = (currentStateJournal.roles || []).filter((role) => {
           if (shouldHideStateJournalEmptyRole(role)) return false;
           const source = String(role.source || "").trim();
-          if (!source || source === desiredSource) return true;
+          const roleId = String(role.role_id || "").trim();
+          if (desiredIds.has(roleId)) return true;
+          if (source === "main_card" || source === "persona") return false;
+          if (!source && desiredSources.has("")) return true;
           return stateJournalRoleHasConfig(role);
         });
         currentStateJournal.roles = mergeStateJournalRoles([...existing, ...desired.roles]).filter((role) => !shouldHideStateJournalEmptyRole(role));
@@ -1504,12 +1542,20 @@
       }
 
       function buildCardPayload() {
+        ensureStateJournalConfigReady();
+        const roleSourceSelect = document.getElementById("state-journal-role-source-mode");
+        if (roleSourceSelect) {
+          currentStateJournal.role_source_mode = normalizeStateJournalRoleSourceMode(roleSourceSelect.value);
+        }
+        ensureStateJournalRolesFromPersonas();
         const personas = {};
         personaGridEl.querySelectorAll(".persona-card").forEach((card) => {
           const key = card.dataset.personaKey;
           if (!key) return;
           personas[key] = {
             name: card.querySelector(`#persona-${key}-name`)?.value.trim() || "",
+            role_id: slugifyOptionalStateJournalKey(card.querySelector(`#persona-${key}-role-id`)?.value.trim() || ""),
+            aliases: parsePersonaAliases(card.querySelector(`#persona-${key}-aliases`)?.value || ""),
             description: card.querySelector(`#persona-${key}-description`)?.value.trim() || "",
             personality: card.querySelector(`#persona-${key}-personality`)?.value.trim() || "",
             scenario: card.querySelector(`#persona-${key}-scenario`)?.value.trim() || "",

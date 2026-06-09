@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from .chat_api_routes import register_chat_api_routes
 from .config_api_routes import register_config_api_routes
+from .macro_variables import build_macro_context, render_macro_variables
 from .mod_api_routes import register_mod_api_routes
 from .mods_runtime import mount_discovered_mods
 from .page_routes import register_page_routes
@@ -509,6 +510,7 @@ def default_state_journal_config() -> dict[str, Any]:
     return {
         "version": 1,
         "enabled": True,
+        "role_source_mode": "auto",
         "roles": [],
     }
 
@@ -560,6 +562,10 @@ def sanitize_state_journal_config(raw: Any) -> dict[str, Any]:
     except (TypeError, ValueError):
         config["version"] = 1
     config["enabled"] = raw.get("enabled") is not False
+    source_mode = str(raw.get("role_source_mode") or raw.get("roleSourceMode") or "auto").strip().lower().replace("-", "_")
+    if source_mode not in {"auto", "main_card", "personas_only"}:
+        source_mode = "auto"
+    config["role_source_mode"] = source_mode
 
     roles: list[dict[str, Any]] = []
     raw_roles = raw.get("roles", [])
@@ -716,11 +722,18 @@ def sanitize_state_journal_config(raw: Any) -> dict[str, Any]:
             "role_name": role_name or role_id,
             "aliases": aliases,
             "enabled": role.get("enabled") is not False,
+            "mode": str(role.get("mode") or role.get("stateJournalMode") or "default").strip() or "default",
+            "stateJournalMode": str(role.get("stateJournalMode") or role.get("mode") or "default").strip() or "default",
             "use_default_variables": bool(role.get("use_default_variables", False)),
             "initial_stage": _normalize_state_journal_key(role.get("initial_stage") or settings.get("initial_stage"), stages[0]["stage_key"] if stages else "stage_a"),
             "variables": variables,
             "stages": stages,
             "snapshotFields": snapshot_fields,
+            "source": str(role.get("source") or role.get("role_source") or "").strip(),
+            "source_type": str(role.get("source_type") or role.get("sourceType") or "").strip(),
+            "has_state_journal_config": bool(role.get("has_state_journal_config") or role.get("hasStateJournalConfig")),
+            "is_empty_slot": bool(role.get("is_empty_slot") or role.get("isEmptySlot")),
+            "display_policy": str(role.get("display_policy") or role.get("displayPolicy") or "show").strip() or "show",
             "settings": {
                 "allow_regression": bool(settings.get("allow_regression", False)),
                 "confirm_turns": _state_journal_int(settings.get("confirm_turns", 1), 1, 1),
@@ -1589,7 +1602,7 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
 
     # Preserve every imported persona instead of mapping into the default 1/2/3 slots.
     raw_personas = raw.get("personas", {})
-    normalized_personas: dict[str, dict[str, str]] = {}
+    normalized_personas: dict[str, dict[str, Any]] = {}
     if isinstance(raw_personas, dict):
         persona_items: list[tuple[str, Any]] = list(raw_personas.items())
     elif isinstance(raw_personas, list):
@@ -1618,6 +1631,8 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
 
         normalized_personas[persona_key] = {
             "name": display_name,
+            "role_id": sanitize_role_alias_key(value.get("role_id") or value.get("id"), ""),
+            "aliases": sanitize_role_aliases(value.get("aliases")),
             "description": str(value.get("description", "")).strip(),
             "personality": str(value.get("personality", "")).strip(),
             "scenario": str(value.get("scenario", "")).strip(),
@@ -1628,6 +1643,27 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
         card["personas"] = normalized_personas
 
     return card
+
+def sanitize_role_alias_key(value: Any, fallback: str = "") -> str:
+    text = unicodedata.normalize("NFKC", str(value or fallback or "")).strip().lower()
+    text = re.sub(r"\s+", "_", text)
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+def sanitize_role_aliases(value: Any) -> list[str]:
+    if isinstance(value, list):
+        raw_items = value
+    elif isinstance(value, tuple):
+        raw_items = list(value)
+    else:
+        raw_items = re.split(r"[\n,，、;；|]+", str(value or ""))
+    aliases: list[str] = []
+    for item in raw_items:
+        text = str(item or "").strip()
+        if text and text not in aliases:
+            aliases.append(text[:80])
+    return aliases[:24]
 
 def extract_persona_name_from_fields(*texts: str) -> str:
     patterns = [
@@ -3218,6 +3254,32 @@ def _evaluate_worldbook_keyword_entry(
     return final_ok, primary_matches, secondary_matches, matched_text
 
 
+def _worldbook_macro_context() -> dict[str, Any]:
+    return build_macro_context(persona=get_persona(), user_profile=get_user_profile(), role_card=get_current_card())
+
+
+def _render_worldbook_item_macros(item: dict[str, Any], macro_context: dict[str, Any]) -> dict[str, Any]:
+    rendered_item = dict(item)
+    macro_debug: dict[str, Any] = {}
+    for field in ("trigger", "secondary_trigger", "content"):
+        original = str(rendered_item.get(field, "") or "")
+        rendered, debug = render_macro_variables(original, macro_context)
+        if rendered != original:
+            if field in {"trigger", "secondary_trigger"}:
+                rendered = re.sub(r"[\u3001;；]+", ",", rendered)
+            rendered_item[field] = rendered
+            macro_debug[field] = {
+                "raw": original,
+                "rendered": rendered,
+                "replacements": int(debug.get("replacements", 0) or 0),
+                "used": debug.get("used", []),
+                "unresolved": debug.get("unresolved", []),
+            }
+    if macro_debug:
+        rendered_item["_macro_debug"] = macro_debug
+    return rendered_item
+
+
 def _worldbook_match_payload(
     *,
     item: dict[str, Any],
@@ -3240,6 +3302,7 @@ def _worldbook_match_payload(
         "trigger": str(item.get("trigger", "")).strip(),
         "secondary_trigger": str(item.get("secondary_trigger", "")).strip(),
         "content": str(item.get("content", "")).strip(),
+        "macro_debug": item.get("_macro_debug", {}) if isinstance(item.get("_macro_debug"), dict) else {},
         "matched": matched_text,
         "comment": str(item.get("comment", "")).strip(),
         "priority": order,
@@ -3540,8 +3603,10 @@ def match_worldbook_entries(query: str, external_active_tags: Any = None) -> lis
     seed_queue: list[dict[str, Any]] = [{"text": text, "depth": 0, "from": ""}]
     recursion_enabled = bool(settings.get("recursive_scan_enabled", False))
     recursion_max_depth = clamp_int(settings.get("recursion_max_depth", 2), 0, 5, 2)
+    macro_context = _worldbook_macro_context()
 
-    for item in get_worldbook_entries():
+    for raw_item in get_worldbook_entries():
+        item = _render_worldbook_item_macros(raw_item, macro_context)
         if not item.get("enabled", True):
             continue
 
@@ -4764,6 +4829,7 @@ async def archive_current_conversation() -> dict[str, Any]:
 configure_prompt_builder(
     sanitize_tags=sanitize_tags,
     get_persona=get_persona,
+    get_current_card=get_current_card,
     get_conversation=get_conversation,
     get_memories=get_memories,
     get_user_profile=get_user_profile,

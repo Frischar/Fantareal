@@ -2651,6 +2651,7 @@ select option:disabled {
 #roleStateRoleList {
   display: grid;
   gap: 9px;
+  min-width: 0;
 }
 .role-state-role-card.role-state-role-card-v115,
 .role-state-empty-role-card {
@@ -2658,6 +2659,8 @@ select option:disabled {
   padding: 11px 12px;
   border-radius: 16px;
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
 }
 .role-state-role-card-v115 .role-state-card-head {
   gap: 8px;
