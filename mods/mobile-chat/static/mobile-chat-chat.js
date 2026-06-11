@@ -188,6 +188,49 @@
     `;
   }
 
+  function textBubbleParts(value) {
+    const text = String(value || "").trim();
+    if (!text) return [""];
+    const explicitParts = text.split(/\n+/).map((part) => part.trim()).filter(Boolean);
+    const sourceParts = explicitParts.length > 1 ? explicitParts : [text];
+    const parts = [];
+    const splitPattern = /[^。！？!?；;…]+[。！？!?；;…]*|[。！？!?；;…]+/g;
+
+    sourceParts.forEach((part) => {
+      const matches = part.match(splitPattern);
+      const chunks = (matches && matches.length ? matches : [part])
+        .map((chunk) => chunk.trim())
+        .filter(Boolean);
+      let buffer = "";
+      chunks.forEach((chunk) => {
+        const next = buffer ? `${buffer}${chunk}` : chunk;
+        if (next.length <= 52) {
+          buffer = next;
+          return;
+        }
+        if (buffer) parts.push(buffer);
+        if (chunk.length <= 72) {
+          buffer = chunk;
+          return;
+        }
+        for (let index = 0; index < chunk.length; index += 72) {
+          parts.push(chunk.slice(index, index + 72));
+        }
+        buffer = "";
+      });
+      if (buffer) parts.push(buffer);
+    });
+    if (!parts.length) return [text];
+    if (parts.length <= 16) return parts;
+    return [...parts.slice(0, 15), parts.slice(15).join("")];
+  }
+
+  function textBubbleMarkup(value) {
+    return textBubbleParts(value)
+      .map((part) => `<div class="fmcp-message-bubble">${esc(part)}</div>`)
+      .join("");
+  }
+
   function avatarMarkup(member, extraClass = "") {
     const avatar = String(member && member.avatar ? member.avatar : "");
     const name = String(member && member.name ? member.name : "?").trim();
@@ -281,7 +324,7 @@
 
   function currentTheme() {
     const theme = state.settings?.ui_theme || state.settings?.world_theme || "modern";
-    return ["modern", "xianxia", "apocalypse"].includes(theme) ? theme : "modern";
+    return ["modern", "social", "xianxia", "apocalypse"].includes(theme) ? theme : "modern";
   }
 
   function themedLabel(kind, value) {
@@ -289,21 +332,25 @@
     const maps = {
       app: {
         modern: { group_chat: "群聊", settings: "详细设置", stickers: "贴纸包", assist: "辅助功能", feed: "动态", forum: "论坛", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
+        social: { group_chat: "群聊", settings: "设置", stickers: "表情", assist: "助手", feed: "朋友圈", forum: "群公告", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
         xianxia: { group_chat: "传讯", settings: "设定", stickers: "贴纸", assist: "造像", feed: "见闻", forum: "论道", live: "留影", notifications: "灵讯", phone: "传音", mail: "书信", diary: "札记", calendar: "行程" },
         apocalypse: { group_chat: "频道", settings: "终端", stickers: "物资", assist: "档案", feed: "公告", forum: "情报板", live: "监控", notifications: "警报", phone: "通话", mail: "信件", diary: "日志", calendar: "排班" },
       },
       subtitle: {
         modern: { group_chat: "角色卡群聊", settings: "偏好与模型", stickers: "内置资源", assist: "人物生成", feed: "角色近况", forum: "世界讨论板", live: "弹幕与醒目留言", notifications: "系统与角色提醒", phone: "模拟通话 RP", mail: "角色邮件往来", diary: "角色日记", calendar: "日程安排" },
+        social: { group_chat: "像 QQ/WX 一样轻量聊天", settings: "显示、模型与群聊偏好", stickers: "表情包与贴纸", assist: "从角色卡生成联系人", feed: "角色生活碎片", forum: "群内话题与公告", live: "弹幕互动", notifications: "消息提醒", phone: "模拟语音通话", mail: "长消息往来", diary: "角色私密记录", calendar: "约定与提醒" },
         xianxia: { group_chat: "角色传讯", settings: "灵机设定", stickers: "符贴资源", assist: "人物造像", feed: "山门见闻", forum: "论道闲谈", live: "留影弹幕", notifications: "系统灵讯", phone: "模拟传音 RP", mail: "角色书信", diary: "随身札记", calendar: "行程安排" },
         apocalypse: { group_chat: "避难频道", settings: "终端参数", stickers: "贴标物资", assist: "人物档案", feed: "态势公告", forum: "情报交换", live: "监控画面", notifications: "风险警报", phone: "模拟通话 RP", mail: "角色信件", diary: "行动日志", calendar: "值班排程" },
       },
       channel: {
         modern: { feed: "动态", forum: "论坛", mail: "邮箱", diary: "日记", calendar: "日程", live: "直播", phone: "电话" },
+        social: { feed: "朋友圈", forum: "群公告", mail: "邮箱", diary: "日记", calendar: "日程", live: "直播", phone: "电话" },
         xianxia: { feed: "见闻", forum: "论道", mail: "书信", diary: "札记", calendar: "行程", live: "留影", phone: "传音" },
         apocalypse: { feed: "公告", forum: "情报板", mail: "信件", diary: "日志", calendar: "排班", live: "监控", phone: "通话" },
       },
       event: {
         modern: { post: "动态", thread: "帖子", reply: "回复", mail: "邮件", diary: "日记", calendar: "日程", live: "直播" },
+        social: { post: "动态", thread: "话题", reply: "回复", mail: "邮件", diary: "日记", calendar: "日程", live: "直播" },
         xianxia: { post: "见闻", thread: "论帖", reply: "回帖", mail: "书信", diary: "札记", calendar: "行程", live: "留影" },
         apocalypse: { post: "公告", thread: "情报", reply: "回报", mail: "信件", diary: "日志", calendar: "排班", live: "监控" },
       },
@@ -325,6 +372,10 @@
       modern: {
         title: "我的小手机",
         subtitle: "选择一个应用进入。后续可以继续扩展新的小应用。",
+      },
+      social: {
+        title: "我的小手机",
+        subtitle: "群聊、表情、动态和提醒都收在这里。回复会更短，更像真实聊天窗口。",
       },
       xianxia: {
         title: "书札匣",
@@ -1937,14 +1988,14 @@
     const sticker = message.type === "sticker" ? stickerById(message.content) : null;
     const content = sticker
       ? `<div class="fmcp-sticker${sticker.type === "image" ? " is-image" : ""}">${stickerVisualMarkup(sticker)}<span>${esc(sticker.pack_label || "贴纸")} · ${esc(sticker.label || message.content)}</span></div>`
-      : esc(message.content);
+      : textBubbleMarkup(message.content);
     const time = message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
     return `
       <article class="fmcp-message${userClass}${errorClass}">
         ${isUser ? "" : avatarMarkup(member || { name: message.speaker_name }, "fmcp-message-avatar")}
         <div class="fmcp-message-stack">
           <div class="fmcp-message-meta"><span>${esc(message.speaker_name)}</span>${time ? `<time>${esc(time)}</time>` : ""}</div>
-          <div class="fmcp-message-bubble">${content}</div>
+          ${sticker ? `<div class="fmcp-message-bubble">${content}</div>` : content}
           ${isUser ? `<div class="fmcp-message-foot"><span class="fmcp-message-receipt">✓✓</span>${time ? `<time>${esc(time)}</time>` : ""}</div>` : ""}
         </div>
         ${isUser ? avatarMarkup(member || { name: message.speaker_name }, "fmcp-message-avatar") : ""}
@@ -2053,6 +2104,7 @@
               <span class="fmcp-settings-copy"><strong>主题风格</strong><small>影响小手机显示名和生成语境</small></span>
               <select class="fmcp-select fmcp-theme-select" name="ui_theme">
                 <option value="modern" ${currentTheme() === "modern" ? "selected" : ""}>现代</option>
+                <option value="social" ${currentTheme() === "social" ? "selected" : ""}>社交</option>
                 <option value="xianxia" ${currentTheme() === "xianxia" ? "selected" : ""}>古风</option>
                 <option value="apocalypse" ${currentTheme() === "apocalypse" ? "selected" : ""}>末世</option>
               </select>

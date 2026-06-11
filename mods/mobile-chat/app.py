@@ -72,10 +72,15 @@ DEFAULT_UI_SETTINGS = {
     "panel_position": {"right": 28, "bottom": 92},
     "ui_theme": "modern",
 }
-WORLD_THEME_IDS = {"modern", "xianxia", "apocalypse"}
+WORLD_THEME_IDS = {"modern", "social", "xianxia", "apocalypse"}
 DEFAULT_WORLD_THEME = "modern"
 WORLD_THEME_PROMPTS = {
     "modern": "",
+    "social": (
+        "World style layer: keep this as a lightweight QQ/WeChat-like phone chat. "
+        "Prefer short, natural, message-sized replies that can stand as separate chat bubbles. "
+        "Use casual timing, brief reactions, stickers or emoji when suitable, and avoid long narration unless the user asks."
+    ),
     "xianxia": (
         "World style layer: keep the phone UI and JSON schema modern internally, but let wording and character behavior fit a xianxia or classical fantasy setting. "
         "Use display concepts such as transmission, letter, voice transmission and sightings when natural. Keep replies light, fragmented and conversational; do not force archaic prose."
