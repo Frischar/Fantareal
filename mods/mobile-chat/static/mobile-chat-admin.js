@@ -1462,7 +1462,7 @@
   }
 
   function themeLabel(value) {
-    return { modern: "现代沉浸", xianxia: "古风 / 修仙", apocalypse: "末世 / 生存" }[value] || "现代沉浸";
+    return { modern: "现代沉浸", social: "QQ/WX 社交", xianxia: "古风 / 修仙", apocalypse: "末世 / 生存" }[value] || "现代沉浸";
   }
 
 
@@ -1569,7 +1569,7 @@
     byId("fmca-enabled").checked = Boolean(settings.enabled);
     byId("fmca-show-fab").checked = Boolean(settings.show_floating_button);
     byId("fmca-remember-position").checked = Boolean(settings.remember_position);
-    byId("fmca-ui-theme").value = ["modern", "xianxia", "apocalypse"].includes(settings.ui_theme) ? settings.ui_theme : "modern";
+    byId("fmca-ui-theme").value = ["modern", "social", "xianxia", "apocalypse"].includes(settings.ui_theme) ? settings.ui_theme : "modern";
     byId("fmca-reply-count").value = settings.reply_count === "1" ? "1" : "1-2";
     byId("fmca-max-tokens").value = settings.max_tokens || 500;
     byId("fmca-recent-limit").value = settings.recent_message_limit || 30;

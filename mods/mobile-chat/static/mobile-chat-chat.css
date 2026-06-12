@@ -2462,6 +2462,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
+  gap: 4px;
 }
 
 .fmcp-message-meta,
@@ -2496,6 +2497,10 @@
   background: rgba(118, 137, 164, 0.24);
   color: rgba(247, 250, 255, 0.96);
   overflow-wrap: anywhere;
+}
+
+.fmcp-message-bubble + .fmcp-message-bubble {
+  margin-top: 2px;
 }
 
 .fmcp-message.is-user .fmcp-message-bubble {
@@ -5296,6 +5301,117 @@
   --fmcp-blue-soft: rgba(149, 91, 44, 0.2);
   --fmcp-green: #687f58;
   --fmcp-danger: #9b3f32;
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] {
+  --fmcp-panel: rgba(11, 12, 14, 0.98);
+  --fmcp-panel-strong: rgba(19, 20, 23, 0.99);
+  --fmcp-card: rgba(38, 40, 44, 0.92);
+  --fmcp-card-strong: rgba(45, 47, 52, 0.96);
+  --fmcp-border: rgba(255, 255, 255, 0.1);
+  --fmcp-border-soft: rgba(255, 255, 255, 0.06);
+  --fmcp-muted: rgba(235, 239, 245, 0.48);
+  --fmcp-text: #f1f3f5;
+  --fmcp-blue: #5fcf7a;
+  --fmcp-blue-strong: #45bd64;
+  --fmcp-blue-soft: rgba(95, 207, 122, 0.18);
+  --fmcp-green: #5fcf7a;
+  --fmcp-danger: #ff7f8a;
+  color: var(--fmcp-text);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-panel {
+  border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(14, 15, 18, 0.99), rgba(9, 10, 12, 0.99)),
+    var(--fmcp-panel);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.42);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-header,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-composer {
+  background: rgba(24, 25, 28, 0.96);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-title,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-home-intro strong,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-app-card strong {
+  color: var(--fmcp-text);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-subtitle,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-home-intro span,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-message-meta,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-message-foot,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-help {
+  color: var(--fmcp-muted);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-message-meta span {
+  color: rgba(235, 239, 245, 0.66);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-message-avatar {
+  width: 42px;
+  height: 42px;
+  margin-top: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-message-bubble {
+  max-width: min(315px, 70vw);
+  padding: 12px 14px;
+  border-color: transparent;
+  border-radius: 8px;
+  background: #2a2c30;
+  box-shadow: none;
+  color: #f0f2f5;
+  font-size: 15px;
+  line-height: 1.62;
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-message.is-user .fmcp-message-bubble {
+  border-color: transparent;
+  background: #62c777;
+  color: #08190e;
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-composer-input,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-button,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-tab,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-select,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-number-input,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-settings-card,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-group-card,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-import-card {
+  border-color: var(--fmcp-border);
+  background: rgba(42, 44, 48, 0.92);
+  color: var(--fmcp-text);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-composer {
+  padding: 10px 10px 12px;
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-composer-input {
+  border-radius: 8px;
+  background: #24262a;
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-composer-icon {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(244, 247, 250, 0.86);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-fab,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-tab.is-active,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-button-primary {
+  border-color: rgba(95, 207, 122, 0.34);
+  background: linear-gradient(135deg, var(--fmcp-blue-strong), var(--fmcp-blue));
+  color: #ffffff;
 }
 
 #fantareal-mobile-chat-root[data-theme="apocalypse"] {
