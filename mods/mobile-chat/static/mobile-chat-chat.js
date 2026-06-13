@@ -288,13 +288,6 @@
     `;
   }
 
-  function groupAvatarMarkup(group, extraClass = "") {
-    const member = group && Array.isArray(group.members)
-      ? group.members.find((item) => item.type === "character")
-      : null;
-    return avatarMarkup(member || { name: group && group.name ? group.name : "群" }, extraClass);
-  }
-
   function currentGroup() {
     return state.groups.find((item) => item.group_id === state.currentGroupId) || null;
   }
@@ -2021,7 +2014,6 @@
             : "";
           return `
           <article class="fmcp-group-card">
-            ${groupAvatarMarkup(group, "fmcp-group-avatar")}
             <button class="fmcp-group-main" type="button" data-action="open-group" data-group-id="${esc(group.group_id)}">
               <div class="fmcp-group-heading">
                 <div class="fmcp-group-name">${esc(group.name)}</div>
