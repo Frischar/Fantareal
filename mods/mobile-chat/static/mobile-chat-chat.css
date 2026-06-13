@@ -124,10 +124,33 @@
 
 .fmcp-shell {
   position: relative;
+  isolation: isolate;
   display: flex;
   min-width: 0;
   width: 100%;
   flex-direction: column;
+}
+
+.fmcp-fixed-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(8, 12, 17, 0.48), rgba(8, 12, 17, 0.64)),
+    var(--fmcp-home-background-image);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.fmcp-header,
+.fmcp-body,
+.fmcp-composer,
+.fmcp-bottom-nav,
+.fmcp-generation-overlay {
+  position: relative;
+  z-index: 1;
 }
 
 .fmcp-header {
@@ -281,8 +304,20 @@
   flex: 1;
   overflow-y: auto;
   padding: 15px;
+  background: transparent;
   scrollbar-color: rgba(192, 207, 228, 0.32) transparent;
   scrollbar-width: thin;
+}
+
+.fmcp-shell.has-custom-background .fmcp-app-drawer-hero {
+  background: rgba(16, 23, 31, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.fmcp-shell.has-custom-background .fmcp-body-groups .fmcp-group-card,
+.fmcp-shell.has-custom-background .fmcp-body-stickers .fmcp-settings-card,
+.fmcp-shell.has-custom-background .fmcp-body-stickers .fmcp-sticker-option {
+  backdrop-filter: blur(10px);
 }
 
 .fmcp-shell.is-generating > .fmcp-body,
@@ -337,6 +372,116 @@
 .fmcp-sticker-app {
   display: grid;
   gap: 15px;
+}
+
+.fmcp-app-drawer {
+  align-content: start;
+  gap: 18px;
+}
+
+.fmcp-app-drawer-hero {
+  position: relative;
+  display: flex;
+  min-height: 118px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid var(--fmcp-border);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 86% 8%, rgba(112, 157, 255, 0.34), transparent 38%),
+    linear-gradient(145deg, rgba(62, 91, 145, 0.38), rgba(255, 255, 255, 0.035));
+  background-position: center;
+  background-size: cover;
+}
+
+.fmcp-app-drawer-hero::after {
+  display: none;
+}
+
+.fmcp-home-time {
+  position: relative;
+  z-index: 1;
+  color: #f8faff;
+  font-size: clamp(34px, 10vw, 48px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 720;
+  letter-spacing: -0.055em;
+  line-height: 1;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, 0.38);
+}
+
+.fmcp-home-time-stack {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+}
+
+.fmcp-home-fortune {
+  display: grid;
+  max-width: 225px;
+  gap: 3px;
+}
+
+.fmcp-home-fortune strong {
+  color: #f8faff;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.fmcp-home-fortune span {
+  color: rgba(226, 234, 247, 0.72);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.fmcp-home-weather {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.fmcp-weather-icon {
+  font-size: 30px;
+  line-height: 1;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.24));
+}
+
+.fmcp-weather-copy {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+}
+
+.fmcp-weather-copy strong {
+  color: #f8faff;
+  font-size: 14px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.fmcp-weather-copy span {
+  color: rgba(226, 234, 247, 0.68);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fmcp-app-drawer-label {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+}
+
+.fmcp-app-drawer-label strong {
+  color: var(--fmcp-text);
+  font-size: 14px;
 }
 
 .fmcp-home-intro {
@@ -469,6 +614,47 @@
   background: linear-gradient(145deg, #6fa7f2, #4f8a8f);
 }
 
+.fmcp-app-drawer .fmcp-app-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px 10px;
+}
+
+.fmcp-app-drawer .fmcp-app-card {
+  min-height: 82px;
+  gap: 8px;
+  padding: 4px 2px;
+  border-color: transparent;
+  border-radius: 18px;
+  background: transparent;
+}
+
+.fmcp-app-drawer .fmcp-app-card:hover,
+.fmcp-app-drawer .fmcp-app-card:focus-visible {
+  border-color: var(--fmcp-border);
+  background: var(--fmcp-blue-soft);
+  transform: translateY(-2px);
+}
+
+.fmcp-app-drawer .fmcp-app-card strong {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.fmcp-app-drawer .fmcp-app-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 17px;
+  box-shadow:
+    0 9px 18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.fmcp-app-drawer .fmcp-app-icon .fmcp-glyph {
+  width: 26px;
+  height: 26px;
+}
+
 .fmcp-toolbar,
 .fmcp-form-actions {
   display: flex;
@@ -522,6 +708,25 @@
   white-space: nowrap;
 }
 
+.fmcp-group-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.fmcp-group-heading .fmcp-group-name {
+  min-width: 0;
+  flex: 1;
+}
+
+.fmcp-group-time {
+  flex: 0 0 auto;
+  color: var(--fmcp-muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
 .fmcp-group-meta,
 .fmcp-help,
 .fmcp-message-time,
@@ -531,7 +736,15 @@
 }
 
 .fmcp-group-meta {
+  overflow: hidden;
   margin-top: 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fmcp-group-meta strong {
+  color: rgba(232, 239, 249, 0.82);
+  font-weight: 650;
 }
 
 .fmcp-group-delete {
@@ -2452,10 +2665,7 @@
 }
 
 .fmcp-message-avatar {
-  width: 34px;
-  height: 34px;
-  margin-top: 17px;
-  font-size: 13px;
+  display: none !important;
 }
 
 .fmcp-message-stack {
@@ -2515,6 +2725,68 @@
   color: #ffd5d7;
 }
 
+.fmcp-typing-message {
+  animation: fmcp-typing-enter 180ms ease-out both;
+}
+
+.fmcp-typing-bubble {
+  display: flex;
+  width: 54px;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.fmcp-typing-bubble span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.36;
+  animation: fmcp-typing-dot 1.15s ease-in-out infinite;
+}
+
+.fmcp-typing-bubble span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.fmcp-typing-bubble span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes fmcp-typing-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+@keyframes fmcp-typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 0.95;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fmcp-typing-message,
+  .fmcp-typing-bubble span {
+    animation: none;
+  }
+
+  .fmcp-typing-bubble span {
+    opacity: 0.72;
+  }
+}
+
 .fmcp-message-foot {
   justify-content: flex-end;
   margin-top: 3px;
@@ -2543,6 +2815,18 @@
 .fmcp-sticker.is-image {
   width: min(174px, 52vw);
   min-height: 0;
+}
+
+.fmcp-message-bubble.fmcp-sticker-bubble.is-image {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fmcp-message.is-user .fmcp-message-bubble.fmcp-sticker-bubble.is-image {
+  border: 0;
+  background: transparent;
 }
 
 .fmcp-sticker.is-image .fmcp-sticker-image {
@@ -2666,6 +2950,96 @@
   opacity: 0.56;
 }
 
+.fmcp-bottom-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  margin: 0 10px 10px;
+  padding: 6px;
+  border: 1px solid var(--fmcp-border-soft);
+  border-radius: 21px;
+  background: rgba(12, 20, 30, 0.9);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(18px);
+}
+
+.fmcp-bottom-nav-item {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 52px;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  padding: 5px 2px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--fmcp-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.fmcp-bottom-nav-item:hover,
+.fmcp-bottom-nav-item:focus-visible {
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--fmcp-text);
+  outline: none;
+}
+
+.fmcp-bottom-nav-item.is-active {
+  background: var(--fmcp-blue-soft);
+  color: var(--fmcp-text);
+}
+
+.fmcp-bottom-nav-item.is-active::before {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--fmcp-blue);
+  content: "";
+}
+
+.fmcp-bottom-nav-icon {
+  display: grid;
+  width: 27px;
+  height: 25px;
+  place-items: center;
+  border-radius: 10px;
+}
+
+.fmcp-bottom-nav-icon .fmcp-glyph {
+  width: 19px;
+  height: 19px;
+}
+
+.fmcp-bottom-nav-item.is-active .fmcp-bottom-nav-icon {
+  color: var(--fmcp-blue);
+}
+
+.fmcp-background-setting {
+  align-items: center;
+}
+
+.fmcp-background-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.fmcp-background-actions .fmcp-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
 .fmcp-extension-panel {
   display: grid;
   gap: 7px;
@@ -2779,6 +3153,24 @@
   background: rgba(255, 255, 255, 0.045);
   color: var(--fmcp-text);
   text-align: center;
+}
+
+.fmcp-sticker-library-card {
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+}
+
+.fmcp-sticker-library-card:hover,
+.fmcp-sticker-library-card:focus-visible {
+  border-color: rgba(126, 170, 255, 0.66);
+  background: rgba(89, 133, 214, 0.14);
+  outline: none;
+}
+
+.fmcp-sticker-library-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .fmcp-sticker-library-card .fmcp-sticker-art {
@@ -2953,6 +3345,52 @@
     gap: 9px;
   }
 
+  .fmcp-app-drawer {
+    gap: 14px;
+  }
+
+  .fmcp-app-drawer-hero {
+    min-height: 104px;
+    padding: 16px;
+  }
+
+  .fmcp-home-time {
+    font-size: 38px;
+  }
+
+  .fmcp-app-drawer-hero {
+    gap: 10px;
+  }
+
+  .fmcp-home-fortune {
+    max-width: 190px;
+  }
+
+  .fmcp-home-fortune span {
+    font-size: 8px;
+  }
+
+  .fmcp-weather-icon {
+    font-size: 25px;
+  }
+
+  .fmcp-weather-copy strong {
+    font-size: 12px;
+  }
+
+  .fmcp-app-drawer .fmcp-app-grid {
+    gap: 14px 6px;
+  }
+
+  .fmcp-app-drawer .fmcp-app-card {
+    min-height: 76px;
+  }
+
+  .fmcp-app-drawer .fmcp-app-icon {
+    width: 49px;
+    height: 49px;
+  }
+
   .fmcp-app-card {
     min-height: 116px;
     padding: 10px 6px;
@@ -2974,6 +3412,14 @@
   .fmcp-composer .fmcp-button-primary {
     min-width: 56px;
     padding-inline: 10px;
+  }
+
+  .fmcp-bottom-nav {
+    margin: 0 7px 7px;
+  }
+
+  .fmcp-bottom-nav-item {
+    min-height: 49px;
   }
 
   .fmcp-sticker-panel {
@@ -5352,14 +5798,6 @@
   color: rgba(235, 239, 245, 0.66);
 }
 
-#fantareal-mobile-chat-root[data-theme="social"] .fmcp-message-avatar {
-  width: 42px;
-  height: 42px;
-  margin-top: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: none;
-}
-
 #fantareal-mobile-chat-root[data-theme="social"] .fmcp-message-bubble {
   max-width: min(315px, 70vw);
   padding: 12px 14px;
@@ -5682,4 +6120,174 @@
 
 #fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-mail-topbar {
   background: linear-gradient(135deg, #2f4638, #6f7545);
+}
+
+/* Android-style app drawer and persistent primary navigation */
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-bottom-nav {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(24, 25, 28, 0.96);
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-app-drawer-hero {
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at 86% 8%, rgba(95, 207, 122, 0.22), transparent 38%),
+    linear-gradient(145deg, rgba(36, 75, 48, 0.44), rgba(38, 40, 44, 0.9));
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-bottom-nav-item.is-active {
+  background: rgba(95, 207, 122, 0.14);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-bottom-nav {
+  border-color: rgba(112, 76, 41, 0.22);
+  background: rgba(238, 211, 164, 0.94);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-drawer-hero {
+  background:
+    radial-gradient(circle at 86% 8%, rgba(163, 95, 42, 0.2), transparent 38%),
+    linear-gradient(145deg, rgba(187, 126, 67, 0.24), rgba(255, 240, 207, 0.48));
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-drawer-hero strong,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-drawer-kicker,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-app-drawer-count,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-home-time {
+  color: #3c2a18;
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-bottom-nav {
+  background: rgba(22, 28, 23, 0.94);
+}
+
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-app-drawer-hero {
+  background:
+    radial-gradient(circle at 86% 8%, rgba(181, 161, 93, 0.2), transparent 38%),
+    linear-gradient(145deg, rgba(83, 111, 72, 0.28), rgba(222, 232, 216, 0.045));
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-shell.has-custom-background .fmcp-home-time {
+  color: #fff;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-shell.has-custom-background .fmcp-home-fortune strong,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-shell.has-custom-background .fmcp-home-fortune span,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-shell.has-custom-background .fmcp-weather-copy strong,
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-shell.has-custom-background .fmcp-weather-copy span {
+  color: #fff;
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-shell.has-custom-background .fmcp-fixed-background,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-shell.has-custom-background .fmcp-fixed-background {
+  background-image:
+    linear-gradient(rgba(15, 14, 11, 0.42), rgba(15, 14, 11, 0.58)),
+    var(--fmcp-home-background-image);
+}
+
+#fantareal-mobile-chat-root .fmcp-panel.is-chat-room .fmcp-chat-header {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+#fantareal-mobile-chat-root .fmcp-panel.is-chat-room .fmcp-chat-header .fmcp-header-action {
+  width: 40px;
+  height: 40px;
+  border-color: rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(12, 17, 23, 0.38);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+#fantareal-mobile-chat-root .fmcp-panel.is-chat-room .fmcp-body-chat {
+  padding-top: 62px;
+}
+
+#fantareal-mobile-chat-root .fmcp-panel.is-chat-room .fmcp-composer {
+  border-top-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+#fantareal-mobile-chat-root .fmcp-body-groups .fmcp-group-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(14, 20, 28, 0.46);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+#fantareal-mobile-chat-root .fmcp-panel:not(.is-chat-room) .fmcp-header {
+  margin: 8px 8px 0;
+  min-height: 62px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(12, 17, 23, 0.42);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+}
+
+#fantareal-mobile-chat-root .fmcp-panel:not(.is-chat-room) .fmcp-device-mark,
+#fantareal-mobile-chat-root .fmcp-panel:not(.is-chat-room) .fmcp-header-action {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(8px);
+}
+
+#fantareal-mobile-chat-root .fmcp-bottom-nav {
+  gap: 4px;
+  margin: 0 9px 9px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  background: rgba(12, 17, 23, 0.46);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(16px);
+}
+
+#fantareal-mobile-chat-root .fmcp-bottom-nav-item {
+  min-height: 50px;
+  border-radius: 14px;
+  color: rgba(235, 241, 249, 0.68);
+}
+
+#fantareal-mobile-chat-root .fmcp-bottom-nav-icon {
+  display: grid;
+}
+
+#fantareal-mobile-chat-root .fmcp-bottom-nav-item.is-active {
+  background: rgba(79, 131, 232, 0.2);
+  color: #fff;
+}
+
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-bottom-nav-item.is-active {
+  background: rgba(95, 207, 122, 0.2);
+}
+
+#fantareal-mobile-chat-root[data-theme="xianxia"] .fmcp-bottom-nav,
+#fantareal-mobile-chat-root[data-theme="apocalypse"] .fmcp-bottom-nav,
+#fantareal-mobile-chat-root[data-theme="social"] .fmcp-bottom-nav {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(12, 17, 23, 0.46);
+}
+
+#fantareal-mobile-chat-root .fmcp-message .fmcp-message-bubble.fmcp-sticker-bubble.is-image,
+#fantareal-mobile-chat-root .fmcp-message.is-user .fmcp-message-bubble.fmcp-sticker-bubble.is-image {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }

@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import os
+import random
 import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -13,7 +14,7 @@ from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -30,6 +31,7 @@ RESOURCE_DIR = APP_DIR
 PROJECT_ROOT = APP_DIR.parent.parent if APP_DIR.parent.name.lower() == "mods" else APP_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data" / "mobile_chat"
 CARDS_DIR = DATA_DIR / "cards"
+BACKGROUNDS_DIR = DATA_DIR / "backgrounds"
 SETTINGS_PATH = DATA_DIR / "settings.json"
 GROUPS_PATH = DATA_DIR / "groups.json"
 ROLE_PROFILES_PATH = DATA_DIR / "role_profiles.json"
@@ -57,6 +59,43 @@ STICKER_IDS = set(DEFAULT_STICKER_IDS)
 STICKER_PACK_ROOT = STATIC_DIR / "stickers"
 RESERVED_STICKER_PACK_IDS = {"default"}
 MAX_CUSTOM_STICKERS_PER_PACK = 160
+STICKER_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+STICKER_MEDIA_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+STICKER_PACK_LABELS = {
+    "angry": "生气",
+    "baka": "笨蛋",
+    "color": "色彩",
+    "confused": "疑惑",
+    "cpu": "CPU",
+    "fool": "搞怪",
+    "givemoney": "给钱",
+    "happy": "开心",
+    "like": "喜欢",
+    "meow": "猫猫",
+    "morning": "早安",
+    "reply": "回复",
+    "sad": "难过",
+    "see": "围观",
+    "shy": "害羞",
+    "sigh": "叹气",
+    "sleep": "睡觉",
+    "surprised": "惊讶",
+    "work": "工作",
+}
+MOOD_STICKER_TAGS = tuple(STICKER_PACK_LABELS)
+MOOD_STICKER_CHANCE = 0.25
+MOOD_TAG_PROMPT = (
+    "在每条角色文字回复的 content 末尾附加且只附加一个心情标签，格式必须为 {angry}。"
+    "标签只能从以下列表选择："
+    + ", ".join(f"{{{tag}}}" for tag in MOOD_STICKER_TAGS)
+    + "。标签用于系统选择表情包，不要解释标签，不要把标签单独作为消息。"
+)
 MESSAGE_TYPES = {"text", "sticker", "system", "error"}
 MESSAGE_SOURCES = {"user", "ai", "system"}
 GROUP_ID_RE = re.compile(r"^group_[a-z0-9_-]{6,80}$")
@@ -71,9 +110,38 @@ DEFAULT_UI_SETTINGS = {
     "floating_position": {"right": 28, "bottom": 150},
     "panel_position": {"right": 28, "bottom": 92},
     "ui_theme": "modern",
+    "home_background_image": "",
 }
+BACKGROUND_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+MAX_BACKGROUND_IMAGE_BYTES = 8 * 1024 * 1024
 WORLD_THEME_IDS = {"modern", "social", "xianxia", "apocalypse"}
 DEFAULT_WORLD_THEME = "modern"
+WEATHER_CATALOG = {
+    "spring": (
+        ("晴", "☀", 18, 7),
+        ("多云", "⛅", 16, 6),
+        ("小雨", "🌦", 13, 5),
+        ("阵雨", "🌧", 14, 6),
+    ),
+    "summer": (
+        ("晴", "☀", 30, 8),
+        ("多云", "⛅", 28, 7),
+        ("雷阵雨", "⛈", 26, 6),
+        ("阵雨", "🌧", 25, 6),
+    ),
+    "autumn": (
+        ("晴", "☀", 21, 8),
+        ("多云", "⛅", 19, 7),
+        ("阴", "☁", 17, 6),
+        ("小雨", "🌦", 15, 5),
+    ),
+    "winter": (
+        ("晴", "☀", 8, 9),
+        ("多云", "⛅", 6, 8),
+        ("阴", "☁", 4, 7),
+        ("小雪", "🌨", 1, 6),
+    ),
+}
 WORLD_THEME_PROMPTS = {
     "modern": "",
     "social": (
@@ -249,15 +317,12 @@ DEFAULT_PROMPT_BLOCKS = {
         },
         {
             "block_id": "sticker_contract",
-            "label": "Sticker Contract",
+            "label": "Mood Sticker Contract",
             "order": 40,
             "enabled": True,
             "locked": False,
             "scope": ["group_chat"],
-            "content": (
-                "When sending stickers, use only sticker ids from available_stickers. "
-                "Choose stickers by label, tags and character mood."
-            ),
+            "content": MOOD_TAG_PROMPT,
         },
         {
             "block_id": "json_output",
@@ -275,7 +340,7 @@ DEFAULT_APP_REGISTRY = {
     "apps": [
         {"app_id": "group_chat", "label": "口袋群聊", "subtitle": "角色卡群聊", "icon": "message", "page": "groups", "order": 10, "enabled": True, "stage": "v1.3"},
         {"app_id": "settings", "label": "详细设置", "subtitle": "偏好与模型", "icon": "settings", "page": "settings", "order": 20, "enabled": True, "stage": "v1.3"},
-        {"app_id": "stickers", "label": "贴纸包", "subtitle": "内置资源", "icon": "smile", "page": "stickers", "order": 30, "enabled": True, "stage": "v1.3"},
+        {"app_id": "stickers", "label": "表情包", "subtitle": "全部表情资源", "icon": "smile", "page": "stickers", "order": 30, "enabled": True, "stage": "v1.3"},
         {"app_id": "assist", "label": "辅助功能", "subtitle": "人物生成", "icon": "toolbox", "page": "assist", "order": 35, "enabled": True, "stage": "v4.0"},
         {"app_id": "feed", "label": "动态", "subtitle": "角色近况", "icon": "spark", "page": "channel-feed_main", "order": 40, "enabled": True, "stage": "v1.7"},
         {"app_id": "forum", "label": "论坛", "subtitle": "世界讨论板", "icon": "forum", "page": "channel-forum_main", "order": 50, "enabled": True, "stage": "v1.7"},
@@ -674,13 +739,13 @@ def clamp_float(value: Any, minimum: float, maximum: float, default: float) -> f
     return max(minimum, min(maximum, parsed))
 
 
-def is_safe_png_filename(filename: Any) -> bool:
+def is_safe_sticker_filename(filename: Any) -> bool:
     name = str(filename or "").strip()
     if not name or len(name) > 160 or name.startswith("."):
         return False
     if Path(name).name != name:
         return False
-    return name.lower().endswith(".png")
+    return Path(name).suffix.lower() in STICKER_IMAGE_SUFFIXES
 
 
 def is_safe_sticker_pack_id(pack_id: Any) -> bool:
@@ -698,7 +763,7 @@ def custom_sticker_packs() -> dict[str, dict[str, Any]]:
         if not directory.is_dir() or not is_safe_sticker_pack_id(directory.name):
             continue
         pack_id = directory.name
-        label = pack_id.replace("_", " ").replace("-", " ").title()
+        label = STICKER_PACK_LABELS.get(pack_id, pack_id.replace("_", " ").replace("-", " ").title())
         manifest = read_json(directory / "manifest.json", {})
         if isinstance(manifest, dict):
             label = compact_text(manifest.get("label"), 80) or label
@@ -727,7 +792,7 @@ def default_sticker_files() -> list[Path]:
     files = [
         path
         for path in directory.iterdir()
-        if path.is_file() and is_safe_png_filename(path.name)
+        if path.is_file() and is_safe_sticker_filename(path.name)
     ]
     return sorted(files, key=custom_sticker_sort_key)[:MAX_CUSTOM_STICKERS_PER_PACK]
 
@@ -737,7 +802,7 @@ def custom_sticker_path(pack_id: str, filename: str, require_exists: bool = True
     pack = custom_sticker_pack(safe_pack_id)
     if safe_pack_id == "default":
         pack = {"label": "默认", "directory": default_sticker_directory()}
-    if not pack or not is_safe_png_filename(filename):
+    if not pack or not is_safe_sticker_filename(filename):
         return None
     directory = pack["directory"]
     path = directory / filename
@@ -748,7 +813,7 @@ def custom_sticker_path(pack_id: str, filename: str, require_exists: bool = True
         return None
     if resolved_dir != resolved_path.parent:
         return None
-    if require_exists and (not resolved_path.is_file() or resolved_path.suffix.lower() != ".png"):
+    if require_exists and (not resolved_path.is_file() or resolved_path.suffix.lower() not in STICKER_IMAGE_SUFFIXES):
         return None
     return resolved_path
 
@@ -770,7 +835,7 @@ def custom_sticker_files(pack_id: str) -> list[Path]:
     files = [
         path
         for path in directory.iterdir()
-        if path.is_file() and is_safe_png_filename(path.name)
+        if path.is_file() and is_safe_sticker_filename(path.name)
     ]
     return sorted(files, key=custom_sticker_sort_key)[:MAX_CUSTOM_STICKERS_PER_PACK]
 
@@ -813,7 +878,7 @@ def custom_sticker_manifest(pack_id: str) -> dict[str, dict[str, Any]]:
         }
     result: dict[str, dict[str, Any]] = {}
     for filename, meta in rows.items():
-        if not is_safe_png_filename(filename) or not isinstance(meta, dict):
+        if not is_safe_sticker_filename(filename) or not isinstance(meta, dict):
             continue
         result[str(filename)] = {
             "label": compact_text(meta.get("label") or Path(str(filename)).stem, 80),
@@ -866,15 +931,15 @@ def sticker_catalog() -> list[dict[str, Any]]:
             meta = manifest.get(path.name, {})
             stickers.append(
                 {
-                    "id": f"{safe_pack_id}:{path.name}",
+                    "id": f"{pack_id}:{path.name}",
                     "type": "image",
                     "pack_id": pack_id,
                     "pack_label": pack["label"],
                     "label": compact_text(meta.get("label"), 80) or path.stem,
-                    "tags": meta.get("tags", []),
+                    "tags": meta.get("tags", []) or [pack_id],
                     "description": compact_text(meta.get("description"), 120),
                     "filename": path.name,
-                    "url_path": f"/stickers/{safe_pack_id}/{quote(path.name)}",
+                    "url_path": f"/stickers/{pack_id}/{quote(path.name)}",
                 }
             )
     return stickers
@@ -945,7 +1010,7 @@ def sanitize_manifest_rows(value: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         filename = compact_text(item.get("filename") or item.get("file"), 160)
-        if not is_safe_png_filename(filename) or filename in seen:
+        if not is_safe_sticker_filename(filename) or filename in seen:
             continue
         seen.add(filename)
         rows.append(
@@ -986,6 +1051,59 @@ def local_today() -> date:
 
 def local_today_iso() -> str:
     return local_today().isoformat()
+
+
+def daily_weather_payload(target_date: date | None = None) -> dict[str, Any]:
+    day = target_date or local_today()
+    season = (
+        "spring" if day.month in {3, 4, 5}
+        else "summer" if day.month in {6, 7, 8}
+        else "autumn" if day.month in {9, 10, 11}
+        else "winter"
+    )
+    digest = hashlib.sha256(f"{current_mobile_card_uid()}:{day.isoformat()}:weather".encode("utf-8")).digest()
+    condition, icon, seasonal_high, spread = WEATHER_CATALOG[season][digest[0] % len(WEATHER_CATALOG[season])]
+    high = seasonal_high + (digest[1] % 7) - 3
+    low = high - spread - (digest[2] % 3)
+    current = low + (digest[3] % max(1, high - low + 1))
+    return {
+        "date": day.isoformat(),
+        "condition": condition,
+        "icon": icon,
+        "temperature": current,
+        "high": high,
+        "low": low,
+        "season": season,
+    }
+
+
+def daily_fortune_payload(target_date: date | None = None) -> dict[str, Any]:
+    day = target_date or local_today()
+    digest = hashlib.sha256(f"{current_mobile_card_uid()}:{day.isoformat()}:fortune".encode("utf-8")).digest()
+    score = 50 + digest[0] % 51
+    if score >= 90:
+        message = "好运正盛，适合主动迈出一步。"
+    elif score >= 80:
+        message = "状态不错，今天容易遇到顺心的小事。"
+    elif score >= 70:
+        message = "平稳向好，按自己的节奏来就好。"
+    elif score >= 60:
+        message = "稍微放慢一点，会更容易看清方向。"
+    else:
+        message = "别急着做决定，先照顾好自己的心情。"
+    return {"date": day.isoformat(), "score": score, "message": message}
+
+
+def weather_context_message() -> dict[str, str]:
+    weather = daily_weather_payload()
+    content = (
+        "小手机今日环境信息："
+        f"{weather['date']}，天气{weather['condition']}，当前约{weather['temperature']}℃，"
+        f"最高{weather['high']}℃，最低{weather['low']}℃。"
+        "这是当天稳定的环境事实。角色可在穿着、出行、身体感受、动态、日程和闲聊中自然参考，"
+        "但不要每次回复都主动播报天气，也不要改变既有剧情设定。"
+    )
+    return {"role": "system", "content": content}
 
 
 def normalize_id(value: Any, fallback: str = "") -> str:
@@ -1097,6 +1215,7 @@ def ensure_runtime_data() -> None:
     with STORAGE_LOCK:
         MESSAGES_DIR.mkdir(parents=True, exist_ok=True)
         EVENTS_DIR.mkdir(parents=True, exist_ok=True)
+        BACKGROUNDS_DIR.mkdir(parents=True, exist_ok=True)
         card_messages_dir().mkdir(parents=True, exist_ok=True)
         card_events_dir().mkdir(parents=True, exist_ok=True)
         if not SETTINGS_PATH.exists():
@@ -1129,6 +1248,13 @@ def sanitize_position(raw: Any, default: dict[str, int]) -> dict[str, int]:
         "right": clamp_int(source.get("right"), 0, 10000, default["right"]),
         "bottom": clamp_int(source.get("bottom"), 0, 10000, default["bottom"]),
     }
+
+
+def sanitize_background_filename(value: Any) -> str:
+    filename = Path(str(value or "").strip()).name
+    if not filename or Path(filename).suffix.lower() not in BACKGROUND_IMAGE_SUFFIXES:
+        return ""
+    return filename if (BACKGROUNDS_DIR / filename).is_file() else ""
 
 
 def section_source(raw: dict[str, Any], key: str) -> dict[str, Any]:
@@ -1319,6 +1445,9 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
     settings["remember_position"] = bool(pick_section_value(source, ui_source, "remember_position", DEFAULT_UI_SETTINGS["remember_position"]))
     settings["ui_theme"] = sanitize_world_theme(pick_section_value(source, ui_source, "ui_theme", source.get("world_theme", DEFAULT_WORLD_THEME)))
     settings["world_theme"] = settings["ui_theme"]
+    settings["home_background_image"] = sanitize_background_filename(
+        pick_section_value(source, ui_source, "home_background_image", DEFAULT_UI_SETTINGS["home_background_image"])
+    )
     settings["floating_position"] = sanitize_position(
         pick_section_value(source, ui_source, "floating_position", DEFAULT_UI_SETTINGS["floating_position"]),
         DEFAULT_UI_SETTINGS["floating_position"],
@@ -1378,6 +1507,7 @@ def sanitize_settings(raw: Any) -> dict[str, Any]:
         "floating_position": settings["floating_position"],
         "panel_position": settings["panel_position"],
         "ui_theme": settings["ui_theme"],
+        "home_background_image": settings["home_background_image"],
     }
     settings["generation"] = {
         "model_source": settings["model_source"],
@@ -1474,6 +1604,12 @@ def sanitize_prompt_blocks(raw: Any) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     for index, item in enumerate(source.get("blocks") if isinstance(source.get("blocks"), list) else DEFAULT_PROMPT_BLOCKS["blocks"]):
         block = sanitize_prompt_block(item, index)
+        if block and block["block_id"] == "sticker_contract" and "available_stickers" in block["content"]:
+            block = {
+                **block,
+                "label": "Mood Sticker Contract",
+                "content": MOOD_TAG_PROMPT,
+            }
         if block:
             rows.append(block)
     if not any(item["block_id"] == "json_output" for item in rows):
@@ -1702,6 +1838,7 @@ def prompt_preview_payload(scope: str = "group_chat", group_id: str = "") -> dic
         "prompt_mode": prompt_mode_for_settings(settings),
         "role_count": len(get_role_profiles(include_disabled=False)),
         "sticker_count": len(sticker_catalog()),
+        "weather": daily_weather_payload(),
     }
     if group:
         context["group"] = {
@@ -1724,6 +1861,7 @@ def prompt_preview_payload(scope: str = "group_chat", group_id: str = "") -> dic
         "prompt_body": prompt_body_preview_text(target_scope, settings),
         "locked_contract_text": locked_prompt_contract_text(target_scope),
         "assembled_prompt": assembled_prompt_text(target_scope),
+        "weather_context": weather_context_message()["content"],
         "context_preview": context,
         "schemas": [item for item in channel_schema_catalog() if item["type"] == target_scope],
     }
@@ -3226,6 +3364,14 @@ def append_group_messages(group_id: str, entries: list[dict[str, Any]]) -> list[
         rows.extend(sanitized_entries)
         _write_json_unlocked(path, rows)
     return sanitized_entries
+
+
+def group_with_last_message(group: dict[str, Any]) -> dict[str, Any]:
+    messages = get_messages(group["group_id"])
+    return {
+        **group,
+        "last_message": messages[-1] if messages else None,
+    }
 
 
 def sanitize_app_entry(raw: Any, index: int = 0) -> dict[str, Any] | None:
@@ -4735,7 +4881,7 @@ async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, te
         headers["Authorization"] = f"Bearer {config['api_key']}"
     payload = {
         "model": config["model"],
-        "messages": messages,
+        "messages": [weather_context_message(), *messages],
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": False,
@@ -4761,9 +4907,12 @@ async def call_chat_model(messages: list[dict[str, str]], *, max_tokens: int, te
                 response_text = exc.response.text.strip()[:500]
             except Exception:
                 response_text = ""
-        detail = f"模型服务返回 HTTP {status_code}。"
-        if response_text:
-            detail = f"{detail} upstream={response_text}"
+        if "input new_sensitive" in response_text.lower():
+            detail = "上游模型拒绝了输入：内容触发敏感审核（new_sensitive 1026）。请检查本轮消息或角色上下文中的敏感内容。"
+        else:
+            detail = f"模型服务返回 HTTP {status_code}。"
+            if response_text:
+                detail = f"{detail} upstream={response_text}"
         raise HTTPException(status_code=502, detail=detail) from exc
     except httpx.TimeoutException as exc:
         raise HTTPException(status_code=504, detail="模型服务响应超时，请稍后重试。") from exc
@@ -4858,7 +5007,6 @@ def build_mobile_model_messages(
         "allow_role_to_role_reply": group["allow_role_to_role_reply"],
         "allow_auto_interject": group["allow_auto_interject"],
         "role_app_policy": role_app_generation_policy("group_chat"),
-        "available_stickers": sticker_prompt_catalog(),
         "main_story_context": main_story_context_payload(),
     }
     user_text = (
@@ -4868,6 +5016,7 @@ def build_mobile_model_messages(
         + json.dumps(context, ensure_ascii=False, indent=2)
     )
     user_text = apply_custom_prompt_to_user_text("group_chat", user_text)
+    user_text = f"{user_text.rstrip()}\n\n{MOOD_TAG_PROMPT}"
     return [
         {"role": "system", "content": system_prompt_text()},
         {
@@ -5085,6 +5234,52 @@ def first_ai_member(group: dict[str, Any]) -> dict[str, str] | None:
     return next((item for item in group["members"] if item["type"] == "character"), None)
 
 
+def extract_mood_tag(content: Any) -> tuple[str, str]:
+    text = str(content or "")
+    mood = ""
+    tag_pattern = re.compile(r"\{\s*(" + "|".join(re.escape(tag) for tag in MOOD_STICKER_TAGS) + r")\s*\}", re.IGNORECASE)
+
+    def replace_tag(match: re.Match[str]) -> str:
+        nonlocal mood
+        if not mood:
+            mood = match.group(1).lower()
+        return ""
+
+    cleaned = tag_pattern.sub(replace_tag, text)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r" *\n *", "\n", cleaned).strip()
+    return compact_text(cleaned, 280), mood
+
+
+def mood_sticker_message(
+    message: dict[str, Any],
+    mood: str,
+    *,
+    chance: float = MOOD_STICKER_CHANCE,
+    random_value: Any = None,
+    choose: Any = None,
+) -> dict[str, Any] | None:
+    if not mood or mood not in MOOD_STICKER_TAGS:
+        return None
+    roll = random_value if callable(random_value) else random.random
+    if roll() >= chance:
+        return None
+    files = custom_sticker_files(mood)
+    if not files:
+        return None
+    picker = choose if callable(choose) else random.choice
+    path = picker(files)
+    return {
+        "message_id": make_id("msg"),
+        "speaker_id": message["speaker_id"],
+        "speaker_name": message["speaker_name"],
+        "type": "sticker",
+        "content": f"{mood}:{path.name}",
+        "created_at": now_iso(),
+        "source": "ai",
+    }
+
+
 def parse_model_mobile_messages(raw: str, group: dict[str, Any]) -> list[dict[str, Any]]:
     raw_messages, parse_error = parse_model_json_output(
         raw,
@@ -5105,6 +5300,7 @@ def parse_model_mobile_messages(raw: str, group: dict[str, Any]) -> list[dict[st
     by_id = {item["role_id"]: item for item in ai_members}
     parsed: list[dict[str, Any]] = []
     reply_limit = 1 if group["reply_count"] == "1" else 2
+    reply_count_used = 0
     for item in raw_messages:
         if not isinstance(item, dict):
             continue
@@ -5125,23 +5321,28 @@ def parse_model_mobile_messages(raw: str, group: dict[str, Any]) -> list[dict[st
             message_type = "text"
         if message_type in {"message", "reply"}:
             message_type = "text"
-        content = compact_text(item.get("sticker") if message_type == "sticker" else item.get("content") or item.get("text") or item.get("body"), 280)
+        raw_content = item.get("sticker") if message_type == "sticker" else item.get("content") or item.get("text") or item.get("body")
+        content, mood = extract_mood_tag(raw_content) if message_type == "text" else (compact_text(raw_content, 280), "")
         if not member or message_type not in {"text", "sticker"} or not content:
             continue
         if message_type == "sticker" and not is_valid_sticker_id(content, require_exists=True):
             continue
-        parsed.append(
-            {
-                "message_id": make_id("msg"),
-                "speaker_id": member["role_id"],
-                "speaker_name": member["name"],
-                "type": message_type,
-                "content": content,
-                "created_at": now_iso(),
-                "source": "ai",
-            }
-        )
-        if len(parsed) >= reply_limit:
+        message = {
+            "message_id": make_id("msg"),
+            "speaker_id": member["role_id"],
+            "speaker_name": member["name"],
+            "type": message_type,
+            "content": content,
+            "created_at": now_iso(),
+            "source": "ai",
+        }
+        parsed.append(message)
+        if message_type == "text":
+            sticker_message = mood_sticker_message(message, mood)
+            if sticker_message:
+                parsed.append(sticker_message)
+        reply_count_used += 1
+        if reply_count_used >= reply_limit:
             break
     return parsed
 
@@ -5169,7 +5370,63 @@ async def api_get_settings() -> dict[str, Any]:
     settings = settings_public_payload(get_settings())
     automation_state = get_automation_state()
     settings["auto_behavior"] = {**settings.get("auto_behavior", {}), "paused": automation_state["paused"]}
-    return {"ok": True, "settings": settings}
+    return {
+        "ok": True,
+        "settings": settings,
+        "weather": daily_weather_payload(),
+        "fortune": daily_fortune_payload(),
+    }
+
+
+@app.get("/api/background")
+async def api_get_background() -> FileResponse:
+    filename = get_settings().get("home_background_image", "")
+    path = BACKGROUNDS_DIR / filename
+    if not filename or not path.is_file():
+        raise HTTPException(status_code=404, detail="未设置背景图片。")
+    media_type = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(path, media_type=media_type)
+
+
+@app.post("/api/background")
+async def api_upload_background(file: UploadFile = File(...)) -> dict[str, Any]:
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in BACKGROUND_IMAGE_SUFFIXES:
+        raise HTTPException(status_code=400, detail="背景仅支持 JPG、PNG 或 WebP。")
+    raw = await file.read(MAX_BACKGROUND_IMAGE_BYTES + 1)
+    if not raw:
+        raise HTTPException(status_code=400, detail="背景图片不能为空。")
+    if len(raw) > MAX_BACKGROUND_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="背景图片不能超过 8 MB。")
+    ensure_runtime_data()
+    filename = f"home-{uuid4().hex}{suffix}"
+    target = BACKGROUNDS_DIR / filename
+    target.write_bytes(raw)
+    settings = get_settings()
+    previous = sanitize_background_filename(settings.get("home_background_image"))
+    settings["home_background_image"] = filename
+    settings["ui"] = {**settings.get("ui", {}), "home_background_image": filename}
+    write_json(SETTINGS_PATH, sanitize_settings(settings))
+    if previous and previous != filename:
+        (BACKGROUNDS_DIR / previous).unlink(missing_ok=True)
+    return {"ok": True, "settings": settings_public_payload(get_settings())}
+
+
+@app.delete("/api/background")
+async def api_clear_background() -> dict[str, Any]:
+    settings = get_settings()
+    filename = sanitize_background_filename(settings.get("home_background_image"))
+    settings["home_background_image"] = ""
+    settings["ui"] = {**settings.get("ui", {}), "home_background_image": ""}
+    write_json(SETTINGS_PATH, sanitize_settings(settings))
+    if filename:
+        (BACKGROUNDS_DIR / filename).unlink(missing_ok=True)
+    return {"ok": True, "settings": settings_public_payload(get_settings())}
 
 
 @app.get("/api/stickers")
@@ -5181,8 +5438,8 @@ async def api_get_stickers() -> dict[str, Any]:
 async def api_get_sticker_image(pack_id: str, filename: str) -> FileResponse:
     path = custom_sticker_path(pack_id, filename, require_exists=True)
     if not path:
-        raise HTTPException(status_code=404, detail="贴纸图片不存在。")
-    return FileResponse(path, media_type="image/png")
+        raise HTTPException(status_code=404, detail="表情包图片不存在。")
+    return FileResponse(path, media_type=STICKER_MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream"))
 
 
 @app.get("/api/admin/sticker-packs")
@@ -5471,7 +5728,7 @@ async def api_admin_role_generator_save(payload: RoleGeneratorSavePayload) -> di
 
 @app.get("/api/groups")
 async def api_get_groups() -> dict[str, Any]:
-    return {"ok": True, "groups": get_groups()}
+    return {"ok": True, "groups": [group_with_last_message(group) for group in get_groups()]}
 
 
 @app.post("/api/groups")
@@ -5570,7 +5827,7 @@ async def api_post_message(group_id: str, payload: MessageCreatePayload) -> dict
     if not content:
         raise HTTPException(status_code=400, detail="消息不能为空。")
     if message_type == "sticker" and not is_valid_sticker_id(content, require_exists=True):
-        raise HTTPException(status_code=400, detail="贴纸 ID 不在可用列表中。")
+        raise HTTPException(status_code=400, detail="表情包 ID 不在可用列表中。")
     message = user_message_for(group, content, message_type)
     stored = append_group_messages(group["group_id"], [message])
     return {"ok": True, "message": stored[0]}

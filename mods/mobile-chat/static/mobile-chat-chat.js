@@ -58,6 +58,7 @@
     panel_position: { right: 28, bottom: 92 },
     ui_theme: "modern",
     world_theme: "modern",
+    home_background_image: "",
   };
   const state = {
     settings: defaults,
@@ -107,6 +108,8 @@
     revealedLiveThoughts: {},
     stickers: fallbackStickers,
     stickerPacks: [],
+    weather: null,
+    fortune: null,
     showStickers: false,
     showExtensions: false,
     error: "",
@@ -120,6 +123,7 @@
   let panelDrag = null;
   let suppressFabClickUntil = 0;
   let automationTimer = 0;
+  let clockTimer = 0;
   let activeGenerationAbort = null;
   let phoneLineAnimationTimer = 0;
   let sidebarSafeLeftCache = { value: 8, width: 0, height: 0, time: 0 };
@@ -139,6 +143,48 @@
     return Number.isFinite(parsed) ? Math.max(0, Math.min(viewportLimit, parsed)) : fallback;
   }
 
+  function currentTimeText() {
+    const now = new Date();
+    const hours = now.getHours() % 12 || 12;
+    return `${String(hours).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  }
+
+  function weatherMarkup() {
+    const weather = state.weather;
+    if (!weather) return "";
+    return `
+      <div class="fmcp-home-weather">
+        <span class="fmcp-weather-icon" aria-hidden="true">${esc(weather.icon || "")}</span>
+        <div class="fmcp-weather-copy">
+          <strong>${esc(weather.condition || "")} ${esc(weather.temperature)}°</strong>
+          <span>${esc(weather.high)}° / ${esc(weather.low)}°</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function fortuneMarkup() {
+    const fortune = state.fortune;
+    if (!fortune) return "";
+    return `
+      <div class="fmcp-home-fortune">
+        <strong>今日运势 ${esc(fortune.score)}</strong>
+        <span>${esc(fortune.message || "")}</span>
+      </div>
+    `;
+  }
+
+  function pageUsesBackground() {
+    return ["home", "groups", "chat", "stickers"].includes(state.page);
+  }
+
+  function pageBackgroundStyle() {
+    const filename = String(state.settings?.home_background_image || "").trim();
+    if (!filename || !pageUsesBackground()) return "";
+    const url = `${apiBase}/background?v=${encodeURIComponent(filename)}`;
+    return ` style="--fmcp-home-background-image:url('${esc(url)}')"`;
+  }
+
   function icon(name) {
     return `<span class="fmcp-glyph" aria-hidden="true">${icons[name] || ""}</span>`;
   }
@@ -152,7 +198,7 @@
       id: stickerId,
       type: "builtin",
       pack_id: "unknown",
-      pack_label: "贴纸",
+      pack_label: "表情包",
       label: stickerId,
     };
   }
@@ -177,7 +223,7 @@
 
   function stickerButtonMarkup(sticker) {
     const imageClass = sticker.type === "image" ? " is-image" : "";
-    const title = [sticker.pack_label || "贴纸", sticker.label || sticker.id, (sticker.tags || []).join(", ")]
+    const title = [sticker.pack_label || "表情包", sticker.label || sticker.id, (sticker.tags || []).join(", ")]
       .filter(Boolean)
       .join(" · ");
     return `
@@ -331,16 +377,16 @@
     const theme = currentTheme();
     const maps = {
       app: {
-        modern: { group_chat: "群聊", settings: "详细设置", stickers: "贴纸包", assist: "辅助功能", feed: "动态", forum: "论坛", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
-        social: { group_chat: "群聊", settings: "设置", stickers: "表情", assist: "助手", feed: "朋友圈", forum: "群公告", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
-        xianxia: { group_chat: "传讯", settings: "设定", stickers: "贴纸", assist: "造像", feed: "见闻", forum: "论道", live: "留影", notifications: "灵讯", phone: "传音", mail: "书信", diary: "札记", calendar: "行程" },
-        apocalypse: { group_chat: "频道", settings: "终端", stickers: "物资", assist: "档案", feed: "公告", forum: "情报板", live: "监控", notifications: "警报", phone: "通话", mail: "信件", diary: "日志", calendar: "排班" },
+        modern: { group_chat: "群聊", settings: "详细设置", stickers: "表情包", assist: "辅助功能", feed: "动态", forum: "论坛", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
+        social: { group_chat: "群聊", settings: "设置", stickers: "表情包", assist: "助手", feed: "朋友圈", forum: "群公告", live: "直播", notifications: "通知", phone: "电话", mail: "邮箱", diary: "日记", calendar: "日程" },
+        xianxia: { group_chat: "传讯", settings: "设定", stickers: "表情包", assist: "造像", feed: "见闻", forum: "论道", live: "留影", notifications: "灵讯", phone: "传音", mail: "书信", diary: "札记", calendar: "行程" },
+        apocalypse: { group_chat: "频道", settings: "终端", stickers: "表情包", assist: "档案", feed: "公告", forum: "情报板", live: "监控", notifications: "警报", phone: "通话", mail: "信件", diary: "日志", calendar: "排班" },
       },
       subtitle: {
-        modern: { group_chat: "角色卡群聊", settings: "偏好与模型", stickers: "内置资源", assist: "人物生成", feed: "角色近况", forum: "世界讨论板", live: "弹幕与醒目留言", notifications: "系统与角色提醒", phone: "模拟通话 RP", mail: "角色邮件往来", diary: "角色日记", calendar: "日程安排" },
-        social: { group_chat: "像 QQ/WX 一样轻量聊天", settings: "显示、模型与群聊偏好", stickers: "表情包与贴纸", assist: "从角色卡生成联系人", feed: "角色生活碎片", forum: "群内话题与公告", live: "弹幕互动", notifications: "消息提醒", phone: "模拟语音通话", mail: "长消息往来", diary: "角色私密记录", calendar: "约定与提醒" },
-        xianxia: { group_chat: "角色传讯", settings: "灵机设定", stickers: "符贴资源", assist: "人物造像", feed: "山门见闻", forum: "论道闲谈", live: "留影弹幕", notifications: "系统灵讯", phone: "模拟传音 RP", mail: "角色书信", diary: "随身札记", calendar: "行程安排" },
-        apocalypse: { group_chat: "避难频道", settings: "终端参数", stickers: "贴标物资", assist: "人物档案", feed: "态势公告", forum: "情报交换", live: "监控画面", notifications: "风险警报", phone: "模拟通话 RP", mail: "角色信件", diary: "行动日志", calendar: "值班排程" },
+        modern: { group_chat: "角色卡群聊", settings: "偏好与模型", stickers: "全部表情资源", assist: "人物生成", feed: "角色近况", forum: "世界讨论板", live: "弹幕与醒目留言", notifications: "系统与角色提醒", phone: "模拟通话 RP", mail: "角色邮件往来", diary: "角色日记", calendar: "日程安排" },
+        social: { group_chat: "像 QQ/WX 一样轻量聊天", settings: "显示、模型与群聊偏好", stickers: "全部表情资源", assist: "从角色卡生成联系人", feed: "角色生活碎片", forum: "群内话题与公告", live: "弹幕互动", notifications: "消息提醒", phone: "模拟通话", mail: "长消息往来", diary: "角色私密记录", calendar: "约定与提醒" },
+        xianxia: { group_chat: "角色传讯", settings: "灵机设定", stickers: "全部表情资源", assist: "人物造像", feed: "山门见闻", forum: "论道闲谈", live: "留影弹幕", notifications: "系统灵讯", phone: "模拟传音 RP", mail: "角色书信", diary: "随身札记", calendar: "行程安排" },
+        apocalypse: { group_chat: "避难频道", settings: "终端参数", stickers: "全部表情资源", assist: "人物档案", feed: "态势公告", forum: "情报交换", live: "监控画面", notifications: "风险警报", phone: "模拟通话 RP", mail: "角色信件", diary: "行动日志", calendar: "值班排程" },
       },
       channel: {
         modern: { feed: "动态", forum: "论坛", mail: "邮箱", diary: "日记", calendar: "日程", live: "直播", phone: "电话" },
@@ -1743,6 +1789,13 @@
     }, 5000);
   }
 
+  function restartClockTimer() {
+    if (clockTimer) window.clearInterval(clockTimer);
+    clockTimer = window.setInterval(() => {
+      if (state.open && state.page === "home") render();
+    }, 15000);
+  }
+
   async function request(path, options = {}) {
     const response = await fetch(`${apiBase}${path}`, {
       headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -1800,7 +1853,8 @@
   function pageTitle() {
     if (state.page === "home") {
       const titles = {
-        modern: ["小手机", "应用桌面"],
+        modern: ["应用中心", "全部轻应用"],
+        social: ["应用中心", "全部轻应用"],
         xianxia: ["随身书札", "书信与见闻"],
         apocalypse: ["随身终端", "频道桌面"],
       };
@@ -1808,7 +1862,7 @@
     }
     if (state.page === "create") return ["创建群聊", "从当前角色卡选择成员"];
     if (state.page === "settings") return ["详细设置", "小手机偏好"];
-    if (state.page === "stickers") return ["贴纸包", "默认表情资源"];
+    if (state.page === "stickers") return ["表情包", "全部表情资源"];
     if (state.page === "assist") return ["辅助功能", "人物生成"];
     if (state.page === "notifications") return ["通知", `${state.notifications.filter((item) => !item.read).length} 条未读`];
     if (state.page === "phone") return ["电话", "模拟通话 RP"];
@@ -1845,17 +1899,22 @@
   function headerMarkup() {
     const [title, subtitle] = pageTitle();
     const showBack = state.page !== "home";
-    const group = currentGroup();
     const isChat = state.page === "chat";
+    if (isChat) {
+      return `
+        <header class="fmcp-header fmcp-chat-header">
+          <button class="fmcp-icon-btn fmcp-header-action" type="button" data-action="back" aria-label="返回">${icon("back")}</button>
+        </header>
+      `;
+    }
     return `
       <header class="fmcp-header">
         ${showBack
           ? `<button class="fmcp-icon-btn fmcp-header-action" type="button" data-action="back" aria-label="返回">${icon("back")}</button>`
           : `<span class="fmcp-device-mark">${icon("phone")}</span>`}
-        ${isChat ? groupAvatarMarkup(group, "fmcp-header-avatar") : ""}
         <div class="fmcp-heading">
           <div class="fmcp-title">${esc(title)}</div>
-          <div class="fmcp-subtitle">${isChat ? '<span class="fmcp-online-dot"></span>' : ""}${esc(subtitle)}</div>
+          <div class="fmcp-subtitle">${esc(subtitle)}</div>
         </div>
         ${state.page === "groups" ? `<button class="fmcp-icon-btn fmcp-header-action" type="button" data-action="settings" aria-label="设置">${icon("settings")}</button>` : ""}
         <button class="fmcp-icon-btn fmcp-header-action" type="button" data-action="close" aria-label="关闭">${icon("close")}</button>
@@ -1863,25 +1922,70 @@
     `;
   }
 
+  function primaryNavigationItems() {
+    return [
+      { app_id: "group_chat", label: themedLabel("app", "group_chat"), icon: "message", page: "groups" },
+      { app_id: "apps", label: currentTheme() === "xianxia" ? "书匣" : "应用", icon: "toolbox", page: "home" },
+      { app_id: "stickers", label: themedLabel("app", "stickers"), icon: "smile", page: "stickers" },
+      { app_id: "settings", label: themedLabel("app", "settings"), icon: "settings", page: "settings" },
+    ];
+  }
+
+  function primaryNavigationActivePage() {
+    if (state.page === "groups" || state.page === "chat" || state.page === "create") return "groups";
+    if (state.page === "stickers") return "stickers";
+    if (state.page === "settings") return "settings";
+    return "home";
+  }
+
+  function bottomNavigationMarkup() {
+    const activePage = primaryNavigationActivePage();
+    return `
+      <nav class="fmcp-bottom-nav" aria-label="小手机常用导航">
+        ${primaryNavigationItems().map((item) => `
+          <button class="fmcp-bottom-nav-item${activePage === item.page ? " is-active" : ""}" type="button" data-action="open-app" data-page="${esc(item.page)}" aria-label="${esc(item.label)}">
+            <span class="fmcp-bottom-nav-icon">${icon(item.icon)}</span>
+            <span>${esc(item.label)}</span>
+          </button>
+        `).join("")}
+      </nav>
+    `;
+  }
+
   function homeMarkup() {
     const fallbackApps = [
-      { app_id: "group_chat", label: "口袋群聊", subtitle: "角色卡群聊", icon: "message", page: "groups" },
-      { app_id: "settings", label: "详细设置", subtitle: "偏好与模型", icon: "settings", page: "settings" },
-      { app_id: "stickers", label: "贴纸包", subtitle: "内置资源", icon: "smile", page: "stickers" },
+      { app_id: "assist", label: "辅助功能", subtitle: "人物生成", icon: "toolbox", page: "assist" },
+      { app_id: "feed", label: "动态", subtitle: "角色近况", icon: "spark", page: "channel-feed_main" },
+      { app_id: "forum", label: "论坛", subtitle: "世界讨论板", icon: "forum", page: "channel-forum_main" },
+      { app_id: "live", label: "直播", subtitle: "弹幕与醒目留言", icon: "live", page: "channel-live_main" },
+      { app_id: "notifications", label: "通知", subtitle: "系统与角色提醒", icon: "bell", page: "notifications" },
+      { app_id: "phone", label: "电话", subtitle: "模拟通话 RP", icon: "phone", page: "phone" },
+      { app_id: "mail", label: "邮箱", subtitle: "角色邮件", icon: "mail", page: "channel-mail_inbox" },
+      { app_id: "diary", label: "日记", subtitle: "角色碎片记录", icon: "diary", page: "channel-diary_main" },
+      { app_id: "calendar", label: "日程", subtitle: "事件安排", icon: "calendar", page: "channel-calendar_main" },
     ];
-    const apps = (Array.isArray(state.apps) && state.apps.length ? state.apps : fallbackApps).map(themedAppCopy);
+    const pinnedAppIds = new Set(["group_chat", "settings", "stickers"]);
+    const registeredApps = Array.isArray(state.apps) && state.apps.length ? state.apps : fallbackApps;
+    const apps = registeredApps
+      .filter((app) => !pinnedAppIds.has(String(app?.app_id || "")))
+      .map(themedAppCopy);
     return `
-      <div class="fmcp-home">
-        <div class="fmcp-home-intro">
-          <strong>${esc(themedHomeCopy().title)}</strong>
-          <span>${esc(themedHomeCopy().subtitle)}</span>
+      <div class="fmcp-home fmcp-app-drawer">
+        <div class="fmcp-app-drawer-hero">
+          <div class="fmcp-home-time-stack">
+            <time class="fmcp-home-time">${esc(currentTimeText())}</time>
+            ${fortuneMarkup()}
+          </div>
+          ${weatherMarkup()}
+        </div>
+        <div class="fmcp-app-drawer-label">
+          <strong>全部应用</strong>
         </div>
         <div class="fmcp-app-grid">
           ${apps.map((app) => `
             <button class="fmcp-app-card" type="button" data-action="open-app" data-page="${esc(app.page)}">
               <span class="fmcp-app-icon is-${esc(app.icon || "message")}">${icon(app.icon || "message")}</span>
               <strong>${esc(app.label)}</strong>
-              <small>${esc(app.subtitle || app.stage || "")}</small>
             </button>
           `).join("")}
         </div>
@@ -1906,17 +2010,30 @@
         <button class="fmcp-button fmcp-button-primary" type="button" data-action="create">新建群聊</button>
       </div>
       <div class="fmcp-group-list">
-        ${state.groups.map((group) => `
+        ${state.groups.map((group) => {
+          const lastMessage = group.last_message;
+          const lastContent = lastMessage
+            ? (lastMessage.type === "sticker" ? "[表情包]" : String(lastMessage.content || ""))
+            : (group.description || "暂无聊天消息");
+          const lastSpeaker = lastMessage?.speaker_name ? `${lastMessage.speaker_name}：` : "";
+          const lastTime = lastMessage?.created_at
+            ? new Date(lastMessage.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "";
+          return `
           <article class="fmcp-group-card">
             ${groupAvatarMarkup(group, "fmcp-group-avatar")}
             <button class="fmcp-group-main" type="button" data-action="open-group" data-group-id="${esc(group.group_id)}">
-              <div class="fmcp-group-name">${esc(group.name)}</div>
-              <div class="fmcp-group-meta">${esc(group.description || "未填写群聊简介")} · ${group.members.length} 位成员</div>
+              <div class="fmcp-group-heading">
+                <div class="fmcp-group-name">${esc(group.name)}</div>
+                ${lastTime ? `<time class="fmcp-group-time">${esc(lastTime)}</time>` : ""}
+              </div>
+              <div class="fmcp-group-meta"><strong>${esc(lastSpeaker)}</strong>${esc(lastContent)}</div>
             </button>
             <button class="fmcp-icon-btn fmcp-group-delete" type="button" data-action="delete-group" data-group-id="${esc(group.group_id)}" aria-label="删除群聊">${icon("trash")}</button>
             <span class="fmcp-group-chevron">${icon("chevron")}</span>
           </article>
-        `).join("")}
+        `;
+        }).join("")}
       </div>
     `;
   }
@@ -1981,24 +2098,41 @@
     const isUser = message.source === "user";
     const userClass = isUser ? " is-user" : "";
     const errorClass = message.type === "error" ? " is-error" : "";
-    const group = currentGroup();
-    const member = group && Array.isArray(group.members)
-      ? group.members.find((item) => item.role_id === message.speaker_id || item.name === message.speaker_name)
-      : null;
     const sticker = message.type === "sticker" ? stickerById(message.content) : null;
+    const imageSticker = sticker?.type === "image";
     const content = sticker
-      ? `<div class="fmcp-sticker${sticker.type === "image" ? " is-image" : ""}">${stickerVisualMarkup(sticker)}<span>${esc(sticker.pack_label || "贴纸")} · ${esc(sticker.label || message.content)}</span></div>`
+      ? `<div class="fmcp-sticker${imageSticker ? " is-image" : ""}">${stickerVisualMarkup(sticker)}${imageSticker ? "" : `<span>${esc(sticker.label || message.content)}</span>`}</div>`
       : textBubbleMarkup(message.content);
     const time = message.created_at ? new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
     return `
       <article class="fmcp-message${userClass}${errorClass}">
-        ${isUser ? "" : avatarMarkup(member || { name: message.speaker_name }, "fmcp-message-avatar")}
         <div class="fmcp-message-stack">
           <div class="fmcp-message-meta"><span>${esc(message.speaker_name)}</span>${time ? `<time>${esc(time)}</time>` : ""}</div>
-          ${sticker ? `<div class="fmcp-message-bubble">${content}</div>` : content}
+          ${sticker ? `<div class="fmcp-message-bubble fmcp-sticker-bubble${imageSticker ? " is-image" : ""}">${content}</div>` : content}
           ${isUser ? `<div class="fmcp-message-foot"><span class="fmcp-message-receipt">✓✓</span>${time ? `<time>${esc(time)}</time>` : ""}</div>` : ""}
         </div>
-        ${isUser ? avatarMarkup(member || { name: message.speaker_name }, "fmcp-message-avatar") : ""}
+      </article>
+    `;
+  }
+
+  function typingIndicatorMarkup(group) {
+    const members = Array.isArray(group?.members) ? group.members : [];
+    const recentRoleMessage = [...state.messages].reverse().find((message) => message.source !== "user");
+    const member = members.find((item) => (
+      item.type !== "user"
+      && (
+        item.role_id === recentRoleMessage?.speaker_id
+        || item.name === recentRoleMessage?.speaker_name
+      )
+    )) || members.find((item) => item.type !== "user") || { name: "角色" };
+    return `
+      <article class="fmcp-message fmcp-typing-message" role="status" aria-label="角色正在输入">
+        <div class="fmcp-message-stack">
+          <div class="fmcp-message-meta"><span>${esc(member.name || "角色")}</span></div>
+          <div class="fmcp-message-bubble fmcp-typing-bubble" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
       </article>
     `;
   }
@@ -2010,7 +2144,7 @@
     return `
       <div class="fmcp-chat-body" data-role="messages">
         ${state.messages.length ? state.messages.map(messageMarkup).join("") : `<div class="fmcp-empty"><div>${esc(emptyText)}</div></div>`}
-        ${state.generating ? '<div class="fmcp-loading">角色正在回复...</div>' : ""}
+        ${state.generating ? typingIndicatorMarkup(group) : ""}
       </div>
     `;
   }
@@ -2067,7 +2201,7 @@
           <button class="fmcp-composer-icon" type="button" data-action="toggle-extensions" aria-label="打开更多功能">${icon("plus")}</button>
           <div class="fmcp-composer-input">
             <input name="message" maxlength="500" autocomplete="off" placeholder="输入消息..." ${state.generating ? "disabled" : ""}>
-            <button type="button" data-action="toggle-stickers" aria-label="选择贴纸">${icon("smile")}</button>
+            <button type="button" data-action="toggle-stickers" aria-label="选择表情包">${icon("smile")}</button>
           </div>
           <button class="fmcp-composer-icon fmcp-continue-button" type="button" data-action="continue-chat" aria-label="让角色继续聊天" ${state.generating ? "disabled" : ""}>${icon("refresh")}</button>
           <button class="fmcp-button fmcp-button-primary" type="submit" ${state.generating ? "disabled" : ""}>发送</button>
@@ -2109,6 +2243,14 @@
                 <option value="apocalypse" ${currentTheme() === "apocalypse" ? "selected" : ""}>末世</option>
               </select>
             </label>
+            <div class="fmcp-settings-row fmcp-background-setting">
+              <span class="fmcp-settings-copy"><strong>小手机背景</strong></span>
+              <div class="fmcp-background-actions">
+                <input data-home-background-input type="file" accept="image/jpeg,image/png,image/webp" hidden>
+                <button class="fmcp-button" type="button" data-action="choose-home-background">选择背景</button>
+                ${settings.home_background_image ? '<button class="fmcp-button" type="button" data-action="clear-home-background">清除</button>' : ""}
+              </div>
+            </div>
           </div>
         </div>
         <div class="fmcp-settings-section">
@@ -2164,16 +2306,16 @@
     return `
       <div class="fmcp-sticker-app">
         <div class="fmcp-home-intro">
-          <strong>贴纸包</strong>
-          <span>已读取 ${stickers.length} 个贴纸；mod 目录 static/stickers 下的表情包会自动加入。</span>
+          <strong>表情包</strong>
+          <span>已读取 ${stickers.length} 个表情，点击即可发送到最近打开的群聊。</span>
         </div>
         <div class="fmcp-sticker-library">
           ${stickers.map((sticker) => `
-            <div class="fmcp-sticker-library-card">
+            <button class="fmcp-sticker-library-card" type="button" data-action="send-sticker" data-sticker-id="${esc(sticker.id)}" ${state.currentGroupId ? "" : "disabled"}>
               ${stickerVisualMarkup(sticker)}
               <strong>${esc(sticker.label || sticker.id)}</strong>
-              <small>${esc((sticker.tags || []).length ? `${sticker.pack_label || "贴纸"} · ${(sticker.tags || []).join(", ")}` : (sticker.pack_label || "贴纸"))}</small>
-            </div>
+              <small>${esc((sticker.tags || []).length ? `${sticker.pack_label || "表情包"} · ${(sticker.tags || []).join(", ")}` : (sticker.pack_label || "表情包"))}</small>
+            </button>
           `).join("")}
         </div>
       </div>
@@ -2474,6 +2616,7 @@
   function render() {
     if (!root) return;
     const settings = state.settings || defaults;
+    const backgroundStyle = pageBackgroundStyle();
     root.dataset.theme = currentTheme();
     const showFab = settings.enabled && settings.show_floating_button;
     if (!showFab && !state.open) {
@@ -2490,13 +2633,15 @@
         ` : ""}
         ${state.open ? `
           <section class="fmcp-panel${state.page === "chat" ? " is-chat-room" : ""}" aria-label="Fantareal 小手机">
-            <div class="fmcp-shell${state.generationTask ? " is-generating" : ""}">
+            <div class="fmcp-shell${state.generationTask ? " is-generating" : ""}${backgroundStyle ? " has-custom-background" : ""}"${backgroundStyle}>
+              ${backgroundStyle ? '<div class="fmcp-fixed-background" aria-hidden="true"></div>' : ""}
               ${headerMarkup()}
               <main class="fmcp-body fmcp-body-${esc(state.page)}">
                 ${errorMarkup()}
                 ${bodyMarkup()}
               </main>
               ${composerMarkup()}
+              ${state.page === "chat" || state.page === "create" ? "" : bottomNavigationMarkup()}
               ${generationOverlayMarkup()}
             </div>
           </section>
@@ -2545,6 +2690,8 @@
     try {
       const payload = await request("/settings");
       state.settings = payload.settings || defaults;
+      state.weather = payload.weather || null;
+      state.fortune = payload.fortune || null;
       restartAutomationTimer();
     } catch (error) {
       state.error = error.message;
@@ -2664,6 +2811,9 @@
     try {
       const payload = await request("/groups");
       state.groups = payload.groups || [];
+      if (!state.groups.some((group) => group.group_id === state.currentGroupId)) {
+        state.currentGroupId = state.groups[0]?.group_id || "";
+      }
     } catch (error) {
       state.error = error.message;
     } finally {
@@ -2960,6 +3110,33 @@
     }
   }
 
+  async function uploadHomeBackground(file) {
+    if (!file) return;
+    state.error = "";
+    const body = new FormData();
+    body.append("file", file);
+    try {
+      const response = await fetch(`${apiBase}/background`, { method: "POST", body });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(formatApiError(payload, response.status));
+      state.settings = payload.settings || state.settings;
+    } catch (error) {
+      state.error = error.message;
+    }
+    render();
+  }
+
+  async function clearHomeBackground() {
+    state.error = "";
+    try {
+      const payload = await request("/background", { method: "DELETE" });
+      state.settings = payload.settings || state.settings;
+    } catch (error) {
+      state.error = error.message;
+    }
+    render();
+  }
+
   async function createGroup(form) {
     const data = new FormData(form);
     const selectedIds = new Set(data.getAll("member").map(String));
@@ -2994,11 +3171,28 @@
     state.messages = payload.messages || [];
   }
 
+  function optimisticUserMessage(content) {
+    const group = currentGroup();
+    const member = Array.isArray(group?.members)
+      ? group.members.find((item) => item.type === "user")
+      : null;
+    return {
+      message_id: `pending_user_${Date.now()}`,
+      speaker_id: member?.role_id || "user",
+      speaker_name: member?.name || currentUserName(),
+      type: "text",
+      content,
+      created_at: new Date().toISOString(),
+      source: "user",
+    };
+  }
+
   async function sendMessage(form) {
     const data = new FormData(form);
     const message = String(data.get("message") || "").trim();
     if (!message || state.generating) return;
     touchActivity();
+    state.messages = [...state.messages, optimisticUserMessage(message)];
     state.generating = true;
     state.error = "";
     render();
@@ -3028,6 +3222,7 @@
       });
       state.showStickers = false;
       await reloadMessages();
+      if (state.page === "stickers") state.page = "chat";
     } catch (error) {
       state.error = error.message;
     }
@@ -3976,6 +4171,10 @@
     }
     if (action === "clear-messages") void clearMessages();
     if (action === "reset-position") void resetPosition();
+    if (action === "choose-home-background") {
+      root.querySelector("[data-home-background-input]")?.click();
+    }
+    if (action === "clear-home-background") void clearHomeBackground();
     if (action === "select-role-draft") {
       const scrollTop = currentBodyScrollTop();
       const index = Number.parseInt(button.dataset.index || "0", 10);
@@ -4049,6 +4248,11 @@
   }
 
   function onChange(event) {
+    const backgroundInput = event.target.closest("[data-home-background-input]");
+    if (backgroundInput) {
+      void uploadHomeBackground(backgroundInput.files?.[0]);
+      return;
+    }
     const scope = event.target.closest("[data-role-draft-scope]");
     if (scope) {
       const index = Number.parseInt(scope.dataset.draftIndex || String(state.roleGeneratorSelectedIndex || 0), 10);
@@ -4082,6 +4286,7 @@
     window.addEventListener("resize", () => requestAnimationFrame(applyResponsivePositions));
     document.body.appendChild(root);
     render();
+    restartClockTimer();
     void loadSettings();
     void loadStickers();
     void loadApps();
