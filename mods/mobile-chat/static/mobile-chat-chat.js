@@ -3770,29 +3770,18 @@
     return sidebarSafeLeftCache.value;
   }
 
-  function isDefaultPosition(position, fallback) {
-    return safeNumber(position && position.right, fallback.right) === fallback.right
-      && safeNumber(position && position.bottom, fallback.bottom) === fallback.bottom;
-  }
-
   function effectiveFloatingPosition(position) {
     const next = position || defaults.floating_position;
-    const hasStatusPanel = Boolean(document.getElementById("xuqi-status-panel-mod"));
     return {
       right: safeNumber(next.right, defaults.floating_position.right),
-      bottom: isDefaultPosition(next, defaults.floating_position) && hasStatusPanel
-        ? Math.max(defaults.floating_position.bottom, 158)
-        : safeNumber(next.bottom, defaults.floating_position.bottom),
+      bottom: safeNumber(next.bottom, defaults.floating_position.bottom),
     };
   }
 
   function effectivePanelPosition(position) {
     const next = position || defaults.panel_position;
-    const hasStatusPanel = Boolean(document.getElementById("xuqi-status-panel-mod"));
     return {
-      right: isDefaultPosition(next, defaults.panel_position) && hasStatusPanel
-        ? Math.max(defaults.panel_position.right, 92)
-        : safeNumber(next.right, defaults.panel_position.right),
+      right: safeNumber(next.right, defaults.panel_position.right),
       bottom: safeNumber(next.bottom, defaults.panel_position.bottom),
     };
   }

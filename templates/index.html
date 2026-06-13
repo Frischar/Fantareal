@@ -1208,6 +1208,7 @@
                  data-role="{{ item.role }}"
                  data-history-index="{{ loop.index0 }}"
                  {% if item.message_id %}data-message-id="{{ item.message_id }}"{% endif %}
+                 {% if item.mod_message_id %}data-mod-message-id="{{ item.mod_message_id }}"{% endif %}
                  {% if item.turn_id or item.state_journal_turn %}data-turn-id="{{ item.turn_id or item.state_journal_turn }}" data-state-journal-turn="{{ item.state_journal_turn or item.turn_id }}"{% endif %}
                  {% if item.turn_index %}data-turn-index="{{ item.turn_index }}"{% endif %}
                  {% if item.content_hash %}data-content-hash="{{ item.content_hash }}"{% endif %}>
@@ -1470,10 +1471,8 @@
                 <p class="muted">聊天辅助栏只放运行时入口。状态栏浮球保持旧模式，继续覆盖在页面之上。</p>
                 <div class="runtime-plugin-links">
                   {% for mod in registered_mods or [] %}
+                    {% if mod.slug == 'auto-saga' %}<a href="/mods/auto-saga" class="secondary compact">自动叙事模式</a>{% endif %}
                     {% if mod.slug == 'tts-studio' %}<a href="/mods/tts-studio" class="secondary compact">语声 · 语音 TTS</a>{% endif %}
-                    {% if mod.slug == 'status-panel' %}<a href="/mods/status-panel" class="secondary compact">游录 · 游玩状态栏</a>{% endif %}
-                    {% if mod.slug == 'worldbook-maker' %}<a href="/mods/worldbook-maker" class="secondary compact">界笺 · 世界书生成器</a>{% endif %}
-                    {% if mod.slug == 'soul-weaver' %}<a href="/mods/soul-weaver" class="secondary compact">余音 · 小说提卡器</a>{% endif %}
                     {% if mod.slug == 'tavern-card-converter' %}<a href="/mods/tavern-card-converter" class="secondary compact">渡笺 · 酒馆卡转换器</a>{% endif %}
                     {% if mod.slug == 'state-journal' %}<a href="/mods/state-journal" class="secondary compact">心笺 · 状态数据库</a>{% endif %}
                     {% if mod.slug == 'mobile-chat' %}<a href="/mods/mobile-chat" class="secondary compact">小手机 · 后台管理</a>{% endif %}
@@ -3099,61 +3098,8 @@
         }
       }
 
-      function getStatusPanelBridge() {
-        return window.XuqiStatusPanel || null;
-      }
-
-      function stripStatusPanelBlocksLocal(text) {
-        let value = String(text || "");
-        if (!value) return "";
-        // 本地兜底：状态栏脚本尚未 ready 时，也先把状态块从正文显示里清掉。
-        value = value.replace(/^[ \t]*```[ \t]*status_panel_update[^\n]*\n[\s\S]*?^[ \t]*```[ \t]*$/gim, "");
-        value = value.replace(/^[ \t]*~~~[ \t]*status_panel_update[^\n]*\n[\s\S]*?^[ \t]*~~~[ \t]*$/gim, "");
-        value = value.replace(/(?:^|\n)[ \t]*(?:```|~~~)?[ \t]*(?:status_panel_update|状态栏更新|状态更新)[ \t]*\n[\s\S]*$/i, "");
-        return value.replace(/\n{3,}/g, "\n\n").trim();
-      }
-
-      function isAssistantBubble(bubble) {
-        if (!bubble) return false;
-        const role = bubble.dataset?.role;
-        if (role) return role !== "user";
-        const message = bubble.closest?.(".message");
-        if (!message) return true;
-        return !message.classList.contains("user");
-      }
-
-      function sanitizeAssistantStatusBlocks(text, bubble = null) {
-        if (!isAssistantBubble(bubble)) return String(text || "");
-        const original = String(text || "");
-        const bridge = getStatusPanelBridge();
-        if (bridge && typeof bridge.sanitizeAssistantText === "function") {
-          try {
-            return stripStatusPanelBlocksLocal(bridge.sanitizeAssistantText(original));
-          } catch (error) {
-            console.warn("Status panel sanitize failed:", error);
-          }
-        }
-        return stripStatusPanelBlocksLocal(original);
-      }
-
-      function processAssistantStatusPanelText(text, context = {}) {
-        const original = String(text || "");
-        const bridge = getStatusPanelBridge();
-        if (bridge && typeof bridge.processAssistantText === "function") {
-          try {
-            const result = bridge.processAssistantText(original, context) || {};
-            const cleaned = typeof result.cleanedText === "string" ? result.cleanedText : original;
-            return stripStatusPanelBlocksLocal(cleaned);
-          } catch (error) {
-            console.warn("Status panel processing failed:", error);
-          }
-        }
-        return stripStatusPanelBlocksLocal(original);
-      }
-
-
       function cleanAssistantTextForModHooks(text) {
-        let value = stripStatusPanelBlocksLocal(text || "");
+        let value = String(text || "");
         const thought = parseThoughtSections(value);
         value = thought.visible || value;
         const parsed = parseTtsVoiceRichText(value);
@@ -3215,8 +3161,7 @@
           removeThinkNodes(bubble);
         }
 
-        let nextBodyText = state.visible || (state.think && state.thinking ? "" : "");
-        nextBodyText = sanitizeAssistantStatusBlocks(nextBodyText, bubble);
+        const nextBodyText = state.visible || (state.think && state.thinking ? "" : "");
         renderTtsVoiceBody(nodes.body, nextBodyText);
       }
 
@@ -3652,6 +3597,26 @@
       function addMessage(role, content, createdAt = new Date().toLocaleString()) {
         return createMessage(role, content, createdAt);
       }
+
+      window.FantarealChat = {
+        addModMessage({ role = "assistant", name = "", content = "", id = "", createdAt = "" } = {}) {
+          const text = name ? `**${name}**\n${String(content || "")}` : String(content || "");
+          const messageRole = role === "gm" ? "system" : role === "user" ? "user" : "assistant";
+          const entry = addMessage(messageRole, text, createdAt || new Date().toLocaleString());
+          if (id) {
+            entry.wrapper.dataset.messageId = id;
+            entry.wrapper.dataset.modMessageId = id;
+          }
+          return entry;
+        },
+        getContext() {
+          return {
+            characterName: {{ (persona.name or "角色") | tojson }},
+            persona: {{ (persona.system_prompt or "") | tojson }},
+            history: buildRecentHistoryForModHook(null, 10),
+          };
+        },
+      };
 
       function updateMessage(entry, content, createdAt = "") {
         if (!entry) return;
@@ -7169,10 +7134,7 @@
                 renderDirectorNotes(data.director_notes);
               }
               const workshopDynamicParse = extractWorkshopDynamicEvents(finalReply);
-              finalReply = processAssistantStatusPanelText(workshopDynamicParse.cleanedText, {
-                source: "chat_done",
-                userText: messageText,
-              });
+              finalReply = workshopDynamicParse.cleanedText;
               triggerDynamicScenesByModelEvents(workshopDynamicParse.events);
               workshopRoundCount += 1;
               triggerDynamicScenesByRound(workshopRoundCount);
@@ -7290,6 +7252,12 @@
         queueEndStatus(1400, "正在保存到 Memory…");
         try {
           const data = await postJson("/api/conversation/end", {});
+          await fetch("/mods/auto-saga/app/api/session/end", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          }).catch(() => null);
+          window.dispatchEvent(new CustomEvent("fantareal:conversation-ended"));
           if (data.skipped) {
             setStatus("已完成：当前对话已结束，无需重复保存", "success");
             showToast("当前对话已结束", "success");

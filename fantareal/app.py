@@ -367,9 +367,6 @@ def resolve_access_label(method: str, path: str) -> str:
     if path.startswith("/mods/"):
         parts = [part for part in path.split("/") if part]
         mod_labels = {
-            "status-panel": "角色状态面板",
-            "worldbook-maker": "世界书工坊",
-            "soul-weaver": "余声",
             "card-writer": "缃笺",
             "state-journal": "心笺",
             "tavern-card-converter": "酒馆卡转换器",
@@ -1719,6 +1716,7 @@ def normalize_legacy_message_content(role: str, content: str) -> str:
 
 CHAT_MESSAGE_META_TEXT_KEYS = {
     "message_id",
+    "mod_message_id",
     "turn_id",
     "state_journal_turn",
     "content_hash",
@@ -4800,7 +4798,7 @@ async def archive_current_conversation() -> dict[str, Any]:
     slot_id = get_active_slot_id()
     lock = _get_archive_lock(slot_id)
     async with lock:
-        history = [item for item in get_conversation() if item.get("role") in {"user", "assistant"}]
+        history = [item for item in get_conversation() if item.get("role") in {"user", "assistant", "system"}]
         if not history:
             return {"_skipped": True}
 

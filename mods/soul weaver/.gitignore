@@ -1,4 +1,0 @@
-data/*.json
-!data/.gitkeep
-__pycache__/
-*.pyc
