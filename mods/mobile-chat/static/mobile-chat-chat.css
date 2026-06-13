@@ -145,12 +145,159 @@
 }
 
 .fmcp-header,
+.fmcp-status-bar,
 .fmcp-body,
 .fmcp-composer,
 .fmcp-bottom-nav,
 .fmcp-generation-overlay {
   position: relative;
   z-index: 1;
+}
+
+.fmcp-status-bar {
+  display: flex;
+  min-height: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 14px 1px;
+  box-sizing: border-box;
+  color: rgba(245, 248, 253, 0.9);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  user-select: none;
+}
+
+.fmcp-status-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.fmcp-status-icons {
+  display: flex;
+  height: 16px;
+  align-items: center;
+  gap: 6px;
+}
+
+.fmcp-status-network {
+  font-size: 9px;
+  letter-spacing: -0.03em;
+}
+
+.fmcp-status-silent {
+  position: relative;
+  width: 9px;
+  height: 10px;
+  border: 1.5px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 5px 5px;
+  opacity: 0.82;
+}
+
+.fmcp-status-silent::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: -2px;
+  width: 13px;
+  height: 1.5px;
+  background: currentColor;
+  transform: rotate(-45deg);
+  transform-origin: center;
+}
+
+.fmcp-status-wifi {
+  position: relative;
+  width: 14px;
+  height: 11px;
+  overflow: hidden;
+}
+
+.fmcp-status-wifi::before,
+.fmcp-status-wifi::after,
+.fmcp-status-wifi i {
+  position: absolute;
+  left: 50%;
+  border: 1.5px solid currentColor;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50% 0 0;
+  content: "";
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.fmcp-status-wifi::before {
+  top: -5px;
+  width: 13px;
+  height: 13px;
+}
+
+.fmcp-status-wifi::after {
+  top: 0;
+  width: 7px;
+  height: 7px;
+}
+
+.fmcp-status-wifi i {
+  top: 7px;
+  width: 2px;
+  height: 2px;
+  border-width: 1px;
+  background: currentColor;
+}
+
+.fmcp-status-signal {
+  display: flex;
+  height: 12px;
+  align-items: flex-end;
+  gap: 1.5px;
+}
+
+.fmcp-status-signal i {
+  display: block;
+  width: 2.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.fmcp-status-signal i:nth-child(1) { height: 4px; }
+.fmcp-status-signal i:nth-child(2) { height: 7px; }
+.fmcp-status-signal i:nth-child(3) { height: 10px; }
+.fmcp-status-signal i:nth-child(4) { height: 12px; opacity: 0.38; }
+
+.fmcp-status-battery {
+  position: relative;
+  display: grid;
+  width: 25px;
+  height: 12px;
+  place-items: center;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+.fmcp-status-battery::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: -3px;
+  width: 2px;
+  height: 4px;
+  border-radius: 0 1px 1px 0;
+  background: currentColor;
+}
+
+.fmcp-status-battery i {
+  font-size: 7px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.fmcp-shell.has-custom-background .fmcp-status-bar {
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.72);
 }
 
 .fmcp-header {
@@ -6196,7 +6343,7 @@
 
 #fantareal-mobile-chat-root .fmcp-panel.is-chat-room .fmcp-chat-header {
   position: absolute;
-  top: 10px;
+  top: 38px;
   left: 10px;
   z-index: 3;
   width: auto;
@@ -6218,7 +6365,7 @@
 }
 
 #fantareal-mobile-chat-root .fmcp-panel.is-chat-room .fmcp-body-chat {
-  padding-top: 62px;
+  padding-top: 72px;
 }
 
 #fantareal-mobile-chat-root .fmcp-panel.is-chat-room .fmcp-composer {

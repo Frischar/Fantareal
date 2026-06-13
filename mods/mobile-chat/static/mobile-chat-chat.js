@@ -149,6 +149,21 @@
     return `${String(hours).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   }
 
+  function statusBarMarkup() {
+    return `
+      <div class="fmcp-status-bar" aria-label="手机状态">
+        <time class="fmcp-status-time">${esc(currentTimeText())}</time>
+        <div class="fmcp-status-icons" aria-hidden="true">
+          <span class="fmcp-status-silent"></span>
+          <span class="fmcp-status-wifi"><i></i></span>
+          <span class="fmcp-status-network">5G</span>
+          <span class="fmcp-status-signal"><i></i><i></i><i></i><i></i></span>
+          <span class="fmcp-status-battery"><i>85</i></span>
+        </div>
+      </div>
+    `;
+  }
+
   function weatherMarkup() {
     const weather = state.weather;
     if (!weather) return "";
@@ -1785,7 +1800,7 @@
   function restartClockTimer() {
     if (clockTimer) window.clearInterval(clockTimer);
     clockTimer = window.setInterval(() => {
-      if (state.open && state.page === "home") render();
+      if (state.open) render();
     }, 15000);
   }
 
@@ -2627,6 +2642,7 @@
           <section class="fmcp-panel${state.page === "chat" ? " is-chat-room" : ""}" aria-label="Fantareal 小手机">
             <div class="fmcp-shell${state.generationTask ? " is-generating" : ""}${backgroundStyle ? " has-custom-background" : ""}"${backgroundStyle}>
               ${backgroundStyle ? '<div class="fmcp-fixed-background" aria-hidden="true"></div>' : ""}
+              ${statusBarMarkup()}
               ${headerMarkup()}
               <main class="fmcp-body fmcp-body-${esc(state.page)}">
                 ${errorMarkup()}
