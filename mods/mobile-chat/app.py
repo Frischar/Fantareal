@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
 import hashlib
 import json
 import os
@@ -53,6 +54,7 @@ MAIN_CONVERSATIONS_PATH = PROJECT_ROOT / "data" / "conversations.json"
 STATIC_DIR = RESOURCE_DIR / "static"
 TEMPLATES_DIR = RESOURCE_DIR / "templates"
 PROMPT_PATH = RESOURCE_DIR / "prompts" / "mobile_chat_prompt.txt"
+FALLBACK_BATTERY_PERCENT = random.randint(55, 95)
 
 DEFAULT_STICKER_IDS = ("happy", "sweat", "stare", "shy", "heart", "cry")
 STICKER_IDS = set(DEFAULT_STICKER_IDS)
@@ -5353,6 +5355,35 @@ def group_async_lock(group_id: str) -> asyncio.Lock:
         return GROUP_ASYNC_LOCKS.setdefault(safe_group_id, asyncio.Lock())
 
 
+def system_battery_payload() -> dict[str, Any]:
+    percent = FALLBACK_BATTERY_PERCENT
+    charging = False
+    source = "fallback"
+    if os.name == "nt":
+        class SystemPowerStatus(ctypes.Structure):
+            _fields_ = [
+                ("ac_line_status", ctypes.c_ubyte),
+                ("battery_flag", ctypes.c_ubyte),
+                ("battery_life_percent", ctypes.c_ubyte),
+                ("system_status_flag", ctypes.c_ubyte),
+                ("battery_life_time", ctypes.c_ulong),
+                ("battery_full_life_time", ctypes.c_ulong),
+            ]
+
+        status = SystemPowerStatus()
+        try:
+            available = bool(ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)))
+            reported_percent = int(status.battery_life_percent)
+            has_battery = int(status.battery_flag) != 128 and reported_percent != 255
+            if available and has_battery:
+                percent = max(0, min(100, reported_percent))
+                charging = int(status.ac_line_status) == 1
+                source = "system"
+        except (AttributeError, OSError, ValueError):
+            pass
+    return {"percent": percent, "charging": charging, "source": source}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     ensure_runtime_data()
@@ -5376,6 +5407,11 @@ async def api_get_settings() -> dict[str, Any]:
         "weather": daily_weather_payload(),
         "fortune": daily_fortune_payload(),
     }
+
+
+@app.get("/api/system-status")
+async def api_system_status() -> dict[str, Any]:
+    return {"ok": True, "battery": system_battery_payload()}
 
 
 @app.get("/api/background")

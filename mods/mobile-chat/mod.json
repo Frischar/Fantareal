@@ -4,11 +4,11 @@
   "version": "4.5.0-alpha.1",
   "hooks": {
     "chat_styles": [
-      "/static/mobile-chat-ui.css?v=mobile-chat-fixed-group-preview-v3",
-      "/static/mobile-chat-chat.css?v=mobile-chat-fixed-group-preview-v3"
+      "/static/mobile-chat-ui.css?v=mobile-chat-system-battery-v5",
+      "/static/mobile-chat-chat.css?v=mobile-chat-system-battery-v5"
     ],
     "chat_scripts": [
-      "/static/mobile-chat-chat.js?v=mobile-chat-fixed-group-preview-v3"
+      "/static/mobile-chat-chat.js?v=mobile-chat-system-battery-v5"
     ]
   }
 }
