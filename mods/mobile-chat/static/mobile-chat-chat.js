@@ -110,6 +110,7 @@
     stickerPacks: [],
     weather: null,
     fortune: null,
+    battery: { percent: 85, charging: false, source: "fallback" },
     showStickers: false,
     showExtensions: false,
     error: "",
@@ -124,6 +125,7 @@
   let suppressFabClickUntil = 0;
   let automationTimer = 0;
   let clockTimer = 0;
+  let systemStatusTimer = 0;
   let activeGenerationAbort = null;
   let phoneLineAnimationTimer = 0;
   let sidebarSafeLeftCache = { value: 8, width: 0, height: 0, time: 0 };
@@ -150,6 +152,8 @@
   }
 
   function statusBarMarkup() {
+    const batteryPercent = Math.max(0, Math.min(100, Number.parseInt(state.battery?.percent, 10) || 0));
+    const chargingClass = state.battery?.charging ? " is-charging" : "";
     return `
       <div class="fmcp-status-bar" aria-label="手机状态">
         <time class="fmcp-status-time">${esc(currentTimeText())}</time>
@@ -158,7 +162,9 @@
           <span class="fmcp-status-wifi"><i></i></span>
           <span class="fmcp-status-network">5G</span>
           <span class="fmcp-status-signal"><i></i><i></i><i></i><i></i></span>
-          <span class="fmcp-status-battery"><i>85</i></span>
+          <span class="fmcp-status-battery${chargingClass}" style="--fmcp-battery-level:${batteryPercent}%">
+            <b></b><i>${batteryPercent}</i>
+          </span>
         </div>
       </div>
     `;
@@ -1804,6 +1810,13 @@
     }, 15000);
   }
 
+  function restartSystemStatusTimer() {
+    if (systemStatusTimer) window.clearInterval(systemStatusTimer);
+    systemStatusTimer = window.setInterval(() => {
+      if (state.open) void loadSystemStatus();
+    }, 60000);
+  }
+
   async function request(path, options = {}) {
     const response = await fetch(`${apiBase}${path}`, {
       headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -2705,6 +2718,16 @@
       state.error = error.message;
     }
     render();
+  }
+
+  async function loadSystemStatus() {
+    try {
+      const payload = await request("/system-status");
+      if (payload.battery) state.battery = payload.battery;
+    } catch (_error) {
+      return;
+    }
+    renderKeepingBodyScroll();
   }
 
   async function loadStickers() {
@@ -4295,7 +4318,9 @@
     document.body.appendChild(root);
     render();
     restartClockTimer();
+    restartSystemStatusTimer();
     void loadSettings();
+    void loadSystemStatus();
     void loadStickers();
     void loadApps();
     void loadChannels();

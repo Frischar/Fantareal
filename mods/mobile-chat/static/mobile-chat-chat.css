@@ -276,6 +276,7 @@
   border: 1.5px solid currentColor;
   border-radius: 3px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .fmcp-status-battery::after {
@@ -290,9 +291,25 @@
 }
 
 .fmcp-status-battery i {
+  position: relative;
+  z-index: 1;
   font-size: 7px;
   font-style: normal;
   font-variant-numeric: tabular-nums;
+}
+
+.fmcp-status-battery b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fmcp-battery-level, 0%);
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.3;
+}
+
+.fmcp-status-battery.is-charging b {
+  color: #6ee7a8;
+  opacity: 0.72;
 }
 
 .fmcp-shell.has-custom-background .fmcp-status-bar {
