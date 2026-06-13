@@ -673,6 +673,11 @@
   gap: 9px;
 }
 
+.fmcp-group-list {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .fmcp-group-card,
 .fmcp-import-card,
 .fmcp-role-row,
@@ -685,12 +690,16 @@
 
 .fmcp-group-card {
   display: flex;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   gap: 9px;
   align-items: center;
   padding: 10px;
 }
 
 .fmcp-group-main {
+  width: 0;
   min-width: 0;
   flex: 1;
   border: 0;
