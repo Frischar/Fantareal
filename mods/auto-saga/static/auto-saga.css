@@ -81,7 +81,48 @@
   font-size: 12px;
 }
 
-/* 自动叙事开启时，隐藏主输入区域（按常见选择器尽量兼容；找不到则由 JS 兜底） */
+/* 本 mod 自己的消息流（不侵入主聊天 DOM）*/
+#fr-auto-saga-feed {
+  position: fixed;
+  left: 50%;
+  top: 72px;
+  transform: translateX(-50%);
+  width: min(760px, 92vw);
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  z-index: 40;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fr-auto-saga-msg {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #e6edf3;
+  animation: fr-auto-saga-fade 0.3s ease;
+}
+
+@keyframes fr-auto-saga-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; }
+}
+
+.fr-auto-saga-who {
+  display: block;
+  font-size: 11px;
+  color: #7c9cff;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.fr-auto-saga-gm .fr-auto-saga-body { color: #c9d4e3; font-style: italic; }
+.fr-auto-saga-silent .fr-auto-saga-body { color: #6b7280; font-size: 12px; }
+.fr-auto-saga-body em { color: #e3b341; font-style: italic; }
+.fr-auto-saga-body code { background: #0d1117; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+/* 自动叙事开启时，隐藏主输入区域 */
 body.fr-auto-saga-active .chat-input,
 body.fr-auto-saga-active .chat-composer,
 body.fr-auto-saga-active .composer,
@@ -89,6 +130,3 @@ body.fr-auto-saga-active #chat-input-area,
 body.fr-auto-saga-active [data-role="chat-input"] {
   display: none !important;
 }
-
-/* KaTeX 块级公式居中留白 */
-.fr-auto-saga-katex-block { margin: 8px 0; overflow-x: auto; }

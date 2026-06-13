@@ -1,27 +1,27 @@
 /* =============================================================================
- * auto-saga mod — 自动叙事模式 (v0.1.0)
+ * auto-saga mod — 自动叙事模式 (v0.2.0)
  *
  * 旁观式玩法：玩家不再每回合输入，全程点击 Next ▶（或自动播放）推进剧情。
- * 角色依据人设卡性格自主判断是否发言（可沉默）。聊天渲染支持 KaTeX 数学公式。
+ * 角色依据人设卡性格由后端自主判断是否发言（可沉默）。聊天渲染支持 KaTeX。
  *
- * 设计原则：零侵入。
- *  - 仅注入一个浮动控制卡片，命名空间 fr-auto-saga。
- *  - 推进剧情复用主应用现有发送/历史接口（运行时探测，找不到则降级提示）。
- *  - 不修改 fantareal/ 核心，不改其他 mod 的状态与 DOM。
- *  - UI 与轻量进度状态存 localStorage。
+ * v0.2.0：推进逻辑改为调用本 mod 后端 /mods/auto-saga/app/api/next，
+ * 由后端逐角色 willSpeak 判定与调 LLM（Key 不暴露前端）。
  *
+ * 设计原则：零侵入。仅注入一个浮动控制卡片 + 一个自己的消息流，命名空间 fr-auto-saga。
  * 关联 Issue #4。
  * ========================================================================== */
 (() => {
   'use strict';
 
   const STORE_KEY = 'fantareal.autoSaga.v1';
+  const API_BASE = '/mods/auto-saga/app/api';
   const KATEX_CSS = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css';
   const KATEX_JS = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js';
   const KATEX_AUTO = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js';
 
   const state = loadState();
   let autoTimer = null;
+  let busy = false;
 
   function loadState() {
     try {
@@ -30,10 +30,9 @@
         active: !!raw.active,
         intervalSec: Number(raw.intervalSec) > 0 ? Number(raw.intervalSec) : 6,
         turn: Number(raw.turn) || 0,
-        lastSpeaker: raw.lastSpeaker || '',
       };
     } catch (e) {
-      return { active: false, intervalSec: 6, turn: 0, lastSpeaker: '' };
+      return { active: false, intervalSec: 6, turn: 0 };
     }
   }
 
@@ -41,7 +40,25 @@
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
   }
 
-  // ---- KaTeX 数学渲染：动态加载并对聊天容器做增量渲染 -------------------------
+  // ---- 启发式：与后端 speak_probability 保持一致（仅用于前端可选预览/测试）----
+  function speakProbability(persona, opts) {
+    const o = opts || {};
+    let p = 0.55;
+    const text = String(persona || '');
+    if (/沉默|寡言|高冷|冷淡|内向/.test(text)) p -= 0.25;
+    if (/健谈|热情|话痨|外向|活泼/.test(text)) p += 0.25;
+    if (/多疑|谨慎|警惕/.test(text)) p -= 0.1;
+    if (o.addressed) p += 0.4;
+    if (typeof o.trust === 'number') p += (o.trust - 50) / 200;
+    return Math.max(0.05, Math.min(0.95, p));
+  }
+
+  function willSpeak(persona, opts, rng) {
+    const r = typeof rng === 'function' ? rng : Math.random;
+    return r() < speakProbability(persona, opts);
+  }
+
+  // ---- KaTeX 数学渲染 -----------------------------------------------------------
   function ensureKatex() {
     return new Promise((resolve) => {
       if (window.renderMathInElement) return resolve(true);
@@ -84,74 +101,66 @@
     } catch (e) { /* ignore */ }
   }
 
-  // 找到聊天消息容器（按常见选择器探测）
-  function findChatContainer() {
-    const sels = ['#chat-messages', '.chat-messages', '#messages', '.message-list', '[data-role="messages"]', '#chat-log', '.chat-log'];
-    for (const s of sels) {
-      const el = document.querySelector(s);
-      if (el) return el;
-    }
-    return null;
+  // ---- 轻量 Markdown → HTML（仅处理本 mod 自己的消息流，不动主聊天 DOM）------
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
   }
 
-  // 监听聊天容器新增节点，自动渲染数学公式
-  function observeChatForMath() {
-    const container = findChatContainer();
-    if (!container) return;
-    ensureKatex().then((ok) => {
-      if (!ok) return;
-      renderMathIn(container);
-      const mo = new MutationObserver((muts) => {
-        for (const m of muts) {
-          m.addedNodes && m.addedNodes.forEach((n) => {
-            if (n.nodeType === 1) renderMathIn(n);
-          });
-        }
-      });
-      mo.observe(container, { childList: true, subtree: true });
-    });
+  function miniMarkdown(text) {
+    let html = esc(text);
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
   }
 
-  // ---- 角色「是否发言」判定（性格驱动 + 随机性）--------------------------------
-  // 在缺少结构化角色数据时，提供一个可解释的本地启发式，供前端节奏控制与提示。
-  function willSpeak(persona, opts) {
-    const o = opts || {};
-    let p = 0.55;
-    const text = String(persona || '');
-    if (/沉默|寡言|高冷|冷淡|内向/.test(text)) p -= 0.25;
-    if (/健谈|热情|话痨|外向|活泼/.test(text)) p += 0.25;
-    if (/多疑|谨慎|警惕/.test(text)) p -= 0.1;
-    if (o.addressed) p += 0.4;       // 上一回合被点名
-    if (typeof o.trust === 'number') p += (o.trust - 50) / 200;
-    p = Math.max(0.05, Math.min(0.95, p));
-    return Math.random() < p;
+  // ---- 消息流渲染 -------------------------------------------------------------
+  function ensureFeed() {
+    let feed = document.getElementById('fr-auto-saga-feed');
+    if (feed) return feed;
+    feed = document.createElement('div');
+    feed.id = 'fr-auto-saga-feed';
+    document.body.appendChild(feed);
+    return feed;
   }
 
-  // ---- 推进一回合：复用主应用现有的发送逻辑 -----------------------------------
-  // 优先调用主应用暴露的全局发送函数；否则模拟点击发送按钮。
-  function advanceTurn() {
-    state.turn += 1;
-    saveState();
+  function renderMessage(m) {
+    const feed = ensureFeed();
+    const el = document.createElement('div');
+    el.className = 'fr-auto-saga-msg fr-auto-saga-' + (m.role || 'gm');
+    const who = m.role === 'gm' ? '' : `<span class="fr-auto-saga-who">${esc(m.name)}</span>`;
+    el.innerHTML = `${who}<div class="fr-auto-saga-body">${miniMarkdown(m.text)}</div>`;
+    feed.appendChild(el);
+    renderMathIn(el);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  // ---- 推进一回合：调 mod 后端 ----------------------------------------------
+  async function advanceTurn() {
+    if (busy) return;
+    busy = true;
     updateBar();
-
-    // 1) 主应用若暴露了发送 API，直接复用（不同版本命名可能不同，逐一探测）
-    const fn = window.sendChatMessage || window.fantarealSend || (window.Fantareal && window.Fantareal.send);
-    if (typeof fn === 'function') {
-      try { fn('(继续推进剧情)'); return; } catch (e) { /* 落到下面的兜底 */ }
+    try {
+      const resp = await fetch(API_BASE + '/next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      state.turn = data.turn || state.turn + 1;
+      saveState();
+      (data.messages || []).forEach(renderMessage);
+      if (!data.llm) flashHint('后端未配置 API Key，当前为本地模拟叙事。', 2500);
+    } catch (e) {
+      flashHint('推进失败：' + e.message + '（请确认 auto-saga mod 后端已启用）');
+      stopAuto();
+    } finally {
+      busy = false;
+      updateBar();
     }
-
-    // 2) 兜底：填充输入框 + 触发发送按钮点击
-    const input = document.querySelector('textarea, input[type="text"][data-role="chat-input"], #chat-input, .chat-input textarea');
-    const sendBtn = document.querySelector('#send-btn, .send-btn, [data-action="send"], button[type="submit"]');
-    if (input && sendBtn) {
-      input.value = '(继续推进剧情)';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      sendBtn.click();
-      return;
-    }
-
-    // 3) 都找不到：提示用户（不同 chat 版本选择器差异）
-    flashHint('未找到聊天发送入口，请在普通 Chat 页开启自动叙事模式。');
   }
 
   // ---- 自动播放 ---------------------------------------------------------------
@@ -207,6 +216,11 @@
       state.intervalSec = Math.max(2, Math.min(60, Number(inInterval.value) || 6));
       inInterval.value = state.intervalSec;
       saveState();
+      // 同步间隔到后端（失败不阻断）
+      fetch(API_BASE + '/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interval_sec: state.intervalSec }),
+      }).catch(() => {});
       if (autoTimer) startAuto();
     });
     bar.querySelector('#fr-auto-saga-next').addEventListener('click', () => {
@@ -223,6 +237,8 @@
 
   function applyActiveClass() {
     document.body.classList.toggle('fr-auto-saga-active', !!state.active);
+    const feed = document.getElementById('fr-auto-saga-feed');
+    if (feed) feed.style.display = state.active ? '' : 'none';
   }
 
   function updateBar() {
@@ -231,15 +247,15 @@
     const next = bar.querySelector('#fr-auto-saga-next');
     const auto = bar.querySelector('#fr-auto-saga-auto');
     const turn = bar.querySelector('#fr-auto-saga-turn');
-    if (next) next.disabled = !state.active || !!autoTimer;
+    if (next) next.disabled = !state.active || !!autoTimer || busy;
     if (auto) {
-      auto.disabled = !state.active;
+      auto.disabled = !state.active || busy;
       auto.textContent = autoTimer ? '⏸ 暂停' : '▶ 自动';
     }
-    if (turn) turn.textContent = state.active ? `已推进 ${state.turn} 回合` : '未开启';
+    if (turn) turn.textContent = state.active ? `已推进 ${state.turn} 回合${busy ? ' …' : ''}` : '未开启';
   }
 
-  function flashHint(msg) {
+  function flashHint(msg, ms) {
     let hint = document.getElementById('fr-auto-saga-hint');
     if (!hint) {
       hint = document.createElement('div');
@@ -249,14 +265,15 @@
     }
     hint.textContent = msg;
     clearTimeout(hint._t);
-    hint._t = setTimeout(() => { hint.remove(); }, 4000);
+    hint._t = setTimeout(() => { hint.remove(); }, ms || 4000);
   }
 
   // ---- 初始化 -----------------------------------------------------------------
   function init() {
     ensureBar();
+    ensureFeed();
     applyActiveClass();
-    observeChatForMath();
+    ensureKatex();
   }
 
   if (document.readyState === 'loading') {
@@ -265,8 +282,7 @@
     init();
   }
 
-  // 暴露最小测试接口（便于 node --test 复用纯函数）
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { willSpeak };
+    module.exports = { willSpeak, speakProbability };
   }
 })();
