@@ -1,0 +1,94 @@
+/* auto-saga mod — 自动叙事模式样式
+   零侵入：仅作用于本 mod 注入的元素，命名空间前缀 fr-auto-saga */
+
+#fr-auto-saga-bar {
+  position: fixed;
+  right: 16px;
+  bottom: 84px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  font-family: inherit;
+}
+
+.fr-auto-saga-card {
+  background: rgba(22, 27, 34, 0.92);
+  border: 1px solid rgba(124, 156, 255, 0.4);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  color: #e6edf3;
+  min-width: 200px;
+}
+
+.fr-auto-saga-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.fr-auto-saga-row label {
+  color: #8b949e;
+  cursor: pointer;
+}
+
+.fr-auto-saga-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fr-auto-saga-btn {
+  flex: 1;
+  background: #7c9cff;
+  color: #0a0f1c;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fr-auto-saga-btn:hover { filter: brightness(1.08); }
+.fr-auto-saga-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.fr-auto-saga-btn.ghost {
+  background: transparent;
+  border: 1px solid rgba(124, 156, 255, 0.4);
+  color: #e6edf3;
+}
+
+.fr-auto-saga-toggle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e3b341;
+}
+
+.fr-auto-saga-interval {
+  width: 64px;
+  background: #0d1117;
+  border: 1px solid rgba(124, 156, 255, 0.3);
+  border-radius: 6px;
+  color: #e6edf3;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+/* 自动叙事开启时，隐藏主输入区域（按常见选择器尽量兼容；找不到则由 JS 兜底） */
+body.fr-auto-saga-active .chat-input,
+body.fr-auto-saga-active .chat-composer,
+body.fr-auto-saga-active .composer,
+body.fr-auto-saga-active #chat-input-area,
+body.fr-auto-saga-active [data-role="chat-input"] {
+  display: none !important;
+}
+
+/* KaTeX 块级公式居中留白 */
+.fr-auto-saga-katex-block { margin: 8px 0; overflow-x: auto; }
