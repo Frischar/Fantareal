@@ -300,6 +300,18 @@ def hash_text(value: Any) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
+def visible_message_text(value: Any) -> str:
+    text = str(value or "")
+    for tag in ("think", "thinking", "thought", "thoughts", "reason", "reasoning", "analysis"):
+        text = re.sub(
+            rf"<\s*{tag}\b[^>]*>[\s\S]*?</\s*{tag}\s*>",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+    return text.strip()
+
+
 def normalize_turn_id(value: Any) -> str:
     text = str(value or "").strip()
     text = re.sub(r"[^a-zA-Z0-9_.:-]+", "_", text).strip("_")
@@ -5110,7 +5122,7 @@ def format_history(history: Any, limit_turns: int) -> list[dict[str, str]]:
         role = str(item.get("role") or "").strip()
         if role not in {"user", "assistant"}:
             continue
-        content = str(item.get("content") or "").strip()
+        content = visible_message_text(item.get("content"))
         if content:
             clean.append({"role": role, "content": content})
     max_messages = max(2, limit_turns * 2)
@@ -6325,7 +6337,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     latest_turn = payload.get("latest_turn") if isinstance(payload.get("latest_turn"), dict) else None
     trigger_source = str(payload.get("trigger_source") or payload.get("triggerSource") or payload.get("source") or payload.get("event_type") or "manual_backend").strip() or "manual_backend"
     direct_user_text = str(payload.get("user_text") or payload.get("userText") or "")
-    direct_assistant_text = str(
+    direct_assistant_text = visible_message_text(
         payload.get("assistant_clean_text")
         or payload.get("assistantCleanText")
         or payload.get("assistant_text")
@@ -6349,7 +6361,9 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     turn_index = payload.get("turn_index") or payload.get("turnIndex")
     safe_turn_index = int(turn_index or 0) if str(turn_index or "").strip() else 0
     user_text = str((latest_turn or {}).get("user") or (latest_turn or {}).get("userText") or "")
-    assistant_text = str((latest_turn or {}).get("assistant") or (latest_turn or {}).get("assistantText") or "")
+    assistant_text = visible_message_text((latest_turn or {}).get("assistant") or (latest_turn or {}).get("assistantText") or "")
+    if isinstance(latest_turn, dict):
+        latest_turn = {**latest_turn, "assistant": assistant_text}
     if not payload.get("dry_run", False) and assistant_text.strip():
         save_worker_turn_state(
             turn_id=turn_id,

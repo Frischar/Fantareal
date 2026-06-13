@@ -1,12 +1,13 @@
 {
   "label": "自动叙事模式",
-  "description": "旁观式玩法：全程点击 Next 推进剧情，角色依据人设卡性格由后端自主判断是否发言。支持 KaTeX 数学公式渲染。",
+  "description": "嵌入聊天页的旁观式叙事插件：由旁白推进场景，角色依据人设自主判断是否发言。",
+  "version": "0.5.4",
   "hooks": {
     "chat_styles": [
-      "/static/auto-saga.css?v=auto-saga-v0-2-0"
+      "/static/auto-saga.css?v=auto-saga-v0-5-4"
     ],
     "chat_scripts": [
-      "/static/auto-saga-chat.js?v=auto-saga-v0-2-0"
+      "/static/auto-saga-chat.js?v=auto-saga-v0-5-4"
     ]
   }
 }

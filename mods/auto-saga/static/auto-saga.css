@@ -1,132 +1,366 @@
-/* auto-saga mod — 自动叙事模式样式
-   零侵入：仅作用于本 mod 注入的元素，命名空间前缀 fr-auto-saga */
+.chat-page .fr-auto-saga-trigger {
+  position: relative;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border-radius: 999px;
+}
 
-#fr-auto-saga-bar {
+.chat-page .fr-auto-saga-trigger.active,
+.chat-page .fr-auto-saga-trigger.is-enabled {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--line) 64%);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel-strong) 90%);
+}
+
+.fr-auto-saga-dot {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid var(--panel-strong);
+}
+
+.fr-auto-saga-trigger.is-enabled .fr-auto-saga-dot {
+  background: #42b86b;
+  box-shadow: 0 0 0 3px rgba(66, 184, 107, 0.12);
+}
+
+.fr-auto-saga-panel {
   position: fixed;
-  right: 16px;
-  bottom: 84px;
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
-  font-family: inherit;
+  top: 82px;
+  right: 28px;
+  z-index: 240;
+  width: min(350px, calc(100vw - 32px));
+  padding: 18px;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent 18%);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--panel-strong) 94%, transparent 6%);
+  box-shadow: 0 24px 60px rgba(35, 24, 18, 0.22);
+  backdrop-filter: blur(20px) saturate(1.1);
+  animation: fr-auto-saga-panel-in 0.18s ease-out;
 }
 
-.fr-auto-saga-card {
-  background: rgba(22, 27, 34, 0.92);
-  border: 1px solid rgba(124, 156, 255, 0.4);
-  border-radius: 12px;
-  padding: 10px 12px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
-  color: #e6edf3;
-  min-width: 200px;
+.fr-auto-saga-panel[hidden] {
+  display: none;
 }
 
-.fr-auto-saga-row {
+@keyframes fr-auto-saga-panel-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.fr-auto-saga-panel-head,
+.fr-auto-saga-switch-row,
+.fr-auto-saga-field,
+.fr-auto-saga-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 6px 0;
-  font-size: 12px;
 }
 
-.fr-auto-saga-row label {
-  color: #8b949e;
-  cursor: pointer;
+.fr-auto-saga-panel-head {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.fr-auto-saga-panel-head strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 18px;
+}
+
+.fr-auto-saga-kicker {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.fr-auto-saga-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 22px;
+}
+
+.fr-auto-saga-switch-row {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel) 93%);
+}
+
+.fr-auto-saga-switch-row span {
+  min-width: 0;
+}
+
+.fr-auto-saga-switch-row strong,
+.fr-auto-saga-switch-row small {
+  display: block;
+}
+
+.fr-auto-saga-switch-row small {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.fr-auto-saga-switch-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.fr-auto-saga-field {
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 2px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.fr-auto-saga-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fr-auto-saga-number input {
+  width: 64px;
+  padding: 7px 8px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.fr-auto-saga-number em {
+  font-style: normal;
+}
+
+.fr-auto-saga-status {
+  margin: 12px 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  border-top: 1px solid color-mix(in srgb, var(--line) 64%, transparent 36%);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 64%, transparent 36%);
+  font-size: 12px;
+  text-align: center;
 }
 
 .fr-auto-saga-actions {
-  display: flex;
   gap: 8px;
-  margin-top: 8px;
 }
 
-.fr-auto-saga-btn {
+.fr-auto-saga-actions button {
   flex: 1;
-  background: #7c9cff;
-  color: #0a0f1c;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
+  min-height: 38px;
+  border-radius: 12px;
+  font-weight: 700;
 }
 
-.fr-auto-saga-btn:hover { filter: brightness(1.08); }
-.fr-auto-saga-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.fr-auto-saga-btn.ghost {
-  background: transparent;
-  border: 1px solid rgba(124, 156, 255, 0.4);
-  color: #e6edf3;
+.fr-auto-saga-primary {
+  color: white;
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
-.fr-auto-saga-toggle {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e3b341;
+.fr-auto-saga-secondary {
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--panel);
 }
 
-.fr-auto-saga-interval {
-  width: 64px;
-  background: #0d1117;
-  border: 1px solid rgba(124, 156, 255, 0.3);
-  border-radius: 6px;
-  color: #e6edf3;
-  padding: 4px 6px;
-  font-size: 12px;
-}
-
-/* 本 mod 自己的消息流（不侵入主聊天 DOM）*/
-#fr-auto-saga-feed {
-  position: fixed;
-  left: 50%;
-  top: 72px;
-  transform: translateX(-50%);
-  width: min(760px, 92vw);
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
-  z-index: 40;
-  padding: 8px 4px;
+.fr-auto-saga-config-link {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 10px 2px 2px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
 }
 
-.fr-auto-saga-msg {
-  font-size: 14px;
-  line-height: 1.7;
-  color: #e6edf3;
-  animation: fr-auto-saga-fade 0.3s ease;
+#fr-auto-saga-toast {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 260;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 11px 15px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--panel-strong);
+  box-shadow: 0 14px 38px rgba(35, 24, 18, 0.2);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: 0.18s ease;
 }
 
-@keyframes fr-auto-saga-fade {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; }
+#fr-auto-saga-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-.fr-auto-saga-who {
-  display: block;
-  font-size: 11px;
-  color: #7c9cff;
-  margin-bottom: 2px;
-  font-weight: 600;
+#fr-auto-saga-toast.is-error {
+  color: #b64040;
+  border-color: rgba(182, 64, 64, 0.35);
 }
 
-.fr-auto-saga-gm .fr-auto-saga-body { color: #c9d4e3; font-style: italic; }
-.fr-auto-saga-silent .fr-auto-saga-body { color: #6b7280; font-size: 12px; }
-.fr-auto-saga-body em { color: #e3b341; font-style: italic; }
-.fr-auto-saga-body code { background: #0d1117; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-
-/* 自动叙事开启时，隐藏主输入区域 */
-body.fr-auto-saga-active .chat-input,
-body.fr-auto-saga-active .chat-composer,
-body.fr-auto-saga-active .composer,
-body.fr-auto-saga-active #chat-input-area,
-body.fr-auto-saga-active [data-role="chat-input"] {
+body.fr-auto-saga-active .composer {
   display: none !important;
+}
+
+.fr-auto-saga-choices {
+  display: none;
+  grid-row: 4;
+  min-width: 0;
+  margin: 0 18px 18px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 64%, transparent 36%);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--panel-strong) 72%, transparent 28%);
+  box-shadow: 0 14px 34px rgba(35, 24, 18, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+body.fr-auto-saga-active .fr-auto-saga-choices {
+  display: block;
+}
+
+.fr-auto-saga-choice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.fr-auto-saga-choice-head strong,
+.fr-auto-saga-choice-head small {
+  display: block;
+}
+
+.fr-auto-saga-choice-head > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fr-auto-saga-choice-head strong {
+  font-size: 14px;
+}
+
+.fr-auto-saga-choice-head small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.fr-auto-saga-choice-head button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 30px;
+  padding: 5px 10px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 11px;
+}
+
+.fr-auto-saga-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.fr-auto-saga-choice {
+  min-width: 0;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  padding: 11px;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent 22%);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 84%, transparent 16%);
+  text-align: left;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.fr-auto-saga-choice:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line) 62%);
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel) 93%);
+}
+
+.fr-auto-saga-choice:disabled {
+  opacity: 0.52;
+  cursor: wait;
+}
+
+.fr-auto-saga-choice-index {
+  color: var(--accent);
+  font-family: Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.fr-auto-saga-choice strong,
+.fr-auto-saga-choice small {
+  display: block;
+}
+
+.fr-auto-saga-choice strong {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fr-auto-saga-choice small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .fr-auto-saga-panel {
+    top: 72px;
+    right: 16px;
+  }
+
+  #fr-auto-saga-toast {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .fr-auto-saga-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fr-auto-saga-choices {
+    margin: 0 10px 10px;
+  }
 }

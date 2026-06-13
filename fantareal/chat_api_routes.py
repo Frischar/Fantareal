@@ -20,6 +20,56 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
     async def api_get_history() -> list[dict[str, Any]]:
         return ctx.get_conversation()
 
+    @app.post("/api/chat/history/mod-message")
+    async def api_append_mod_message(payload: dict[str, Any]) -> dict[str, Any]:
+        role = str(payload.get("role") or "").strip()
+        if role not in {"user", "assistant", "system"}:
+            raise HTTPException(status_code=400, detail="Invalid message role.")
+        content = str(payload.get("content") or "").strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="Message cannot be empty.")
+        mod_message_id = str(payload.get("mod_message_id") or "").strip()
+        if not mod_message_id:
+            raise HTTPException(status_code=400, detail="mod_message_id is required.")
+
+        history = ctx.get_conversation()
+        for index, item in enumerate(history):
+            if str(item.get("mod_message_id") or "") == mod_message_id:
+                return {"ok": True, "created": False, "index": index}
+
+        history.append(
+            {
+                "role": role,
+                "content": content,
+                "created_at": str(payload.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                "message_id": mod_message_id,
+                "mod_message_id": mod_message_id,
+                "source": str(payload.get("source") or "mod").strip() or "mod",
+            }
+        )
+        item = history[-1]
+        turn_id = str(payload.get("turn_id") or payload.get("turnId") or "").strip()
+        if turn_id:
+            item["turn_id"] = turn_id
+            item["state_journal_turn"] = turn_id
+        try:
+            turn_index = int(payload.get("turn_index", payload.get("turnIndex", 0)) or 0)
+        except (TypeError, ValueError):
+            turn_index = 0
+        if turn_index > 0:
+            item["turn_index"] = turn_index
+        content_hash = str(payload.get("content_hash") or payload.get("contentHash") or "").strip()
+        if content_hash:
+            item["content_hash"] = content_hash
+            if role == "assistant":
+                item["assistant_hash"] = content_hash
+        ctx.persist_json(
+            ctx.conversation_path(),
+            history,
+            detail="Mod message save failed. Please check disk space or file permissions.",
+        )
+        return {"ok": True, "created": True, "index": len(history) - 1}
+
     @app.get("/api/chat/director-notes")
     async def api_get_director_notes() -> dict[str, Any]:
         return {"items": ctx.get_director_notes(ctx.get_active_slot_id())}
