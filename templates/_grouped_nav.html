@@ -177,8 +177,7 @@
     function closeAll(exceptGroup = null) {
       groups.forEach((group) => {
         if (group === exceptGroup) return;
-        if (preserveActiveGroups && group.classList.contains("active-group")) {
-          group.setAttribute("open", "");
+        if (preserveActiveGroups && group.classList.contains("active-group") && group.hasAttribute("open")) {
           return;
         }
         group.removeAttribute("open");

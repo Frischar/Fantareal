@@ -6,7 +6,7 @@
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
     <link rel="stylesheet" href="/static/styles.css?v=ui-sidebar-drawer-v1" />
-    <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-v1" />
+    <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-switch-v1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=challenge-hide-v1" data-mod-hook="{{ mod.slug }}" />
@@ -1447,8 +1447,9 @@
                   <button id="download-prompt-debug-json" type="button" class="secondary compact" disabled>下载 Debug JSON</button>
                 </div>
                 <p class="muted">集中查看 Prompt Package、Active Tags、Preset activation_tags 和 Worldbook external_tag 的调试链路。</p>
-                <label class="checkbox-row prompt-layered-switch-row">
+                <label class="prompt-layered-switch-row">
                   <input id="prompt-layered-injection-enabled" type="checkbox" />
+                  <span class="prompt-debug-switch" aria-hidden="true"></span>
                   <span>启用预设分层注入实验模式</span>
                 </label>
                 <p class="muted">实验功能：开启后仅让系统核心、系统格式、历史前、输出守卫四类预设片段真实生效；关闭后回到旧拼装逻辑。</p>
