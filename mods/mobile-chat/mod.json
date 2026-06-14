@@ -8,7 +8,7 @@
       "/static/mobile-chat-chat.css?v=mobile-chat-system-battery-v5"
     ],
     "chat_scripts": [
-      "/static/mobile-chat-chat.js?v=mobile-chat-system-battery-v5"
+      "/static/mobile-chat-chat.js?v=mobile-chat-passive-clock-v1"
     ]
   }
 }

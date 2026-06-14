@@ -566,6 +566,8 @@ class ChannelSeedPayload(BaseModel):
     channel_id: str = ""
     count: int | None = None
     force: bool | None = None
+    role_id: str | None = Field(default=None, max_length=120)
+    role_name: str | None = Field(default=None, max_length=80)
 
 
 class ChannelInteractionPayload(BaseModel):
@@ -3817,6 +3819,132 @@ def get_channel_events(channel_id: str) -> list[dict[str, Any]]:
     return sorted(events, key=lambda item: item["created_at"], reverse=True)
 
 
+def seed_role_profiles_for_app(app_id: str, *, limit: int = 20) -> list[dict[str, Any]]:
+    target = normalize_id(app_id, "")
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_profile(profile: dict[str, Any]) -> None:
+        role_id = normalize_id(profile.get("role_id") or profile.get("id"), "")
+        display_name = compact_text(profile.get("display_name") or profile.get("name"), 80)
+        if not role_id or not display_name or role_id in seen:
+            return
+        normalized = {**profile, "role_id": role_id, "display_name": display_name}
+        if not role_app_allowed(normalized, target):
+            return
+        seen.add(role_id)
+        rows.append(normalized)
+
+    for profile in role_profiles_for_app(target, limit=limit):
+        add_profile(profile)
+    for profile in current_card_profiles():
+        add_profile(profile)
+    return rows[:limit]
+
+
+def diary_role_candidates(*, limit: int = 20) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add_role(role_id: Any, name: Any, summary: Any = "", avatar: Any = "") -> None:
+        safe_role_id = normalize_id(role_id, "")
+        safe_name = compact_text(name, 80)
+        if not safe_role_id or not safe_name or safe_role_id in seen:
+            return
+        seen.add(safe_role_id)
+        rows.append({
+            "role_id": safe_role_id,
+            "name": safe_name,
+            "summary": compact_text(summary, 360),
+            "avatar": safe_avatar(avatar),
+        })
+
+    for profile in seed_role_profiles_for_app("diary", limit=limit):
+        add_role(profile.get("role_id"), profile.get("display_name"), profile.get("summary"), profile.get("avatar"))
+    if len(rows) < limit:
+        for member in available_role_members().get("roles", []):
+            if member.get("type") != "character":
+                continue
+            add_role(member.get("role_id"), member.get("name"), member.get("summary"), member.get("avatar"))
+            if len(rows) >= limit:
+                break
+    return rows[:limit]
+
+
+UNASSIGNED_DIARY_IDENTITY_KEYS = {"", "system", "user", "me", "self", "default", "unknown"}
+
+
+def diary_seed_role_hint(role_id: Any = "", role_name: Any = "") -> dict[str, str] | None:
+    safe_role_id = normalize_id(role_id, "")
+    safe_role_name = compact_text(role_name, 80)
+    if not safe_role_id and not safe_role_name:
+        return None
+    candidates = diary_role_candidates(limit=50)
+    selected = None
+    if safe_role_id:
+        selected = next((item for item in candidates if item["role_id"] == safe_role_id), None)
+    if not selected and safe_role_name:
+        selected = next((item for item in candidates if role_name_key(item["name"]) == role_name_key(safe_role_name)), None)
+    if selected:
+        return selected
+    return {
+        "role_id": safe_role_id or normalize_id(safe_role_name, f"role_{uuid4().hex[:8]}"),
+        "name": safe_role_name or safe_role_id,
+        "summary": "",
+        "avatar": "",
+    }
+
+
+def assign_diary_event_roles(events: list[dict[str, Any]], preferred_role: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    candidates = diary_role_candidates(limit=max(20, len(events)))
+    preferred = diary_seed_role_hint(
+        preferred_role.get("role_id") if isinstance(preferred_role, dict) else "",
+        preferred_role.get("name") or preferred_role.get("display_name") if isinstance(preferred_role, dict) else "",
+    )
+    if preferred:
+        candidates = [preferred, *[item for item in candidates if item["role_id"] != preferred["role_id"]]]
+    if not candidates:
+        return events
+    by_id = {item["role_id"]: item for item in candidates}
+    by_name = {role_name_key(item["name"]): item for item in candidates}
+
+    def matching_candidate(event: dict[str, Any], index: int) -> dict[str, str] | None:
+        if preferred:
+            return preferred
+        metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+        raw_role = metadata.get("role_id") or metadata.get("role")
+        role_id = normalize_id(raw_role, "")
+        role_name = role_name_key(raw_role)
+        if role_id in by_id:
+            return by_id[role_id]
+        if role_name in by_name:
+            return by_name[role_name]
+        author_id = normalize_id(event.get("author_id"), "")
+        author_name = role_name_key(event.get("author_name"))
+        if author_id in by_id:
+            return by_id[author_id]
+        if author_name in by_name:
+            return by_name[author_name]
+        if role_id and role_id not in UNASSIGNED_DIARY_IDENTITY_KEYS:
+            return None
+        return candidates[index % len(candidates)]
+
+    for index, event in enumerate(events):
+        metadata = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+        event["metadata"] = metadata
+        candidate = matching_candidate(event, index)
+        if not candidate:
+            continue
+        metadata["role_id"] = candidate["role_id"]
+        metadata["role_name"] = candidate["name"]
+        author_id = normalize_id(event.get("author_id"), "")
+        author_name = role_name_key(event.get("author_name"))
+        if author_id in UNASSIGNED_DIARY_IDENTITY_KEYS or author_name in UNASSIGNED_DIARY_IDENTITY_KEYS:
+            event["author_id"] = candidate["role_id"]
+            event["author_name"] = candidate["name"]
+    return events
+
+
 def append_channel_events(channel_id: str, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     channel = get_channel_or_404(channel_id)
     existing = get_channel_events(channel["channel_id"])
@@ -3907,7 +4035,7 @@ def summarize_mobile_context(app_id: str = "") -> dict[str, Any]:
 
 def summarize_mobile_seed_context(channel: dict[str, Any]) -> dict[str, Any]:
     target_app = normalize_id(channel.get("type") or channel.get("app_id"), "")
-    roles = role_profiles_for_app(target_app, limit=12)
+    roles = seed_role_profiles_for_app(target_app, limit=12)
     groups = get_groups()[:8]
     return {
         "target_app": target_app,
@@ -3949,16 +4077,19 @@ def effective_channel_seed_count(channel: dict[str, Any], count: Any = None) -> 
     return safe_count
 
 
-def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dict[str, str]]:
+def build_channel_seed_messages(channel: dict[str, Any], count: int, role_hint: dict[str, Any] | None = None) -> list[dict[str, str]]:
     schema = next((item for item in channel_schema_catalog() if item["type"] == channel["type"]), {})
     current_datetime = now_iso()
+    mobile_context = summarize_mobile_seed_context(channel)
+    if role_hint:
+        mobile_context["selected_role"] = role_hint
     context = {
         "channel": channel,
         "count": count,
         "schema": schema,
         "current_date": current_datetime[:10],
         "current_datetime": current_datetime,
-        "mobile_context": summarize_mobile_seed_context(channel),
+        "mobile_context": mobile_context,
     }
     system_text = assembled_prompt_text(channel["type"]) or system_prompt_text()
     content_limit = 520 if channel["type"] == "forum" else 280 if channel["type"] in {"diary", "live"} else 180 if channel["type"] in {"mail", "calendar"} else 140
@@ -3992,6 +4123,12 @@ def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dic
             "For diary events, write a richer diary fragment with clear paragraphs; "
             "metadata should include mood, related_people and role_id when known."
         )
+        if role_hint:
+            output_rules.append(
+                "For this diary seed, write every event from mobile_context.selected_role only; "
+                "author_id must equal selected_role.role_id, author_name must equal selected_role.name, "
+                "and metadata.role_id must equal selected_role.role_id."
+            )
     if channel["type"] == "live":
         output_rules.append(
             "For live events, event_type must be live. metadata must include live_status, viewers, fans, inner_thought, "
@@ -4007,8 +4144,11 @@ def build_channel_seed_messages(channel: dict[str, Any], count: int) -> list[dic
     return [{"role": "system", "content": system_text}, {"role": "user", "content": user_text}]
 
 
-def build_channel_seed_retry_messages(channel: dict[str, Any], count: int) -> list[dict[str, str]]:
+def build_channel_seed_retry_messages(channel: dict[str, Any], count: int, role_hint: dict[str, Any] | None = None) -> list[dict[str, str]]:
     current_datetime = now_iso()
+    mobile_context = summarize_mobile_seed_context(channel)
+    if role_hint:
+        mobile_context["selected_role"] = role_hint
     context = {
         "channel": {
             "channel_id": channel["channel_id"],
@@ -4019,7 +4159,7 @@ def build_channel_seed_retry_messages(channel: dict[str, Any], count: int) -> li
         "count": count,
         "current_date": current_datetime[:10],
         "current_datetime": current_datetime,
-        "mobile_context": summarize_mobile_seed_context(channel),
+        "mobile_context": mobile_context,
     }
     system_text = (
         "Return compact valid JSON only. Do not include markdown, prose, analysis, hidden reasoning, or explanations. "
@@ -4031,6 +4171,11 @@ def build_channel_seed_retry_messages(channel: dict[str, Any], count: int) -> li
             "Generate one substantial forum thread with concrete details, context, and a clear question or point of discussion. "
             "Each event must be event_type thread and include metadata.replies with exactly 2 replies. "
             "Each reply must include author_name, author_type, source, content, mood and floor, and each reply content <= 120 Chinese characters."
+        )
+    if channel["type"] == "diary" and role_hint:
+        reply_rule = (
+            "Write every diary event from mobile_context.selected_role only; author_id must equal selected_role.role_id, "
+            "author_name must equal selected_role.name, and metadata.role_id must equal selected_role.role_id."
         )
     user_text = (
         f"Generate exactly {count} {channel['type']} event(s). "
@@ -4388,7 +4533,7 @@ async def generate_mail_reply(event: dict[str, Any], user_content: str) -> list[
     return replies
 
 
-def parse_channel_seed_events(raw: str, channel: dict[str, Any], count: int) -> list[dict[str, Any]]:
+def parse_channel_seed_events(raw: str, channel: dict[str, Any], count: int, role_hint: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     raw_events, parse_error = parse_model_json_output(
         raw,
         scope=f"channel_{channel['type']}_seed",
@@ -4404,6 +4549,8 @@ def parse_channel_seed_events(raw: str, channel: dict[str, Any], count: int) -> 
         record_parser_diagnostic(f"channel_{channel['type']}_seed", "events", channel["channel_id"], "events_not_list", raw)
         raw_events = []
     events = [event for index, item in enumerate(raw_events[:count]) if (event := sanitize_channel_event(item, channel, index)) is not None]
+    if channel["type"] == "diary":
+        events = assign_diary_event_roles(events, role_hint)
     if events:
         return events
     record_parser_diagnostic(f"channel_{channel['type']}_seed", "events", channel["channel_id"], "no_valid_events", raw)
@@ -6879,12 +7026,12 @@ async def api_advance_live_event(channel_id: str, event_id: str) -> JSONResponse
     return {"ok": True, "event": updated, "events": get_channel_events(channel["channel_id"]), "notification": notification}
 
 
-async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any]:
+async def run_channel_seed(channel: dict[str, Any], count: int, role_hint: dict[str, Any] | None = None) -> dict[str, Any]:
     count = effective_channel_seed_count(channel, count)
     job = begin_generation_job(f"channel_{channel['type']}", channel["channel_id"])
     try:
         raw_reply = await call_chat_model(
-            build_channel_seed_messages(channel, count),
+            build_channel_seed_messages(channel, count, role_hint),
             max_tokens=channel_seed_max_tokens(channel, count),
             temperature=read_mobile_llm_config()["temperature"],
         )
@@ -6894,14 +7041,14 @@ async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any
             raise
         try:
             raw_reply = await call_chat_model(
-                build_channel_seed_retry_messages(channel, count),
+                build_channel_seed_retry_messages(channel, count, role_hint),
                 max_tokens=channel_seed_max_tokens(channel, count, retry=True),
                 temperature=read_mobile_llm_config()["temperature"],
             )
         except HTTPException as retry_exc:
             finish_generation_job(job, "error", compact_text(retry_exc.detail, 240))
             raise retry_exc
-    events = parse_channel_seed_events(raw_reply, channel, count)
+    events = parse_channel_seed_events(raw_reply, channel, count, role_hint)
     if not events:
         finish_generation_job(job, "error", "parser_no_valid_events")
         raise HTTPException(status_code=502, detail="模型返回内容无法解析，请查看后台 diagnostics。")
@@ -6916,8 +7063,9 @@ async def run_channel_seed(channel: dict[str, Any], count: int) -> dict[str, Any
 async def api_seed_channel(channel_id: str, payload: ChannelSeedPayload | None = None) -> JSONResponse | dict[str, Any]:
     channel = get_channel_or_404(channel_id)
     count = effective_channel_seed_count(channel, payload.count if payload else None)
+    role_hint = diary_seed_role_hint(payload.role_id, payload.role_name) if payload and channel["type"] == "diary" else None
     try:
-        return await run_channel_seed(channel, count)
+        return await run_channel_seed(channel, count, role_hint)
     except HTTPException as exc:
         return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc))
 
@@ -6929,8 +7077,9 @@ async def api_admin_seed_channel(payload: ChannelSeedPayload) -> JSONResponse | 
     if existing and not payload.force:
         return {"ok": True, "channel": channel, "events": existing[: effective_channel_seed_count(channel)], "skipped": True}
     count = effective_channel_seed_count(channel, payload.count)
+    role_hint = diary_seed_role_hint(payload.role_id, payload.role_name) if channel["type"] == "diary" else None
     try:
-        return await run_channel_seed(channel, count)
+        return await run_channel_seed(channel, count, role_hint)
     except HTTPException as exc:
         return JSONResponse(status_code=exc.status_code, content=mobile_error_payload(exc))
 
