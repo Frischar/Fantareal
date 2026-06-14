@@ -66,6 +66,7 @@ class SettingsPayload(BaseModel):
     rerank_api_key: str = ""
     rerank_model: str = ""
     rerank_top_n: int = 3
+    layered_prompt_injection_enabled: bool = False
     memory_summary_length: str = "medium"
     memory_summary_max_chars: int = 520
 

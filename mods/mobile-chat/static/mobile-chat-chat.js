@@ -11,6 +11,7 @@
   const automationLockKey = "fantareal-mobile-chat-automation-lock";
   const automationHistoryKey = "fantareal-mobile-chat-automation-history";
   const automationOwner = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const unassignedDiaryKeys = new Set(["", "system", "user", "me", "self", "default", "unknown"]);
   const fallbackStickerIds = ["happy", "sweat", "stare", "shy", "heart", "cry"];
   const fallbackStickers = fallbackStickerIds.map((id) => ({
     id,
@@ -96,6 +97,7 @@
     loading: false,
     generating: false,
     generationTask: null,
+    createGroupDraft: null,
     roleGeneratorForm: {},
     roleGeneratorDrafts: [],
     roleGeneratorSaved: [],
@@ -143,6 +145,43 @@
     const parsed = Number.parseInt(value, 10);
     const viewportLimit = Math.max(3200, (window.innerWidth || 0) + (window.innerHeight || 0));
     return Number.isFinite(parsed) ? Math.max(0, Math.min(viewportLimit, parsed)) : fallback;
+  }
+
+  function defaultCreateGroupDraft() {
+    return {
+      name: "",
+      description: "",
+      memberIds: [],
+      includeUser: false,
+      allowRoleToRoleReply: (state.settings || defaults).allow_role_to_role_reply !== false,
+    };
+  }
+
+  function ensureCreateGroupDraft() {
+    if (!state.createGroupDraft) state.createGroupDraft = defaultCreateGroupDraft();
+    return state.createGroupDraft;
+  }
+
+  function resetCreateGroupDraft() {
+    state.createGroupDraft = defaultCreateGroupDraft();
+  }
+
+  function updateCreateGroupDraftFromForm(form) {
+    if (!form || form.dataset.form !== "create-group") return false;
+    const data = new FormData(form);
+    state.createGroupDraft = {
+      name: String(data.get("name") || ""),
+      description: String(data.get("description") || ""),
+      memberIds: data.getAll("member").map(String),
+      includeUser: data.has("include_user"),
+      allowRoleToRoleReply: data.has("allow_role_to_role_reply"),
+    };
+    return true;
+  }
+
+  function syncCreateGroupDraftFromEvent(event) {
+    const form = event.target?.closest?.('form[data-form="create-group"]');
+    return updateCreateGroupDraftFromForm(form);
   }
 
   function currentTimeText() {
@@ -1049,6 +1088,15 @@
     return metadataValueText(event?.metadata?.role_id || event?.metadata?.role || event?.author_id || event?.author_name);
   }
 
+  function isUnassignedDiaryEvent(event) {
+    const explicitRole = metadataValueText(event?.metadata?.role_id || event?.metadata?.role);
+    if (explicitRole) return false;
+    const key = eventRoleKey(event).toLowerCase();
+    const authorId = metadataValueText(event?.author_id).toLowerCase();
+    const authorName = metadataValueText(event?.author_name).toLowerCase();
+    return unassignedDiaryKeys.has(key) || unassignedDiaryKeys.has(authorId) || authorName === "\u6211";
+  }
+
   function isoDateOnly(value) {
     const text = metadataValueText(value);
     if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
@@ -1626,7 +1674,7 @@
     const roleEvents = selectedKey
       ? visibleEvents.filter((event) => {
           const key = eventRoleKey(event);
-          return !key || key === selectedKey || key === selected.display_name || event.author_name === selected.display_name;
+          return !key || isUnassignedDiaryEvent(event) || key === selectedKey || key === selected.display_name || event.author_name === selected.display_name;
         })
       : visibleEvents;
     return `
@@ -1782,6 +1830,45 @@
     }
   }
 
+  function isCreatePageOpen() {
+    return state.open && state.page === "create";
+  }
+
+  function updatePassiveStatusSurfaces() {
+    if (!root || !state.open) return false;
+    let updated = false;
+    const timeText = currentTimeText();
+    root.querySelectorAll(".fmcp-status-time, .fmcp-home-time").forEach((time) => {
+      time.textContent = timeText;
+      updated = true;
+    });
+    const batteryPercent = Math.max(0, Math.min(100, Number.parseInt(state.battery?.percent, 10) || 0));
+    root.querySelectorAll(".fmcp-status-battery").forEach((battery) => {
+      battery.classList.toggle("is-charging", !!state.battery?.charging);
+      battery.style.setProperty("--fmcp-battery-level", `${batteryPercent}%`);
+      const label = battery.querySelector("i");
+      if (label) label.textContent = String(batteryPercent);
+      updated = true;
+    });
+    return updated;
+  }
+
+  function renderPassiveUpdate() {
+    if (isCreatePageOpen()) {
+      updatePassiveStatusSurfaces();
+      return;
+    }
+    render();
+  }
+
+  function renderPassiveUpdateKeepingBodyScroll() {
+    if (isCreatePageOpen()) {
+      updatePassiveStatusSurfaces();
+      return;
+    }
+    renderKeepingBodyScroll();
+  }
+
   async function runAutomationTick() {
     if (!automationCanRun()) return;
     const groupId = state.currentGroupId;
@@ -1806,7 +1893,7 @@
   function restartClockTimer() {
     if (clockTimer) window.clearInterval(clockTimer);
     clockTimer = window.setInterval(() => {
-      if (state.open) render();
+      if (state.open) updatePassiveStatusSurfaces();
     }, 15000);
   }
 
@@ -2060,15 +2147,17 @@
 
   function createMarkup() {
     const roles = state.roles;
+    const draft = ensureCreateGroupDraft();
+    const selectedMemberIds = new Set((draft.memberIds || []).map(String));
     return `
       <form class="fmcp-form" data-form="create-group">
         <label class="fmcp-field">
           <span>群聊名称</span>
-          <input class="fmcp-input" name="name" maxlength="80" placeholder="例如：小院夜话" required>
+          <input class="fmcp-input" name="name" maxlength="80" placeholder="例如：小院夜话" value="${esc(draft.name)}" required>
         </label>
         <label class="fmcp-field">
           <span>群聊简介</span>
-          <textarea class="fmcp-textarea" name="description" maxlength="500" placeholder="可选：这群人通常聊些什么"></textarea>
+          <textarea class="fmcp-textarea" name="description" maxlength="500" placeholder="可选：这群人通常聊些什么">${esc(draft.description)}</textarea>
         </label>
         <button class="fmcp-import-card" type="button" data-action="import-current-card-roles" ${state.loading ? "disabled" : ""}>
           ${icon("import")}
@@ -2087,7 +2176,7 @@
                   <strong>${esc(role.name)}</strong>
                   <span class="fmcp-help">角色</span>
                 </span>
-                <input type="checkbox" name="member" value="${esc(role.role_id)}">
+                <input type="checkbox" name="member" value="${esc(role.role_id)}" ${selectedMemberIds.has(String(role.role_id)) ? "checked" : ""}>
               </label>
             `).join("")}
           </div>
@@ -2095,11 +2184,11 @@
         <div class="fmcp-create-options">
           <label class="fmcp-settings-row">
             <span class="fmcp-settings-copy"><strong>我也加入群聊</strong><small>关闭后只观察角色之间的对话</small></span>
-            <span class="fmcp-switch"><input type="checkbox" name="include_user"><i></i></span>
+            <span class="fmcp-switch"><input type="checkbox" name="include_user" ${draft.includeUser ? "checked" : ""}><i></i></span>
           </label>
           <label class="fmcp-settings-row">
             <span class="fmcp-settings-copy"><strong>角色互相回复</strong><small>角色之间可以自然接话</small></span>
-            <span class="fmcp-switch"><input type="checkbox" name="allow_role_to_role_reply" ${(state.settings || defaults).allow_role_to_role_reply !== false ? "checked" : ""}><i></i></span>
+            <span class="fmcp-switch"><input type="checkbox" name="allow_role_to_role_reply" ${draft.allowRoleToRoleReply !== false ? "checked" : ""}><i></i></span>
           </label>
           <div class="fmcp-settings-row">
             <span class="fmcp-settings-copy"><strong>默认回复人数</strong><small>每条消息默认由几个角色回复</small></span>
@@ -2717,7 +2806,7 @@
     } catch (error) {
       state.error = error.message;
     }
-    render();
+    renderPassiveUpdate();
   }
 
   async function loadSystemStatus() {
@@ -2727,7 +2816,7 @@
     } catch (_error) {
       return;
     }
-    renderKeepingBodyScroll();
+    updatePassiveStatusSurfaces();
   }
 
   async function loadStickers() {
@@ -2739,7 +2828,7 @@
     } catch (error) {
       state.stickers = fallbackStickers;
     }
-    render();
+    renderPassiveUpdate();
   }
 
   async function loadApps() {
@@ -2749,7 +2838,7 @@
     } catch (error) {
       state.apps = [];
     }
-    render();
+    renderPassiveUpdate();
   }
 
   async function loadChannels() {
@@ -2759,7 +2848,7 @@
     } catch (error) {
       state.error = error.message;
     }
-    render();
+    renderPassiveUpdate();
   }
 
   async function loadChannelEvents(channelId) {
@@ -2858,6 +2947,7 @@
     state.error = "";
     state.roles = [];
     state.user = null;
+    resetCreateGroupDraft();
     render();
   }
 
@@ -3169,10 +3259,11 @@
   }
 
   async function createGroup(form) {
-    const data = new FormData(form);
-    const selectedIds = new Set(data.getAll("member").map(String));
-    const members = state.roles.filter((item) => selectedIds.has(item.role_id));
-    if (data.has("include_user") && state.user) members.push(state.user);
+    updateCreateGroupDraftFromForm(form);
+    const draft = ensureCreateGroupDraft();
+    const selectedIds = new Set((draft.memberIds || []).map(String));
+    const members = state.roles.filter((item) => selectedIds.has(String(item.role_id)));
+    if (draft.includeUser && state.user) members.push(state.user);
     state.loading = true;
     state.error = "";
     render();
@@ -3180,13 +3271,14 @@
       const payload = await request("/groups", {
         method: "POST",
         body: JSON.stringify({
-          name: data.get("name"),
-          description: data.get("description"),
+          name: draft.name,
+          description: draft.description,
           members,
-          allow_role_to_role_reply: data.has("allow_role_to_role_reply"),
+          allow_role_to_role_reply: draft.allowRoleToRoleReply !== false,
         }),
       });
       state.groups = [payload.group, ...state.groups.filter((item) => item.group_id !== payload.group.group_id)];
+      resetCreateGroupDraft();
       await openGroup(payload.group.group_id);
     } catch (error) {
       state.error = error.message;
@@ -3535,9 +3627,17 @@
     activeGenerationAbort = controller;
     render();
     try {
+      const requestBody = { count: channelSeedCount(channel) };
+      if (channel?.type === "diary") {
+        const role = selectedDiaryRole();
+        if (role) {
+          requestBody.role_id = role.role_id;
+          requestBody.role_name = role.display_name;
+        }
+      }
       const payload = await request(`/channels/${encodeURIComponent(state.currentChannelId)}/seed`, {
         method: "POST",
-        body: JSON.stringify({ count: channelSeedCount(channel) }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       });
       state.channelEvents[state.currentChannelId] = payload.events || [];
@@ -4261,6 +4361,7 @@
       renderKeepingBodyScroll();
       return;
     }
+    if (syncCreateGroupDraftFromEvent(event)) return;
     const field = event.target.closest("[data-role-draft-field]");
     if (!field) return;
     const index = Number.parseInt(field.dataset.draftIndex || String(state.roleGeneratorSelectedIndex || 0), 10);
@@ -4279,6 +4380,7 @@
       updateRoleGeneratorDraftScope(Number.isFinite(index) ? index : 0, scope.dataset.roleDraftScope || "", scope);
       return;
     }
+    if (syncCreateGroupDraftFromEvent(event)) return;
     const target = event.target.closest("[data-change]");
     if (!target) return;
     if (target.dataset.change === "toggle-live-thought") {
