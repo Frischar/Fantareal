@@ -840,7 +840,11 @@ def build_retrieval_prompt(retrieved_items: list[dict[str, Any]]) -> str:
 
 
 def build_memory_recap_prompt(memories: list[dict[str, Any]]) -> str:
-    if not memories:
+    active_memories = [
+        item for item in memories
+        if str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower() != "archived"
+    ]
+    if not active_memories:
         return ""
 
     sanitize_tags = _dep("sanitize_tags")
@@ -848,7 +852,7 @@ def build_memory_recap_prompt(memories: list[dict[str, Any]]) -> str:
         "The following are long-term memories that should stay consistent over time.",
         "Treat them as durable background facts unless the user explicitly asks to revise them.",
     ]
-    for index, item in enumerate(memories, start=1):
+    for index, item in enumerate(active_memories, start=1):
         title = str(item.get("title", "")).strip() or f"Memory {index}"
         content = str(item.get("content", "")).strip()
         tags = ", ".join(sanitize_tags(item.get("tags", [])))

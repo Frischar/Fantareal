@@ -77,6 +77,8 @@ class MemoryItemPayload(BaseModel):
     content: str = ""
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
+    memory_status: str = "active"
+    archived_at: str = ""
 
 
 class MemoryListPayload(BaseModel):
@@ -121,7 +123,19 @@ class MemoryMergePayload(BaseModel):
     merged_title: str = ""
     outline_title: str = ""
     delete_sources: bool = True
+    source_action: str = ""
     runtime_config: dict[str, Any] | None = None
+
+
+class MemoryWorldbookSyncPayload(BaseModel):
+    include_core: bool = True
+    include_index: bool = True
+    include_details: bool = True
+    recent_constant_count: int = 3
+    detail_entry_limit: int = 80
+    index_entry_limit: int = 80
+    replace_existing: bool = True
+    confirm_replace_existing: bool = False
 
 
 class UserProfilePayload(BaseModel):
@@ -174,6 +188,7 @@ class WorldbookEntryPayload(BaseModel):
     external_source: str = ""
     external_ref: dict[str, Any] = Field(default_factory=dict)
     activation_tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class WorldbookSettingsPayload(BaseModel):

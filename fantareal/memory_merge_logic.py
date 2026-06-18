@@ -52,6 +52,9 @@ def _sanitize_tags(value: Any) -> list[str]:
 def _sanitize_memory_item(item: Any, *, fallback_id: str) -> dict[str, Any]:
     if not isinstance(item, dict):
         item = {}
+    memory_status = str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower()
+    if memory_status not in {"active", "archived"}:
+        memory_status = "active"
 
     return {
         "id": str(item.get("id", "")).strip() or fallback_id,
@@ -59,6 +62,8 @@ def _sanitize_memory_item(item: Any, *, fallback_id: str) -> dict[str, Any]:
         "content": str(item.get("content", "")).strip(),
         "tags": _sanitize_tags(item.get("tags", [])),
         "notes": str(item.get("notes", "")).strip(),
+        "memory_status": memory_status,
+        "archived_at": str(item.get("archived_at", "")).strip() if memory_status == "archived" else "",
     }
 
 
@@ -484,6 +489,7 @@ async def merge_memories_to_outline(
     merged_title: str = "",
     outline_title: str = "",
     delete_sources: bool = True,
+    source_action: str = "",
     slot_id: str | None = None,
     runtime_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -547,19 +553,41 @@ async def merge_memories_to_outline(
     outline_items.append(outline_item)
     outline_items = save_memory_outline(ctx, outline_items, active_slot)
 
+    normalized_source_action = str(source_action or "").strip().lower()
+    if normalized_source_action not in {"delete", "archive", "keep"}:
+        normalized_source_action = "delete" if delete_sources else "keep"
+
     remaining_memories = current_memories
     removed_memory_ids: list[str] = []
-    if delete_sources:
+    archived_memory_ids: list[str] = []
+    if normalized_source_action == "delete":
         remaining_memories = [item for item in current_memories if item["id"] not in selected_id_set]
         removed_memory_ids = [item["id"] for item in current_memories if item["id"] in selected_id_set]
+        remaining_memories = ctx.save_memories(remaining_memories, active_slot)
+    elif normalized_source_action == "archive":
+        archived_at = _now_text()
+        remaining_memories = []
+        for item in current_memories:
+            if item["id"] in selected_id_set:
+                archived_item = {
+                    **item,
+                    "memory_status": "archived",
+                    "archived_at": archived_at,
+                }
+                remaining_memories.append(archived_item)
+                archived_memory_ids.append(item["id"])
+            else:
+                remaining_memories.append(item)
         remaining_memories = ctx.save_memories(remaining_memories, active_slot)
 
     return {
         "ok": True,
         "mode": merge_mode,
+        "source_action": normalized_source_action,
         "active_slot": active_slot,
         "selected_count": len(selected_memories),
         "removed_memory_ids": removed_memory_ids,
+        "archived_memory_ids": archived_memory_ids,
         "remaining_items": remaining_memories,
         "merged_memory": merged_memory,
         "outline_item": outline_item,
