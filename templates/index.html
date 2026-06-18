@@ -1961,6 +1961,7 @@
       let worldbookDebugCollapsed = true;
       let isEndingConversation = false;
       let chatRequestInFlight = false;
+      let composerInputRevision = 0;
       let historyMutationInFlight = false;
       let worldbookDebugFilter = "all";
       let lastWorldbookDebugPayload = null;
@@ -5009,6 +5010,8 @@
       const PROMPT_PREVIEW_LEGACY_CACHE_KEY = "fantareal:lastPromptPackagePreview";
       const PROMPT_PREVIEW_CACHE_SCHEMA = "prompt-package-cache-v2";
       const PROMPT_PREVIEW_HISTORY_LIMIT = 10;
+      const CHAT_DRAFT_CACHE_SCHEMA = "chat-draft-cache-v1";
+      const CHAT_DRAFT_STORAGE_PREFIX = "fantareal:chatDraft";
       let promptPackageHistory = createEmptyPromptPackageHistory();
       let lastPromptPackagePayload = null;
 
@@ -5037,6 +5040,93 @@
           sanitizePromptCacheKeyPart(scope.slot_id, "global"),
           sanitizePromptCacheKeyPart(scope.card_id, "unknown-card"),
         ].join(":");
+      }
+
+      function getChatDraftCacheScope() {
+        const scope = getPromptPackageCacheScope();
+        return {
+          schema: CHAT_DRAFT_CACHE_SCHEMA,
+          workspace_id: scope.workspace_id,
+          slot_id: scope.slot_id,
+          card_id: scope.card_id,
+        };
+      }
+
+      function getChatDraftStorageKey() {
+        const scope = getChatDraftCacheScope();
+        return [
+          CHAT_DRAFT_STORAGE_PREFIX,
+          sanitizePromptCacheKeyPart(scope.schema, CHAT_DRAFT_CACHE_SCHEMA),
+          sanitizePromptCacheKeyPart(scope.workspace_id, "unknown-workspace"),
+          sanitizePromptCacheKeyPart(scope.slot_id, "global"),
+          sanitizePromptCacheKeyPart(scope.card_id, "unknown-card"),
+        ].join(":");
+      }
+
+      function isChatDraftScopeMatched(rawScope) {
+        if (!rawScope || typeof rawScope !== "object") return false;
+        const current = getChatDraftCacheScope();
+        return ["schema", "workspace_id", "slot_id", "card_id"].every((key) => String(rawScope[key] || "") === String(current[key] || ""));
+      }
+
+      function readChatDraft() {
+        try {
+          const raw = localStorage.getItem(getChatDraftStorageKey());
+          if (!raw) return "";
+          const payload = JSON.parse(raw);
+          if (!payload || typeof payload !== "object" || !isChatDraftScopeMatched(payload.scope)) return "";
+          return typeof payload.value === "string" ? payload.value : "";
+        } catch (error) {
+          return "";
+        }
+      }
+
+      function persistChatDraft(value) {
+        const text = String(value || "");
+        try {
+          if (!text.trim()) {
+            localStorage.removeItem(getChatDraftStorageKey());
+            return;
+          }
+          localStorage.setItem(getChatDraftStorageKey(), JSON.stringify({
+            scope: getChatDraftCacheScope(),
+            value: text,
+            updated_at: new Date().toISOString(),
+          }));
+        } catch (error) {
+          // localStorage can be unavailable or full; the composer should still work.
+        }
+      }
+
+      function clearChatDraft() {
+        try {
+          localStorage.removeItem(getChatDraftStorageKey());
+        } catch (error) {
+          // Ignore storage failures.
+        }
+      }
+
+      function restoreChatDraft() {
+        if (!inputEl || inputEl.value) return;
+        const draft = readChatDraft();
+        if (!draft) return;
+        inputEl.value = draft;
+        syncComposerState();
+      }
+
+      function restoreSubmittedChatDraft(messageText, revisionAtSubmit) {
+        if (!inputEl || inputEl.value || composerInputRevision !== revisionAtSubmit) return;
+        inputEl.value = messageText;
+        composerInputRevision += 1;
+        persistChatDraft(messageText);
+        syncComposerState();
+        inputEl.focus();
+      }
+
+      function handleComposerInput() {
+        composerInputRevision += 1;
+        syncComposerState();
+        persistChatDraft(inputEl.value);
       }
 
       function isPromptPackageCacheScopeMatched(rawScope) {
@@ -7037,11 +7127,12 @@
         };
       }
 
-      inputEl.addEventListener("input", syncComposerState);
+      inputEl.addEventListener("input", handleComposerInput);
       inputEl.addEventListener("focus", () => chatForm?.classList.add("composer-focused"));
       inputEl.addEventListener("blur", () => chatForm?.classList.remove("composer-focused"));
       messagesEl?.addEventListener("scroll", () => updateScrollBottomButton(false));
       scrollBottomBtn?.addEventListener("click", scrollMessagesToBottom);
+      restoreChatDraft();
       syncComposerState();
       scrollMessagesToBottom();
 
@@ -7065,6 +7156,7 @@
         if (!messageText || chatRequestInFlight || isEndingConversation) return;
 
         const clearInput = options.clearInput !== false;
+        const composerRevisionAtSubmit = composerInputRevision;
         const chatTurnIndex = Math.max(1, Math.floor(getHistoryMessageWrappers().length / 2) + 1);
         const chatTurnId = options.turnId || createChatTurnId(messageText, chatTurnIndex);
         const chatTurnCreatedAt = new Date().toISOString();
@@ -7206,6 +7298,9 @@
               throw new Error(data.detail || "流式请求失败");
             },
           });
+          if (clearInput && composerInputRevision === composerRevisionAtSubmit && !inputEl.value) {
+            clearChatDraft();
+          }
           setStatus("就绪", "idle");
         } catch (error) {
           streamingEntries.delete(assistantEntry);
@@ -7216,6 +7311,9 @@
           renderRetrievedItems([]);
           renderWorldbookHits([]);
           renderWorldbookDebug({});
+          if (clearInput) {
+            restoreSubmittedChatDraft(messageText, composerRevisionAtSubmit);
+          }
           setStatus("回复失败", "error");
           showToast(`回复失败：${error.message}`, "error");
         } finally {

@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 import colorama
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from .chat_api_routes import register_chat_api_routes
@@ -4859,6 +4860,16 @@ async def chinese_access_log(request: Request, call_next):
     logger.info(format_access_log(label, method, response.status_code, mood, format_access_route_tag(method, path)))
     logger.debug("请求耗时%dms", elapsed_ms)
     return response
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> FileResponse:
+    return FileResponse(
+        STATIC_DIR / "fantareal_icon.ico",
+        media_type="image/x-icon",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
