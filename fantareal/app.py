@@ -1240,6 +1240,9 @@ def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         memory_id = str(item.get("id", "")).strip() or f"memory-{index}"
+        memory_status = str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower()
+        if memory_status not in {"active", "archived"}:
+            memory_status = "active"
         items.append(
             {
                 "id": memory_id,
@@ -1247,6 +1250,8 @@ def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
                 "content": str(item.get("content", "")).strip(),
                 "tags": sanitize_tags(item.get("tags", [])),
                 "notes": str(item.get("notes", "")).strip(),
+                "memory_status": memory_status,
+                "archived_at": str(item.get("archived_at", "")).strip() if memory_status == "archived" else "",
             }
         )
     return items
@@ -4068,7 +4073,10 @@ def extract_stream_visible_reply(raw_text: str) -> tuple[str, str]:
 
 async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     embedding = get_runtime_embedding_config(runtime_overrides)
-    memories = get_memories()
+    memories = [
+        item for item in get_memories()
+        if str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower() != "archived"
+    ]
     if not memories:
         return []
     if not (embedding["base_url"] and embedding["model"]):
