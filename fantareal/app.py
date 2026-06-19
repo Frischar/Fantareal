@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 import colorama
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from .chat_api_routes import register_chat_api_routes
@@ -1239,6 +1240,9 @@ def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         memory_id = str(item.get("id", "")).strip() or f"memory-{index}"
+        memory_status = str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower()
+        if memory_status not in {"active", "archived"}:
+            memory_status = "active"
         items.append(
             {
                 "id": memory_id,
@@ -1246,6 +1250,8 @@ def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
                 "content": str(item.get("content", "")).strip(),
                 "tags": sanitize_tags(item.get("tags", [])),
                 "notes": str(item.get("notes", "")).strip(),
+                "memory_status": memory_status,
+                "archived_at": str(item.get("archived_at", "")).strip() if memory_status == "archived" else "",
             }
         )
     return items
@@ -4067,7 +4073,10 @@ def extract_stream_visible_reply(raw_text: str) -> tuple[str, str]:
 
 async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     embedding = get_runtime_embedding_config(runtime_overrides)
-    memories = get_memories()
+    memories = [
+        item for item in get_memories()
+        if str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower() != "archived"
+    ]
     if not memories:
         return []
     if not (embedding["base_url"] and embedding["model"]):
@@ -4859,6 +4868,16 @@ async def chinese_access_log(request: Request, call_next):
     logger.info(format_access_log(label, method, response.status_code, mood, format_access_route_tag(method, path)))
     logger.debug("请求耗时%dms", elapsed_ms)
     return response
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> FileResponse:
+    return FileResponse(
+        STATIC_DIR / "fantareal_icon.ico",
+        media_type="image/x-icon",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")

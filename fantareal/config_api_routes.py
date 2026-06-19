@@ -19,6 +19,10 @@ from .memory_merge_logic import (
     save_memory_outline,
     save_merged_memories,
 )
+from .memory_worldbook_sync import (
+    apply_memory_worldbook_sync,
+    preview_memory_worldbook_sync,
+)
 
 from .app_models import (
     DynamicWorldbookPreviewPayload,
@@ -26,6 +30,7 @@ from .app_models import (
     MemoryListPayload,
     MemoryMergePayload,
     MemoryOutlineListPayload,
+    MemoryWorldbookSyncPayload,
     MergedMemoryListPayload,
     PersonaPayload,
     PresetActionPayload,
@@ -992,9 +997,20 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             merged_title=payload.merged_title,
             outline_title=payload.outline_title,
             delete_sources=payload.delete_sources,
+            source_action=payload.source_action,
             slot_id=active_slot,
             runtime_overrides=payload.runtime_config,
         )
+
+    @app.post("/api/memories/worldbook-sync/preview")
+    async def api_preview_memory_worldbook_sync(payload: MemoryWorldbookSyncPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return preview_memory_worldbook_sync(ctx, payload.model_dump(), active_slot)
+
+    @app.post("/api/memories/worldbook-sync/apply")
+    async def api_apply_memory_worldbook_sync(payload: MemoryWorldbookSyncPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return apply_memory_worldbook_sync(ctx, payload.model_dump(), active_slot)
 
     @app.get("/api/worldbook")
     async def api_get_worldbook() -> dict[str, Any]:
@@ -1116,6 +1132,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 "external_source",
                 "external_ref",
                 "activation_tags",
+                "metadata",
             ]:
                 if key in row:
                     merged[key] = row[key]

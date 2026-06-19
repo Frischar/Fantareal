@@ -31,6 +31,7 @@ RESOURCE_DIR = get_resource_dir()
 PROJECT_ROOT = APP_DIR.parent.parent if APP_DIR.parent.name.lower() == "mods" else APP_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data" / "mods" / "state_journal"
 DB_PATH = DATA_DIR / "state_journal.db"
+DATA_CARD_UID_COLUMN = "state_journal_card_uid"
 EXPORTS_DIR = DATA_DIR / "exports"
 BACKUPS_DIR = DATA_DIR / "backups"
 LOGS_DIR = DATA_DIR / "logs"
@@ -783,6 +784,7 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
         );
         CREATE TABLE IF NOT EXISTS state_journal_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_uid TEXT NOT NULL DEFAULT 'global',
             created_at TEXT NOT NULL,
             table_id TEXT NOT NULL,
             rows_json TEXT NOT NULL,
@@ -995,6 +997,9 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
     if "card_uid" not in display_cols:
         conn.execute("ALTER TABLE state_journal_turn_displays ADD COLUMN card_uid TEXT NOT NULL DEFAULT 'global'")
         display_cols.add("card_uid")
+    snapshot_cols = {row["name"] for row in conn.execute("PRAGMA table_info(state_journal_snapshots)").fetchall()}
+    if "card_uid" not in snapshot_cols:
+        conn.execute("ALTER TABLE state_journal_snapshots ADD COLUMN card_uid TEXT NOT NULL DEFAULT 'global'")
 
     def rebuild_card_scoped_table(table: str, create_sql: str, copy_columns: list[str]) -> None:
         cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -1114,15 +1119,100 @@ def field_map(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {field["key"]: field for field in schema.get("fields", []) if isinstance(field, dict) and field.get("key")}
 
 
+def normalize_data_card_uid(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = "global"
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or "global"
+
+
+def table_pk_columns(info: list[sqlite3.Row]) -> list[str]:
+    rows = sorted((row for row in info if int(row["pk"] or 0) > 0), key=lambda row: int(row["pk"] or 0))
+    return [str(row["name"]) for row in rows]
+
+
+def current_card_role_names() -> set[str]:
+    raw = current_role_card_payload()
+    personas = raw.get("personas") if isinstance(raw, dict) else {}
+    names: set[str] = set()
+    if isinstance(personas, dict):
+        iterable = personas.values()
+    elif isinstance(personas, list):
+        iterable = personas
+    else:
+        iterable = []
+    for item in iterable:
+        if not isinstance(item, dict):
+            continue
+        for key in ("name", "role_name"):
+            text = str(item.get(key) or "").strip()
+            if text:
+                names.add(text)
+        aliases = item.get("aliases")
+        if isinstance(aliases, list):
+            names.update(str(alias).strip() for alias in aliases if str(alias).strip())
+    return names
+
+
+def legacy_row_names(schema: dict[str, Any], row: dict[str, Any]) -> set[str]:
+    names: set[str] = set()
+    candidate_keys = [schema.get("primary_key"), "name", "character_name", "role_name", "from", "to"]
+    for key in candidate_keys:
+        safe_key = safe_id(key, "")
+        if not safe_key or safe_key not in row:
+            continue
+        text = str(row.get(safe_key) or "").strip()
+        if text:
+            names.add(text)
+    pair_text = str(row.get("pair_id") or "").strip()
+    if pair_text:
+        for part in re.split(r"[-—–~～/|]", pair_text):
+            part = part.strip()
+            if part:
+                names.add(part)
+    return names
+
+
+def infer_legacy_row_card_uid(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[str, Any]) -> str:
+    names = legacy_row_names(schema, row)
+    if not names:
+        return "global"
+    votes: dict[str, int] = {}
+    lookups = [
+        ("state_journal_metric_states", "character_name"),
+        ("state_journal_metric_history", "character_name"),
+        ("state_journal_stage_states", "role_id"),
+        ("state_journal_stage_states", "role_name"),
+    ]
+    for table_name, column_name in lookups:
+        if not table_exists(conn, table_name):
+            continue
+        for name in names:
+            for match in conn.execute(
+                f"SELECT card_uid, COUNT(*) AS count FROM {qident(table_name)} WHERE {qident(column_name)}=? GROUP BY card_uid",
+                (name,),
+            ).fetchall():
+                card_uid = normalize_data_card_uid(match["card_uid"])
+                votes[card_uid] = votes.get(card_uid, 0) + int(match["count"] or 0)
+    if votes:
+        ranked = sorted(votes.items(), key=lambda item: item[1], reverse=True)
+        if len(ranked) == 1 or ranked[0][1] > ranked[1][1]:
+            return ranked[0][0]
+    if names & current_card_role_names():
+        return normalize_data_card_uid(current_card_uid())
+    return "global"
+
+
 def build_create_table_sql(schema: dict[str, Any], physical_name: str | None = None) -> str:
     fields = schema.get("fields", [])
     primary_key = schema.get("primary_key")
-    parts: list[str] = []
+    parts: list[str] = [f"{qident(DATA_CARD_UID_COLUMN)} TEXT NOT NULL DEFAULT 'global'"]
     for field in fields:
         key = field["key"]
         col = f"{qident(key)} {sqlite_type(field.get('type') or 'text')}"
-        if key == primary_key:
-            col += " PRIMARY KEY"
         if field.get("required") and key != primary_key:
             # Keep user editing forgiving. Required is validated before save/AI update,
             # not as a hard NOT NULL that would make partial AI updates brittle.
@@ -1130,6 +1220,8 @@ def build_create_table_sql(schema: dict[str, Any], physical_name: str | None = N
         parts.append(col)
     if not parts:
         raise ValueError("至少需要一个字段。")
+    if primary_key:
+        parts.append(f"PRIMARY KEY ({qident(DATA_CARD_UID_COLUMN)}, {qident(primary_key)})")
     table_name = physical_name or data_table_name(schema["id"])
     return f"CREATE TABLE {qident(table_name)} ({', '.join(parts)})"
 
@@ -1145,11 +1237,13 @@ def sync_physical_table(conn: sqlite3.Connection, schema: dict[str, Any]) -> Non
 
     existing_info = conn.execute(f"PRAGMA table_info({qident(table_name)})").fetchall()
     existing_cols = [str(row["name"]) for row in existing_info]
-    old_pk = next((str(row["name"]) for row in existing_info if int(row["pk"] or 0) == 1), "")
+    existing_user_cols = [col for col in existing_cols if col != DATA_CARD_UID_COLUMN]
+    old_pk = table_pk_columns(existing_info)
     new_pk = str(schema.get("primary_key") or "")
-    old_set = set(existing_cols)
+    expected_pk = [DATA_CARD_UID_COLUMN, new_pk] if new_pk else []
+    old_set = set(existing_user_cols)
     new_set = set(fields)
-    need_rebuild = old_pk != new_pk or old_set != new_set
+    need_rebuild = old_pk != expected_pk or old_set != new_set or DATA_CARD_UID_COLUMN not in existing_cols
 
     if not need_rebuild:
         # SQLite type changes require rebuild too. Keep it simple and rebuild if any
@@ -1167,8 +1261,18 @@ def sync_physical_table(conn: sqlite3.Connection, schema: dict[str, Any]) -> Non
     conn.execute(build_create_table_sql(schema, temp_name))
     common = [col for col in fields if col in existing_cols]
     if common:
-        cols = ", ".join(qident(col) for col in common)
-        conn.execute(f"INSERT OR IGNORE INTO {qident(temp_name)} ({cols}) SELECT {cols} FROM {qident(table_name)}")
+        dest_cols = [DATA_CARD_UID_COLUMN, *common]
+        dest_sql = ", ".join(qident(col) for col in dest_cols)
+        if DATA_CARD_UID_COLUMN in existing_cols:
+            source_sql = ", ".join(qident(col) for col in dest_cols)
+            conn.execute(f"INSERT OR IGNORE INTO {qident(temp_name)} ({dest_sql}) SELECT {source_sql} FROM {qident(table_name)}")
+        else:
+            source_sql = ", ".join(qident(col) for col in common)
+            insert_sql = f"INSERT OR IGNORE INTO {qident(temp_name)} ({dest_sql}) VALUES ({', '.join('?' for _ in dest_cols)})"
+            for row in conn.execute(f"SELECT {source_sql} FROM {qident(table_name)}").fetchall():
+                row_dict = {col: row[col] for col in common}
+                card_uid = infer_legacy_row_card_uid(conn, schema, row_dict)
+                conn.execute(insert_sql, [card_uid, *[row_dict.get(col) for col in common]])
     conn.execute(f"DROP TABLE {qident(table_name)}")
     conn.execute(f"ALTER TABLE {qident(temp_name)} RENAME TO {qident(table_name)}")
 
@@ -1289,13 +1393,17 @@ def serialize_db_value(value: Any, field: dict[str, Any]) -> Any:
     return str(value)
 
 
-def get_table_rows_from_db(conn: sqlite3.Connection, schema: dict[str, Any]) -> list[dict[str, Any]]:
+def get_table_rows_from_db(conn: sqlite3.Connection, schema: dict[str, Any], card_uid: str | None = None) -> list[dict[str, Any]]:
     table_name = data_table_name(schema["id"])
     if not table_exists(conn, table_name):
         sync_physical_table(conn, schema)
     fields = schema.get("fields", [])
     columns = ", ".join(qident(field["key"]) for field in fields)
-    rows = conn.execute(f"SELECT {columns} FROM {qident(table_name)}").fetchall()
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
+    rows = conn.execute(
+        f"SELECT {columns} FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=?",
+        (safe_card_uid,),
+    ).fetchall()
     result: list[dict[str, Any]] = []
     for row in rows:
         item: dict[str, Any] = {}
@@ -1366,18 +1474,19 @@ def clean_rows(schema: dict[str, Any], rows: Any) -> list[dict[str, Any]]:
     return result
 
 
-def replace_table_rows(conn: sqlite3.Connection, schema: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+def replace_table_rows(conn: sqlite3.Connection, schema: dict[str, Any], rows: list[dict[str, Any]], card_uid: str | None = None) -> None:
     table_name = data_table_name(schema["id"])
     sync_physical_table(conn, schema)
-    conn.execute(f"DELETE FROM {qident(table_name)}")
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
+    conn.execute(f"DELETE FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=?", (safe_card_uid,))
     fields = schema.get("fields", [])
     if not fields:
         return
-    column_list = ", ".join(qident(field["key"]) for field in fields)
-    placeholders = ", ".join("?" for _ in fields)
+    column_list = ", ".join([qident(DATA_CARD_UID_COLUMN), *[qident(field["key"]) for field in fields]])
+    placeholders = ", ".join("?" for _ in range(len(fields) + 1))
     sql = f"INSERT INTO {qident(table_name)} ({column_list}) VALUES ({placeholders})"
     for row in rows:
-        values = [row.get(field["key"]) for field in fields]
+        values = [safe_card_uid, *[row.get(field["key"]) for field in fields]]
         conn.execute(sql, values)
 
 
@@ -1404,10 +1513,11 @@ def build_table_snapshot(conn: sqlite3.Connection, table_ids: list[str] | None =
 def save_snapshot(conn: sqlite3.Connection, table_id: str, reason: str = "update") -> None:
     try:
         schema = get_schema_from_db(conn, table_id)
-        rows = get_table_rows_from_db(conn, schema)
+        safe_card_uid = current_card_uid()
+        rows = get_table_rows_from_db(conn, schema, safe_card_uid)
         conn.execute(
-            "INSERT INTO state_journal_snapshots(created_at, table_id, rows_json, reason) VALUES(?, ?, ?, ?)",
-            (now_string(), table_id, json.dumps(rows, ensure_ascii=False), reason),
+            "INSERT INTO state_journal_snapshots(card_uid, created_at, table_id, rows_json, reason) VALUES(?, ?, ?, ?, ?)",
+            (safe_card_uid, now_string(), table_id, json.dumps(rows, ensure_ascii=False), reason),
         )
     except Exception:
         # Snapshot is defensive; never block the actual user action because of it.
@@ -1721,16 +1831,17 @@ def normalize_updates(payload: Any) -> list[dict[str, Any]]:
     return [item for item in candidates if isinstance(item, dict)]
 
 
-def select_row_by_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str) -> dict[str, Any] | None:
+def select_row_by_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str, card_uid: str | None = None) -> dict[str, Any] | None:
     primary_key = schema.get("primary_key")
     if not primary_key:
         return None
     table_name = data_table_name(schema["id"])
     fields = schema.get("fields", [])
     columns = ", ".join(qident(field["key"]) for field in fields)
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
     row = conn.execute(
-        f"SELECT {columns} FROM {qident(table_name)} WHERE {qident(primary_key)}=?",
-        (pk_value,),
+        f"SELECT {columns} FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+        (safe_card_uid, pk_value),
     ).fetchone()
     if not row:
         return None
@@ -1747,9 +1858,9 @@ def reverse_pair_id(value: str) -> str:
     return f"{right}-{left}"
 
 
-def resolve_relationship_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str) -> tuple[str, dict[str, Any] | None, str]:
+def resolve_relationship_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str, card_uid: str | None = None) -> tuple[str, dict[str, Any] | None, str]:
     """relationship 表 A-B / B-A 自动反查，避免正反主键不同导致整轮失败。"""
-    before = select_row_by_pk(conn, schema, pk_value)
+    before = select_row_by_pk(conn, schema, pk_value, card_uid)
     if before is not None:
         return pk_value, before, ""
     if schema.get("id") != "relationship" or schema.get("primary_key") != "pair_id":
@@ -1757,7 +1868,7 @@ def resolve_relationship_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk
     reversed_pk = reverse_pair_id(pk_value)
     if not reversed_pk:
         return pk_value, before, ""
-    reversed_before = select_row_by_pk(conn, schema, reversed_pk)
+    reversed_before = select_row_by_pk(conn, schema, reversed_pk, card_uid)
     if reversed_before is not None:
         return reversed_pk, reversed_before, f"关系主键已按反向匹配：{pk_value} → {reversed_pk}"
     return pk_value, before, ""
@@ -1768,6 +1879,7 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
     applied: list[dict[str, Any]] = []
     errors: list[str] = []
     touched_tables: set[str] = set()
+    safe_card_uid = current_card_uid()
     with connect_db() as conn:
         init_meta_tables(conn)
         schemas = {schema["id"]: schema for schema in list_schemas_from_db(conn)}
@@ -1795,15 +1907,18 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
 
                 table_name = data_table_name(table_id)
                 sync_physical_table(conn, schema)
-                before = select_row_by_pk(conn, schema, pk_value)
+                before = select_row_by_pk(conn, schema, pk_value, safe_card_uid)
                 if table_id == "relationship" and primary_key == "pair_id":
-                    pk_value, before, _relation_note = resolve_relationship_pk(conn, schema, pk_value)
+                    pk_value, before, _relation_note = resolve_relationship_pk(conn, schema, pk_value, safe_card_uid)
                 if operation == "delete":
                     if before is not None:
                         if table_id not in snapshot_done:
                             save_snapshot(conn, table_id, "worker_update")
                             snapshot_done.add(table_id)
-                        conn.execute(f"DELETE FROM {qident(table_name)} WHERE {qident(primary_key)}=?", (pk_value,))
+                        conn.execute(
+                            f"DELETE FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+                            (safe_card_uid, pk_value),
+                        )
                         applied.append({"table": table_id, "operation": "delete", "key": {primary_key: pk_value}, "old": before})
                         touched_tables.add(table_id)
                     continue
@@ -1840,16 +1955,20 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
                     fields = schema.get("fields", [])
                     insert_row = {field["key"]: None for field in fields}
                     insert_row.update(cleaned_set)
-                    cols = list(insert_row.keys())
+                    row_cols = list(insert_row.keys())
+                    cols = [DATA_CARD_UID_COLUMN, *row_cols]
                     sql = f"INSERT INTO {qident(table_name)} ({', '.join(qident(col) for col in cols)}) VALUES ({', '.join('?' for _ in cols)})"
-                    conn.execute(sql, [insert_row[col] for col in cols])
+                    conn.execute(sql, [safe_card_uid, *[insert_row[col] for col in row_cols]])
                     applied.append({"table": table_id, "operation": "insert", "key": {primary_key: pk_value}, "set": clone_json(cleaned_set)})
                 else:
                     update_cols = [col for col in cleaned_set.keys() if col != primary_key]
                     if update_cols:
                         set_clause = ", ".join(f"{qident(col)}=?" for col in update_cols)
-                        values = [cleaned_set[col] for col in update_cols] + [pk_value]
-                        conn.execute(f"UPDATE {qident(table_name)} SET {set_clause} WHERE {qident(primary_key)}=?", values)
+                        values = [cleaned_set[col] for col in update_cols] + [safe_card_uid, pk_value]
+                        conn.execute(
+                            f"UPDATE {qident(table_name)} SET {set_clause} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+                            values,
+                        )
                     applied.append({"table": table_id, "operation": "update", "key": {primary_key: pk_value}, "set": clone_json(cleaned_set), "old": before})
                 touched_tables.add(table_id)
             if dry_run:
@@ -1863,28 +1982,31 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
 
 
 
-def upsert_full_row(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[str, Any]) -> None:
+def upsert_full_row(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[str, Any], card_uid: str | None = None) -> None:
     table_name = data_table_name(schema["id"])
     sync_physical_table(conn, schema)
     fields = schema.get("fields", [])
     if not fields:
         return
-    values = []
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
+    values = [safe_card_uid]
     for field in fields:
         try:
             values.append(coerce_value(row.get(field["key"]), field))
         except ValueError:
             values.append(row.get(field["key"]))
-    sql = f"INSERT OR REPLACE INTO {qident(table_name)} ({', '.join(qident(field['key']) for field in fields)}) VALUES ({', '.join('?' for _ in fields)})"
+    columns = [qident(DATA_CARD_UID_COLUMN), *[qident(field["key"]) for field in fields]]
+    sql = f"INSERT OR REPLACE INTO {qident(table_name)} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in values)})"
     conn.execute(sql, values)
 
 
 def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = "reroll") -> int:
     safe_turn = normalize_turn_id(turn_id)
+    safe_card_uid = current_card_uid()
     count = rollback_story_time_effects(conn, safe_turn)
     row = conn.execute("SELECT effects_json FROM state_journal_turn_effects WHERE turn_id=?", (safe_turn,)).fetchone()
     if not row:
-        conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (safe_turn,))
+        conn.execute("DELETE FROM state_journal_turn_displays WHERE card_uid=? AND turn_id=?", (safe_card_uid, safe_turn))
         return count
     try:
         payload = json.loads(row["effects_json"] or "{}")
@@ -1913,14 +2035,17 @@ def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = 
         operation = str(item.get("operation") or "").lower()
         old_row = item.get("old") if isinstance(item.get("old"), dict) else None
         if operation == "insert":
-            conn.execute(f"DELETE FROM {qident(table_name)} WHERE {qident(primary_key)}=?", (pk_value,))
+            conn.execute(
+                f"DELETE FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+                (safe_card_uid, pk_value),
+            )
             count += 1
         elif old_row:
-            upsert_full_row(conn, schema, old_row)
+            upsert_full_row(conn, schema, old_row, safe_card_uid)
             count += 1
     count += rollback_metric_effects(conn, safe_turn, payload.get("metrics") if isinstance(payload, dict) else [])
     conn.execute("DELETE FROM state_journal_turn_effects WHERE turn_id=?", (safe_turn,))
-    conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (safe_turn,))
+    conn.execute("DELETE FROM state_journal_turn_displays WHERE card_uid=? AND turn_id=?", (safe_card_uid, safe_turn))
     conn.execute(
         "UPDATE state_journal_turn_records SET state_journal_status='rolled_back', stale_reason=?, updated_at=? WHERE turn_id=?",
         (reason, now_string(), safe_turn),
@@ -4596,6 +4721,7 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
     """把真实数值表镜像到用户可见表册：角色状态表、关系表、数值变化记录。"""
     ensure_schema_extra_field(conn, "character_status", {"key": "metrics_summary", "label": "数值摘要", "type": "textarea", "note": "由心笺数值系统同步，角色自身状态数值，例如心绪 47/100（+0）。"})
     ensure_schema_extra_field(conn, "relationship", {"key": "metrics_summary", "label": "数值摘要", "type": "textarea", "note": "由心笺数值系统同步，关系数值，例如好感 71/100（+1）；信任 80/100（+2）。"})
+    safe_card_uid = current_card_uid()
 
     rows = conn.execute(
         """
@@ -4604,7 +4730,7 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
         WHERE card_uid=?
         ORDER BY character_name ASC, metric_key ASC
         """,
-        (current_card_uid(),),
+        (safe_card_uid,),
     ).fetchall()
     by_character: dict[str, list[sqlite3.Row]] = {}
     for row in rows:
@@ -4630,7 +4756,10 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
         for name, items in by_character.items():
             summary = summary_for(items, character_metric_keys)
             if summary:
-                conn.execute(f"UPDATE {qident(char_table)} SET metrics_summary=? WHERE name=?", (summary, name))
+                conn.execute(
+                    f"UPDATE {qident(char_table)} SET metrics_summary=? WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND name=?",
+                    (summary, safe_card_uid, name),
+                )
     except Exception:
         pass
 
@@ -4643,8 +4772,8 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
             if not summary:
                 continue
             conn.execute(
-                f"UPDATE {qident(rel_table)} SET metrics_summary=? WHERE {qident('from')}=? OR pair_id LIKE ?",
-                (summary, name, f"{name}-%"),
+                f"UPDATE {qident(rel_table)} SET metrics_summary=? WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND ({qident('from')}=? OR pair_id LIKE ?)",
+                (summary, safe_card_uid, name, f"{name}-%"),
             )
     except Exception:
         pass
