@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
 </head>
   <body class="modern-setting-page app-sidebar-shell global-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div id="config-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">
@@ -33,7 +34,7 @@
           <strong>设置工作台</strong>
           <p id="status-text" class="task-status is-idle">已准备 · 修改后会自动保存，也可以手动保存全部配置。</p>
         </div>
-        <div class="config-sticky-buttons">
+        <div class="config-sticky-buttons ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
           <button id="save-all" type="button">保存全部配置</button>
           <button id="test-connection-sticky" type="button" class="secondary compact">测试聊天模型</button>
           <button id="reset-chat" type="button" class="secondary compact danger-action" title="清空当前聊天记录"><span class="danger-icon" aria-hidden="true">⚠</span> 清空聊天记录</button>
@@ -1277,6 +1278,8 @@
       applyTheme({{ settings.theme | tojson }});
       applyUiOpacity({{ settings.ui_opacity | tojson }});
       applyBackground({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
+      window.FantarealThemeToggle = { uiOpacity: {{ settings.ui_opacity | tojson }} };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground, postJson };
       applyFontSettings({
         font_family_url: {{ settings.font_family_url | tojson }},
         font_family_name: {{ settings.font_family_name | tojson }},
@@ -1285,5 +1288,6 @@
         font_color: {{ settings.font_color | tojson }}
       });
     </script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
   </body>
 </html>

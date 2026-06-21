@@ -377,20 +377,10 @@ def register_page_routes(app: FastAPI, *, templates: Any, ctx: Any) -> None:
             },
         )
 
-    @app.get("/config/sprite", response_class=HTMLResponse)
-    async def sprite_config_page(request: Request) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request,
-            "sprite_config.html",
-            {
-                "settings": ctx.get_settings(),
-                "sprites": ctx.list_sprite_assets(),
-                "sprite_count": len(ctx.list_sprite_assets()),
-                "sprite_base_path": ctx.default_sprite_base_path_for_slot(),
-                "role_avatar_url": ctx.get_role_avatar_url(),
-                "force_mobile_shell": request.query_params.get("mobile") == "1",
-            },
-        )
+    @app.get("/config/sprite")
+    async def sprite_config_page(request: Request) -> RedirectResponse:
+        target = "/config/user?mobile=1" if request.query_params.get("mobile") == "1" else "/config/user"
+        return RedirectResponse(url=target, status_code=307)
 
     @app.get("/config/about", response_class=HTMLResponse)
     async def about_config_page(request: Request) -> HTMLResponse:

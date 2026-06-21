@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>路由转发 - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="modern-setting-page app-sidebar-shell route-forwarding-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div id="route-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">
@@ -25,7 +26,7 @@
             <span class="route-switch-brand">路由转发</span>
             <p>只转发 Fantareal 内部外发 POST；按队列顺序和故障转发规则处理。</p>
           </div>
-          <div class="route-switch-actions">
+          <div class="route-switch-actions ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
             <label class="route-switch-toggle" title="启用 Fantareal POST 转发">
               <span class="toggle-label">启用</span>
               <input id="rf-enabled" type="checkbox" />
@@ -514,10 +515,13 @@
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground };
       bindTopControls();
       renderProviders();
       updateStats(initialStats);
       window.setInterval(refreshRouteStats, 2000);
     </script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
   </body>
 </html>

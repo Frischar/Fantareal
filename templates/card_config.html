@@ -4,66 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Card Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
-    <style id="state-journal-card-config-v1">
-      .card-state-journal-panel[hidden], .card-state-journal-dialog[hidden] { display: none !important; }
-      .card-state-journal-panel { margin-top: 18px; }
-      .card-state-journal-source-card { display: grid; grid-template-columns: minmax(210px, 0.8fr) minmax(260px, 1.2fr); gap: 12px; align-items: end; margin: 12px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--input-bg) 54%, transparent); }
-      .card-state-journal-source-card label { display: grid; gap: 6px; margin: 0; font-size: 0.82rem; color: var(--muted); font-weight: 760; }
-      .card-state-journal-source-card select { min-height: 38px; }
-      .card-state-journal-source-hint { margin: 0; color: var(--muted); line-height: 1.55; }
-      .card-state-journal-source-hint strong { color: var(--text); }
-
-      .card-state-journal-table-wrap { overflow-x: auto; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--input-bg) 58%, transparent); }
-      .card-state-journal-table { width: 100%; border-collapse: collapse; min-width: 760px; table-layout: auto; }
-      .card-state-journal-dialog .card-state-journal-table { min-width: 980px; }
-      .card-state-journal-table th, .card-state-journal-table td { padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb, var(--border) 66%, transparent); text-align: left; vertical-align: middle; white-space: nowrap; }
-      .card-state-journal-table th { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.04em; font-weight: 800; }
-      .card-state-journal-table tr:last-child td { border-bottom: none; }
-      .card-state-journal-table input[type="text"], .card-state-journal-table input[type="number"], .card-state-journal-table select { min-height: 36px; }
-      .card-state-journal-name-input { min-width: 128px; }
-      .card-state-journal-key-input { min-width: 128px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-      .card-state-journal-num-input { width: 76px; }
-      .card-state-journal-range-inputs { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-      .card-state-journal-check { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; }
-      .card-state-journal-check input[type="checkbox"], .card-state-journal-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
-      .card-state-journal-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); background: color-mix(in srgb, var(--input-bg) 72%, transparent); color: var(--muted); font-size: 0.78rem; font-weight: 760; white-space: nowrap; }
-      .card-state-journal-dialog { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; padding: 24px; box-sizing: border-box; background: rgba(0, 0, 0, 0.38); backdrop-filter: blur(12px); }
-      .card-state-journal-dialog-card { width: min(1240px, 100%); max-width: 100%; max-height: min(88vh, 940px); overflow: auto; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); border-radius: 24px; background: var(--panel-strong); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34); padding: 18px; }
-      .card-state-journal-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
-      .card-state-journal-dialog-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
-      .card-state-journal-tabs { display: inline-flex; align-items: center; gap: 4px; margin: 12px 0; padding: 4px; border: 1px solid color-mix(in srgb, var(--border) 74%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--input-bg) 56%, transparent); }
-      .card-state-journal-tabs button { border-radius: 999px; min-height: 34px; padding-inline: 14px; }
-      .card-state-journal-tabs button.active { background: color-mix(in srgb, var(--accent) 22%, var(--input-bg)); border-color: color-mix(in srgb, var(--accent) 52%, var(--border)); color: var(--text); }
-      .card-state-journal-tab[hidden] { display: none !important; }
-      .card-state-journal-editor-grid { display: grid; gap: 10px; }
-      .card-state-journal-editor-grid textarea { min-height: 70px; }
-      .card-state-journal-empty { padding: 18px; border: 1px dashed color-mix(in srgb, var(--border) 80%, transparent); border-radius: 18px; color: var(--muted); background: color-mix(in srgb, var(--input-bg) 44%, transparent); white-space: normal; }
-      .card-state-journal-code { display: inline-flex; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
-      .card-state-journal-muted { display: block; margin-top: 4px; color: var(--muted); font-size: 0.76rem; }
-      .card-state-journal-advanced { margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
-      .card-state-journal-advanced summary { cursor: pointer; opacity: 0.72; }
-      .card-state-journal-advanced label { display: grid; gap: 4px; margin-top: 6px; }
-      .card-state-journal-advanced code { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px; }
-
-      .card-state-journal-condition-editor { min-width: 420px; max-width: 560px; }
-      .card-state-journal-condition-toolbar { margin: 8px 0; }
-      .card-state-journal-condition-list { display: grid; gap: 8px; margin: 8px 0; }
-      .card-state-journal-condition-row { display: grid; grid-template-columns: minmax(150px, 1fr) 76px 88px auto; gap: 8px; align-items: center; }
-      .card-state-journal-condition-row input, .card-state-journal-condition-row select { min-height: 34px; }
-      .card-state-journal-condition-dialog { z-index: 270; }
-      .card-state-journal-condition-dialog-card { width: min(760px, 100%); max-width: 100%; }
-      .card-state-journal-condition-dialog-body { display: grid; gap: 12px; }
-      .card-state-journal-stage-summary { display: grid; gap: 8px; min-width: 260px; white-space: normal; }
-      .card-state-journal-stage-summary strong { line-height: 1.55; }
-      @media (max-width: 1180px) { .card-state-journal-dialog { padding: 18px; } .card-state-journal-dialog .card-state-journal-table { min-width: 900px; } }
-      @media (max-width: 760px) { .card-state-journal-dialog { padding: 14px; } .card-state-journal-dialog-card { width: 100%; padding: 14px; } .card-state-journal-condition-row { grid-template-columns: 1fr; } }
-    </style>
 
 
   </head>
   <body class="modern-setting-page card-config-page app-sidebar-shell pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">
@@ -88,19 +35,16 @@
           <p class="muted">这里把常用的 JSON 键都拆成了固定输入位。玩家只需要逐项填写，然后点击保存并加载即可。加载后的当前角色卡也支持直接导出。</p>
         </div>
 
-        <div class="card-workbench">
+        <div class="card-workbench ui-readable-canvas">
           <div class="card-workbench-head">
             <div class="card-workbench-title">
-              <span class="eyebrow mini">CARD WORKBENCH</span>
+              <div class="ui-workbench-titleline card-workbench-titleline">
+                <span class="eyebrow mini">CARD WORKBENCH</span>
+                <span id="status-text" class="config-status-pill ui-status-pill status-line is-success" data-state="success" aria-live="polite">就绪</span>
+              </div>
               <strong>角色工作台</strong>
               <span class="muted compact">加载、导入、导出与保存都在这里完成。</span>
             </div>
-            <div class="card-workbench-status" aria-live="polite">
-              <span class="card-status-dot"></span>
-              <p id="status-text" class="muted status-line" data-state="success">就绪</p>
-            </div>
-          </div>
-
           <div class="grid-two card-top-grid card-workbench-grid">
             <div>
               <label for="card-file-select">文件夹里的角色卡</label>
@@ -117,63 +61,131 @@
             </div>
           </div>
 
-          <div class="card-workbench-actions">
-            <button id="refresh-cards" type="button" class="secondary compact">刷新</button>
-            <button id="load-card" type="button" class="secondary compact">加载</button>
-            <button id="import-local-card" type="button" class="secondary compact">导入</button>
-            <button id="export-card" type="button" class="secondary compact">导出</button>
-            <button id="save-card" type="button" class="compact">保存并加载</button>
-            <input
-              id="import-local-card-file"
-              type="file"
-              accept=".json,.txt,application/json,text/plain"
-              style="display: none"
-            />
           </div>
+
+
         </div>
       </section>
 
-      <section class="panel config-panel card-builder full-span">
-        <div class="card-grid">
-          <div class="card-column">
-            <div class="card-block">
-              <h3>基础信息</h3>
-              <label for="card-name">name <span class="field-note">（角色卡标题 / 主显示名）</span></label>
-              <input id="card-name" value="{{ card_template.name }}" />
-
-              <label for="card-tags">tags <span class="field-note">（标签，方便分类与检索）</span></label>
-              <input id="card-tags" value="{{ card_template.tags | join(', ') }}" placeholder="用英文逗号分隔" />
-
-              <label for="card-description">description <span class="field-note">（角色背景 / 设定简介）</span></label>
-              <textarea id="card-description" rows="5">{{ card_template.description }}</textarea>
-
-              <label for="card-personality">personality <span class="field-note">（性格关键词 / 行为倾向）</span></label>
-              <textarea id="card-personality" rows="4">{{ card_template.personality }}</textarea>
-
-              <label for="card-scenario">scenario <span class="field-note">（当前世界观 / 场景基调）</span></label>
-              <textarea id="card-scenario" rows="4">{{ card_template.scenario }}</textarea>
+      <div class="card-workbench-actions ui-sticky-toolbar ui-action-dock is-wrap full-span">
+        <div class="card-actions-primary ui-action-dock-primary">
+          <button id="add-persona" type="button" class="secondary compact card-add-button">＋ 新增角色</button>
+          <button id="save-card" type="button" class="compact">保存并加载</button>
+          <button id="load-card" type="button" class="secondary compact">加载</button>
+          <details class="card-more-actions ui-action-more">
+            <summary class="secondary compact" role="button">更多</summary>
+            <div class="card-more-menu ui-action-more-menu">
+              <button id="refresh-cards" type="button" class="secondary compact">刷新列表</button>
+              <button id="import-local-card" type="button" class="secondary compact">导入本地卡</button>
+              <button id="export-card" type="button" class="secondary compact">导出当前卡</button>
             </div>
-          </div>
-          <div class="card-column">
-            <div class="card-block">
+          </details>
+        </div>
+        <label class="card-canvas-opacity-toggle ui-preference-toggle" for="card-canvas-follow-opacity">
+          <input id="card-canvas-follow-opacity" type="checkbox" {% if settings.card_canvas_follow_opacity %}checked{% endif %} />
+          <span>底色跟随透明度</span>
+        </label>
+        <input
+          id="import-local-card-file"
+          type="file"
+          accept=".json,.txt,application/json,text/plain"
+          style="display: none"
+        />
+      </div>
+
+      <section class="panel config-panel card-builder full-span card-dossier-editor">
+        <div class="card-dossier-grid" aria-label="角色档案正文编辑区">
+          <section class="card-dossier-section card-dossier-identity" aria-labelledby="card-dossier-identity-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">01</span>
+              <div>
+                <h3 id="card-dossier-identity-title">基础身份</h3>
+                <p class="helper-text">角色名称、检索标签，以及用户最先需要理解的核心背景。</p>
+              </div>
+            </div>
+
+            <div class="card-field-row card-field-row-inline">
+              <div class="card-field-unit">
+                <label for="card-name">name <span class="field-note">（角色卡标题 / 主显示名）</span></label>
+                <input id="card-name" value="{{ card_template.name }}" />
+              </div>
+              <div class="card-field-unit">
+                <label for="card-tags">tags <span class="field-note">（标签，方便分类与检索）</span></label>
+                <input id="card-tags" value="{{ card_template.tags | join(', ') }}" placeholder="用英文逗号分隔" />
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-description">description <span class="field-note">（角色背景 / 设定简介）</span></label>
+              <textarea id="card-description" rows="7">{{ card_template.description }}</textarea>
+            </div>
+          </section>
+
+          <section class="card-dossier-section card-dossier-narrative" aria-labelledby="card-dossier-narrative-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">02</span>
+              <div>
+                <h3 id="card-dossier-narrative-title">叙事设定</h3>
+                <p class="helper-text">决定角色如何行动、处在什么局势，以及故事运行时的基调。</p>
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-personality">personality <span class="field-note">（性格关键词 / 行为倾向）</span></label>
+              <textarea id="card-personality" rows="7">{{ card_template.personality }}</textarea>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-scenario">scenario <span class="field-note">（当前世界观 / 场景基调）</span></label>
+              <textarea id="card-scenario" rows="7">{{ card_template.scenario }}</textarea>
+            </div>
+          </section>
+
+          <section class="card-dossier-section card-dossier-dialogue" aria-labelledby="card-dossier-dialogue-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">03</span>
+              <div>
+                <h3 id="card-dossier-dialogue-title">开场与对话</h3>
+                <p class="helper-text">新对话的第一印象，以及模型模仿语气时参考的样例。</p>
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
               <label for="card-first-mes">first_mes <span class="field-note">（开场白 / 初见时第一句）</span></label>
               <p class="field-note card-field-tip">只作为新对话首次展示，不作为常驻提示词反复注入。</p>
-              <textarea id="card-first-mes" rows="4">{{ card_template.first_mes }}</textarea>
-
-              <label for="card-mes-example">mes_example <span class="field-note">（示例对话 / 说话风格参考）</span></label>
-              <textarea id="card-mes-example" rows="5">{{ card_template.mes_example }}</textarea>
-
-              <label for="card-creator-notes">creator_notes <span class="field-note">（隐藏规则 / 对模型的补充说明）</span></label>
-              <textarea id="card-creator-notes" rows="4">{{ card_template.creator_notes }}</textarea>
+              <textarea id="card-first-mes" rows="7">{{ card_template.first_mes }}</textarea>
             </div>
-          </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-mes-example">mes_example <span class="field-note">（示例对话 / 说话风格参考）</span></label>
+              <textarea id="card-mes-example" rows="8">{{ card_template.mes_example }}</textarea>
+            </div>
+          </section>
+
+          <section class="card-dossier-section card-dossier-rules" aria-labelledby="card-dossier-rules-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">04</span>
+              <div>
+                <h3 id="card-dossier-rules-title">创作者规则</h3>
+                <p class="helper-text">隐藏规则和补充说明，主要用于约束模型，而不是展示给玩家。</p>
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-creator-notes">creator_notes <span class="field-note">（隐藏规则 / 对模型的补充说明）</span></label>
+              <textarea id="card-creator-notes" rows="12">{{ card_template.creator_notes }}</textarea>
+            </div>
+
+            <div class="card-field-unit card-field-unit-meta">
+              <label for="card-creator-comment">创作者备注 <span class="field-note">（不进入 prompt，仅写入角色卡）</span></label>
+              <p class="field-note card-field-tip">用于记录卡的摘要、版本号、作者、简单介绍、灵感来源或使用说明。</p>
+              <textarea id="card-creator-comment" rows="4">{{ card_template.creator_comment or '' }}</textarea>
+            </div>
+          </section>
         </div>
 
         <div class="persona-toolbar">
           <h3>多角色</h3>
-          <div class="button-row">
-            <button id="add-persona" type="button" class="secondary compact card-add-button">＋ 新增角色</button>
-          </div>
         </div>
 
         <div id="persona-grid" class="card-persona-grid">
@@ -182,7 +194,7 @@
             <div class="memory-card-head persona-card-head card-item-head">
               <div class="card-item-title">
                 <strong class="persona-display-title">{{ persona.name or ('角色' ~ loop.index) }}</strong>
-                <span class="card-summary-chip">多角色</span>
+                <span class="card-summary-chip ui-summary-chip">多角色</span>
               </div>
               <button type="button" class="card-icon-button card-danger-icon remove-persona" title="删除角色" aria-label="删除角色">×</button>
             </div>
@@ -297,6 +309,7 @@
     </div>
 
     <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
     <script>
       const PERSONA_LABELS = {
         name: "（该角色显示名）",
@@ -323,6 +336,9 @@
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
+      const initialCardCanvasFollowOpacity = {{ settings.card_canvas_follow_opacity | default(false) | tojson }};
+      const cardCanvasFollowOpacityEl = document.getElementById("card-canvas-follow-opacity");
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
       const initialWorkshop = {{ card_template.creativeWorkshop | tojson }};
       const initialStateJournal = {{ card_template.stateJournal | tojson }};
       const initialWorkshopTemp = Number({{ workshop_state.temp or 0 }}) || 0;
@@ -343,16 +359,87 @@
         return "success";
       }
 
+      function getCompactStatusLabel(text, state) {
+        const value = String(text || "");
+        if (state === "error") return "出错";
+        if (state === "dirty") return "有修改";
+        if (state === "saving") {
+          if (value.includes("保存")) return "保存中";
+          if (value.includes("加载")) return "加载中";
+          if (value.includes("读取") || value.includes("刷新")) return "读取中";
+          if (value.includes("导入")) return "导入中";
+          if (value.includes("导出")) return "导出中";
+          if (value.includes("上传")) return "上传中";
+          return "处理中";
+        }
+        if (state === "success") {
+          if (value.includes("保存")) return "已保存";
+          if (value.includes("加载")) return "已加载";
+          if (value.includes("刷新")) return "已刷新";
+          if (value.includes("导入")) return "已导入";
+          if (value.includes("导出")) return "已导出";
+          if (value.includes("新增")) return "已新增";
+          if (value.includes("删除")) return "已删除";
+          return "就绪";
+        }
+        return "就绪";
+      }
+
       function setStatus(text, state = "") {
         if (!statusEl) return;
         const resolvedState = inferStatusState(text, state);
-        statusEl.textContent = text;
+        statusEl.textContent = getCompactStatusLabel(text, resolvedState);
+        statusEl.title = text;
         statusEl.dataset.state = resolvedState;
+        statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
+        statusEl.classList.add(`is-${resolvedState}`);
       }
 
       function markCardDirty() {
         setStatus("已修改，尚未保存。", "dirty");
       }
+
+      function getCardCanvasTheme() {
+        return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      }
+
+      function normalizeCardCanvasOpacity(value) {
+        return Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+      }
+
+      function applyCardCanvasOpacity(follow = false) {
+        const theme = getCardCanvasTheme();
+        const opacity = normalizeCardCanvasOpacity(currentOpacity);
+        const alpha = follow
+          ? Math.max(theme === "dark" ? 0.46 : 0.50, opacity)
+          : (theme === "dark" ? 0.62 : 0.72);
+        const rgb = theme === "dark" ? "18, 27, 37" : "255, 248, 238";
+        const canvasColor = `rgba(${rgb}, ${alpha.toFixed(2)})`;
+        document.documentElement.style.setProperty("--card-readable-canvas", canvasColor);
+        document.body?.style.setProperty("--card-readable-canvas", canvasColor);
+      }
+
+      async function saveCardCanvasFollowOpacity(follow) {
+        const data = await fetch("/api/settings").then((response) => response.json());
+        const settings = { ...(data.settings || {}), card_canvas_follow_opacity: follow };
+        await postJson("/api/settings", settings);
+      }
+
+      cardCanvasFollowOpacityEl?.addEventListener("change", async () => {
+        const follow = cardCanvasFollowOpacityEl.checked;
+        applyCardCanvasOpacity(follow);
+        try {
+          await saveCardCanvasFollowOpacity(follow);
+          setStatus(follow ? "工作台底色已跟随透明度。" : "工作台底色已固定为可读模式。", "success");
+        } catch (error) {
+          cardCanvasFollowOpacityEl.checked = !follow;
+          applyCardCanvasOpacity(cardCanvasFollowOpacityEl.checked);
+          setStatus(`透明度偏好保存失败：${error.message}`, "error");
+        }
+      });
+
+      new MutationObserver(() => applyCardCanvasOpacity(cardCanvasFollowOpacityEl?.checked ?? initialCardCanvasFollowOpacity))
+        .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
       function value(id) {
         return document.getElementById(id).value.trim();
@@ -826,7 +913,7 @@
           <div class="memory-card-head persona-card-head card-item-head">
             <div class="card-item-title">
               <strong class="persona-display-title">角色${formatPersonaIndex(key)}</strong>
-              <span class="card-summary-chip">多角色</span>
+              <span class="card-summary-chip ui-summary-chip">多角色</span>
             </div>
             <button type="button" class="card-icon-button card-danger-icon remove-persona" title="删除角色" aria-label="删除角色">×</button>
           </div>
@@ -1600,6 +1687,7 @@
           mes_example: value("card-mes-example"),
           scenario: value("card-scenario"),
           creator_notes: value("card-creator-notes"),
+          creator_comment: value("card-creator-comment"),
           tags: value("card-tags").split(",").map((item) => item.trim()).filter(Boolean),
           personas,
           stateJournal: stripStateJournalDraftIds(normalizeStateJournalConfig(ensureStateJournalConfigReady())),
@@ -1616,6 +1704,7 @@
         document.getElementById("card-mes-example").value = card.mes_example || "";
         document.getElementById("card-scenario").value = card.scenario || "";
         document.getElementById("card-creator-notes").value = card.creator_notes || "";
+        document.getElementById("card-creator-comment").value = card.creator_comment || card.creatorComment || card.creator_summary || card.creatorSummary || "";
         document.getElementById("card-tags").value = Array.isArray(card.tags) ? card.tags.join(", ") : "";
         currentStateJournal = normalizeStateJournalConfig(card.stateJournal || {});
 
@@ -2006,6 +2095,7 @@
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
+      applyCardCanvasOpacity(cardCanvasFollowOpacityEl?.checked ?? initialCardCanvasFollowOpacity);
       fillWorkshopForm(initialWorkshop);
       refreshCardList(document.getElementById("card-filename").value).catch(() => {});
     </script>

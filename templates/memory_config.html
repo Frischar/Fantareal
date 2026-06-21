@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memory - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=memory-outline-editor-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="app-sidebar-shell modern-setting-page memory-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">
@@ -31,7 +32,10 @@
       <section class="panel config-panel full-span memory-workbench-panel">
         <div class="section-head memory-workbench-head">
           <div>
-            <p class="eyebrow">Memory Workbench</p>
+            <div class="ui-workbench-titleline">
+              <p class="eyebrow">Memory Workbench</p>
+              <strong id="status-text" class="config-status-pill ui-status-pill status-line strong is-success" aria-live="polite">就绪</strong>
+            </div>
             <h2>记忆工作台</h2>
             <p class="muted">
               当前角色卡的原记忆会参与聊天；新增、保存、读取、导入与导出都只作用于当前角色卡。
@@ -45,26 +49,6 @@
             <span class="memory-overview-pill">大纲表 <strong id="outline-count">0</strong></span>
             <span class="memory-overview-pill">当前选中 <strong id="selected-count">0</strong></span>
           </div>
-          <div class="memory-overview-status config-status-strip">
-            <strong id="status-text" class="config-status-pill status-line strong is-success" aria-live="polite">就绪</strong>
-          </div>
-        </div>
-        <div class="config-workbench-actions memory-workbench-actions">
-          <button id="add-memory" type="button" class="secondary">新增</button>
-          <button id="save-memories" type="button">保存</button>
-          <button id="reload-all" type="button" class="secondary">读取</button>
-          <select id="memory-import-select" class="memory-transfer-select" aria-label="导入记忆">
-            <option value="" selected>导入 ▾</option>
-            <option value="original">导入原记忆 JSON</option>
-            <option value="bundle">导入完整记忆包 ZIP</option>
-          </select>
-          <select id="memory-export-select" class="memory-transfer-select is-primary" aria-label="导出记忆">
-            <option value="" selected>导出 ▾</option>
-            <option value="original">导出原记忆 JSON</option>
-            <option value="bundle">导出完整记忆包 ZIP</option>
-          </select>
-          <input id="import-memories-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
-          <input id="import-memory-bundle-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden />
         </div>
         <div class="memory-workbench-settings">
           <div class="memory-workbench-settings-copy">
@@ -90,6 +74,33 @@
           </div>
         </div>
       </section>
+
+      <div class="config-workbench-actions memory-workbench-actions ui-sticky-toolbar ui-action-dock is-wrap full-span">
+        <div class="memory-actions-primary ui-action-dock-primary">
+          <button id="add-memory" type="button" class="secondary">新增</button>
+          <button id="save-memories" type="button">保存</button>
+          <button id="reload-all" type="button" class="secondary">读取</button>
+        </div>
+        <details class="memory-transfer-more ui-action-more">
+          <summary class="secondary compact" role="button">更多</summary>
+          <div class="memory-transfer-menu ui-action-more-menu">
+            <label for="memory-import-select">导入记忆</label>
+            <select id="memory-import-select" class="memory-transfer-select" aria-label="导入记忆">
+              <option value="" selected>选择导入类型</option>
+              <option value="original">导入原记忆 JSON</option>
+              <option value="bundle">导入完整记忆包 ZIP</option>
+            </select>
+            <label for="memory-export-select">导出记忆</label>
+            <select id="memory-export-select" class="memory-transfer-select is-primary" aria-label="导出记忆">
+              <option value="" selected>选择导出类型</option>
+              <option value="original">导出原记忆 JSON</option>
+              <option value="bundle">导出完整记忆包 ZIP</option>
+            </select>
+          </div>
+        </details>
+        <input id="import-memories-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
+        <input id="import-memory-bundle-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden />
+      </div>
 
       <section class="panel config-panel full-span">
         <div class="memory-tool-stack">
@@ -133,8 +144,8 @@
         </div>
       </section>
 
-      <section class="panel config-panel full-span">
-        <div class="section-head">
+      <section class="panel config-panel full-span memory-stage5-section memory-stage5-original">
+        <div class="section-head memory-stage5-section-head">
           <p class="eyebrow">Original Memories</p>
           <h2>原记忆区</h2>
           <p class="muted">这里保留原始长期记忆。可多选后进行批量合并。</p>
@@ -188,8 +199,8 @@
         </div>
       </section>
 
-      <section class="panel config-panel full-span">
-        <div class="section-head">
+      <section class="panel config-panel full-span memory-stage5-section memory-stage5-outline">
+        <div class="section-head memory-stage5-section-head">
           <p class="eyebrow">Outline Overview</p>
           <h2>大纲表总览</h2>
           <p class="muted">时间列在最前，精确到分钟。点击任意一行，在下方查看完整详情。</p>
@@ -223,8 +234,8 @@
         </div>
       </section>
 
-      <section class="panel config-panel full-span">
-        <div class="section-head">
+      <section class="panel config-panel full-span memory-stage5-section memory-stage5-merged">
+        <div class="section-head memory-stage5-section-head">
           <p class="eyebrow">Merged Memories</p>
           <h2>合并后的记忆</h2>
           <p class="muted">这里保留每次批量合并产出的长期记忆结果。</p>
@@ -315,6 +326,7 @@
     </template>
 
     <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
     <script>
       const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -332,6 +344,7 @@
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
 
       let currentOutlineItems = [];
       let currentMergedItems = [];
@@ -344,10 +357,38 @@
       const SOURCE_ACTION_PREF_KEY = "xuqi_memory_source_action";
       const DELETE_SOURCES_PREF_KEY = "xuqi_memory_delete_sources_toggle";
 
+      function getCompactStatusLabel(text, state) {
+        const value = String(text || "");
+        if (state === "error") return "出错";
+        if (state === "dirty") return "有修改";
+        if (state === "saving") {
+          if (value.includes("保存")) return "保存中";
+          if (value.includes("读取")) return "读取中";
+          if (value.includes("导入")) return "导入中";
+          if (value.includes("导出")) return "导出中";
+          if (value.includes("生成")) return "生成中";
+          if (value.includes("同步")) return "同步中";
+          return "处理中";
+        }
+        if (state === "success") {
+          if (value.includes("保存")) return "已保存";
+          if (value.includes("读取")) return "已读取";
+          if (value.includes("导入")) return "已导入";
+          if (value.includes("导出")) return "已导出";
+          if (value.includes("新增")) return "已新增";
+          if (value.includes("删除")) return "已删除";
+          if (value.includes("同步")) return "已同步";
+          if (value.includes("生成")) return "已完成";
+          return "就绪";
+        }
+        return "就绪";
+      }
+
       function setStatus(text) {
         const value = text || "就绪";
-        statusEl.textContent = value;
         const state = getStatusState(value);
+        statusEl.textContent = getCompactStatusLabel(value, state);
+        statusEl.title = value;
         statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
         statusEl.classList.add(`is-${state}`);
       }
@@ -417,7 +458,7 @@
 
       function createMemorySummaryChip(text, className = "") {
         const chip = document.createElement("span");
-        chip.className = "memory-summary-chip" + (className ? " " + className : "");
+        chip.className = "memory-summary-chip ui-summary-chip" + (className ? " " + className : "");
         chip.textContent = text;
         return chip;
       }
@@ -1032,9 +1073,9 @@
               <div class="outline-title-main">${escapeHtml(item.title || "未命名大纲")}</div>
               <div class="outline-submeta">来源 ${Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0} 条</div>
             </td>
-            <td>${escapeHtml(item.characters || "—")}</td>
-            <td>${escapeHtml(item.relationship_progress || "—")}</td>
-            <td class="outline-events-inline">${escapeHtml(events.join(" / ") || "—")}</td>
+            <td><div class="outline-cell-clamp">${escapeHtml(item.characters || "—")}</div></td>
+            <td><div class="outline-cell-clamp">${escapeHtml(item.relationship_progress || "—")}</div></td>
+            <td><div class="outline-events-inline outline-cell-clamp">${escapeHtml(events.join(" / ") || "—")}</div></td>
           `;
           row.addEventListener("click", () => {
             setActiveOutline(item.id || "");

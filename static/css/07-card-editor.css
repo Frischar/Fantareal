@@ -645,3 +645,1318 @@ body.force-mobile-shell.card-config-page .card-builder textarea {
   min-height: 120px;
 }
 
+
+
+/* Card editor v1.1: desktop de-glass pass.
+   Reduce nested glass/card weight, keep the existing Jinja ids and JavaScript hooks intact. */
+body.modern-setting-page.card-config-page {
+  --card-plain-border: color-mix(in srgb, var(--line) 62%, transparent 38%);
+  --card-plain-border-soft: color-mix(in srgb, var(--line) 42%, transparent 58%);
+  --card-plain-surface: color-mix(in srgb, var(--panel) 78%, transparent 22%);
+  --card-plain-surface-strong: color-mix(in srgb, var(--panel-strong) 84%, transparent 16%);
+  --card-plain-section: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
+  --card-plain-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="dark"] body.modern-setting-page.card-config-page {
+  --card-plain-surface: color-mix(in srgb, var(--panel) 66%, transparent 34%);
+  --card-plain-surface-strong: color-mix(in srgb, var(--panel-strong) 72%, transparent 28%);
+  --card-plain-section: color-mix(in srgb, var(--input-bg) 34%, transparent 66%);
+  --card-plain-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+body.modern-setting-page.card-config-page .slot-toolbar {
+  min-height: 0;
+  padding: 14px 18px;
+  border-radius: 18px;
+  background: var(--card-plain-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+body.modern-setting-page.card-config-page .slot-toolbar .slot-meta p {
+  max-width: 82ch;
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type {
+  border-color: var(--card-plain-border);
+  background: var(--card-plain-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--card-plain-shadow);
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type .section-head {
+  margin-bottom: 12px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench {
+  margin-top: 12px;
+  padding: 12px;
+  border-color: var(--card-plain-border-soft);
+  border-radius: 18px;
+  background: var(--card-plain-section);
+  box-shadow: none;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-title .eyebrow,
+body.modern-setting-page.card-config-page .card-workbench-title .muted.compact {
+  display: none;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head {
+  align-items: flex-start;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-status {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-grid {
+  gap: 10px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: flex-end !important;
+  min-height: 56px;
+  margin: 0 0 12px;
+  padding: 8px;
+  overflow: visible;
+  border-color: var(--card-plain-border);
+  background: var(--card-plain-surface-strong);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+body.modern-setting-page.card-config-page .card-actions-primary {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions button,
+body.modern-setting-page.card-config-page .card-more-actions > summary {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 36px !important;
+  flex: 0 0 auto !important;
+  padding: 8px 13px !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
+  min-width: 118px !important;
+  margin-left: 2px !important;
+}
+
+body.modern-setting-page.card-config-page .card-more-actions {
+  position: relative;
+  z-index: calc(var(--ui-z-popover) + 2);
+}
+
+body.modern-setting-page.card-config-page .card-more-actions > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.modern-setting-page.card-config-page .card-more-actions > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.modern-setting-page.card-config-page .card-more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: calc(var(--ui-z-popover) + 4);
+  min-width: 172px;
+  padding: 7px;
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--card-plain-border);
+  border-radius: 14px;
+  background: var(--card-plain-surface-strong);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+}
+
+body.modern-setting-page.card-config-page .card-more-menu button {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  border-radius: 10px !important;
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.card-builder {
+  padding: 16px;
+  border-color: var(--card-plain-border);
+  border-radius: 22px;
+  background: var(--card-plain-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+body.modern-setting-page.card-config-page .card-grid {
+  gap: 12px;
+}
+
+body.modern-setting-page.card-config-page .card-column {
+  gap: 12px;
+}
+
+body.modern-setting-page.card-config-page .card-block,
+body.modern-setting-page.card-config-page .sub-block {
+  padding: 14px;
+  border-color: var(--card-plain-border-soft);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--card-plain-section) 76%, transparent 24%);
+  box-shadow: none;
+}
+
+body.modern-setting-page.card-config-page .card-grid > .card-column > .card-block {
+  border-left: 2px solid color-mix(in srgb, var(--accent) 28%, var(--card-plain-border-soft) 72%);
+}
+
+body.modern-setting-page.card-config-page .persona-toolbar {
+  margin: 8px 0 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+body.modern-setting-page.card-config-page .card-persona-grid {
+  gap: 10px;
+}
+
+body.modern-setting-page.card-config-page .persona-card {
+  min-height: 0;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 22%, var(--card-plain-border-soft) 78%);
+}
+
+body.modern-setting-page.card-config-page .card-item-head {
+  min-height: 36px;
+  padding: 0 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--card-plain-border-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+body.modern-setting-page.card-config-page .card-summary-chip {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+body.modern-setting-page.card-config-page .card-builder input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body.modern-setting-page.card-config-page .card-builder select,
+body.modern-setting-page.card-config-page .card-builder textarea {
+  border-color: var(--card-plain-border-soft) !important;
+  background: color-mix(in srgb, var(--input-bg) 76%, transparent 24%) !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.card-config-page .card-builder textarea {
+  min-height: 96px;
+}
+
+@media (max-width: 980px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    min-height: 0;
+  }
+
+  body.modern-setting-page.card-config-page .card-actions-primary {
+    justify-content: flex-start;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions button,
+  body.modern-setting-page.card-config-page .card-more-actions > summary {
+    flex: 0 0 auto !important;
+  }
+}
+
+@media (max-width: 680px) {
+  body.modern-setting-page.card-config-page .card-more-menu {
+    left: 0;
+    right: auto;
+  }
+}
+
+
+/* Card editor v1.1.1: override legacy config-panel elevation on the card editor canvas. */
+body.modern-setting-page.card-config-page .panel.config-panel.card-builder {
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type {
+  box-shadow: var(--card-plain-shadow) !important;
+}
+
+
+/* Card editor v1.2: flatten the card page and move the compact action rail to the left gutter. */
+body.modern-setting-page.card-config-page .slot-toolbar {
+  display: none !important;
+}
+
+body.modern-setting-page.card-config-page .config-shell.compact {
+  margin-top: 18px !important;
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type {
+  padding: 0 0 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type .section-head {
+  margin: 0 0 14px !important;
+  padding: 0 0 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 42%, transparent 58%);
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type .section-head .eyebrow {
+  margin-bottom: 8px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head {
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-title strong {
+  font-size: 0.98rem;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-status {
+  min-width: 180px;
+  background: color-mix(in srgb, var(--input-bg) 52%, transparent 48%);
+}
+
+body.modern-setting-page.card-config-page .card-workbench-grid {
+  padding: 12px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 34%, transparent 66%);
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.card-builder {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.card-config-page .card-grid {
+  gap: 18px;
+}
+
+body.modern-setting-page.card-config-page .card-column {
+  gap: 16px;
+}
+
+body.modern-setting-page.card-config-page .card-block,
+body.modern-setting-page.card-config-page .sub-block {
+  padding: 0 0 18px !important;
+  border: 0 !important;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line) 70%) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.card-config-page .card-block > *,
+body.modern-setting-page.card-config-page .sub-block > * {
+  margin-left: 18px;
+  margin-right: 0;
+}
+
+body.modern-setting-page.card-config-page .card-block h3,
+body.modern-setting-page.card-config-page .persona-toolbar h3 {
+  margin-top: 0;
+  margin-bottom: 14px;
+}
+
+body.modern-setting-page.card-config-page .card-block label {
+  margin-top: 12px;
+}
+
+body.modern-setting-page.card-config-page .card-builder input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body.modern-setting-page.card-config-page .card-builder select,
+body.modern-setting-page.card-config-page .card-builder textarea {
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent 12%) !important;
+  border-color: color-mix(in srgb, var(--line) 48%, transparent 52%) !important;
+}
+
+body.modern-setting-page.card-config-page .persona-toolbar {
+  margin: 20px 0 12px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 38%, transparent 62%);
+}
+
+body.modern-setting-page.card-config-page .card-persona-grid {
+  gap: 18px;
+}
+
+body.modern-setting-page.card-config-page .persona-card {
+  min-height: 0;
+}
+
+body.modern-setting-page.card-config-page .card-item-head {
+  margin-left: 18px;
+  padding-bottom: 10px;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    position: fixed !important;
+    top: 324px;
+    left: max(18px, calc((100vw - 1480px) / 2 - 118px));
+    z-index: var(--ui-z-floating);
+    width: 96px !important;
+    min-height: 0;
+    margin: 0;
+    padding: 8px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--panel-strong) 80%, transparent 20%);
+    border: 1px solid color-mix(in srgb, var(--line) 58%, transparent 42%);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+  }
+
+  body.modern-setting-page.card-config-page .card-actions-primary {
+    display: grid;
+    width: 100%;
+    gap: 7px;
+    justify-content: stretch;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions button,
+  body.modern-setting-page.card-config-page .card-more-actions > summary {
+    width: 100% !important;
+    min-height: 34px !important;
+    padding: 7px 8px !important;
+    justify-content: center !important;
+    font-size: 0.86rem !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    white-space: normal;
+    line-height: 1.18;
+  }
+
+  body.modern-setting-page.card-config-page .card-more-menu {
+    top: 0;
+    left: calc(100% + 8px);
+    right: auto;
+  }
+}
+
+@media (max-width: 1719px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    position: sticky !important;
+    top: 10px;
+    width: 100% !important;
+  }
+}
+
+
+/* Card editor v1.3: restore readable workbench surface and align left action rail. */
+body.modern-setting-page.card-config-page {
+  --card-readable-canvas: color-mix(in srgb, var(--panel-strong) 88%, var(--bg) 12%);
+  --card-readable-canvas-dark: rgba(16, 25, 34, 0.86);
+  --card-readable-field: color-mix(in srgb, var(--input-bg) 94%, var(--panel-strong) 6%);
+  --card-readable-section: color-mix(in srgb, var(--panel) 84%, var(--bg) 16%);
+}
+
+html[data-theme="dark"] body.modern-setting-page.card-config-page {
+  --card-readable-canvas: var(--card-readable-canvas-dark);
+  --card-readable-field: rgba(12, 20, 28, 0.88);
+  --card-readable-section: rgba(18, 28, 38, 0.72);
+}
+
+body.modern-setting-page.card-config-page .config-shell.compact {
+  padding: 20px 22px 26px;
+  border: 1px solid color-mix(in srgb, var(--line) 42%, transparent 58%);
+  border-radius: 24px;
+  background: var(--card-readable-canvas) !important;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.16);
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.full-span:first-of-type .section-head {
+  border-bottom-color: color-mix(in srgb, var(--line) 56%, transparent 44%);
+}
+
+body.modern-setting-page.card-config-page .card-workbench-grid {
+  border-top-color: color-mix(in srgb, var(--line) 50%, transparent 50%);
+}
+
+body.modern-setting-page.card-config-page .card-workbench-status {
+  background: color-mix(in srgb, var(--card-readable-field) 86%, transparent 14%) !important;
+}
+
+body.modern-setting-page.card-config-page .card-block,
+body.modern-setting-page.card-config-page .sub-block {
+  background: transparent !important;
+}
+
+body.modern-setting-page.card-config-page .card-builder input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+body.modern-setting-page.card-config-page .card-builder select,
+body.modern-setting-page.card-config-page .card-builder textarea,
+body.modern-setting-page.card-config-page .card-workbench select,
+body.modern-setting-page.card-config-page .card-workbench input:not([type="checkbox"]):not([type="radio"]):not([type="file"]) {
+  background: var(--card-readable-field) !important;
+  border-color: color-mix(in srgb, var(--line) 62%, transparent 38%) !important;
+  color: var(--text) !important;
+}
+
+body.modern-setting-page.card-config-page .card-builder textarea {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    top: 188px;
+    left: max(24px, calc((100vw - 1480px) / 2 - 116px));
+    width: 92px !important;
+    background: var(--card-readable-canvas) !important;
+    border-color: color-mix(in srgb, var(--line) 58%, transparent 42%) !important;
+  }
+}
+
+@media (min-width: 1720px) and (max-height: 820px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    top: 154px;
+  }
+}
+
+@media (max-width: 1719px) {
+  body.modern-setting-page.card-config-page .config-shell.compact {
+    padding: 16px;
+  }
+}
+
+
+/* Card editor v1.3.1: explicit readable canvas colors; do not depend on missing bg tokens. */
+body.modern-setting-page.card-config-page {
+  --card-readable-canvas: rgba(255, 248, 238, 0.72);
+  --card-readable-field: rgba(255, 250, 244, 0.96);
+  --card-readable-section: rgba(255, 250, 244, 0.72);
+}
+
+html[data-theme="dark"] body.modern-setting-page.card-config-page {
+  --card-readable-canvas: rgba(18, 27, 37, 0.62);
+  --card-readable-field: rgba(11, 18, 26, 0.72);
+  --card-readable-section: rgba(18, 27, 37, 0.46);
+}
+
+body.modern-setting-page.card-config-page .config-shell.compact {
+  background: var(--card-readable-canvas) !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    top: 178px;
+    background: var(--card-readable-canvas) !important;
+  }
+}
+
+
+/* Card editor v1.4: remove blue section rails and standardize the left action dock. */
+body.modern-setting-page.card-config-page .card-block,
+body.modern-setting-page.card-config-page .sub-block,
+body.modern-setting-page.card-config-page .persona-card,
+body.modern-setting-page.card-config-page .card-grid > .card-column > .card-block {
+  border-left: 0 !important;
+}
+
+body.modern-setting-page.card-config-page .card-block > *,
+body.modern-setting-page.card-config-page .sub-block > * {
+  margin-left: 0;
+}
+
+body.modern-setting-page.card-config-page .card-item-head {
+  margin-left: 0;
+}
+
+body.modern-setting-page.card-config-page .card-block,
+body.modern-setting-page.card-config-page .sub-block {
+  border-top: 1px solid color-mix(in srgb, var(--line) 36%, transparent 64%) !important;
+  padding-top: 18px !important;
+}
+
+body.modern-setting-page.card-config-page .card-grid > .card-column > .card-block:first-child {
+  border-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    top: 18px;
+    left: max(28px, calc((100vw - 1480px) / 2 - 132px));
+    width: 112px !important;
+    padding: 10px;
+    border-radius: 22px;
+    background: var(--card-readable-canvas) !important;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  }
+
+  body.modern-setting-page.card-config-page .card-actions-primary {
+    gap: 8px;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions button,
+  body.modern-setting-page.card-config-page .card-more-actions > summary {
+    min-height: 42px !important;
+    border-radius: 16px !important;
+    font-size: 0.92rem !important;
+    font-weight: 760 !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions #load-card,
+  body.modern-setting-page.card-config-page .card-more-actions > summary {
+    background: color-mix(in srgb, var(--input-bg) 82%, transparent 18%) !important;
+    color: var(--text) !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
+    min-height: 54px !important;
+    border-radius: 18px !important;
+    font-size: 0.96rem !important;
+    line-height: 1.16;
+  }
+
+  body.modern-setting-page.card-config-page .card-more-menu {
+    min-width: 190px;
+    left: calc(100% + 10px);
+  }
+
+  body.modern-setting-page.card-config-page .card-more-menu button {
+    min-height: 40px !important;
+    justify-content: flex-start !important;
+    padding-inline: 12px !important;
+  }
+}
+
+@media (min-width: 1720px) and (max-height: 820px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    top: 18px;
+  }
+}
+
+
+/* Card editor v1.5: make the left action dock occupy the intended gutter block. */
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    top: 76px;
+    left: max(30px, calc((100vw - 1480px) / 2 - 236px));
+    width: 188px !important;
+    min-height: 260px;
+    padding: 12px;
+    align-items: flex-start;
+  }
+
+  body.modern-setting-page.card-config-page .card-actions-primary {
+    align-content: start;
+    justify-content: stretch;
+    gap: 10px;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions button,
+  body.modern-setting-page.card-config-page .card-more-actions > summary {
+    min-height: 44px !important;
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
+    min-height: 58px !important;
+    white-space: normal;
+  }
+
+  body.modern-setting-page.card-config-page .card-more-menu {
+    min-width: 204px;
+  }
+}
+
+
+/* Card editor v1.6: optional readable canvas opacity following global UI opacity. */
+body.modern-setting-page.card-config-page .card-workbench-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+
+body.modern-setting-page.card-config-page .card-canvas-opacity-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 42%, transparent 58%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-readable-field) 80%, transparent 20%);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+body.modern-setting-page.card-config-page .card-canvas-opacity-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+body.modern-setting-page.card-config-page .card-canvas-opacity-toggle:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--line) 62%, transparent 38%);
+}
+
+@media (max-width: 980px) {
+  body.modern-setting-page.card-config-page .card-workbench-controls {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  body.modern-setting-page.card-config-page .card-canvas-opacity-toggle {
+    justify-content: center;
+  }
+}
+
+
+/* Card editor v1.7: move canvas opacity control into the left action dock and harden the more menu. */
+body.modern-setting-page.card-config-page .card-workbench-head {
+  align-items: center;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-status {
+  margin-left: auto;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+  gap: 10px;
+}
+
+body.modern-setting-page.card-config-page .card-canvas-opacity-toggle {
+  width: 100%;
+  justify-content: center;
+  min-height: 42px;
+  padding: 9px 12px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--input-bg) 88%, var(--card-readable-canvas) 12%);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body.modern-setting-page.card-config-page .card-canvas-opacity-toggle span {
+  line-height: 1.2;
+}
+
+body.modern-setting-page.card-config-page .card-more-menu {
+  border-color: color-mix(in srgb, var(--line) 68%, transparent 32%) !important;
+  background: rgba(18, 27, 37, 0.92) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28) !important;
+}
+
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-more-menu {
+  background: rgba(255, 248, 238, 0.94) !important;
+}
+
+body.modern-setting-page.card-config-page .card-more-menu button {
+  background: color-mix(in srgb, var(--input-bg) 92%, transparent 8%) !important;
+  color: var(--text) !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-canvas-opacity-toggle {
+    margin-top: auto;
+  }
+}
+
+@media (max-width: 1719px) {
+  body.modern-setting-page.card-config-page .card-canvas-opacity-toggle {
+    width: auto;
+    min-height: 38px;
+    border-radius: 999px;
+  }
+}
+
+
+/* Card editor v1.8: strengthen light-mode boundaries for the left dock and more menu. */
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+  border-color: rgba(151, 103, 69, 0.34) !important;
+  background: rgba(255, 248, 238, 0.88) !important;
+  box-shadow:
+    0 16px 36px rgba(92, 66, 42, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.54) !important;
+}
+
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-workbench-actions button,
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-more-actions > summary,
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-canvas-opacity-toggle {
+  border-color: rgba(151, 103, 69, 0.24) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(151, 103, 69, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.56) !important;
+}
+
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-workbench-actions #save-card {
+  border-color: rgba(196, 101, 57, 0.42) !important;
+  box-shadow: 0 8px 18px rgba(196, 101, 57, 0.20) !important;
+}
+
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-more-menu {
+  border-color: rgba(151, 103, 69, 0.36) !important;
+  background: rgba(255, 248, 238, 0.97) !important;
+  box-shadow:
+    0 18px 42px rgba(92, 66, 42, 0.20),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.58) !important;
+}
+
+html[data-theme="light"] body.modern-setting-page.card-config-page .card-more-menu button {
+  border-color: rgba(151, 103, 69, 0.20) !important;
+  background: rgba(255, 252, 247, 0.96) !important;
+}
+
+
+/* Card editor v1.9: align the left action dock to the editor canvas edge on wide screens. */
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-sticky-toolbar {
+    top: 18px;
+    left: max(24px, calc((100vw - 1480px) / 2 - 104px));
+  }
+}
+
+
+/* Card editor v2.0 ? Stage 5 dossier layout.
+   Structural redesign only: keep existing buttons, action dock and opacity-follow tokens intact. */
+body.modern-setting-page.card-config-page .card-dossier-editor {
+  overflow: visible;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  gap: 18px;
+  align-items: start;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-section {
+  min-width: 0;
+  padding: 18px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 40%, transparent 60%);
+}
+
+body.modern-setting-page.card-config-page .card-dossier-section:nth-child(1),
+body.modern-setting-page.card-config-page .card-dossier-section:nth-child(2) {
+  padding-top: 0;
+  border-top: 0;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-section-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--line) 50%, transparent 50%);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--card-readable-field) 74%, transparent 26%);
+  color: color-mix(in srgb, var(--accent) 62%, var(--text) 38%);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-section-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.02rem;
+  letter-spacing: -0.012em;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-section-head .helper-text {
+  margin: 4px 0 0;
+  max-width: 58ch;
+  color: color-mix(in srgb, var(--muted) 88%, var(--text) 12%);
+  line-height: 1.55;
+}
+
+body.modern-setting-page.card-config-page .card-field-row {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+body.modern-setting-page.card-config-page .card-field-row-inline {
+  grid-template-columns: minmax(180px, 0.88fr) minmax(240px, 1.12fr);
+  align-items: end;
+}
+
+body.modern-setting-page.card-config-page .card-field-unit {
+  min-width: 0;
+}
+
+body.modern-setting-page.card-config-page .card-field-unit + .card-field-unit {
+  margin-top: 14px;
+}
+
+body.modern-setting-page.card-config-page .card-field-row .card-field-unit + .card-field-unit {
+  margin-top: 0;
+}
+
+body.modern-setting-page.card-config-page .card-field-unit-main textarea {
+  min-height: 142px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-identity #card-description,
+body.modern-setting-page.card-config-page .card-dossier-narrative textarea,
+body.modern-setting-page.card-config-page .card-dossier-dialogue textarea,
+body.modern-setting-page.card-config-page .card-dossier-rules textarea {
+  line-height: 1.64;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-rules {
+  align-self: stretch;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-rules #card-creator-notes {
+  min-height: 332px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-dialogue #card-mes-example {
+  min-height: 190px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-editor > .persona-toolbar {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 42%, transparent 58%);
+}
+
+body.modern-setting-page.card-config-page .card-dossier-editor > .persona-toolbar h3 {
+  margin: 0;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-editor .card-field-tip {
+  margin: -2px 0 8px;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.card-config-page .card-dossier-grid,
+  body.modern-setting-page.card-config-page .card-field-row-inline {
+    grid-template-columns: 1fr;
+  }
+
+  body.modern-setting-page.card-config-page .card-dossier-section:nth-child(2) {
+    padding-top: 18px;
+    border-top: 1px solid color-mix(in srgb, var(--line) 40%, transparent 60%);
+  }
+}
+
+
+/* Card editor v2.1 ? Stage 5 dossier polish: compact file header and clearer editor rhythm. */
+body.modern-setting-page.card-config-page .config-shell.compact > .panel.config-panel.full-span:first-of-type {
+  padding: 18px 20px !important;
+}
+
+body.modern-setting-page.card-config-page .config-shell.compact > .panel.config-panel.full-span:first-of-type .section-head {
+  padding-bottom: 12px;
+  margin-bottom: 0;
+}
+
+body.modern-setting-page.card-config-page .config-shell.compact > .panel.config-panel.full-span:first-of-type .section-head h2 {
+  margin-bottom: 5px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench.ui-readable-canvas {
+  margin-top: 12px !important;
+  padding: 12px !important;
+  gap: 12px !important;
+  border-radius: 18px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 10px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-title {
+  gap: 7px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-title .muted.compact {
+  flex-basis: 100%;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-status {
+  min-width: 0;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+  gap: 12px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-grid label {
+  margin-bottom: 6px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-grid select,
+body.modern-setting-page.card-config-page .card-workbench-grid input {
+  min-height: 40px !important;
+}
+
+body.modern-setting-page.card-config-page .panel.config-panel.card-builder.card-dossier-editor {
+  margin-top: 14px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-grid {
+  gap: 20px 22px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-section {
+  padding-top: 20px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-section-head {
+  margin-bottom: 12px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-index {
+  width: 36px;
+  height: 36px;
+}
+
+body.modern-setting-page.card-config-page .card-field-unit-main textarea {
+  min-height: 154px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-identity #card-description {
+  min-height: 186px;
+}
+
+body.modern-setting-page.card-config-page .card-dossier-rules #card-creator-notes {
+  min-height: 360px;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.card-config-page .card-workbench-head,
+  body.modern-setting-page.card-config-page .card-workbench-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* Card editor v2.3 ? workbench inline file controls. */
+body.modern-setting-page.card-config-page .card-workbench-head {
+  grid-template-columns: minmax(120px, 150px) minmax(520px, 760px) minmax(260px, 360px) !important;
+  align-items: end !important;
+  gap: 14px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid {
+  width: min(760px, 100%) !important;
+  max-width: 760px !important;
+  justify-self: start;
+  margin: 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr) !important;
+  gap: 12px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid > div {
+  min-width: 0;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid label {
+  margin-bottom: 6px !important;
+  font-size: 0.84rem;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid select,
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid input {
+  width: 100% !important;
+  min-height: 40px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-status {
+  align-self: end;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 1380px) {
+  body.modern-setting-page.card-config-page .card-workbench-head {
+    grid-template-columns: minmax(120px, 150px) minmax(420px, 1fr) minmax(240px, 320px) !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid {
+    max-width: 620px !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.card-config-page .card-workbench-head {
+    grid-template-columns: 1fr !important;
+    align-items: stretch !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid {
+    max-width: 100% !important;
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* Card editor v2.4 ? creator comment and stronger add-persona affordance. */
+body.modern-setting-page.card-config-page .card-field-unit-meta {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed color-mix(in srgb, var(--line) 48%, transparent 52%);
+}
+
+body.modern-setting-page.card-config-page .card-field-unit-meta textarea {
+  min-height: 104px !important;
+  opacity: 0.96;
+}
+
+body.modern-setting-page.card-config-page .card-field-unit-meta label::after {
+  content: "META";
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--line) 54%, transparent 46%);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--muted) 78%, var(--text) 22%);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+
+body.modern-setting-page.card-config-page #add-persona.card-add-button {
+  min-height: 40px !important;
+  padding-inline: 18px !important;
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line) 38%) !important;
+  background: color-mix(in srgb, var(--accent) 34%, var(--input-bg) 66%) !important;
+  color: color-mix(in srgb, #ffffff 88%, var(--text) 12%) !important;
+  font-weight: 900 !important;
+  box-shadow:
+    0 8px 20px color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+body.modern-setting-page.card-config-page #add-persona.card-add-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 78%, var(--line) 22%) !important;
+  background: color-mix(in srgb, var(--accent) 46%, var(--input-bg) 54%) !important;
+}
+
+html[data-theme="light"] body.modern-setting-page.card-config-page #add-persona.card-add-button {
+  color: #fffaf4 !important;
+  background: color-mix(in srgb, var(--accent) 72%, #8a5c38 28%) !important;
+  border-color: rgba(151, 103, 69, 0.52) !important;
+  box-shadow: 0 9px 20px rgba(151, 103, 69, 0.22) !important;
+}
+
+
+/* Card editor v2.5 ? align workbench inline controls on one center line. */
+body.modern-setting-page.card-config-page .card-workbench-head {
+  grid-template-columns: 174px minmax(560px, 760px) minmax(300px, 360px) !important;
+  align-items: center !important;
+  gap: 14px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-title {
+  align-self: center;
+  min-height: 40px;
+  display: flex !important;
+  align-items: center !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-title strong {
+  line-height: 1.2;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid {
+  align-self: center;
+  align-items: end !important;
+  width: min(720px, 100%) !important;
+  max-width: 720px !important;
+  grid-template-columns: minmax(250px, 1fr) minmax(250px, 1fr) !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid label {
+  line-height: 1.1;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid select,
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid input {
+  height: 42px !important;
+  min-height: 42px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-status {
+  align-self: center !important;
+  margin: 17px 0 0 !important;
+  min-height: 34px;
+  max-width: 360px;
+}
+
+@media (max-width: 1380px) {
+  body.modern-setting-page.card-config-page .card-workbench-head {
+    grid-template-columns: 160px minmax(480px, 1fr) minmax(280px, 340px) !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid {
+    max-width: 640px !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.card-config-page .card-workbench-title {
+    min-height: 0;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-status {
+    margin-top: 0 !important;
+    max-width: 100%;
+  }
+}
+
+
+/* Card editor v2.6 ? final workbench control center alignment. */
+body.modern-setting-page.card-config-page .card-workbench-title {
+  margin-top: 23px !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-status {
+  margin-top: 32px !important;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.card-config-page .card-workbench-title,
+  body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-status {
+    margin-top: 0 !important;
+  }
+}
+
+
+/* P6-8 migrated from templates/card_config.html: state-journal-card-config-v1 inline styles.
+   Pure move only: selectors and values unchanged. These are page-specific .card-state-journal-* rules,
+   single-class low specificity, no conflict with existing card-state-journal rules above (more specific)
+   or 18-force-mobile-shell.css (mobile override wins by !important). */
+      .card-state-journal-panel[hidden], .card-state-journal-dialog[hidden] { display: none !important; }
+      .card-state-journal-panel { margin-top: 18px; }
+      .card-state-journal-source-card { display: grid; grid-template-columns: minmax(210px, 0.8fr) minmax(260px, 1.2fr); gap: 12px; align-items: end; margin: 12px 0; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--input-bg) 54%, transparent); }
+      .card-state-journal-source-card label { display: grid; gap: 6px; margin: 0; font-size: 0.82rem; color: var(--muted); font-weight: 760; }
+      .card-state-journal-source-card select { min-height: 38px; }
+      .card-state-journal-source-hint { margin: 0; color: var(--muted); line-height: 1.55; }
+      .card-state-journal-source-hint strong { color: var(--text); }
+
+      .card-state-journal-table-wrap { overflow-x: auto; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--input-bg) 58%, transparent); }
+      .card-state-journal-table { width: 100%; border-collapse: collapse; min-width: 760px; table-layout: auto; }
+      .card-state-journal-dialog .card-state-journal-table { min-width: 980px; }
+      .card-state-journal-table th, .card-state-journal-table td { padding: 10px 12px; border-bottom: 1px solid color-mix(in srgb, var(--border) 66%, transparent); text-align: left; vertical-align: middle; white-space: nowrap; }
+      .card-state-journal-table th { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.04em; font-weight: 800; }
+      .card-state-journal-table tr:last-child td { border-bottom: none; }
+      .card-state-journal-table input[type="text"], .card-state-journal-table input[type="number"], .card-state-journal-table select { min-height: 36px; }
+      .card-state-journal-name-input { min-width: 128px; }
+      .card-state-journal-key-input { min-width: 128px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .card-state-journal-num-input { width: 76px; }
+      .card-state-journal-range-inputs { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+      .card-state-journal-check { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; }
+      .card-state-journal-check input[type="checkbox"], .card-state-journal-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+      .card-state-journal-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--border) 78%, transparent); background: color-mix(in srgb, var(--input-bg) 72%, transparent); color: var(--muted); font-size: 0.78rem; font-weight: 760; white-space: nowrap; }
+      .card-state-journal-dialog { position: fixed; inset: 0; z-index: 260; display: grid; place-items: center; padding: 24px; box-sizing: border-box; background: rgba(0, 0, 0, 0.38); backdrop-filter: blur(12px); }
+      .card-state-journal-dialog-card { width: min(1240px, 100%); max-width: 100%; max-height: min(88vh, 940px); overflow: auto; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); border-radius: 24px; background: var(--panel-strong); box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34); padding: 18px; }
+      .card-state-journal-dialog-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
+      .card-state-journal-dialog-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+      .card-state-journal-tabs { display: inline-flex; align-items: center; gap: 4px; margin: 12px 0; padding: 4px; border: 1px solid color-mix(in srgb, var(--border) 74%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--input-bg) 56%, transparent); }
+      .card-state-journal-tabs button { border-radius: 999px; min-height: 34px; padding-inline: 14px; }
+      .card-state-journal-tabs button.active { background: color-mix(in srgb, var(--accent) 22%, var(--input-bg)); border-color: color-mix(in srgb, var(--accent) 52%, var(--border)); color: var(--text); }
+      .card-state-journal-tab[hidden] { display: none !important; }
+      .card-state-journal-editor-grid { display: grid; gap: 10px; }
+      .card-state-journal-editor-grid textarea { min-height: 70px; }
+      .card-state-journal-empty { padding: 18px; border: 1px dashed color-mix(in srgb, var(--border) 80%, transparent); border-radius: 18px; color: var(--muted); background: color-mix(in srgb, var(--input-bg) 44%, transparent); white-space: normal; }
+      .card-state-journal-code { display: inline-flex; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+      .card-state-journal-muted { display: block; margin-top: 4px; color: var(--muted); font-size: 0.76rem; }
+      .card-state-journal-advanced { margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
+      .card-state-journal-advanced summary { cursor: pointer; opacity: 0.72; }
+      .card-state-journal-advanced label { display: grid; gap: 4px; margin-top: 6px; }
+      .card-state-journal-advanced code { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px; }
+
+      .card-state-journal-condition-editor { min-width: 420px; max-width: 560px; }
+      .card-state-journal-condition-toolbar { margin: 8px 0; }
+      .card-state-journal-condition-list { display: grid; gap: 8px; margin: 8px 0; }
+      .card-state-journal-condition-row { display: grid; grid-template-columns: minmax(150px, 1fr) 76px 88px auto; gap: 8px; align-items: center; }
+      .card-state-journal-condition-row input, .card-state-journal-condition-row select { min-height: 34px; }
+      .card-state-journal-condition-dialog { z-index: 270; }
+      .card-state-journal-condition-dialog-card { width: min(760px, 100%); max-width: 100%; }
+      .card-state-journal-condition-dialog-body { display: grid; gap: 12px; }
+      .card-state-journal-stage-summary { display: grid; gap: 8px; min-width: 260px; white-space: normal; }
+      .card-state-journal-stage-summary strong { line-height: 1.55; }
+      @media (max-width: 1180px) { .card-state-journal-dialog { padding: 18px; } .card-state-journal-dialog .card-state-journal-table { min-width: 900px; } }
+      @media (max-width: 760px) { .card-state-journal-dialog { padding: 14px; } .card-state-journal-dialog-card { width: 100%; padding: 14px; } .card-state-journal-condition-row { grid-template-columns: 1fr; } }
