@@ -437,6 +437,7 @@ DEFAULT_SETTINGS = {
     "request_timeout": 120,
     "demo_mode": False,
     "ui_opacity": 0.84,
+    "card_canvas_follow_opacity": False,
     "background_image_url": DEFAULT_BACKGROUND_IMAGE_URL,
     "background_overlay": 0.42,
     "font_family_url": "",
@@ -752,6 +753,7 @@ def default_role_card() -> dict[str, Any]:
         "mes_example": "",
         "scenario": "",
         "creator_notes": "",
+        "creator_comment": "",
         "tags": [],
         "stateJournal": default_state_journal_config(),
         "creativeWorkshop": {
@@ -1184,6 +1186,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "request_timeout": clamp_int(settings.get("request_timeout"), 10, 600, 120),
         "demo_mode": parse_bool(settings.get("demo_mode"), False),
         "ui_opacity": clamp_float(settings.get("ui_opacity"), 0.2, 1.0, 0.84),
+        "card_canvas_follow_opacity": parse_bool(settings.get("card_canvas_follow_opacity"), False),
         "background_image_url": sanitize_background_image_url(
             settings.get("background_image_url", ""),
             strict=strict,
@@ -1599,6 +1602,13 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
     ]:
         card[key] = str(raw.get(key, "")).strip()
 
+    card["creator_comment"] = str(
+        raw.get("creator_comment")
+        or raw.get("creatorComment")
+        or raw.get("creator_summary")
+        or raw.get("creatorSummary")
+        or ""
+    ).strip()
     card["tags"] = sanitize_tags(raw.get("tags", []))
     card["stateJournal"] = sanitize_state_journal_config(raw.get("stateJournal", {}))
     card["creativeWorkshop"] = sanitize_creative_workshop(raw.get("creativeWorkshop", {}))
@@ -2320,7 +2330,7 @@ def extract_role_card_payload(data: Any) -> dict[str, Any]:
         return {}
 
     merged = dict(candidate)
-    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "stateJournal", "creativeWorkshop", "personas"]:
+    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "creator_comment", "tags", "stateJournal", "creativeWorkshop", "personas"]:
         if not merged.get(key) and data.get(key):
             merged[key] = data.get(key)
 

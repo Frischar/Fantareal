@@ -47,6 +47,7 @@ class SettingsPayload(BaseModel):
     request_timeout: int = 120
     demo_mode: bool = False
     ui_opacity: float = 0.84
+    card_canvas_follow_opacity: bool = False
     background_image_url: str = "/assets/default.jpg"
     background_overlay: float = 0.42
     font_family_url: str = ""

@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>演出工坊 - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 </head>
   <body class="modern-setting-page app-sidebar-shell workshop-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div id="workshop-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">
@@ -34,6 +35,7 @@
           <h2>入场演出、常驻氛围与动态演出</h2>
           <p class="muted">演出工坊作为角色卡的前端演出层；封面、背景、音乐、环境音和动态演出不会写进提示词。</p>
         </div>
+
 
         <div id="workshop-opening-config" class="workshop-opening-config-block workshop-panel-block">
           <div class="workshop-opening-config-head">
@@ -255,13 +257,17 @@
           <h2>演出工坊面板</h2>
         </div>
 
-        <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存到当前角色卡。</p>
 
-        <div class="workshop-panel-actions workshop-panel-actions-top">
+
+        <div class="workshop-panel-block workshop-side-actions-panel">
+          <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存到当前角色卡。</p>
+
+          <div class="workshop-panel-actions workshop-panel-actions-top ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
           <button id="save-workshop" type="button">保存到当前角色卡</button>
           <a class="secondary compact button-link workshop-return-link" href="/config/card">返回角色卡</a>
           <button id="reload-workshop-status" type="button" class="secondary compact">重新读取角色卡</button>
-          <button id="clear-workshop-binding" type="button" class="secondary compact ghost">清除本卡演出</button>
+          <button id="clear-workshop-binding" type="button" class="secondary compact ghost danger stage4-danger-action">清除本卡演出</button>
+        </div>
         </div>
 
         <div class="workshop-panel-block workshop-card-binding-panel">
@@ -288,21 +294,23 @@
             <span>当前角色卡</span>
             <strong id="workshop-current-card-name">{{ current_card.source_name or "未命名角色卡" }}</strong>
           </div>
-          <div class="workshop-summary-item ui-summary-card">
-            <span>演出工坊开关</span>
-            <strong id="workshop-enabled-state">未启用</strong>
-          </div>
-          <div class="workshop-summary-item ui-summary-card">
-            <span>开场演出</span>
-            <strong id="workshop-opening-state">未启用</strong>
-          </div>
-          <div class="workshop-summary-item ui-summary-card">
-            <span>常驻氛围</span>
-            <strong id="workshop-ambience-state">未启用</strong>
-          </div>
-          <div class="workshop-summary-item ui-summary-card">
-            <span>动态演出</span>
-            <strong id="workshop-dynamic-state">0 项</strong>
+          <div class="workshop-summary-grid" aria-label="演出工坊状态总览">
+            <div class="workshop-summary-item ui-summary-card">
+              <span>演出工坊开关</span>
+              <strong id="workshop-enabled-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>开场演出</span>
+              <strong id="workshop-opening-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>常驻氛围</span>
+              <strong id="workshop-ambience-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>动态演出</span>
+              <strong id="workshop-dynamic-state">0 项</strong>
+            </div>
           </div>
         </div>
       </aside>
@@ -2043,10 +2051,13 @@
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground };
       currentWorkshop = normalizeCreativeWorkshop(initialWorkshop);
       renderWorkshopRules(currentWorkshop);
       updateWorkshopPanelStats();
       refreshWorkshopStatus().catch(() => {});
     </script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
   </body>
 </html>

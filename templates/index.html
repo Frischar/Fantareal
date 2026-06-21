@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
-    <link rel="stylesheet" href="/static/styles.css?v=ui-sidebar-drawer-v1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-switch-v1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
@@ -13,1137 +13,11 @@
       {% endfor %}
     {% endfor %}
 
-    <style>
-      .message {
-        align-items: flex-start;
-      }
-      .message .bubble-wrap {
-        display: flex;
-        flex-direction: column;
-        max-width: min(78%, 920px);
-      }
-      .message.user .bubble-wrap {
-        align-items: flex-end;
-      }
-      .message.assistant .bubble-wrap,
-      .message.system .bubble-wrap {
-        align-items: flex-start;
-      }
-      .message-avatar {
-        width: 58px;
-        height: 58px;
-        min-width: 58px;
-        border-radius: 0.85rem;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        align-self: flex-start;
-        box-shadow: var(--shadow-soft);
-        border: 1px solid var(--border);
-        background: var(--panel-strong);
-      }
-      .message-avatar img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-      }
-      .message-avatar .avatar-text {
-        font-weight: 700;
-        font-size: 1rem;
-      }
-      .message.user .message-avatar {
-        order: 2;
-        margin-left: 0.65rem;
-      }
-      .message.assistant .message-avatar,
-      .message.system .message-avatar {
-        order: 0;
-        margin-right: 0.65rem;
-      }
-      @media (max-width: 768px) {
-        .message-avatar {
-          width: 38px;
-          height: 38px;
-          min-width: 38px;
-        }
-      }
-      .fr-rich-blocks {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        width: 100%;
-      }
-      .fr-render-card {
-        width: min(100%, 720px);
-        box-sizing: border-box;
-        border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
-        border-radius: 1rem;
-        background:
-          linear-gradient(145deg, color-mix(in srgb, var(--panel-strong) 72%, transparent 28%), color-mix(in srgb, var(--panel) 54%, transparent 46%));
-        box-shadow: 0 16px 42px color-mix(in srgb, #000 22%, transparent 78%);
-        backdrop-filter: blur(16px);
-        overflow: hidden;
-      }
-      .fr-render-card + .fr-render-card {
-        margin-top: 0.1rem;
-      }
-      .fr-title-card {
-        padding: 1rem 1.1rem;
-        border-color: color-mix(in srgb, var(--accent) 32%, var(--border) 68%);
-      }
-      .fr-title-kicker,
-      .fr-card-subtitle {
-        color: var(--muted);
-        font-size: 0.82rem;
-        line-height: 1.45;
-      }
-      .fr-title-kicker {
-        margin-bottom: 0.35rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .fr-card-title {
-        margin: 0;
-        color: var(--text);
-        font-size: 1.08rem;
-        line-height: 1.35;
-        font-weight: 800;
-      }
-      .fr-title-card .fr-card-title {
-        font-size: clamp(1.16rem, 2.6vw, 1.55rem);
-      }
-      .fr-card-subtitle {
-        margin-top: 0.45rem;
-      }
-      .fr-card-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.38rem;
-        margin-top: 0.75rem;
-      }
-      .fr-card-tag {
-        display: inline-flex;
-        align-items: center;
-        min-height: 1.45rem;
-        padding: 0.18rem 0.55rem;
-        border-radius: 999px;
-        border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border) 76%);
-        background: color-mix(in srgb, var(--accent) 10%, transparent 90%);
-        color: color-mix(in srgb, var(--text) 88%, var(--muted) 12%);
-        font-size: 0.75rem;
-        line-height: 1.2;
-      }
-      .fr-panel-card,
-      .fr-block-card,
-      .fr-choices-card {
-        padding: 0.95rem 1rem;
-      }
-      .fr-card-head {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 0.75rem;
-        margin-bottom: 0.65rem;
-      }
-      .fr-card-head .fr-card-title {
-        font-size: 0.98rem;
-      }
-      .fr-card-head .fr-card-subtitle {
-        margin-top: 0;
-        flex: 0 0 auto;
-        font-size: 0.78rem;
-      }
-      .fr-card-body {
-        color: var(--text);
-        font-size: 0.95rem;
-        line-height: 1.72;
-        white-space: pre-wrap;
-      }
-      .fr-card-items,
-      .fr-choice-list {
-        display: flex;
-        flex-direction: column;
-        gap: 0.45rem;
-        margin: 0.55rem 0 0;
-        padding: 0;
-        list-style: none;
-      }
-      .fr-card-item,
-      .fr-choice-item {
-        border-radius: 0.72rem;
-        color: var(--text);
-        line-height: 1.55;
-      }
-      .fr-card-item {
-        padding: 0.48rem 0.62rem;
-        border: 1px solid color-mix(in srgb, var(--border) 64%, transparent 36%);
-        background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
-      }
-      .fr-choice-button {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        align-items: flex-start;
-        gap: 0.55rem;
-        width: 100%;
-        min-height: 2.55rem;
-        padding: 0.55rem 0.65rem;
-        border-radius: 0.72rem;
-        border: 1px solid color-mix(in srgb, var(--border) 64%, transparent 36%);
-        background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
-        color: var(--text);
-        font: inherit;
-        line-height: 1.55;
-        text-align: left;
-        cursor: pointer;
-        transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-      }
-      .fr-choice-button:hover,
-      .fr-choice-button:focus-visible {
-        border-color: color-mix(in srgb, var(--accent) 42%, var(--border) 58%);
-        background: color-mix(in srgb, var(--accent) 10%, var(--input-bg) 90%);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent 88%);
-        outline: none;
-      }
-      .fr-choice-text {
-        min-width: 0;
-      }
-      .fr-choice-index {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.45rem;
-        height: 1.45rem;
-        border-radius: 999px;
-        background: color-mix(in srgb, var(--accent) 18%, transparent 82%);
-        color: color-mix(in srgb, var(--text) 90%, var(--accent) 10%);
-        font-size: 0.78rem;
-        font-weight: 800;
-      }
-      .fr-html-card {
-        width: min(100%, 760px);
-        padding: 1rem;
-      }
-      .fr-html-scope {
-        display: flex;
-        flex-direction: column;
-        gap: 0.85rem;
-        max-width: 100%;
-        color: var(--text);
-        font-size: 0.95rem;
-        line-height: 1.72;
-        overflow-wrap: anywhere;
-      }
-      .fr-html-scope :is(section, article, div, header, footer) {
-        box-sizing: border-box;
-        max-width: 100%;
-      }
-      .fr-html-scope :is(h2, h3, h4, p, blockquote, ul, ol) {
-        margin: 0;
-      }
-      .fr-html-scope :is(h2, h3, h4) {
-        color: var(--text);
-        line-height: 1.35;
-        font-weight: 800;
-      }
-      .fr-html-scope h2,
-      .fr-html-scope .fr-title-main {
-        font-size: clamp(1.2rem, 2.8vw, 1.7rem);
-      }
-      .fr-html-scope h3,
-      .fr-html-scope .fr-title-sub {
-        font-size: clamp(1.02rem, 2.2vw, 1.28rem);
-      }
-      .fr-html-scope h4 {
-        font-size: 0.98rem;
-      }
-      .fr-html-scope :is(ul, ol) {
-        padding-left: 1.25rem;
-      }
-      .fr-html-scope li + li {
-        margin-top: 0.25rem;
-      }
-      .fr-html-scope blockquote {
-        padding: 0.65rem 0.8rem;
-        border-left: 3px solid color-mix(in srgb, var(--accent) 44%, var(--border) 56%);
-        border-radius: 0.75rem;
-        background: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
-        color: color-mix(in srgb, var(--text) 88%, var(--muted) 12%);
-      }
-      .fr-html-scope hr {
-        width: 100%;
-        border: none;
-        border-top: 1px dashed color-mix(in srgb, var(--border) 72%, transparent 28%);
-        margin: 0.2rem 0;
-      }
-      .fr-html-scope .fr-scene,
-      .fr-html-scope .fr-profile-card,
-      .fr-html-scope .fr-note {
-        padding: 0.9rem;
-        border: 1px solid color-mix(in srgb, var(--border) 64%, transparent 36%);
-        border-radius: 0.95rem;
-        background: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
-      }
-      .fr-html-scope .fr-prose {
-        white-space: pre-wrap;
-      }
-      .fr-html-scope .fr-muted {
-        color: var(--muted);
-      }
-      .fr-html-scope .fr-pill,
-      .fr-html-scope .fr-badge,
-      .fr-html-scope .fr-profile-tab {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.45rem;
-        width: fit-content;
-        max-width: 100%;
-        border: 1px solid color-mix(in srgb, var(--border) 68%, transparent 32%);
-        background: color-mix(in srgb, var(--panel-strong) 68%, transparent 32%);
-        color: var(--text);
-      }
-      .fr-html-scope .fr-pill {
-        min-height: 2.35rem;
-        padding: 0.42rem 1.15rem;
-        border-radius: 999px;
-        letter-spacing: 0.04em;
-      }
-      .fr-html-scope .fr-badge,
-      .fr-html-scope .fr-profile-tab {
-        min-height: 1.8rem;
-        padding: 0.25rem 0.72rem;
-        border-radius: 0.55rem;
-      }
-      .fr-html-scope .fr-divider,
-      .fr-html-scope .fr-choice-banner {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.35rem;
-        min-height: 4.5rem;
-        padding: 0.85rem;
-        border-radius: 0.75rem;
-        border: 1px solid color-mix(in srgb, var(--border) 58%, transparent 42%);
-        background: color-mix(in srgb, var(--panel) 48%, transparent 52%);
-        text-align: center;
-      }
-      .fr-html-scope .fr-grid,
-      .fr-html-scope .fr-grid-2,
-      .fr-html-scope .fr-grid-3 {
-        display: grid;
-        gap: 0.65rem;
-      }
-      .fr-html-scope .fr-grid-2 {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .fr-html-scope .fr-grid-3 {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-      .fr-html-scope .fr-table-wrap {
-        max-width: 100%;
-        overflow-x: auto;
-        border: 1px solid color-mix(in srgb, var(--border) 62%, transparent 38%);
-        border-radius: 0.75rem;
-      }
-      .fr-html-scope table,
-      .fr-html-scope .fr-data-table {
-        width: 100%;
-        min-width: 32rem;
-        border-collapse: collapse;
-        background: color-mix(in srgb, var(--panel-strong) 32%, transparent 68%);
-      }
-      .fr-html-scope div.fr-data-table {
-        min-width: 0;
-        padding: 0.65rem;
-        border: 1px solid color-mix(in srgb, var(--border) 62%, transparent 38%);
-        border-radius: 0.75rem;
-        overflow-x: auto;
-      }
-      .fr-html-scope div.fr-data-table > .fr-grid {
-        min-width: 0;
-      }
-      .fr-html-scope div.fr-data-table .fr-note {
-        padding: 0.55rem 0.65rem;
-        border: 1px solid var(--border);
-        border-radius: 0.55rem;
-        background: color-mix(in srgb, var(--input-bg) 42%, transparent 58%);
-      }
-      .fr-html-scope :is(th, td) {
-        padding: 0.55rem 0.65rem;
-        border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
-        text-align: left;
-        vertical-align: top;
-      }
-      .fr-html-scope th {
-        color: color-mix(in srgb, var(--text) 92%, var(--accent) 8%);
-        background: color-mix(in srgb, var(--accent) 10%, transparent 90%);
-        font-weight: 800;
-      }
-      .fr-html-scope .fr-style-strawberry :is(.fr-title-main, .fr-title-sub, h2, h3) {
-        color: #ffc1d6;
-      }
-      .fr-html-scope .fr-style-strawberry .fr-pill,
-      .fr-html-scope .fr-style-strawberry .fr-badge,
-      .fr-html-scope .fr-style-strawberry .fr-profile-tab {
-        border-color: color-mix(in srgb, #ff7aa8 42%, var(--border) 58%);
-        background: color-mix(in srgb, #ff7aa8 14%, var(--panel-strong) 86%);
-      }
-      .fr-html-scope .fr-style-noir {
-        background: color-mix(in srgb, #05060b 58%, var(--panel) 42%);
-      }
-      .fr-html-scope .fr-style-paradise .fr-pill {
-        background: #050507;
-        color: #fff4dc;
-        border-color: color-mix(in srgb, #fff4dc 16%, transparent 84%);
-      }
-      @media (max-width: 768px) {
-        .fr-render-card {
-          width: 100%;
-          border-radius: 0.9rem;
-        }
-        .fr-card-head {
-          align-items: flex-start;
-          flex-direction: column;
-          gap: 0.25rem;
-        }
-        .fr-html-card {
-          padding: 0.85rem;
-        }
-        .fr-html-scope .fr-grid-2,
-        .fr-html-scope .fr-grid-3 {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
-
-    <style>
-      .preset-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: 0.95rem 1rem;
-        border-radius: 1rem;
-        border: 1px solid color-mix(in srgb, var(--line) 38%, transparent 62%);
-        background: color-mix(in srgb, var(--panel-strong) 18%, transparent 82%);
-        box-shadow: none;
-        margin-bottom: 1rem;
-      }
-      .preset-toolbar-left {
-        display: flex;
-        align-items: center;
-        gap: 0.85rem;
-        min-width: 0;
-      }
-      .preset-pill-label {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.38rem 0.75rem;
-        border-radius: 999px;
-        background: var(--input-bg);
-        border: 1px solid var(--border);
-        font-size: 0.82rem;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        white-space: nowrap;
-      }
-      .preset-current-meta {
-        min-width: 0;
-      }
-      .preset-current-meta strong {
-        display: block;
-        font-size: 0.98rem;
-        line-height: 1.2;
-      }
-      .preset-current-meta p {
-        margin: 0.18rem 0 0;
-        font-size: 0.84rem;
-        line-height: 1.3;
-      }
-      .preset-toolbar-right {
-        display: flex;
-        align-items: center;
-        gap: 0.65rem;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-      }
-      .preset-combo {
-        position: relative;
-      }
-      .preset-pill-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.55rem;
-        min-height: 2.55rem;
-        padding: 0.7rem 1rem;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: linear-gradient(180deg, var(--panel), var(--panel-strong));
-        color: var(--text);
-        box-shadow: var(--shadow-soft);
-        cursor: pointer;
-        transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-      }
-      .preset-pill-button:hover {
-        transform: translateY(-1px);
-        border-color: var(--accent, var(--border));
-      }
-      .preset-pill-arrow {
-        font-size: 0.85rem;
-        opacity: 0.75;
-      }
-      .preset-manage-link {
-        text-decoration: none;
-      }
-      .preset-menu {
-        position: absolute;
-        top: calc(100% + 0.5rem);
-        right: 0;
-        min-width: 18rem;
-        max-width: min(26rem, 80vw);
-        max-height: 20rem;
-        overflow-y: auto;
-        padding: 0.45rem;
-        border-radius: 1rem;
-        border: 1px solid var(--border);
-        background: var(--panel-strong);
-        box-shadow: var(--shadow-soft);
-        z-index: 50;
-      }
-      .preset-menu-item {
-        width: 100%;
-        border: none;
-        background: transparent;
-        color: var(--text);
-        text-align: left;
-        padding: 0.75rem 0.85rem;
-        border-radius: 0.8rem;
-        cursor: pointer;
-        transition: background 0.15s ease;
-      }
-      .preset-menu-item:hover {
-        background: var(--input-bg);
-      }
-      .preset-menu-item.active {
-        background: var(--input-bg);
-        border: 1px solid var(--border);
-      }
-      .preset-menu-title {
-        display: block;
-        font-weight: 700;
-        font-size: 0.95rem;
-        line-height: 1.2;
-      }
-      .preset-menu-meta {
-        display: block;
-        margin-top: 0.22rem;
-        font-size: 0.8rem;
-        color: var(--muted);
-        line-height: 1.3;
-      }
-      .drawer-preset-tools {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        margin-bottom: 0.85rem;
-      }
-      .drawer-preset-current {
-        padding: 0.85rem 0.95rem;
-        border: 1px solid var(--border);
-        border-radius: 0.9rem;
-        background: var(--panel);
-        margin-bottom: 0.85rem;
-      }
-      .drawer-preset-current strong {
-        display: block;
-        font-size: 0.95rem;
-        margin-bottom: 0.18rem;
-      }
-      .drawer-preset-current p {
-        margin: 0;
-        font-size: 0.82rem;
-        color: var(--muted);
-      }
-      .drawer-debug-panel {
-        border: 1px solid var(--border);
-        border-radius: 0.9rem;
-        background: var(--panel);
-        padding: 0.85rem 0.95rem;
-      }
-      .drawer-debug-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-      }
-      .drawer-debug-meta {
-        display: flex;
-        align-items: center;
-        gap: 0.55rem;
-        flex-wrap: wrap;
-      }
-      .drawer-debug-title {
-        font-weight: 700;
-      }
-      .drawer-debug-body {
-        margin-top: 0.8rem;
-      }
-      .preset-debug-panel {
-        margin-bottom: 1rem;
-      }
-      .preset-debug-status-row {
-        display: flex;
-        align-items: center;
-        gap: 0.65rem;
-        flex-wrap: wrap;
-        margin-bottom: 0.6rem;
-      }
-      .preset-debug-chip {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.3rem 0.7rem;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--input-bg);
-        font-size: 0.8rem;
-        font-weight: 600;
-      }
-      .preset-debug-chip.active {
-        border-color: var(--accent, var(--border));
-      }
-      .preset-module-chip-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-        margin: 0.5rem 0 0.8rem;
-      }
-      .preset-module-chip {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.28rem 0.68rem;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--panel);
-        font-size: 0.78rem;
-      }
-      #preset-debug-body[hidden] {
-        display: none !important;
-      }
-      .prompt-package-tools {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 0.85rem;
-      }
-      .prompt-package-summary {
-        font-size: 0.82rem;
-      }
-      .prompt-package-actions {
-        display: grid;
-        gap: 0.55rem;
-        justify-items: center;
-        width: 100%;
-      }
-      .prompt-package-history-row,
-      .prompt-package-action-row {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.45rem;
-        width: 100%;
-      }
-      .prompt-package-action-row .secondary.compact {
-        padding-inline: 0.75rem;
-      }
-      .prompt-package-actions select.compact {
-        width: min(100%, 24rem);
-        min-height: 2rem;
-        padding: 0.25rem 0.75rem;
-        border-radius: 999px;
-        font-size: 0.78rem;
-        text-align: center;
-      }
-      .prompt-layer-list {
-        display: grid;
-        gap: 0.7rem;
-        margin-bottom: 0.85rem;
-      }
-      .prompt-layer-card {
-        border: 1px solid var(--border);
-        border-radius: 0.85rem;
-        background: var(--input-bg);
-        padding: 0.75rem 0.85rem;
-      }
-      .prompt-layer-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 0.75rem;
-        margin-bottom: 0.4rem;
-        flex-wrap: wrap;
-      }
-      .prompt-layer-title {
-        font-size: 0.9rem;
-      }
-      .prompt-layer-meta {
-        font-size: 0.76rem;
-        color: var(--muted);
-      }
-      .prompt-layer-snippet {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-size: 0.8rem;
-        line-height: 1.45;
-        color: var(--muted);
-      }
-      .prompt-segment-panel {
-        margin-bottom: 0.85rem;
-      }
-      .prompt-segment-list {
-        display: grid;
-        gap: 0.45rem;
-        margin-top: 0.6rem;
-      }
-      .prompt-segment-card {
-        border: 1px solid var(--border);
-        border-radius: 0.75rem;
-        background: rgba(255, 255, 255, 0.028);
-        overflow: hidden;
-      }
-      .prompt-segment-card[open] {
-        background: rgba(255, 255, 255, 0.045);
-      }
-      .prompt-segment-row {
-        display: grid;
-        grid-template-columns: 3rem minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 0.45rem 0.65rem;
-        padding: 0.62rem 0.75rem;
-        cursor: pointer;
-        list-style: none;
-      }
-      .prompt-segment-row::-webkit-details-marker {
-        display: none;
-      }
-      .prompt-segment-order {
-        color: var(--muted);
-        font-size: 0.76rem;
-        font-variant-numeric: tabular-nums;
-      }
-      .prompt-segment-title {
-        min-width: 0;
-        font-size: 0.82rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .prompt-segment-chip {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 0;
-        padding: 0.16rem 0.48rem;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        color: var(--text);
-        background: rgba(255, 255, 255, 0.04);
-        font-size: 0.72rem;
-        white-space: nowrap;
-      }
-      .prompt-segment-chip.source-preset {
-        border-color: rgba(185, 147, 255, 0.5);
-        background: rgba(133, 88, 255, 0.16);
-      }
-      .prompt-segment-chip.source-character {
-        border-color: rgba(112, 179, 255, 0.45);
-        background: rgba(62, 130, 220, 0.15);
-      }
-      .prompt-segment-chip.source-worldbook {
-        border-color: rgba(104, 214, 158, 0.42);
-        background: rgba(54, 154, 105, 0.14);
-      }
-      .prompt-segment-chip.source-memory,
-      .prompt-segment-chip.source-user_profile {
-        border-color: rgba(236, 202, 116, 0.48);
-        background: rgba(184, 139, 48, 0.14);
-      }
-      .prompt-segment-chip.source-runtime {
-        border-color: rgba(170, 184, 205, 0.35);
-        background: rgba(130, 148, 176, 0.12);
-      }
-      .prompt-segment-placement,
-      .prompt-segment-meta,
-      .prompt-segment-size {
-        min-width: 0;
-        color: var(--muted);
-        font-size: 0.74rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .prompt-segment-placement {
-        grid-column: 2 / 3;
-      }
-      .prompt-segment-meta {
-        display: none;
-      }
-      .prompt-segment-flags {
-        grid-column: 3 / 4;
-        grid-row: 2;
-        display: inline-flex;
-        justify-content: flex-end;
-        gap: 0.3rem;
-        flex-wrap: wrap;
-      }
-      .prompt-segment-flag {
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        padding: 0.12rem 0.4rem;
-        color: var(--muted);
-        font-size: 0.68rem;
-        white-space: nowrap;
-      }
-      .prompt-segment-flag.hard,
-      .prompt-segment-flag.required {
-        color: var(--text);
-        border-color: rgba(255, 184, 108, 0.45);
-        background: rgba(255, 184, 108, 0.1);
-      }
-      .prompt-segment-detail {
-        border-top: 1px solid var(--border);
-        padding: 0.65rem 0.75rem 0.75rem;
-      }
-      .prompt-segment-snippet {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.78rem;
-        line-height: 1.42;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-      .prompt-segment-tag-row {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 0.38rem;
-        margin: 0.1rem 0;
-      }
-      .prompt-segment-tag-label {
-        color: var(--muted);
-        font-size: 0.76rem;
-        font-weight: 800;
-      }
-      @media (max-width: 980px) {
-        .prompt-segment-row {
-          grid-template-columns: 2.5rem minmax(0, 1fr) auto;
-        }
-      }
-      .director-note-panel {
-        margin-top: 0.9rem;
-      }
-      .director-note-form {
-        display: grid;
-        gap: 0.75rem;
-      }
-      .director-note-form textarea {
-        min-height: 5.6rem;
-        resize: vertical;
-      }
-      .director-note-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.75rem;
-      }
-      .director-note-actions {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.85rem;
-        flex-wrap: wrap;
-      }
-      .director-note-list {
-        display: grid;
-        gap: 0.7rem;
-        margin-top: 0.9rem;
-      }
-      .director-note-item {
-        border: 1px solid var(--border);
-        border-radius: 0.85rem;
-        background: var(--panel);
-        padding: 0.85rem 0.95rem;
-      }
-      .director-note-item-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.75rem;
-        margin-bottom: 0.55rem;
-      }
-      .director-note-item-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-      }
-      .director-note-chip {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.22rem 0.58rem;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--input-bg);
-        font-size: 0.76rem;
-      }
-      .director-note-content {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-size: 0.82rem;
-        line-height: 1.5;
-        color: var(--text);
-      }
-      .director-note-empty {
-        border: 1px dashed var(--border);
-        border-radius: 0.85rem;
-        padding: 0.95rem;
-        color: var(--muted);
-        background: color-mix(in srgb, var(--panel) 84%, transparent 16%);
-      }
-      @media (max-width: 768px) {
-        .preset-toolbar {
-          flex-direction: column;
-          align-items: stretch;
-        }
-        .preset-toolbar-right {
-          justify-content: stretch;
-        }
-        .preset-combo,
-        .preset-pill-button,
-        .preset-manage-link {
-          width: 100%;
-        }
-        .preset-menu {
-          left: 0;
-          right: 0;
-          max-width: 100%;
-        }
-        .director-note-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      .worldbook-debug-panel {
-        padding: 0.9rem 1rem;
-      }
-      .worldbook-debug-toggle {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: 0;
-        border: none;
-        background: transparent;
-        color: inherit;
-        text-align: left;
-        cursor: pointer;
-      }
-      .worldbook-debug-toggle-main {
-        min-width: 0;
-        flex: 1;
-      }
-      .worldbook-debug-toggle .debug-status-row {
-        margin-top: 0.45rem;
-      }
-      .worldbook-debug-arrow {
-        flex: 0 0 auto;
-        width: 2rem;
-        height: 2rem;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--input-bg);
-        font-size: 0.9rem;
-        line-height: 1;
-        transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-      }
-      .worldbook-debug-toggle:hover .worldbook-debug-arrow {
-        border-color: var(--accent, var(--border));
-        background: var(--panel);
-      }
-      .worldbook-debug-panel.expanded .worldbook-debug-arrow {
-        transform: rotate(180deg);
-      }
-      .worldbook-debug-body {
-        margin-top: 0.75rem;
-      }
-      .worldbook-debug-body[hidden] {
-        display: none !important;
-      }
-      .worldbook-debug-body .debug-code-block {
-        margin: 0;
-        max-height: 16rem;
-        overflow: auto;
-      }
-      .worldbook-debug-summary {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-bottom: 0.75rem;
-      }
-      .worldbook-debug-chip {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.3rem 0.7rem;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--input-bg);
-        font-size: 0.78rem;
-        font-weight: 600;
-      }
-      .worldbook-debug-chip.active {
-        border-color: var(--accent, var(--border));
-      }
-      .worldbook-debug-filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-bottom: 0.85rem;
-      }
-      .worldbook-debug-filters[hidden] {
-        display: none !important;
-      }
-      .worldbook-debug-filters .secondary.compact.active {
-        border-color: var(--accent, var(--border));
-        background: var(--panel);
-      }
-      .worldbook-debug-groups {
-        display: grid;
-        gap: 0.85rem;
-      }
-      .worldbook-debug-group {
-        border: 1px solid var(--border);
-        border-radius: 0.9rem;
-        background: var(--panel);
-        padding: 0.8rem 0.9rem;
-      }
-      .worldbook-debug-group-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        margin-bottom: 0.7rem;
-        flex-wrap: wrap;
-      }
-      .worldbook-debug-group-title {
-        font-weight: 700;
-        font-size: 0.9rem;
-      }
-      .worldbook-debug-group-meta {
-        font-size: 0.78rem;
-        color: var(--muted);
-      }
-      .worldbook-debug-empty {
-        border: 1px dashed var(--border);
-        border-radius: 0.85rem;
-        padding: 0.85rem 0.95rem;
-        color: var(--muted);
-        font-size: 0.8rem;
-        background: var(--panel);
-      }
-      .worldbook-debug-item-list {
-        display: grid;
-        gap: 0.65rem;
-      }
-      .worldbook-debug-item {
-        border: 1px solid var(--border);
-        border-radius: 0.8rem;
-        background: var(--input-bg);
-        padding: 0.75rem 0.85rem;
-      }
-      .worldbook-debug-item-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        margin-bottom: 0.5rem;
-      }
-      .worldbook-debug-item-title {
-        font-weight: 700;
-        font-size: 0.88rem;
-      }
-      .worldbook-debug-tag-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-      }
-      .worldbook-debug-tag {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.22rem 0.58rem;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--panel);
-        font-size: 0.75rem;
-      }
-      .worldbook-debug-tag.selected {
-        border-color: var(--accent, var(--border));
-      }
-      .worldbook-debug-tag.dropped {
-        color: var(--muted);
-      }
-      .worldbook-debug-item-meta {
-        display: grid;
-        gap: 0.28rem;
-        margin-bottom: 0.55rem;
-        font-size: 0.79rem;
-      }
-      .worldbook-debug-label {
-        color: var(--muted);
-      }
-      .worldbook-debug-item-preview {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-size: 0.78rem;
-        line-height: 1.45;
-        color: var(--muted);
-      }
-      .worldbook-debug-raw-wrap {
-        margin-top: 0.85rem;
-      }
-      .worldbook-debug-raw-wrap summary {
-        cursor: pointer;
-        color: var(--muted);
-        font-size: 0.8rem;
-      }
-      @media (max-width: 768px) {
-        .worldbook-debug-toggle {
-          gap: 0.75rem;
-        }
-        .worldbook-debug-arrow {
-          width: 1.8rem;
-          height: 1.8rem;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="/static/css/01b-chat-inline.css?v=ui-p614a-chat-inline-low-risk-prune-20260621" />
 
   </head>
   <body class="chat-page chat-visual-shell">
+    {% include "_theme_toggle.html" %}
     <div id="chat-left-sidebar" class="topbar topbar-chat">
       <div class="topbar-left">
         <a class="brand chat-brand" href="/chat">Fantareal</a>
@@ -1175,9 +49,6 @@
               </button>
               <button id="workshop-opening-replay" type="button" class="secondary compact icon-button workshop-opening-replay" aria-label="重新播放开场" title="重新播放开场" {% if not workshop_opening.enabled %}hidden{% endif %}>
                 <span aria-hidden="true">↺</span>
-              </button>
-              <button id="open-drawer-secondary" type="button" class="secondary compact icon-button config-gear-button" aria-label="运行配置" title="运行配置" aria-expanded="false" aria-controls="config-drawer">
-                <span aria-hidden="true">⚙</span>
               </button>
             </div>
           </div>
@@ -1219,7 +90,7 @@
               </div>
               <div class="message-avatar user-avatar" aria-hidden="true">
                 {% if user_profile.avatar_url %}
-                <img src="{{ user_profile.avatar_url }}" alt="{{ user_profile.display_name or "我" }}" />
+                <img src="{{ user_profile.avatar_url }}" alt="{{ user_profile.display_name or "我" }}" onerror="this.outerHTML='<span class=&quot;avatar-text&quot;>{{ (user_profile.display_name or "我")[:1] }}</span>';" />
                 {% else %}
                 <span class="avatar-text">{{ (user_profile.display_name or "我")[:1] }}</span>
               {% endif %}
@@ -1260,13 +131,14 @@
             <div>
               <p class="eyebrow">Runtime</p>
               <h2>聊天辅助栏</h2>
-              <p class="muted">运行状态、Worldbook Debug、Prompt 预览和插件入口。</p>
+              <p class="muted">运行状态、常用设置、Worldbook Debug、Prompt 预览和插件入口。</p>
             </div>
             <button id="close-runtime-panel" type="button" class="secondary compact" aria-label="收起辅助栏">收起</button>
           </div>
 
           <div class="runtime-panel-tabs" role="tablist" aria-label="聊天辅助栏分类">
             <button type="button" class="runtime-tab active" data-runtime-tab="status" role="tab" aria-selected="true">状态</button>
+            <button type="button" class="runtime-tab" data-runtime-tab="settings" role="tab" aria-selected="false">设置</button>
             <button type="button" class="runtime-tab" data-runtime-tab="preset" role="tab" aria-selected="false">预设</button>
             <button type="button" class="runtime-tab" data-runtime-tab="worldbook" role="tab" aria-selected="false">世界书 <span id="worldbook-rail-count" class="runtime-tab-count" hidden>0</span></button>
             <button type="button" class="runtime-tab" data-runtime-tab="prompt" role="tab" aria-selected="false">Prompt <span id="prompt-runtime-dot" class="runtime-tab-dot" hidden></span></button>
@@ -1277,6 +149,37 @@
 
           <div class="runtime-panel-body">
             <section id="runtime-tab-status" class="runtime-tab-panel active" data-runtime-panel="status" role="tabpanel">
+              <div class="runtime-card runtime-settings-card runtime-appearance-card">
+                <div class="runtime-card-head runtime-settings-head">
+                  <div>
+                    <strong>外观快捷设置</strong>
+                    <p class="muted">背景、透明度和字体显示；修改后会自动保存。</p>
+                  </div>
+                </div>
+
+                <div class="runtime-appearance-grid">
+                  <div class="runtime-appearance-field">
+                    <label for="runtime-settings-ui-opacity">UI 透明度</label>
+                    <input id="runtime-settings-ui-opacity" data-runtime-settings-field type="range" min="0.2" max="1" step="0.01" />
+                    <div class="runtime-settings-value"><span>当前值</span><strong id="runtime-settings-ui-opacity-value">0.84</strong></div>
+                  </div>
+                  <div class="runtime-appearance-field">
+                    <label for="runtime-settings-background-overlay">背景遮罩</label>
+                    <input id="runtime-settings-background-overlay" data-runtime-settings-field type="range" min="0" max="0.85" step="0.01" />
+                    <div class="runtime-settings-value"><span>当前值</span><strong id="runtime-settings-background-overlay-value">0.42</strong></div>
+                  </div>
+                  <div class="runtime-appearance-field">
+                    <label for="runtime-settings-font-size">字号</label>
+                    <input id="runtime-settings-font-size" data-runtime-settings-field type="range" min="10" max="28" step="1" />
+                    <div class="runtime-settings-value"><span>当前值</span><strong id="runtime-settings-font-size-value">15px</strong></div>
+                  </div>
+                  <div class="runtime-appearance-field">
+                    <label for="runtime-settings-font-weight">字重</label>
+                    <input id="runtime-settings-font-weight" data-runtime-settings-field type="range" min="100" max="900" step="100" />
+                    <div class="runtime-settings-value"><span>当前值</span><strong id="runtime-settings-font-weight-value">400</strong></div>
+                  </div>
+                </div>
+              </div>
               <div class="runtime-card">
                 <div class="runtime-card-head">
                   <strong>当前会话</strong>
@@ -1287,6 +190,47 @@
                   <div><span>模型</span><strong id="runtime-model-label">{{ settings.llm_model or "未配置" }}</strong></div>
                   <div><span>上下文</span><strong id="runtime-history-label">{{ settings.history_limit }} 条</strong></div>
                   <div><span>最近操作</span><strong id="runtime-last-action-label">暂无</strong></div>
+                </div>
+              </div>
+            </section>
+
+            <section id="runtime-tab-settings" class="runtime-tab-panel" data-runtime-panel="settings" role="tabpanel" hidden>
+              <div class="runtime-card runtime-settings-card">
+                <div class="runtime-card-head runtime-settings-head">
+                  <div>
+                    <strong>模型设置</strong>
+                    <p class="muted">聊天模型与上下文预算；修改后会自动保存。</p>
+                  </div>
+                </div>
+
+                <div class="runtime-settings-summary">
+                  <div>
+                    <span>模型</span>
+                    <strong id="runtime-settings-model-readout">{{ settings.llm_model or "未配置" }}</strong>
+                  </div>
+                  <div>
+                    <span>上下文</span>
+                    <strong id="runtime-settings-history-readout">{{ settings.history_limit }} 条</strong>
+                  </div>
+                </div>
+
+                <div class="runtime-settings-form">
+                  <label for="runtime-settings-llm-model">模型名</label>
+                  <input id="runtime-settings-llm-model" data-runtime-settings-field type="text" autocomplete="off" />
+
+                  <div class="runtime-settings-grid">
+                    <div>
+                      <label for="runtime-settings-temperature">Temperature</label>
+                      <input id="runtime-settings-temperature" data-runtime-settings-field type="number" min="0" max="2" step="0.05" />
+                    </div>
+                    <div>
+                      <label for="runtime-settings-history-limit">上下文条数</label>
+                      <input id="runtime-settings-history-limit" data-runtime-settings-field type="number" min="1" max="100" step="1" />
+                    </div>
+                  </div>
+
+                  <label for="runtime-settings-prompt-budget-token-limit">预算 tokens</label>
+                  <input id="runtime-settings-prompt-budget-token-limit" data-runtime-settings-field type="number" min="1000" max="1000000" step="1000" />
                 </div>
               </div>
             </section>
@@ -1531,190 +475,6 @@
     <audio id="workshop-ambience-ambient-audio" preload="auto"></audio>
     <audio id="workshop-dynamic-audio" preload="auto"></audio>
     <div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>
-
-    <div id="drawer-overlay" class="drawer-overlay" hidden></div>
-    <aside id="config-drawer" class="config-drawer" aria-hidden="true">
-      <div class="drawer-head">
-        <div>
-          <p class="eyebrow">Sidebar</p>
-          <h2>运行时配置</h2>
-          <p class="muted">这里的 API Key、模型参数和界面设置只保存在浏览器本地。</p>
-        </div>
-        <button id="close-drawer" class="secondary compact" type="button">关闭</button>
-      </div>
-
-      <div class="drawer-body">
-        <section class="drawer-section">
-          <div class="section-head">
-            <p class="eyebrow">LLM</p>
-            <h3>聊天模型</h3>
-          </div>
-          <label for="drawer-llm-base-url">API URL</label>
-          <input id="drawer-llm-base-url" placeholder="例如 https://api.deepseek.com/v1" />
-          <label for="drawer-llm-api-key">API Key</label>
-          <input id="drawer-llm-api-key" type="password" placeholder="保存到当前全局配置的服务端参数" />
-          <label for="drawer-llm-model">模型名</label>
-          <input id="drawer-llm-model" placeholder="例如 deepseek-chat" />
-          <div class="grid-two">
-            <div>
-              <label for="drawer-temperature">Temperature</label>
-              <input id="drawer-temperature" type="number" min="0" max="2" step="0.05" />
-            </div>
-            <div>
-              <label for="drawer-request-timeout">超时秒数</label>
-              <input id="drawer-request-timeout" type="number" min="10" max="600" step="1" />
-            </div>
-          </div>
-          <div class="grid-two">
-            <div>
-              <label for="drawer-history-limit">上下文条数</label>
-              <input id="drawer-history-limit" type="number" min="1" max="100" step="1" />
-            </div>
-            <div>
-              <label for="drawer-prompt-budget-token-limit">最大上下文预算</label>
-              <input id="drawer-prompt-budget-token-limit" type="number" min="1000" max="1000000" step="1000" />
-              <p class="muted tiny">单位 tokens，用于 Prompt Debug 估算与超限提醒，不会自动裁剪。</p>
-            </div>
-          </div>
-          <label class="checkbox-row offset-top">
-            <input id="drawer-demo-mode" type="checkbox" />
-            <span>未配置模型时允许演示模式</span>
-          </label>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
-            <p class="eyebrow">Retrieval</p>
-            <h3>嵌入与重排序</h3>
-          </div>
-          <label for="drawer-embedding-base-url">嵌入 API URL</label>
-          <input id="drawer-embedding-base-url" placeholder="例如 http://127.0.0.1:8000/v1" />
-          <label for="drawer-embedding-api-key">嵌入 API Key</label>
-          <input id="drawer-embedding-api-key" type="password" placeholder="本地服务可留空" />
-          <label for="drawer-embedding-model">嵌入模型名</label>
-          <input id="drawer-embedding-model" placeholder="例如 text-embedding-3-small" />
-          <label>嵌入时读取字段</label>
-          <div class="field-chip-row">
-            <label class="check-chip"><input class="drawer-embedding-field" type="checkbox" value="title" /><span>标题</span></label>
-            <label class="check-chip"><input class="drawer-embedding-field" type="checkbox" value="content" /><span>正文</span></label>
-            <label class="check-chip"><input class="drawer-embedding-field" type="checkbox" value="tags" /><span>标签</span></label>
-            <label class="check-chip"><input class="drawer-embedding-field" type="checkbox" value="notes" /><span>备注</span></label>
-          </div>
-          <div class="grid-two">
-            <div>
-              <label for="drawer-retrieval-top-k">召回条数</label>
-              <input id="drawer-retrieval-top-k" type="number" min="1" max="12" step="1" />
-            </div>
-            <div>
-              <label class="checkbox-row offset-top">
-                <input id="drawer-rerank-enabled" type="checkbox" />
-                <span>启用重排序</span>
-              </label>
-            </div>
-          </div>
-          <label for="drawer-rerank-base-url">重排序 API URL</label>
-          <input id="drawer-rerank-base-url" placeholder="例如 http://127.0.0.1:8000/v1" />
-          <label for="drawer-rerank-api-key">重排序 API Key</label>
-          <input id="drawer-rerank-api-key" type="password" placeholder="本地服务可留空" />
-          <div class="grid-two">
-            <div>
-              <label for="drawer-rerank-model">重排序模型名</label>
-              <input id="drawer-rerank-model" placeholder="例如 jina-reranker-v2-base-multilingual" />
-            </div>
-            <div>
-              <label for="drawer-rerank-top-n">保留条数</label>
-              <input id="drawer-rerank-top-n" type="number" min="1" max="12" step="1" />
-            </div>
-          </div>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
-            <p class="eyebrow">Appearance</p>
-            <h3>背景与透明度</h3>
-          </div>
-          <label for="drawer-theme">界面主题</label>
-          <select id="drawer-theme">
-            <option value="light">浅色</option>
-            <option value="dark">暗色</option>
-          </select>
-          <label for="drawer-ui-opacity">UI 透明度</label>
-          <input id="drawer-ui-opacity" type="range" min="0.2" max="1" step="0.01" />
-          <div class="range-value"><span>当前值</span><strong id="drawer-ui-opacity-value">0.84</strong></div>
-          <label for="drawer-background-url">背景图 URL</label>
-          <input id="drawer-background-url" placeholder="远程地址或上传后的本地地址" />
-          <div class="button-row background-preset-row" aria-label="背景预设">
-            <button id="drawer-use-default-background" class="secondary compact" type="button">使用默认背景</button>
-          </div>
-          <label for="drawer-background-overlay">背景遮罩</label>
-          <input id="drawer-background-overlay" type="range" min="0" max="0.85" step="0.01" />
-          <div class="range-value"><span>当前值</span><strong id="drawer-background-overlay-value">0.42</strong></div>
-          <label for="drawer-background-file">上传背景图</label>
-          <div class="inline-field">
-            <input id="drawer-background-file" type="file" accept="image/*" />
-            <button id="upload-background" class="secondary compact" type="button">上传</button>
-          </div>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
-            <p class="eyebrow">Font</p>
-            <h3>字体设置</h3>
-          </div>
-          <label for="drawer-font-size">字体大小</label>
-          <input id="drawer-font-size" type="range" min="10" max="28" step="1" />
-          <div class="range-value"><span>当前值</span><strong id="drawer-font-size-value">15px</strong></div>
-          <label for="drawer-font-weight">字体粗细</label>
-          <input id="drawer-font-weight" type="range" min="100" max="900" step="100" />
-          <div class="range-value"><span>当前值</span><strong id="drawer-font-weight-value">400</strong></div>
-          <label for="drawer-font-color-text">字体颜色</label>
-          <div class="inline-field">
-            <input id="drawer-font-color" type="color" value="#2d1f18" style="width: 40px; height: 32px; padding: 2px;" />
-            <input id="drawer-font-color-text" placeholder="留空跟随主题" />
-            <button id="drawer-reset-font-color" class="secondary compact" type="button">重置</button>
-          </div>
-          <label for="drawer-font-family-url">自定义字体 URL</label>
-          <div class="inline-field">
-            <input id="drawer-font-family-url" placeholder="上传后自动填入" />
-            <button id="drawer-clear-font" class="secondary compact" type="button">清除</button>
-          </div>
-          <label for="drawer-font-file">上传字体文件</label>
-          <div class="inline-field">
-            <input id="drawer-font-file" type="file" accept=".ttf,.otf,.woff,.woff2" />
-            <button id="drawer-upload-font" class="secondary compact" type="button">上传</button>
-          </div>
-          <p class="muted" id="drawer-font-name-display">未设置自定义字体</p>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
-            <p class="eyebrow">Worldbook</p>
-            <h3>世界书</h3>
-            <p class="muted">命中触发词后会把对应设定文本临时拼进本轮 Prompt。</p>
-          </div>
-          <div id="worldbook-list" class="worldbook-list"></div>
-          <div class="button-row">
-            <button id="add-worldbook" type="button" class="secondary">新增词条</button>
-            <button id="save-worldbook" type="button">保存世界书</button>
-          </div>
-        </section>
-
-        <section class="drawer-section">
-          <div class="section-head">
-            <p class="eyebrow">Quick Links</p>
-            <h3>更多页面</h3>
-          </div>
-          <div class="button-row">
-            <a class="ghost-link button-link" href="/config/user">User Settings</a>
-            <a class="ghost-link button-link" href="/config/card">Card Editor</a>
-            <a class="ghost-link button-link" href="/config/memory">Memory Manager</a>
-            <a class="ghost-link button-link" href="/config/worldbook">Worldbook Settings</a>
-            <a class="ghost-link button-link" href="/config/worldbook/entries">Worldbook Entries</a>
-          </div>
-        </section>
-      </div>
-    </aside>
-
     <script src="/static/js/prompt-debug.js?v=prompt-debug-v1"></script>
     <script>
       const rootEl = document.documentElement;
@@ -1736,6 +496,21 @@
       const runtimePanelToggleEl = document.getElementById("toggle-runtime-panel");
       const runtimePanelHandleIconEl = document.getElementById("runtime-panel-handle-icon");
       const runtimePanelCloseEl = document.getElementById("close-runtime-panel");
+      const runtimeSettingsFieldEls = [...document.querySelectorAll("[data-runtime-settings-field]")];
+      const runtimeSettingsModelEl = document.getElementById("runtime-settings-llm-model");
+      const runtimeSettingsTemperatureEl = document.getElementById("runtime-settings-temperature");
+      const runtimeSettingsHistoryLimitEl = document.getElementById("runtime-settings-history-limit");
+      const runtimeSettingsPromptBudgetEl = document.getElementById("runtime-settings-prompt-budget-token-limit");
+      const runtimeSettingsUiOpacityEl = document.getElementById("runtime-settings-ui-opacity");
+      const runtimeSettingsUiOpacityValueEl = document.getElementById("runtime-settings-ui-opacity-value");
+      const runtimeSettingsBackgroundOverlayEl = document.getElementById("runtime-settings-background-overlay");
+      const runtimeSettingsBackgroundOverlayValueEl = document.getElementById("runtime-settings-background-overlay-value");
+      const runtimeSettingsFontSizeEl = document.getElementById("runtime-settings-font-size");
+      const runtimeSettingsFontSizeValueEl = document.getElementById("runtime-settings-font-size-value");
+      const runtimeSettingsFontWeightEl = document.getElementById("runtime-settings-font-weight");
+      const runtimeSettingsFontWeightValueEl = document.getElementById("runtime-settings-font-weight-value");
+      const runtimeSettingsModelReadoutEl = document.getElementById("runtime-settings-model-readout");
+      const runtimeSettingsHistoryReadoutEl = document.getElementById("runtime-settings-history-readout");
       const promptRuntimeDotEl = document.getElementById("prompt-runtime-dot");
       const runtimeTabButtons = [...document.querySelectorAll("[data-runtime-tab]")];
       const runtimeTabPanels = [...document.querySelectorAll("[data-runtime-panel]")];
@@ -1787,6 +562,7 @@
       const promptSegmentSummaryEl = document.getElementById("prompt-segment-summary");
       const promptSegmentListEl = document.getElementById("prompt-segment-list");
       const promptDebugPanelEl = document.getElementById("prompt-debug-panel");
+      const promptLayeredInjectionEl = document.getElementById("prompt-layered-injection-enabled");
       const downloadPromptDebugJsonBtn = document.getElementById("download-prompt-debug-json");
       const directorNoteContentEl = document.getElementById("director-note-content");
       const directorNoteTurnsEl = document.getElementById("director-note-turns");
@@ -1849,9 +625,6 @@
         { id: "rain", label: "雨声氛围", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
       ];
       let workshopStatusCache = null;
-      const drawerEl = document.getElementById("config-drawer");
-      const drawerOverlayEl = document.getElementById("drawer-overlay");
-      const worldbookListEl = document.getElementById("worldbook-list");
       const userAvatarUrl = {{ user_profile.avatar_url | tojson }};
       const userAvatarLabel = {{ ((user_profile.display_name or "我")[:1]) | tojson }};
       const assistantAvatarUrl = {{ role_avatar_url | tojson }};
@@ -1862,65 +635,31 @@
         avatar.className = `message-avatar ${role === "user" ? "user-avatar" : "assistant-avatar"}`;
         avatar.setAttribute("aria-hidden", "true");
 
-        if (role === "user") {
-          if (userAvatarUrl) {
-            const img = document.createElement("img");
-            img.alt = userAvatarLabel;
-            img.src = userAvatarUrl;
-            avatar.appendChild(img);
-          } else {
-            const label = document.createElement("span");
-            label.className = "avatar-text";
-            label.textContent = userAvatarLabel;
-            avatar.appendChild(label);
-          }
-          return avatar;
-        }
+        const avatarUrl = role === "user" ? userAvatarUrl : assistantAvatarUrl;
+        const avatarLabel = role === "user" ? userAvatarLabel : assistantAvatarLabel;
 
-        const label = document.createElement("span");
-        label.className = "avatar-text";
-        label.textContent = assistantAvatarLabel;
+        const appendFallback = () => {
+          if (avatar.querySelector(".avatar-text")) return;
+          const label = document.createElement("span");
+          label.className = "avatar-text";
+          label.textContent = avatarLabel;
+          avatar.appendChild(label);
+        };
 
-        if (assistantAvatarUrl) {
+        if (avatarUrl) {
           const img = document.createElement("img");
-          img.alt = assistantAvatarLabel;
-          img.src = assistantAvatarUrl;
+          img.alt = avatarLabel;
+          img.src = avatarUrl;
           img.addEventListener("error", () => {
             img.remove();
-          });
+            appendFallback();
+          }, { once: true });
           avatar.appendChild(img);
+        } else {
+          appendFallback();
         }
-        avatar.appendChild(label);
         return avatar;
       }
-      const DRAWER_SERVER_INPUT_IDS = new Set([
-        "drawer-llm-base-url",
-        "drawer-llm-api-key",
-        "drawer-llm-model",
-        "drawer-temperature",
-        "drawer-history-limit",
-        "drawer-prompt-budget-token-limit",
-        "drawer-request-timeout",
-        "drawer-demo-mode",
-        "prompt-layered-injection-enabled",
-        "drawer-embedding-base-url",
-        "drawer-embedding-api-key",
-        "drawer-embedding-model",
-        "drawer-retrieval-top-k",
-        "drawer-rerank-enabled",
-        "drawer-rerank-base-url",
-        "drawer-rerank-api-key",
-        "drawer-rerank-model",
-        "drawer-rerank-top-n",
-        "drawer-theme",
-        "drawer-ui-opacity",
-        "drawer-background-url",
-        "drawer-background-overlay",
-        "drawer-font-size",
-        "drawer-font-weight",
-        "drawer-font-color-text",
-        "drawer-font-family-url",
-      ]);
       const initialState = {
         llm_base_url: {{ settings.llm_base_url | tojson }},
         llm_api_key: {{ settings.llm_api_key | tojson }},
@@ -1951,13 +690,6 @@
         font_weight: {{ settings.font_weight | tojson }},
         font_color: {{ settings.font_color | tojson }}
       };
-      const DEFAULT_BACKGROUND_PRESET = {
-        label: "默认背景",
-        url: "/assets/default.jpg",
-        theme: "dark",
-        overlay: 0.42,
-      };
-
       let worldbookDebugCollapsed = true;
       let isEndingConversation = false;
       let chatRequestInFlight = false;
@@ -1970,9 +702,8 @@
       const PROMPT_BUDGET_DEFAULT = 200000;
       let serverState = normalizeRuntimeState(initialState);
       let runtimeState = { ...serverState };
-      let worldbookEntries = [];
       const streamingEntries = new Set();
-      let drawerSettingsSaveTimer = null;
+      let runtimeSettingsSaveTimer = null;
 
       function normalizePromptBudgetValue(value) {
         const raw = Number(value ?? PROMPT_BUDGET_DEFAULT);
@@ -1980,7 +711,7 @@
         return Math.max(PROMPT_BUDGET_MIN, Math.min(PROMPT_BUDGET_MAX, Math.round(raw)));
       }
 
-      function normalizeDrawerPromptBudgetInput(input, notify = false) {
+      function normalizePromptBudgetInputElement(input, notify = false) {
         const normalized = normalizePromptBudgetValue(input?.value);
         if (input && String(input.value) !== String(normalized)) {
           input.value = String(normalized);
@@ -2013,7 +744,7 @@
         applyUiOpacity(runtimeState.ui_opacity);
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
         applyFontSettings(runtimeState);
-        syncDrawerFromState();
+        syncRuntimeSettingsFromState();
         if (statusText) {
           setStatus(statusText);
           showToast(statusText, "success");
@@ -2021,8 +752,8 @@
       }
 
       function scheduleRuntimeStateSave() {
-        window.clearTimeout(drawerSettingsSaveTimer);
-        drawerSettingsSaveTimer = window.setTimeout(() => {
+        window.clearTimeout(runtimeSettingsSaveTimer);
+        runtimeSettingsSaveTimer = window.setTimeout(() => {
           saveRuntimeStateToServer().catch((error) => {
             setStatus(`侧边栏配置保存失败：${error.message}`);
           });
@@ -2143,133 +874,68 @@
           updateScrollBottomButton(hasNew);
         }
       }
-
-      function drawerInput(id) {
-        return document.getElementById(id);
+      function setRuntimeSettingsValue(el, value) {
+        if (el) el.value = value ?? "";
       }
 
-      function syncDrawerFromState() {
-        drawerInput("drawer-llm-base-url").value = runtimeState.llm_base_url || "";
-        drawerInput("drawer-llm-api-key").value = runtimeState.llm_api_key || "";
-        drawerInput("drawer-llm-model").value = runtimeState.llm_model || "";
-        drawerInput("drawer-temperature").value = runtimeState.temperature ?? 0.85;
-        drawerInput("drawer-history-limit").value = runtimeState.history_limit ?? 20;
-        drawerInput("drawer-prompt-budget-token-limit").value = runtimeState.prompt_budget_token_limit ?? 200000;
-        drawerInput("drawer-request-timeout").value = runtimeState.request_timeout ?? 120;
-        drawerInput("drawer-demo-mode").checked = !!runtimeState.demo_mode;
-        drawerInput("prompt-layered-injection-enabled").checked = !!runtimeState.layered_prompt_injection_enabled;
-        drawerInput("drawer-embedding-base-url").value = runtimeState.embedding_base_url || "";
-        drawerInput("drawer-embedding-api-key").value = runtimeState.embedding_api_key || "";
-        drawerInput("drawer-embedding-model").value = runtimeState.embedding_model || "";
-        drawerInput("drawer-retrieval-top-k").value = runtimeState.retrieval_top_k ?? 4;
-        drawerInput("drawer-rerank-enabled").checked = !!runtimeState.rerank_enabled;
-        drawerInput("drawer-rerank-base-url").value = runtimeState.rerank_base_url || "";
-        drawerInput("drawer-rerank-api-key").value = runtimeState.rerank_api_key || "";
-        drawerInput("drawer-rerank-model").value = runtimeState.rerank_model || "";
-        drawerInput("drawer-rerank-top-n").value = runtimeState.rerank_top_n ?? 3;
-        drawerInput("drawer-theme").value = runtimeState.theme || "light";
-        drawerInput("drawer-ui-opacity").value = runtimeState.ui_opacity ?? 0.84;
-        drawerInput("drawer-background-url").value = runtimeState.background_image_url || "";
-        drawerInput("drawer-background-overlay").value = runtimeState.background_overlay ?? 0.42;
+      function syncRuntimeSettingsFromState() {
+        const model = runtimeState.llm_model || "未配置";
+        const historyLimit = runtimeState.history_limit ?? 20;
+        const uiOpacity = Number(runtimeState.ui_opacity ?? 0.84);
+        const backgroundOverlay = Number(runtimeState.background_overlay ?? 0.42);
+        const fontSize = runtimeState.font_size ?? 15;
+        const fontWeight = runtimeState.font_weight ?? 400;
 
-        document.querySelectorAll(".drawer-embedding-field").forEach((el) => {
-          el.checked = (runtimeState.embedding_fields || []).includes(el.value);
-        });
+        setRuntimeSettingsValue(runtimeSettingsModelEl, runtimeState.llm_model || "");
+        setRuntimeSettingsValue(runtimeSettingsTemperatureEl, runtimeState.temperature ?? 0.85);
+        setRuntimeSettingsValue(runtimeSettingsHistoryLimitEl, historyLimit);
+        setRuntimeSettingsValue(runtimeSettingsPromptBudgetEl, runtimeState.prompt_budget_token_limit ?? PROMPT_BUDGET_DEFAULT);
+        setRuntimeSettingsValue(runtimeSettingsUiOpacityEl, uiOpacity);
+        setRuntimeSettingsValue(runtimeSettingsBackgroundOverlayEl, backgroundOverlay);
+        setRuntimeSettingsValue(runtimeSettingsFontSizeEl, fontSize);
+        setRuntimeSettingsValue(runtimeSettingsFontWeightEl, fontWeight);
 
-        document.getElementById("drawer-ui-opacity-value").textContent = Number(runtimeState.ui_opacity || 0.84).toFixed(2);
-        document.getElementById("drawer-background-overlay-value").textContent = Number(runtimeState.background_overlay || 0.42).toFixed(2);
-
-        drawerInput("drawer-font-size").value = runtimeState.font_size ?? 15;
-        drawerInput("drawer-font-weight").value = runtimeState.font_weight ?? 400;
-        drawerInput("drawer-font-color-text").value = runtimeState.font_color || "";
-        drawerInput("drawer-font-color").value = runtimeState.font_color || "#2d1f18";
-        drawerInput("drawer-font-family-url").value = runtimeState.font_family_url || "";
-        document.getElementById("drawer-font-size-value").textContent = (runtimeState.font_size || 15) + "px";
-        document.getElementById("drawer-font-weight-value").textContent = runtimeState.font_weight || 400;
-        document.getElementById("drawer-font-name-display").textContent =
-          runtimeState.font_family_name ? "当前字体：" + runtimeState.font_family_name : "未设置自定义字体";
+        if (runtimeSettingsModelReadoutEl) runtimeSettingsModelReadoutEl.textContent = model;
+        if (runtimeSettingsHistoryReadoutEl) runtimeSettingsHistoryReadoutEl.textContent = `${historyLimit} 条`;
+        if (runtimeSettingsUiOpacityValueEl) runtimeSettingsUiOpacityValueEl.textContent = uiOpacity.toFixed(2);
+        if (runtimeSettingsBackgroundOverlayValueEl) runtimeSettingsBackgroundOverlayValueEl.textContent = backgroundOverlay.toFixed(2);
+        if (runtimeSettingsFontSizeValueEl) runtimeSettingsFontSizeValueEl.textContent = `${fontSize}px`;
+        if (runtimeSettingsFontWeightValueEl) runtimeSettingsFontWeightValueEl.textContent = fontWeight;
+        if (promptLayeredInjectionEl) promptLayeredInjectionEl.checked = !!runtimeState.layered_prompt_injection_enabled;
       }
-
-      function syncStateFromDrawer(event) {
+      function syncStateFromRuntimeSettings(event) {
         runtimeState = {
           ...runtimeState,
-          llm_base_url: drawerInput("drawer-llm-base-url").value.trim(),
-          llm_api_key: drawerInput("drawer-llm-api-key").value.trim(),
-          llm_model: drawerInput("drawer-llm-model").value.trim(),
-          temperature: Number(drawerInput("drawer-temperature").value || 0.85),
-          history_limit: Number(drawerInput("drawer-history-limit").value || 20),
-          prompt_budget_token_limit: normalizeDrawerPromptBudgetInput(drawerInput("drawer-prompt-budget-token-limit"), event?.target?.id === "drawer-prompt-budget-token-limit"),
-          request_timeout: Number(drawerInput("drawer-request-timeout").value || 120),
-          demo_mode: drawerInput("drawer-demo-mode").checked,
-          layered_prompt_injection_enabled: drawerInput("prompt-layered-injection-enabled").checked,
-          embedding_base_url: drawerInput("drawer-embedding-base-url").value.trim(),
-          embedding_api_key: drawerInput("drawer-embedding-api-key").value.trim(),
-          embedding_model: drawerInput("drawer-embedding-model").value.trim(),
-          embedding_fields: [...document.querySelectorAll(".drawer-embedding-field:checked")].map((el) => el.value),
-          retrieval_top_k: Number(drawerInput("drawer-retrieval-top-k").value || 4),
-          rerank_enabled: drawerInput("drawer-rerank-enabled").checked,
-          rerank_base_url: drawerInput("drawer-rerank-base-url").value.trim(),
-          rerank_api_key: drawerInput("drawer-rerank-api-key").value.trim(),
-          rerank_model: drawerInput("drawer-rerank-model").value.trim(),
-          rerank_top_n: Number(drawerInput("drawer-rerank-top-n").value || 3),
-          theme: drawerInput("drawer-theme").value,
-          ui_opacity: Number(drawerInput("drawer-ui-opacity").value || 0.84),
-          background_image_url: drawerInput("drawer-background-url").value.trim(),
-          background_overlay: Number(drawerInput("drawer-background-overlay").value || 0.42),
-          font_family_url: drawerInput("drawer-font-family-url").value.trim(),
-          font_family_name: runtimeState.font_family_name || "",
-          font_size: Number(drawerInput("drawer-font-size").value || 15),
-          font_weight: Number(drawerInput("drawer-font-weight").value || 400),
-          font_color: drawerInput("drawer-font-color-text").value.trim(),
+          llm_model: runtimeSettingsModelEl?.value.trim() || "",
+          temperature: Number(runtimeSettingsTemperatureEl?.value || 0.85),
+          history_limit: Number(runtimeSettingsHistoryLimitEl?.value || 20),
+          prompt_budget_token_limit: normalizePromptBudgetInputElement(
+            runtimeSettingsPromptBudgetEl,
+            event?.target?.id === "runtime-settings-prompt-budget-token-limit"
+          ),
+          ui_opacity: Number(runtimeSettingsUiOpacityEl?.value || 0.84),
+          background_overlay: Number(runtimeSettingsBackgroundOverlayEl?.value || 0.42),
+          font_size: Number(runtimeSettingsFontSizeEl?.value || 15),
+          font_weight: Number(runtimeSettingsFontWeightEl?.value || 400),
         };
 
-        applyTheme(runtimeState.theme);
         applyUiOpacity(runtimeState.ui_opacity);
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
         applyFontSettings(runtimeState);
         if (runtimeModelLabelEl) runtimeModelLabelEl.textContent = runtimeState.llm_model || "未配置";
         if (runtimeHistoryLabelEl) runtimeHistoryLabelEl.textContent = `${runtimeState.history_limit || 20} 条`;
-
-        const shouldSyncServer = DRAWER_SERVER_INPUT_IDS.has(event?.target?.id || "")
-          || !!event?.target?.classList?.contains("drawer-embedding-field");
-        if (shouldSyncServer) {
-          scheduleRuntimeStateSave();
-        }
+        syncRuntimeSettingsFromState();
+        scheduleRuntimeStateSave();
       }
 
-      function syncConfigGearButton(open) {
-        const button = document.getElementById("open-drawer-secondary");
-        if (!button) return;
-        button.setAttribute("aria-expanded", String(!!open));
-        button.classList.toggle("active", !!open);
+      function syncStateFromPromptDebug() {
+        runtimeState = {
+          ...runtimeState,
+          layered_prompt_injection_enabled: !!promptLayeredInjectionEl?.checked,
+        };
+        scheduleRuntimeStateSave();
       }
 
-      function openDrawer() {
-        if (isChallengeModeUnlocked()) {
-          closeDrawer();
-          return;
-        }
-        drawerEl?.classList.add("open");
-        drawerEl?.setAttribute("aria-hidden", "false");
-        if (drawerOverlayEl) drawerOverlayEl.hidden = false;
-        syncConfigGearButton(true);
-      }
-
-      function closeDrawer() {
-        drawerEl?.classList.remove("open");
-        drawerEl?.setAttribute("aria-hidden", "true");
-        if (drawerOverlayEl) drawerOverlayEl.hidden = true;
-        syncConfigGearButton(false);
-      }
-
-      function toggleDrawer() {
-        const isOpen = drawerEl?.classList.contains("open");
-        if (isOpen) {
-          closeDrawer();
-        } else {
-          openDrawer();
-        }
-      }
       const LEFT_SIDEBAR_STORAGE_KEY = "fantareal.chat.leftSidebarCollapsed";
 
       function isLeftSidebarCollapsed() {
@@ -2303,16 +969,27 @@
       }
 
       function applyTheme(theme) {
-        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+        const normalizedTheme = theme === "dark" ? "dark" : "light";
+        runtimeState.theme = normalizedTheme;
+        window.FantarealThemeToggle = {
+          ...(window.FantarealThemeToggle || {}),
+          theme: normalizedTheme,
+        };
+        rootEl.setAttribute("data-theme", normalizedTheme);
         updateThemeBadge();
         if (runtimeThemeLabelEl) {
-          runtimeThemeLabelEl.textContent = theme === "dark" ? "暗色" : "浅色";
+          runtimeThemeLabelEl.textContent = normalizedTheme === "dark" ? "暗色" : "浅色";
         }
       }
 
       function applyUiOpacity(value) {
         const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
-        document.getElementById("drawer-ui-opacity-value").textContent = opacity.toFixed(2);
+        runtimeState.ui_opacity = opacity;
+        window.FantarealThemeToggle = {
+          ...(window.FantarealThemeToggle || {}),
+          uiOpacity: opacity,
+        };
+        if (runtimeSettingsUiOpacityValueEl) runtimeSettingsUiOpacityValueEl.textContent = opacity.toFixed(2);
         const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
         const palette = theme === "dark"
           ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
@@ -2352,7 +1029,7 @@
 
       function applyBackground(url, overlay) {
         const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
-        document.getElementById("drawer-background-overlay-value").textContent = normalizedOverlay.toFixed(2);
+        if (runtimeSettingsBackgroundOverlayValueEl) runtimeSettingsBackgroundOverlayValueEl.textContent = normalizedOverlay.toFixed(2);
         bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
         if (url) {
           bodyEl.style.setProperty("--background-image", `url("${url}")`);
@@ -2387,10 +1064,8 @@
         root.style.setProperty("--chat-font-weight", String(fontWeight));
         const fontColor = String(state.font_color || "").trim();
         root.style.setProperty("--chat-font-color", fontColor || "inherit");
-        const sizeEl = document.getElementById("drawer-font-size-value");
-        if (sizeEl) sizeEl.textContent = fontSize + "px";
-        const weightEl = document.getElementById("drawer-font-weight-value");
-        if (weightEl) weightEl.textContent = fontWeight;
+        if (runtimeSettingsFontSizeValueEl) runtimeSettingsFontSizeValueEl.textContent = fontSize + "px";
+        if (runtimeSettingsFontWeightValueEl) runtimeSettingsFontWeightValueEl.textContent = fontWeight;
       }
 
       const THINK_TAG_NAMES = [
@@ -3746,7 +2421,6 @@
       function applyChallengeChatHeader() {
         if (!isChallengeModeUnlocked()) return;
         document.body.classList.add("challenge-mode-unlocked");
-        closeDrawer();
         const titleEl = document.getElementById("chat-title");
         const subtitleEl = document.getElementById("chat-subtitle");
         if (titleEl) titleEl.textContent = "绪亓";
@@ -6979,129 +5653,6 @@
           if (done) break;
         }
       }
-
-      function renderWorldbookEditor() {
-        worldbookListEl.innerHTML = "";
-        if (worldbookEntries.length === 0) {
-          worldbookEntries.push({ trigger: "", content: "" });
-        }
-        worldbookEntries.forEach((item, index) => {
-          const card = document.createElement("div");
-          card.className = "worldbook-card";
-          const head = document.createElement("div");
-          head.className = "memory-card-head";
-          head.innerHTML = `<strong>词条 ${index + 1}</strong>`;
-          const removeBtn = document.createElement("button");
-          removeBtn.type = "button";
-          removeBtn.className = "secondary compact";
-          removeBtn.textContent = "删除";
-          removeBtn.addEventListener("click", () => {
-            worldbookEntries.splice(index, 1);
-            renderWorldbookEditor();
-          });
-          head.appendChild(removeBtn);
-          const triggerLabel = document.createElement("label");
-          triggerLabel.textContent = "触发词";
-          const triggerInput = document.createElement("input");
-          triggerInput.value = item.trigger || "";
-          triggerInput.placeholder = "例如 魔杖，古木，莉莉丝";
-          triggerInput.addEventListener("input", (event) => {
-            worldbookEntries[index].trigger = event.target.value;
-          });
-          const contentLabel = document.createElement("label");
-          contentLabel.textContent = "设定文本";
-          const contentInput = document.createElement("textarea");
-          contentInput.rows = 4;
-          contentInput.value = item.content || "";
-          contentInput.placeholder = "命中触发词后，会把这里的内容作为设定补丁拼入 Prompt";
-          contentInput.addEventListener("input", (event) => {
-            worldbookEntries[index].content = event.target.value;
-          });
-          card.appendChild(head);
-          card.appendChild(triggerLabel);
-          card.appendChild(triggerInput);
-          card.appendChild(contentLabel);
-          card.appendChild(contentInput);
-          worldbookListEl.appendChild(card);
-        });
-      }
-
-      async function loadWorldbook() {
-        const data = await fetch("/api/worldbook").then((response) => response.json());
-        worldbookEntries = Array.isArray(data.items) ? data.items : [];
-        renderWorldbookEditor();
-      }
-
-      async function saveWorldbook() {
-        const payload = {
-          items: worldbookEntries
-            .map((item) => ({
-              trigger: String(item.trigger || "").trim(),
-              content: String(item.content || "").trim(),
-            }))
-            .filter((item) => item.trigger && item.content),
-        };
-        const data = await postJson("/api/worldbook", payload);
-        worldbookEntries = data.items || [];
-        renderWorldbookEditor();
-        setStatus("世界书已保存");
-      }
-
-      async function uploadBackground() {
-        const fileInput = document.getElementById("drawer-background-file");
-        const file = fileInput.files[0];
-        if (!file) {
-          throw new Error("请先选择一张背景图");
-        }
-        const formData = new FormData();
-        formData.append("file", file);
-        const response = await fetch("/api/background", { method: "POST", body: formData });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.detail || "上传失败");
-        }
-        const data = await response.json();
-        runtimeState.background_image_url = data.url || "";
-        drawerInput("drawer-background-url").value = runtimeState.background_image_url;
-        applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
-        await saveRuntimeStateToServer("背景图已上传并同步到服务端配置");
-      }
-
-      async function useDefaultBackgroundPreset() {
-        runtimeState = {
-          ...runtimeState,
-          theme: DEFAULT_BACKGROUND_PRESET.theme,
-          background_image_url: DEFAULT_BACKGROUND_PRESET.url,
-          background_overlay: DEFAULT_BACKGROUND_PRESET.overlay,
-        };
-        syncDrawerFromState();
-        applyTheme(runtimeState.theme);
-        applyUiOpacity(runtimeState.ui_opacity);
-        applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
-        await saveRuntimeStateToServer("默认背景预设已同步到服务端配置");
-      }
-
-      async function uploadDrawerFont() {
-        const fileInput = document.getElementById("drawer-font-file");
-        const file = fileInput.files[0];
-        if (!file) throw new Error("请先选择一个字体文件");
-        const formData = new FormData();
-        formData.append("file", file);
-        const response = await fetch("/api/font", { method: "POST", body: formData });
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.detail || "上传失败");
-        }
-        const data = await response.json();
-        runtimeState.font_family_url = data.url || "";
-        runtimeState.font_family_name = data.font_name || file.name.replace(/\.(ttf|otf|woff|woff2)$/i, "");
-        drawerInput("drawer-font-family-url").value = runtimeState.font_family_url;
-        document.getElementById("drawer-font-name-display").textContent =
-          "当前字体：" + runtimeState.font_family_name;
-        applyFontSettings(runtimeState);
-        await saveRuntimeStateToServer("字体文件已上传并同步到服务端配置");
-      }
-
       function buildChatRuntimeConfig() {
         return {
           llm_base_url: runtimeState.llm_base_url,
@@ -7386,109 +5937,16 @@
       document.getElementById("export-history").addEventListener("click", () => {
         window.location.href = "/api/export/history";
       });
-
-      document.getElementById("open-drawer")?.addEventListener("click", openDrawer);
-      document.getElementById("open-drawer-secondary")?.addEventListener("click", toggleDrawer);
-      document.getElementById("close-drawer")?.addEventListener("click", closeDrawer);
-      drawerOverlayEl?.addEventListener("click", closeDrawer);
       leftSidebarToggleEl?.addEventListener("click", () => {
         setLeftSidebarCollapsed(!document.body.classList.contains("left-sidebar-collapsed"));
       });
 
-      document.querySelectorAll("#config-drawer input, #config-drawer select, #runtime-tab-prompt-debug input").forEach((element) => {
-        element.addEventListener("input", syncStateFromDrawer);
-        element.addEventListener("change", syncStateFromDrawer);
+      runtimeSettingsFieldEls.forEach((element) => {
+        element.addEventListener("input", syncStateFromRuntimeSettings);
+        element.addEventListener("change", syncStateFromRuntimeSettings);
       });
-
-      document.getElementById("upload-background").addEventListener("click", async () => {
-        try {
-          await uploadBackground();
-        } catch (error) {
-          setStatus(`上传失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("drawer-use-default-background")?.addEventListener("click", async (event) => {
-        const button = event.currentTarget;
-        setButtonState(button, "loading", "应用中…");
-        try {
-          await useDefaultBackgroundPreset();
-          setButtonState(button, "success", "已应用 ✓");
-        } catch (error) {
-          setButtonState(button, "error", "应用失败");
-          setStatus(`默认背景应用失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("drawer-upload-font").addEventListener("click", async () => {
-        try {
-          await uploadDrawerFont();
-        } catch (error) {
-          setStatus(`字体上传失败：${error.message}`);
-        }
-      });
-
-      document.getElementById("drawer-font-size").addEventListener("input", (e) => {
-        document.getElementById("drawer-font-size-value").textContent = e.target.value + "px";
-        runtimeState.font_size = Number(e.target.value);
-        applyFontSettings(runtimeState);
-        scheduleRuntimeStateSave();
-      });
-
-      document.getElementById("drawer-font-weight").addEventListener("input", (e) => {
-        document.getElementById("drawer-font-weight-value").textContent = e.target.value;
-        runtimeState.font_weight = Number(e.target.value);
-        applyFontSettings(runtimeState);
-        scheduleRuntimeStateSave();
-      });
-
-      document.getElementById("drawer-font-color").addEventListener("input", (e) => {
-        document.getElementById("drawer-font-color-text").value = e.target.value;
-        runtimeState.font_color = e.target.value;
-        applyFontSettings(runtimeState);
-        scheduleRuntimeStateSave();
-      });
-
-      document.getElementById("drawer-font-color-text").addEventListener("input", (e) => {
-        const val = e.target.value.trim();
-        if (/^#[0-9a-fA-F]{3,4}$/.test(val) || /^#([0-9a-fA-F]{6,8})$/.test(val)) {
-          document.getElementById("drawer-font-color").value = val;
-        }
-        runtimeState.font_color = val;
-        applyFontSettings(runtimeState);
-        scheduleRuntimeStateSave();
-      });
-
-      document.getElementById("drawer-reset-font-color").addEventListener("click", () => {
-        document.getElementById("drawer-font-color-text").value = "";
-        document.getElementById("drawer-font-color").value = "#2d1f18";
-        runtimeState.font_color = "";
-        applyFontSettings(runtimeState);
-        scheduleRuntimeStateSave();
-      });
-
-      document.getElementById("drawer-clear-font").addEventListener("click", () => {
-        document.getElementById("drawer-font-family-url").value = "";
-        runtimeState.font_family_url = "";
-        runtimeState.font_family_name = "";
-        document.getElementById("drawer-font-name-display").textContent = "未设置自定义字体";
-        applyFontSettings(runtimeState);
-        scheduleRuntimeStateSave();
-      });
-
-      document.getElementById("add-worldbook").addEventListener("click", () => {
-        worldbookEntries.push({ trigger: "", content: "" });
-        renderWorldbookEditor();
-      });
-
-      document.getElementById("save-worldbook").addEventListener("click", async () => {
-        try {
-          await saveWorldbook();
-        } catch (error) {
-          setStatus(`世界书保存失败：${error.message}`);
-        }
-      });
-
+      promptLayeredInjectionEl?.addEventListener("input", syncStateFromPromptDebug);
+      promptLayeredInjectionEl?.addEventListener("change", syncStateFromPromptDebug);
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
           streamingEntries.forEach((entry) => flushPendingVisible(entry));
@@ -7543,7 +6001,7 @@
       applyFontSettings(runtimeState);
       prepareOpeningFirstMessageTypewriter();
       initWorkshopOpening();
-      syncDrawerFromState();
+      syncRuntimeSettingsFromState();
       setWorldbookDebugCollapsed(false);
       hydrateExistingMessages();
       refreshMessageControls();
@@ -7552,17 +6010,28 @@
       loadPresetStoreForChat().catch(() => {
         presetDebugPanelEl.hidden = true;
       });
-      loadWorldbook().catch(() => {
-        worldbookEntries = [];
-        renderWorldbookEditor();
-      });
       loadDirectorNotes().catch(() => {
         renderDirectorNotes([]);
       });
+
+      window.FantarealThemeToggle = {
+        ...(window.FantarealThemeToggle || {}),
+        theme: runtimeState.theme,
+        uiOpacity: runtimeState.ui_opacity,
+      };
+      window.Fantareal = {
+        ...(window.Fantareal || {}),
+        applyTheme,
+        applyUiOpacity,
+        applyBackground,
+        getUiOpacity: () => Math.min(Math.max(Number(runtimeState.ui_opacity || runtimeSettingsUiOpacityEl?.value || 0.84), 0.2), 1),
+        postJson,
+      };
     </script>
+    <script src="/static/js/theme-toggle.js?v=ui-chat-theme-toggle-opacity-sync-20260621"></script>
     {% for mod in registered_mods or [] %}
       {% for src in mod.hooks.chat_scripts or [] %}
-    <script src="{{ src }}{% if '?' in src %}&{% else %}?{% endif %}v=state-journal-opacity-sync-v2" data-mod-hook="{{ mod.slug }}"></script>
+    <script src="{{ src }}{% if '?' in src %}&{% else %}?{% endif %}v=state-journal-opacity-sync-v2-p611c-runtime-drawer-remove" data-mod-hook="{{ mod.slug }}"></script>
       {% endfor %}
     {% endfor %}
   </body>
