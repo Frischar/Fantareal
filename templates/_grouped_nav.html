@@ -25,7 +25,7 @@
 {% set worldbook_active = current_path.startswith('/config/worldbook') %}
 {% set plugins_active = current_path.startswith('/mods/auto-saga') or current_path.startswith('/mods/tts-studio') or current_path.startswith('/mods/card-writer') or current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/state-journal') or current_path.startswith('/mods/mobile-chat') or current_path.startswith('/mods/challenge-mode') %}
 {% set game_active = current_path == '/game' or current_path == '/game/flying-chess' %}
-{% set pe_role_active = current_path == '/config/card' or current_path == '/config/user' or current_path == '/config/sprite' %}
+{% set pe_role_active = current_path == '/config/card' or current_path == '/config/user' %}
 {% set pe_knowledge_active = current_path == '/config/memory' or current_path.startswith('/config/worldbook') %}
 {% set pe_tools_active = current_path == '/config/preset' or current_path == '/config/workshop' or current_path.startswith('/mods/') or current_path == '/game' or current_path == '/game/flying-chess' %}
 {% set mobile_query = '?mobile=1' if request.query_params.get('mobile') == '1' else '' %}

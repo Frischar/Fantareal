@@ -329,9 +329,8 @@
 
   function ensureUi() {
     if (document.getElementById("fr-auto-saga-trigger")) return;
-    const gear = document.getElementById("open-drawer-secondary");
-    const actions = gear?.parentElement;
-    if (!gear || !actions) return;
+    const actions = document.querySelector(".chat-page .header-actions");
+    if (!actions) return;
 
     const trigger = document.createElement("button");
     trigger.id = "fr-auto-saga-trigger";
@@ -341,7 +340,7 @@
     trigger.setAttribute("title", "自动叙事设置");
     trigger.setAttribute("aria-expanded", "false");
     trigger.innerHTML = '<span aria-hidden="true">▶</span><i class="fr-auto-saga-dot" aria-hidden="true"></i>';
-    actions.insertBefore(trigger, gear);
+    actions.appendChild(trigger);
 
     const panel = document.createElement("section");
     panel.id = "fr-auto-saga-panel";

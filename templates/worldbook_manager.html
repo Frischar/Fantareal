@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
   </head>
   <body class="app-sidebar-shell worldbook-manager-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">
@@ -30,7 +31,12 @@
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
-          <p class="eyebrow">Worldbook</p>
+          <div class="ui-workbench-titleline worldbook-manager-titleline">
+            <p class="eyebrow">Worldbook Entries</p>
+            <span id="worldbook-status-box" class="worldbook-status-box worldbook-status-pill config-status-pill ui-status-pill is-success" aria-live="polite">
+              <strong id="status-text" class="status-line strong">就绪</strong>
+            </span>
+          </div>
           <h2>世界书词条管理</h2>
           <p class="muted">支持标题、主关键词、副关键词、常驻/关键词触发、主副组关系、组别、概率、黏性、冷却、顺序，以及角色定义前/后与聊天内注入等字段。</p>
         </div>
@@ -39,26 +45,27 @@
             <span class="worldbook-overview-pill">当前条数 <strong id="worldbook-count">{{ worldbook_count }}</strong></span>
             <span class="worldbook-overview-pill">快速入口 <a class="ghost-link" href="/config/worldbook">打开触发设置</a></span>
           </div>
-          <div id="worldbook-status-box" class="worldbook-status-box is-success">
-            <span class="worldbook-status-label">当前状态</span>
-            <strong id="status-text" class="status-line strong">就绪</strong>
-          </div>
         </div>
       </section>
 
       <section class="panel config-panel full-span">
-        <div class="memory-actions worldbook-action-bar">
-          <div class="button-row">
+        <div class="worldbook-workspace">
+        <div class="memory-actions worldbook-action-bar ui-sticky-toolbar ui-action-dock is-wrap full-span">
+          <div class="button-row worldbook-actions-primary ui-action-dock-primary">
             <button id="add-worldbook-entry" type="button">新增词条</button>
             <button id="save-worldbook-entries" type="button" class="secondary">保存全部词条</button>
             <button id="reload-worldbook-entries" type="button" class="secondary">重新读取</button>
-            <button id="import-worldbook" type="button" class="secondary">导入世界书</button>
-            <button id="export-worldbook" type="button" class="secondary">导出世界书</button>
-            <input id="import-worldbook-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
           </div>
+          <details class="worldbook-more-actions ui-action-more">
+            <summary class="secondary compact" role="button">更多</summary>
+            <div class="worldbook-more-menu ui-action-more-menu">
+              <button id="import-worldbook" type="button" class="secondary compact">导入世界书</button>
+              <button id="export-worldbook" type="button" class="secondary compact">导出世界书</button>
+            </div>
+          </details>
+          <input id="import-worldbook-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
         </div>
 
-        <div class="worldbook-workspace">
           <aside class="panel config-panel worldbook-group-panel">
             <div class="section-head">
               <p class="eyebrow">Groups</p>
@@ -68,7 +75,7 @@
             <div id="worldbook-group-sidebar" class="worldbook-group-list"></div>
           </aside>
 
-          <div class="worldbook-list-pane">
+          <div class="worldbook-list-pane worldbook-stage5-rule-editor">
             <div class="worldbook-list-toolbar">
               <div>
                 <label for="worldbook-search">搜索词条</label>
@@ -105,7 +112,7 @@
 
             <div id="worldbook-entry-list" class="memory-list">
           {% for item in worldbook_entries %}
-          <article class="memory-card worldbook-entry-card" data-collapsed="false">
+          <article class="memory-card worldbook-entry-card worldbook-rule-card" data-collapsed="false">
             <div class="memory-card-head">
               <label class="checkbox-row wb-select-control" title="选择此词条">
                 <input class="wb-selected" type="checkbox" aria-label="选择此词条" />
@@ -117,7 +124,7 @@
               </div>
             </div>
 
-            <div class="worldbook-entry-body">
+            <div class="worldbook-entry-body worldbook-rule-body">
               <div class="grid-two wb-wide-grid">
                 <div>
                   <label>标题</label>
@@ -438,7 +445,7 @@
     </div>
 
     <template id="worldbook-entry-template">
-      <article class="memory-card worldbook-entry-card" data-collapsed="false">
+      <article class="memory-card worldbook-entry-card worldbook-rule-card" data-collapsed="false">
         <div class="memory-card-head">
           <label class="checkbox-row wb-select-control" title="选择此词条">
             <input class="wb-selected" type="checkbox" aria-label="选择此词条" />
@@ -450,7 +457,7 @@
           </div>
         </div>
 
-        <div class="worldbook-entry-body">
+        <div class="worldbook-entry-body worldbook-rule-body">
           <div class="grid-two wb-wide-grid">
             <div>
               <label>标题</label>
@@ -622,6 +629,7 @@
     </template>
 
     <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
     <script>
       const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -632,6 +640,7 @@
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
       const selectedWorldbookCountEl = document.getElementById("selected-worldbook-count");
       const importModeEl = document.getElementById("import-mode");
       const importModeHintEl = document.getElementById("import-mode-hint");
@@ -693,25 +702,48 @@
         return PROMPT_LAYER_HINTS[value] || "跟随注入位置：继续按角色前/角色后/聊天注入生效。";
       }
 
+      function getWorldbookStatusKind(message = "") {
+        const text = String(message || statusEl?.title || statusEl?.textContent || "");
+        if (/失败|错误|异常|未能/.test(text)) return "error";
+        if (/正在|保存中|读取中|导入中|导出中|处理中/.test(text)) return "loading";
+        if (worldbookDirty || /未保存|记得保存|修改|移除|追加|启用|停用/.test(text)) return "dirty";
+        return "success";
+      }
+
+      function getCompactWorldbookStatusLabel(message = "", kind = "success") {
+        const text = String(message || "");
+        if (kind === "error") return "出错";
+        if (kind === "dirty") return "有修改";
+        if (kind === "loading") {
+          if (text.includes("保存")) return "保存中";
+          if (text.includes("读取")) return "读取中";
+          if (text.includes("导入")) return "导入中";
+          if (text.includes("导出")) return "导出中";
+          return "处理中";
+        }
+        if (text.includes("保存")) return "已保存";
+        if (text.includes("读取")) return "已读取";
+        if (text.includes("导入")) return "已导入";
+        if (text.includes("导出")) return "已导出";
+        if (text.includes("检查")) return "已检查";
+        return "就绪";
+      }
+
       function updateWorldbookStatusClass(message = "") {
         const box = document.getElementById("worldbook-status-box");
         if (!box) return;
-        box.classList.remove("is-success", "is-loading", "is-dirty", "is-error");
-        const text = String(message || statusEl?.textContent || "");
-        let kind = "success";
-        if (/失败|错误|异常|未能/.test(text)) {
-          kind = "error";
-        } else if (/正在|保存中|读取中|导入中|导出中|处理中/.test(text)) {
-          kind = "loading";
-        } else if (worldbookDirty || /未保存|记得保存|修改|移除|追加|启用|停用/.test(text)) {
-          kind = "dirty";
-        }
-        box.classList.add(`is-${kind}`);
+        box.classList.remove("is-success", "is-loading", "is-saving", "is-dirty", "is-error", "is-idle");
+        const kind = getWorldbookStatusKind(message);
+        box.classList.add(kind === "loading" ? "is-saving" : `is-${kind}`);
+        return kind;
       }
 
       function setStatus(text) {
         const message = worldbookDirty ? `${text}（有未保存修改）` : text;
-        statusEl.textContent = message;
+        const kind = getWorldbookStatusKind(message);
+        statusEl.textContent = getCompactWorldbookStatusLabel(message, kind);
+        statusEl.title = message;
+        document.getElementById("worldbook-status-box")?.setAttribute("title", message);
         updateWorldbookStatusClass(message);
       }
 
@@ -1014,6 +1046,7 @@
           toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
           toggleBtn.classList.add("icon-button");
         }
+        updateCardSummary(card);
       }
 
       function applyWorldbookSearch() {
@@ -1188,12 +1221,35 @@
         const head = card.querySelector(".memory-card-head");
         if (!head) return;
         ensureQuickEnabledSwitch(card);
-        let summary = head.querySelector(".worldbook-card-summary");
+
+        let titleline = head.querySelector(".worldbook-entry-titleline");
+        const directTitle = head.querySelector(":scope > strong");
+        if (!titleline) {
+          titleline = document.createElement("div");
+          titleline.className = "worldbook-entry-titleline";
+          if (directTitle) titleline.appendChild(directTitle);
+          const actions = head.querySelector(".button-row");
+          head.insertBefore(titleline, actions || null);
+        }
+
+        let groupLabel = head.querySelector(".worldbook-entry-group-label");
+        if (!groupLabel) {
+          groupLabel = document.createElement("span");
+          groupLabel.className = "worldbook-entry-group-label";
+          titleline.appendChild(groupLabel);
+        }
+
+        const currentTitle = card.querySelector(".wb-title")?.value?.trim() || titleline.querySelector("strong")?.textContent || "???";
+        const currentGroup = card.querySelector(".wb-group")?.value?.trim() || "???";
+        const titleTextEl = titleline.querySelector("strong");
+        if (titleTextEl) titleTextEl.textContent = currentTitle;
+        groupLabel.textContent = currentGroup;
+
+        let summary = titleline.querySelector(".worldbook-card-summary");
         if (!summary) {
           summary = document.createElement("div");
           summary.className = "worldbook-card-summary";
-          const actions = head.querySelector(".button-row");
-          head.insertBefore(summary, actions || null);
+          titleline.appendChild(summary);
         }
         summary.innerHTML = "";
 
@@ -1205,23 +1261,27 @@
         const injectionOrder = Number(card.querySelector(".wb-injection-order")?.value || order);
         const chance = Number(card.querySelector(".wb-chance")?.value || 100);
         const externalRuntime = entryType === "external_tag";
+        const expanded = card.dataset.collapsed === "false";
 
-        summary.appendChild(createSummaryChip(getEntryTypeLabel(entryType), "strong"));
+        const layerChipLabel = getPromptLayerLabel(promptLayer)
+          .replace("\u5f53\u524d\u72b6\u6001\u533a", "\u5f53\u524d")
+          .replace("\u8f93\u51fa\u534f\u8bae\u533a", "\u534f\u8bae")
+          .replace("\u7a33\u5b9a\u533a", "\u7a33\u5b9a")
+          .replace("\u52a8\u6001\u533a", "\u52a8\u6001");
+
+        summary.appendChild(createSummaryChip(getEntryTypeLabel(entryType), "strong wb-chip-type"));
         if (promptLayer === "follow_position") {
-          summary.appendChild(createSummaryChip("跟随位置"));
           summary.appendChild(createSummaryChip(
             insertionPosition === "in_chat"
-              ? `聊天注入 depth ${depth}`
+              ? `\u804a\u5929 ${depth}`
               : getInsertionPositionLabel(insertionPosition),
-            "strong"
+            "strong wb-chip-layer"
           ));
         } else {
-          summary.appendChild(createSummaryChip(`${getPromptLayerLabel(promptLayer)}优先`, "strong"));
-          summary.appendChild(createSummaryChip(`原位置:${getInsertionPositionLabel(insertionPosition)}`));
+          summary.appendChild(createSummaryChip(`${layerChipLabel}\u4f18\u5148`, "strong wb-chip-layer"));
+          if (!expanded) summary.appendChild(createSummaryChip(`\u539f:${getInsertionPositionLabel(insertionPosition)}`, "wb-chip-position"));
         }
-        summary.appendChild(createSummaryChip(`顺序 ${order}`));
-        summary.appendChild(createSummaryChip(`注入 ${injectionOrder}`));
-        summary.appendChild(externalRuntime ? createSummaryChip("实时标签") : createSummaryChip(`概率 ${chance}%`, chance <= 0 ? "warning" : ""));
+        summary.appendChild(externalRuntime ? createSummaryChip("\u5b9e\u65f6\u6807\u7b7e", "wb-chip-chance") : createSummaryChip(`\u7387 ${chance}%`, `wb-chip-chance${chance <= 0 ? " warning" : ""}`));
         syncQuickEnabledSwitch(card);
       }
 

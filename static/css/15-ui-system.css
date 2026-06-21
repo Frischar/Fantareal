@@ -703,3 +703,1106 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
     linear-gradient(45deg, transparent 0 50%, #fff 51% 63%, transparent 64%),
     var(--accent);
 }
+
+/* Stage 2 · reusable configuration interaction primitives.
+   These classes are opt-in only. They do not remap legacy pages yet. */
+
+:root {
+  --ui-motion-fast: 140ms;
+  --ui-motion-base: 200ms;
+  --ui-motion-panel: 260ms;
+  --ui-motion-theme: 520ms;
+  --ui-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ui-ease-feedback: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ui-z-sticky: 70;
+  --ui-z-popover: 1200;
+  --ui-z-floating: 1300;
+  --ui-toolbar-bg: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  --ui-toolbar-border: color-mix(in srgb, var(--border, var(--line)) 76%, var(--accent) 24%);
+  --ui-popover-bg: color-mix(in srgb, var(--panel-strong) 94%, transparent);
+}
+
+.ui-sticky-toolbar {
+  position: sticky;
+  top: var(--ui-sticky-top, 10px);
+  z-index: var(--ui-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--ui-space-2);
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-toolbar-bg);
+  backdrop-filter: var(--ui-glass-blur-soft);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.13);
+}
+
+.ui-sticky-toolbar.is-wrap {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.ui-status-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 78%, var(--accent) 22%);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--input-bg) 86%, transparent);
+  color: var(--muted);
+  font: var(--ui-font-label);
+  white-space: nowrap;
+}
+
+.ui-status-token.is-dirty,
+.ui-status-token.is-saving {
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border, var(--line)));
+  background: color-mix(in srgb, var(--accent) 12%, var(--input-bg));
+}
+
+.ui-status-token.is-saved,
+.ui-status-token.is-success {
+  color: color-mix(in srgb, #2f8f63 82%, var(--text));
+  border-color: color-mix(in srgb, #2f8f63 42%, var(--border, var(--line)));
+  background: color-mix(in srgb, #2f8f63 10%, var(--input-bg));
+}
+
+.ui-status-token.is-error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 46%, var(--border, var(--line)));
+  background: color-mix(in srgb, var(--danger) 8%, var(--input-bg));
+}
+
+.ui-workbench-titleline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 5px;
+}
+
+.ui-workbench-titleline > .eyebrow {
+  margin: 0;
+}
+
+.ui-workbench-titleline > .ui-status-pill,
+.ui-workbench-titleline > .config-status-pill {
+  flex: 0 0 auto;
+}
+
+.config-status-strip.is-helper-only {
+  display: block !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.config-status-strip.is-helper-only .helper-text {
+  display: block;
+  text-align: left !important;
+}
+
+.card-workbench-titleline {
+  width: 100%;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head {
+  grid-template-columns: minmax(280px, 300px) minmax(0, 1fr) !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-titleline {
+  flex-wrap: nowrap;
+  width: max-content;
+  max-width: 100%;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-titleline > .eyebrow {
+  display: inline-flex !important;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.card-config-page .card-workbench-head {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-titleline {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+:where(.ui-status-pill) {
+  --ui-status-success: #2f8f63;
+  --ui-status-success-bg: rgba(47, 143, 99, 0.13);
+  --ui-status-success-border: rgba(47, 143, 99, 0.38);
+  --ui-status-saving: var(--accent);
+  --ui-status-saving-bg: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+  --ui-status-dirty: #b9792f;
+  --ui-status-dirty-bg: rgba(185, 121, 47, 0.15);
+  --ui-status-error: #c44b3e;
+  --ui-status-error-bg: rgba(196, 75, 62, 0.12);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, 100%);
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--ui-status-saving) 42%, var(--border, var(--line)));
+  border-radius: var(--ui-radius-pill);
+  background: linear-gradient(180deg, var(--ui-status-saving-bg), color-mix(in srgb, var(--accent) 5%, var(--input-bg)));
+  color: var(--ui-status-saving);
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.40), 0 3px 10px rgba(100, 62, 36, 0.06);
+}
+
+:where(.ui-status-pill)::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.92;
+}
+
+:where(.ui-status-pill.is-idle)::before {
+  border-top-color: currentColor;
+  background: currentColor;
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--input-bg) 86%, transparent 14%);
+}
+
+:where(.ui-status-pill.is-saving)::before {
+  animation: ui-status-spin 0.9s linear infinite;
+}
+
+:where(.ui-status-pill.is-success) {
+  color: var(--ui-status-success);
+  border-color: var(--ui-status-success-border);
+  background: linear-gradient(180deg, var(--ui-status-success-bg), color-mix(in srgb, var(--input-bg) 92%, var(--ui-status-success) 8%));
+}
+
+:where(.ui-status-pill.is-success)::before {
+  content: "✓";
+  width: 16px;
+  height: 16px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  line-height: 1;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+:where(.ui-status-pill.is-dirty) {
+  color: var(--ui-status-dirty);
+  border-color: rgba(185, 121, 47, 0.45);
+  background: linear-gradient(180deg, var(--ui-status-dirty-bg), color-mix(in srgb, var(--input-bg) 88%, transparent 12%));
+}
+
+:where(.ui-status-pill.is-dirty)::before {
+  border-top-color: currentColor;
+}
+
+:where(.ui-status-pill.is-error) {
+  color: var(--ui-status-error);
+  border-color: rgba(196, 75, 62, 0.45);
+  background: linear-gradient(180deg, var(--ui-status-error-bg), color-mix(in srgb, var(--input-bg) 88%, transparent 12%));
+}
+
+:where(.ui-status-pill.is-error)::before {
+  content: "!";
+  width: 16px;
+  height: 16px;
+  border: 1px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  line-height: 1;
+  font-weight: 900;
+}
+
+html[data-theme="dark"] :where(.ui-status-pill) {
+  --ui-status-success: #69d69a;
+  --ui-status-success-bg: rgba(105, 214, 154, 0.12);
+  --ui-status-success-border: rgba(105, 214, 154, 0.36);
+  --ui-status-dirty: #f0b66f;
+  --ui-status-dirty-bg: rgba(240, 182, 111, 0.14);
+  --ui-status-error: #f2a08f;
+  --ui-status-error-bg: rgba(242, 160, 143, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 10px rgba(0,0,0,0.18);
+}
+
+@keyframes ui-status-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ui-object-picker {
+  position: relative;
+  flex: 0 1 var(--ui-picker-width, 340px);
+  min-width: var(--ui-picker-min-width, 260px);
+  z-index: calc(var(--ui-z-sticky) + 20);
+}
+
+.ui-object-picker-toggle {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "kicker caret" "name caret";
+  align-items: center;
+  justify-items: start;
+  gap: 0 10px;
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent);
+  color: var(--text);
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+body.modern-setting-page .ui-object-picker-toggle {
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 6px 12px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas: "kicker caret" "name caret";
+  align-items: center !important;
+  justify-items: start !important;
+  gap: 0 10px !important;
+  border-radius: 15px !important;
+  text-align: left !important;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent) !important;
+  border: 1px solid var(--ui-toolbar-border) !important;
+  box-shadow: none !important;
+}
+
+.ui-object-picker-kicker {
+  grid-area: kicker;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.ui-object-picker-name {
+  grid-area: name;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.25;
+  font-weight: 850;
+}
+
+.ui-object-picker-toggle > strong {
+  grid-area: name;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.ui-object-picker-caret {
+  grid-area: caret;
+  color: var(--muted);
+}
+
+.ui-popover,
+.ui-menu-popover,
+.ui-object-picker-menu {
+  position: absolute;
+  z-index: var(--ui-z-popover);
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 74%, var(--accent) 26%);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-popover-bg);
+  backdrop-filter: var(--ui-glass-blur-soft);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+}
+
+.ui-object-picker-menu {
+  left: 0;
+  top: calc(100% + 8px);
+  width: min(420px, calc(100vw - 48px));
+  max-height: min(520px, calc(100vh - 120px));
+  overflow: auto;
+  padding: 10px;
+}
+
+.ui-menu-popover {
+  right: 0;
+  top: calc(100% + 8px);
+  padding: 6px;
+  border-radius: 16px;
+}
+
+.ui-popover[hidden],
+.ui-menu-popover[hidden],
+.ui-object-picker-menu[hidden] {
+  display: none !important;
+}
+
+.ui-menu-popover button,
+.ui-menu-popover > button,
+.ui-menu-item {
+  width: 100% !important;
+  min-height: 34px !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0 !important;
+  padding: 8px 10px !important;
+  border: 0 !important;
+  border-radius: var(--ui-radius-sm) !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  text-align: left !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page .ui-menu-popover > button,
+body.modern-setting-page .ui-menu-popover .ui-menu-item {
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+body.modern-setting-page.preset-config-page .config-workbench-actions .ui-menu-popover > button {
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+.ui-menu-popover button:hover,
+.ui-menu-item:hover {
+  background: color-mix(in srgb, var(--accent) 9%, var(--input-bg));
+}
+
+.ui-menu-item.is-danger,
+.ui-menu-popover .is-danger,
+.ui-menu-popover > .is-danger {
+  color: color-mix(in srgb, var(--danger) 82%, var(--text)) !important;
+}
+
+.ui-danger-confirm {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--border, var(--line)));
+  border-radius: var(--ui-radius-lg);
+  background: color-mix(in srgb, var(--danger) 7%, var(--panel-strong));
+}
+
+.ui-danger-confirm[hidden] {
+  display: none !important;
+}
+
+.ui-danger-confirm strong {
+  display: block;
+  color: color-mix(in srgb, var(--danger) 78%, var(--text));
+}
+
+.ui-danger-confirm p {
+  margin: 3px 0 0;
+}
+
+.ui-danger-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+}
+
+.ui-action-menu {
+  position: relative;
+  z-index: calc(var(--ui-z-sticky) + 10);
+  display: inline-flex;
+}
+
+.ui-theme-toggle {
+  position: fixed;
+  top: var(--ui-theme-toggle-top, 18px);
+  right: var(--ui-theme-toggle-right, 22px);
+  z-index: var(--ui-z-floating);
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 72%, var(--accent) 28%);
+  background: var(--ui-toolbar-bg);
+  color: var(--text);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: var(--ui-glass-blur-soft);
+  font-size: 1.08rem;
+  line-height: 1;
+}
+
+.ui-theme-toggle:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+
+.ui-theme-toggle.is-switching {
+  animation: ui-theme-toggle-pop 420ms var(--ui-ease-feedback);
+}
+
+.ui-theme-burst {
+  position: fixed;
+  top: var(--ui-theme-burst-top, 39px);
+  right: var(--ui-theme-burst-right, 43px);
+  z-index: calc(var(--ui-z-floating) - 10);
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+  border-radius: var(--ui-radius-pill);
+  opacity: 0;
+  transform: translate(50%, -50%) scale(0.2);
+  background: radial-gradient(circle, var(--theme-burst-core, rgba(255, 226, 145, 0.34)) 0%, var(--theme-burst-soft, rgba(94, 194, 168, 0.16)) 48%, transparent 72%);
+  animation: ui-theme-burst var(--ui-motion-theme) var(--ui-ease-standard) forwards;
+}
+
+.ui-theme-burst[data-next-theme="dark"] {
+  --theme-burst-core: rgba(88, 147, 255, 0.30);
+  --theme-burst-soft: rgba(12, 20, 32, 0.18);
+}
+
+.ui-theme-burst[data-next-theme="light"] {
+  --theme-burst-core: rgba(255, 224, 139, 0.34);
+  --theme-burst-soft: rgba(255, 248, 225, 0.20);
+}
+
+@keyframes ui-theme-toggle-pop {
+  0% { transform: scale(1) rotate(0deg); }
+  42% { transform: scale(0.86) rotate(-16deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes ui-theme-burst {
+  0% { opacity: 0; transform: translate(50%, -50%) scale(0.2); }
+  28% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(50%, -50%) scale(36); }
+}
+
+@media (max-width: 980px) {
+  .ui-sticky-toolbar {
+    top: var(--ui-sticky-top-mobile, 8px);
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .ui-object-picker {
+    flex-basis: 100%;
+    min-width: 100%;
+  }
+
+  .ui-theme-toggle {
+    top: 12px;
+    right: 12px;
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-theme-toggle.is-switching,
+  .ui-theme-burst {
+    animation: none !important;
+  }
+}
+
+
+/* Stage 2 config-page unification: opt-in sticky action rows on remaining config pages. */
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar,
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  z-index: var(--ui-z-sticky);
+}
+
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar {
+  top: 10px;
+  margin-bottom: 14px;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  padding: 8px;
+}
+
+
+/* Stage 2 compact overrides for route/workshop action rows. */
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+}
+
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar .route-switch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar .route-switch-actions > * {
+  flex: 0 0 auto;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  margin: 0 0 18px;
+  border-top-width: 1px;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar button,
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar .button-link {
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar button:first-child {
+  min-height: 40px !important;
+  font-size: 0.94rem !important;
+}
+
+@media (max-width: 680px) {
+  body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar .route-switch-actions,
+  body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+    justify-content: flex-start;
+  }
+}
+
+
+/* Stage 2 final compact action-bar corrections. */
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 8px !important;
+}
+
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar > * {
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar button,
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar input {
+  min-height: 36px !important;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  top: 10px;
+  align-self: stretch;
+}
+
+
+body.workshop-config-page .workshop-main-card:has(.workshop-panel-actions.ui-sticky-toolbar) {
+  overflow: visible;
+}
+
+/* =========================================================
+   Stage 3A shared workbench pattern
+   ---------------------------------------------------------
+   Opt-in classes extracted from the verified /config/card sample.
+   These classes describe reusable structure only; page-level files may
+   still provide exact positioning while each page is migrated safely.
+   ========================================================= */
+.ui-readable-canvas {
+  --ui-readable-canvas-bg: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  --ui-readable-canvas-border: color-mix(in srgb, var(--border, var(--line)) 76%, transparent);
+  --ui-readable-canvas-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--ui-readable-canvas-border);
+  border-radius: var(--ui-card-radius);
+  background: var(--ui-readable-canvas-bg);
+  box-shadow: var(--ui-readable-canvas-shadow);
+}
+
+:root[data-theme="dark"] .ui-readable-canvas {
+  --ui-readable-canvas-bg: rgba(18, 27, 37, 0.82);
+  --ui-readable-canvas-border: color-mix(in srgb, var(--border, var(--line)) 68%, transparent);
+  --ui-readable-canvas-shadow: 0 22px 52px rgba(0, 0, 0, 0.26);
+}
+
+:root[data-theme="light"] .ui-readable-canvas {
+  --ui-readable-canvas-bg: rgba(255, 248, 238, 0.88);
+  --ui-readable-canvas-border: rgba(151, 103, 69, 0.28);
+  --ui-readable-canvas-shadow: 0 18px 42px rgba(92, 66, 42, 0.14);
+}
+
+.ui-action-dock {
+  position: sticky;
+  top: var(--ui-action-dock-top, 10px);
+  z-index: var(--ui-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: 20px;
+  background: var(--ui-toolbar-bg);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+.ui-action-dock.is-vertical {
+  flex-direction: column;
+  align-items: stretch;
+  width: var(--ui-action-dock-width, 188px);
+}
+
+.ui-action-dock-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ui-action-dock.is-vertical .ui-action-dock-primary {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.ui-action-dock.is-vertical button,
+.ui-action-dock.is-vertical summary,
+.ui-action-dock.is-vertical .ui-preference-toggle {
+  width: 100%;
+}
+
+.ui-action-more {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.ui-action-more > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.ui-action-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-action-more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--ui-z-popover);
+  min-width: 190px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 72%, transparent);
+  border-radius: 18px;
+  background: rgba(18, 27, 37, 0.92);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-theme="light"] .ui-action-more-menu {
+  border-color: rgba(151, 103, 69, 0.34);
+  background: rgba(255, 248, 238, 0.97);
+  box-shadow: 0 18px 42px rgba(92, 66, 42, 0.18);
+}
+
+.ui-action-more-menu button,
+.ui-action-more-menu .button-link {
+  justify-content: flex-start;
+}
+
+.ui-preference-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent);
+  color: var(--text);
+  font: var(--ui-font-helper);
+  font-weight: 760;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.ui-preference-toggle input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+:root[data-theme="light"] .ui-action-dock {
+  border-color: rgba(151, 103, 69, 0.30);
+  background: rgba(255, 248, 238, 0.88);
+  box-shadow: 0 16px 36px rgba(92, 66, 42, 0.14);
+}
+
+:root[data-theme="light"] .ui-action-dock button,
+:root[data-theme="light"] .ui-action-dock summary,
+:root[data-theme="light"] .ui-preference-toggle {
+  border-color: rgba(151, 103, 69, 0.22);
+}
+
+
+/* Stage 4 config-family action consistency.
+   Opt-in only: normalizes remaining config pages without changing business DOM ids. */
+body.modern-setting-page .stage4-action-row.ui-action-dock,
+body.global-config-page .stage4-action-row.ui-action-dock,
+body.user-config-page .stage4-action-row.ui-action-dock,
+body.worldbook-config-page .stage4-action-row.ui-action-dock,
+body.route-forwarding-page .stage4-action-row.ui-action-dock,
+body.workshop-config-page .stage4-action-row.ui-action-dock {
+  --ui-action-dock-top: 10px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 0;
+  gap: 8px;
+  padding: 8px;
+  margin: 0 0 14px;
+  border-radius: var(--ui-radius-lg);
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+body.global-config-page .config-sticky-buttons.stage4-action-row,
+body.user-config-page .config-sticky-buttons.stage4-action-row,
+body.worldbook-config-page .worldbook-workbench-actions.stage4-action-row,
+body.route-forwarding-page .route-switch-actions.stage4-action-row,
+body.workshop-config-page .workshop-panel-actions.stage4-action-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+}
+
+body.global-config-page .stage4-action-row button,
+body.global-config-page .stage4-action-row .button-link,
+body.user-config-page .stage4-action-row button,
+body.user-config-page .stage4-action-row .button-link,
+body.worldbook-config-page .stage4-action-row button,
+body.worldbook-config-page .stage4-action-row .button-link,
+body.route-forwarding-page .stage4-action-row button,
+body.route-forwarding-page .stage4-action-row .button-link,
+body.workshop-config-page .stage4-action-row button,
+body.workshop-config-page .stage4-action-row .button-link {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 38px !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap;
+}
+
+body.global-config-page .stage4-action-row button:first-child,
+body.user-config-page .stage4-action-row button:first-child,
+body.worldbook-config-page .stage4-action-row button:last-child,
+body.route-forwarding-page .stage4-action-row #save-route-forwarding,
+body.workshop-config-page .stage4-action-row #save-workshop {
+  min-height: 42px !important;
+  padding-inline: 18px !important;
+}
+
+body.user-config-page .stage4-local-actions {
+  justify-content: flex-start;
+  margin-top: 16px;
+  opacity: 0.88;
+}
+
+body.user-config-page .stage4-local-actions #save-user-profile {
+  background: var(--ui-control-bg) !important;
+  color: var(--text) !important;
+  border-color: var(--ui-toolbar-border) !important;
+  box-shadow: none !important;
+}
+
+body.workshop-config-page .stage4-danger-action,
+body.workshop-config-page .stage4-action-row .stage4-danger-action {
+  color: color-mix(in srgb, #ff8b8b 78%, var(--text)) !important;
+  border-color: rgba(220, 84, 84, 0.42) !important;
+  background: color-mix(in srgb, rgba(220, 84, 84, 0.14) 50%, var(--ui-control-bg)) !important;
+}
+
+:root[data-theme="light"] body.workshop-config-page .stage4-danger-action,
+:root[data-theme="light"] body.workshop-config-page .stage4-action-row .stage4-danger-action {
+  color: #8b2f2f !important;
+  border-color: rgba(177, 73, 58, 0.38) !important;
+  background: rgba(255, 238, 232, 0.88) !important;
+}
+
+@media (max-width: 760px) {
+  body.modern-setting-page .stage4-action-row.ui-action-dock,
+  body.global-config-page .stage4-action-row.ui-action-dock,
+  body.user-config-page .stage4-action-row.ui-action-dock,
+  body.worldbook-config-page .stage4-action-row.ui-action-dock,
+  body.route-forwarding-page .stage4-action-row.ui-action-dock,
+  body.workshop-config-page .stage4-action-row.ui-action-dock {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+
+/* Stage 4 user page: keep one visible page-level save entry in the unified dock. */
+body.user-config-page .stage4-local-actions {
+  display: none !important;
+}
+
+
+/* Stage 4 workshop correction: keep actions inside the workbench and compact side states. */
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row.ui-action-dock {
+  position: static !important;
+  top: auto !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  margin: 12px 0 18px !important;
+  padding: 8px !important;
+  border-radius: 18px !important;
+  border-color: color-mix(in srgb, var(--border) 66%, transparent) !important;
+  background: color-mix(in srgb, var(--panel-strong) 68%, transparent) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  justify-content: flex-start !important;
+}
+
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row button,
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row .button-link {
+  min-height: 38px !important;
+  height: 38px !important;
+  padding-inline: 14px !important;
+  font-size: 0.88rem !important;
+}
+
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row #save-workshop {
+  min-height: 40px !important;
+  height: 40px !important;
+  padding-inline: 16px !important;
+}
+
+:root[data-theme="light"] body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row.ui-action-dock {
+  border-color: rgba(151, 103, 69, 0.24) !important;
+  background: rgba(255, 248, 238, 0.54) !important;
+}
+
+body.workshop-config-page .workshop-side-summary {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+}
+
+body.workshop-config-page .workshop-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body.workshop-config-page .workshop-summary-grid .workshop-summary-item {
+  min-height: 74px;
+  padding: 10px 11px;
+  border-radius: 14px;
+  align-content: center;
+}
+
+body.workshop-config-page .workshop-summary-grid .workshop-summary-item span {
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+body.workshop-config-page .workshop-summary-grid .workshop-summary-item strong {
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+@media (max-width: 1180px) {
+  body.workshop-config-page .workshop-summary-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+
+
+/* Stage 4 workshop side panel correction: actions live in the right Workshop Panel. */
+body.workshop-config-page .workshop-main-card > .task-status,
+body.workshop-config-page .workshop-main-card > .workshop-panel-actions {
+  display: none !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 12px 13px !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--panel-strong) 76%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent) !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel #status-text {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel .workshop-panel-actions.stage4-action-row.ui-action-dock {
+  position: static !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel .workshop-panel-actions button,
+body.workshop-config-page .workshop-side-actions-panel .workshop-panel-actions .button-link {
+  width: 100% !important;
+  min-height: 38px !important;
+  height: auto !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel #save-workshop {
+  min-height: 42px !important;
+}
+
+:root[data-theme="light"] body.workshop-config-page .workshop-side-actions-panel {
+  border-color: rgba(151, 103, 69, 0.26) !important;
+  background: rgba(255, 248, 238, 0.62) !important;
+}
+
+/* P6-5B: visible hover/focus states for shared action-more menus. */
+.ui-action-more-menu button,
+.ui-action-more-menu .button-link,
+.ui-action-more-menu select {
+  transition: background var(--ui-motion-fast) var(--ui-ease-feedback), border-color var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback), transform var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+.ui-action-more-menu button:hover,
+.ui-action-more-menu button:focus-visible,
+.ui-action-more-menu .button-link:hover,
+.ui-action-more-menu .button-link:focus-visible,
+.ui-action-more-menu select:hover,
+.ui-action-more-menu select:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--accent) 18%, var(--input-bg)) !important;
+  color: var(--text) !important;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 82%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent) !important;
+}
+
+.ui-action-more-menu button:active,
+.ui-action-more-menu .button-link:active {
+  transform: translateY(1px);
+}
+
+.ui-action-more-menu button.is-danger:hover,
+.ui-action-more-menu button.is-danger:focus-visible,
+.ui-action-more-menu .danger-menu-item:hover,
+.ui-action-more-menu .danger-menu-item:focus-visible {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger) 14%, var(--input-bg)) !important;
+  color: color-mix(in srgb, var(--danger) 84%, var(--text)) !important;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--danger) 82%, transparent), 0 0 0 1px color-mix(in srgb, var(--danger) 16%, transparent) !important;
+}
+
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu {
+  min-width: 190px !important;
+  padding: 8px !important;
+  gap: 6px !important;
+  border-radius: 18px !important;
+}
+
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu button,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button,
+body.worldbook-manager-page .worldbook-more-menu.ui-action-more-menu button {
+  min-height: 38px !important;
+  border-radius: 14px !important;
+  padding: 10px 14px !important;
+}
+
+/* P6-5B hardening: beat page-level button backgrounds in existing more menus. */
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu button:hover,
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu button:focus-visible,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button:hover,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button:focus-visible,
+body.modern-setting-page.memory-config-page .memory-transfer-menu.ui-action-more-menu select:hover,
+body.modern-setting-page.memory-config-page .memory-transfer-menu.ui-action-more-menu select:focus-visible,
+body.worldbook-manager-page .worldbook-more-menu.ui-action-more-menu button:hover,
+body.worldbook-manager-page .worldbook-more-menu.ui-action-more-menu button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--accent) 20%, var(--input-bg)) !important;
+  color: var(--text) !important;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 86%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent) !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button.is-danger:hover,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button.is-danger:focus-visible {
+  border-color: color-mix(in srgb, var(--danger) 62%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger) 16%, var(--input-bg)) !important;
+  color: color-mix(in srgb, var(--danger) 86%, var(--text)) !important;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--danger) 86%, transparent), 0 0 0 1px color-mix(in srgb, var(--danger) 18%, transparent) !important;
+}

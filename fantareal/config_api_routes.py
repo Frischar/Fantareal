@@ -1575,11 +1575,6 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
                 media_summary = restore_workshop_media_from_bundle(archive, role_card)
 
-                if isinstance(memories_payload, dict) and "items" in memories_payload:
-                    ctx.save_memories(memories_payload.get("items", []), active_slot)
-                elif isinstance(memories_payload, list):
-                    ctx.save_memories(memories_payload, active_slot)
-
                 if isinstance(worldbook_payload, dict):
                     ctx.save_worldbook_store(worldbook_payload, active_slot)
 
@@ -1589,6 +1584,11 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 card_to_apply, workshop_preserved = preserve_existing_workshop_when_importing(role_card, source_name)
 
                 result = ctx.apply_role_card(card_to_apply, source_name=source_name, slot_id=active_slot)
+
+                if isinstance(memories_payload, dict) and "items" in memories_payload:
+                    ctx.save_memories(memories_payload.get("items", []), active_slot)
+                elif isinstance(memories_payload, list):
+                    ctx.save_memories(memories_payload, active_slot)
                 ctx.persist_json(
                     target_card_path,
                     result.get("card", {}).get("raw", card_to_apply),

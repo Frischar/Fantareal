@@ -54,6 +54,10 @@ body.modern-setting-page.memory-config-page .config-workbench-actions select {
   min-width: 118px;
 }
 
+body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-sticky-toolbar {
+  padding: 8px;
+}
+
 body.memory-config-page .memory-workbench-settings {
   display: flex;
   flex-wrap: wrap;
@@ -123,10 +127,6 @@ body.modern-setting-page.memory-config-page .config-workbench-actions button.is-
   border-color: color-mix(in srgb, var(--accent) 62%, var(--border)) !important;
   background: color-mix(in srgb, var(--accent) 24%, var(--input-bg)) !important;
   color: var(--text) !important;
-}
-
-body.modern-setting-page.preset-config-page .preset-library-head {
-  align-items: flex-start;
 }
 
 body.modern-setting-page.preset-config-page button:hover,
@@ -736,10 +736,13 @@ body.memory-config-page .memory-tool-stack {
 }
 
 body.memory-config-page .memory-tool-block {
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 14px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 72%, transparent), color-mix(in srgb, var(--input-bg) 58%, transparent));
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 body.memory-config-page .memory-tool-head {
@@ -1114,7 +1117,6 @@ body.memory-config-page .memory-select:checked::after {
   transform: translate(-50%, -58%) rotate(-45deg);
 }
 
-body.memory-config-page .memory-tool-block,
 body.memory-config-page .outline-table-wrap,
 body.memory-config-page .outline-detail-shell,
 body.memory-config-page .merged-card {
@@ -1723,4 +1725,859 @@ body.memory-config-page .loading-button::after {
   body.memory-config-page .outline-table-scroll {
     max-height: 420px;
   }
+}
+
+/* Stage 3B: memory page adopts the shared card-style action dock vocabulary. */
+body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock {
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 14px;
+  overflow: visible;
+}
+
+body.modern-setting-page.memory-config-page .memory-actions-primary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+body.modern-setting-page.memory-config-page .memory-transfer-more > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: var(--ui-control-radius);
+  background: var(--ui-control-bg);
+  color: var(--text);
+  font-weight: 760;
+}
+
+body.modern-setting-page.memory-config-page .memory-transfer-menu {
+  right: auto;
+  left: 0;
+  min-width: 260px;
+}
+
+body.modern-setting-page.memory-config-page .memory-transfer-menu label {
+  margin: 4px 4px 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 820;
+}
+
+body.modern-setting-page.memory-config-page .memory-transfer-menu select {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock {
+    position: fixed;
+    top: 18px;
+    left: max(24px, calc((100vw - 1480px) / 2 - 104px));
+    z-index: calc(var(--ui-z-sticky) + 8);
+    width: 188px !important;
+    min-height: 230px;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border-radius: 22px;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-actions-primary {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-workbench-actions button,
+  body.modern-setting-page.memory-config-page .memory-transfer-more > summary {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  body.modern-setting-page.memory-config-page #save-memories {
+    min-height: 54px !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-transfer-menu {
+    top: 0;
+    left: calc(100% + 10px);
+  }
+}
+
+/* Stage 3B hotfix: memory page should not use the left fixed dock.
+   The fixed dock pulled the work area into a full-width feeling on wide screens. */
+@media (min-width: 1720px) {
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock {
+    position: sticky !important;
+    top: 10px !important;
+    left: auto !important;
+    width: fit-content !important;
+    min-height: 0 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 8px !important;
+    border-radius: var(--ui-radius-lg) !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-actions-primary {
+    flex-direction: row !important;
+    align-items: center !important;
+    width: auto !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-workbench-actions button,
+  body.modern-setting-page.memory-config-page .memory-transfer-more > summary {
+    width: auto !important;
+    min-height: 38px !important;
+  }
+
+  body.modern-setting-page.memory-config-page #save-memories {
+    min-height: 38px !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-transfer-menu {
+    top: calc(100% + 8px) !important;
+    left: 0 !important;
+  }
+}
+
+body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide {
+  width: min(1480px, calc(100vw - var(--app-sidebar-width, 260px) - 48px)) !important;
+  max-width: 1480px !important;
+}
+
+/* Stage 3B final fix: keep memory work areas aligned to the workbench width. */
+body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide {
+  width: min(1480px, calc(100vw - var(--app-sidebar-width, 260px) - 72px)) !important;
+  max-width: 1480px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  align-items: stretch !important;
+}
+
+body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > .full-span,
+body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > section.full-span,
+body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > .panel.full-span {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock {
+  align-self: flex-start !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock {
+    position: sticky !important;
+    top: 10px !important;
+    left: auto !important;
+    transform: none !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+}
+
+/* Stage 3B structural fix: memory sections remain inside the centered shell. */
+body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  width: min(1480px, calc(100vw - var(--app-sidebar-width, 260px) - 72px)) !important;
+  max-width: 1480px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock {
+  width: fit-content !important;
+  max-width: 100% !important;
+  align-self: flex-start !important;
+  margin: 0 0 0 !important;
+}
+
+
+/* Stage 3B final external-dock fix: memory actions float outside the editor flow. */
+@media (min-width: 1181px) {
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide {
+    position: relative !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock {
+    position: absolute !important;
+    top: 0 !important;
+    left: -206px !important;
+    width: 188px !important;
+    min-height: 232px !important;
+    max-width: none !important;
+    margin: 0 !important;
+    z-index: calc(var(--ui-z-sticky) + 8) !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    padding: 12px !important;
+    border-radius: 22px !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-actions-primary {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-workbench-actions button,
+  body.modern-setting-page.memory-config-page .memory-transfer-more,
+  body.modern-setting-page.memory-config-page .memory-transfer-more > summary {
+    width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-transfer-menu {
+    top: 0 !important;
+    left: calc(100% + 10px) !important;
+    right: auto !important;
+  }
+}
+
+
+/* Stage 3B scroll-follow dock fix: memory dock matches the external vertical workbench pattern. */
+@media (min-width: 1181px) {
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide {
+    position: relative !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
+    align-items: start !important;
+  }
+
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > * {
+    grid-column: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > .memory-workbench-panel {
+    grid-row: 1 !important;
+  }
+
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > .memory-workbench-actions.ui-action-dock,
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > .config-workbench-actions.memory-workbench-actions.ui-action-dock {
+    position: sticky !important;
+    top: 12px !important;
+    left: auto !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+    justify-self: start !important;
+    transform: translateX(-206px) !important;
+    width: 188px !important;
+    min-width: 188px !important;
+    max-width: 188px !important;
+    min-height: 232px !important;
+    margin: 0 !important;
+    z-index: calc(var(--ui-z-sticky) + 8) !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    padding: 12px !important;
+    border-radius: 22px !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-actions-primary {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock button,
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock .memory-transfer-more,
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock .memory-transfer-more > summary {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-transfer-menu {
+    top: 0 !important;
+    left: calc(100% + 10px) !important;
+    right: auto !important;
+  }
+}
+
+
+/* Stage 3B outline overview table repair: keep the overview compact and readable. */
+body.memory-config-page .outline-table-wrap {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+body.memory-config-page .outline-table-scroll {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+body.memory-config-page table.outline-table,
+body.memory-config-page .outline-table {
+  width: max(100%, 1180px) !important;
+  min-width: 1180px !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+}
+
+body.memory-config-page .outline-table th:nth-child(1),
+body.memory-config-page .outline-table td:nth-child(1) {
+  width: 150px !important;
+}
+
+body.memory-config-page .outline-table th:nth-child(2),
+body.memory-config-page .outline-table td:nth-child(2) {
+  width: 220px !important;
+}
+
+body.memory-config-page .outline-table th:nth-child(3),
+body.memory-config-page .outline-table td:nth-child(3) {
+  width: 180px !important;
+}
+
+body.memory-config-page .outline-table th:nth-child(4),
+body.memory-config-page .outline-table td:nth-child(4) {
+  width: 240px !important;
+}
+
+body.memory-config-page .outline-table th:nth-child(5),
+body.memory-config-page .outline-table td:nth-child(5) {
+  width: 390px !important;
+}
+
+body.memory-config-page .outline-table tbody td {
+  overflow: hidden !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+body.memory-config-page .outline-table tbody td:nth-child(3),
+body.memory-config-page .outline-table tbody td:nth-child(4),
+body.memory-config-page .outline-events-inline {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  line-clamp: 3 !important;
+  overflow: hidden !important;
+}
+
+body.memory-config-page .outline-table tbody tr {
+  max-height: 128px !important;
+}
+
+
+/* Stage 3B outline table hard repair: clamp inner content, never table cells. */
+body.memory-config-page .outline-table tbody td,
+body.memory-config-page .outline-table th {
+  display: table-cell !important;
+}
+
+body.memory-config-page .outline-table tbody td:nth-child(3),
+body.memory-config-page .outline-table tbody td:nth-child(4),
+body.memory-config-page .outline-table tbody td:nth-child(5) {
+  display: table-cell !important;
+  vertical-align: top !important;
+}
+
+body.memory-config-page .outline-cell-clamp,
+body.memory-config-page .outline-events-inline.outline-cell-clamp {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 3 !important;
+  line-clamp: 3 !important;
+  overflow: hidden !important;
+  max-height: 5.2em !important;
+  line-height: 1.72 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+body.memory-config-page .outline-table tbody tr {
+  height: auto !important;
+}
+
+body.memory-config-page .outline-table tbody td {
+  max-height: none !important;
+}
+
+
+/* Stage 3B outline table dividers: make columns readable without heavy grid chrome. */
+body.memory-config-page .outline-table thead th,
+body.memory-config-page .outline-table tbody td {
+  border-right: 1px solid color-mix(in srgb, var(--line) 72%, transparent 28%) !important;
+}
+
+body.memory-config-page .outline-table thead th:last-child,
+body.memory-config-page .outline-table tbody td:last-child {
+  border-right: 0 !important;
+}
+
+body.memory-config-page .outline-table thead th {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 84%, transparent 16%) !important;
+}
+
+body.memory-config-page .outline-table tbody td {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 56%, transparent 44%) !important;
+}
+
+body.memory-config-page .outline-table tbody tr:last-child td {
+  border-bottom: 0 !important;
+}
+
+html:not([data-theme="dark"]) body.memory-config-page .outline-table thead th,
+html:not([data-theme="dark"]) body.memory-config-page .outline-table tbody td {
+  border-right-color: rgba(128, 103, 82, 0.22) !important;
+}
+
+html:not([data-theme="dark"]) body.memory-config-page .outline-table thead th {
+  border-bottom-color: rgba(128, 103, 82, 0.30) !important;
+}
+
+html:not([data-theme="dark"]) body.memory-config-page .outline-table tbody td {
+  border-bottom-color: rgba(128, 103, 82, 0.18) !important;
+}
+
+/* Stage 5 memory dossier editor layout.
+   Consolidated: no decorative section numbers, no nested background cards. */
+body.modern-setting-page.memory-config-page .memory-workbench-panel {
+  overflow: visible;
+}
+
+body.modern-setting-page.memory-config-page .memory-overview-strip {
+  align-items: center;
+}
+
+body.modern-setting-page.memory-config-page .memory-workbench-settings,
+body.modern-setting-page.memory-config-page .memory-tool-stack,
+body.modern-setting-page.memory-config-page .memory-tool-block,
+body.modern-setting-page.memory-config-page .memory-list-toolbar {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-workbench-settings {
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-radius: 0 !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-tool-stack,
+body.modern-setting-page.memory-config-page .memory-tool-block {
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-stage5-section {
+  position: relative;
+  overflow: visible;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-stage5-section-head {
+  display: block;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 34%, transparent 66%);
+}
+
+body.modern-setting-page.memory-config-page .memory-stage5-section-head::before {
+  display: none !important;
+  content: none !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-stage5-section .section-head h2 {
+  letter-spacing: -0.035em;
+}
+
+body.modern-setting-page.memory-config-page .memory-list-toolbar {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 24%, transparent 76%);
+  border-radius: 18px;
+}
+
+body.modern-setting-page.memory-config-page .memory-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+body.modern-setting-page.memory-config-page .memory-card {
+  border-color: color-mix(in srgb, var(--line) 44%, transparent 56%) !important;
+  background: color-mix(in srgb, var(--panel-strong) 50%, transparent 50%) !important;
+  box-shadow: none !important;
+  border-radius: 18px !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 28%, transparent 72%);
+}
+
+body.modern-setting-page.memory-config-page .memory-card-summary {
+  grid-column: 1 / -1;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body {
+  display: block;
+  padding-top: 12px;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body label {
+  display: block;
+  margin: 12px 0 6px;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body label:first-child {
+  margin-top: 0;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body .memory-title,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-tags,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-notes,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-content {
+  width: 100%;
+  min-width: 0;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body .memory-content {
+  min-height: 180px;
+  line-height: 1.64;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body .memory-title,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-tags,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-notes,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-content {
+  border-color: color-mix(in srgb, var(--line) 42%, transparent 58%);
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body .memory-title:focus,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-tags:focus,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-notes:focus,
+body.modern-setting-page.memory-config-page .memory-card-body .memory-content:focus {
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--line) 46%);
+}
+
+body.modern-setting-page.memory-config-page .outline-overview-shell,
+body.modern-setting-page.memory-config-page .merged-list-grid {
+  margin-top: 16px;
+}
+
+@media (min-width: 1181px) and (max-width: 1519px) {
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > .memory-workbench-actions.ui-action-dock,
+  body.modern-setting-page.memory-config-page .config-shell.compact.memory-wide > .config-workbench-actions.memory-workbench-actions.ui-action-dock {
+    position: sticky !important;
+    top: 12px !important;
+    transform: none !important;
+    width: fit-content !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    align-self: flex-start !important;
+    padding: 8px !important;
+    border-radius: var(--ui-radius-lg) !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-actions-primary {
+    width: auto !important;
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock button,
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock .memory-transfer-more,
+  body.modern-setting-page.memory-config-page .memory-workbench-actions.ui-action-dock .memory-transfer-more > summary {
+    width: auto !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    min-height: 38px !important;
+  }
+
+  body.modern-setting-page.memory-config-page .memory-transfer-menu {
+    top: calc(100% + 8px) !important;
+    left: 0 !important;
+    right: auto !important;
+  }
+}
+
+
+/* Memory phase 5D-2: compact collapsed rows without adding extra layers. */
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] {
+  max-width: calc(100% - 14px);
+  min-height: 54px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .memory-card-head {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 92px 82px 78px 58px;
+  grid-template-rows: 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  height: 52px;
+  padding: 5px 10px;
+  border-bottom: 0;
+  box-sizing: border-box;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .memory-card-head-main {
+  min-width: 0;
+  gap: 8px;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .memory-card-head-main strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .memory-card-summary {
+  display: contents;
+  padding-left: 0;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .memory-summary-chip {
+  max-width: 100%;
+  min-width: 0;
+  justify-content: center;
+  padding: 3px 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .memory-card-head .button-row {
+  grid-column: 5;
+  grid-row: 1;
+  justify-self: end;
+  width: 58px;
+  max-width: 58px;
+  gap: 4px;
+  overflow: hidden;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .toggle-memory,
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .remove-memory {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] .restore-memory[hidden] {
+  display: none !important;
+}
+
+
+/* Memory phase 5D-2b: remove inherited card padding only in collapsed rows. */
+body.modern-setting-page.memory-config-page .memory-card.selectable[data-collapsed="true"] {
+  padding: 0 !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-list {
+  gap: 8px;
+}
+
+
+/* Memory phase 5D-3: lower-section density pass for outline and merged memories. */
+body.modern-setting-page.memory-config-page .outline-overview-shell {
+  gap: 10px;
+}
+
+body.modern-setting-page.memory-config-page .outline-table-wrap {
+  border-radius: 18px;
+}
+
+body.modern-setting-page.memory-config-page .outline-table thead th {
+  padding: 10px 12px !important;
+  line-height: 1.35;
+}
+
+body.modern-setting-page.memory-config-page .outline-table tbody td {
+  padding: 9px 12px !important;
+  line-height: 1.45 !important;
+  vertical-align: middle !important;
+}
+
+body.modern-setting-page.memory-config-page .outline-table tbody tr {
+  height: 74px !important;
+  max-height: 74px !important;
+}
+
+body.modern-setting-page.memory-config-page .outline-title-main,
+body.modern-setting-page.memory-config-page .outline-cell-clamp,
+body.modern-setting-page.memory-config-page .outline-events-inline {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+body.modern-setting-page.memory-config-page .outline-title-main {
+  -webkit-line-clamp: 1 !important;
+  line-clamp: 1 !important;
+}
+
+body.modern-setting-page.memory-config-page .outline-cell-clamp,
+body.modern-setting-page.memory-config-page .outline-events-inline {
+  -webkit-line-clamp: 2 !important;
+  line-clamp: 2 !important;
+}
+
+body.modern-setting-page.memory-config-page .outline-submeta {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+body.modern-setting-page.memory-config-page .merged-list-grid {
+  gap: 8px;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed {
+  padding: 0 !important;
+  min-height: 58px;
+  overflow: hidden;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-head {
+  grid-template-columns: 132px minmax(0, 1fr) 58px;
+  min-height: 54px;
+  height: 54px;
+  padding: 6px 10px;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-title h3 {
+  font-size: 15px;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-subline {
+  margin-top: 0;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--line) 44%, transparent 56%);
+  border-radius: 999px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .memory-icon-actions {
+  width: 58px;
+  gap: 4px;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .memory-icon-button {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+
+/* P6-7: stable memory quick-action size and subtle danger affordance. */
+body.modern-setting-page.memory-config-page .memory-card.selectable .toggle-memory,
+body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memory,
+body.modern-setting-page.memory-config-page .merged-card .memory-icon-button {
+  min-width: 26px !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memory,
+body.modern-setting-page.memory-config-page .merged-card .memory-icon-button.memory-danger,
+body.modern-setting-page.memory-config-page .merged-card .remove-merged-card {
+  border-color: color-mix(in srgb, var(--danger, #dc5454) 48%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger, #dc5454) 12%, var(--input-bg)) !important;
+  color: color-mix(in srgb, var(--danger, #dc5454) 84%, var(--text)) !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memory:hover,
+body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memory:focus-visible,
+body.modern-setting-page.memory-config-page .merged-card .memory-icon-button.memory-danger:hover,
+body.modern-setting-page.memory-config-page .merged-card .memory-icon-button.memory-danger:focus-visible,
+body.modern-setting-page.memory-config-page .merged-card .remove-merged-card:hover,
+body.modern-setting-page.memory-config-page .merged-card .remove-merged-card:focus-visible {
+  border-color: color-mix(in srgb, var(--danger, #dc5454) 76%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger, #dc5454) 22%, var(--input-bg)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger, #dc5454) 18%, transparent) !important;
+}
+
+/* P6-7 correction: avoid 1px compact-button box sizing drift. */
+body.modern-setting-page.memory-config-page .memory-card.selectable .toggle-memory,
+body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memory,
+body.modern-setting-page.memory-config-page .merged-card .memory-icon-button {
+  box-sizing: border-box !important;
+}
+
+/* P6-7 correction: lock memory quick action width in flex rows. */
+body.modern-setting-page.memory-config-page .memory-card.selectable .toggle-memory,
+body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memory {
+  flex: 0 0 26px !important;
+  max-width: 26px !important;
 }

@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="modern-setting-page app-sidebar-shell worldbook-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">
@@ -31,19 +32,19 @@
         <div class="worldbook-workbench-lite">
           <div class="worldbook-workbench-headline">
             <div class="worldbook-workbench-summary">
-              <div class="worldbook-workbench-titleline">
+              <div class="worldbook-workbench-titleline ui-workbench-titleline">
                 <p class="eyebrow">WORLDBOOK WORKBENCH</p>
-                <div class="worldbook-workbench-statusline">
-                  <span id="wb-status-pill" class="config-status-pill is-success">就绪</span>
-                  <span class="worldbook-workbench-mini">当前状态 <strong id="enabled-label">{% if worldbook_settings.enabled %}启用{% else %}停用{% endif %}</strong></span>
-                  <span class="worldbook-workbench-mini">命中上限 <strong id="max-hits-label">{{ worldbook_settings.max_hits }}</strong></span>
-                </div>
+                <span id="wb-status-pill" class="config-status-pill ui-status-pill is-success">就绪</span>
+              </div>
+              <div class="worldbook-workbench-statusline">
+                <span class="worldbook-workbench-mini">当前状态 <strong id="enabled-label">{% if worldbook_settings.enabled %}启用{% else %}停用{% endif %}</strong></span>
+                <span class="worldbook-workbench-mini">命中上限 <strong id="max-hits-label">{{ worldbook_settings.max_hits }}</strong></span>
               </div>
               <h2>世界书工作台</h2>
               <p class="muted helper-text">保存、读取、词条管理与核心运行项集中在这里；下方只保留触发规则、新词条默认值和默认导入行为。</p>
             </div>
 
-            <div class="worldbook-workbench-actions">
+            <div class="worldbook-workbench-actions ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
               <a class="button-link secondary" href="/config/worldbook/entries">词条管理</a>
               <button id="reload-worldbook-settings" type="button" class="secondary">重新读取</button>
               <button id="save-worldbook-settings" type="button">保存设置</button>
@@ -274,6 +275,7 @@
         </div>
       </section>
     <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
     <script>
       const { applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
       const statusPill = document.getElementById("wb-status-pill");
@@ -281,10 +283,29 @@
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
       let dirty = false;
 
+      function getCompactStatusLabel(text, type) {
+        const value = String(text || "");
+        if (type === "error") return "出错";
+        if (type === "dirty") return "有修改";
+        if (type === "saving") {
+          if (value.includes("保存")) return "保存中";
+          if (value.includes("读取")) return "读取中";
+          return "处理中";
+        }
+        if (type === "success") {
+          if (value.includes("保存")) return "已保存";
+          if (value.includes("读取")) return "已读取";
+          return "就绪";
+        }
+        return "就绪";
+      }
+
       function setStatus(text, type = "success") {
-        statusPill.textContent = text;
+        statusPill.textContent = getCompactStatusLabel(text, type);
+        statusPill.title = text;
         statusPill.classList.remove("is-idle", "is-saving", "is-success", "is-dirty", "is-error");
         const className = type === "saving" ? "is-saving"
           : type === "dirty" ? "is-dirty"

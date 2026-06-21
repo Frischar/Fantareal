@@ -142,6 +142,93 @@ body.modern-setting-page .user-panel-actions button {
   width: 100%;
 }
 
+body.user-config-page .chat-avatar-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body.user-config-page .chat-avatar-tile {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+}
+
+body.user-config-page .chat-avatar-tile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.user-config-page .chat-avatar-tile-head span,
+body.user-config-page .chat-avatar-tile-head em {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  line-height: 1.2;
+}
+
+body.user-config-page .chat-avatar-tile-head strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+body.user-config-page .chat-avatar-tile-head em {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent 78%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-strong) 70%, transparent 30%);
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-frame {
+  aspect-ratio: 1 / 1;
+  min-height: 0 !important;
+  border-radius: 16px;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-image {
+  border-radius: 13px;
+}
+
+body.user-config-page .chat-avatar-tile .sprite-placeholder {
+  padding: 12px;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls {
+  gap: 7px;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.78rem;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls button {
+  min-height: 34px !important;
+  padding: 7px 10px !important;
+  font-size: 0.82rem !important;
+}
+
 body.modern-setting-page .user-layout-a .user-layout-a-side {
   align-self: start;
 }
@@ -197,6 +284,12 @@ body.modern-setting-page .user-panel-actions button {
 
   body.modern-setting-page .user-layout-a-toolbar .config-sticky-copy {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  body.user-config-page .chat-avatar-grid {
+    grid-template-columns: 1fr;
   }
 }
 
