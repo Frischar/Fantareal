@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memory - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="app-sidebar-shell modern-setting-page memory-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
@@ -326,7 +326,8 @@
     </template>
 
     <script src="/static/js/app-core.js?v=v161"></script>
-    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -387,10 +388,18 @@
       function setStatus(text) {
         const value = text || "就绪";
         const state = getStatusState(value);
-        statusEl.textContent = getCompactStatusLabel(value, state);
-        statusEl.title = value;
-        statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
-        statusEl.classList.add(`is-${state}`);
+        const label = getCompactStatusLabel(value, state);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: value,
+          state,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = value;
+          statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
+          statusEl.classList.add(`is-${state}`);
+        }
       }
 
       function getStatusState(text) {
@@ -484,11 +493,11 @@
       function setMemoryCollapsed(card, collapsed) {
         const body = card.querySelector(".memory-card-body");
         const toggleBtn = card.querySelector(".toggle-memory");
-        card.dataset.collapsed = collapsed ? "true" : "false";
-        if (body) body.style.display = collapsed ? "none" : "";
+        window.Fantareal?.motion?.setDisclosureCollapsed(card, body, collapsed, { hiddenMode: "display" });
         if (toggleBtn) {
           toggleBtn.textContent = collapsed ? "▾" : "▴";
           toggleBtn.title = collapsed ? "展开" : "收起";
+          toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
         }
         updateMemorySummary(card);
       }
@@ -606,10 +615,11 @@
 
       function attachRemoveHandler(card) {
         card.querySelector(".remove-memory").addEventListener("click", () => {
-          card.remove();
-          updateMemoryCount();
-          applyMemorySearch();
-          setStatus("已删除一条原记忆，记得保存。");
+          (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+            updateMemoryCount();
+            applyMemorySearch();
+            setStatus("已删除一条原记忆，记得保存。");
+          });
         });
 
         const toggleBtn = card.querySelector(".toggle-memory");
@@ -760,9 +770,12 @@
 
           const toggle = article.querySelector(".toggle-merged-card");
           toggle?.addEventListener("click", () => {
-            const collapsed = article.classList.toggle("is-collapsed");
+            const collapsed = !article.classList.contains("is-collapsed");
+            const body = article.querySelector(".merged-card-body");
+            window.Fantareal?.motion?.setDisclosureCollapsed(article, body, collapsed, { collapsedClass: "is-collapsed", toggleData: false, hiddenMode: "display" });
             toggle.textContent = collapsed ? "▾" : "▴";
             toggle.title = collapsed ? "展开" : "收起";
+            toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
           });
 
           article.querySelector(".remove-merged-card")?.addEventListener("click", async () => {
@@ -828,7 +841,7 @@
         setStatus("已删除一条大纲项。");
       }
 
-      function renderOutlineEditor(item) {
+      function renderOutlineEditor(item, previousDetailHeight = 0) {
         const keyEvents = Array.isArray(item.key_events) ? item.key_events : [];
         const sourceCount = Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0;
         outlineDetailPanelEl.innerHTML = `
@@ -901,16 +914,52 @@
             setStatus(`删除大纲项失败：${error.message}`);
           }
         });
+        animateOutlineDetailPanel(previousDetailHeight);
+      }
+
+      function animateOutlineDetailPanel(previousHeight = 0) {
+        const motion = window.Fantareal?.motion;
+        const panel = outlineDetailPanelEl;
+        const durationMs = 560;
+        const reduceMotion = motion?.prefersReducedMotion?.() === true;
+        panel.classList.remove("outline-detail-motion-in", "outline-detail-resizing");
+        void panel.offsetWidth;
+
+        if (!reduceMotion && Number(previousHeight) > 0) {
+          const nextHeight = panel.scrollHeight || panel.getBoundingClientRect().height;
+          if (nextHeight > 0 && Math.abs(nextHeight - previousHeight) > 2) {
+            panel.style.height = `${previousHeight}px`;
+            panel.style.overflow = "hidden";
+            panel.classList.add("outline-detail-resizing");
+            requestAnimationFrame(() => {
+              panel.style.height = `${nextHeight}px`;
+            });
+            window.setTimeout(() => {
+              panel.style.height = "";
+              panel.style.overflow = "";
+              panel.classList.remove("outline-detail-resizing");
+            }, durationMs + 40);
+          }
+        }
+
+        if (motion?.pulseItem) {
+          motion.pulseItem(panel, "outline-detail-motion-in", { fallbackMs: durationMs + 80 });
+        } else {
+          panel.classList.add("outline-detail-motion-in");
+          window.setTimeout(() => panel.classList.remove("outline-detail-motion-in"), durationMs + 80);
+        }
       }
 
       function renderOutlineDetail(item) {
+        const previousDetailHeight = outlineDetailPanelEl.getBoundingClientRect().height;
         if (!item) {
           outlineDetailPanelEl.innerHTML = '<div class="outline-detail-empty">先点击上方某一行，这里会显示该大纲项的简要内容。</div>';
+          animateOutlineDetailPanel(previousDetailHeight);
           return;
         }
 
         if (outlineDetailEditing) {
-          renderOutlineEditor(item);
+          renderOutlineEditor(item, previousDetailHeight);
           return;
         }
 
@@ -958,6 +1007,7 @@
               setStatus(`删除大纲项失败：${error.message}`);
             }
           });
+          animateOutlineDetailPanel(previousDetailHeight);
           return;
         }
 
@@ -1033,6 +1083,7 @@
             setStatus(`删除大纲项失败：${error.message}`);
           }
         });
+        animateOutlineDetailPanel(previousDetailHeight);
       }
 
       function setActiveOutline(id) {
@@ -1312,7 +1363,9 @@
       }
 
       document.getElementById("add-memory").addEventListener("click", () => {
-        memoryListEl.prepend(createMemoryCard());
+        const card = createMemoryCard();
+        memoryListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
         updateMemoryCount();
         applyMemorySearch();
         setStatus("已新增一条空白原记忆。");

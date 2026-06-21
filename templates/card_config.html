@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Card Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
 
@@ -309,7 +309,8 @@
     </div>
 
     <script src="/static/js/app-core.js?v=v161"></script>
-    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const PERSONA_LABELS = {
         name: "（该角色显示名）",
@@ -388,11 +389,19 @@
       function setStatus(text, state = "") {
         if (!statusEl) return;
         const resolvedState = inferStatusState(text, state);
-        statusEl.textContent = getCompactStatusLabel(text, resolvedState);
-        statusEl.title = text;
-        statusEl.dataset.state = resolvedState;
-        statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
-        statusEl.classList.add(`is-${resolvedState}`);
+        const label = getCompactStatusLabel(text, resolvedState);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: text || label,
+          state: resolvedState,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = text;
+          statusEl.dataset.state = resolvedState;
+          statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
+          statusEl.classList.add(`is-${resolvedState}`);
+        }
       }
 
       function markCardDirty() {
@@ -590,14 +599,12 @@
       function setWorkshopRuleCollapsed(shell, collapsed) {
         if (!shell) return;
         const body = shell.querySelector(".workshop-rule-body");
-        if (body) {
-          body.hidden = !!collapsed;
-        }
-        shell.dataset.collapsed = collapsed ? "true" : "false";
-        shell.classList.toggle("is-collapsed", !!collapsed);
+        window.Fantareal?.motion?.setDisclosureCollapsed(shell, body, collapsed, { collapsedClass: "is-collapsed", hiddenMode: "hidden" });
         const button = shell.querySelector(".toggle-workshop-rule");
         if (button) {
           button.textContent = collapsed ? "展开" : "折叠";
+          button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          button.setAttribute("aria-label", collapsed ? "展开这条规则" : "折叠这条规则");
         }
       }
 
@@ -864,6 +871,7 @@
         const lastCard = workshopRuleListEl?.querySelector(".workshop-rule-card:last-of-type");
         if (lastCard && typeof lastCard.scrollIntoView === "function") {
           lastCard.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.Fantareal?.motion?.pulseItem(lastCard);
         }
         setStatus("已新增演出工坊规则。");
       }
@@ -2011,9 +2019,10 @@
             return;
           }
           if (Number.isFinite(targetIndex)) {
-            card.remove();
+            (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
             setStatus("演出工坊规则已删除。");
             applyWorkshopRuleSearch();
+            });
           }
           return;
         }

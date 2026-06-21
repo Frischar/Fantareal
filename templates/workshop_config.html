@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>演出工坊 - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 </head>
   <body class="modern-setting-page app-sidebar-shell workshop-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
@@ -316,6 +316,7 @@
       </aside>
     </div>
 
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
@@ -370,9 +371,18 @@
       function setStatus(text, kind = null) {
         if (!statusEl) return;
         const statusKind = kind || inferStatusKind(text);
-        statusEl.textContent = text || "已准备";
-        statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
-        statusEl.classList.add("task-status", `is-${statusKind}`);
+        const label = text || "已准备";
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: label,
+          state: statusKind,
+          stateClasses: ["is-idle", "is-busy", "is-success", "is-error"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = label;
+          statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
+          statusEl.classList.add("task-status", `is-${statusKind}`);
+        }
       }
 
       function showToast(message, type = "info") {
@@ -408,12 +418,14 @@
         button.disabled = state === "loading";
         if (state === "loading") {
           button.classList.add("is-loading");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "处理中…";
           return;
         }
         if (state === "success") {
           button.disabled = false;
           button.classList.add("is-success");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "已完成 ✓";
           button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1200));
           return;
@@ -421,6 +433,7 @@
         if (state === "error") {
           button.disabled = false;
           button.classList.add("is-error");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "操作失败";
           button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1500));
           return;
@@ -900,8 +913,7 @@
         if (!shell) return;
         const body = shell.querySelector(".workshop-rule-body");
         if (body) body.setAttribute("aria-hidden", collapsed ? "true" : "false");
-        shell.dataset.collapsed = collapsed ? "true" : "false";
-        shell.classList.toggle("is-collapsed", !!collapsed);
+        window.Fantareal?.motion?.setDisclosureCollapsed(shell, body, collapsed, { collapsedClass: "is-collapsed", hiddenMode: "display" });
         const button = shell.querySelector(".toggle-workshop-rule");
         if (button) {
           button.textContent = collapsed ? "▸" : "▾";
@@ -1265,6 +1277,7 @@
         const lastCard = workshopRuleListEl?.querySelector(".workshop-rule-card:last-of-type");
         if (lastCard && typeof lastCard.scrollIntoView === "function") {
           lastCard.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.Fantareal?.motion?.pulseItem(lastCard);
         }
         setStatus("已新增演出工坊规则。");
       }
@@ -2035,8 +2048,9 @@
         const card = event.target.closest(".dynamic-scene-card");
         if (!card) return;
         if (event.target.closest(".remove-dynamic-scene")) {
-          card.remove();
+          (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
           setStatus("已删除动态演出，记得保存到当前角色卡。", "success");
+          });
           return;
         }
         if (event.target.closest(".dynamic-image-pick")) card.querySelector(".dynamic-image-file")?.click();
@@ -2058,6 +2072,6 @@
       updateWorkshopPanelStats();
       refreshWorkshopStatus().catch(() => {});
     </script>
-    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
   </body>
 </html>
