@@ -1271,6 +1271,37 @@ body.memory-config-page .outline-detail-shell {
   border-radius: 22px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--panel-strong) 72%, transparent), color-mix(in srgb, var(--input-bg) 58%, transparent));
   padding: 18px;
+  transform-origin: top center;
+}
+
+body.memory-config-page .outline-detail-shell.outline-detail-motion-in {
+  animation: outline-detail-motion-in 0.56s var(--ui-ease-enter, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+}
+
+body.memory-config-page .outline-detail-shell.outline-detail-resizing {
+  transition: height 0.56s var(--ui-ease-enter, cubic-bezier(0.2, 0.8, 0.2, 1));
+  will-change: height, opacity, transform, clip-path;
+}
+
+@keyframes outline-detail-motion-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+    clip-path: inset(0 0 18% 0 round 22px);
+    box-shadow: 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+  55% {
+    opacity: 1;
+    box-shadow:
+      inset 2px 0 0 color-mix(in srgb, var(--accent) 46%, transparent),
+      0 16px 36px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0 round 22px);
+    box-shadow: 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+  }
 }
 
 body.memory-config-page .outline-detail-empty {

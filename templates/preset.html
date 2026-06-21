@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preset - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3f-rule-chip-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
   </head>
@@ -158,7 +158,7 @@
               <li>基础系统规则</li>
               <li>已启用常用模块</li>
               <li>规则组中当前采用的规则项</li>
-              <li>已启用普通额外规则块</li>
+              <li>已启用额外规则块</li>
             </ol>
             <div class="preset-v4f-note">
               <strong>V4F稳定器</strong>
@@ -172,7 +172,7 @@
             <div class="section-head">
           <p class="eyebrow">Blocks</p>
           <h2>额外规则块</h2>
-          <p class="muted">普通规则块适合固定补充；规则组适合“文风 / 节奏 / 描写重点”等多选一或多选配置。</p>
+          <p class="muted">规则块适合固定补充；规则组适合“文风 / 节奏 / 描写重点”等多选一或多选配置。</p>
         </div>
         <div class="preset-block-toolbar">
           <div class="preset-block-actions">
@@ -196,7 +196,8 @@
     </div>
 
     <script src="/static/js/app-core.js?v=v161"></script>
-    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -456,11 +457,129 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         return result;
       }
 
+      function setAdvancedDetailsOpen(details, shouldOpen, options = {}) {
+        const body = details?.querySelector(".preset-advanced-body");
+        const summary = details?.querySelector(".preset-advanced-summary");
+        if (!details || !body) return;
+        const nextOpen = Boolean(shouldOpen);
+        const motion = window.Fantareal?.motion;
+        if (summary) summary.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+        if (nextOpen) {
+          details.open = true;
+          if (motion?.setDisclosureCollapsed) {
+            motion.setDisclosureCollapsed(details, body, false, {
+              hiddenMode: "hidden",
+              dataAttribute: "advancedCollapsed",
+              immediate: options.immediate === true,
+              fallbackMs: 340,
+            });
+          } else {
+            body.hidden = false;
+            body.setAttribute("aria-hidden", "false");
+            details.dataset.advancedCollapsed = "false";
+          }
+          return;
+        }
+
+        if (motion?.setDisclosureCollapsed) {
+          motion.setDisclosureCollapsed(details, body, true, {
+            hiddenMode: "hidden",
+            dataAttribute: "advancedCollapsed",
+            immediate: options.immediate === true,
+            fallbackMs: 320,
+          });
+          const finishClose = () => {
+            if (details.dataset.advancedCollapsed === "true") details.open = false;
+          };
+          motion.afterMotion?.(body, finishClose, 360) || window.setTimeout(finishClose, 360);
+        } else {
+          body.hidden = true;
+          body.setAttribute("aria-hidden", "true");
+          details.dataset.advancedCollapsed = "true";
+          details.open = false;
+        }
+      }
+
+      function initPresetAdvancedDisclosure(scope = document) {
+        scope.querySelectorAll("details.preset-advanced-fields").forEach((details) => {
+          if (details.dataset.motionReady === "true") return;
+          const summary = details.querySelector(".preset-advanced-summary");
+          const body = details.querySelector(".preset-advanced-body");
+          if (!summary || !body) return;
+          details.dataset.motionReady = "true";
+          if (!body.id) body.id = generateId("preset-advanced-body");
+          summary.setAttribute("role", "button");
+          summary.setAttribute("aria-controls", body.id);
+          summary.setAttribute("aria-expanded", details.open ? "true" : "false");
+          if (details.open) {
+            setAdvancedDetailsOpen(details, true, { immediate: true });
+          } else {
+            body.hidden = true;
+            body.setAttribute("aria-hidden", "true");
+            body.dataset.uiMotionReady = "true";
+            details.dataset.advancedCollapsed = "true";
+          }
+          summary.addEventListener("click", (event) => {
+            event.preventDefault();
+            setAdvancedDetailsOpen(details, !details.open || body.hidden);
+          });
+        });
+      }
+
       function countAdvancedGroupItems(card) {
         if (!card) return 0;
         return Array.from(card.querySelectorAll(".preset-group-item"))
           .filter((row) => Object.keys(collectSegmentAdvancedFields(row)).length > 0)
           .length;
+      }
+
+      function updateGroupItemSummary(row) {
+        if (!row) return;
+        const summary = row.querySelector(".preset-group-item-summary");
+        if (!summary) return;
+        const selected = row.querySelector(".preset-group-item-selected")?.checked === true;
+        const content = row.querySelector(".preset-group-item-content")?.value || "";
+        const contentLength = String(content).trim().length;
+        const advancedCount = Object.keys(collectSegmentAdvancedFields(row)).length;
+        const collapsed = row.dataset.collapsed === "true";
+        const chips = [
+          `<span class="preset-group-item-mini-chip ${selected ? "is-selected" : "is-muted"}">${selected ? "已采用" : "未采用"}</span>`,
+          `<span class="preset-group-item-mini-chip">${contentLength} 字</span>`,
+        ];
+        if (advancedCount > 0) {
+          chips.push(`<span class="preset-group-item-mini-chip is-advanced">高级字段 ${advancedCount}</span>`);
+        }
+        summary.innerHTML = `
+          <span class="preset-group-item-summary-chips">${chips.join("")}</span>
+        `;
+        const toggle = row.querySelector(".preset-group-item-toggle");
+        if (toggle) {
+          toggle.textContent = collapsed ? "▸" : "▾";
+          toggle.title = collapsed ? "展开规则项" : "收起规则项";
+          toggle.setAttribute("aria-label", collapsed ? "展开规则项" : "收起规则项");
+          toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        }
+      }
+
+      function setGroupItemCollapsed(row, collapsed, options = {}) {
+        const body = row?.querySelector(".preset-group-item-body");
+        if (!row || !body) return;
+        window.Fantareal?.motion?.setDisclosureCollapsed?.(row, body, collapsed, {
+          hiddenMode: "hidden",
+          collapsedClass: "is-group-item-collapsed",
+          immediate: options.immediate === true,
+          fallbackMs: 300,
+        });
+        row.dataset.collapsed = collapsed ? "true" : "false";
+        if (!window.Fantareal?.motion?.setDisclosureCollapsed) {
+          body.hidden = !!collapsed;
+        }
+        updateGroupItemSummary(row);
+      }
+
+      function updateGroupItemSummaries(scope) {
+        if (!scope?.querySelectorAll) return;
+        scope.querySelectorAll(".preset-group-item").forEach(updateGroupItemSummary);
       }
 
       function getCompactStatusLabel(text, state) {
@@ -490,12 +609,18 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
       function setStatus(text) {
         const value = text || "就绪";
         const state = getStatusState(value);
-        statusEl.textContent = getCompactStatusLabel(value, state);
-        statusEl.title = value;
-        statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
-        statusEl.classList.add(`is-${state}`);
-        statusStripEl?.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
-        statusStripEl?.classList.add(`is-${state}`);
+        const label = getCompactStatusLabel(value, state);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: value,
+          state,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = value;
+          statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
+          statusEl.classList.add(`is-${state}`);
+        }
       }
 
       function getStatusState(text) {
@@ -509,10 +634,19 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
 
       function setDirty(dirty, message) {
         presetDirty = Boolean(dirty);
-        dirtyStateLabelEl.textContent = presetDirty ? "有未保存修改" : "已保存";
-        headerSaveStateEl.textContent = presetDirty ? "有未保存修改" : "已保存";
-        headerSaveStateEl.classList.toggle("is-dirty", presetDirty);
-        headerSaveStateEl.classList.toggle("is-saved", !presetDirty);
+        const stateLabel = presetDirty ? "有未保存修改" : "已保存";
+        dirtyStateLabelEl.textContent = stateLabel;
+        if (!window.Fantareal?.motion?.setStatusState?.(headerSaveStateEl, {
+          text: stateLabel,
+          title: message || stateLabel,
+          state: presetDirty ? "dirty" : "saved",
+          stateClasses: ["is-dirty", "is-saved", "is-success", "is-error", "is-saving"],
+        })) {
+          headerSaveStateEl.textContent = stateLabel;
+          headerSaveStateEl.title = message || stateLabel;
+          headerSaveStateEl.classList.toggle("is-dirty", presetDirty);
+          headerSaveStateEl.classList.toggle("is-saved", !presetDirty);
+        }
         statusStripEl.classList.toggle("is-dirty", presetDirty);
         presetSaveStateBoxEl?.classList.toggle("is-dirty", presetDirty);
         savePresetButton?.classList.toggle("is-dirty", presetDirty);
@@ -642,14 +776,14 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
       }
 
       function setCardCollapsed(card, collapsed) {
-        card.dataset.collapsed = collapsed ? "true" : "false";
         const body = card.querySelector(".preset-card-body");
         const toggle = card.querySelector(".toggle-preset-card");
-        if (body) body.hidden = collapsed;
+        window.Fantareal?.motion?.setDisclosureCollapsed(card, body, collapsed, { hiddenMode: "hidden" });
         if (toggle) {
           toggle.textContent = collapsed ? "▸" : "▾";
           toggle.title = collapsed ? "展开" : "折叠";
           toggle.setAttribute("aria-label", collapsed ? "展开" : "折叠");
+          toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
         }
       }
 
@@ -686,7 +820,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
           const mode = card.querySelector(".preset-group-selection-mode")?.value || "single";
           const itemCount = card.querySelectorAll(".preset-group-item").length;
           const selectedNames = getGroupSelectedNames(card);
-          chips.push({ text: "\u89c4\u5219\u7ec4", cls: "preset-chip-type" });
+          chips.push({ text: "\u89c4\u5219\u7ec4", cls: "preset-chip-type preset-chip-rule-group" });
           chips.push({ text: mode === "multiple" ? "\u591a\u9009" : "\u5355\u9009", cls: "preset-chip-mode" });
           chips.push({ text: selectedNames.length ? `\u5f53\u524d:${selectedNames.slice(0, 2).join("\u3001")}${selectedNames.length > 2 ? "\u7b49" : ""}` : "\u5f53\u524d:\u672a\u9009\u62e9", cls: "preset-chip-current" });
           chips.push({ text: `${itemCount} \u9879`, cls: "preset-chip-count" });
@@ -694,7 +828,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
           const advancedCount = countAdvancedGroupItems(card);
           if (advancedCount > 0) chips.push({ text: `\u542b\u9ad8\u7ea7\u9879 ${advancedCount}`, cls: "preset-chip-advanced advanced" });
         } else {
-          chips.push({ text: "\u666e\u901a\u89c4\u5219\u5757", cls: "preset-chip-type" });
+          chips.push({ text: "规则块", cls: "preset-chip-type preset-chip-rule-block" });
           chips.push({ text: `${contentLength} \u5b57`, cls: "preset-chip-words" });
           if (Object.keys(collectSegmentAdvancedFields(card)).length > 0) chips.push({ text: "\u9ad8\u7ea7\u5b57\u6bb5", cls: "preset-chip-advanced advanced" });
         }
@@ -739,9 +873,10 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
 
       function bindCardShellEvents(card) {
         card.querySelector(".preset-card-remove")?.addEventListener("click", () => {
-          card.remove();
-          applySearch();
-          markDirty("已删除规则块，有未保存修改。");
+          (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+            applySearch();
+            markDirty("已删除规则块，有未保存修改。");
+          });
         });
         card.querySelector(".toggle-preset-card")?.addEventListener("click", () => {
           setCardCollapsed(card, card.dataset.collapsed !== "true");
@@ -841,28 +976,38 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
           <textarea class="preset-block-content" rows="5" placeholder="这里填写要拼进系统规则的文本。">${escapeHtml(item.content || "")}</textarea>
           ${renderSegmentAdvancedFields(item, "block")}
         `;
+        initPresetAdvancedDisclosure(card);
         setCardCollapsed(card, collapsed);
         updateCardSummary(card);
         return card;
       }
 
-      function createGroupItemElement(item = {}, selected = false) {
+      function createGroupItemElement(item = {}, selected = false, collapsed = true) {
         const row = document.createElement("div");
         row.className = "preset-group-item";
         row.dataset.itemId = item.id || generateId("group-item");
         row.innerHTML = `
           <div class="preset-group-item-head">
+            <button type="button" class="secondary preset-icon-button preset-group-item-toggle" title="收起规则项" aria-label="收起规则项" aria-expanded="true">▾</button>
             <label class="preset-group-item-select" title="是否采用这个规则项">
               <input class="preset-group-item-selected" type="checkbox" ${selected ? "checked" : ""} />
               <span class="preset-quick-enabled-track" aria-hidden="true"></span>
               <span class="preset-group-item-select-label">采用</span>
             </label>
-            <input class="preset-group-item-name-input" placeholder="规则项名称，例如：轻古风" value="${escapeHtml(item.name || "")}" />
+            <div class="preset-group-item-title-stack">
+              <input class="preset-group-item-name-input" placeholder="规则项名称，例如：轻古风" value="${escapeHtml(item.name || "")}" />
+              <div class="preset-group-item-summary" aria-live="polite"></div>
+            </div>
             <button type="button" class="secondary preset-icon-button preset-group-item-remove" title="删除规则项">×</button>
           </div>
-          <textarea class="preset-group-item-content" rows="4" placeholder="这里填写这个规则项被选中后要拼进 prompt 的文本。">${escapeHtml(item.content || "")}</textarea>
-          ${renderSegmentAdvancedFields(item, "group-item")}
+          <div class="preset-group-item-body">
+            <textarea class="preset-group-item-content" rows="4" placeholder="这里填写这个规则项被选中后要拼进 prompt 的文本。">${escapeHtml(item.content || "")}</textarea>
+            ${renderSegmentAdvancedFields(item, "group-item")}
+          </div>
         `;
+        row.querySelector(".preset-group-item-toggle")?.addEventListener("click", () => {
+          setGroupItemCollapsed(row, row.dataset.collapsed !== "true");
+        });
         row.querySelector(".preset-group-item-remove")?.addEventListener("click", () => {
           const card = row.closest(".preset-card");
           row.remove();
@@ -872,15 +1017,24 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         row.querySelector(".preset-group-item-selected")?.addEventListener("change", () => {
           const card = row.closest(".preset-card");
           if (card) enforceGroupSelection(card, row);
+          updateGroupItemSummary(row);
           markDirty("规则组选中项已修改，有未保存修改。");
         });
-        row.querySelectorAll("input, textarea").forEach((el) => {
+        row.querySelectorAll("input, textarea, select").forEach((el) => {
           el.addEventListener("input", () => {
             const card = row.closest(".preset-card");
             if (card) updateCardSummary(card);
+            updateGroupItemSummary(row);
             markDirty("规则项内容已修改，有未保存修改。");
           });
+          el.addEventListener("change", () => {
+            const card = row.closest(".preset-card");
+            if (card) updateCardSummary(card);
+            updateGroupItemSummary(row);
+          });
         });
+        initPresetAdvancedDisclosure(row);
+        setGroupItemCollapsed(row, collapsed, { immediate: true });
         return row;
       }
 
@@ -914,15 +1068,15 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
           items.forEach((item, index) => {
             const itemId = String(item.id || "");
             const selected = selectedIds.length ? selectedIds.includes(itemId) : index === 0 && group.selection_mode !== "multiple";
-            list.appendChild(createGroupItemElement(item, selected));
+            list.appendChild(createGroupItemElement(item, selected, true));
           });
         } else {
-          list.appendChild(createGroupItemElement({ name: "轻古风", content: "" }, true));
-          list.appendChild(createGroupItemElement({ name: "散文", content: "" }, false));
-          list.appendChild(createGroupItemElement({ name: "小说", content: "" }, false));
+          list.appendChild(createGroupItemElement({ name: "轻古风", content: "" }, true, true));
+          list.appendChild(createGroupItemElement({ name: "散文", content: "" }, false, true));
+          list.appendChild(createGroupItemElement({ name: "小说", content: "" }, false, true));
         }
         body.querySelector(".add-group-item")?.addEventListener("click", () => {
-          list.appendChild(createGroupItemElement({ name: "新规则项", content: "" }, false));
+          list.appendChild(createGroupItemElement({ name: "新规则项", content: "" }, false, false));
           enforceGroupSelection(card);
           markDirty("已新增规则项，有未保存修改。");
         });
@@ -952,6 +1106,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
             });
           }
         }
+        updateGroupItemSummaries(card);
         updateCardSummary(card);
       }
 
@@ -980,7 +1135,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
               <strong>${escapeHtml(item.name || "未命名预设")}</strong>
               <span class="preset-pill-row">${pills.join("")}</span>
             </div>
-            <small>${item.enabled === false ? "已停用" : "已启用"} · ${blockCount} 个普通规则块 · ${groupCount} 个规则组</small>
+            <small>${item.enabled === false ? "已停用" : "已启用"} · ${blockCount} 个规则块 · ${groupCount} 个规则组</small>
           `;
           btn.addEventListener("click", async () => {
             syncEditorToStore();
@@ -1046,7 +1201,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         if (!cards.length) {
           const empty = document.createElement("div");
           empty.className = "preset-empty-state";
-          empty.textContent = "还没有额外规则块。可以新增普通规则块，或新增一个规则组。";
+          empty.textContent = "还没有额外规则块。可以新增规则块，或新增一个规则组。";
           presetListEl.appendChild(empty);
         } else {
           cards.forEach((entry) => {
@@ -1275,13 +1430,17 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
 
       document.getElementById("add-preset-block").addEventListener("click", () => {
         removeEmptyState();
-        presetListEl.prepend(createBlockCard({}, false));
+        const card = createBlockCard({}, false);
+        presetListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
         applySearch();
         markDirty("已新增一条空白规则块。");
       });
       document.getElementById("add-preset-group").addEventListener("click", () => {
         removeEmptyState();
-        presetListEl.prepend(createGroupCard({ name: "文风", selection_mode: "single" }, false));
+        const card = createGroupCard({ name: "文风", selection_mode: "single" }, false);
+        presetListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
         applySearch();
         markDirty("已新增一个规则组。");
       });

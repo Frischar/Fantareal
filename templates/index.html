@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-chat-motion-final-20260622" />
     <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-switch-v1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
@@ -476,6 +476,7 @@
     <audio id="workshop-dynamic-audio" preload="auto"></audio>
     <div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>
     <script src="/static/js/prompt-debug.js?v=prompt-debug-v1"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-cde-chat-motion-20260621"></script>
     <script>
       const rootEl = document.documentElement;
       const bodyEl = document.body;
@@ -629,6 +630,9 @@
       const userAvatarLabel = {{ ((user_profile.display_name or "我")[:1]) | tojson }};
       const assistantAvatarUrl = {{ role_avatar_url | tojson }};
       const assistantAvatarLabel = {{ ((persona.name or "AI")[:1]) | tojson }};
+      let scrollBottomHideTimer = null;
+      let messageEditOutsideController = null;
+      let messageEditOutsideHandler = null;
 
       function buildAvatar(role) {
         const avatar = document.createElement("div");
@@ -800,11 +804,33 @@
         if (!statusEl) return;
         const normalized = normalizeStatusText(text);
         const statusKind = kind || inferStatusKind(normalized);
-        statusEl.textContent = normalized;
-        statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
-        statusEl.classList.add("task-status", `is-${statusKind}`);
+        const motion = window.Fantareal?.motion;
+        const stateClasses = ["is-idle", "is-busy", "is-success", "is-error"];
+        if (!motion?.setStatusState?.(statusEl, {
+          text: normalized,
+          title: normalized,
+          state: statusKind,
+          stateClasses,
+          fallbackMs: 560,
+        })) {
+          statusEl.textContent = normalized;
+          statusEl.title = normalized;
+          statusEl.classList.remove(...stateClasses);
+          statusEl.classList.add("task-status", `is-${statusKind}`);
+        } else {
+          statusEl.classList.add("task-status");
+        }
         if (runtimeLastActionLabelEl && statusKind !== "idle") {
           runtimeLastActionLabelEl.textContent = normalized;
+        }
+      }
+
+      function logBackgroundAudioNotice(message, error = null) {
+        if (!message) return;
+        if (error) {
+          console.warn(`[Fantareal] ${message}`, error);
+        } else {
+          console.warn(`[Fantareal] ${message}`);
         }
       }
 
@@ -814,7 +840,13 @@
         toast.className = `app-toast ${type}`;
         toast.textContent = message;
         toastHostEl.appendChild(toast);
-        requestAnimationFrame(() => toast.classList.add("show"));
+        requestAnimationFrame(() => {
+          toast.classList.add("show");
+          window.Fantareal?.motion?.pulseStatus?.(toast, {
+            className: "chat-toast-settle",
+            fallbackMs: 560,
+          });
+        });
         window.setTimeout(() => {
           toast.classList.remove("show");
           window.setTimeout(() => toast.remove(), 220);
@@ -837,6 +869,14 @@
         inputEl.style.height = `${nextHeight}px`;
       }
 
+      function pulseChatElement(element, className, fallbackMs = 560) {
+        if (!element || !className) return;
+        window.Fantareal?.motion?.pulseStatus?.(element, {
+          className,
+          fallbackMs,
+        });
+      }
+
       function applyFantarealChoiceText(choiceText) {
         const text = String(choiceText || "").trim();
         if (!text || !inputEl) return;
@@ -853,11 +893,36 @@
         return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <= threshold;
       }
 
+      function setScrollBottomButtonVisible(visible) {
+        if (!scrollBottomBtn) return;
+        window.clearTimeout(scrollBottomHideTimer);
+        if (visible) {
+          const wasHidden = scrollBottomBtn.hidden;
+          scrollBottomBtn.hidden = false;
+          if (wasHidden || !scrollBottomBtn.classList.contains("is-visible")) {
+            requestAnimationFrame(() => {
+              scrollBottomBtn.classList.add("is-visible");
+            });
+          }
+          return;
+        }
+        scrollBottomBtn.classList.remove("is-visible", "has-new");
+        scrollBottomHideTimer = window.setTimeout(() => {
+          if (!scrollBottomBtn.classList.contains("is-visible")) {
+            scrollBottomBtn.hidden = true;
+          }
+        }, 180);
+      }
+
       function updateScrollBottomButton(hasNew = false) {
         if (!scrollBottomBtn) return;
         const shouldShow = !isMessagesNearBottom(120);
-        scrollBottomBtn.hidden = !shouldShow;
-        scrollBottomBtn.classList.toggle("has-new", !!hasNew && shouldShow);
+        setScrollBottomButtonVisible(shouldShow);
+        if (!shouldShow) {
+          scrollBottomBtn.textContent = "↓ 回到底部";
+          return;
+        }
+        scrollBottomBtn.classList.toggle("has-new", !!hasNew);
         scrollBottomBtn.textContent = hasNew && shouldShow ? "有新回复 ↓" : "↓ 回到底部";
       }
 
@@ -944,6 +1009,7 @@
 
       function setLeftSidebarCollapsed(collapsed, { persist = true } = {}) {
         const shouldCollapse = !!collapsed;
+        const changed = document.body.classList.contains("left-sidebar-collapsed") !== shouldCollapse;
         document.body.classList.toggle("left-sidebar-collapsed", shouldCollapse);
         leftSidebarEl?.setAttribute("aria-hidden", String(shouldCollapse));
         leftSidebarToggleEl?.setAttribute("aria-expanded", String(!shouldCollapse));
@@ -953,6 +1019,9 @@
         }
         if (leftSidebarHandleIconEl) {
           leftSidebarHandleIconEl.textContent = shouldCollapse ? "»" : "«";
+        }
+        if (changed) {
+          pulseChatElement(leftSidebarToggleEl, "chat-sidebar-handle-pulse", 520);
         }
         if (persist) {
           localStorage.setItem(LEFT_SIDEBAR_STORAGE_KEY, String(shouldCollapse));
@@ -2006,10 +2075,59 @@
       }
 
       function closeMessageEditors() {
+        if (messageEditOutsideHandler) {
+          document.removeEventListener("pointerdown", messageEditOutsideHandler, true);
+          messageEditOutsideHandler = null;
+        }
+        if (messageEditOutsideController) {
+          messageEditOutsideController.abort();
+          messageEditOutsideController = null;
+        }
         messagesEl?.querySelectorAll(".message-edit-panel").forEach((panel) => panel.remove());
+        messagesEl?.querySelectorAll(".message.is-editing-message").forEach((wrapper) => {
+          wrapper.classList.remove("is-editing-message");
+        });
         messagesEl?.querySelectorAll(".message-actions").forEach((actions) => {
           actions.hidden = false;
         });
+      }
+
+      function updateFloatingMessageEditPlacement(panel) {
+        if (!panel || !messagesEl) return;
+        panel.classList.remove("is-flipped");
+        const panelRect = panel.getBoundingClientRect();
+        const messagesRect = messagesEl.getBoundingClientRect();
+        const composerRect = chatForm?.getBoundingClientRect();
+        const lowerBound = Math.min(messagesRect.bottom - 12, (composerRect?.top ?? messagesRect.bottom) - 14);
+        const canFlip = panelRect.height < Math.max(180, panelRect.top - messagesRect.top + panelRect.height);
+        if (panelRect.bottom > lowerBound && canFlip) {
+          panel.classList.add("is-flipped");
+        }
+      }
+
+      function bindMessageEditOutsideClose(panel) {
+        if (!panel) return;
+        messageEditOutsideController?.abort();
+        messageEditOutsideController = new AbortController();
+        const { signal } = messageEditOutsideController;
+
+        const schedulePlacement = () => requestAnimationFrame(() => updateFloatingMessageEditPlacement(panel));
+        window.addEventListener("resize", schedulePlacement, { signal });
+        messagesEl?.addEventListener("scroll", schedulePlacement, { signal, passive: true });
+        requestAnimationFrame(() => updateFloatingMessageEditPlacement(panel));
+
+        messageEditOutsideHandler = (event) => {
+          const target = event.target;
+          if (panel.classList.contains("is-saving")) return;
+          if (!target || panel.contains(target)) return;
+          if (target.closest?.(".message-action-button")) return;
+          closeMessageEditors();
+        };
+        window.setTimeout(() => {
+          if (!signal.aborted && messageEditOutsideHandler) {
+            document.addEventListener("pointerdown", messageEditOutsideHandler, true);
+          }
+        }, 0);
       }
 
       function ensureMessageActions(wrapper) {
@@ -2046,7 +2164,7 @@
         if (role === "assistant") {
           const rerollBtn = document.createElement("button");
           rerollBtn.type = "button";
-          rerollBtn.className = "message-action-button";
+          rerollBtn.className = "message-action-button message-action-reroll";
           rerollBtn.textContent = "🎲";
           rerollBtn.setAttribute("aria-label", "重 roll 这条助手回复");
           rerollBtn.title = "删除这条回复及后续内容，并用上一条用户消息重新生成";
@@ -2088,11 +2206,18 @@
         if (!bubbleWrap) return;
 
         closeMessageEditors();
-        const actions = bubbleWrap.querySelector(":scope > .message-actions");
+        wrapper.classList.add("is-editing-message");
+        const actions = bubbleWrap.querySelector(":scope > .message-meta .message-actions");
         if (actions) actions.hidden = true;
 
         const panel = document.createElement("div");
-        panel.className = "message-edit-panel";
+        panel.className = "message-edit-panel floating-message-edit-panel";
+        panel.setAttribute("role", "group");
+        panel.setAttribute("aria-label", "编辑这条消息");
+
+        const panelLabel = document.createElement("div");
+        panelLabel.className = "message-edit-panel-label";
+        panelLabel.textContent = "正在编辑";
 
         const textarea = document.createElement("textarea");
         textarea.className = "message-edit-textarea";
@@ -2113,6 +2238,7 @@
         saveBtn.className = "compact message-edit-save";
         saveBtn.textContent = "保存并重生成";
         saveBtn.addEventListener("click", async () => {
+          if (saveBtn.classList.contains("is-saving")) return;
           const nextText = textarea.value.trim();
           if (!nextText) {
             showToast("编辑后的消息不能为空", "error");
@@ -2122,14 +2248,50 @@
             const confirmed = window.confirm("编辑这里会删除这条消息之后的对话，并从这里重新生成。继续吗？");
             if (!confirmed) return;
           }
-          await editUserMessageAndRegenerate(index, nextText);
+          saveBtn.classList.add("is-saving");
+          saveBtn.textContent = "保存中…";
+          saveBtn.disabled = true;
+          cancelBtn.disabled = true;
+          textarea.readOnly = true;
+          panel.classList.add("is-saving");
+          try {
+            await editUserMessageAndRegenerate(index, nextText);
+            if (panel.isConnected) {
+              saveBtn.classList.remove("is-saving");
+              saveBtn.textContent = "保存并重生成";
+              saveBtn.disabled = false;
+              cancelBtn.disabled = false;
+              textarea.readOnly = false;
+              panel.classList.remove("is-saving");
+            }
+          } catch (error) {
+            saveBtn.classList.remove("is-saving");
+            saveBtn.textContent = "保存并重生成";
+            saveBtn.disabled = false;
+            cancelBtn.disabled = false;
+            textarea.readOnly = false;
+            panel.classList.remove("is-saving");
+          }
+        });
+        textarea.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeMessageEditors();
+            return;
+          }
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            saveBtn.click();
+          }
         });
 
         footer.appendChild(cancelBtn);
         footer.appendChild(saveBtn);
+        panel.appendChild(panelLabel);
         panel.appendChild(textarea);
         panel.appendChild(footer);
         bubbleWrap.appendChild(panel);
+        bindMessageEditOutsideClose(panel);
         textarea.focus();
         textarea.setSelectionRange(textarea.value.length, textarea.value.length);
       }
@@ -2431,6 +2593,7 @@
 
       function setRuntimePanelOpen(open) {
         const shouldOpen = !!open && !isChallengeModeUnlocked();
+        const changed = chatLayoutEl?.classList.contains("runtime-panel-open") !== shouldOpen;
         chatLayoutEl?.classList.toggle("runtime-panel-open", shouldOpen);
         chatLayoutEl?.classList.toggle("runtime-panel-collapsed", !shouldOpen);
         runtimePanelEl?.setAttribute("aria-hidden", String(!shouldOpen));
@@ -2441,6 +2604,12 @@
         }
         if (runtimePanelHandleIconEl) {
           runtimePanelHandleIconEl.textContent = shouldOpen ? "»" : "«";
+        }
+        if (changed) {
+          pulseChatElement(runtimePanelToggleEl, "chat-runtime-handle-pulse", 520);
+          if (shouldOpen) {
+            pulseChatElement(runtimePanelEl, "chat-runtime-panel-settle", 620);
+          }
         }
       }
 
@@ -5042,8 +5211,12 @@
         workshopAmbienceMuted = false;
         workshopActiveAudioGroup = "ambience";
         updateWorkshopOpeningAudioToggle();
-        return Promise.all(tasks).catch(() => {
-          setStatus(fromUserGesture ? "常驻氛围播放失败，请检查音频文件或浏览器权限。" : "常驻氛围等待用户点击喇叭后播放。");
+        return Promise.all(tasks).catch((error) => {
+          if (fromUserGesture) {
+            setStatus("常驻氛围播放失败，请检查音频文件或浏览器权限。", "error");
+          } else {
+            logBackgroundAudioNotice("常驻氛围自动播放被浏览器拦截，等待用户点击喇叭后播放。", error);
+          }
           updateWorkshopOpeningAudioToggle();
         });
       }
@@ -5102,7 +5275,7 @@
             return audio.play().then(() => fadeAudioElement(audio, audio === workshopAmbienceAmbientAudioEl ? clampAudioVolume(workshopAmbienceConfig?.ambient?.volume, 0.35) : clampAudioVolume(workshopAmbienceConfig?.music?.volume || workshopOpeningConfig?.volume, 0.65), getOpeningTransitionMs()));
           });
           workshopAmbienceMuted = false;
-          await Promise.all(resumeTasks).catch(() => setStatus("工坊氛围播放失败，请检查浏览器权限。"));
+          await Promise.all(resumeTasks).catch((error) => setStatus("工坊氛围播放失败，请检查浏览器权限。", "error"));
         } else {
           await Promise.all(activeElements.map((audio) => audio ? fadeAudioElement(audio, 0, getOpeningTransitionMs()).then(() => audio.pause()) : Promise.resolve()));
           workshopAmbienceMuted = true;
@@ -5362,7 +5535,7 @@
         if (tasks.length) {
           workshopAmbienceStarted = true;
           workshopActiveAudioGroup = "ambience";
-          await Promise.all(tasks).catch(() => setStatus("常驻氛围恢复失败，请检查音频文件或浏览器权限。"));
+          await Promise.all(tasks).catch((error) => logBackgroundAudioNotice("常驻氛围恢复失败，请检查音频文件或浏览器权限。", error));
         }
       }
 
@@ -5406,10 +5579,10 @@
           workshopDynamicAudioStopTimer = window.setTimeout(() => {
             stopDynamicSound({ restoreAmbience: true });
           }, durationMs);
-        } catch (_) {
+        } catch (error) {
           workshopDynamicAudioActive = false;
           workshopDynamicAudioRestoreAmbience = false;
-          setStatus("动态演出音乐播放失败，请检查音频文件。", "error");
+          logBackgroundAudioNotice("动态演出音乐播放失败，请检查音频文件。", error);
           await resumeAmbienceAfterDynamic();
         }
       }
@@ -5533,8 +5706,8 @@
         }
         workshopAudioEl.currentTime = 0;
         if (action?.autoplay !== false) {
-          workshopAudioEl.play().catch(() => {
-            setStatus("演出工坊音乐播放失败，请点击页面后重试。");
+          workshopAudioEl.play().catch((error) => {
+            logBackgroundAudioNotice("演出工坊音乐播放失败，请点击页面后重试。", error);
           });
         }
       }
@@ -5878,6 +6051,7 @@
         event.preventDefault();
         const text = inputEl.value.trim();
         if (!text) return;
+        pulseChatElement(chatForm, "chat-composer-submit-pulse", 520);
         await generateChatTurn(text);
       });
 
@@ -6028,7 +6202,7 @@
         postJson,
       };
     </script>
-    <script src="/static/js/theme-toggle.js?v=ui-chat-theme-toggle-opacity-sync-20260621"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     {% for mod in registered_mods or [] %}
       {% for src in mod.hooks.chat_scripts or [] %}
     <script src="{{ src }}{% if '?' in src %}&{% else %}?{% endif %}v=state-journal-opacity-sync-v2-p611c-runtime-drawer-remove" data-mod-hook="{{ mod.slug }}"></script>

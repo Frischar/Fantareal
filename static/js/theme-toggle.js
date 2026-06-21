@@ -17,6 +17,24 @@
     return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
   }
 
+  function normalizeTheme(theme) {
+    return theme === "dark" ? "dark" : "light";
+  }
+
+  function syncThemeControls(theme) {
+    const normalizedTheme = normalizeTheme(theme);
+    document.querySelectorAll("#theme-select, [data-theme-select]").forEach((control) => {
+      if ("value" in control && control.value !== normalizedTheme) {
+        control.value = normalizedTheme;
+      }
+    });
+    window.FantarealThemeToggle = {
+      ...(window.FantarealThemeToggle || {}),
+      theme: normalizedTheme,
+    };
+    return normalizedTheme;
+  }
+
   function normalizeUiOpacity(value) {
     const opacity = Number(value);
     if (!Number.isFinite(opacity)) return undefined;
@@ -54,8 +72,9 @@
   }
 
   function updateThemeToggle(button, theme) {
-    const nextTheme = theme === "dark" ? "light" : "dark";
-    button.textContent = theme === "dark" ? "🌙" : "🌞";
+    const normalizedTheme = normalizeTheme(theme);
+    const nextTheme = normalizedTheme === "dark" ? "light" : "dark";
+    button.textContent = normalizedTheme === "dark" ? "🌙" : "🌞";
     button.setAttribute("aria-label", nextTheme === "dark" ? "切换为深色主题" : "切换为浅色主题");
     button.title = nextTheme === "dark" ? "切换为深色主题" : "切换为浅色主题";
   }
@@ -94,14 +113,22 @@
     const button = document.querySelector("[data-theme-toggle]");
     if (!button || button.dataset.themeToggleReady === "true") return;
     button.dataset.themeToggleReady = "true";
-    let activeTheme = getTheme();
+    let activeTheme = syncThemeControls(getTheme());
     updateThemeToggle(button, activeTheme);
+    document.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!target?.matches?.("#theme-select, [data-theme-select]")) return;
+      activeTheme = syncThemeControls(target.value);
+      updateThemeToggle(button, activeTheme);
+    });
     button.addEventListener("click", async () => {
-      const nextTheme = activeTheme === "dark" ? "light" : "dark";
+      const currentTheme = getTheme();
+      const nextTheme = currentTheme === "dark" ? "light" : "dark";
       const currentOpacity = syncThemeToggleOpacity(readCurrentUiOpacity());
-      activeTheme = nextTheme;
+      activeTheme = normalizeTheme(nextTheme);
       playThemeTransition(button, activeTheme);
       applyTheme(activeTheme);
+      syncThemeControls(activeTheme);
       if (currentOpacity !== undefined) applyUiOpacity(currentOpacity);
       updateThemeToggle(button, activeTheme);
       setThemeStatus(activeTheme === "dark" ? "已切换为深色主题。" : "已切换为浅色主题。");
@@ -118,4 +145,8 @@
   } else {
     initThemeToggle();
   }
+  window.Fantareal = {
+    ...(window.Fantareal || {}),
+    syncThemeControls,
+  };
 })();
