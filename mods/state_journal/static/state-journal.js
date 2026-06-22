@@ -60,6 +60,15 @@
     dashboardEnabled: $("#dashboardEnabled"),
     dashboardAutoUpdate: $("#dashboardAutoUpdate"),
     dashboardTurnNote: $("#dashboardTurnNote"),
+    nextStepModel: $("#nextStepModel"),
+    nextStepModelTitle: $("#nextStepModelTitle"),
+    nextStepModelAction: $("#nextStepModelAction"),
+    nextStepEnabled: $("#nextStepEnabled"),
+    nextStepEnabledTitle: $("#nextStepEnabledTitle"),
+    nextStepEnabledStatus: $("#nextStepEnabledStatus"),
+    nextStepAuto: $("#nextStepAuto"),
+    nextStepAutoTitle: $("#nextStepAutoTitle"),
+    nextStepAutoStatus: $("#nextStepAutoStatus"),
     tableList: $("#tableList"),
     currentTitle: $("#currentTableTitle"),
     currentDesc: $("#currentTableDesc"),
@@ -217,9 +226,9 @@
 
 
   const ROLE_SOURCE_MODES = {
-    auto: { label: "自动识别", desc: "没有多角色时读取主卡；有多角色时默认读取多角色。" },
+    auto: { label: "自动识别", desc: "自动识别主卡和有内容的多角色；空占位子角色会自动隐藏。" },
     main_card: { label: "主卡就是角色", desc: "适合普通单角色卡，心笺会把主卡作为唯一角色记录。" },
-    personas_only: { label: "主卡是旁白，只读取多角色", desc: "适合双女主、多角色卡，主卡只作为旁白或总设定。" },
+    personas_only: { label: "主卡旁白，多角色展开", desc: "适合旁白卡、多角色卡；只显示有内容的多角色，不显示主卡。" },
   };
 
   const STORY_TIME_FIELDS = [
@@ -382,6 +391,22 @@
       };
       modal.querySelector("[data-confirm-cancel]").onclick = () => cleanup(false);
       ok.onclick = () => cleanup(true);
+    });
+  }
+
+  async function confirmDangerousRoleCardAction({ title, body, confirmText, finalTitle, finalBody, finalConfirmText }) {
+    const firstOk = await confirmAction({
+      title,
+      body,
+      confirmText,
+      danger: true,
+    });
+    if (!firstOk) return false;
+    return confirmAction({
+      title: finalTitle || `最终确认：${title}`,
+      body: finalBody,
+      confirmText: finalConfirmText || "我已确认，继续执行",
+      danger: true,
     });
   }
 
@@ -910,6 +935,47 @@
     el.classList.toggle("is-off", !enabled);
   }
 
+  function setNextStepState(item, titleEl, statusEl, ok, title, status) {
+    if (titleEl) titleEl.textContent = title;
+    if (statusEl) statusEl.textContent = status;
+    if (!item) return;
+    item.classList.toggle("needs-action", !ok);
+    item.classList.toggle("is-complete", !!ok);
+    item.classList.toggle("is-pending", !ok);
+  }
+
+  function renderNextStepChecklist() {
+    const cfg = state.config || {};
+    const modelReady = !!String(cfg.api_base_url || "").trim() && !!String(cfg.model || "").trim();
+    const enabled = cfg.enabled !== false;
+    const autoUpdate = !!cfg.auto_update;
+    setNextStepState(
+      els.nextStepModel,
+      els.nextStepModelTitle,
+      null,
+      modelReady,
+      modelReady ? "辅助模型 API 已配置" : "配置辅助模型 API",
+      modelReady ? "完成" : "去配置"
+    );
+    if (els.nextStepModelAction) els.nextStepModelAction.textContent = modelReady ? "查看" : "去配置";
+    setNextStepState(
+      els.nextStepEnabled,
+      els.nextStepEnabledTitle,
+      els.nextStepEnabledStatus,
+      enabled,
+      enabled ? "心笺运行环境已启用" : "心笺运行环境未启用",
+      enabled ? "完成" : "未开启"
+    );
+    setNextStepState(
+      els.nextStepAuto,
+      els.nextStepAutoTitle,
+      els.nextStepAutoStatus,
+      autoUpdate,
+      autoUpdate ? "自动填表已开启" : "自动填表未开启",
+      autoUpdate ? "完成" : "未开启"
+    );
+  }
+
   function renderRuntimeOverview() {
     const cfg = state.config || {};
     const enabled = cfg.enabled !== false;
@@ -929,6 +995,7 @@
     if (els.dashboardEnabled) els.dashboardEnabled.checked = enabled;
     if (els.dashboardAutoUpdate) els.dashboardAutoUpdate.checked = autoUpdate;
     if (els.dashboardTurnNote) els.dashboardTurnNote.checked = turnNoteEnabled;
+    renderNextStepChecklist();
   }
 
   function bindConfig() {
@@ -1464,27 +1531,32 @@
   }
 
   const WORKSPACE_DEFAULT_TAB = {
+    home: null,
     journal: null,
+    role: "roleState",
     roleState: "roleState",
     turnNote: "turnNote",
+    advanced: "data",
     beauty: "template",
     settings: "model",
   };
 
   const TAB_WORKSPACE = {
-    schema: "journal",
-    rules: "journal",
-    roleState: "roleState",
-    log: "settings",
-    turnNote: "turnNote",
-    generate: "settings",
-    template: "beauty",
-    theme: "beauty",
-    model: "settings",
-    link: "settings",
+    data: "advanced",
+    schema: "advanced",
+    rules: "advanced",
+    roleState: "role",
+    turnNote: "role",
+    log: "advanced",
+    generate: "advanced",
+    template: "advanced",
+    theme: "advanced",
+    model: "advanced",
+    link: "advanced",
   };
 
   const TAB_TITLES = {
+    data: "数据表册",
     schema: "字段设置",
     rules: "规则设置",
     roleState: "角色配置",
@@ -1497,25 +1569,37 @@
     link: "聊天联动",
   };
 
+  function normalizeWorkspace(workspace = "home") {
+    const aliases = {
+      journal: "home",
+      roleState: "role",
+      turnNote: "role",
+      beauty: "advanced",
+      settings: "advanced",
+    };
+    return aliases[workspace] || workspace || "home";
+  }
+
   function setWorkspaceNav(workspace) {
+    const normalized = normalizeWorkspace(workspace);
     document.querySelectorAll(".workspace-nav-btn").forEach((item) => {
-      item.classList.toggle("active", item.dataset.workspace === workspace);
+      item.classList.toggle("active", normalizeWorkspace(item.dataset.workspace) === normalized);
     });
   }
 
-  function switchWorkspace(workspace = "journal", tab = null) {
-    const database = document.getElementById("databaseWorkspace");
-    const showConfig = workspace !== "journal" || !!tab;
-    setWorkspaceNav(workspace);
-    if (database) database.classList.toggle("active", !showConfig);
-    if (els.configDrawer) {
-      els.configDrawer.classList.toggle("active", showConfig);
-      els.configDrawer.dataset.activeWorkspace = workspace;
-      els.configDrawer.setAttribute("aria-hidden", showConfig ? "false" : "true");
-    }
+  function switchWorkspace(workspace = "home", tab = null) {
+    const normalized = normalizeWorkspace(workspace);
+    setWorkspaceNav(normalized);
+    document.querySelectorAll("[data-workspace-page]").forEach((page) => {
+      page.classList.toggle("active", page.dataset.workspacePage === normalized);
+    });
+    document.querySelectorAll(".config-workspace-panel").forEach((page) => {
+      page.dataset.activeWorkspace = normalized;
+    });
     if (els.drawerMask) els.drawerMask.hidden = true;
-    if (showConfig) {
-      switchTab(tab || WORKSPACE_DEFAULT_TAB[workspace] || "schema");
+    const defaultTab = tab || WORKSPACE_DEFAULT_TAB[normalized];
+    if (defaultTab) {
+      switchTab(defaultTab);
     }
   }
 
@@ -1528,17 +1612,28 @@
   }
 
   function closeConfigDrawer() {
-    switchWorkspace("journal");
+    switchWorkspace("home");
   }
 
   function switchTab(tab) {
-    const workspace = TAB_WORKSPACE[tab] || "journal";
-    if (els.configDrawer) els.configDrawer.dataset.activeWorkspace = workspace;
+    const workspace = normalizeWorkspace(TAB_WORKSPACE[tab] || "advanced");
+    document.querySelectorAll(".config-workspace-panel").forEach((page) => {
+      page.dataset.activeWorkspace = workspace;
+    });
     if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "心笺设置";
     document.querySelectorAll(".tab-btn").forEach((item) => item.classList.toggle("active", item.dataset.tab === tab));
+    const advancedGroup = ({ schema: "data", rules: "data", generate: "model", link: "model", theme: "template" }[tab]) || tab;
+    document.querySelectorAll(".advanced-nav .tab-btn").forEach((item) => {
+      item.classList.toggle("active", item.dataset.tab === advancedGroup);
+    });
     document.querySelectorAll(".tab-page").forEach((item) => item.classList.toggle("active", item.dataset.page === tab));
     setWorkspaceNav(workspace);
+    document.querySelectorAll("[data-workspace-page]").forEach((page) => {
+      page.classList.toggle("active", page.dataset.workspacePage === workspace);
+    });
     if (tab === "roleState") loadRoleStateConfig().catch((error) => pageToast("角色配置载入失败", error.message, "error"));
+    if (tab === "link") refreshHookStatus();
+    if (tab === "log") loadLog().catch(() => {});
   }
 
   function roleStateStageKey(index) {
@@ -1555,17 +1650,8 @@
   function normalizeRoleStateConfig(config = {}) {
     const roles = Array.isArray(config.roles) ? config.roles : [];
     const roleSourceMode = normalizeRoleSourceMode(config.role_source_mode || config.roleSourceMode);
-    return { version: 1, enabled: config.enabled !== false, role_source_mode: roleSourceMode, role_source_summary: config.role_source_summary || {}, roles: roles.map((role, index) => ({
-      role_id: safeTemplateId(role.role_id || role.id || `role_${index + 1}`),
-      role_name: String(role.role_name || role.name || `角色${index + 1}`).trim(),
-      aliases: Array.isArray(role.aliases) ? role.aliases : [],
-      enabled: role.enabled !== false,
-      mode: normalizeRoleStateMode(role.mode || role.stateJournalMode, role),
-      stateJournalMode: normalizeRoleStateMode(role.mode || role.stateJournalMode, role),
-      use_default_variables: !!role.use_default_variables,
-      source: String(role.source || role.role_source || "").trim(),
-      initial_stage: safeTemplateId(role.initial_stage || "stage_a"),
-      variables: Array.isArray(role.variables) ? role.variables.map((variable, varIndex) => ({
+    return { version: 1, enabled: config.enabled !== false, role_source_mode: roleSourceMode, role_source_summary: config.role_source_summary || {}, roles: roles.map((role, index) => {
+      const variables = Array.isArray(role.variables) ? role.variables.map((variable, varIndex) => ({
         var_key: safeTemplateId(variable.var_key || variable.key || `var_${varIndex + 1}`),
         var_name: String(variable.var_name || variable.label || `变量${varIndex + 1}`).trim(),
         enabled: variable.enabled !== false,
@@ -1577,8 +1663,8 @@
         display: variable.display !== false,
         stage_relevant: variable.stage_relevant !== false,
         instruction: String(variable.instruction || ""),
-      })) : [],
-      stages: Array.isArray(role.stages) ? role.stages.map((stage, stageIndex) => ({
+      })) : [];
+      const stages = Array.isArray(role.stages) ? role.stages.map((stage, stageIndex) => ({
         stage_key: safeTemplateId(stage.stage_key || stage.key || roleStateStageKey(stageIndex + 1)),
         stage_name: String(stage.stage_name || stage.name || roleStateStageName(stageIndex + 1)).trim(),
         enabled: stage.enabled !== false,
@@ -1588,20 +1674,53 @@
         allow_regression: !!stage.allow_regression,
         confirm_turns: Math.max(1, Number(stage.confirm_turns || 1) || 1),
         cooldown_turns: Math.max(0, Number(stage.cooldown_turns || 0) || 0),
-      })) : [],
-      snapshotFields: Array.isArray(role.snapshotFields) ? role.snapshotFields.map((field, fieldIndex) => ({
+      })) : [];
+      const snapshotFields = Array.isArray(role.snapshotFields) ? role.snapshotFields.map((field, fieldIndex) => ({
         key: safeTemplateId(field.key || field.field_key || `snapshot_${fieldIndex + 1}`),
         label: String(field.label || field.name || `快照字段${fieldIndex + 1}`).trim(),
         enabled: field.enabled !== false,
         display: field.display !== false,
         instruction: String(field.instruction || field.note || "根据本轮上下文生成该状态快照字段。"),
-      })) : [],
-      settings: role.settings || { allow_regression: false, confirm_turns: 1, cooldown_turns: 1 },
-    })) };
+      })) : [];
+      const source = String(role.source || role.role_source || "").trim();
+      const sourceType = String(role.source_type || role.sourceType || (source === "persona" ? "multi_role_slot" : source || "manual")).trim();
+      const mode = normalizeRoleStateMode(role.mode || role.stateJournalMode, { ...role, variables, stages, snapshotFields });
+      const hasStateJournalConfig = !!(role.has_state_journal_config || role.hasStateJournalConfig || variables.length || stages.length || snapshotFields.length || ["snapshot_only", "full"].includes(mode));
+      const displayPolicy = String(role.display_policy || role.displayPolicy || "").trim();
+      const explicitShow = displayPolicy === "show";
+      const isEmptySlot = !!(role.is_empty_slot || role.isEmptySlot || (!explicitShow && sourceType === "multi_role_slot" && !hasStateJournalConfig && !variables.length && !stages.length && !snapshotFields.length));
+      return {
+        role_id: safeTemplateId(role.role_id || role.id || `role_${index + 1}`),
+        role_name: String(role.role_name || role.name || `角色${index + 1}`).trim(),
+        aliases: Array.isArray(role.aliases) ? role.aliases : [],
+        enabled: role.enabled !== false,
+        mode,
+        stateJournalMode: mode,
+        use_default_variables: !!role.use_default_variables,
+        source,
+        source_type: sourceType,
+        has_state_journal_config: hasStateJournalConfig,
+        is_empty_slot: isEmptySlot,
+        display_policy: displayPolicy || (isEmptySlot ? "hide_empty" : "show"),
+        initial_stage: safeTemplateId(role.initial_stage || "stage_a"),
+        variables,
+        stages,
+        snapshotFields,
+        settings: role.settings || { allow_regression: false, confirm_turns: 1, cooldown_turns: 1 },
+      };
+    }) };
+  }
+
+  function shouldShowRoleStateRole(role) {
+    if (!role) return false;
+    if (role.display_policy === "hide_empty" || role.is_empty_slot) return false;
+    return true;
   }
 
   function currentRoleState() {
-    return (state.roleStateConfig.roles || []).find((role) => role.role_id === state.currentRoleStateId) || state.roleStateConfig.roles?.[0] || null;
+    const roles = state.roleStateConfig.roles || [];
+    const visibleRoles = roles.filter(shouldShowRoleStateRole);
+    return visibleRoles.find((role) => role.role_id === state.currentRoleStateId) || visibleRoles[0] || roles.find((role) => role.role_id === state.currentRoleStateId) || roles[0] || null;
   }
 
   function activeStageForRole(role) {
@@ -1836,8 +1955,10 @@
     const list = document.getElementById("roleStateRoleList");
     const detail = document.getElementById("roleStateDetail");
     if (!list || !detail) return;
-    const roles = state.roleStateConfig.roles || [];
+    const allRoles = state.roleStateConfig.roles || [];
+    const roles = allRoles.filter(shouldShowRoleStateRole);
     if (!state.currentRoleStateId && roles[0]) state.currentRoleStateId = roles[0].role_id;
+    if (state.currentRoleStateId && !roles.some((role) => role.role_id === state.currentRoleStateId) && roles[0]) state.currentRoleStateId = roles[0].role_id;
     const sourceInfo = roleSourceSummary(state.roleStateConfig);
     const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>`;
     renderStoryTimePanel();
@@ -2044,6 +2165,11 @@
     renderRoleStateWorkspace();
   }
 
+  async function ensureRoleStateConfigLoadedForDanger() {
+    if (Array.isArray(state.roleStateConfig?.roles) && state.roleStateConfig.roles.length) return;
+    await loadRoleStateConfig();
+  }
+
   async function loadStoryTime() {
     const payload = await requestJson("./api/story-time");
     state.storyTime = normalizeStoryTime(payload.story_time || {});
@@ -2103,7 +2229,7 @@
     const payload = await requestJson("./api/role-state/from-card", { method: "POST", body: JSON.stringify({}) });
     state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
     state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : [];
-    state.currentRoleStateId = state.roleStateConfig.roles?.[0]?.role_id || "";
+    state.currentRoleStateId = state.roleStateConfig.roles?.filter(shouldShowRoleStateRole)?.[0]?.role_id || state.roleStateConfig.roles?.[0]?.role_id || "";
     renderRoleStateWorkspace();
     pageToast("已读取角色卡配置", payload.message || "", "ok");
   }
@@ -2150,10 +2276,14 @@
   }
 
   async function syncRoleStateToCard() {
-    const ok = await confirmAction({
+    await ensureRoleStateConfigLoadedForDanger();
+    const ok = await confirmDangerousRoleCardAction({
       title: "同步配置至角色卡",
       body: buildSyncRoleStateConfirmBody(),
       confirmText: "确认写入角色卡",
+      finalTitle: "最终确认：写入角色卡",
+      finalBody: "<p>这是第二次确认。继续后会把当前心笺角色配置写入角色卡 <code>stateJournal</code>，可能覆盖角色卡里已有的心笺配置模板。</p><p class=\"danger-text\">如果你只是想保存后台设置，请取消，并使用「保存角色配置」。</p>",
+      finalConfirmText: "我确认写入角色卡",
     });
     if (!ok) return;
     await requestJson("./api/role-state/sync-to-card", { method: "POST", body: JSON.stringify({ config: state.roleStateConfig }) });
@@ -2175,11 +2305,15 @@
   }
 
   async function initCurrentRoleState() {
+    await ensureRoleStateConfigLoadedForDanger();
     const roles = (state.roleStateConfig.roles || []).filter((role) => role.enabled !== false && normalizeRoleStateMode(role.mode || role.stateJournalMode, role) === "full");
-    const ok = await confirmAction({
+    const ok = await confirmDangerousRoleCardAction({
       title: "从角色卡初始化当前状态",
       body: `<p>此操作会先读取当前角色卡里的 <code>stateJournal</code> 配置，再重建心笺当前变量与阶段。它可能覆盖当前运行中的变量值和当前阶段，但不会删除历史记录。</p><p><strong>当前已加载的完整心笺角色：</strong>${escapeHtml(roles.map((role) => role.role_name || role.role_id).join("、") || "暂无完整心笺角色")}</p><p>适合首轮开局前使用；游玩中请谨慎操作。</p>`,
       confirmText: "确认从角色卡初始化",
+      finalTitle: "最终确认：初始化当前状态",
+      finalBody: "<p>这是第二次确认。继续后会按角色卡里的 <code>stateJournal</code> 重建当前运行状态，当前变量值和当前阶段可能被覆盖。</p><p class=\"danger-text\">正式游玩中不建议执行；更适合开局前或排查配置时使用。</p>",
+      finalConfirmText: "我确认初始化当前状态",
     });
     if (!ok) return;
     const payload = await requestJson("./api/role-state/init-current", { method: "POST", body: JSON.stringify({ source: "role_card", from_card: true }) });
@@ -2406,11 +2540,15 @@
   async function importFile(file) { if (!file) return; const payload = JSON.parse(await file.text()); await requestJson("./api/import", { method: "POST", body: JSON.stringify(payload) }); await loadState(); setStatus("导入完成。", "ok"); pageToast("导入完成", "JSON 数据已写入心笺 SQLite。", "ok"); }
 
   document.querySelectorAll(".workspace-nav-btn").forEach((button) => button.addEventListener("click", () => {
-    const workspace = button.dataset.workspace || "journal";
+    const workspace = normalizeWorkspace(button.dataset.workspace || "home");
     const defaultTab = button.dataset.defaultTab || WORKSPACE_DEFAULT_TAB[workspace];
-    if (workspace === "journal") switchWorkspace("journal"); else openConfigDrawer(defaultTab);
+    if (defaultTab) openConfigDrawer(defaultTab);
+    else switchWorkspace(workspace);
   }));
-  document.querySelectorAll(".tab-btn").forEach((button) => button.addEventListener("click", () => openConfigDrawer(button.dataset.tab)));
+  document.querySelectorAll(".tab-btn").forEach((button) => button.addEventListener("click", () => {
+    if (button.dataset.tab) openConfigDrawer(button.dataset.tab);
+  }));
+  document.querySelectorAll("[data-open-tab]").forEach((button) => button.addEventListener("click", () => openConfigDrawer(button.dataset.openTab)));
   els.cardViewBtn.addEventListener("click", () => { state.viewMode = "card"; localStorage.setItem("state_journal:viewMode", state.viewMode); renderAll(); });
   els.tableViewBtn.addEventListener("click", () => { state.viewMode = "table"; localStorage.setItem("state_journal:viewMode", state.viewMode); renderAll(); });
   $("#openSchemaDrawerBtn")?.addEventListener("click", () => openConfigDrawer("schema"));

@@ -19,6 +19,10 @@ from .memory_merge_logic import (
     save_memory_outline,
     save_merged_memories,
 )
+from .memory_worldbook_sync import (
+    apply_memory_worldbook_sync,
+    preview_memory_worldbook_sync,
+)
 
 from .app_models import (
     DynamicWorldbookPreviewPayload,
@@ -26,6 +30,7 @@ from .app_models import (
     MemoryListPayload,
     MemoryMergePayload,
     MemoryOutlineListPayload,
+    MemoryWorldbookSyncPayload,
     MergedMemoryListPayload,
     PersonaPayload,
     PresetActionPayload,
@@ -509,7 +514,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
     @app.post("/api/preset")
     async def api_save_preset(payload: PresetStorePayload) -> dict[str, Any]:
         active_slot = ctx.get_active_slot_id()
-        store = ctx.save_preset_store(payload.model_dump(), active_slot)
+        store = ctx.save_preset_store(payload.model_dump(exclude_none=True), active_slot)
         return {
             "ok": True,
             "active_slot": active_slot,
@@ -655,7 +660,18 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
     @app.post("/api/settings")
     async def api_save_settings(payload: SettingsPayload) -> dict[str, Any]:
         active_slot = ctx.get_active_slot_id()
-        settings = ctx.sanitize_settings(payload.model_dump(), strict=True, slot_id=active_slot)
+        raw_settings = payload.model_dump()
+        if "layered_prompt_injection_enabled" not in payload.model_fields_set:
+            raw_settings["layered_prompt_injection_enabled"] = ctx.get_settings(active_slot).get(
+                "layered_prompt_injection_enabled",
+                False,
+            )
+        if "prompt_budget_token_limit" not in payload.model_fields_set:
+            raw_settings["prompt_budget_token_limit"] = ctx.get_settings(active_slot).get(
+                "prompt_budget_token_limit",
+                200000,
+            )
+        settings = ctx.sanitize_settings(raw_settings, strict=True, slot_id=active_slot)
         ctx.persist_json(
             ctx.settings_path(active_slot),
             settings,
@@ -981,9 +997,20 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             merged_title=payload.merged_title,
             outline_title=payload.outline_title,
             delete_sources=payload.delete_sources,
+            source_action=payload.source_action,
             slot_id=active_slot,
             runtime_overrides=payload.runtime_config,
         )
+
+    @app.post("/api/memories/worldbook-sync/preview")
+    async def api_preview_memory_worldbook_sync(payload: MemoryWorldbookSyncPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return preview_memory_worldbook_sync(ctx, payload.model_dump(), active_slot)
+
+    @app.post("/api/memories/worldbook-sync/apply")
+    async def api_apply_memory_worldbook_sync(payload: MemoryWorldbookSyncPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return apply_memory_worldbook_sync(ctx, payload.model_dump(), active_slot)
 
     @app.get("/api/worldbook")
     async def api_get_worldbook() -> dict[str, Any]:
@@ -1105,6 +1132,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 "external_source",
                 "external_ref",
                 "activation_tags",
+                "metadata",
             ]:
                 if key in row:
                     merged[key] = row[key]
@@ -1432,7 +1460,7 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 if include_memories:
                     archive.writestr(
                         f"{bundle_label}的记忆.json",
-                        json.dumps({"items": ctx.get_memories()}, ensure_ascii=False, indent=2),
+                        json.dumps({"items": ctx.get_memories(ctx.get_active_slot_id())}, ensure_ascii=False, indent=2),
                     )
                 if include_worldbook:
                     archive.writestr(
@@ -1547,11 +1575,6 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
                 media_summary = restore_workshop_media_from_bundle(archive, role_card)
 
-                if isinstance(memories_payload, dict) and "items" in memories_payload:
-                    ctx.save_memories(memories_payload.get("items", []), active_slot)
-                elif isinstance(memories_payload, list):
-                    ctx.save_memories(memories_payload, active_slot)
-
                 if isinstance(worldbook_payload, dict):
                     ctx.save_worldbook_store(worldbook_payload, active_slot)
 
@@ -1561,6 +1584,11 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 card_to_apply, workshop_preserved = preserve_existing_workshop_when_importing(role_card, source_name)
 
                 result = ctx.apply_role_card(card_to_apply, source_name=source_name, slot_id=active_slot)
+
+                if isinstance(memories_payload, dict) and "items" in memories_payload:
+                    ctx.save_memories(memories_payload.get("items", []), active_slot)
+                elif isinstance(memories_payload, list):
+                    ctx.save_memories(memories_payload, active_slot)
                 ctx.persist_json(
                     target_card_path,
                     result.get("card", {}).get("raw", card_to_apply),

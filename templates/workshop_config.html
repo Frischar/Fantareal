@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>演出工坊 - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 </head>
   <body class="modern-setting-page app-sidebar-shell workshop-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div id="workshop-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">
@@ -35,6 +36,7 @@
           <p class="muted">演出工坊作为角色卡的前端演出层；封面、背景、音乐、环境音和动态演出不会写进提示词。</p>
         </div>
 
+
         <div id="workshop-opening-config" class="workshop-opening-config-block workshop-panel-block">
           <div class="workshop-opening-config-head">
             <div>
@@ -42,7 +44,7 @@
               <h3>开场演出</h3>
               <p class="muted compact">新对话第一次进入 Chat 时显示封面；点击按钮后播放音乐并进入 first_mes。</p>
             </div>
-            <label class="checkbox-row workshop-opening-enabled-row"><input id="workshop-opening-enabled" type="checkbox" /> 启用开场演出</label>
+            <label class="fr-setting-switch-row workshop-opening-enabled-row"><input id="workshop-opening-enabled" type="checkbox" /> 启用开场演出</label>
           </div>
 
           <div class="grid-two workshop-opening-fields">
@@ -60,7 +62,7 @@
           <textarea id="workshop-opening-subtitle" rows="2" placeholder="例如：重逢与试探，自此始。"></textarea>
 
           <div class="grid-two workshop-opening-fields workshop-opening-typewriter-row">
-            <label class="checkbox-row workshop-opening-inline-toggle"><input id="workshop-opening-typewriter-enabled" type="checkbox" /> 开场白打字机效果</label>
+            <label class="fr-setting-switch-row workshop-opening-inline-toggle"><input id="workshop-opening-typewriter-enabled" type="checkbox" /> 开场白打字机效果</label>
             <div>
               <label for="workshop-opening-typewriter-speed">打字速度</label>
               <select id="workshop-opening-typewriter-speed">
@@ -113,7 +115,7 @@
               </div>
               <label for="workshop-opening-volume">开场音乐音量</label>
               <input id="workshop-opening-volume" type="range" min="0" max="1" step="0.01" />
-              <label class="checkbox-row workshop-opening-inline-toggle"><input id="workshop-opening-autoplay-music" type="checkbox" /> 封面出现时尝试自动播放开场音乐</label>
+              <label class="fr-setting-switch-row workshop-opening-inline-toggle"><input id="workshop-opening-autoplay-music" type="checkbox" /> 封面出现时尝试自动播放开场音乐</label>
               <p class="muted compact">浏览器可能限制自动播放；如果失败，点击进入按钮后仍会正常播放。</p>
               <div class="grid-two workshop-opening-timing-grid">
                 <div>
@@ -157,7 +159,7 @@
               <h3>常驻氛围</h3>
               <p class="muted compact">正式聊天时持续存在的背景、主音乐和环境音；不判断剧情，不进入提示词。</p>
             </div>
-            <label class="checkbox-row"><input id="workshop-ambience-enabled" type="checkbox" /> 启用常驻氛围</label>
+            <label class="fr-setting-switch-row"><input id="workshop-ambience-enabled" type="checkbox" /> 启用常驻氛围</label>
           </div>
 
           <div class="grid-two workshop-opening-fields">
@@ -176,7 +178,7 @@
 
           <div class="grid-two workshop-ambience-grid">
             <div class="workshop-opening-media-card">
-              <label class="checkbox-row"><input id="workshop-ambience-bg-enabled" type="checkbox" /> 启用聊天背景</label>
+              <label class="fr-setting-switch-row"><input id="workshop-ambience-bg-enabled" type="checkbox" /> 启用聊天背景</label>
               <label for="workshop-ambience-bg-url">背景图地址</label>
               <input id="workshop-ambience-bg-url" type="text" placeholder="上传后自动回填，或粘贴图片地址" />
               <div class="button-row workshop-asset-row">
@@ -189,7 +191,7 @@
             </div>
 
             <div class="workshop-opening-media-card">
-              <label class="checkbox-row"><input id="workshop-ambience-music-enabled" type="checkbox" /> 启用主音乐</label>
+              <label class="fr-setting-switch-row"><input id="workshop-ambience-music-enabled" type="checkbox" /> 启用主音乐</label>
               <label for="workshop-ambience-music-preset">主音乐预设</label>
               <select id="workshop-ambience-music-preset"></select>
               <label for="workshop-ambience-music-url">主音乐地址</label>
@@ -205,7 +207,7 @@
           </div>
 
           <div class="workshop-opening-media-card workshop-ambience-ambient-card">
-            <label class="checkbox-row"><input id="workshop-ambience-ambient-enabled" type="checkbox" /> 启用环境音</label>
+            <label class="fr-setting-switch-row"><input id="workshop-ambience-ambient-enabled" type="checkbox" /> 启用环境音</label>
             <div class="grid-two workshop-opening-fields">
               <div>
                 <label for="workshop-ambience-ambient-preset">环境音预设</label>
@@ -255,13 +257,17 @@
           <h2>演出工坊面板</h2>
         </div>
 
-        <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存到当前角色卡。</p>
 
-        <div class="workshop-panel-actions workshop-panel-actions-top">
+
+        <div class="workshop-panel-block workshop-side-actions-panel">
+          <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存到当前角色卡。</p>
+
+          <div class="workshop-panel-actions workshop-panel-actions-top ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
           <button id="save-workshop" type="button">保存到当前角色卡</button>
           <a class="secondary compact button-link workshop-return-link" href="/config/card">返回角色卡</a>
           <button id="reload-workshop-status" type="button" class="secondary compact">重新读取角色卡</button>
-          <button id="clear-workshop-binding" type="button" class="secondary compact ghost">清除本卡演出</button>
+          <button id="clear-workshop-binding" type="button" class="secondary compact ghost danger stage4-danger-action">清除本卡演出</button>
+        </div>
         </div>
 
         <div class="workshop-panel-block workshop-card-binding-panel">
@@ -279,35 +285,38 @@
         </div>
 
         <div class="workshop-panel-block workshop-runtime-panel-side">
-          <label class="checkbox-row"><input id="workshop-enabled" type="checkbox" /> 启用演出工坊</label>
+          <label class="fr-setting-switch-row"><input id="workshop-enabled" type="checkbox" /> 启用演出工坊</label>
           <p class="muted compact" id="workshop-runtime-info">当前 temp = {{ workshop_state.temp or 0 }}，阶段 = {{ workshop_stage }}阶段。</p>
         </div>
 
         <div class="workshop-panel-block workshop-side-summary">
-          <div class="workshop-summary-item">
+          <div class="workshop-summary-item ui-summary-card">
             <span>当前角色卡</span>
             <strong id="workshop-current-card-name">{{ current_card.source_name or "未命名角色卡" }}</strong>
           </div>
-          <div class="workshop-summary-item">
-            <span>演出工坊开关</span>
-            <strong id="workshop-enabled-state">未启用</strong>
-          </div>
-          <div class="workshop-summary-item">
-            <span>开场演出</span>
-            <strong id="workshop-opening-state">未启用</strong>
-          </div>
-          <div class="workshop-summary-item">
-            <span>常驻氛围</span>
-            <strong id="workshop-ambience-state">未启用</strong>
-          </div>
-          <div class="workshop-summary-item">
-            <span>动态演出</span>
-            <strong id="workshop-dynamic-state">0 项</strong>
+          <div class="workshop-summary-grid" aria-label="演出工坊状态总览">
+            <div class="workshop-summary-item ui-summary-card">
+              <span>演出工坊开关</span>
+              <strong id="workshop-enabled-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>开场演出</span>
+              <strong id="workshop-opening-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>常驻氛围</span>
+              <strong id="workshop-ambience-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>动态演出</span>
+              <strong id="workshop-dynamic-state">0 项</strong>
+            </div>
           </div>
         </div>
       </aside>
     </div>
 
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const currentTheme = {{ settings.theme | tojson }};
       const currentOpacity = {{ settings.ui_opacity | tojson }};
@@ -362,9 +371,18 @@
       function setStatus(text, kind = null) {
         if (!statusEl) return;
         const statusKind = kind || inferStatusKind(text);
-        statusEl.textContent = text || "已准备";
-        statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
-        statusEl.classList.add("task-status", `is-${statusKind}`);
+        const label = text || "已准备";
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: label,
+          state: statusKind,
+          stateClasses: ["is-idle", "is-busy", "is-success", "is-error"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = label;
+          statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
+          statusEl.classList.add("task-status", `is-${statusKind}`);
+        }
       }
 
       function showToast(message, type = "info") {
@@ -400,12 +418,14 @@
         button.disabled = state === "loading";
         if (state === "loading") {
           button.classList.add("is-loading");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "处理中…";
           return;
         }
         if (state === "success") {
           button.disabled = false;
           button.classList.add("is-success");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "已完成 ✓";
           button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1200));
           return;
@@ -413,6 +433,7 @@
         if (state === "error") {
           button.disabled = false;
           button.classList.add("is-error");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "操作失败";
           button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1500));
           return;
@@ -892,8 +913,7 @@
         if (!shell) return;
         const body = shell.querySelector(".workshop-rule-body");
         if (body) body.setAttribute("aria-hidden", collapsed ? "true" : "false");
-        shell.dataset.collapsed = collapsed ? "true" : "false";
-        shell.classList.toggle("is-collapsed", !!collapsed);
+        window.Fantareal?.motion?.setDisclosureCollapsed(shell, body, collapsed, { collapsedClass: "is-collapsed", hiddenMode: "display" });
         const button = shell.querySelector(".toggle-workshop-rule");
         if (button) {
           button.textContent = collapsed ? "▸" : "▾";
@@ -934,8 +954,8 @@
             <label>音乐地址</label>
             <input class="workshop-rule-url" data-workshop-rule-url="${index}" value="${escapeAttr(item.musicUrl || "")}" placeholder="留空则使用上面的预设" />
             <div class="grid-two">
-              <label class="checkbox-row"><input class="workshop-rule-autoplay" data-workshop-rule-autoplay="${index}" type="checkbox" ${item.autoplay !== false ? "checked" : ""} /> 自动播放</label>
-              <label class="checkbox-row"><input class="workshop-rule-loop" data-workshop-rule-loop="${index}" type="checkbox" ${item.loop !== false ? "checked" : ""} /> 循环播放</label>
+              <label class="fr-setting-switch-row"><input class="workshop-rule-autoplay" data-workshop-rule-autoplay="${index}" type="checkbox" ${item.autoplay !== false ? "checked" : ""} /> 自动播放</label>
+              <label class="fr-setting-switch-row"><input class="workshop-rule-loop" data-workshop-rule-loop="${index}" type="checkbox" ${item.loop !== false ? "checked" : ""} /> 循环播放</label>
             </div>
             <label>音量</label>
             <input class="workshop-rule-volume" data-workshop-rule-volume="${index}" type="range" min="0" max="1" step="0.01" value="${escapeAttr(item.volume ?? 0.85)}" />
@@ -1180,7 +1200,7 @@
               <input class="workshop-rule-id" data-workshop-rule-id="${index}" type="hidden" value="${escapeAttr(item.id || "")}" />
               <label>标题</label>
               <input class="workshop-rule-name" data-workshop-rule-name="${index}" value="${escapeAttr(item.name || "")}" />
-              <label class="checkbox-row"><input class="workshop-rule-enabled" data-workshop-rule-enabled="${index}" type="checkbox" ${item.enabled !== false ? "checked" : ""} /> 启用规则</label>
+              <label class="fr-setting-switch-row"><input class="workshop-rule-enabled" data-workshop-rule-enabled="${index}" type="checkbox" ${item.enabled !== false ? "checked" : ""} /> 启用规则</label>
               ${buildTriggerFields(item, index, isCoreStage)}
               <div>
                 <label>动作类型</label>
@@ -1257,6 +1277,7 @@
         const lastCard = workshopRuleListEl?.querySelector(".workshop-rule-card:last-of-type");
         if (lastCard && typeof lastCard.scrollIntoView === "function") {
           lastCard.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.Fantareal?.motion?.pulseItem(lastCard);
         }
         setStatus("已新增演出工坊规则。");
       }
@@ -1767,7 +1788,7 @@
             <input class="dynamic-scene-id" type="hidden" value="${escapeAttr(scene.id)}" />
             <div class="grid-two">
               <div><label>演出名称</label><input class="dynamic-scene-name" value="${escapeAttr(scene.name)}" /></div>
-              <label class="checkbox-row dynamic-enabled-row"><input class="dynamic-scene-enabled" type="checkbox" ${scene.enabled ? "checked" : ""} /> 启用演出</label>
+              <label class="fr-setting-switch-row dynamic-enabled-row"><input class="dynamic-scene-enabled" type="checkbox" ${scene.enabled ? "checked" : ""} /> 启用演出</label>
             </div>
             <div class="grid-two">
               <div>
@@ -1827,7 +1848,7 @@
             </div>
             <div class="grid-two">
               <div><label>显示时长（秒）</label><input class="dynamic-duration" type="number" min="0" max="60" step="0.5" value="${escapeAttr(scene.presentation.duration)}" /></div>
-              <label class="checkbox-row"><input class="dynamic-autoclose" type="checkbox" ${scene.presentation.autoClose ? "checked" : ""} /> 到时自动关闭</label>
+              <label class="fr-setting-switch-row"><input class="dynamic-autoclose" type="checkbox" ${scene.presentation.autoClose ? "checked" : ""} /> 到时自动关闭</label>
             </div>
             <label>备注</label><textarea class="dynamic-note" rows="2">${escapeHtml(scene.note)}</textarea>
           </div>
@@ -2027,8 +2048,9 @@
         const card = event.target.closest(".dynamic-scene-card");
         if (!card) return;
         if (event.target.closest(".remove-dynamic-scene")) {
-          card.remove();
+          (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
           setStatus("已删除动态演出，记得保存到当前角色卡。", "success");
+          });
           return;
         }
         if (event.target.closest(".dynamic-image-pick")) card.querySelector(".dynamic-image-file")?.click();
@@ -2043,10 +2065,13 @@
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground };
       currentWorkshop = normalizeCreativeWorkshop(initialWorkshop);
       renderWorkshopRules(currentWorkshop);
       updateWorkshopPanelStats();
       refreshWorkshopStatus().catch(() => {});
     </script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
   </body>
 </html>

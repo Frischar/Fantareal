@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ mod.label }} - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
     <style>
       .mod-host-page {
         padding: 0 16px 20px;
@@ -148,5 +148,18 @@
         </section>
       </div>
     </div>
+    <script>
+      (() => {
+        const backToChatTypes = new Set([
+          "fantareal:mobile-chat:back-to-chat",
+          "fantareal:plugin:back-to-chat",
+        ]);
+        window.addEventListener("message", (event) => {
+          const data = event.data;
+          if (!data || typeof data !== "object" || !backToChatTypes.has(data.type)) return;
+          window.location.href = "/chat";
+        });
+      })();
+    </script>
   </body>
 </html>

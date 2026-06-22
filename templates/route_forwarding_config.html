@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>路由转发 - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="modern-setting-page app-sidebar-shell route-forwarding-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div id="route-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">
@@ -25,7 +26,7 @@
             <span class="route-switch-brand">路由转发</span>
             <p>只转发 Fantareal 内部外发 POST；按队列顺序和故障转发规则处理。</p>
           </div>
-          <div class="route-switch-actions">
+          <div class="route-switch-actions ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
             <label class="route-switch-toggle" title="启用 Fantareal POST 转发">
               <span class="toggle-label">启用</span>
               <input id="rf-enabled" type="checkbox" />
@@ -68,7 +69,7 @@
             <span>供应商名称</span>
             <input data-field="name" placeholder="例如 DeepSeek / MiniMax / GPT" />
           </label>
-          <span class="provider-status" data-status>就绪</span>
+          <span class="provider-status ui-status-token" data-status>就绪</span>
           <label class="provider-enabled"><input data-field="enabled" type="checkbox" /><span>启用</span></label>
           <button type="button" class="route-test-button provider-test">测试</button>
           <button type="button" class="route-delete-button provider-delete">删除</button>
@@ -92,6 +93,7 @@
       </article>
     </template>
 
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const initialConfig = {{ route_forwarding | tojson }};
       const initialStats = {{ route_forwarding_stats | tojson }};
@@ -106,6 +108,7 @@
       const toastHostEl = document.getElementById("route-toast-host");
       let config = normalizeConfig(initialConfig);
       let runtimeStats = initialStats || {};
+      let lastAddedProviderId = "";
       const collapsedProviders = readCollapsedProviders();
 
       function applyTheme(theme) {
@@ -140,7 +143,7 @@
 
       function toast(title, detail = "", type = "ok") {
         const node = document.createElement("div");
-        node.className = `toast ${type}`;
+        node.className = `app-toast ${type}`;
         node.innerHTML = `<strong>${escapeHtml(title)}</strong>${detail ? `<span>${escapeHtml(detail)}</span>` : ""}`;
         toastHostEl.appendChild(node);
         requestAnimationFrame(() => node.classList.add("show"));
@@ -217,16 +220,59 @@
         return "就绪";
       }
 
+      function routeStatusClass(state, status = {}) {
+        if (state === "circuit_open") return "is-error";
+        if (state === "retrying" || state === "testing") return "is-busy";
+        if (status.current) return "is-success";
+        if (state === "disabled") return "is-idle";
+        return "is-saved";
+      }
+
       function applyProviderStatus(node, provider) {
         const status = providerStatus(provider.id);
         const statusNode = node.querySelector("[data-status]");
         const state = status.state || (provider.enabled === false ? "disabled" : "ready");
+        const label = statusLabel(status);
+        const title = status.last_error || "";
+        const wasReady = statusNode.dataset.uiStatusReady === "true";
+        const changed = statusNode.textContent !== label || statusNode.dataset.state !== state || statusNode.title !== title;
         node.classList.toggle("is-circuit-open", state === "circuit_open");
         node.classList.toggle("is-current", Boolean(status.current));
         node.classList.toggle("is-testing", state === "testing");
-        statusNode.textContent = statusLabel(status);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusNode, {
+          text: label,
+          title,
+          stateClass: routeStatusClass(state, status),
+          dataState: false,
+          animate: wasReady && changed,
+        })) {
+          statusNode.textContent = label;
+          statusNode.title = title;
+        }
         statusNode.dataset.state = state;
-        statusNode.title = status.last_error || "";
+        statusNode.dataset.uiStatusReady = "true";
+      }
+
+      function setRouteButtonState(button, state = "idle", label = "") {
+        if (!button) return;
+        const defaultText = button.dataset.defaultText || button.textContent.trim();
+        button.dataset.defaultText = defaultText;
+        button.classList.remove("is-loading", "is-success", "is-error");
+        if (state === "loading") button.classList.add("is-loading");
+        if (state === "success") button.classList.add("is-success");
+        if (state === "error") button.classList.add("is-error");
+        button.disabled = state === "loading";
+        button.textContent = label || defaultText;
+        if (state !== "idle") {
+          window.Fantareal?.motion?.pulseStatus?.(button);
+        }
+        if (state === "success" || state === "error") {
+          window.setTimeout(() => {
+            button.disabled = false;
+            button.classList.remove("is-loading", "is-success", "is-error");
+            button.textContent = defaultText;
+          }, 880);
+        }
       }
 
       function providerSummary(provider) {
@@ -241,9 +287,13 @@
       }
 
       function setProviderCollapsed(node, providerId, collapsed) {
-        node.classList.toggle("is-collapsed", collapsed);
+        const body = node.querySelector(".route-provider-body");
+        window.Fantareal?.motion?.setDisclosureCollapsed(node, body, collapsed, { collapsedClass: "is-collapsed", toggleData: false, hiddenMode: "display" });
         const button = node.querySelector(".provider-collapse");
-        if (button) button.textContent = collapsed ? "展开" : "收起";
+        if (button) {
+          button.textContent = collapsed ? "展开" : "收起";
+          button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        }
         if (collapsed) collapsedProviders.add(providerId);
         else collapsedProviders.delete(providerId);
         saveCollapsedProviders();
@@ -301,15 +351,21 @@
               setProviderCollapsed(node, provider.id, !node.classList.contains("is-collapsed"));
             });
             node.querySelector(".provider-delete").addEventListener("click", () => {
-              config.providers = config.providers.filter((item) => item.id !== provider.id);
-              collapsedProviders.delete(provider.id);
-              saveCollapsedProviders();
-              normalizeProviderOrder();
-              renderProviders();
+              (window.Fantareal?.motion?.removeWithMotion?.(node, { fallbackMs: 180 }) || Promise.resolve(false).then(() => node.remove())).then(() => {
+                config.providers = config.providers.filter((item) => item.id !== provider.id);
+                collapsedProviders.delete(provider.id);
+                saveCollapsedProviders();
+                normalizeProviderOrder();
+                renderProviders();
+              });
             });
             bindDragHandlers(node);
             setProviderCollapsed(node, provider.id, collapsedProviders.has(provider.id));
             providerListEl.appendChild(node);
+            if (provider.id === lastAddedProviderId) {
+              window.Fantareal?.motion?.pulseItem(node);
+              lastAddedProviderId = "";
+            }
           });
       }
 
@@ -423,7 +479,8 @@
 
       async function saveConfig(options = {}) {
         const button = document.getElementById("save-route-forwarding");
-        button.disabled = true;
+        if (options.silent) button.disabled = true;
+        else setRouteButtonState(button, "loading", "保存中…");
         try {
           const response = await fetch("/api/route-forwarding", {
             method: "POST",
@@ -438,22 +495,24 @@
           updateStats(data.stats || {});
           if (!options.silent) {
             toast("路由转发已保存", "新的 POST 请求会立即使用这份配置。");
+            setRouteButtonState(button, "success", "已保存 ✓");
           }
           return data;
         } catch (error) {
           if (!options.silent) {
             toast("保存失败", error.message || String(error), "error");
+            setRouteButtonState(button, "error", "保存失败");
           }
           throw error;
         } finally {
-          button.disabled = false;
+          if (options.silent) button.disabled = false;
         }
       }
 
       async function testProvider(providerId) {
         const card = document.querySelector(`.route-provider-card[data-provider-id="${CSS.escape(providerId)}"]`);
         const button = card?.querySelector(".provider-test");
-        if (button) button.disabled = true;
+        setRouteButtonState(button, "loading", "测试中…");
         try {
           await saveConfig({ silent: true });
           updateLocalProviderState(providerId, "testing");
@@ -469,10 +528,11 @@
             throw new Error(result.error || data.detail || "测试失败");
           }
           toast("测试成功", "该 API 已恢复，可以重新参与转发。");
+          setRouteButtonState(button, "success", "通过 ✓");
         } catch (error) {
           toast("测试失败", error.message || String(error), "error");
+          setRouteButtonState(button, "error", "失败");
         } finally {
-          if (button) button.disabled = false;
           refreshRouteStats();
         }
       }
@@ -495,8 +555,10 @@
       }
 
       document.getElementById("add-provider").addEventListener("click", () => {
+        window.Fantareal?.motion?.pulseStatus?.(document.getElementById("add-provider"));
+        lastAddedProviderId = `provider-${Date.now()}`;
         config.providers.push({
-          id: `provider-${Date.now()}`,
+          id: lastAddedProviderId,
           name: "新供应商",
           base_url: "",
           model: "",
@@ -514,10 +576,13 @@
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground };
       bindTopControls();
       renderProviders();
       updateStats(initialStats);
       window.setInterval(refreshRouteStats, 2000);
     </script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
   </body>
 </html>
