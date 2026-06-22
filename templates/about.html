@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>About - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="modern-setting-page app-sidebar-shell global-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">
@@ -121,6 +122,7 @@
     </div>
 
     <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     <script>
       const bgUrl = {{ settings.background_image_url | tojson }};
       const bgOverlay = {{ settings.background_overlay | tojson }};
@@ -128,6 +130,7 @@
       const uiOpacity = {{ settings.ui_opacity | tojson }};
 
       const { applyTheme, applyUiOpacity, applyBackground } = window.Fantareal;
+      window.FantarealThemeToggle = { uiOpacity };
 
       applyTheme(themeVal);
       applyUiOpacity(uiOpacity);

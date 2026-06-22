@@ -20,10 +20,12 @@ from urllib.parse import urlparse
 import colorama
 import httpx
 from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from .chat_api_routes import register_chat_api_routes
 from .config_api_routes import register_config_api_routes
+from .macro_variables import build_macro_context, render_macro_variables
 from .mod_api_routes import register_mod_api_routes
 from .mods_runtime import mount_discovered_mods
 from .page_routes import register_page_routes
@@ -35,6 +37,7 @@ from .route_forwarding import (
 from .preset_rules import (
     PRESET_MODULE_RULES,
     activate_preset_in_store,
+    build_preset_observation_segments_from_preset,
     build_preset_prompt_from_preset,
     create_preset_in_store,
     default_preset_store as default_preset_store_data,
@@ -67,6 +70,7 @@ from .prompt_builder import (
     build_memory_recap_prompt,
     build_messages,
     build_prompt_package,
+    collect_preset_activation_tags,
     build_retrieval_prompt,
     build_sprite_prompt,
     build_user_profile_prompt,
@@ -120,6 +124,7 @@ RESOURCE_CARDS_DIR = RESOURCE_DIR / "cards"
 ROLE_CARD_EXTENSIONS = {".json", ".txt"}
 SLOT_META_PATH = DATA_DIR / "save_slots.json"
 EXPORT_DIR = BASE_DIR / "exports"
+CARD_RUNTIME_DIR = DATA_DIR / "card_runtime" / "cards"
 LEGACY_PERSONA_PATH = DATA_DIR / "persona.json"
 LEGACY_CONVERSATION_PATH = DATA_DIR / "conversations.json"
 LEGACY_SETTINGS_PATH = DATA_DIR / "settings.json"
@@ -129,6 +134,7 @@ LEGACY_CURRENT_CARD_PATH = DATA_DIR / "current_role_card.json"
 GLOBAL_PRESET_PATH = DATA_DIR / "preset.json"
 GLOBAL_WORKSHOP_STATE_PATH = DATA_DIR / "creative_workshop_state.json"
 GLOBAL_USER_PROFILE_PATH = DATA_DIR / "user_profile.json"
+GLOBAL_DIRECTOR_NOTES_PATH = DATA_DIR / "director_notes.json"
 GLOBAL_WORLDBOOK_RUNTIME_STATE_PATH = DATA_DIR / "worldbook_runtime_state.json"
 GLOBAL_ROUTE_FORWARDING_PATH = DATA_DIR / "route_forwarding.json"
 SLOT_MIGRATION_MARKER_PATH = DATA_DIR / ".slot_migration_done"
@@ -146,6 +152,30 @@ ALLOWED_FONT_SUFFIXES = {".ttf", ".otf", ".woff", ".woff2"}
 MAX_FONT_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
 REQUEST_RETRY_ATTEMPTS = 5
 REQUEST_RETRY_BASE_DELAY_SECONDS = 1.0
+STREAM_FALLBACK_STATUS_CODES = {400, 422}
+STREAM_FALLBACK_MARKERS = (
+    "stream",
+    "streaming",
+    "stream_options",
+    "sse",
+    "event stream",
+    "invalid stream",
+    "流式",
+    "不支持流",
+)
+CONTENT_REJECTION_MARKERS = (
+    "input_sensitive",
+    "output_sensitive",
+    "sensitive",
+    "moderation",
+    "content policy",
+    "policy_violation",
+    "safety",
+    "审核",
+    "敏感",
+    "安全",
+)
+NON_STREAM_CHAT_COMPAT_KEYS: set[str] = set()
 DEFAULT_SPRITE_BASE_PATH = "/static/sprites"
 DEFAULT_BACKGROUND_IMAGE_URL = "/assets/default.jpg"
 GLOBAL_RUNTIME_ID = "global_workspace"
@@ -338,9 +368,6 @@ def resolve_access_label(method: str, path: str) -> str:
     if path.startswith("/mods/"):
         parts = [part for part in path.split("/") if part]
         mod_labels = {
-            "status-panel": "角色状态面板",
-            "worldbook-maker": "世界书工坊",
-            "soul-weaver": "余声",
             "card-writer": "缃笺",
             "state-journal": "心笺",
             "tavern-card-converter": "酒馆卡转换器",
@@ -357,8 +384,14 @@ def _copy_worldbook_debug_snapshot(snapshot: dict[str, Any] | None = None) -> di
     all_matches = source.get("all_matches", [])
     selected_ids = source.get("selected_ids", [])
     dropped_ids = source.get("dropped_ids", [])
+    external_active_tags = source.get("external_active_tags", [])
+    active_tag_sources = source.get("active_tag_sources", [])
+    external_tag_debug = source.get("external_tag_debug", {})
     return {
         "query": str(source.get("query", "") or ""),
+        "external_active_tags": [str(item) for item in external_active_tags] if isinstance(external_active_tags, list) else [],
+        "active_tag_sources": [dict(item) for item in active_tag_sources if isinstance(item, dict)] if isinstance(active_tag_sources, list) else [],
+        "external_tag_debug": dict(external_tag_debug) if isinstance(external_tag_debug, dict) else {},
         "all_matches": [dict(item) for item in all_matches if isinstance(item, dict)],
         "selected_ids": [str(item) for item in selected_ids] if isinstance(selected_ids, list) else [],
         "dropped_ids": [str(item) for item in dropped_ids] if isinstance(dropped_ids, list) else [],
@@ -400,9 +433,11 @@ DEFAULT_SETTINGS = {
     "theme": "dark",
     "temperature": 0.85,
     "history_limit": 20,
+    "prompt_budget_token_limit": 200000,
     "request_timeout": 120,
     "demo_mode": False,
     "ui_opacity": 0.84,
+    "card_canvas_follow_opacity": False,
     "background_image_url": DEFAULT_BACKGROUND_IMAGE_URL,
     "background_overlay": 0.42,
     "font_family_url": "",
@@ -422,6 +457,7 @@ DEFAULT_SETTINGS = {
     "rerank_top_n": 3,
     "sprite_enabled": False,
     "sprite_base_path": DEFAULT_SPRITE_BASE_PATH,
+    "layered_prompt_injection_enabled": False,
     "memory_summary_length": "medium",
     "memory_summary_max_chars": 520,
 }
@@ -473,6 +509,7 @@ def default_state_journal_config() -> dict[str, Any]:
     return {
         "version": 1,
         "enabled": True,
+        "role_source_mode": "auto",
         "roles": [],
     }
 
@@ -524,6 +561,10 @@ def sanitize_state_journal_config(raw: Any) -> dict[str, Any]:
     except (TypeError, ValueError):
         config["version"] = 1
     config["enabled"] = raw.get("enabled") is not False
+    source_mode = str(raw.get("role_source_mode") or raw.get("roleSourceMode") or "auto").strip().lower().replace("-", "_")
+    if source_mode not in {"auto", "main_card", "personas_only"}:
+        source_mode = "auto"
+    config["role_source_mode"] = source_mode
 
     roles: list[dict[str, Any]] = []
     raw_roles = raw.get("roles", [])
@@ -680,11 +721,18 @@ def sanitize_state_journal_config(raw: Any) -> dict[str, Any]:
             "role_name": role_name or role_id,
             "aliases": aliases,
             "enabled": role.get("enabled") is not False,
+            "mode": str(role.get("mode") or role.get("stateJournalMode") or "default").strip() or "default",
+            "stateJournalMode": str(role.get("stateJournalMode") or role.get("mode") or "default").strip() or "default",
             "use_default_variables": bool(role.get("use_default_variables", False)),
             "initial_stage": _normalize_state_journal_key(role.get("initial_stage") or settings.get("initial_stage"), stages[0]["stage_key"] if stages else "stage_a"),
             "variables": variables,
             "stages": stages,
             "snapshotFields": snapshot_fields,
+            "source": str(role.get("source") or role.get("role_source") or "").strip(),
+            "source_type": str(role.get("source_type") or role.get("sourceType") or "").strip(),
+            "has_state_journal_config": bool(role.get("has_state_journal_config") or role.get("hasStateJournalConfig")),
+            "is_empty_slot": bool(role.get("is_empty_slot") or role.get("isEmptySlot")),
+            "display_policy": str(role.get("display_policy") or role.get("displayPolicy") or "show").strip() or "show",
             "settings": {
                 "allow_regression": bool(settings.get("allow_regression", False)),
                 "confirm_turns": _state_journal_int(settings.get("confirm_turns", 1), 1, 1),
@@ -705,6 +753,7 @@ def default_role_card() -> dict[str, Any]:
         "mes_example": "",
         "scenario": "",
         "creator_notes": "",
+        "creator_comment": "",
         "tags": [],
         "stateJournal": default_state_journal_config(),
         "creativeWorkshop": {
@@ -754,6 +803,112 @@ def default_user_profile() -> dict[str, Any]:
         "notes": "",
         "avatar_url": "",
     }
+
+
+DIRECTOR_NOTE_POSITIONS = {"before_char_defs", "after_char_defs", "before_user_input"}
+
+
+def normalize_director_note_position(value: Any) -> str:
+    text = str(value or "").strip()
+    return text if text in DIRECTOR_NOTE_POSITIONS else "after_char_defs"
+
+
+def sanitize_director_note(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    content = str(raw.get("content", "") or "").strip()
+    if not content:
+        return None
+    note_id = str(raw.get("id", "") or "").strip()
+    if not note_id:
+        seed = f"{content}|{raw.get('created_at', '')}|{random.random()}"
+        note_id = "director_note_" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:12]
+    remaining_turns = clamp_int(raw.get("remaining_turns"), 1, 20, 1)
+    created_at = str(raw.get("created_at", "") or "").strip()
+    updated_at = str(raw.get("updated_at", "") or "").strip()
+    return {
+        "id": note_id,
+        "content": content[:12000],
+        "remaining_turns": remaining_turns,
+        "position": normalize_director_note_position(raw.get("position")),
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
+
+
+def sanitize_director_notes(raw: Any) -> list[dict[str, Any]]:
+    source = raw.get("items", []) if isinstance(raw, dict) else raw
+    if not isinstance(source, list):
+        return []
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw_item in source:
+        item = sanitize_director_note(raw_item)
+        if not item:
+            continue
+        note_id = item["id"]
+        if note_id in seen:
+            continue
+        seen.add(note_id)
+        items.append(item)
+    return items[:50]
+
+
+def get_director_notes(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return sanitize_director_notes(read_json(director_notes_path(slot_id), []))
+
+
+def save_director_notes(items: list[dict[str, Any]], slot_id: str | None = None) -> list[dict[str, Any]]:
+    sanitized = sanitize_director_notes(items)
+    persist_json(
+        director_notes_path(slot_id),
+        sanitized,
+        detail="Director notes save failed. Please check disk space or file permissions.",
+    )
+    return sanitized
+
+
+def create_director_note(payload: dict[str, Any], slot_id: str | None = None) -> list[dict[str, Any]]:
+    content = str(payload.get("content", "") or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="导演注内容不能为空。")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    seed = f"{now}|{content}|{random.random()}"
+    note = {
+        "id": "director_note_" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:12],
+        "content": content[:12000],
+        "remaining_turns": clamp_int(payload.get("remaining_turns"), 1, 20, 1),
+        "position": normalize_director_note_position(payload.get("position")),
+        "created_at": now,
+        "updated_at": now,
+    }
+    items = get_director_notes(slot_id)
+    items.append(note)
+    return save_director_notes(items, slot_id)
+
+
+def delete_director_note(note_id: str, slot_id: str | None = None) -> list[dict[str, Any]]:
+    target_id = str(note_id or "").strip()
+    items = [item for item in get_director_notes(slot_id) if str(item.get("id", "")) != target_id]
+    return save_director_notes(items, slot_id)
+
+
+def consume_director_notes_turn(slot_id: str | None = None) -> list[dict[str, Any]]:
+    changed = False
+    items: list[dict[str, Any]] = []
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for item in get_director_notes(slot_id):
+        remaining = max(0, int(item.get("remaining_turns", 1) or 1) - 1)
+        if remaining <= 0:
+            changed = True
+            continue
+        if remaining != item.get("remaining_turns"):
+            item = dict(item)
+            item["remaining_turns"] = remaining
+            item["updated_at"] = now
+            changed = True
+        items.append(item)
+    return save_director_notes(items, slot_id) if changed else items
 
 
 def default_creative_workshop() -> dict[str, Any]:
@@ -846,6 +1001,22 @@ def build_preset_prompt(slot_id: str | None = None) -> str:
     return build_preset_prompt_from_preset(get_active_preset(slot_id))
 
 
+def build_preset_observation_segments(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return build_preset_observation_segments_from_preset(get_active_preset(slot_id))
+
+
+def build_active_preset_context(slot_id: str | None = None) -> dict[str, Any]:
+    preset = get_active_preset(slot_id)
+    prompt = build_preset_prompt_from_preset(preset)
+    segments = build_preset_observation_segments_from_preset(preset)
+    return {
+        "preset": preset,
+        "prompt": prompt,
+        "observation_segments": segments,
+        "activation_tags": collect_preset_activation_tags(segments),
+    }
+
+
 def get_active_preset_module_labels(slot_id: str | None = None) -> list[str]:
     preset = get_active_preset(slot_id)
     modules = preset.get("modules", {}) if isinstance(preset, dict) else {}
@@ -856,15 +1027,17 @@ def get_active_preset_module_labels(slot_id: str | None = None) -> list[str]:
     return labels
 
 
-def build_preset_debug_payload(slot_id: str | None = None) -> dict[str, Any]:
+def build_preset_debug_payload(slot_id: str | None = None, preset_context: dict[str, Any] | None = None) -> dict[str, Any]:
     store = get_preset_store(slot_id)
-    preset = get_active_preset_from_store(store)
-    prompt = build_preset_prompt_from_preset(preset)
+    context = preset_context if isinstance(preset_context, dict) else build_active_preset_context(slot_id)
+    preset = context.get("preset") if isinstance(context.get("preset"), dict) else get_active_preset_from_store(store)
+    prompt = str(context.get("prompt", "")).strip()
     return {
         "active_preset_id": str(store.get("active_preset_id", "")).strip(),
         "active_preset_name": str(preset.get("name", "Unnamed preset")).strip() or "Unnamed preset",
         "enabled": bool(preset.get("enabled", True)),
         "active_modules": get_active_preset_module_labels(slot_id),
+        "activation_tags": context.get("activation_tags", {"tags": [], "count": 0, "segments": []}),
         "prompt": prompt,
     }
 
@@ -1009,9 +1182,11 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "theme": "dark" if str(settings.get("theme", "dark")).strip() == "dark" else "light",
         "temperature": clamp_float(settings.get("temperature"), 0.0, 2.0, 0.85),
         "history_limit": clamp_int(settings.get("history_limit"), 1, 100, 20),
+        "prompt_budget_token_limit": clamp_int(settings.get("prompt_budget_token_limit"), 1000, 1000000, 200000),
         "request_timeout": clamp_int(settings.get("request_timeout"), 10, 600, 120),
         "demo_mode": parse_bool(settings.get("demo_mode"), False),
         "ui_opacity": clamp_float(settings.get("ui_opacity"), 0.2, 1.0, 0.84),
+        "card_canvas_follow_opacity": parse_bool(settings.get("card_canvas_follow_opacity"), False),
         "background_image_url": sanitize_background_image_url(
             settings.get("background_image_url", ""),
             strict=strict,
@@ -1027,6 +1202,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "font_color": sanitize_font_color(settings.get("font_color", "")),
         "sprite_enabled": parse_bool(settings.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
+        "layered_prompt_injection_enabled": parse_bool(settings.get("layered_prompt_injection_enabled"), False),
         "embedding_base_url": str(settings.get("embedding_base_url", "")).strip(),
         "embedding_api_key": str(settings.get("embedding_api_key", "")).strip(),
         "embedding_model": str(settings.get("embedding_model", "")).strip(),
@@ -1067,6 +1243,9 @@ def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         memory_id = str(item.get("id", "")).strip() or f"memory-{index}"
+        memory_status = str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower()
+        if memory_status not in {"active", "archived"}:
+            memory_status = "active"
         items.append(
             {
                 "id": memory_id,
@@ -1074,6 +1253,8 @@ def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
                 "content": str(item.get("content", "")).strip(),
                 "tags": sanitize_tags(item.get("tags", [])),
                 "notes": str(item.get("notes", "")).strip(),
+                "memory_status": memory_status,
+                "archived_at": str(item.get("archived_at", "")).strip() if memory_status == "archived" else "",
             }
         )
     return items
@@ -1210,8 +1391,50 @@ def settings_path(slot_id: str | None = None) -> Path:
 
 
 def memories_path(slot_id: str | None = None) -> Path:
-    return LEGACY_MEMORIES_PATH
-    return get_slot_dir(slot_id) / "memories.json"
+    return card_runtime_dir(current_memory_card_uid(slot_id)) / "memories.json"
+
+
+def card_runtime_dir(card_uid: str) -> Path:
+    safe_uid = _normalize_card_runtime_key(card_uid, "global")
+    return CARD_RUNTIME_DIR / safe_uid
+
+
+def _normalize_card_runtime_key(value: Any, fallback: str = "global") -> str:
+    text = str(value or "").strip() or fallback
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+
+def current_memory_card_uid(slot_id: str | None = None) -> str:
+    stored = read_json(global_current_card_path(), {})
+    if not isinstance(stored, dict):
+        return "global"
+    identity_raw = stored.get("raw", {}) if isinstance(stored.get("raw", {}), dict) else {}
+    current_card = get_current_card(slot_id)
+    raw = current_card.get("raw", {}) if isinstance(current_card, dict) else {}
+    if not isinstance(raw, dict) or not raw:
+        return "global"
+    default_card = default_role_card()
+    source_name = str(current_card.get("source_name", "")).strip() if isinstance(current_card, dict) else ""
+    has_identity = any(str(identity_raw.get(key, "") or "").strip() for key in ("card_uid", "uid", "id"))
+    has_card_name = bool(str(raw.get("name") or raw.get("role_name") or "").strip())
+    if not source_name and not has_identity and not has_card_name:
+        return "global"
+
+    for key in ("card_uid", "uid", "id"):
+        text = str(identity_raw.get(key, "") or "").strip()
+        if text:
+            return _normalize_card_runtime_key(text, "global")
+
+    fingerprint_payload = {
+        "source_name": source_name,
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
 
 
 def worldbook_path(slot_id: str | None = None) -> Path:
@@ -1240,6 +1463,11 @@ def workshop_state_path(slot_id: str | None = None) -> Path:
 def user_profile_path(slot_id: str | None = None) -> Path:
     return GLOBAL_USER_PROFILE_PATH
     return get_slot_dir(slot_id) / "user_profile.json"
+
+
+def director_notes_path(slot_id: str | None = None) -> Path:
+    return GLOBAL_DIRECTOR_NOTES_PATH
+    return get_slot_dir(slot_id) / "director_notes.json"
 
 
 def route_forwarding_path() -> Path:
@@ -1374,13 +1602,20 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
     ]:
         card[key] = str(raw.get(key, "")).strip()
 
+    card["creator_comment"] = str(
+        raw.get("creator_comment")
+        or raw.get("creatorComment")
+        or raw.get("creator_summary")
+        or raw.get("creatorSummary")
+        or ""
+    ).strip()
     card["tags"] = sanitize_tags(raw.get("tags", []))
     card["stateJournal"] = sanitize_state_journal_config(raw.get("stateJournal", {}))
     card["creativeWorkshop"] = sanitize_creative_workshop(raw.get("creativeWorkshop", {}))
 
     # Preserve every imported persona instead of mapping into the default 1/2/3 slots.
     raw_personas = raw.get("personas", {})
-    normalized_personas: dict[str, dict[str, str]] = {}
+    normalized_personas: dict[str, dict[str, Any]] = {}
     if isinstance(raw_personas, dict):
         persona_items: list[tuple[str, Any]] = list(raw_personas.items())
     elif isinstance(raw_personas, list):
@@ -1409,6 +1644,8 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
 
         normalized_personas[persona_key] = {
             "name": display_name,
+            "role_id": sanitize_role_alias_key(value.get("role_id") or value.get("id"), ""),
+            "aliases": sanitize_role_aliases(value.get("aliases")),
             "description": str(value.get("description", "")).strip(),
             "personality": str(value.get("personality", "")).strip(),
             "scenario": str(value.get("scenario", "")).strip(),
@@ -1419,6 +1656,27 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
         card["personas"] = normalized_personas
 
     return card
+
+def sanitize_role_alias_key(value: Any, fallback: str = "") -> str:
+    text = unicodedata.normalize("NFKC", str(value or fallback or "")).strip().lower()
+    text = re.sub(r"\s+", "_", text)
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+def sanitize_role_aliases(value: Any) -> list[str]:
+    if isinstance(value, list):
+        raw_items = value
+    elif isinstance(value, tuple):
+        raw_items = list(value)
+    else:
+        raw_items = re.split(r"[\n,，、;；|]+", str(value or ""))
+    aliases: list[str] = []
+    for item in raw_items:
+        text = str(item or "").strip()
+        if text and text not in aliases:
+            aliases.append(text[:80])
+    return aliases[:24]
 
 def extract_persona_name_from_fields(*texts: str) -> str:
     patterns = [
@@ -1466,7 +1724,7 @@ def normalize_legacy_message_content(role: str, content: str) -> str:
         return text
 
     stripped = text.lstrip()
-    if stripped.startswith("??????"):
+    if stripped.startswith("?") and is_replacement_marker_text(stripped.split(":", 1)[0].strip()):
         remainder = stripped.lstrip("?").lstrip(":").lstrip()
         return f"Error: {remainder}" if remainder else "Error."
     return text
@@ -1474,6 +1732,7 @@ def normalize_legacy_message_content(role: str, content: str) -> str:
 
 CHAT_MESSAGE_META_TEXT_KEYS = {
     "message_id",
+    "mod_message_id",
     "turn_id",
     "state_journal_turn",
     "content_hash",
@@ -2071,7 +2330,7 @@ def extract_role_card_payload(data: Any) -> dict[str, Any]:
         return {}
 
     merged = dict(candidate)
-    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "stateJournal", "creativeWorkshop", "personas"]:
+    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "creator_comment", "tags", "stateJournal", "creativeWorkshop", "personas"]:
         if not merged.get(key) and data.get(key):
             merged[key] = data.get(key)
 
@@ -2253,6 +2512,7 @@ def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
         "llm_model": str(source.get("llm_model", "")).strip(),
         "temperature": clamp_float(source.get("temperature"), 0.0, 2.0, 0.85),
         "history_limit": clamp_int(source.get("history_limit"), 1, 100, 20),
+        "prompt_budget_token_limit": clamp_int(source.get("prompt_budget_token_limit"), 1000, 1000000, 200000),
         "request_timeout": clamp_int(source.get("request_timeout"), 10, 600, 120),
         "demo_mode": parse_bool(source.get("demo_mode"), False),
         "embedding_base_url": str(source.get("embedding_base_url", "")).strip(),
@@ -2267,6 +2527,7 @@ def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
         "rerank_top_n": clamp_int(source.get("rerank_top_n"), 1, 12, 3),
         "sprite_enabled": parse_bool(source.get("sprite_enabled"), False),
         "sprite_base_path": sprite_base_path,
+        "layered_prompt_injection_enabled": parse_bool(source.get("layered_prompt_injection_enabled"), False),
     }
 
 
@@ -2327,10 +2588,12 @@ def get_runtime_chat_config(runtime_overrides: dict[str, Any] | None = None) -> 
         "model": model or route_defaults["model"],
         "temperature": overrides.get("temperature") if runtime_overrides else settings.get("temperature", 0.85),
         "history_limit": overrides.get("history_limit") if runtime_overrides else settings.get("history_limit", 20),
+        "prompt_budget_token_limit": overrides.get("prompt_budget_token_limit") if runtime_overrides else settings.get("prompt_budget_token_limit", 200000),
         "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
         "demo_mode": overrides.get("demo_mode") if runtime_overrides else settings.get("demo_mode", False),
         "sprite_enabled": overrides.get("sprite_enabled") if runtime_overrides else settings.get("sprite_enabled", False),
         "sprite_base_path": overrides.get("sprite_base_path") if runtime_overrides else settings.get("sprite_base_path", DEFAULT_SPRITE_BASE_PATH),
+        "layered_prompt_injection_enabled": overrides.get("layered_prompt_injection_enabled") if runtime_overrides else settings.get("layered_prompt_injection_enabled", False),
     }
 
 
@@ -2419,6 +2682,85 @@ def should_retry_status_code(status_code: int) -> bool:
     return status_code >= 500
 
 
+async def safe_response_text(response: httpx.Response | None, *, limit: int = 1200) -> str:
+    if response is None:
+        return ""
+    try:
+        await response.aread()
+    except Exception:
+        pass
+    try:
+        return response.text.strip()[:limit]
+    except Exception:
+        return ""
+
+
+def summarize_upstream_error(raw_text: str, *, limit: int = 600) -> str:
+    text = str(raw_text or "").strip()
+    if not text:
+        return ""
+
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        return text[:limit]
+
+    if not isinstance(payload, dict):
+        return text[:limit]
+
+    parts: list[str] = []
+
+    def append_part(label: str, value: Any) -> None:
+        content = str(value or "").strip()
+        if content:
+            parts.append(f"{label}: {content[:240]}")
+
+    error = payload.get("error")
+    if isinstance(error, dict):
+        for field in ("message", "msg", "detail", "type", "code", "param"):
+            append_part(field, error.get(field))
+    else:
+        append_part("error", error)
+
+    for field in ("message", "msg", "detail", "reason", "code", "status_msg"):
+        append_part(field, payload.get(field))
+
+    base_resp = payload.get("base_resp")
+    if isinstance(base_resp, dict):
+        append_part("base_status_code", base_resp.get("status_code"))
+        append_part("base_status_msg", base_resp.get("status_msg"))
+
+    if payload.get("input_sensitive"):
+        append_part("input_sensitive", payload.get("input_sensitive_type") or True)
+    if payload.get("output_sensitive"):
+        append_part("output_sensitive", payload.get("output_sensitive_type") or True)
+
+    deduped: list[str] = []
+    for part in parts:
+        if part not in deduped:
+            deduped.append(part)
+
+    return ("; ".join(deduped) or text)[:limit]
+
+
+def stream_compat_key(llm_config: dict[str, Any]) -> str:
+    return "|".join(
+        [
+            str(llm_config.get("base_url", "") or "").strip().lower(),
+            str(llm_config.get("model", "") or "").strip().lower(),
+        ]
+    )
+
+
+def should_retry_without_stream(status_code: int, error_detail: str) -> bool:
+    if status_code not in STREAM_FALLBACK_STATUS_CODES:
+        return False
+    lowered = str(error_detail or "").lower()
+    if any(marker in lowered for marker in CONTENT_REJECTION_MARKERS):
+        return False
+    return any(marker in lowered for marker in STREAM_FALLBACK_MARKERS)
+
+
 async def request_json(
     *,
     url: str,
@@ -2442,8 +2784,7 @@ async def request_json(
                 logger.warning("上游 JSON 解析失败，第 %s/%s 次：%s", attempt, REQUEST_RETRY_ATTEMPTS, url)
         except httpx.HTTPStatusError as exc:
             last_error = exc
-            response_text = exc.response.text.strip() if exc.response is not None else ""
-            last_error_detail = response_text[:500]
+            last_error_detail = summarize_upstream_error(await safe_response_text(exc.response))
             logger.warning("上游请求失败，第 %s/%s 次：%s | 返回=%s", attempt, REQUEST_RETRY_ATTEMPTS, url, last_error_detail or "<空>")
             status_code = exc.response.status_code if exc.response is not None else 0
             if 400 <= status_code < 500 and not should_retry_status_code(status_code):
@@ -2457,9 +2798,9 @@ async def request_json(
             await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
 
     if isinstance(last_error, ValueError):
-        raise HTTPException(status_code=502, detail="妯″瀷杩斿洖鐨勪笉鏄悎娉?JSON") from last_error
+        raise HTTPException(status_code=502, detail="模型服务返回的内容不是合法 JSON。") from last_error
 
-    detail = f"妯″瀷璇锋眰澶辫触: {last_error}"
+    detail = f"模型服务请求失败：{last_error}"
     if last_error_detail:
         detail = f"{detail} | upstream={last_error_detail}"
     raise HTTPException(status_code=502, detail=detail) from last_error
@@ -2480,8 +2821,8 @@ async def fetch_available_models(
             response = await client.get(url, headers=build_headers(api_key))
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        response_text = exc.response.text.strip() if exc.response is not None else ""
-        detail = response_text[:500] if response_text else str(exc)
+        response_text = summarize_upstream_error(await safe_response_text(exc.response))
+        detail = response_text if response_text else str(exc)
         raise HTTPException(status_code=502, detail=f"Failed to fetch model list: {detail}") from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"Failed to fetch model list: {exc}") from exc
@@ -2927,6 +3268,32 @@ def _evaluate_worldbook_keyword_entry(
     return final_ok, primary_matches, secondary_matches, matched_text
 
 
+def _worldbook_macro_context() -> dict[str, Any]:
+    return build_macro_context(persona=get_persona(), user_profile=get_user_profile(), role_card=get_current_card())
+
+
+def _render_worldbook_item_macros(item: dict[str, Any], macro_context: dict[str, Any]) -> dict[str, Any]:
+    rendered_item = dict(item)
+    macro_debug: dict[str, Any] = {}
+    for field in ("trigger", "secondary_trigger", "content"):
+        original = str(rendered_item.get(field, "") or "")
+        rendered, debug = render_macro_variables(original, macro_context)
+        if rendered != original:
+            if field in {"trigger", "secondary_trigger"}:
+                rendered = re.sub(r"[\u3001;；]+", ",", rendered)
+            rendered_item[field] = rendered
+            macro_debug[field] = {
+                "raw": original,
+                "rendered": rendered,
+                "replacements": int(debug.get("replacements", 0) or 0),
+                "used": debug.get("used", []),
+                "unresolved": debug.get("unresolved", []),
+            }
+    if macro_debug:
+        rendered_item["_macro_debug"] = macro_debug
+    return rendered_item
+
+
 def _worldbook_match_payload(
     *,
     item: dict[str, Any],
@@ -2949,6 +3316,7 @@ def _worldbook_match_payload(
         "trigger": str(item.get("trigger", "")).strip(),
         "secondary_trigger": str(item.get("secondary_trigger", "")).strip(),
         "content": str(item.get("content", "")).strip(),
+        "macro_debug": item.get("_macro_debug", {}) if isinstance(item.get("_macro_debug"), dict) else {},
         "matched": matched_text,
         "comment": str(item.get("comment", "")).strip(),
         "priority": order,
@@ -3072,22 +3440,168 @@ def get_state_journal_active_stage_rows() -> list[dict[str, Any]]:
     return result
 
 
-def get_state_journal_active_stage_tags() -> list[str]:
-    return [row["activation_tag"] for row in get_state_journal_active_stage_rows() if row.get("activation_tag")]
+def get_state_journal_active_stage_tag_sources() -> list[dict[str, Any]]:
+    return [
+        {
+            "tag": row["activation_tag"],
+            "source": "state_journal",
+            "label": " · ".join([item for item in [row.get("role_name"), row.get("stage_name")] if item]) or "心笺阶段",
+            "ref": {
+                "role_id": row.get("role_id", ""),
+                "role_name": row.get("role_name", ""),
+                "stage_key": row.get("stage_key", ""),
+                "stage_name": row.get("stage_name", ""),
+                "is_active": True,
+                "updated_at": row.get("updated_at", ""),
+            },
+        }
+        for row in get_state_journal_active_stage_rows()
+        if row.get("activation_tag")
+    ]
 
 
-def match_worldbook_entries(query: str, external_active_tags: list[str] | None = None) -> list[dict[str, Any]]:
+def get_state_journal_active_stage_tags() -> list[dict[str, Any]]:
+    return get_state_journal_active_stage_tag_sources()
+
+
+def _normalize_active_tag_context(value: Any, default_source: str = "external") -> dict[str, Any]:
+    tags: list[str] = []
+    sources: list[dict[str, Any]] = []
+
+    def add_tag(tag_value: Any, *, source: str = default_source, label: str = "", ref: dict[str, Any] | None = None) -> None:
+        tag = str(tag_value or "").strip()
+        if not tag:
+            return
+        if tag not in tags:
+            tags.append(tag)
+        sources.append(
+            {
+                "tag": tag,
+                "source": str(source or default_source).strip() or default_source,
+                "label": str(label or "").strip(),
+                "ref": ref if isinstance(ref, dict) else {},
+            }
+        )
+
+    if isinstance(value, dict):
+        for row in value.get("sources", []) if isinstance(value.get("sources", []), list) else []:
+            if isinstance(row, dict):
+                add_tag(row.get("tag"), source=row.get("source", default_source), label=row.get("label", ""), ref=row.get("ref", {}))
+        for tag in value.get("tags", []) if isinstance(value.get("tags", []), list) else []:
+            if tag not in tags:
+                add_tag(tag, source=default_source)
+    elif isinstance(value, list):
+        for row in value:
+            if isinstance(row, dict):
+                add_tag(row.get("tag"), source=row.get("source", default_source), label=row.get("label", ""), ref=row.get("ref", {}))
+            else:
+                add_tag(row, source=default_source)
+    elif value is not None:
+        add_tag(value, source=default_source)
+
+    return {"tags": tags, "sources": sources}
+
+
+def _merge_active_tag_contexts(*contexts: Any) -> dict[str, Any]:
+    merged_tags: list[str] = []
+    merged_sources: list[dict[str, Any]] = []
+    for context in contexts:
+        normalized = _normalize_active_tag_context(context)
+        for tag in normalized.get("tags", []):
+            if tag not in merged_tags:
+                merged_tags.append(tag)
+        merged_sources.extend(normalized.get("sources", []))
+    return {"tags": merged_tags, "sources": merged_sources}
+
+
+def build_active_tag_context(active_stage_tags: list[Any] | None = None, preset_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    state_sources: list[dict[str, Any]] = []
+    for item in active_stage_tags or []:
+        if isinstance(item, dict):
+            tag = str(item.get("tag") or item.get("activation_tag") or "").strip()
+            if not tag:
+                continue
+            state_sources.append(
+                {
+                    "tag": tag,
+                    "source": str(item.get("source") or "state_journal").strip() or "state_journal",
+                    "label": str(item.get("label") or "心笺阶段").strip() or "心笺阶段",
+                    "ref": item.get("ref") if isinstance(item.get("ref"), dict) else {},
+                }
+            )
+        else:
+            tag = str(item or "").strip()
+            if tag:
+                state_sources.append({"tag": tag, "source": "state_journal", "label": "心笺阶段", "ref": {}})
+    state_context = {"tags": [row["tag"] for row in state_sources], "sources": state_sources}
+    preset_sources: list[dict[str, Any]] = []
+    activation = preset_context.get("activation_tags", {}) if isinstance(preset_context, dict) else {}
+    for segment in activation.get("segments", []) if isinstance(activation.get("segments", []), list) else []:
+        if not isinstance(segment, dict):
+            continue
+        for tag in segment.get("tags", []) if isinstance(segment.get("tags", []), list) else []:
+            preset_sources.append(
+                {
+                    "tag": tag,
+                    "source": "preset",
+                    "label": str(segment.get("title", "预设")).strip() or "预设",
+                    "ref": {
+                        "segment_id": str(segment.get("id", "")).strip(),
+                        "title": str(segment.get("title", "")).strip(),
+                        "placement": str(segment.get("placement", "")).strip(),
+                        "kind": str(segment.get("kind", "")).strip(),
+                    },
+                }
+            )
+    return _merge_active_tag_contexts(state_context, preset_sources)
+
+
+def _active_tag_sources_by_tag(active_tag_context: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    result: dict[str, list[dict[str, Any]]] = {}
+    for row in active_tag_context.get("sources", []) if isinstance(active_tag_context.get("sources", []), list) else []:
+        if not isinstance(row, dict):
+            continue
+        tag = str(row.get("tag", "")).strip()
+        if not tag:
+            continue
+        result.setdefault(tag, []).append(row)
+    return result
+
+
+def _source_labels_for_tags(tags: list[str], sources_by_tag: dict[str, list[dict[str, Any]]]) -> list[str]:
+    labels: list[str] = []
+    for tag in tags:
+        for row in sources_by_tag.get(tag, []):
+            source = str(row.get("source", "external")).strip() or "external"
+            if source not in labels:
+                labels.append(source)
+    return labels or ["external"]
+
+
+def match_worldbook_entries(query: str, external_active_tags: Any = None) -> list[dict[str, Any]]:
     global _LAST_WORLDBOOK_DEBUG_SNAPSHOT
 
     text = str(query or "").strip()
-    active_tag_set = {str(tag).strip() for tag in (external_active_tags or []) if str(tag).strip()}
+    active_tag_context = _normalize_active_tag_context(external_active_tags)
+    active_tag_values = [str(tag).strip() for tag in active_tag_context.get("tags", []) if str(tag).strip()]
+    active_tag_set = set(active_tag_values)
+    active_tag_sources = _active_tag_sources_by_tag(active_tag_context)
+    empty_snapshot = {
+        "query": text,
+        "external_active_tags": active_tag_values,
+        "active_tag_sources": active_tag_context.get("sources", []),
+        "external_tag_debug": {"active_count": len(active_tag_values), "matched_count": 0, "missed_count": 0, "entries": []},
+        "all_matches": [],
+        "selected_ids": [],
+        "dropped_ids": [],
+    }
     if not text and not active_tag_set:
-        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": "", "all_matches": [], "selected_ids": [], "dropped_ids": []}
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = empty_snapshot
         return []
 
     settings = get_worldbook_settings()
     if not settings.get("enabled", True):
-        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {"query": text, "all_matches": [], "selected_ids": [], "dropped_ids": []}
+        _LAST_WORLDBOOK_DEBUG_SNAPSHOT = empty_snapshot
         return []
 
     runtime_state = get_worldbook_runtime_state()
@@ -3099,11 +3613,14 @@ def match_worldbook_entries(query: str, external_active_tags: list[str] | None =
     hits: list[dict[str, Any]] = []
     hits_by_id: dict[str, dict[str, Any]] = {}
     keyword_candidates: list[dict[str, Any]] = []
+    external_tag_debug_entries: list[dict[str, Any]] = []
     seed_queue: list[dict[str, Any]] = [{"text": text, "depth": 0, "from": ""}]
     recursion_enabled = bool(settings.get("recursive_scan_enabled", False))
     recursion_max_depth = clamp_int(settings.get("recursion_max_depth", 2), 0, 5, 2)
+    macro_context = _worldbook_macro_context()
 
-    for item in get_worldbook_entries():
+    for raw_item in get_worldbook_entries():
+        item = _render_worldbook_item_macros(raw_item, macro_context)
         if not item.get("enabled", True):
             continue
 
@@ -3139,20 +3656,34 @@ def match_worldbook_entries(query: str, external_active_tags: list[str] | None =
             continue
 
         if entry_type == "external_tag":
-            activation_tags = {str(tag).strip() for tag in (item.get("activation_tags") or []) if str(tag).strip()}
-            matched_tags = sorted(activation_tags & active_tag_set)
+            activation_tags = sorted({str(tag).strip() for tag in (item.get("activation_tags") or []) if str(tag).strip()})
+            matched_tags = sorted(set(activation_tags) & active_tag_set)
+            matched_sources = _source_labels_for_tags(matched_tags, active_tag_sources) if matched_tags else []
+            debug_entry = {
+                "id": entry_id,
+                "title": str(item.get("title", "")).strip() or str(item.get("trigger", "")).strip(),
+                "activation_tags": activation_tags,
+                "matched_tags": matched_tags,
+                "missing_tags": [tag for tag in activation_tags if tag not in active_tag_set],
+                "matched_sources": matched_sources,
+                "selected_for_prompt": False,
+                "result": "matched" if matched_tags else "miss",
+            }
             if matched_tags:
                 state_row["last_result"] = "triggered"
                 state_row["last_reason"] = "external_tag"
                 state_row["matched_text"] = ", ".join(matched_tags)[:240]
                 clean_runtime_entries[entry_id] = state_row
-                hit = _worldbook_match_payload(item=item, source="external_tag", matched_text=state_row["matched_text"], matched_depth=0, matched_from="state_journal")
+                hit = _worldbook_match_payload(item=item, source="external_tag", matched_text=state_row["matched_text"], matched_depth=0, matched_from=", ".join(matched_sources))
+                hit["matched_tags"] = matched_tags
+                hit["matched_tag_sources"] = matched_sources
                 hits.append(hit)
                 hits_by_id[entry_id] = hit
             else:
                 state_row["last_result"] = "miss"
                 state_row["last_reason"] = "external_tag"
                 clean_runtime_entries[entry_id] = state_row
+            external_tag_debug_entries.append(debug_entry)
             continue
 
         if state_row["active_until_turn"] >= current_turn and state_row["last_trigger_turn"] < current_turn:
@@ -3286,13 +3817,25 @@ def match_worldbook_entries(query: str, external_active_tags: list[str] | None =
         selected_for_prompt = entry_id in selected_ids
         row["selected_for_prompt"] = selected_for_prompt
         row["dropped_reason"] = "" if selected_for_prompt else "max_hits"
+        for debug_entry in external_tag_debug_entries:
+            if debug_entry.get("id") == entry_id:
+                debug_entry["selected_for_prompt"] = selected_for_prompt
+                debug_entry["dropped_reason"] = row["dropped_reason"]
         all_matches_sorted.append(row)
         if not selected_for_prompt and entry_id:
             dropped_ids.append(entry_id)
 
+    matched_tag_values = sorted({tag for entry in external_tag_debug_entries for tag in entry.get("matched_tags", [])})
     _LAST_WORLDBOOK_DEBUG_SNAPSHOT = {
         "query": text,
-        "external_active_tags": sorted(active_tag_set),
+        "external_active_tags": active_tag_values,
+        "active_tag_sources": active_tag_context.get("sources", []),
+        "external_tag_debug": {
+            "active_count": len(active_tag_values),
+            "matched_count": len(matched_tag_values),
+            "missed_count": max(len(active_tag_values) - len(matched_tag_values), 0),
+            "entries": external_tag_debug_entries,
+        },
         "all_matches": all_matches_sorted,
         "selected_ids": list(selected_ids),
         "dropped_ids": dropped_ids,
@@ -3540,7 +4083,10 @@ def extract_stream_visible_reply(raw_text: str) -> tuple[str, str]:
 
 async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     embedding = get_runtime_embedding_config(runtime_overrides)
-    memories = get_memories()
+    memories = [
+        item for item in get_memories()
+        if str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower() != "archived"
+    ]
     if not memories:
         return []
     if not (embedding["base_url"] and embedding["model"]):
@@ -3637,6 +4183,20 @@ async def request_model_reply(
     }
 
 
+def iter_non_stream_reply_events(reply_result: dict[str, Any]):
+    think_text = str(reply_result.get("think", "") or "").strip()
+    if think_text:
+        yield {"type": "think_start"}
+        yield {"type": "think_chunk", "delta": think_text}
+        yield {"type": "think_end"}
+
+    reply_text = str(reply_result.get("reply", "") or "")
+    if reply_text:
+        yield {"type": "chunk", "delta": reply_text}
+
+    yield {"type": "done", **reply_result}
+
+
 def build_worldbook_debug_payload(
     user_message: str,
     worldbook_matches: list[dict[str, str]],
@@ -3644,7 +4204,8 @@ def build_worldbook_debug_payload(
     reply_result: dict[str, Any] | None = None,
     debug_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if not get_worldbook_settings().get("debug_enabled", False):
+    settings = get_worldbook_settings()
+    if not settings.get("debug_enabled", False):
         return {}
 
     runtime_state = get_worldbook_runtime_state()
@@ -3655,6 +4216,13 @@ def build_worldbook_debug_payload(
     snapshot_matches = snapshot.get("all_matches", [])
     selected_snapshot = [item for item in snapshot_matches if item.get("selected_for_prompt")]
     dropped_snapshot = [item for item in snapshot_matches if not item.get("selected_for_prompt")]
+    external_tag_debug = snapshot.get("external_tag_debug", {}) if isinstance(snapshot.get("external_tag_debug"), dict) else {}
+    external_tag_entries = external_tag_debug.get("entries", []) if isinstance(external_tag_debug.get("entries", []), list) else []
+    external_active_tags = snapshot.get("external_active_tags", []) if isinstance(snapshot.get("external_active_tags", []), list) else []
+    active_tag_sources = snapshot.get("active_tag_sources", []) if isinstance(snapshot.get("active_tag_sources", []), list) else []
+    matched_external_entries = [item for item in external_tag_entries if item.get("matched_tags")]
+    injected_external_entries = [item for item in matched_external_entries if item.get("selected_for_prompt")]
+    dropped_external_entries = [item for item in matched_external_entries if item.get("dropped_reason")]
 
     buckets = bucket_worldbook_matches(selected_snapshot or worldbook_matches)
 
@@ -3694,6 +4262,18 @@ def build_worldbook_debug_payload(
         "selected": selected_snapshot or worldbook_matches,
         "dropped": dropped_snapshot,
         "buckets": buckets,
+        "external_active_tags": external_active_tags,
+        "active_tag_sources": active_tag_sources,
+        "external_tag_debug": external_tag_debug,
+        "tag_relation_summary": {
+            "active_count": len(external_active_tags),
+            "listening_entry_count": len(external_tag_entries),
+            "matched_entry_count": len(matched_external_entries),
+            "injected_entry_count": len(injected_external_entries),
+            "dropped_entry_count": len(dropped_external_entries),
+            "missing_count": max(len(external_active_tags) - len({tag for item in external_tag_entries for tag in item.get("matched_tags", [])}), 0),
+            "max_hits": max(1, int(settings.get("max_hits", DEFAULT_WORLDBOOK_SETTINGS["max_hits"]))),
+        },
         "entry_states": _build_worldbook_runtime_debug_entries(
             clamp_int(runtime_state.get("turn_index"), 0, 10_000_000, 0),
             all_entries,
@@ -3722,6 +4302,18 @@ async def stream_model_reply(
         "temperature": llm_config["temperature"],
         "stream": True,
     }
+    compat_key = stream_compat_key(llm_config)
+    if compat_key in NON_STREAM_CHAT_COMPAT_KEYS:
+        reply_result = await request_model_reply(
+            user_message,
+            retrieved_items,
+            runtime_overrides=runtime_overrides,
+            worldbook_matches=worldbook_matches,
+            prompt_package=package,
+        )
+        for item in iter_non_stream_reply_events(reply_result):
+            yield item
+        return
 
     accumulated_raw = ""
     accumulated_visible = ""
@@ -3743,6 +4335,8 @@ async def stream_model_reply(
                     headers=build_headers(llm_config["api_key"]),
                     json=payload,
                 ) as response:
+                    if response.status_code >= 400:
+                        last_error_detail = summarize_upstream_error(await safe_response_text(response))
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line:
@@ -3809,8 +4403,8 @@ async def stream_model_reply(
             break
         except httpx.HTTPStatusError as exc:
             last_error = exc
-            response_text = exc.response.text.strip() if exc.response is not None else ""
-            last_error_detail = response_text[:500]
+            if not last_error_detail:
+                last_error_detail = summarize_upstream_error(await safe_response_text(exc.response))
             status_code = exc.response.status_code if exc.response is not None else 0
             logger.warning(
                 "Upstream stream request failed on attempt %s/%s for %s: %s | body=%s",
@@ -3820,6 +4414,24 @@ async def stream_model_reply(
                 exc,
                 last_error_detail or "<empty>",
             )
+            if not stream_started and should_retry_without_stream(status_code, last_error_detail):
+                NON_STREAM_CHAT_COMPAT_KEYS.add(compat_key)
+                logger.info(
+                    "Falling back to non-stream chat completions for %s after HTTP %s: %s",
+                    llm_config.get("model", ""),
+                    status_code,
+                    last_error_detail or "<empty>",
+                )
+                reply_result = await request_model_reply(
+                    user_message,
+                    retrieved_items,
+                    runtime_overrides=runtime_overrides,
+                    worldbook_matches=worldbook_matches,
+                    prompt_package=package,
+                )
+                for item in iter_non_stream_reply_events(reply_result):
+                    yield item
+                return
             if stream_started or (400 <= status_code < 500 and not should_retry_status_code(status_code)):
                 break
         except httpx.HTTPError as exc:
@@ -3839,7 +4451,7 @@ async def stream_model_reply(
             await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
 
     if last_error and not accumulated_raw and not accumulated_visible and not accumulated_think:
-        detail = f"妯″瀷娴佸紡璇锋眰澶辫触: {last_error}"
+        detail = f"模型服务流式请求失败：{last_error}"
         if last_error_detail:
             detail = f"{detail} | upstream={last_error_detail}"
         raise HTTPException(status_code=502, detail=detail) from last_error
@@ -3861,14 +4473,17 @@ async def generate_reply(
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]], dict[str, Any], dict[str, Any]]:
     llm_config = get_runtime_chat_config(runtime_overrides)
     retrieved = await retrieve_memories(user_message, runtime_overrides)
+    preset_context = build_active_preset_context()
     active_stage_tags = get_state_journal_active_stage_tags()
-    worldbook_matches = match_worldbook_entries(user_message, external_active_tags=active_stage_tags)
+    active_tag_context = build_active_tag_context(active_stage_tags, preset_context)
+    worldbook_matches = match_worldbook_entries(user_message, external_active_tags=active_tag_context)
     worldbook_debug_snapshot = get_worldbook_debug_snapshot()
     prompt_package = build_prompt_package(
         user_message,
         retrieved,
         runtime_overrides=runtime_overrides,
         worldbook_matches=worldbook_matches,
+        preset_context=preset_context,
     )
 
     if not (llm_config["base_url"] and llm_config["model"]):
@@ -4202,7 +4817,7 @@ async def archive_current_conversation() -> dict[str, Any]:
     slot_id = get_active_slot_id()
     lock = _get_archive_lock(slot_id)
     async with lock:
-        history = [item for item in get_conversation() if item.get("role") in {"user", "assistant"}]
+        history = [item for item in get_conversation() if item.get("role") in {"user", "assistant", "system"}]
         if not history:
             return {"_skipped": True}
 
@@ -4231,6 +4846,7 @@ async def archive_current_conversation() -> dict[str, Any]:
 configure_prompt_builder(
     sanitize_tags=sanitize_tags,
     get_persona=get_persona,
+    get_current_card=get_current_card,
     get_conversation=get_conversation,
     get_memories=get_memories,
     get_user_profile=get_user_profile,
@@ -4238,6 +4854,8 @@ configure_prompt_builder(
     bucket_worldbook_matches=bucket_worldbook_matches,
     normalize_worldbook_injection_role=_normalize_worldbook_injection_role,
     build_preset_prompt=build_preset_prompt,
+    build_preset_observation_segments=build_preset_observation_segments,
+    get_director_notes=get_director_notes,
 )
 
 load_env_file()
@@ -4260,6 +4878,16 @@ async def chinese_access_log(request: Request, call_next):
     logger.info(format_access_log(label, method, response.status_code, mood, format_access_route_tag(method, path)))
     logger.debug("请求耗时%dms", elapsed_ms)
     return response
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> FileResponse:
+    return FileResponse(
+        STATIC_DIR / "fantareal_icon.ico",
+        media_type="image/x-icon",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
@@ -4288,6 +4916,8 @@ route_ctx = SimpleNamespace(
     apply_role_card=apply_role_card,
     archive_current_conversation=archive_current_conversation,
     build_prompt_package=build_prompt_package,
+    build_active_preset_context=build_active_preset_context,
+    build_active_tag_context=build_active_tag_context,
     build_preset_debug_payload=build_preset_debug_payload,
     build_worldbook_debug_payload=build_worldbook_debug_payload,
     conversation_path=conversation_path,
@@ -4296,6 +4926,10 @@ route_ctx = SimpleNamespace(
     delete_preset_from_store=delete_preset_from_store,
     duplicate_preset_in_store=duplicate_preset_in_store,
     evaluate_creative_workshop=evaluate_creative_workshop,
+    create_director_note=create_director_note,
+    delete_director_note=delete_director_note,
+    consume_director_notes_turn=consume_director_notes_turn,
+    director_notes_path=director_notes_path,
     fetch_available_models=fetch_available_models,
     fetch_embeddings=fetch_embeddings,
     generate_reply=generate_reply,
@@ -4304,6 +4938,7 @@ route_ctx = SimpleNamespace(
     get_active_slot_id=get_active_slot_id,
     get_conversation=get_conversation,
     get_current_card=get_current_card,
+    get_director_notes=get_director_notes,
     get_memories=get_memories,
     get_mod=lambda slug: next(
         (mod.to_dict() for mod in registered_mods if mod.slug == slug), None

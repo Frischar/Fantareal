@@ -31,6 +31,7 @@ RESOURCE_DIR = get_resource_dir()
 PROJECT_ROOT = APP_DIR.parent.parent if APP_DIR.parent.name.lower() == "mods" else APP_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data" / "mods" / "state_journal"
 DB_PATH = DATA_DIR / "state_journal.db"
+DATA_CARD_UID_COLUMN = "state_journal_card_uid"
 EXPORTS_DIR = DATA_DIR / "exports"
 BACKUPS_DIR = DATA_DIR / "backups"
 LOGS_DIR = DATA_DIR / "logs"
@@ -298,6 +299,18 @@ def clone_json(value: Any) -> Any:
 def hash_text(value: Any) -> str:
     text = str(value or "")
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def visible_message_text(value: Any) -> str:
+    text = str(value or "")
+    for tag in ("think", "thinking", "thought", "thoughts", "reason", "reasoning", "analysis"):
+        text = re.sub(
+            rf"<\s*{tag}\b[^>]*>[\s\S]*?</\s*{tag}\s*>",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+    return text.strip()
 
 
 def normalize_turn_id(value: Any) -> str:
@@ -771,6 +784,7 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
         );
         CREATE TABLE IF NOT EXISTS state_journal_snapshots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_uid TEXT NOT NULL DEFAULT 'global',
             created_at TEXT NOT NULL,
             table_id TEXT NOT NULL,
             rows_json TEXT NOT NULL,
@@ -983,6 +997,9 @@ def init_meta_tables(conn: sqlite3.Connection) -> None:
     if "card_uid" not in display_cols:
         conn.execute("ALTER TABLE state_journal_turn_displays ADD COLUMN card_uid TEXT NOT NULL DEFAULT 'global'")
         display_cols.add("card_uid")
+    snapshot_cols = {row["name"] for row in conn.execute("PRAGMA table_info(state_journal_snapshots)").fetchall()}
+    if "card_uid" not in snapshot_cols:
+        conn.execute("ALTER TABLE state_journal_snapshots ADD COLUMN card_uid TEXT NOT NULL DEFAULT 'global'")
 
     def rebuild_card_scoped_table(table: str, create_sql: str, copy_columns: list[str]) -> None:
         cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -1102,15 +1119,100 @@ def field_map(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {field["key"]: field for field in schema.get("fields", []) if isinstance(field, dict) and field.get("key")}
 
 
+def normalize_data_card_uid(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        text = "global"
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or "global"
+
+
+def table_pk_columns(info: list[sqlite3.Row]) -> list[str]:
+    rows = sorted((row for row in info if int(row["pk"] or 0) > 0), key=lambda row: int(row["pk"] or 0))
+    return [str(row["name"]) for row in rows]
+
+
+def current_card_role_names() -> set[str]:
+    raw = current_role_card_payload()
+    personas = raw.get("personas") if isinstance(raw, dict) else {}
+    names: set[str] = set()
+    if isinstance(personas, dict):
+        iterable = personas.values()
+    elif isinstance(personas, list):
+        iterable = personas
+    else:
+        iterable = []
+    for item in iterable:
+        if not isinstance(item, dict):
+            continue
+        for key in ("name", "role_name"):
+            text = str(item.get(key) or "").strip()
+            if text:
+                names.add(text)
+        aliases = item.get("aliases")
+        if isinstance(aliases, list):
+            names.update(str(alias).strip() for alias in aliases if str(alias).strip())
+    return names
+
+
+def legacy_row_names(schema: dict[str, Any], row: dict[str, Any]) -> set[str]:
+    names: set[str] = set()
+    candidate_keys = [schema.get("primary_key"), "name", "character_name", "role_name", "from", "to"]
+    for key in candidate_keys:
+        safe_key = safe_id(key, "")
+        if not safe_key or safe_key not in row:
+            continue
+        text = str(row.get(safe_key) or "").strip()
+        if text:
+            names.add(text)
+    pair_text = str(row.get("pair_id") or "").strip()
+    if pair_text:
+        for part in re.split(r"[-—–~～/|]", pair_text):
+            part = part.strip()
+            if part:
+                names.add(part)
+    return names
+
+
+def infer_legacy_row_card_uid(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[str, Any]) -> str:
+    names = legacy_row_names(schema, row)
+    if not names:
+        return "global"
+    votes: dict[str, int] = {}
+    lookups = [
+        ("state_journal_metric_states", "character_name"),
+        ("state_journal_metric_history", "character_name"),
+        ("state_journal_stage_states", "role_id"),
+        ("state_journal_stage_states", "role_name"),
+    ]
+    for table_name, column_name in lookups:
+        if not table_exists(conn, table_name):
+            continue
+        for name in names:
+            for match in conn.execute(
+                f"SELECT card_uid, COUNT(*) AS count FROM {qident(table_name)} WHERE {qident(column_name)}=? GROUP BY card_uid",
+                (name,),
+            ).fetchall():
+                card_uid = normalize_data_card_uid(match["card_uid"])
+                votes[card_uid] = votes.get(card_uid, 0) + int(match["count"] or 0)
+    if votes:
+        ranked = sorted(votes.items(), key=lambda item: item[1], reverse=True)
+        if len(ranked) == 1 or ranked[0][1] > ranked[1][1]:
+            return ranked[0][0]
+    if names & current_card_role_names():
+        return normalize_data_card_uid(current_card_uid())
+    return "global"
+
+
 def build_create_table_sql(schema: dict[str, Any], physical_name: str | None = None) -> str:
     fields = schema.get("fields", [])
     primary_key = schema.get("primary_key")
-    parts: list[str] = []
+    parts: list[str] = [f"{qident(DATA_CARD_UID_COLUMN)} TEXT NOT NULL DEFAULT 'global'"]
     for field in fields:
         key = field["key"]
         col = f"{qident(key)} {sqlite_type(field.get('type') or 'text')}"
-        if key == primary_key:
-            col += " PRIMARY KEY"
         if field.get("required") and key != primary_key:
             # Keep user editing forgiving. Required is validated before save/AI update,
             # not as a hard NOT NULL that would make partial AI updates brittle.
@@ -1118,6 +1220,8 @@ def build_create_table_sql(schema: dict[str, Any], physical_name: str | None = N
         parts.append(col)
     if not parts:
         raise ValueError("至少需要一个字段。")
+    if primary_key:
+        parts.append(f"PRIMARY KEY ({qident(DATA_CARD_UID_COLUMN)}, {qident(primary_key)})")
     table_name = physical_name or data_table_name(schema["id"])
     return f"CREATE TABLE {qident(table_name)} ({', '.join(parts)})"
 
@@ -1133,11 +1237,13 @@ def sync_physical_table(conn: sqlite3.Connection, schema: dict[str, Any]) -> Non
 
     existing_info = conn.execute(f"PRAGMA table_info({qident(table_name)})").fetchall()
     existing_cols = [str(row["name"]) for row in existing_info]
-    old_pk = next((str(row["name"]) for row in existing_info if int(row["pk"] or 0) == 1), "")
+    existing_user_cols = [col for col in existing_cols if col != DATA_CARD_UID_COLUMN]
+    old_pk = table_pk_columns(existing_info)
     new_pk = str(schema.get("primary_key") or "")
-    old_set = set(existing_cols)
+    expected_pk = [DATA_CARD_UID_COLUMN, new_pk] if new_pk else []
+    old_set = set(existing_user_cols)
     new_set = set(fields)
-    need_rebuild = old_pk != new_pk or old_set != new_set
+    need_rebuild = old_pk != expected_pk or old_set != new_set or DATA_CARD_UID_COLUMN not in existing_cols
 
     if not need_rebuild:
         # SQLite type changes require rebuild too. Keep it simple and rebuild if any
@@ -1155,8 +1261,18 @@ def sync_physical_table(conn: sqlite3.Connection, schema: dict[str, Any]) -> Non
     conn.execute(build_create_table_sql(schema, temp_name))
     common = [col for col in fields if col in existing_cols]
     if common:
-        cols = ", ".join(qident(col) for col in common)
-        conn.execute(f"INSERT OR IGNORE INTO {qident(temp_name)} ({cols}) SELECT {cols} FROM {qident(table_name)}")
+        dest_cols = [DATA_CARD_UID_COLUMN, *common]
+        dest_sql = ", ".join(qident(col) for col in dest_cols)
+        if DATA_CARD_UID_COLUMN in existing_cols:
+            source_sql = ", ".join(qident(col) for col in dest_cols)
+            conn.execute(f"INSERT OR IGNORE INTO {qident(temp_name)} ({dest_sql}) SELECT {source_sql} FROM {qident(table_name)}")
+        else:
+            source_sql = ", ".join(qident(col) for col in common)
+            insert_sql = f"INSERT OR IGNORE INTO {qident(temp_name)} ({dest_sql}) VALUES ({', '.join('?' for _ in dest_cols)})"
+            for row in conn.execute(f"SELECT {source_sql} FROM {qident(table_name)}").fetchall():
+                row_dict = {col: row[col] for col in common}
+                card_uid = infer_legacy_row_card_uid(conn, schema, row_dict)
+                conn.execute(insert_sql, [card_uid, *[row_dict.get(col) for col in common]])
     conn.execute(f"DROP TABLE {qident(table_name)}")
     conn.execute(f"ALTER TABLE {qident(temp_name)} RENAME TO {qident(table_name)}")
 
@@ -1277,13 +1393,17 @@ def serialize_db_value(value: Any, field: dict[str, Any]) -> Any:
     return str(value)
 
 
-def get_table_rows_from_db(conn: sqlite3.Connection, schema: dict[str, Any]) -> list[dict[str, Any]]:
+def get_table_rows_from_db(conn: sqlite3.Connection, schema: dict[str, Any], card_uid: str | None = None) -> list[dict[str, Any]]:
     table_name = data_table_name(schema["id"])
     if not table_exists(conn, table_name):
         sync_physical_table(conn, schema)
     fields = schema.get("fields", [])
     columns = ", ".join(qident(field["key"]) for field in fields)
-    rows = conn.execute(f"SELECT {columns} FROM {qident(table_name)}").fetchall()
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
+    rows = conn.execute(
+        f"SELECT {columns} FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=?",
+        (safe_card_uid,),
+    ).fetchall()
     result: list[dict[str, Any]] = []
     for row in rows:
         item: dict[str, Any] = {}
@@ -1354,18 +1474,19 @@ def clean_rows(schema: dict[str, Any], rows: Any) -> list[dict[str, Any]]:
     return result
 
 
-def replace_table_rows(conn: sqlite3.Connection, schema: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+def replace_table_rows(conn: sqlite3.Connection, schema: dict[str, Any], rows: list[dict[str, Any]], card_uid: str | None = None) -> None:
     table_name = data_table_name(schema["id"])
     sync_physical_table(conn, schema)
-    conn.execute(f"DELETE FROM {qident(table_name)}")
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
+    conn.execute(f"DELETE FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=?", (safe_card_uid,))
     fields = schema.get("fields", [])
     if not fields:
         return
-    column_list = ", ".join(qident(field["key"]) for field in fields)
-    placeholders = ", ".join("?" for _ in fields)
+    column_list = ", ".join([qident(DATA_CARD_UID_COLUMN), *[qident(field["key"]) for field in fields]])
+    placeholders = ", ".join("?" for _ in range(len(fields) + 1))
     sql = f"INSERT INTO {qident(table_name)} ({column_list}) VALUES ({placeholders})"
     for row in rows:
-        values = [row.get(field["key"]) for field in fields]
+        values = [safe_card_uid, *[row.get(field["key"]) for field in fields]]
         conn.execute(sql, values)
 
 
@@ -1392,10 +1513,11 @@ def build_table_snapshot(conn: sqlite3.Connection, table_ids: list[str] | None =
 def save_snapshot(conn: sqlite3.Connection, table_id: str, reason: str = "update") -> None:
     try:
         schema = get_schema_from_db(conn, table_id)
-        rows = get_table_rows_from_db(conn, schema)
+        safe_card_uid = current_card_uid()
+        rows = get_table_rows_from_db(conn, schema, safe_card_uid)
         conn.execute(
-            "INSERT INTO state_journal_snapshots(created_at, table_id, rows_json, reason) VALUES(?, ?, ?, ?)",
-            (now_string(), table_id, json.dumps(rows, ensure_ascii=False), reason),
+            "INSERT INTO state_journal_snapshots(card_uid, created_at, table_id, rows_json, reason) VALUES(?, ?, ?, ?, ?)",
+            (safe_card_uid, now_string(), table_id, json.dumps(rows, ensure_ascii=False), reason),
         )
     except Exception:
         # Snapshot is defensive; never block the actual user action because of it.
@@ -1709,16 +1831,17 @@ def normalize_updates(payload: Any) -> list[dict[str, Any]]:
     return [item for item in candidates if isinstance(item, dict)]
 
 
-def select_row_by_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str) -> dict[str, Any] | None:
+def select_row_by_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str, card_uid: str | None = None) -> dict[str, Any] | None:
     primary_key = schema.get("primary_key")
     if not primary_key:
         return None
     table_name = data_table_name(schema["id"])
     fields = schema.get("fields", [])
     columns = ", ".join(qident(field["key"]) for field in fields)
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
     row = conn.execute(
-        f"SELECT {columns} FROM {qident(table_name)} WHERE {qident(primary_key)}=?",
-        (pk_value,),
+        f"SELECT {columns} FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+        (safe_card_uid, pk_value),
     ).fetchone()
     if not row:
         return None
@@ -1735,9 +1858,9 @@ def reverse_pair_id(value: str) -> str:
     return f"{right}-{left}"
 
 
-def resolve_relationship_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str) -> tuple[str, dict[str, Any] | None, str]:
+def resolve_relationship_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk_value: str, card_uid: str | None = None) -> tuple[str, dict[str, Any] | None, str]:
     """relationship 表 A-B / B-A 自动反查，避免正反主键不同导致整轮失败。"""
-    before = select_row_by_pk(conn, schema, pk_value)
+    before = select_row_by_pk(conn, schema, pk_value, card_uid)
     if before is not None:
         return pk_value, before, ""
     if schema.get("id") != "relationship" or schema.get("primary_key") != "pair_id":
@@ -1745,7 +1868,7 @@ def resolve_relationship_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk
     reversed_pk = reverse_pair_id(pk_value)
     if not reversed_pk:
         return pk_value, before, ""
-    reversed_before = select_row_by_pk(conn, schema, reversed_pk)
+    reversed_before = select_row_by_pk(conn, schema, reversed_pk, card_uid)
     if reversed_before is not None:
         return reversed_pk, reversed_before, f"关系主键已按反向匹配：{pk_value} → {reversed_pk}"
     return pk_value, before, ""
@@ -1756,6 +1879,7 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
     applied: list[dict[str, Any]] = []
     errors: list[str] = []
     touched_tables: set[str] = set()
+    safe_card_uid = current_card_uid()
     with connect_db() as conn:
         init_meta_tables(conn)
         schemas = {schema["id"]: schema for schema in list_schemas_from_db(conn)}
@@ -1783,15 +1907,18 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
 
                 table_name = data_table_name(table_id)
                 sync_physical_table(conn, schema)
-                before = select_row_by_pk(conn, schema, pk_value)
+                before = select_row_by_pk(conn, schema, pk_value, safe_card_uid)
                 if table_id == "relationship" and primary_key == "pair_id":
-                    pk_value, before, _relation_note = resolve_relationship_pk(conn, schema, pk_value)
+                    pk_value, before, _relation_note = resolve_relationship_pk(conn, schema, pk_value, safe_card_uid)
                 if operation == "delete":
                     if before is not None:
                         if table_id not in snapshot_done:
                             save_snapshot(conn, table_id, "worker_update")
                             snapshot_done.add(table_id)
-                        conn.execute(f"DELETE FROM {qident(table_name)} WHERE {qident(primary_key)}=?", (pk_value,))
+                        conn.execute(
+                            f"DELETE FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+                            (safe_card_uid, pk_value),
+                        )
                         applied.append({"table": table_id, "operation": "delete", "key": {primary_key: pk_value}, "old": before})
                         touched_tables.add(table_id)
                     continue
@@ -1828,16 +1955,20 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
                     fields = schema.get("fields", [])
                     insert_row = {field["key"]: None for field in fields}
                     insert_row.update(cleaned_set)
-                    cols = list(insert_row.keys())
+                    row_cols = list(insert_row.keys())
+                    cols = [DATA_CARD_UID_COLUMN, *row_cols]
                     sql = f"INSERT INTO {qident(table_name)} ({', '.join(qident(col) for col in cols)}) VALUES ({', '.join('?' for _ in cols)})"
-                    conn.execute(sql, [insert_row[col] for col in cols])
+                    conn.execute(sql, [safe_card_uid, *[insert_row[col] for col in row_cols]])
                     applied.append({"table": table_id, "operation": "insert", "key": {primary_key: pk_value}, "set": clone_json(cleaned_set)})
                 else:
                     update_cols = [col for col in cleaned_set.keys() if col != primary_key]
                     if update_cols:
                         set_clause = ", ".join(f"{qident(col)}=?" for col in update_cols)
-                        values = [cleaned_set[col] for col in update_cols] + [pk_value]
-                        conn.execute(f"UPDATE {qident(table_name)} SET {set_clause} WHERE {qident(primary_key)}=?", values)
+                        values = [cleaned_set[col] for col in update_cols] + [safe_card_uid, pk_value]
+                        conn.execute(
+                            f"UPDATE {qident(table_name)} SET {set_clause} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+                            values,
+                        )
                     applied.append({"table": table_id, "operation": "update", "key": {primary_key: pk_value}, "set": clone_json(cleaned_set), "old": before})
                 touched_tables.add(table_id)
             if dry_run:
@@ -1851,28 +1982,31 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
 
 
 
-def upsert_full_row(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[str, Any]) -> None:
+def upsert_full_row(conn: sqlite3.Connection, schema: dict[str, Any], row: dict[str, Any], card_uid: str | None = None) -> None:
     table_name = data_table_name(schema["id"])
     sync_physical_table(conn, schema)
     fields = schema.get("fields", [])
     if not fields:
         return
-    values = []
+    safe_card_uid = normalize_data_card_uid(card_uid or current_card_uid())
+    values = [safe_card_uid]
     for field in fields:
         try:
             values.append(coerce_value(row.get(field["key"]), field))
         except ValueError:
             values.append(row.get(field["key"]))
-    sql = f"INSERT OR REPLACE INTO {qident(table_name)} ({', '.join(qident(field['key']) for field in fields)}) VALUES ({', '.join('?' for _ in fields)})"
+    columns = [qident(DATA_CARD_UID_COLUMN), *[qident(field["key"]) for field in fields]]
+    sql = f"INSERT OR REPLACE INTO {qident(table_name)} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in values)})"
     conn.execute(sql, values)
 
 
 def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = "reroll") -> int:
     safe_turn = normalize_turn_id(turn_id)
+    safe_card_uid = current_card_uid()
     count = rollback_story_time_effects(conn, safe_turn)
     row = conn.execute("SELECT effects_json FROM state_journal_turn_effects WHERE turn_id=?", (safe_turn,)).fetchone()
     if not row:
-        conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (safe_turn,))
+        conn.execute("DELETE FROM state_journal_turn_displays WHERE card_uid=? AND turn_id=?", (safe_card_uid, safe_turn))
         return count
     try:
         payload = json.loads(row["effects_json"] or "{}")
@@ -1901,14 +2035,17 @@ def rollback_turn_effects(conn: sqlite3.Connection, turn_id: str, reason: str = 
         operation = str(item.get("operation") or "").lower()
         old_row = item.get("old") if isinstance(item.get("old"), dict) else None
         if operation == "insert":
-            conn.execute(f"DELETE FROM {qident(table_name)} WHERE {qident(primary_key)}=?", (pk_value,))
+            conn.execute(
+                f"DELETE FROM {qident(table_name)} WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND {qident(primary_key)}=?",
+                (safe_card_uid, pk_value),
+            )
             count += 1
         elif old_row:
-            upsert_full_row(conn, schema, old_row)
+            upsert_full_row(conn, schema, old_row, safe_card_uid)
             count += 1
     count += rollback_metric_effects(conn, safe_turn, payload.get("metrics") if isinstance(payload, dict) else [])
     conn.execute("DELETE FROM state_journal_turn_effects WHERE turn_id=?", (safe_turn,))
-    conn.execute("DELETE FROM state_journal_turn_displays WHERE turn_id=?", (safe_turn,))
+    conn.execute("DELETE FROM state_journal_turn_displays WHERE card_uid=? AND turn_id=?", (safe_card_uid, safe_turn))
     conn.execute(
         "UPDATE state_journal_turn_records SET state_journal_status='rolled_back', stale_reason=?, updated_at=? WHERE turn_id=?",
         (reason, now_string(), safe_turn),
@@ -2101,7 +2238,7 @@ def role_source_mode_label(mode: str) -> str:
     return {
         "auto": "自动识别",
         "main_card": "主卡就是角色",
-        "personas_only": "主卡是旁白，只读取多角色",
+        "personas_only": "主卡旁白，多角色展开",
     }.get(normalize_role_source_mode(mode), "自动识别")
 
 
@@ -2177,8 +2314,7 @@ def current_card_uid() -> str:
     raw = current_role_card_payload()
     if not raw:
         return "global"
-    state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
-    for value in (state_journal.get("card_uid"), raw.get("card_uid"), raw.get("uid"), raw.get("id")):
+    for value in (raw.get("card_uid"), raw.get("uid"), raw.get("id")):
         text = str(value or "").strip()
         if text:
             return normalize_role_state_key(text, "global")
@@ -2389,6 +2525,23 @@ def normalize_role_state_role(raw: Any, index: int = 1) -> dict[str, Any] | None
     mode = normalize_role_state_mode(raw.get("mode") or raw.get("stateJournalMode"), enabled=enabled, has_variables=bool(variables), has_stages=bool(stages), has_snapshot=bool(snapshot_fields))
     if mode == "disabled":
         enabled = False
+    source = str(raw.get("source") or raw.get("role_source") or "").strip()
+    source_type = str(raw.get("source_type") or raw.get("sourceType") or "").strip()
+    has_state_journal_config = bool(
+        raw.get("has_state_journal_config")
+        or raw.get("hasStateJournalConfig")
+        or variables
+        or stages
+        or snapshot_fields
+        or mode in {"snapshot_only", "full"}
+    )
+    display_policy = str(raw.get("display_policy") or raw.get("displayPolicy") or "").strip()
+    is_empty_slot = bool(raw.get("is_empty_slot") or raw.get("isEmptySlot"))
+    explicit_show = display_policy == "show"
+    if not is_empty_slot and not explicit_show and source_type == "multi_role_slot" and not has_state_journal_config and not variables and not stages and not snapshot_fields:
+        is_empty_slot = True
+    if not display_policy:
+        display_policy = "hide_empty" if is_empty_slot else "show"
     return {
         "role_id": role_id,
         "role_name": role_name or role_id,
@@ -2401,7 +2554,11 @@ def normalize_role_state_role(raw: Any, index: int = 1) -> dict[str, Any] | None
         "variables": variables,
         "stages": stages,
         "snapshotFields": snapshot_fields,
-        "source": str(raw.get("source") or raw.get("role_source") or "").strip(),
+        "source": source,
+        "source_type": source_type or ("multi_role_slot" if source == "persona" else source or "manual"),
+        "has_state_journal_config": has_state_journal_config,
+        "is_empty_slot": is_empty_slot,
+        "display_policy": display_policy,
         "settings": {
             "allow_regression": bool(settings.get("allow_regression", False)),
             "confirm_turns": role_state_int(settings.get("confirm_turns"), 1, 1),
@@ -2429,6 +2586,7 @@ def role_state_role_score(role: dict[str, Any]) -> int:
 
 PLACEHOLDER_ROLE_NAME_RE = re.compile(r"^role\s*[a-z0-9]+$", re.I)
 PLACEHOLDER_ROLE_ID_RE = re.compile(r"^role[_\-\s]*[a-z0-9]+$", re.I)
+PLACEHOLDER_CN_ROLE_RE = re.compile(r"^(?:子?角色|多角色|人物|persona|char|character)\s*[0-9一二三四五六七八九十]+$", re.I)
 PLACEHOLDER_PERSONA_HINTS = (
     "main emotional anchor",
     "secondary analytical voice",
@@ -2444,7 +2602,7 @@ PLACEHOLDER_PERSONA_HINTS = (
 
 def is_placeholder_role_label(value: Any) -> bool:
     text = str(value or "").strip()
-    return bool(text and (PLACEHOLDER_ROLE_NAME_RE.match(text) or PLACEHOLDER_ROLE_ID_RE.match(text)))
+    return bool(text and (text.isdigit() or PLACEHOLDER_ROLE_NAME_RE.match(text) or PLACEHOLDER_ROLE_ID_RE.match(text) or PLACEHOLDER_CN_ROLE_RE.match(text)))
 
 
 def is_placeholder_role_state_role(role: dict[str, Any]) -> bool:
@@ -2470,6 +2628,43 @@ def is_placeholder_persona(persona_key: str, persona: dict[str, Any]) -> bool:
         return True
     key_text = str(persona_key or "").strip()
     return key_text.isdigit() and not persona_text.strip()
+
+
+def persona_has_state_journal_payload(persona: dict[str, Any]) -> bool:
+    if not isinstance(persona, dict):
+        return False
+    state_journal = persona.get("stateJournal") if isinstance(persona.get("stateJournal"), dict) else {}
+    if state_journal.get("roles") or state_journal.get("variables") or state_journal.get("stages") or state_journal.get("snapshotFields"):
+        return True
+    return bool(persona.get("variables") or persona.get("stages") or persona.get("snapshotFields") or persona.get("fields"))
+
+
+def is_empty_persona_slot(persona_key: str, persona: dict[str, Any]) -> bool:
+    if not isinstance(persona, dict):
+        return False
+    if persona_has_state_journal_payload(persona):
+        return False
+    name = str(persona.get("name") or "").strip()
+    if not is_placeholder_role_label(name):
+        return False
+    meaningful_keys = (
+        "description",
+        "personality",
+        "scenario",
+        "creator_notes",
+        "first_mes",
+        "mes_example",
+        "system_prompt",
+        "prompt",
+    )
+    persona_text = " ".join(str(persona.get(key) or "").strip() for key in meaningful_keys)
+    compact = re.sub(r"\s+", " ", persona_text).strip().lower()
+    if not compact:
+        return True
+    if any(hint in compact for hint in PLACEHOLDER_PERSONA_HINTS):
+        return True
+    # Role A/B/C 这类多角色模板名如果没有心笺配置，即使带有少量模板描述，也不默认作为心笺角色展示。
+    return True
 
 
 def merge_role_state_role(base: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
@@ -2501,7 +2696,7 @@ def merge_role_state_role(base: dict[str, Any], incoming: dict[str, Any]) -> dic
     return normalize_role_state_role(merged, 1) or merged
 
 
-def normalize_role_state_config(raw: Any) -> dict[str, Any]:
+def normalize_role_state_config(raw: Any, *, include_hidden_empty: bool = True) -> dict[str, Any]:
     config = {"version": 1, "enabled": True, "role_source_mode": "auto", "roles": []}
     if not isinstance(raw, dict):
         return config
@@ -2519,6 +2714,8 @@ def normalize_role_state_config(raw: Any) -> dict[str, Any]:
         for index, item in enumerate(raw_roles, start=1):
             role = normalize_role_state_role(item, index)
             if not role:
+                continue
+            if not include_hidden_empty and role.get("display_policy") == "hide_empty":
                 continue
             tokens = role_state_role_tokens(role)
             existing_index = -1
@@ -2577,6 +2774,10 @@ def role_state_main_card_role(raw_card: dict[str, Any]) -> dict[str, Any] | None
         "snapshotFields": [],
         "initial_stage": "stage_a",
         "source": "main_card",
+        "source_type": "main_card",
+        "has_state_journal_config": False,
+        "is_empty_slot": False,
+        "display_policy": "show",
     }
 
 
@@ -2586,31 +2787,118 @@ def role_state_persona_roles(raw_card: dict[str, Any]) -> list[dict[str, Any]]:
     for index, (persona_key, persona) in enumerate(personas.items(), start=1):
         if not isinstance(persona, dict):
             continue
-        if is_placeholder_persona(str(persona_key), persona):
+        if is_placeholder_persona(str(persona_key), persona) or is_empty_persona_slot(str(persona_key), persona):
             continue
         name = str(persona.get("name") or f"角色{index}").strip()
-        role_id = normalize_role_state_key(persona.get("role_id") or persona.get("id") or name or persona_key, f"role_{index}")
+        raw_role_id = str(persona.get("role_id") or persona.get("id") or "").strip()
+        if not raw_role_id or raw_role_id.startswith("item_"):
+            raw_role_id = f"current_card_{persona_key}_{name}"
+        role_id = normalize_role_state_key(raw_role_id, f"current_card_role_{index}")
+        if any(role.get("role_id") == role_id for role in roles):
+            role_id = normalize_role_state_key(f"current_card_{persona_key}_{name}", f"current_card_role_{index}")
         aliases: list[str] = []
         key_text = str(persona_key or "").strip()
         if key_text and key_text != role_id:
             aliases.append(key_text)
-        roles.append({"role_id": role_id, "role_name": name, "aliases": aliases, "enabled": True, "mode": "default", "stateJournalMode": "default", "use_default_variables": True, "variables": [], "stages": [], "snapshotFields": [], "initial_stage": "stage_a", "source": "persona"})
+        raw_aliases = persona.get("aliases", [])
+        if isinstance(raw_aliases, str):
+            alias_items = re.split(r"[\n,，、;；|]+", raw_aliases)
+        elif isinstance(raw_aliases, list):
+            alias_items = raw_aliases
+        else:
+            alias_items = []
+        for alias in alias_items:
+            alias_text = str(alias or "").strip()
+            if alias_text and alias_text != name and alias_text not in aliases:
+                aliases.append(alias_text)
+        roles.append({"role_id": role_id, "role_name": name, "aliases": aliases, "enabled": True, "mode": "default", "stateJournalMode": "default", "use_default_variables": True, "variables": [], "stages": [], "snapshotFields": [], "initial_stage": "stage_a", "source": "persona", "source_type": "multi_role_slot", "has_state_journal_config": False, "is_empty_slot": False, "display_policy": "show"})
     return roles
 
+
+
+def current_card_role_identity_roles(raw_card: dict[str, Any], source_mode: str = "auto") -> list[dict[str, Any]]:
+    safe_mode = normalize_role_source_mode(source_mode)
+    main_role = role_state_main_card_role(raw_card)
+    persona_roles = role_state_persona_roles(raw_card)
+    if safe_mode == "main_card":
+        return [main_role] if main_role else []
+    roles: list[dict[str, Any]] = []
+    if safe_mode == "auto" and main_role:
+        roles.append(main_role)
+    if safe_mode in {"auto", "personas_only"}:
+        roles.extend(persona_roles)
+    return roles
+
+
+def current_card_allowed_role_tokens(raw_card: dict[str, Any], source_mode: str = "auto") -> set[str]:
+    tokens: set[str] = set()
+    for role in current_card_role_identity_roles(raw_card, source_mode):
+        tokens.update(role_state_role_tokens(role))
+    return {token for token in tokens if token and not token.isdigit()}
+
+
+def overlay_role_state_config(identity: dict[str, Any], configured: dict[str, Any]) -> dict[str, Any]:
+    merged = json.loads(json.dumps(identity, ensure_ascii=False))
+    for key in ("variables", "stages", "snapshotFields"):
+        if configured.get(key):
+            merged[key] = configured.get(key)
+    for key in ("settings",):
+        if isinstance(configured.get(key), dict):
+            merged[key] = configured.get(key)
+    for key in ("enabled", "mode", "stateJournalMode", "use_default_variables", "initial_stage", "has_state_journal_config", "display_policy"):
+        if key in configured:
+            merged[key] = configured.get(key)
+    alias_set: list[str] = []
+    for value in identity.get("aliases") or []:
+        text = str(value or "").strip()
+        if text and text != merged.get("role_name") and not text.isdigit() and text not in alias_set:
+            alias_set.append(text)
+    merged["aliases"] = alias_set
+    merged["role_id"] = identity.get("role_id") or merged.get("role_id") or ""
+    merged["role_name"] = identity.get("role_name") or merged.get("role_name") or merged.get("role_id") or ""
+    merged["source"] = identity.get("source") or merged.get("source") or "current_card"
+    merged["source_type"] = identity.get("source_type") or merged.get("source_type") or "current_card"
+    return normalize_role_state_role(merged, 1) or merged
+
+
+def filter_roles_to_current_card(roles: list[dict[str, Any]], raw_card: dict[str, Any], source_mode: str = "auto") -> list[dict[str, Any]]:
+    identities = current_card_role_identity_roles(raw_card, source_mode)
+    if not identities:
+        return roles
+    filtered: list[dict[str, Any]] = []
+    used_indexes: set[int] = set()
+    for identity in identities:
+        identity_tokens = {token for token in role_state_role_tokens(identity) if token and not token.isdigit()}
+        matched: dict[str, Any] | None = None
+        matched_index = -1
+        for index, role in enumerate(roles):
+            if index in used_indexes:
+                continue
+            role_tokens = {token for token in role_state_role_tokens(role) if token and not token.isdigit()}
+            if identity_tokens.intersection(role_tokens):
+                matched = role
+                matched_index = index
+                break
+        if matched is not None:
+            filtered.append(overlay_role_state_config(identity, matched))
+            used_indexes.add(matched_index)
+        else:
+            filtered.append(identity)
+    return filtered
 
 def role_source_summary(mode: str, detected: str, roles: list[dict[str, Any]], has_personas: bool, main_role_name: str = "") -> dict[str, Any]:
     safe_mode = normalize_role_source_mode(mode)
     safe_detected = normalize_role_source_mode(detected)
     if safe_detected == "main_card":
-        message = f"未检测到多角色，已将主卡「{main_role_name or '主卡角色'}」作为唯一心笺角色。"
+        message = f"已将主卡「{main_role_name or '主卡角色'}」作为心笺角色。"
     elif safe_detected == "personas_only":
-        message = f"已识别 {len(roles)} 个多角色，主卡未作为心笺角色参与记录。"
+        message = f"已识别 {len(roles)} 个多角色，主卡不作为心笺角色参与记录。"
     else:
-        message = "尚未识别到可用心笺角色。"
+        message = f"已自动识别 {len(roles)} 个角色，主卡与有内容的多角色都会作为心笺角色参与记录。" if roles else "尚未识别到可用心笺角色。"
     if safe_mode == "main_card":
         message = f"当前设置为“主卡就是角色”，心笺会把主卡「{main_role_name or '主卡角色'}」作为角色。"
     elif safe_mode == "personas_only" and not has_personas:
-        message = "当前设置为“只读取多角色”，但这张卡没有多角色。可在角色卡页面改为“主卡就是角色”。"
+        message = "当前设置为“主卡旁白，多角色展开”，但这张卡没有可用多角色。"
     return {
         "mode": safe_mode,
         "mode_label": role_source_mode_label(safe_mode),
@@ -2648,6 +2936,7 @@ def role_state_config_from_current_card() -> dict[str, Any]:
     has_personas = bool(persona_roles)
     if config.get("roles"):
         filtered_roles = [role for role in (config.get("roles") or []) if not is_placeholder_role_state_role(role)]
+        filtered_roles = filter_roles_to_current_card(filtered_roles, raw_card, source_mode)
         if not filtered_roles:
             config["roles"] = []
         else:
@@ -2661,14 +2950,13 @@ def role_state_config_from_current_card() -> dict[str, Any]:
         roles = [main_role] if main_role else []
         detected_mode = "main_card"
     elif source_mode == "personas_only":
-        roles = persona_roles
+        roles.extend(persona_roles)
         detected_mode = "personas_only"
-    elif persona_roles:
-        roles = persona_roles
-        detected_mode = "personas_only"
-    elif main_role:
-        roles = [main_role]
-        detected_mode = "main_card"
+    else:
+        if main_role:
+            roles.append(main_role)
+        roles.extend(persona_roles)
+        detected_mode = "auto" if persona_roles else "main_card"
     config = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": source_mode, "roles": roles})
     config["card_uid"] = current_card_uid()
     config["card"] = current_card_summary()
@@ -2688,7 +2976,7 @@ def sync_role_state_config_to_current_card(config: dict[str, Any]) -> bool:
     raw_card = data.get("raw")
     if not isinstance(raw_card, dict):
         raw_card = {}
-    normalized = normalize_role_state_config(config)
+    normalized = normalize_role_state_config(config, include_hidden_empty=False)
     existing_state_journal = raw_card.get("stateJournal") if isinstance(raw_card.get("stateJournal"), dict) else {}
     normalized["role_source_mode"] = normalize_role_source_mode(normalized.get("role_source_mode") or existing_state_journal.get("role_source_mode") or existing_state_journal.get("roleSourceMode"))
     normalized["card_uid"] = current_card_uid()
@@ -3431,7 +3719,9 @@ def load_role_state_config(conn: sqlite3.Connection, card_uid: str | None = None
         })
     raw_card = current_role_card_payload()
     raw_state_journal = raw_card.get("stateJournal") if isinstance(raw_card.get("stateJournal"), dict) else {}
-    normalized = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": raw_state_journal.get("role_source_mode") or raw_state_journal.get("roleSourceMode"), "roles": roles})
+    source_mode = normalize_role_source_mode(raw_state_journal.get("role_source_mode") or raw_state_journal.get("roleSourceMode"))
+    roles = filter_roles_to_current_card(roles, raw_card, source_mode)
+    normalized = normalize_role_state_config({"version": 1, "enabled": True, "role_source_mode": source_mode, "roles": roles})
     normalized["card_uid"] = safe_card_uid
     normalized["card"] = current_card_summary()
     personas = raw_card.get("personas") if isinstance(raw_card.get("personas"), dict) else {}
@@ -3444,7 +3734,9 @@ def load_role_state_config(conn: sqlite3.Connection, card_uid: str | None = None
 def save_role_state_config(conn: sqlite3.Connection, config: dict[str, Any], card_uid: str | None = None) -> dict[str, Any]:
     init_meta_tables(conn)
     safe_card_uid = normalize_role_state_key(card_uid or (config or {}).get("card_uid") or current_card_uid(), "global")
-    normalized = normalize_role_state_config(config)
+    normalized = normalize_role_state_config(config, include_hidden_empty=False)
+    raw_card = current_role_card_payload()
+    normalized["roles"] = filter_roles_to_current_card(normalized.get("roles") or [], raw_card, normalized.get("role_source_mode") or "auto")
     normalized["card_uid"] = safe_card_uid
     normalized["card"] = current_card_summary()
     now = now_string()
@@ -4093,20 +4385,38 @@ def get_active_stage_tags_from_db() -> dict[str, Any]:
         , (current_card_uid(),)).fetchall()
     stages = []
     tags = []
+    sources = []
     for row in rows:
         tag = str(row["active_tag"] or "").strip()
         if not tag:
             continue
+        role_id = str(row["role_id"] or "").strip()
+        role_name = str(row["role_name"] or role_id).strip()
+        stage_key = str(row["current_stage_key"] or "").strip()
+        stage_name = str(row["current_stage_name"] or stage_key).strip()
+        updated_at = str(row["updated_at"] or "").strip()
         tags.append(tag)
+        stage_ref = {
+            "role_id": role_id,
+            "role_name": role_name,
+            "stage_key": stage_key,
+            "stage_name": stage_name,
+            "is_active": True,
+            "updated_at": updated_at,
+        }
         stages.append({
-            "role_id": row["role_id"],
-            "role_name": row["role_name"],
-            "stage_key": row["current_stage_key"],
-            "stage_name": row["current_stage_name"],
+            **stage_ref,
             "tag": tag,
-            "updated_at": row["updated_at"],
+            "activation_tag": tag,
+            "updated_at": updated_at,
         })
-    return {"active_stage_tags": tags, "stages": stages}
+        sources.append({
+            "tag": tag,
+            "source": "state_journal",
+            "label": " · ".join([item for item in [role_name, stage_name] if item]) or "心笺阶段",
+            "ref": stage_ref,
+        })
+    return {"active_stage_tags": tags, "active_stage_sources": sources, "stages": stages}
 
 
 
@@ -4411,6 +4721,7 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
     """把真实数值表镜像到用户可见表册：角色状态表、关系表、数值变化记录。"""
     ensure_schema_extra_field(conn, "character_status", {"key": "metrics_summary", "label": "数值摘要", "type": "textarea", "note": "由心笺数值系统同步，角色自身状态数值，例如心绪 47/100（+0）。"})
     ensure_schema_extra_field(conn, "relationship", {"key": "metrics_summary", "label": "数值摘要", "type": "textarea", "note": "由心笺数值系统同步，关系数值，例如好感 71/100（+1）；信任 80/100（+2）。"})
+    safe_card_uid = current_card_uid()
 
     rows = conn.execute(
         """
@@ -4419,7 +4730,7 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
         WHERE card_uid=?
         ORDER BY character_name ASC, metric_key ASC
         """,
-        (current_card_uid(),),
+        (safe_card_uid,),
     ).fetchall()
     by_character: dict[str, list[sqlite3.Row]] = {}
     for row in rows:
@@ -4445,7 +4756,10 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
         for name, items in by_character.items():
             summary = summary_for(items, character_metric_keys)
             if summary:
-                conn.execute(f"UPDATE {qident(char_table)} SET metrics_summary=? WHERE name=?", (summary, name))
+                conn.execute(
+                    f"UPDATE {qident(char_table)} SET metrics_summary=? WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND name=?",
+                    (summary, safe_card_uid, name),
+                )
     except Exception:
         pass
 
@@ -4458,8 +4772,8 @@ def sync_metric_summary_tables(conn: sqlite3.Connection) -> None:
             if not summary:
                 continue
             conn.execute(
-                f"UPDATE {qident(rel_table)} SET metrics_summary=? WHERE {qident('from')}=? OR pair_id LIKE ?",
-                (summary, name, f"{name}-%"),
+                f"UPDATE {qident(rel_table)} SET metrics_summary=? WHERE {qident(DATA_CARD_UID_COLUMN)}=? AND ({qident('from')}=? OR pair_id LIKE ?)",
+                (summary, safe_card_uid, name, f"{name}-%"),
             )
     except Exception:
         pass
@@ -4937,7 +5251,7 @@ def format_history(history: Any, limit_turns: int) -> list[dict[str, str]]:
         role = str(item.get("role") or "").strip()
         if role not in {"user", "assistant"}:
             continue
-        content = str(item.get("content") or "").strip()
+        content = visible_message_text(item.get("content"))
         if content:
             clean.append({"role": role, "content": content})
     max_messages = max(2, limit_turns * 2)
@@ -6152,7 +6466,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     latest_turn = payload.get("latest_turn") if isinstance(payload.get("latest_turn"), dict) else None
     trigger_source = str(payload.get("trigger_source") or payload.get("triggerSource") or payload.get("source") or payload.get("event_type") or "manual_backend").strip() or "manual_backend"
     direct_user_text = str(payload.get("user_text") or payload.get("userText") or "")
-    direct_assistant_text = str(
+    direct_assistant_text = visible_message_text(
         payload.get("assistant_clean_text")
         or payload.get("assistantCleanText")
         or payload.get("assistant_text")
@@ -6176,7 +6490,9 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     turn_index = payload.get("turn_index") or payload.get("turnIndex")
     safe_turn_index = int(turn_index or 0) if str(turn_index or "").strip() else 0
     user_text = str((latest_turn or {}).get("user") or (latest_turn or {}).get("userText") or "")
-    assistant_text = str((latest_turn or {}).get("assistant") or (latest_turn or {}).get("assistantText") or "")
+    assistant_text = visible_message_text((latest_turn or {}).get("assistant") or (latest_turn or {}).get("assistantText") or "")
+    if isinstance(latest_turn, dict):
+        latest_turn = {**latest_turn, "assistant": assistant_text}
     if not payload.get("dry_run", False) and assistant_text.strip():
         save_worker_turn_state(
             turn_id=turn_id,

@@ -4,14 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Fantareal Chat - 移动端</title>
-  <link rel="icon" href="/static/fantareal_icon.ico" />
+  <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
   <link rel="stylesheet" href="/static/css/mobile-md3.css" />
   <style>
     .msg-bubble p { margin-bottom: 8px; }
     .msg-bubble p:last-child { margin-bottom: 0; }
   </style>
 </head>
-<body>
+<body class="mobile-chat-page">
+{% include "_theme_toggle.html" %}
 
 <div class="mobile-layout">
 
@@ -140,9 +141,6 @@
     <a href="/config/card?mobile=1" class="drawer-item">
       <span class="drawer-icon">🎭</span> 角色卡管理
     </a>
-    <a href="/config/sprite?mobile=1" class="drawer-item">
-      <span class="drawer-icon">🖼️</span> 立绘管理
-    </a>
     <a href="/config/preset?mobile=1" class="drawer-item">
       <span class="drawer-icon">📦</span> 预设管理
     </a>
@@ -164,6 +162,15 @@
     </a>
   </div>
 </div>
+
+<script src="/static/js/app-core.js?v=ui-chat-theme-toggle-20260620"></script>
+<script>
+  window.FantarealThemeToggle = { uiOpacity: {{ settings.ui_opacity | tojson }} };
+  window.Fantareal?.applyTheme?.({{ settings.theme | tojson }});
+  window.Fantareal?.applyUiOpacity?.({{ settings.ui_opacity | tojson }});
+  window.Fantareal?.applyBackground?.({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
+</script>
+<script src="/static/js/theme-toggle.js?v=ui-chat-theme-toggle-20260620"></script>
 
 <script>
   let isGenerating = false;

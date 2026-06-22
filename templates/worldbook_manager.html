@@ -4,251 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
-    <style>
-      .worldbook-manager-page .worldbook-selection-panel {
-        position: fixed;
-        right: 24px;
-        top: clamp(112px, 15vh, 156px);
-        width: min(340px, calc(100vw - 32px));
-        max-height: calc(100vh - 140px);
-        z-index: 80;
-        opacity: 0;
-        pointer-events: none;
-        transform: translateX(calc(100% + 32px));
-        transition: opacity 180ms ease, transform 220ms ease;
-      }
-
-      .worldbook-manager-page .worldbook-selection-panel.is-visible {
-        opacity: 1;
-        pointer-events: auto;
-        transform: translateX(0);
-      }
-
-      .worldbook-manager-page .worldbook-selection-card,
-      .worldbook-manager-page .worldbook-import-modal {
-        background: var(--panel-strong, rgba(18, 27, 37, 0.92));
-        border: 1px solid rgba(148, 163, 184, 0.22);
-        box-shadow: 0 22px 58px rgba(2, 8, 23, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(22px);
-        -webkit-backdrop-filter: blur(22px);
-      }
-
-      .worldbook-manager-page .worldbook-selection-card {
-        overflow: hidden;
-        border-radius: 22px;
-      }
-
-      .worldbook-manager-page .worldbook-selection-head,
-      .worldbook-manager-page .worldbook-import-head {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 18px 18px 12px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-      }
-
-      .worldbook-manager-page .worldbook-selection-head h3,
-      .worldbook-manager-page .worldbook-import-head h2 {
-        margin: 2px 0 4px;
-      }
-
-      .worldbook-manager-page .worldbook-selection-count {
-        color: var(--accent, #7dd3fc);
-      }
-
-      .worldbook-manager-page .worldbook-close-button {
-        width: 34px;
-        height: 34px;
-        border-radius: 999px;
-        padding: 0;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .worldbook-manager-page .worldbook-selection-content {
-        display: grid;
-        gap: 12px;
-        padding: 14px 16px 16px;
-        max-height: calc(100vh - 250px);
-        overflow: auto;
-      }
-
-      .worldbook-manager-page .worldbook-selection-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-
-      .worldbook-manager-page .worldbook-selection-actions .full-row {
-        grid-column: 1 / -1;
-      }
-
-      .worldbook-manager-page .worldbook-selection-actions button,
-      .worldbook-manager-page .worldbook-bulk-editor button,
-      .worldbook-manager-page .worldbook-import-modal button {
-        min-height: 36px;
-      }
-
-      .worldbook-manager-page .worldbook-bulk-editor {
-        display: grid;
-        gap: 12px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(148, 163, 184, 0.14);
-      }
-
-      .worldbook-manager-page .worldbook-bulk-editor.is-collapsed {
-        display: none;
-      }
-
-      .worldbook-manager-page .worldbook-bulk-section {
-        display: grid;
-        gap: 10px;
-        padding: 12px;
-        border-radius: 16px;
-        background: rgba(148, 163, 184, 0.08);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-      }
-
-      .worldbook-manager-page .worldbook-bulk-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
-      .worldbook-manager-page .worldbook-import-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 100;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 28px;
-        background: rgba(2, 8, 23, 0.46);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-      }
-
-      .worldbook-manager-page .worldbook-import-backdrop.is-hidden {
-        display: none;
-      }
-
-      .worldbook-manager-page .worldbook-import-modal {
-        width: min(760px, calc(100vw - 40px));
-        max-height: calc(100vh - 56px);
-        overflow: hidden;
-        border-radius: 24px;
-      }
-
-      .worldbook-manager-page .worldbook-import-body {
-        display: grid;
-        gap: 16px;
-        padding: 18px;
-        max-height: calc(100vh - 190px);
-        overflow: auto;
-      }
-
-      .worldbook-manager-page .worldbook-import-step {
-        display: grid;
-        gap: 12px;
-        padding: 14px;
-        border-radius: 18px;
-        background: rgba(148, 163, 184, 0.08);
-        border: 1px solid rgba(148, 163, 184, 0.12);
-      }
-
-      .worldbook-manager-page .worldbook-import-step-title {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-
-      .worldbook-manager-page .worldbook-import-step-title strong {
-        font-size: 0.98rem;
-      }
-
-      .worldbook-manager-page .worldbook-import-footer {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 10px;
-        padding: 14px 18px 18px;
-        border-top: 1px solid rgba(148, 163, 184, 0.14);
-      }
-
-      .worldbook-manager-page .worldbook-inline-hint {
-        margin: 0;
-        line-height: 1.65;
-      }
-
-
-      .worldbook-manager-page .wb-stage-select-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
-      .worldbook-manager-page .wb-external-status-chip {
-        display: inline-flex;
-        align-items: center;
-        width: fit-content;
-        min-height: 30px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(125, 211, 252, 0.28);
-        background: rgba(125, 211, 252, 0.12);
-        color: var(--accent, #7dd3fc);
-        font-size: 0.82rem;
-      }
-
-      .worldbook-manager-page .wb-external-status-chip.is-active {
-        border-color: rgba(74, 222, 128, 0.35);
-        background: rgba(74, 222, 128, 0.12);
-        color: #86efac;
-      }
-
-      .worldbook-manager-page .wb-external-status-chip.is-missing {
-        border-color: rgba(251, 191, 36, 0.35);
-        background: rgba(251, 191, 36, 0.1);
-        color: #facc15;
-      }
-
-      @media (max-width: 1180px) {
-        .worldbook-manager-page .worldbook-selection-panel {
-          right: 12px;
-          top: 96px;
-          width: min(320px, calc(100vw - 24px));
-          max-height: calc(100vh - 112px);
-        }
-      }
-
-      @media (max-width: 760px) {
-        .worldbook-manager-page .worldbook-selection-panel {
-          left: 12px;
-          right: 12px;
-          top: auto;
-          bottom: 12px;
-          width: auto;
-          max-height: min(72vh, 620px);
-        }
-
-        .worldbook-manager-page .worldbook-selection-content {
-          max-height: min(58vh, 480px);
-        }
-
-        .worldbook-manager-page .worldbook-bulk-row,
-        .worldbook-manager-page .worldbook-selection-actions {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
   </head>
   <body class="app-sidebar-shell worldbook-manager-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">
@@ -270,7 +31,12 @@
     <div class="config-shell compact">
       <section class="panel config-panel full-span">
         <div class="section-head">
-          <p class="eyebrow">Worldbook</p>
+          <div class="ui-workbench-titleline worldbook-manager-titleline">
+            <p class="eyebrow">Worldbook Entries</p>
+            <span id="worldbook-status-box" class="worldbook-status-box worldbook-status-pill config-status-pill ui-status-pill is-success" aria-live="polite">
+              <strong id="status-text" class="status-line strong">就绪</strong>
+            </span>
+          </div>
           <h2>世界书词条管理</h2>
           <p class="muted">支持标题、主关键词、副关键词、常驻/关键词触发、主副组关系、组别、概率、黏性、冷却、顺序，以及角色定义前/后与聊天内注入等字段。</p>
         </div>
@@ -279,26 +45,27 @@
             <span class="worldbook-overview-pill">当前条数 <strong id="worldbook-count">{{ worldbook_count }}</strong></span>
             <span class="worldbook-overview-pill">快速入口 <a class="ghost-link" href="/config/worldbook">打开触发设置</a></span>
           </div>
-          <div id="worldbook-status-box" class="worldbook-status-box is-success">
-            <span class="worldbook-status-label">当前状态</span>
-            <strong id="status-text" class="status-line strong">就绪</strong>
-          </div>
         </div>
       </section>
 
       <section class="panel config-panel full-span">
-        <div class="memory-actions worldbook-action-bar">
-          <div class="button-row">
+        <div class="worldbook-workspace">
+        <div class="memory-actions worldbook-action-bar ui-sticky-toolbar ui-action-dock is-wrap full-span">
+          <div class="button-row worldbook-actions-primary ui-action-dock-primary">
             <button id="add-worldbook-entry" type="button">新增词条</button>
             <button id="save-worldbook-entries" type="button" class="secondary">保存全部词条</button>
             <button id="reload-worldbook-entries" type="button" class="secondary">重新读取</button>
-            <button id="import-worldbook" type="button" class="secondary">导入世界书</button>
-            <button id="export-worldbook" type="button" class="secondary">导出世界书</button>
-            <input id="import-worldbook-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
           </div>
+          <details class="worldbook-more-actions ui-action-more">
+            <summary class="secondary compact" role="button">更多</summary>
+            <div class="worldbook-more-menu ui-action-more-menu">
+              <button id="import-worldbook" type="button" class="secondary compact">导入世界书</button>
+              <button id="export-worldbook" type="button" class="secondary compact">导出世界书</button>
+            </div>
+          </details>
+          <input id="import-worldbook-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
         </div>
 
-        <div class="worldbook-workspace">
           <aside class="panel config-panel worldbook-group-panel">
             <div class="section-head">
               <p class="eyebrow">Groups</p>
@@ -308,7 +75,7 @@
             <div id="worldbook-group-sidebar" class="worldbook-group-list"></div>
           </aside>
 
-          <div class="worldbook-list-pane">
+          <div class="worldbook-list-pane worldbook-stage5-rule-editor">
             <div class="worldbook-list-toolbar">
               <div>
                 <label for="worldbook-search">搜索词条</label>
@@ -321,7 +88,7 @@
                 <span id="active-health-filter" class="muted helper-text">问题筛选：未启用</span>
                 <button id="collapse-all-worldbook" type="button" class="secondary">全部折叠</button>
                 <button id="expand-all-worldbook" type="button" class="secondary">全部展开</button>
-                <button id="select-all-visible-worldbook-toolbar" type="button" class="secondary">选择当前结果</button>
+                <button id="select-all-visible-worldbook-toolbar" type="button" class="secondary">选择当前</button>
               </div>
             </div>
 
@@ -345,7 +112,7 @@
 
             <div id="worldbook-entry-list" class="memory-list">
           {% for item in worldbook_entries %}
-          <article class="memory-card worldbook-entry-card" data-collapsed="false">
+          <article class="memory-card worldbook-entry-card worldbook-rule-card" data-collapsed="false">
             <div class="memory-card-head">
               <label class="checkbox-row wb-select-control" title="选择此词条">
                 <input class="wb-selected" type="checkbox" aria-label="选择此词条" />
@@ -357,7 +124,7 @@
               </div>
             </div>
 
-            <div class="worldbook-entry-body">
+            <div class="worldbook-entry-body worldbook-rule-body">
               <div class="grid-two wb-wide-grid">
                 <div>
                   <label>标题</label>
@@ -381,13 +148,19 @@
               </div>
               <div class="wb-external-tag-panel" hidden>
                 <div class="grid-two wb-wide-grid">
-                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if item.external_source == 'state_journal' %}selected{% endif %}>心笺 · 角色阶段</option></select></div>
+                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if (item.external_source or 'state_journal') == 'state_journal' %}selected{% endif %}>心笺 · 角色阶段</option><option value="preset" {% if item.external_source == 'preset' %}selected{% endif %}>预设标签</option><option value="manual" {% if item.external_source == 'manual' %}selected{% endif %}>手动标签</option></select></div>
                   <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+                </div>
+                <div class="wb-external-tags-row">
+                  <label class="wb-external-tags-label">自定义触发标签（可选）</label>
+                  <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用心笺角色 / 阶段生成标签">{{ (item.activation_tags or []) | join('&#10;') }}</textarea>
+                  <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成心笺阶段标签。</p>
                 </div>
                 <div class="wb-stage-select-row">
                   <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
                   <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
                 </div>
+                <p class="muted helper-text wb-external-stage-hint">选择心笺角色与阶段；上方标签留空时会自动生成机器标签。</p>
                 <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
                   <div class="grid-two wb-wide-grid">
                     <div><label>角色名</label><input class="wb-external-role-name" value="{{ (item.external_ref or {}).get('role_name', '') }}" placeholder="例如：苏怜烟" /></div>
@@ -461,6 +234,7 @@
                   <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="{{ item.cooldown_turns if item.cooldown_turns is not none else 0 }}" />
                 </div>
               </div>
+              <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当心笺阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
 
               <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
                 <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
@@ -488,7 +262,7 @@
                 </div>
               </div>
 
-              <div class="wb-options-grid" data-section-title="选项">
+              <div class="wb-options-grid ui-options-grid" data-section-title="选项">
                 <label class="checkbox-row">
                   <input class="wb-enabled" type="checkbox" {% if item.enabled %}checked{% endif %} />
                   <span>启用</span>
@@ -540,7 +314,7 @@
         </div>
         <div class="worldbook-selection-content">
           <div class="worldbook-selection-actions">
-            <button id="toggle-bulk-editor" type="button" class="secondary full-row">批量编辑</button>
+            <button id="toggle-bulk-editor" type="button" class="secondary full-row" aria-expanded="false">批量编辑</button>
             <button id="bulk-enable-selected" type="button" class="secondary">启用</button>
             <button id="bulk-disable-selected" type="button" class="secondary">禁用</button>
             <button id="delete-selected-worldbook" type="button" class="secondary danger-button">删除选中</button>
@@ -671,7 +445,7 @@
     </div>
 
     <template id="worldbook-entry-template">
-      <article class="memory-card worldbook-entry-card" data-collapsed="false">
+      <article class="memory-card worldbook-entry-card worldbook-rule-card" data-collapsed="false">
         <div class="memory-card-head">
           <label class="checkbox-row wb-select-control" title="选择此词条">
             <input class="wb-selected" type="checkbox" aria-label="选择此词条" />
@@ -683,7 +457,7 @@
           </div>
         </div>
 
-        <div class="worldbook-entry-body">
+        <div class="worldbook-entry-body worldbook-rule-body">
           <div class="grid-two wb-wide-grid">
             <div>
               <label>标题</label>
@@ -707,13 +481,19 @@
           </div>
           <div class="wb-external-tag-panel" hidden>
             <div class="grid-two wb-wide-grid">
-              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">心笺 · 角色阶段</option></select></div>
+              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">心笺 · 角色阶段</option><option value="preset">预设标签</option><option value="manual">手动标签</option></select></div>
               <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+            </div>
+            <div class="wb-external-tags-row">
+              <label class="wb-external-tags-label">自定义触发标签（可选）</label>
+              <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用心笺角色 / 阶段生成标签"></textarea>
+              <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成心笺阶段标签。</p>
             </div>
             <div class="wb-stage-select-row">
               <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
               <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
             </div>
+            <p class="muted helper-text wb-external-stage-hint">选择心笺角色与阶段；上方标签留空时会自动生成机器标签。</p>
             <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
               <div class="grid-two wb-wide-grid">
                 <div><label>角色名</label><input class="wb-external-role-name" placeholder="例如：苏怜烟" /></div>
@@ -787,6 +567,7 @@
               <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="0" />
             </div>
           </div>
+          <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当心笺阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
 
           <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
             <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
@@ -814,7 +595,7 @@
             </div>
           </div>
 
-          <div class="wb-options-grid" data-section-title="选项">
+          <div class="wb-options-grid ui-options-grid" data-section-title="选项">
             <label class="checkbox-row">
               <input class="wb-enabled" type="checkbox" checked />
               <span>启用</span>
@@ -848,6 +629,8 @@
     </template>
 
     <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -858,6 +641,7 @@
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
       const selectedWorldbookCountEl = document.getElementById("selected-worldbook-count");
       const importModeEl = document.getElementById("import-mode");
       const importModeHintEl = document.getElementById("import-mode-hint");
@@ -919,25 +703,58 @@
         return PROMPT_LAYER_HINTS[value] || "跟随注入位置：继续按角色前/角色后/聊天注入生效。";
       }
 
+      function getWorldbookStatusKind(message = "") {
+        const text = String(message || statusEl?.title || statusEl?.textContent || "");
+        if (/失败|错误|异常|未能/.test(text)) return "error";
+        if (/正在|保存中|读取中|导入中|导出中|处理中/.test(text)) return "loading";
+        if (worldbookDirty || /未保存|记得保存|修改|移除|追加|启用|停用/.test(text)) return "dirty";
+        return "success";
+      }
+
+      function getCompactWorldbookStatusLabel(message = "", kind = "success") {
+        const text = String(message || "");
+        if (kind === "error") return "出错";
+        if (kind === "dirty") return "有修改";
+        if (kind === "loading") {
+          if (text.includes("保存")) return "保存中";
+          if (text.includes("读取")) return "读取中";
+          if (text.includes("导入")) return "导入中";
+          if (text.includes("导出")) return "导出中";
+          return "处理中";
+        }
+        if (text.includes("保存")) return "已保存";
+        if (text.includes("读取")) return "已读取";
+        if (text.includes("导入")) return "已导入";
+        if (text.includes("导出")) return "已导出";
+        if (text.includes("检查")) return "已检查";
+        return "就绪";
+      }
+
       function updateWorldbookStatusClass(message = "") {
         const box = document.getElementById("worldbook-status-box");
         if (!box) return;
-        box.classList.remove("is-success", "is-loading", "is-dirty", "is-error");
-        const text = String(message || statusEl?.textContent || "");
-        let kind = "success";
-        if (/失败|错误|异常|未能/.test(text)) {
-          kind = "error";
-        } else if (/正在|保存中|读取中|导入中|导出中|处理中/.test(text)) {
-          kind = "loading";
-        } else if (worldbookDirty || /未保存|记得保存|修改|移除|追加|启用|停用/.test(text)) {
-          kind = "dirty";
-        }
-        box.classList.add(`is-${kind}`);
+        box.classList.remove("is-success", "is-loading", "is-saving", "is-dirty", "is-error", "is-idle");
+        const kind = getWorldbookStatusKind(message);
+        box.classList.add(kind === "loading" ? "is-saving" : `is-${kind}`);
+        return kind;
       }
 
       function setStatus(text) {
         const message = worldbookDirty ? `${text}（有未保存修改）` : text;
-        statusEl.textContent = message;
+        const kind = getWorldbookStatusKind(message);
+        const label = getCompactWorldbookStatusLabel(message, kind);
+        const statusBox = document.getElementById("worldbook-status-box");
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: message,
+          state: kind === "loading" ? "saving" : kind,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle", "is-loading"],
+          pulseTarget: statusBox || statusEl,
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = message;
+        }
+        statusBox?.setAttribute("title", message);
         updateWorldbookStatusClass(message);
       }
 
@@ -1172,7 +989,7 @@
         QUICK_FILTERS.forEach((item) => {
           const button = document.createElement("button");
           button.type = "button";
-          button.className = `worldbook-quick-filter-button${item.key === activeQuickFilter ? " active" : ""}`;
+          button.className = `worldbook-quick-filter-button ui-filter-chip${item.key === activeQuickFilter ? " active" : ""}`;
           button.dataset.quickFilter = item.key;
           button.textContent = item.label;
           quickFiltersEl.appendChild(button);
@@ -1229,10 +1046,7 @@
       function setEntryCollapsed(card, collapsed) {
         const body = card.querySelector(".worldbook-entry-body");
         const toggleBtn = card.querySelector(".toggle-worldbook-entry");
-        card.dataset.collapsed = collapsed ? "true" : "false";
-        if (body) {
-          body.style.display = collapsed ? "none" : "";
-        }
+        window.Fantareal?.motion?.setDisclosureCollapsed(card, body, collapsed, { hiddenMode: "display" });
         if (toggleBtn) {
           toggleBtn.textContent = collapsed ? "▸" : "▾";
           toggleBtn.title = collapsed ? "展开词条" : "折叠词条";
@@ -1240,6 +1054,7 @@
           toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
           toggleBtn.classList.add("icon-button");
         }
+        updateCardSummary(card);
       }
 
       function applyWorldbookSearch() {
@@ -1337,11 +1152,16 @@
         });
       }
 
-      function setBulkEditorOpen(open) {
+      function setBulkEditorOpen(open, immediate = false) {
         const editor = document.getElementById("worldbook-bulk-editor");
         const toggle = document.getElementById("toggle-bulk-editor");
         if (!editor) return;
-        editor.classList.toggle("is-collapsed", !open);
+        window.Fantareal?.motion?.setDisclosureCollapsed(editor, editor, !open, {
+          collapsedClass: "is-collapsed",
+          dataAttribute: "bulkEditorCollapsed",
+          hiddenMode: "display",
+          immediate,
+        }) ?? editor.classList.toggle("is-collapsed", !open);
         editor.setAttribute("aria-hidden", open ? "false" : "true");
         if (toggle) {
           toggle.textContent = open ? "收起批量编辑" : "批量编辑";
@@ -1370,7 +1190,7 @@
 
       function createSummaryChip(text, className = "") {
         const chip = document.createElement("span");
-        chip.className = `worldbook-summary-chip${className ? ` ${className}` : ""}`;
+        chip.className = `worldbook-summary-chip ui-summary-chip${className ? ` ${className}` : ""}`;
         chip.textContent = text;
         return chip;
       }
@@ -1381,12 +1201,12 @@
         let switchEl = head.querySelector(".wb-quick-enabled-switch");
         if (!switchEl) {
           switchEl = document.createElement("label");
-          switchEl.className = "wb-quick-enabled-switch";
+          switchEl.className = "wb-quick-enabled-switch fr-compact-switch";
           switchEl.title = "快速启用 / 停用这条世界书词条";
           switchEl.innerHTML = `
             <input class="wb-quick-enabled" type="checkbox" aria-label="快速启用或停用词条" />
-            <span class="wb-quick-enabled-track" aria-hidden="true"></span>
-            <em class="wb-quick-enabled-label">启用</em>
+            <span class="wb-quick-enabled-track fr-compact-switch-track" aria-hidden="true"></span>
+            <em class="wb-quick-enabled-label fr-compact-switch-label">启用</em>
           `;
         }
         const actions = head.querySelector(".button-row");
@@ -1414,12 +1234,35 @@
         const head = card.querySelector(".memory-card-head");
         if (!head) return;
         ensureQuickEnabledSwitch(card);
-        let summary = head.querySelector(".worldbook-card-summary");
+
+        let titleline = head.querySelector(".worldbook-entry-titleline");
+        const directTitle = head.querySelector(":scope > strong");
+        if (!titleline) {
+          titleline = document.createElement("div");
+          titleline.className = "worldbook-entry-titleline";
+          if (directTitle) titleline.appendChild(directTitle);
+          const actions = head.querySelector(".button-row");
+          head.insertBefore(titleline, actions || null);
+        }
+
+        let groupLabel = head.querySelector(".worldbook-entry-group-label");
+        if (!groupLabel) {
+          groupLabel = document.createElement("span");
+          groupLabel.className = "worldbook-entry-group-label";
+          titleline.appendChild(groupLabel);
+        }
+
+        const currentTitle = card.querySelector(".wb-title")?.value?.trim() || titleline.querySelector("strong")?.textContent || "???";
+        const currentGroup = card.querySelector(".wb-group")?.value?.trim() || "???";
+        const titleTextEl = titleline.querySelector("strong");
+        if (titleTextEl) titleTextEl.textContent = currentTitle;
+        groupLabel.textContent = currentGroup;
+
+        let summary = titleline.querySelector(".worldbook-card-summary");
         if (!summary) {
           summary = document.createElement("div");
           summary.className = "worldbook-card-summary";
-          const actions = head.querySelector(".button-row");
-          head.insertBefore(summary, actions || null);
+          titleline.appendChild(summary);
         }
         summary.innerHTML = "";
 
@@ -1430,23 +1273,28 @@
         const order = Number(card.querySelector(".wb-order")?.value || 100);
         const injectionOrder = Number(card.querySelector(".wb-injection-order")?.value || order);
         const chance = Number(card.querySelector(".wb-chance")?.value || 100);
+        const externalRuntime = entryType === "external_tag";
+        const expanded = card.dataset.collapsed === "false";
 
-        summary.appendChild(createSummaryChip(getEntryTypeLabel(entryType), "strong"));
+        const layerChipLabel = getPromptLayerLabel(promptLayer)
+          .replace("\u5f53\u524d\u72b6\u6001\u533a", "\u5f53\u524d")
+          .replace("\u8f93\u51fa\u534f\u8bae\u533a", "\u534f\u8bae")
+          .replace("\u7a33\u5b9a\u533a", "\u7a33\u5b9a")
+          .replace("\u52a8\u6001\u533a", "\u52a8\u6001");
+
+        summary.appendChild(createSummaryChip(getEntryTypeLabel(entryType), "strong wb-chip-type"));
         if (promptLayer === "follow_position") {
-          summary.appendChild(createSummaryChip("跟随位置"));
           summary.appendChild(createSummaryChip(
             insertionPosition === "in_chat"
-              ? `聊天注入 depth ${depth}`
+              ? `\u804a\u5929 ${depth}`
               : getInsertionPositionLabel(insertionPosition),
-            "strong"
+            "strong wb-chip-layer"
           ));
         } else {
-          summary.appendChild(createSummaryChip(`${getPromptLayerLabel(promptLayer)}优先`, "strong"));
-          summary.appendChild(createSummaryChip(`原位置:${getInsertionPositionLabel(insertionPosition)}`));
+          summary.appendChild(createSummaryChip(`${layerChipLabel}\u4f18\u5148`, "strong wb-chip-layer"));
+          if (!expanded) summary.appendChild(createSummaryChip(`\u539f:${getInsertionPositionLabel(insertionPosition)}`, "wb-chip-position"));
         }
-        summary.appendChild(createSummaryChip(`顺序 ${order}`));
-        summary.appendChild(createSummaryChip(`注入 ${injectionOrder}`));
-        summary.appendChild(createSummaryChip(`概率 ${chance}%`, chance <= 0 ? "warning" : ""));
+        summary.appendChild(externalRuntime ? createSummaryChip("\u5b9e\u65f6\u6807\u7b7e", "wb-chip-chance") : createSummaryChip(`\u7387 ${chance}%`, `wb-chip-chance${chance <= 0 ? " warning" : ""}`));
         syncQuickEnabledSwitch(card);
       }
 
@@ -1523,7 +1371,7 @@
           if (entryType === "constant") addIssue(card, "constant");
           if (promptLayer !== "follow_position") addIssue(card, promptLayer);
           if (insertionPosition === "in_chat") addIssue(card, "in_chat");
-          if (chance <= 0) addIssue(card, "chance_zero");
+          if (entryType !== "external_tag" && chance <= 0) addIssue(card, "chance_zero");
           if (title && (titleMap.get(title) || 0) > 1) addIssue(card, "duplicate_title");
           if (trigger && (triggerMap.get(trigger) || 0) > 1) addIssue(card, "duplicate_trigger");
         });
@@ -1582,12 +1430,13 @@
           removeBtn.setAttribute("aria-label", "删除词条");
           removeBtn.classList.add("icon-button", "danger-icon-button");
           removeBtn.addEventListener("click", () => {
-            card.remove();
-            updateCount();
-            updateSelectedCount();
-            refreshWorldbookNavigation();
-            applyWorldbookSearch();
-            markWorldbookDirty("已删除一条世界书词条，记得保存。");
+            (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+              updateCount();
+              updateSelectedCount();
+              refreshWorldbookNavigation();
+              applyWorldbookSearch();
+              markWorldbookDirty("已删除一条世界书词条，记得保存。");
+            });
           });
         }
 
@@ -1608,33 +1457,142 @@
         return safeRole && safeStage ? `state_journal.stage.${safeRole}.${safeStage}` : "";
       }
 
+      function parseExternalTags(value) {
+        const tags = [];
+        String(value || "")
+          .split(/[\n\r,，、\s]+/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .forEach((tag) => {
+            if (!tags.includes(tag)) tags.push(tag);
+          });
+        return tags;
+      }
+
+      function formatExternalTags(tags) {
+        return Array.isArray(tags) ? tags.map((tag) => String(tag || "").trim()).filter(Boolean).join("\n") : "";
+      }
+
+      function getManualExternalTags(card) {
+        return parseExternalTags(card.querySelector(".wb-external-tags")?.value || "");
+      }
+
+      function getExternalSource(card) {
+        return card.querySelector(".wb-external-source")?.value || "state_journal";
+      }
+
+      function getExternalActivationTags(card) {
+        const manualTags = getManualExternalTags(card);
+        if (manualTags.length) return manualTags;
+        if (getExternalSource(card) !== "state_journal") return [];
+        return [buildExternalTag(card.querySelector(".wb-external-role-id")?.value.trim(), card.querySelector(".wb-external-stage-key")?.value.trim())].filter(Boolean);
+      }
+
+      function isStateJournalGeneratedTag(tag, roleId, stageKey) {
+        return String(tag || "").trim() === buildExternalTag(roleId, stageKey);
+      }
+
+      function normalizeInitialExternalTagsField(card) {
+        const tagsInput = card.querySelector(".wb-external-tags");
+        if (!tagsInput || getExternalSource(card) !== "state_journal") return;
+        const roleId = card.querySelector(".wb-external-role-id")?.value.trim() || "";
+        const stageKey = card.querySelector(".wb-external-stage-key")?.value.trim() || "";
+        const manualTags = parseExternalTags(tagsInput.value).filter((tag) => !isStateJournalGeneratedTag(tag, roleId, stageKey));
+        tagsInput.value = formatExternalTags(manualTags);
+      }
+
+      function syncExternalSourceUi(card) {
+        const source = getExternalSource(card);
+        const stageRow = card.querySelector(".wb-stage-select-row");
+        const stageHint = card.querySelector(".wb-external-stage-hint");
+        const tagsLabel = card.querySelector(".wb-external-tags-label");
+        const tagsInput = card.querySelector(".wb-external-tags");
+        const tagsHelper = card.querySelector(".wb-external-tags-helper");
+        const stateJournalSource = source === "state_journal";
+        if (stageRow) stageRow.hidden = !stateJournalSource;
+        if (stageHint) stageHint.hidden = !stateJournalSource;
+        if (tagsLabel) {
+          if (source === "preset") tagsLabel.textContent = "监听预设标签";
+          else if (source === "manual") tagsLabel.textContent = "监听外部标签";
+          else tagsLabel.textContent = "自定义触发标签（可选）";
+        }
+        if (tagsInput) {
+          if (source === "preset") tagsInput.placeholder = "一行一个，例如 preset.style.daily-prose";
+          else if (source === "manual") tagsInput.placeholder = "一行一个，例如 runtime.custom.scene-tag";
+          else tagsInput.placeholder = "留空时自动使用心笺角色 / 阶段生成标签";
+        }
+        if (tagsHelper) {
+          if (source === "preset") tagsHelper.textContent = "只使用这里填写的预设标签；留空会保存为空，不自动生成心笺标签。";
+          else if (source === "manual") tagsHelper.textContent = "只使用这里填写的外部标签；留空会保存为空，不自动生成心笺标签。";
+          else tagsHelper.textContent = "留空时自动使用下方角色 / 阶段生成心笺阶段标签。";
+        }
+      }
+
+      function syncExternalTagRuntimeUi(card) {
+        const isExternalTag = (card.querySelector(".wb-entry-type")?.value || "keyword") === "external_tag";
+        [".wb-chance", ".wb-sticky-turns", ".wb-cooldown-turns"].forEach((selector) => {
+          const control = card.querySelector(selector);
+          if (!control) return;
+          control.disabled = isExternalTag;
+          control.title = isExternalTag ? "外部标签词条按 active tag 实时注入，不使用概率、黏性和冷却。" : "";
+        });
+        const runtimeNote = card.querySelector(".wb-external-runtime-note");
+        if (runtimeNote) runtimeNote.hidden = !isExternalTag;
+      }
+
       function updateExternalTagPreview(card) {
         const type = card.querySelector(".wb-entry-type")?.value || "keyword";
         const keywordGrid = card.querySelector(".wb-keyword-grid");
         const externalPanel = card.querySelector(".wb-external-tag-panel");
         if (keywordGrid) keywordGrid.hidden = type === "external_tag";
         if (externalPanel) externalPanel.hidden = type !== "external_tag";
+        syncExternalTagRuntimeUi(card);
+        syncExternalSourceUi(card);
+        const source = getExternalSource(card);
         const roleName = card.querySelector(".wb-external-role-name")?.value.trim() || "未选择角色";
         const roleId = card.querySelector(".wb-external-role-id")?.value.trim();
         const stageName = card.querySelector(".wb-external-stage-name")?.value.trim() || "未选择阶段";
         const stageKey = card.querySelector(".wb-external-stage-key")?.value.trim();
-        const tag = buildExternalTag(roleId, stageKey);
+        const stageTag = buildExternalTag(roleId, stageKey);
+        const tags = getExternalActivationTags(card);
+        const manualTags = getManualExternalTags(card);
         const preview = card.querySelector(".wb-external-preview");
         const status = card.querySelector(".wb-external-status");
         const activeTags = new Set((stateJournalStageCatalog.active_stage_tags || []).map((item) => String(item || "").trim()).filter(Boolean));
         const inCatalog = Boolean(findStageCatalogItem(roleId, stageKey));
-        if (preview) preview.textContent = tag ? `当「${roleName}」处于「${stageName}」阶段时触发。高级标签：${tag}` : "请选择心笺角色与阶段；机器标签会自动生成。";
+        if (preview) {
+          if (source === "preset") {
+            preview.textContent = manualTags.length
+              ? `监听预设标签：${manualTags.join(" / ")}`
+              : "未填写预设标签；保存后 activation_tags 为空，不会自动生成心笺标签。";
+          } else if (source === "manual") {
+            preview.textContent = manualTags.length
+              ? `监听外部标签：${manualTags.join(" / ")}`
+              : "未填写外部标签；保存后 activation_tags 为空，不会自动生成心笺标签。";
+          } else if (manualTags.length) {
+            preview.textContent = `使用自定义标签触发：${manualTags.join(" / ")}`;
+          } else {
+            preview.textContent = stageTag ? `当「${roleName}」处于「${stageName}」阶段时触发。机器标签：${stageTag}` : "请选择心笺角色与阶段；标签留空时会自动生成心笺阶段标签。";
+          }
+        }
         if (status) {
           status.classList.remove("is-active", "is-missing");
-          if (!tag) {
-            status.textContent = "未绑定阶段";
+          const hasActiveTag = tags.some((tag) => activeTags.has(tag));
+          if (!tags.length) {
+            status.textContent = "未绑定标签";
             status.classList.add("is-missing");
-          } else if (activeTags.has(tag)) {
+          } else if (source === "state_journal" && hasActiveTag) {
             status.textContent = "当前命中";
             status.classList.add("is-active");
-          } else if (!inCatalog && (stateJournalStageCatalog.roles || []).length) {
+          } else if (source === "state_journal" && !manualTags.length && !inCatalog && (stateJournalStageCatalog.roles || []).length) {
             status.textContent = "当前卡未找到该阶段";
             status.classList.add("is-missing");
+          } else if (source === "preset") {
+            status.textContent = "等待预设标签";
+          } else if (source === "manual") {
+            status.textContent = "等待外部标签";
+          } else if (manualTags.length) {
+            status.textContent = "等待外部标签";
           } else {
             status.textContent = "等待阶段";
           }
@@ -1654,12 +1612,17 @@
         card.querySelector(".wb-entry-type").value = item.entry_type || "keyword";
         const externalRef = item.external_ref || {};
         if (card.querySelector(".wb-external-source")) card.querySelector(".wb-external-source").value = item.external_source || "state_journal";
+        if (card.querySelector(".wb-external-tags")) {
+          const activationTags = Array.isArray(item.activation_tags) ? item.activation_tags : [];
+          card.querySelector(".wb-external-tags").value = formatExternalTags(activationTags);
+        }
         if (card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = externalRef.role_name || "";
         if (card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = externalRef.role_id || "";
         if (card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = externalRef.stage_name || "";
         if (card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = externalRef.stage_key || "";
-        card.querySelector(".wb-entry-type")?.addEventListener("change", () => { updateExternalTagPreview(card); updateCardTitle(card); });
-        card.querySelectorAll(".wb-external-tag-panel input, .wb-external-tag-panel select").forEach((input) => input.addEventListener("input", () => updateExternalTagPreview(card)));
+        normalizeInitialExternalTagsField(card);
+        card.querySelector(".wb-entry-type")?.addEventListener("change", () => { updateExternalTagPreview(card); updateCardTitle(card); applyWorldbookSearch(); });
+        card.querySelectorAll(".wb-external-tag-panel input, .wb-external-tag-panel select, .wb-external-tag-panel textarea").forEach((input) => input.addEventListener("input", () => updateExternalTagPreview(card)));
         populateExternalStageSelectors(card);
         updateExternalTagPreview(card);
         card.querySelector(".wb-prompt-layer").value = item.prompt_layer || "follow_position";
@@ -1719,7 +1682,7 @@
               stage_key: card.querySelector(".wb-external-stage-key")?.value.trim() || "",
               stage_name: card.querySelector(".wb-external-stage-name")?.value.trim() || "",
             },
-            activation_tags: [buildExternalTag(card.querySelector(".wb-external-role-id")?.value.trim(), card.querySelector(".wb-external-stage-key")?.value.trim())].filter(Boolean),
+            activation_tags: getExternalActivationTags(card),
             content: card.querySelector(".wb-content").value.trim(),
             comment: card.querySelector(".wb-comment").value.trim(),
             enabled: card.querySelector(".wb-enabled").checked,
@@ -1983,6 +1946,7 @@
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
         if (event.target.classList.contains("wb-entry-type") || event.target.closest(".wb-external-tag-panel")) {
+          if (event.target.classList.contains("wb-external-source")) syncExternalSourceUi(card);
           updateExternalTagPreview(card);
           updateCardTitle(card);
           applyWorldbookSearch();
@@ -1996,6 +1960,7 @@
 
       loadStateJournalStageCatalog().then(() => {
         document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
+          normalizeInitialExternalTagsField(card);
           populateExternalStageSelectors(card);
           updateExternalTagPreview(card);
         });
@@ -2004,6 +1969,7 @@
       document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
         attachRemoveHandler(card);
         syncInjectionUi(card);
+        normalizeInitialExternalTagsField(card);
         populateExternalStageSelectors(card);
         updateExternalTagPreview(card);
         updateCardTitle(card);
@@ -2018,6 +1984,7 @@
           updateCardTitle(card);
         }
         worldbookListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
         updateCount();
         updateSelectedCount();
         refreshWorldbookNavigation();
@@ -2233,13 +2200,14 @@
           `确定删除选中的 ${cards.length} 条世界书词条吗？\n\n这一步只会先从页面移除，点击“保存全部词条”后才会写入文件。`
         );
         if (!confirmed) return;
-        cards.forEach((card) => card.remove());
-        updateCount();
-        updateSelectedCount();
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        Promise.all(cards.map((card) => window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove()))).then(() => {
+          updateCount();
+          updateSelectedCount();
+          refreshWorldbookNavigation();
+          analyzeWorldbookHealth();
+          updateHealthFilterLabel();
+          applyWorldbookSearch();
+        });
         markWorldbookDirty(`已从页面移除 ${cards.length} 条词条，确认无误后请保存。`);
       });
 
@@ -2354,6 +2322,7 @@
         event.returnValue = "";
       });
 
+      setBulkEditorOpen(false, true);
       updateCount();
       updateSelectedCount();
       refreshWorldbookNavigation();

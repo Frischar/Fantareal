@@ -1,0 +1,1807 @@
+/* Preset page styles ? migrated from templates/preset.html during P6 CSS cleanup.
+   Keep selectors scoped to body.preset-config-page / .preset-* to avoid global bleed.
+   Migration goal: remove large inline style block without changing visual output. */
+
+.config-shell.compact {
+  width: min(1760px, calc(100vw - 32px));
+  max-width: min(1760px, calc(100vw - 32px));
+}
+
+.preset-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr)) minmax(220px, 0.8fr);
+  gap: 10px;
+}
+
+.preset-overview-grid .stat-box {
+  min-height: auto;
+  padding: 10px 12px;
+  border-radius: 16px;
+}
+
+.preset-overview-grid .stat-label {
+  font-size: 0.76rem;
+}
+
+.preset-overview-grid .stat-box strong {
+  font-size: 0.98rem;
+  line-height: 1.3;
+}
+
+.preset-save-state-box {
+  border-color: rgba(238, 169, 79, 0.46);
+  border-left: 5px solid rgba(238, 169, 79, 0.82);
+  background: linear-gradient(90deg, rgba(238, 169, 79, 0.16), color-mix(in srgb, var(--panel-strong) 92%, transparent 8%));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.preset-save-state-box.is-dirty {
+  border-color: rgba(238, 169, 79, 0.72);
+  border-left-color: rgba(238, 169, 79, 0.95);
+  background: linear-gradient(90deg, rgba(238, 169, 79, 0.24), rgba(94, 194, 168, 0.08));
+  box-shadow: 0 0 0 2px rgba(238, 169, 79, 0.16), 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+
+.preset-status-strip {
+  margin-top: 10px;
+  padding: 8px 11px;
+  border: 1px solid rgba(238, 169, 79, 0.38);
+  border-left: 5px solid rgba(238, 169, 79, 0.82);
+  border-radius: 16px;
+  background: linear-gradient(90deg, rgba(238, 169, 79, 0.13), rgba(94, 194, 168, 0.06));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preset-status-strip.is-dirty {
+  border-color: rgba(238, 169, 79, 0.70);
+  border-left-color: rgba(238, 169, 79, 0.95);
+  background: linear-gradient(90deg, rgba(238, 169, 79, 0.22), rgba(94, 194, 168, 0.08));
+  box-shadow: 0 0 0 2px rgba(238, 169, 79, 0.14);
+}
+
+.preset-status-strip strong {
+  color: var(--text);
+}
+
+.preset-status-strip #status-text {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.preset-workbench-panel {
+  position: relative;
+  z-index: 40;
+  overflow: visible !important;
+}
+
+.preset-workbench-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.preset-editor-column {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.preset-editor-actions,
+.preset-block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.preset-editor-actions button,
+.preset-block-actions button {
+  width: auto;
+  min-width: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 8px 13px;
+  border-radius: 999px;
+}
+
+.preset-card-remove,
+.preset-group-item-remove {
+  border-color: rgba(220, 84, 84, 0.45);
+}
+
+.preset-card-remove:hover,
+.preset-group-item-remove:hover {
+  border-color: rgba(220, 84, 84, 0.86);
+  background: rgba(220, 84, 84, 0.13);
+}
+
+.preset-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.preset-workbench-shell .preset-card-grid {
+  grid-template-columns: 1fr;
+}
+
+.preset-item {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
+  background: var(--panel-strong);
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  min-height: 106px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.preset-item:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+}
+
+.preset-item.active-editor {
+  border-color: rgba(94, 194, 168, 0.72);
+  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+}
+
+.preset-item.current-runtime {
+  border-color: rgba(238, 169, 79, 0.64);
+  box-shadow: inset 4px 0 0 rgba(238, 169, 79, 0.78), 0 10px 22px rgba(0, 0, 0, 0.10);
+}
+
+.preset-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.preset-item strong {
+  color: var(--text);
+  line-height: 1.3;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.preset-item small {
+  color: var(--muted);
+  display: block;
+  margin-top: 0.55rem;
+}
+
+.preset-pill-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.preset-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.58rem;
+  border-radius: 999px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.preset-pill.runtime {
+  background: rgba(238, 169, 79, 0.20);
+  border-color: rgba(238, 169, 79, 0.45);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.preset-pill.editing {
+  background: rgba(94, 194, 168, 0.16);
+  border-color: rgba(94, 194, 168, 0.40);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.preset-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(480px, 1.1fr) minmax(380px, 0.9fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.preset-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.preset-base-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.preset-module-chip {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--input-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+
+.preset-module-chip:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.preset-module-chip input.preset-module {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preset-module-switch-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+  flex: 0 0 auto;
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.preset-module-switch-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transition: transform 0.16s ease;
+}
+
+.preset-module-chip input.preset-module:checked + .preset-module-switch-track {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+}
+
+.preset-module-chip input.preset-module:checked + .preset-module-switch-track::before {
+  transform: translateX(16px);
+}
+
+.preset-module-chip:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(94, 194, 168, 0.16);
+  font-weight: 800;
+}
+
+.preset-assembly-card {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(94, 194, 168, 0.06);
+}
+
+.preset-assembly-card ol {
+  margin: 8px 0 0;
+  padding-left: 1.3rem;
+  color: var(--muted);
+}
+
+.preset-v4f-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.preset-v4f-note p {
+  margin: 6px 0 0;
+}
+
+.preset-block-toolbar {
+  display: grid;
+  grid-template-columns: max-content minmax(360px, 1fr);
+  gap: 14px;
+  align-items: end;
+  margin: 12px 0 12px;
+}
+
+.preset-block-search {
+  min-width: 0;
+}
+
+.preset-block-search input {
+  width: 100%;
+}
+
+.preset-drag-hint {
+  margin: 0 0 12px;
+}
+
+.preset-drag-hint strong {
+  color: var(--text);
+}
+
+.preset-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preset-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel-strong);
+  transition: opacity 0.16s ease, transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.preset-card.is-disabled {
+  opacity: 0.72;
+}
+
+.preset-card.is-dragging {
+  opacity: 0.52;
+  transform: scale(0.996);
+  border-color: rgba(238, 169, 79, 0.85);
+  box-shadow: 0 0 0 3px rgba(238, 169, 79, 0.16), 0 14px 30px rgba(0, 0, 0, 0.18);
+}
+
+.preset-card.drag-over-top::before,
+.preset-card.drag-over-bottom::after {
+  content: "插入到这里";
+  position: absolute;
+  left: 46px;
+  right: 16px;
+  height: 0;
+  border-top: 3px solid rgba(238, 169, 79, 0.95);
+  color: rgba(238, 169, 79, 0.95);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.preset-card.drag-over-top::before {
+  top: -7px;
+}
+
+.preset-card.drag-over-bottom::after {
+  bottom: -7px;
+}
+
+.preset-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.preset-drag-handle {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+}
+
+.preset-drag-handle:hover {
+  border-color: rgba(238, 169, 79, 0.70);
+  color: var(--text);
+  background: rgba(238, 169, 79, 0.12);
+}
+
+.preset-drag-handle.is-disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.preset-card-title-zone {
+  min-width: 0;
+}
+
+.preset-card-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.preset-card-title-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.preset-card-summary {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.preset-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: var(--input-bg);
+  white-space: nowrap;
+}
+
+.preset-card-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.preset-quick-enabled-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  background: var(--input-bg);
+  cursor: pointer;
+  user-select: none;
+}
+
+.preset-quick-enabled-switch:hover {
+  border-color: var(--accent);
+}
+
+.preset-quick-enabled-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preset-quick-enabled-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.42);
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.preset-quick-enabled-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transition: transform 0.16s ease;
+}
+
+.preset-quick-enabled-switch input:checked + .preset-quick-enabled-track {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+}
+
+.preset-quick-enabled-switch input:checked + .preset-quick-enabled-track::before {
+  transform: translateX(16px);
+}
+
+
+.preset-base-enabled-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 12px 7px 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.preset-base-enabled-switch:hover {
+  border-color: var(--accent);
+}
+
+.preset-base-enabled-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preset-base-enabled-switch input:checked + .preset-quick-enabled-track {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+}
+
+.preset-base-enabled-switch input:checked + .preset-quick-enabled-track::before {
+  transform: translateX(16px);
+}
+
+.preset-icon-button {
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.preset-card-body {
+  border-top: 1px solid var(--border);
+  padding: 14px;
+}
+
+.preset-card-body[hidden] {
+  display: none;
+}
+
+.preset-block-body-grid,
+.preset-group-body-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px);
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.preset-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.preset-group-item {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  transition:
+    border-color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    background var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    box-shadow var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease);
+}
+
+.preset-group-item.is-group-item-collapsed {
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border) 82%);
+  background: color-mix(in srgb, var(--panel-strong) 52%, transparent);
+}
+
+.preset-group-item-head {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.preset-group-item-head label {
+  margin: 0;
+}
+
+.preset-group-item-select {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.preset-group-item-select {
+  gap: 7px;
+  border-radius: 12px;
+  padding: 6px 9px;
+}
+
+.preset-group-item-select input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  border: 2px solid var(--border);
+  background: var(--input-bg);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.preset-group-item-select input:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.12);
+}
+
+.preset-group-item-select input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.04);
+  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.16);
+}
+
+.preset-group-item-select input:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 6px;
+  border-left: 3px solid #fff;
+  border-bottom: 3px solid #fff;
+  border-radius: 1.5px;
+  transform: translate(-50%, -58%) rotate(-45deg);
+}
+
+.preset-group-item-select {
+  gap: 7px;
+  border-radius: 999px;
+  padding: 4px 9px 4px 4px;
+  min-height: 30px;
+  font-weight: 700;
+}
+
+.preset-group-item-select input.preset-group-item-selected {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.preset-group-item-select input.preset-group-item-selected::after {
+  content: none !important;
+  display: none !important;
+}
+
+.preset-group-item-select input.preset-group-item-selected:checked + .preset-quick-enabled-track {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+}
+
+.preset-group-item-select input.preset-group-item-selected:checked + .preset-quick-enabled-track::before {
+  transform: translateX(16px);
+}
+
+.preset-group-item-select-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.preset-group-item-select:has(input.preset-group-item-selected:checked) .preset-group-item-select-label {
+  color: var(--text);
+}
+
+.preset-group-item-toggle {
+  flex: 0 0 auto;
+}
+
+.preset-group-item-title-stack {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.preset-group-item-summary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.preset-group-item-summary-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.preset-group-item-mini-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--input-bg) 66%, transparent);
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.preset-group-item-mini-chip.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border) 54%);
+  background: color-mix(in srgb, var(--accent) 16%, var(--input-bg));
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+}
+
+.preset-group-item-mini-chip.is-advanced {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border) 60%);
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+}
+
+.preset-group-item-body {
+  transform-origin: top center;
+}
+
+.preset-group-item textarea {
+  margin-top: 8px;
+}
+
+.preset-empty-state {
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  color: var(--muted);
+  text-align: center;
+}
+
+html:not([data-theme="dark"]) {
+  --preset-light-panel: rgba(255, 248, 241, 0.92);
+  --preset-light-control: rgba(238, 228, 216, 0.98);
+  --preset-light-control-hover: rgba(231, 219, 205, 0.99);
+  --preset-light-border: rgba(152, 110, 78, 0.42);
+  --preset-light-orange: rgba(238, 169, 79, 0.24);
+}
+
+html:not([data-theme="dark"]) .preset-status-strip,
+html:not([data-theme="dark"]) .preset-assembly-card {
+  background: rgba(250, 242, 234, 0.72);
+  border-color: rgba(152, 110, 78, 0.28);
+}
+
+html:not([data-theme="dark"]) .preset-item,
+html:not([data-theme="dark"]) .preset-card,
+html:not([data-theme="dark"]) .preset-group-item {
+  background: rgba(249, 243, 236, 0.96);
+  border-color: rgba(160, 116, 84, 0.30);
+}
+
+html:not([data-theme="dark"]) .preset-item.current-runtime {
+  background: linear-gradient(180deg, rgba(247, 229, 210, 0.96), rgba(241, 221, 199, 0.92));
+  border-color: rgba(176, 109, 55, 0.64);
+}
+
+html:not([data-theme="dark"]) .preset-summary-chip,
+html:not([data-theme="dark"]) .preset-module-chip,
+html:not([data-theme="dark"]) .preset-base-enabled-switch,
+html:not([data-theme="dark"]) .preset-group-item-select,
+html:not([data-theme="dark"]) .preset-drag-handle,
+html:not([data-theme="dark"]) .preset-quick-enabled-switch {
+  background: var(--preset-light-control);
+  border-color: var(--preset-light-border);
+  color: #4d382a;
+}
+
+html:not([data-theme="dark"]) .preset-group-item-select input {
+  background: rgba(233, 220, 206, 0.98);
+  border-color: rgba(108, 72, 46, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 0 2px rgba(128, 83, 54, 0.08), 0 1px 3px rgba(96, 63, 35, 0.12);
+}
+
+html:not([data-theme="dark"]) .preset-group-item-select input:checked {
+  background: var(--accent);
+  border-color: rgba(86, 148, 128, 0.96);
+  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.22), 0 1px 3px rgba(56, 96, 84, 0.18);
+}
+
+html:not([data-theme="dark"]) .preset-group-item-select input:checked::after {
+  width: 11px;
+  height: 7px;
+  border-left-width: 3.2px;
+  border-bottom-width: 3.2px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.20));
+}
+
+html:not([data-theme="dark"]) .preset-card-body {
+  background: linear-gradient(180deg, rgba(249, 243, 236, 0.55), rgba(244, 235, 225, 0.72));
+}
+
+html:not([data-theme="dark"]) .preset-card.is-dragging {
+  background: rgba(250, 238, 225, 0.96);
+}
+
+html[data-theme="dark"] .preset-base-enabled-switch {
+  background: var(--input-bg);
+  border-color: rgba(126, 149, 169, 0.38);
+  color: var(--text);
+}
+
+html[data-theme="dark"] .preset-status-strip,
+html[data-theme="dark"] .preset-assembly-card {
+  background: rgba(94, 194, 168, 0.08);
+  border-color: rgba(126, 149, 169, 0.28);
+}
+
+html[data-theme="dark"] .preset-group-item-select input {
+  background: rgba(32, 45, 60, 0.96);
+  border-color: rgba(146, 168, 188, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 4px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme="dark"] .preset-group-item-select input:checked {
+  background: var(--accent);
+  border-color: rgba(131, 222, 198, 0.96);
+  box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.18), 0 1px 4px rgba(0, 0, 0, 0.26);
+}
+
+html[data-theme="dark"] .preset-card-body {
+  background: linear-gradient(180deg, rgba(18, 29, 41, 0.42), rgba(13, 21, 31, 0.62));
+}
+
+
+
+/* v1.0.2 restore preset page quality: keep original glass feel,
+   fix save-state card and preset library cards. */
+html:not([data-theme="dark"]) .preset-overview-grid .stat-box.preset-save-state-box {
+  background:
+    linear-gradient(135deg, rgba(255, 246, 232, 0.96), rgba(245, 220, 192, 0.72)) !important;
+  border-color: rgba(205, 132, 75, 0.58) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 0 0 1px rgba(238, 169, 79, 0.14),
+    0 10px 24px rgba(116, 75, 42, 0.10) !important;
+}
+
+html:not([data-theme="dark"]) .preset-overview-grid .stat-box.preset-save-state-box strong {
+  color: #3d2a1c;
+  font-weight: 900;
+}
+
+html:not([data-theme="dark"]) .preset-overview-grid .stat-box.preset-save-state-box.is-dirty {
+  background:
+    linear-gradient(135deg, rgba(255, 238, 214, 0.98), rgba(238, 169, 79, 0.26)) !important;
+  border-color: rgba(205, 116, 52, 0.72) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.70),
+    0 0 0 2px rgba(238, 169, 79, 0.18),
+    0 12px 28px rgba(116, 75, 42, 0.12) !important;
+}
+
+.preset-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.preset-item,
+html:not([data-theme="dark"]) .preset-item,
+html[data-theme="dark"] .preset-item {
+  border-radius: 18px !important;
+  min-height: 118px;
+  padding: 16px 17px;
+  text-align: left;
+  align-items: stretch;
+  overflow: hidden;
+  transform: none !important;
+}
+
+html:not([data-theme="dark"]) .preset-item {
+  background:
+    linear-gradient(180deg, rgba(252, 246, 239, 0.94), rgba(245, 235, 224, 0.88)) !important;
+  border-color: rgba(160, 116, 84, 0.36) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 6px 16px rgba(96, 63, 35, 0.055) !important;
+}
+
+.preset-item:hover,
+html:not([data-theme="dark"]) .preset-item:hover,
+html[data-theme="dark"] .preset-item:hover {
+  transform: none !important;
+}
+
+html:not([data-theme="dark"]) .preset-item:hover {
+  background:
+    linear-gradient(180deg, rgba(255, 248, 241, 0.96), rgba(246, 235, 223, 0.92)) !important;
+  border-color: rgba(176, 109, 55, 0.48) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.66),
+    0 8px 18px rgba(96, 63, 35, 0.075) !important;
+}
+
+html:not([data-theme="dark"]) .preset-item.current-runtime {
+  background:
+    linear-gradient(135deg, rgba(255, 240, 219, 0.98), rgba(242, 211, 181, 0.86)) !important;
+  border-color: rgba(219, 133, 61, 0.68) !important;
+  box-shadow:
+    inset 4px 0 0 rgba(219, 133, 61, 0.82),
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 10px 22px rgba(116, 75, 42, 0.12) !important;
+}
+
+html:not([data-theme="dark"]) .preset-item.active-editor:not(.current-runtime) {
+  border-color: rgba(94, 194, 168, 0.66) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.64),
+    0 0 0 2px rgba(94, 194, 168, 0.13),
+    0 8px 18px rgba(96, 63, 35, 0.06) !important;
+}
+
+.preset-item-head {
+  align-items: flex-start;
+}
+
+.preset-pill-row {
+  gap: 6px;
+}
+
+.preset-pill {
+  border-radius: 999px !important;
+}
+
+@media (max-width: 1180px) {
+  .preset-overview-grid,
+  .preset-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preset-workbench-shell {
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  }
+
+  .preset-block-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .preset-workbench-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .preset-overview-grid,
+  .preset-card-grid,
+  .preset-block-body-grid,
+  .preset-group-body-grid,
+  .preset-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preset-group-item-head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .preset-group-item-select {
+    grid-column: 1 / -1;
+    width: max-content;
+  }
+
+  .preset-group-item-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .preset-group-item-summary-chips {
+    flex-wrap: wrap;
+  }
+
+  .preset-card-head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .preset-card-controls {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+
+
+body.modern-setting-page.preset-config-page .preset-card-grid {
+  gap: 8px;
+}
+
+body.modern-setting-page.preset-config-page .preset-card-grid .preset-item {
+  box-shadow: none !important;
+}
+
+
+
+/* preset workbench density + persistent actions */
+body.modern-setting-page.preset-config-page .preset-workbench-panel {
+  padding: 14px 16px 12px !important;
+  border-radius: 22px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-head {
+  margin-bottom: 8px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-head h2 {
+  margin: 2px 0 4px !important;
+  font-size: clamp(1.25rem, 1.5vw, 1.65rem) !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-head .muted {
+  margin: 0 !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-overview-grid {
+  gap: 8px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-overview-grid .stat-box {
+  min-height: 52px !important;
+  padding: 8px 12px !important;
+  border-radius: 14px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-status-strip {
+  margin-top: 8px !important;
+  min-height: 40px !important;
+  padding: 6px 10px !important;
+  border-radius: 14px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions {
+  gap: 8px;
+  margin: -4px 0 14px;
+  padding: 8px;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions button,
+body.modern-setting-page.preset-config-page .preset-header-save-state {
+  min-height: 32px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-more-menu {
+  z-index: 1100;
+}
+
+body.modern-setting-page.preset-config-page .preset-delete-confirm {
+  position: sticky;
+  top: 62px;
+  z-index: 69;
+  margin: -8px 0 14px;
+  width: min(720px, 100%);
+  backdrop-filter: blur(14px);
+}
+
+@media (max-width: 980px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions {
+    top: 8px;
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+}
+
+
+/* preset library as compact dropdown selector */
+body.modern-setting-page.preset-config-page .preset-workbench-shell {
+  display: block !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-editor-column {
+  width: 100%;
+}
+
+body.modern-setting-page.preset-config-page .preset-picker-menu-head {
+  display: grid;
+  gap: 2px;
+  margin: 2px 4px 10px;
+}
+
+body.modern-setting-page.preset-config-page .preset-picker-menu-head span {
+  font-weight: 900;
+  color: var(--text);
+}
+
+body.modern-setting-page.preset-config-page .preset-picker-menu-head small {
+  color: var(--muted);
+}
+
+body.modern-setting-page.preset-config-page .preset-picker-menu .preset-card-grid {
+  display: grid;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-picker-menu .preset-item {
+  min-height: auto !important;
+  padding: 11px 12px !important;
+  border-radius: 14px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-picker-menu .preset-item small {
+  margin-top: 5px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions {
+  width: min(100%, 900px);
+}
+
+@media (max-width: 980px) {
+  body.modern-setting-page.preset-config-page .preset-picker-wrap {
+    flex-basis: 100%;
+    min-width: 100%;
+  }
+}
+
+
+/* keep preset action row on one compact line */
+body.modern-setting-page.preset-config-page .preset-workbench-actions {
+  width: fit-content !important;
+  max-width: calc(100vw - 360px) !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-picker-wrap {
+  flex: 0 0 320px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions > button,
+body.modern-setting-page.preset-config-page .preset-workbench-actions > .preset-more-wrap,
+body.modern-setting-page.preset-config-page .preset-workbench-actions > .preset-header-save-state {
+  flex: 0 0 auto !important;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions {
+    max-width: calc(100vw - 48px) !important;
+    flex-wrap: wrap !important;
+  }
+}
+
+
+
+/* Stage 3C: preset page recovered into the shared workbench/action-dock language. */
+body.modern-setting-page.preset-config-page .preset-workbench-panel.ui-readable-canvas {
+  overflow: visible !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock {
+  align-items: center !important;
+  gap: 10px !important;
+  width: fit-content !important;
+  max-width: calc(100vw - 360px) !important;
+  margin: -4px 0 14px !important;
+  overflow: visible !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-picker-wrap {
+  flex: 0 0 320px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions #create-preset,
+body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top,
+body.modern-setting-page.preset-config-page .preset-workbench-actions #preset-more-toggle {
+  flex: 0 0 auto !important;
+  min-height: 38px !important;
+  padding-inline: 14px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top {
+  min-width: 76px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-more-wrap.ui-action-more {
+  flex: 0 0 auto !important;
+  z-index: calc(var(--ui-z-sticky) + 12);
+}
+
+body.modern-setting-page.preset-config-page .preset-header-save-state {
+  flex: 0 0 auto !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock {
+    position: fixed !important;
+    top: 18px !important;
+    left: max(24px, calc((100vw - 1480px) / 2 - 104px)) !important;
+    z-index: calc(var(--ui-z-sticky) + 8) !important;
+    width: 188px !important;
+    min-height: 260px !important;
+    max-width: none !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 12px !important;
+    border-radius: 22px !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-picker-wrap {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #create-preset,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #preset-more-toggle,
+  body.modern-setting-page.preset-config-page .preset-header-save-state {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top {
+    min-height: 54px !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu {
+    top: 0;
+    left: calc(100% + 10px);
+    right: auto;
+  }
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock {
+    max-width: calc(100vw - 48px) !important;
+    flex-wrap: wrap !important;
+  }
+}
+
+
+/* Stage 3C hotfix: make the preset dock wide enough for real preset names. */
+@media (min-width: 1720px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock {
+    width: 260px !important;
+    left: max(24px, calc((100vw - 1480px) / 2 - 176px)) !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-picker-wrap,
+  body.modern-setting-page.preset-config-page .preset-picker-toggle {
+    width: 100% !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-picker-current,
+  body.modern-setting-page.preset-config-page #preset-picker-current,
+  body.modern-setting-page.preset-config-page .ui-object-picker-name {
+    max-width: 205px !important;
+  }
+}
+
+
+/* Stage 3C final fix: equal-size preset dock controls. */
+@media (min-width: 1720px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock {
+    width: 260px !important;
+    left: max(24px, calc((100vw - 1480px) / 2 - 176px)) !important;
+    min-height: auto !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-picker-wrap,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #create-preset,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-more-wrap,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #preset-more-toggle,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-header-save-state {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    box-sizing: border-box !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top {
+    min-height: 44px !important;
+    height: 44px !important;
+    border-radius: 16px !important;
+    font-size: 0.92rem !important;
+    line-height: 1.1 !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-picker-toggle {
+    width: 100% !important;
+    height: 52px !important;
+    min-height: 52px !important;
+  }
+
+  body.modern-setting-page.preset-config-page #preset-picker-current {
+    max-width: 205px !important;
+  }
+}
+
+
+
+/* Preset compact summary: align title and chips for denser list scanning. */
+body.modern-setting-page.preset-config-page .preset-card-head {
+  min-height: 56px;
+  padding: 9px 14px;
+}
+
+body.modern-setting-page.preset-config-page .preset-card-title-zone {
+  min-width: 0;
+}
+
+body.modern-setting-page.preset-config-page .preset-card-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.modern-setting-page.preset-config-page .preset-card-title-line strong {
+  flex: 0 1 auto;
+  max-width: min(28vw, 300px);
+}
+
+body.modern-setting-page.preset-config-page .preset-card-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-top: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+body.modern-setting-page.preset-config-page .preset-summary-chip {
+  max-width: 128px;
+  padding: 2px 7px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-summary-chip {
+  max-width: 112px;
+}
+
+
+/* Preset compact summary v2: let current-selection chips breathe. */
+body.modern-setting-page.preset-config-page .preset-card-head {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+}
+
+body.modern-setting-page.preset-config-page .preset-card-title-line strong {
+  max-width: min(32vw, 380px);
+}
+
+body.modern-setting-page.preset-config-page .preset-summary-chip {
+  max-width: 170px;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-summary-chip {
+  max-width: 170px;
+}
+
+
+/* Preset table-like fixed columns for collapsed rows. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-head {
+  grid-template-columns: 30px minmax(0, 1fr) 104px;
+  min-height: 52px;
+  height: 52px;
+  padding: 5px 10px;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-line {
+  display: grid;
+  grid-template-columns: minmax(130px, 210px) 86px 58px minmax(150px, 210px) 52px 70px;
+  column-gap: 8px;
+  align-items: center;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-line strong,
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-summary-chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-line strong {
+  grid-column: 1;
+  max-width: none;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-summary {
+  display: contents;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-chip-type { grid-column: 2; }
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-chip-mode { grid-column: 3; }
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-chip-current { grid-column: 4; }
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-chip-count { grid-column: 5; }
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-chip-words { grid-column: 6; }
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-summary-chip {
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+}
+
+/* P7-3E: distinguish fixed rule blocks from rule groups in compact rows. */
+body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-block {
+  color: #ffd89a;
+  background: linear-gradient(135deg, rgba(238, 169, 79, 0.22), rgba(238, 169, 79, 0.10));
+  border-color: rgba(238, 169, 79, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 222, 160, 0.08);
+}
+
+body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-group {
+  color: #e5c8ff;
+  background: linear-gradient(135deg, rgba(166, 92, 255, 0.34), rgba(125, 65, 214, 0.18));
+  border-color: rgba(196, 137, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(236, 213, 255, 0.12), 0 0 0 1px rgba(166, 92, 255, 0.08);
+}
+
+html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-block {
+  color: #8a4f00;
+  background: linear-gradient(135deg, rgba(238, 169, 79, 0.28), rgba(255, 237, 198, 0.82));
+  border-color: rgba(196, 119, 24, 0.34);
+}
+
+html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-group {
+  color: #5a2494;
+  background: linear-gradient(135deg, rgba(181, 112, 255, 0.34), rgba(245, 231, 255, 0.90));
+  border-color: rgba(132, 63, 205, 0.42);
+}
+
+/* P6-3 migrated from 09-preset-memory.css: preset collapsed table rows now live with preset page CSS. */
+/* Preset table v5: keep action buttons inside the panel. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] {
+  overflow: hidden;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-head {
+  grid-template-columns: 30px minmax(0, 1fr) 94px !important;
+  overflow: hidden;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-zone {
+  min-width: 0;
+  overflow: hidden;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-line {
+  grid-template-columns: minmax(96px, 160px) 72px 48px minmax(120px, 170px) 44px 58px !important;
+  column-gap: 6px !important;
+  overflow: hidden;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-controls {
+  justify-self: end;
+  min-width: 0;
+  width: 94px;
+  gap: 4px;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-quick-enabled-switch {
+  min-width: 40px;
+  height: 26px;
+  padding: 3px;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-icon-button {
+  min-width: 24px !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  padding: 0 !important;
+}
+
+
+/* Preset table v6: keep collapsed-row actions visually inside the list edge. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] {
+  max-width: calc(100% - 14px);
+  box-sizing: border-box;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-head {
+  grid-template-columns: 30px minmax(0, 1fr) 86px !important;
+  padding-right: 14px !important;
+  box-sizing: border-box;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-line {
+  grid-template-columns: minmax(96px, 1.25fr) 70px 46px minmax(118px, 1.1fr) 42px 56px !important;
+  max-width: 100%;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-controls {
+  width: 86px !important;
+  max-width: 86px;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-quick-enabled-switch {
+  min-width: 38px;
+  width: 38px;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-icon-button {
+  min-width: 22px !important;
+  width: 22px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+}
+
+
+
+/* Preset table v7: compact fixed columns, avoid over-stretched middle gaps. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-line {
+  grid-template-columns: 150px 72px 48px minmax(150px, 210px) 46px 58px !important;
+  justify-content: start;
+  column-gap: 8px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-zone {
+  justify-self: start;
+  width: auto;
+  max-width: 610px;
+}
+
+/* P6-5A follow-up: align preset collapsed-row drag and action controls on the row centerline. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-drag-handle,
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-controls,
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-quick-enabled-switch,
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-icon-button {
+  margin: 0 !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-drag-handle {
+  min-height: 32px !important;
+}
+
+/* P6-5A follow-up: restore visible insertion guides and avoid width jump on expand. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"].drag-over-top::before,
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"].drag-over-bottom::after {
+  left: 44px !important;
+  right: 12px !important;
+  height: 3px !important;
+  border-top: 0 !important;
+  border-radius: 999px !important;
+  background: linear-gradient(90deg, rgba(238, 169, 79, 0.98), rgba(94, 194, 168, 0.82)) !important;
+  box-shadow: 0 0 0 1px rgba(238, 169, 79, 0.34), 0 0 18px rgba(238, 169, 79, 0.38) !important;
+  color: transparent !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"].drag-over-top::before {
+  top: 0 !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"].drag-over-bottom::after {
+  bottom: 0 !important;
+}
+
+/* P6-5C: preset action dock uses the same primary-action group order as memory/worldbook/card. */
+body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto !important;
+  min-width: 0;
+}
+
+body.modern-setting-page.preset-config-page .preset-workbench-actions #reload-preset {
+  flex: 0 0 auto !important;
+  min-height: 38px !important;
+  padding-inline: 14px !important;
+}
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #reload-preset,
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary > button,
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary > .preset-more-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+  }
+}
+
+/* P6-7: stable preset quick-action size and subtle danger affordance. */
+body.modern-setting-page.preset-config-page .preset-card .preset-icon-button {
+  min-width: 26px !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card .preset-card-remove,
+body.modern-setting-page.preset-config-page .preset-card .preset-group-item-remove {
+  border-color: color-mix(in srgb, var(--danger, #dc5454) 48%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger, #dc5454) 12%, var(--input-bg)) !important;
+  color: color-mix(in srgb, var(--danger, #dc5454) 84%, var(--text)) !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card .preset-card-remove:hover,
+body.modern-setting-page.preset-config-page .preset-card .preset-card-remove:focus-visible,
+body.modern-setting-page.preset-config-page .preset-card .preset-group-item-remove:hover,
+body.modern-setting-page.preset-config-page .preset-card .preset-group-item-remove:focus-visible {
+  border-color: color-mix(in srgb, var(--danger, #dc5454) 76%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger, #dc5454) 22%, var(--input-bg)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger, #dc5454) 18%, transparent) !important;
+}
+
+/* P6-7 correction: keep preset collapsed quick actions the same size as expanded ones. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-icon-button,
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="false"] .preset-icon-button {
+  min-width: 26px !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  box-sizing: border-box !important;
+}
+
+/* P6-7b: keep preset quick switch fully visible while preserving 26px icon actions. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-head {
+  grid-template-columns: 30px minmax(0, 1fr) 112px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-controls {
+  width: 112px !important;
+  max-width: 112px !important;
+  min-width: 112px !important;
+  overflow: visible !important;
+  gap: 5px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-quick-enabled-switch {
+  flex: 0 0 42px !important;
+  min-width: 42px !important;
+  width: 42px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 3px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-quick-enabled-track {
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 18px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-quick-enabled-track::before {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-quick-enabled-switch input:checked + .preset-quick-enabled-track::before {
+  transform: translateX(16px) !important;
+}
+
+/* P6-9b: status pill moved into workbench titleline; strip now only carries helper copy. */
+body.modern-setting-page.preset-config-page .preset-status-strip.is-helper-only {
+  display: block !important;
+  min-height: 0 !important;
+  margin-top: 6px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-status-strip.is-helper-only .helper-text {
+  display: block !important;
+  min-width: 0 !important;
+  text-align: left !important;
+}
+
+/* P6-14B: preset collapsed rows get a real advanced-chip column.
+   Prevent "高级字段/含高级项" from falling under the title and keep word chips intact. */
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-zone {
+  justify-self: stretch !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-card-title-line {
+  grid-template-columns:
+    minmax(128px, 1.05fr)
+    minmax(64px, 78px)
+    minmax(42px, 54px)
+    minmax(118px, 1fr)
+    minmax(42px, 54px)
+    minmax(66px, 78px)
+    minmax(76px, 98px) !important;
+  column-gap: 6px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-chip-advanced {
+  grid-column: 7 !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] .preset-summary-chip {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}

@@ -1,0 +1,2748 @@
+/* Fantareal UI System · v1
+   Scope: compatibility-first shared UI classes for main program pages.
+   This file should not rewrite legacy page behavior directly. New pages and
+   gradual cleanups can adopt .ui-* classes first, then old classes can be
+   mapped here once each page is verified. */
+
+:root {
+  --ui-radius-sm: 10px;
+  --ui-radius-md: 14px;
+  --ui-radius-lg: 18px;
+  --ui-radius-pill: 999px;
+  --ui-card-radius: 24px;
+  --ui-sub-radius: 18px;
+  --ui-gap: 18px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-control-height: 38px;
+  --ui-control-radius: 999px;
+  --ui-control-border: color-mix(in srgb, var(--border, var(--line)) 82%, transparent);
+  --ui-control-bg: color-mix(in srgb, var(--input-bg) 70%, transparent);
+  --ui-control-hover-bg: color-mix(in srgb, var(--input-bg) 82%, transparent);
+  --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  --ui-motion-instant: 90ms;
+  --ui-motion-fast: 150ms;
+  --ui-motion-base: 220ms;
+  --ui-motion-panel: 300ms;
+  --ui-motion-emphasis: 420ms;
+  --ui-motion-theme: 520ms;
+  --ui-ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ui-ease-feedback: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ui-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ui-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ui-motion-distance-xs: 3px;
+  --ui-motion-distance-sm: 9px;
+  --ui-motion-distance-md: 14px;
+  --ui-motion-lift: 2px;
+  --ui-motion-scale-subtle: 0.972;
+  --ui-transition-control:
+    background var(--ui-motion-fast) var(--ui-ease-feedback),
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    color var(--ui-motion-fast) var(--ui-ease-feedback),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-feedback),
+    opacity var(--ui-motion-fast) var(--ui-ease-feedback),
+    transform var(--ui-motion-fast) var(--ui-ease-feedback);
+  --ui-transition-surface:
+    background var(--ui-motion-base) var(--ui-ease-standard),
+    border-color var(--ui-motion-base) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-base) var(--ui-ease-standard),
+    opacity var(--ui-motion-base) var(--ui-ease-standard);
+  --ui-transition-popover:
+    opacity var(--ui-motion-base) var(--ui-ease-enter),
+    transform var(--ui-motion-base) var(--ui-ease-enter);
+  --ui-check-size: 20px;
+  --ui-check-radius: 6px;
+  --ui-switch-w: 36px;
+  --ui-switch-h: 20px;
+  --ui-switch-dot: 14px;
+  --ui-switch-offset: 2px;
+  --ui-switch-shift: calc(var(--ui-switch-w) - var(--ui-switch-dot) - var(--ui-switch-offset) - var(--ui-switch-offset));
+  --fr-toggle-w: var(--ui-switch-w);
+  --fr-toggle-h: var(--ui-switch-h);
+  --fr-toggle-dot: var(--ui-switch-dot);
+  --fr-toggle-offset: var(--ui-switch-offset);
+  --fr-toggle-shift: var(--ui-switch-shift);
+  --ui-font-body: 400 14px/1.65 "Microsoft YaHei", "PingFang SC", sans-serif;
+  --ui-font-label: 700 13px/1.35 "Microsoft YaHei", "PingFang SC", sans-serif;
+  --ui-font-helper: 400 12px/1.45 "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+
+.ui-panel {
+  min-width: 0;
+  border: 1px solid var(--ui-border-soft, var(--line));
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-card, var(--panel-strong));
+  box-shadow: var(--shadow-soft, var(--shadow));
+  padding: var(--ui-space-5);
+  transition: var(--ui-transition-surface);
+}
+
+.ui-panel.is-danger {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--line) 66%);
+  background: var(--danger-bg);
+}
+
+.ui-summary-card {
+  display: grid;
+  gap: var(--ui-space-1);
+  min-width: 0;
+  padding: 12px 13px;
+  border-radius: var(--ui-sub-radius);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 78%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 72%, transparent),
+      color-mix(in srgb, var(--panel) 82%, transparent));
+  transition: var(--ui-transition-surface);
+}
+
+.ui-summary-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 820;
+  letter-spacing: 0.03em;
+}
+
+.ui-summary-card strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.ui-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line) 68%);
+  border-radius: var(--ui-radius-pill);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font: var(--ui-font-label);
+  padding: 0 var(--ui-space-4);
+  text-decoration: none;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 18%, transparent);
+  transition: var(--ui-transition-control);
+}
+
+.ui-button:hover,
+.ui-button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 56%, var(--line) 44%);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translateY(calc(-1 * var(--ui-motion-distance-xs)));
+}
+
+.ui-button:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring), 0 6px 16px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.ui-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.ui-button:disabled,
+.ui-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.56;
+  transform: none;
+}
+
+.ui-button.secondary {
+  background: var(--ui-surface-control, var(--input-bg));
+  color: var(--accent);
+}
+
+.ui-button.ghost {
+  background: transparent;
+  color: var(--text);
+}
+
+.ui-button.danger {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--line) 58%);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.ui-button.danger:hover,
+.ui-button.danger:focus-visible {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line) 42%);
+  background: color-mix(in srgb, var(--danger) 12%, var(--danger-bg));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.ui-button.icon {
+  width: 38px;
+  padding: 0;
+}
+
+.ui-field {
+  display: grid;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.ui-field > label,
+.ui-label {
+  color: var(--text);
+  font: var(--ui-font-label);
+}
+
+.ui-helper {
+  margin: 0;
+  color: var(--muted);
+  font: var(--ui-font-helper);
+}
+
+.ui-field input,
+.ui-field select,
+.ui-field textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-checkbox-row,
+.ui-switch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  min-height: 42px;
+  color: var(--text);
+  font: var(--ui-font-label);
+}
+
+.ui-checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.fr-compact-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius-pill);
+  padding: 4px 9px;
+  background: var(--input-bg);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  line-height: 1;
+  transition: var(--ui-transition-control);
+}
+
+.fr-compact-switch:hover {
+  border-color: var(--accent);
+}
+
+.fr-compact-switch input[type="checkbox"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fr-compact-switch-track {
+  position: relative;
+  width: var(--ui-switch-w);
+  height: var(--ui-switch-h);
+  border-radius: var(--ui-radius-pill);
+  background: rgba(148, 163, 184, 0.42);
+  transition: background var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
+  flex: 0 0 auto;
+}
+
+.fr-compact-switch-track::before {
+  content: "";
+  position: absolute;
+  top: var(--ui-switch-offset);
+  left: var(--ui-switch-offset);
+  width: var(--ui-switch-dot);
+  height: var(--ui-switch-dot);
+  border-radius: var(--ui-radius-pill);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transition: transform var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+.fr-compact-switch input[type="checkbox"]:checked + .fr-compact-switch-track,
+.fr-compact-switch.is-on .fr-compact-switch-track {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+}
+
+.fr-compact-switch input[type="checkbox"]:checked + .fr-compact-switch-track::before,
+.fr-compact-switch.is-on .fr-compact-switch-track::before {
+  transform: translateX(var(--ui-switch-shift));
+}
+
+.fr-compact-switch-label {
+  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 24px;
+}
+
+.fr-compact-switch.is-on .fr-compact-switch-label {
+  color: var(--text);
+}
+
+.ui-switch {
+  --ui-switch-w: 42px;
+  --ui-switch-h: 24px;
+  --ui-switch-pad: 3px;
+  position: relative;
+  display: inline-flex;
+  width: var(--ui-switch-w);
+  height: var(--ui-switch-h);
+  flex: 0 0 auto;
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--muted) 34%, transparent);
+  transition: background var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+.ui-switch::after {
+  content: "";
+  position: absolute;
+  top: var(--ui-switch-pad);
+  left: var(--ui-switch-pad);
+  width: calc(var(--ui-switch-h) - var(--ui-switch-pad) * 2);
+  height: calc(var(--ui-switch-h) - var(--ui-switch-pad) * 2);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--panel-strong) 88%, white 12%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: transform var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+input:checked + .ui-switch,
+.ui-switch.is-on {
+  background: var(--accent);
+}
+
+input:checked + .ui-switch::after,
+.ui-switch.is-on::after {
+  transform: translateX(var(--ui-switch-shift));
+}
+
+.ui-chip,
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-height: 26px;
+  border: 1px solid var(--ui-border-soft, var(--line));
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--accent) 10%, transparent 90%);
+  color: var(--text);
+  font: var(--ui-font-helper);
+  padding: 0 var(--ui-space-3);
+  transition: var(--ui-transition-control);
+}
+
+.ui-filter-chip {
+  min-width: 0;
+  width: auto;
+  flex: 0 0 auto;
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-control-bg);
+  color: var(--text);
+  cursor: pointer;
+  font: var(--ui-font-helper);
+  line-height: 1.1;
+  padding: 5px 10px;
+  white-space: nowrap;
+  transition: var(--ui-transition-control);
+}
+
+.ui-filter-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--ui-control-hover-bg));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 24%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.ui-filter-chip:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--ui-control-border));
+  box-shadow: var(--ui-focus-ring);
+}
+
+.ui-filter-chip.active,
+.ui-filter-chip.is-active {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--input-bg));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 800;
+}
+
+.ui-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 360px;
+  min-width: 0;
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-radius-pill);
+  background: var(--ui-control-bg);
+  color: var(--muted);
+  font: var(--ui-font-helper);
+  overflow: hidden;
+  padding: 3px 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: var(--ui-transition-control);
+}
+
+.ui-summary-chip.strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.ui-summary-chip.warning {
+  border-color: color-mix(in srgb, var(--danger, #dc5454) 45%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--danger, #dc5454) 12%, transparent);
+  color: var(--text);
+}
+
+.ui-options-grid {
+  display: grid;
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-3);
+  padding: 10px;
+  border-radius: var(--ui-radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 56%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 52%, transparent);
+}
+
+.ui-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  min-width: 0;
+}
+
+.ui-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-space-3);
+}
+
+@media (max-width: 720px) {
+  .ui-panel {
+    padding: var(--ui-space-4);
+  }
+
+  .ui-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ui-toolbar-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* =========================================================
+   Legacy mapping v1
+   ---------------------------------------------------------
+   Keep old templates working while converging pages on one set of
+   tokens. This intentionally excludes chat/game/challenge because
+   those surfaces have dedicated interaction-heavy layouts.
+   ========================================================= */
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) {
+  --ui-page-panel-bg:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--panel-strong) 76%, transparent),
+      color-mix(in srgb, var(--panel) 92%, transparent)
+    );
+  --ui-page-panel-border: color-mix(in srgb, var(--border, var(--line)) 76%, transparent);
+  --ui-page-panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.10);
+}
+
+:root[data-theme="dark"] body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) {
+  --ui-page-panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .panel.config-panel {
+  border-radius: var(--ui-card-radius);
+  border-color: var(--ui-page-panel-border);
+  background: var(--ui-page-panel-bg);
+  box-shadow: var(--ui-page-panel-shadow);
+  transition: var(--ui-transition-surface);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .panel.config-panel.full-span:first-of-type {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--ui-page-panel-border));
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .sprite-frame {
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 78%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 62%, transparent);
+  transition: var(--ui-transition-surface);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"] {
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--ui-sub-radius);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 80%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 70%, transparent);
+  transition: var(--ui-transition-control);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 80%, transparent);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  color: var(--text);
+  font-weight: 760;
+  cursor: pointer;
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"]::file-selector-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border, var(--line)));
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel-strong));
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .section-head h2,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .section-head h3 {
+  letter-spacing: 0;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) label:not(.checkbox-row):not(.check-chip):not(.fr-setting-switch-row) {
+  color: color-mix(in srgb, var(--text) 82%, var(--muted));
+  font: var(--ui-font-label);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) textarea {
+  border-radius: var(--ui-radius-md);
+  border-color: var(--ui-control-border);
+  background: color-mix(in srgb, var(--input-bg) 92%, transparent);
+  color: var(--text);
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+/* P7-3C: native select polish.
+   Keep the real select for existing change handlers; only restyle the closed control and
+   supported option colors. Native dropdown open/close animation is browser-controlled. */
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select {
+  --ui-select-arrow: color-mix(in srgb, var(--accent) 78%, var(--text));
+  --ui-select-bg-top: color-mix(in srgb, var(--input-bg) 96%, transparent);
+  --ui-select-bg-bottom: color-mix(in srgb, var(--panel) 78%, transparent);
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  min-height: var(--ui-control-height);
+  padding-right: 2.7rem !important;
+  cursor: pointer;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--ui-select-arrow) 50%) calc(100% - 22px) 52% / 7px 7px no-repeat,
+    linear-gradient(135deg, var(--ui-select-arrow) 50%, transparent 50%) calc(100% - 17px) 52% / 7px 7px no-repeat,
+    radial-gradient(circle at calc(100% - 20px) 50%, color-mix(in srgb, var(--accent) 16%, transparent) 0 36%, transparent 58%),
+    linear-gradient(180deg, var(--ui-select-bg-top), var(--ui-select-bg-bottom)) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 12%, transparent),
+    0 1px 3px color-mix(in srgb, black 8%, transparent) !important;
+  transition:
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    background var(--ui-motion-fast) var(--ui-ease-feedback),
+    color var(--ui-motion-fast) var(--ui-ease-feedback),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-feedback),
+    transform var(--ui-motion-fast) var(--ui-ease-feedback) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select::-ms-expand {
+  display: none;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:hover {
+  --ui-select-bg-top: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+  --ui-select-bg-bottom: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--ui-control-border));
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--accent) 26%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent),
+    0 6px 15px color-mix(in srgb, var(--accent) 9%, transparent) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus-visible {
+  --ui-select-bg-top: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+  --ui-select-bg-bottom: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--ui-control-border));
+  box-shadow:
+    var(--ui-focus-ring),
+    inset 0 -2px 0 color-mix(in srgb, var(--accent) 32%, transparent),
+    0 8px 18px color-mix(in srgb, var(--accent) 12%, transparent) !important;
+  transform: translateY(calc(-1 * min(var(--ui-motion-lift), 2px)));
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:active {
+  transform: translateY(0);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option {
+  background: color-mix(in srgb, var(--panel-strong) 96%, var(--input-bg) 4%);
+  color: var(--text);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:checked,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:hover {
+  background: color-mix(in srgb, var(--accent) 28%, var(--panel-strong));
+  color: var(--text);
+}
+
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select {
+  --ui-select-arrow: color-mix(in srgb, var(--accent) 84%, #3d2c20);
+  --ui-select-bg-top: rgba(255, 252, 246, 0.99);
+  --ui-select-bg-bottom: rgba(255, 244, 231, 0.97);
+}
+
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option {
+  background: #fff8ec;
+  color: #3d2c20;
+}
+
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:checked,
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:hover {
+  background: color-mix(in srgb, var(--accent) 24%, #fff8ec);
+  color: #2c2018;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):focus,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line) 54%);
+  box-shadow: var(--ui-focus-ring);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--ui-control-border));
+  box-shadow:
+    var(--ui-focus-ring),
+    inset 0 -2px 0 color-mix(in srgb, var(--accent) 32%, transparent),
+    0 8px 18px color-mix(in srgb, var(--accent) 12%, transparent) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="range"] {
+  accent-color: var(--accent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-row,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .action-group,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .inline-field {
+  gap: var(--ui-space-3);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary {
+  min-height: var(--ui-control-height);
+  border-radius: var(--ui-control-radius);
+  transform: translateY(0) !important;
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback), opacity var(--ui-motion-fast) var(--ui-ease-feedback), transform var(--ui-motion-fast) var(--ui-ease-feedback) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:hover {
+  transform: translateY(calc(-1 * var(--ui-motion-lift))) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ui-action-more-menu button:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ui-action-more-menu .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.icon:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .icon-button:hover {
+  transform: none !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.secondary,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link {
+  border: 1px solid var(--ui-control-border);
+  background: var(--ui-control-bg);
+  color: var(--text);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.secondary:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--ui-control-hover-bg));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--ui-control-border));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button:focus-visible,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:focus-visible,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:focus-visible,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--ui-control-border));
+  box-shadow: var(--ui-focus-ring), inset 0 -2px 0 color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button:active,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:active,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:active,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:active {
+  transform: translateY(0) !important;
+  background: color-mix(in srgb, var(--accent) 17%, var(--ui-control-hover-bg));
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Plain checkbox rows: square checkboxes. Switches must use .fr-setting-switch-row. */
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  min-height: 40px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 11px;
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, var(--input-bg) 64%, transparent);
+  color: var(--text);
+  font: var(--ui-font-label);
+  transition: var(--ui-transition-control);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  position: relative !important;
+  flex: 0 0 auto !important;
+  width: var(--ui-check-size) !important;
+  height: var(--ui-check-size) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: var(--ui-check-radius) !important;
+  border: 1.5px solid color-mix(in srgb, var(--border, var(--line)) 92%, var(--muted)) !important;
+  background: color-mix(in srgb, var(--panel-strong) 78%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 16%, transparent);
+  cursor: pointer;
+  transition: var(--ui-transition-control);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]::before {
+  content: none !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:checked {
+  border-color: transparent !important;
+  background: var(--accent) !important;
+  box-shadow: var(--ui-focus-ring);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  border-radius: 1px;
+  transform: translate(-50%, -58%) rotate(-45deg);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  min-height: 40px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  font: var(--ui-font-label);
+  cursor: pointer;
+  user-select: none;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  flex: 0 0 var(--ui-switch-w) !important;
+  width: var(--ui-switch-w) !important;
+  height: var(--ui-switch-h) !important;
+  min-width: var(--ui-switch-w) !important;
+  min-height: var(--ui-switch-h) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: var(--ui-radius-pill) !important;
+  border: 1px solid var(--ui-control-border) !important;
+  background: color-mix(in srgb, var(--muted) 52%, transparent) !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition: background var(--ui-motion-fast) var(--ui-ease-feedback), border-color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--ui-switch-offset);
+  width: var(--ui-switch-dot);
+  height: var(--ui-switch-dot);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--panel-strong) 84%, white 16%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+  transform: translateY(-50%);
+  transition: transform var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent) !important;
+  background: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked::before {
+  transform: translate(var(--ui-switch-shift), -50%);
+  background: #fff;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .field-chip-row {
+  gap: var(--ui-space-2);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip {
+  position: relative;
+  min-height: 38px;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-height: 38px;
+  padding: 8px 13px;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid var(--ui-control-border);
+  background: var(--ui-control-bg);
+  color: color-mix(in srgb, var(--text) 86%, var(--muted));
+  font: var(--ui-font-label);
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip:hover span,
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:focus-visible + span {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--ui-control-hover-bg));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 24%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip span::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 5px;
+  border: 1.5px solid color-mix(in srgb, var(--border, var(--line)) 92%, var(--muted));
+  background: color-mix(in srgb, var(--panel-strong) 78%, transparent);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:checked + span {
+  color: color-mix(in srgb, var(--text) 90%, var(--accent));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--ui-control-border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:checked + span::before {
+  content: "";
+  border-color: transparent;
+  background:
+    linear-gradient(135deg, transparent 0 43%, #fff 44% 56%, transparent 57%),
+    linear-gradient(45deg, transparent 0 50%, #fff 51% 63%, transparent 64%),
+    var(--accent);
+}
+
+/* Stage 2 · reusable configuration interaction primitives.
+   These classes are opt-in only. They do not remap legacy pages yet. */
+
+:root {
+  --ui-z-sticky: 70;
+  --ui-z-popover: 1200;
+  --ui-z-floating: 1300;
+  --ui-toolbar-bg: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  --ui-toolbar-border: color-mix(in srgb, var(--border, var(--line)) 76%, var(--accent) 24%);
+  --ui-popover-bg: color-mix(in srgb, var(--panel-strong) 94%, transparent);
+}
+
+.ui-sticky-toolbar {
+  position: sticky;
+  top: var(--ui-sticky-top, 10px);
+  z-index: var(--ui-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--ui-space-2);
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-toolbar-bg);
+  backdrop-filter: var(--ui-glass-blur-soft);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.13);
+  transition: var(--ui-transition-surface);
+}
+
+.ui-sticky-toolbar.is-wrap {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.ui-status-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 78%, var(--accent) 22%);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--input-bg) 86%, transparent);
+  color: var(--muted);
+  font: var(--ui-font-label);
+  white-space: nowrap;
+  transition: var(--ui-transition-control);
+}
+
+.ui-status-token.is-dirty,
+.ui-status-token.is-saving {
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border, var(--line)));
+  background: color-mix(in srgb, var(--accent) 12%, var(--input-bg));
+}
+
+.ui-status-token.is-saved,
+.ui-status-token.is-success {
+  color: color-mix(in srgb, #2f8f63 82%, var(--text));
+  border-color: color-mix(in srgb, #2f8f63 42%, var(--border, var(--line)));
+  background: color-mix(in srgb, #2f8f63 10%, var(--input-bg));
+}
+
+.ui-status-token.is-error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 46%, var(--border, var(--line)));
+  background: color-mix(in srgb, var(--danger) 8%, var(--input-bg));
+}
+
+.ui-workbench-titleline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 5px;
+}
+
+.ui-workbench-titleline > .eyebrow {
+  margin: 0;
+}
+
+.ui-workbench-titleline > .ui-status-pill,
+.ui-workbench-titleline > .config-status-pill {
+  flex: 0 0 auto;
+}
+
+.config-status-strip.is-helper-only {
+  display: block !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.config-status-strip.is-helper-only .helper-text {
+  display: block;
+  text-align: left !important;
+}
+
+.card-workbench-titleline {
+  width: 100%;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head {
+  grid-template-columns: minmax(280px, 300px) minmax(0, 1fr) !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench-grid {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-titleline {
+  flex-wrap: nowrap;
+  width: max-content;
+  max-width: 100%;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-titleline > .eyebrow {
+  display: inline-flex !important;
+}
+
+@media (max-width: 1180px) {
+  body.modern-setting-page.card-config-page .card-workbench-head {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-titleline {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+:where(.ui-status-pill) {
+  --ui-status-success: #2f8f63;
+  --ui-status-success-bg: rgba(47, 143, 99, 0.13);
+  --ui-status-success-border: rgba(47, 143, 99, 0.38);
+  --ui-status-saving: var(--accent);
+  --ui-status-saving-bg: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
+  --ui-status-dirty: #b9792f;
+  --ui-status-dirty-bg: rgba(185, 121, 47, 0.15);
+  --ui-status-error: #c44b3e;
+  --ui-status-error-bg: rgba(196, 75, 62, 0.12);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, 100%);
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid color-mix(in srgb, var(--ui-status-saving) 42%, var(--border, var(--line)));
+  border-radius: var(--ui-radius-pill);
+  background: linear-gradient(180deg, var(--ui-status-saving-bg), color-mix(in srgb, var(--accent) 5%, var(--input-bg)));
+  color: var(--ui-status-saving);
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.40), 0 3px 10px rgba(100, 62, 36, 0.06);
+  transition: var(--ui-transition-control);
+}
+
+:where(.ui-status-pill)::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.92;
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback), opacity var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+:where(.ui-status-pill.is-idle)::before {
+  border-top-color: currentColor;
+  background: currentColor;
+  box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--input-bg) 86%, transparent 14%);
+}
+
+:where(.ui-status-pill.is-saving)::before {
+  animation: ui-status-spin var(--ui-motion-emphasis) linear infinite;
+}
+
+:where(.ui-status-pill.is-success) {
+  color: var(--ui-status-success);
+  border-color: var(--ui-status-success-border);
+  background: linear-gradient(180deg, var(--ui-status-success-bg), color-mix(in srgb, var(--input-bg) 92%, var(--ui-status-success) 8%));
+}
+
+:where(.ui-status-pill.is-success)::before {
+  content: "✓";
+  width: 16px;
+  height: 16px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  line-height: 1;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+:where(.ui-status-pill.is-dirty) {
+  color: var(--ui-status-dirty);
+  border-color: rgba(185, 121, 47, 0.45);
+  background: linear-gradient(180deg, var(--ui-status-dirty-bg), color-mix(in srgb, var(--input-bg) 88%, transparent 12%));
+}
+
+:where(.ui-status-pill.is-dirty)::before {
+  border-top-color: currentColor;
+}
+
+:where(.ui-status-pill.is-error) {
+  color: var(--ui-status-error);
+  border-color: rgba(196, 75, 62, 0.45);
+  background: linear-gradient(180deg, var(--ui-status-error-bg), color-mix(in srgb, var(--input-bg) 88%, transparent 12%));
+}
+
+:where(.ui-status-pill.is-error)::before {
+  content: "!";
+  width: 16px;
+  height: 16px;
+  border: 1px solid currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  line-height: 1;
+  font-weight: 900;
+}
+
+html[data-theme="dark"] :where(.ui-status-pill) {
+  --ui-status-success: #69d69a;
+  --ui-status-success-bg: rgba(105, 214, 154, 0.12);
+  --ui-status-success-border: rgba(105, 214, 154, 0.36);
+  --ui-status-dirty: #f0b66f;
+  --ui-status-dirty-bg: rgba(240, 182, 111, 0.14);
+  --ui-status-error: #f2a08f;
+  --ui-status-error-bg: rgba(242, 160, 143, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 3px 10px rgba(0,0,0,0.18);
+}
+
+@keyframes ui-status-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ui-object-picker {
+  position: relative;
+  flex: 0 1 var(--ui-picker-width, 340px);
+  min-width: var(--ui-picker-min-width, 260px);
+  z-index: calc(var(--ui-z-sticky) + 20);
+}
+
+.ui-object-picker-toggle {
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "kicker caret" "name caret";
+  align-items: center;
+  justify-items: start;
+  gap: 0 10px;
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent);
+  color: var(--text);
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
+  transition: var(--ui-transition-control);
+}
+
+body.modern-setting-page .ui-object-picker-toggle {
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 6px 12px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-areas: "kicker caret" "name caret";
+  align-items: center !important;
+  justify-items: start !important;
+  gap: 0 10px !important;
+  border-radius: 15px !important;
+  text-align: left !important;
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent) !important;
+  border: 1px solid var(--ui-toolbar-border) !important;
+  box-shadow: none !important;
+}
+
+.ui-object-picker-toggle:hover,
+.ui-object-picker-toggle:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 56%, var(--ui-toolbar-border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 24%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.ui-object-picker-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+body.modern-setting-page .ui-object-picker-toggle:hover,
+body.modern-setting-page .ui-object-picker-toggle:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 56%, var(--ui-toolbar-border)) !important;
+  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg)) !important;
+}
+
+body.modern-setting-page .ui-object-picker-toggle:focus-visible {
+  box-shadow: var(--ui-focus-ring) !important;
+}
+
+.ui-object-picker-kicker {
+  grid-area: kicker;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.ui-object-picker-name {
+  grid-area: name;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.25;
+  font-weight: 850;
+}
+
+.ui-object-picker-toggle > strong {
+  grid-area: name;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+
+.ui-object-picker-caret {
+  grid-area: caret;
+  color: var(--muted);
+}
+
+.ui-popover,
+.ui-menu-popover,
+.ui-object-picker-menu {
+  position: absolute;
+  z-index: var(--ui-z-popover);
+  min-width: 190px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 74%, var(--accent) 26%);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-popover-bg);
+  backdrop-filter: var(--ui-glass-blur-soft);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  transform-origin: var(--ui-motion-origin, top right);
+}
+
+.ui-popover:not([hidden]),
+.ui-menu-popover:not([hidden]),
+.ui-object-picker-menu:not([hidden]) {
+  animation: ui-motion-pop-in var(--ui-motion-base) var(--ui-ease-enter) both;
+}
+
+.ui-object-picker-menu {
+  left: 0;
+  top: calc(100% + 8px);
+  width: min(420px, calc(100vw - 48px));
+  max-height: min(520px, calc(100vh - 120px));
+  overflow: auto;
+  padding: 10px;
+}
+
+.ui-menu-popover {
+  right: 0;
+  top: calc(100% + 8px);
+  padding: 6px;
+  border-radius: 16px;
+}
+
+.ui-popover[hidden],
+.ui-menu-popover[hidden],
+.ui-object-picker-menu[hidden] {
+  display: none !important;
+}
+
+.ui-menu-popover button,
+.ui-menu-popover > button,
+.ui-menu-item {
+  width: 100% !important;
+  min-height: 34px !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0 !important;
+  padding: 8px 10px !important;
+  border: 0 !important;
+  border-radius: var(--ui-radius-sm) !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  text-align: left !important;
+  box-shadow: none !important;
+  transition: var(--ui-transition-control);
+}
+
+body.modern-setting-page .ui-menu-popover > button,
+body.modern-setting-page .ui-menu-popover .ui-menu-item {
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+body.modern-setting-page.preset-config-page .config-workbench-actions .ui-menu-popover > button {
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+.ui-menu-popover button:hover,
+.ui-menu-popover button:focus-visible,
+.ui-menu-item:hover,
+.ui-menu-item:focus-visible {
+  background: color-mix(in srgb, var(--accent) 9%, var(--input-bg));
+}
+
+.ui-menu-popover button:focus-visible,
+.ui-menu-item:focus-visible {
+  outline: none;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 70%, transparent) !important;
+}
+
+.ui-menu-item.is-danger,
+.ui-menu-popover .is-danger,
+.ui-menu-popover > .is-danger {
+  color: color-mix(in srgb, var(--danger) 82%, var(--text)) !important;
+}
+
+.ui-danger-confirm {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  border: 1px solid color-mix(in srgb, var(--danger) 42%, var(--border, var(--line)));
+  border-radius: var(--ui-radius-lg);
+  background: color-mix(in srgb, var(--danger) 7%, var(--panel-strong));
+  transition: var(--ui-transition-surface);
+}
+
+.ui-danger-confirm:not([hidden]) {
+  animation: ui-motion-slide-down var(--ui-motion-panel) var(--ui-ease-enter) both;
+}
+
+.ui-danger-confirm[hidden] {
+  display: none !important;
+}
+
+.ui-danger-confirm strong {
+  display: block;
+  color: color-mix(in srgb, var(--danger) 78%, var(--text));
+}
+
+.ui-danger-confirm p {
+  margin: 3px 0 0;
+}
+
+.ui-danger-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-space-2);
+  flex-wrap: wrap;
+}
+
+.ui-action-menu {
+  position: relative;
+  z-index: calc(var(--ui-z-sticky) + 10);
+  display: inline-flex;
+}
+
+.ui-theme-toggle {
+  position: fixed;
+  top: var(--ui-theme-toggle-top, 18px);
+  right: var(--ui-theme-toggle-right, 22px);
+  z-index: var(--ui-z-floating);
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ui-radius-pill);
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 72%, var(--accent) 28%);
+  background: var(--ui-toolbar-bg);
+  color: var(--text);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: var(--ui-glass-blur-soft);
+  font-size: 1.08rem;
+  line-height: 1;
+  transition: var(--ui-transition-control);
+}
+
+.ui-theme-toggle:hover {
+  transform: translateY(calc(-1 * var(--ui-motion-distance-xs)));
+  border-color: var(--accent);
+}
+
+.ui-theme-toggle.is-switching {
+  animation: ui-theme-toggle-pop var(--ui-motion-emphasis) var(--ui-ease-feedback);
+}
+
+.ui-theme-burst {
+  position: fixed;
+  top: var(--ui-theme-burst-top, 39px);
+  right: var(--ui-theme-burst-right, 43px);
+  z-index: calc(var(--ui-z-floating) - 10);
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+  border-radius: var(--ui-radius-pill);
+  opacity: 0;
+  transform: translate(50%, -50%) scale(0.2);
+  background: radial-gradient(circle, var(--theme-burst-core, rgba(255, 226, 145, 0.34)) 0%, var(--theme-burst-soft, rgba(94, 194, 168, 0.16)) 48%, transparent 72%);
+  animation: ui-theme-burst var(--ui-motion-theme) var(--ui-ease-standard) forwards;
+}
+
+.ui-theme-burst[data-next-theme="dark"] {
+  --theme-burst-core: rgba(88, 147, 255, 0.30);
+  --theme-burst-soft: rgba(12, 20, 32, 0.18);
+}
+
+.ui-theme-burst[data-next-theme="light"] {
+  --theme-burst-core: rgba(255, 224, 139, 0.34);
+  --theme-burst-soft: rgba(255, 248, 225, 0.20);
+}
+
+@keyframes ui-theme-toggle-pop {
+  0% { transform: scale(1) rotate(0deg); }
+  42% { transform: scale(0.86) rotate(-16deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes ui-theme-burst {
+  0% { opacity: 0; transform: translate(50%, -50%) scale(0.2); }
+  28% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(50%, -50%) scale(36); }
+}
+
+/* P7-0 · motion foundation.
+   Helper classes are opt-in only. They do not auto-bind legacy pages. */
+.ui-motion-fade-in {
+  animation: ui-motion-fade-in var(--ui-motion-base) var(--ui-ease-enter) both;
+}
+
+.ui-motion-pop-in {
+  animation: ui-motion-pop-in var(--ui-motion-base) var(--ui-ease-enter) both;
+  transform-origin: var(--ui-motion-origin, center);
+}
+
+.ui-motion-slide-up {
+  animation: ui-motion-slide-up var(--ui-motion-panel) var(--ui-ease-enter) both;
+}
+
+.ui-motion-slide-down {
+  animation: ui-motion-slide-down var(--ui-motion-panel) var(--ui-ease-enter) both;
+}
+
+.ui-motion-item-pulse {
+  animation: ui-motion-item-pulse var(--ui-motion-emphasis) var(--ui-ease-enter) both;
+}
+
+.ui-motion-remove {
+  pointer-events: none;
+  animation: ui-motion-remove var(--ui-motion-base) var(--ui-ease-exit) both;
+  transform-origin: top center;
+}
+
+/* P7-2: shared disclosure/edit-list motion.
+   Opt-in through ui-motion.js; keep button size stable and avoid scale on row actions. */
+.ui-disclosure-card {
+  position: relative;
+  transition:
+    border-color var(--ui-motion-panel) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-panel) var(--ui-ease-standard),
+    background var(--ui-motion-panel) var(--ui-ease-standard);
+}
+
+.ui-disclosure-card.is-disclosure-open {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border, var(--line)) 78%);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 48%, transparent);
+}
+
+.ui-disclosure-card.is-disclosure-opening {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border, var(--line)) 70%);
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--accent) 68%, transparent),
+    0 12px 30px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.ui-disclosure-body {
+  box-sizing: border-box;
+  transform-origin: top center;
+  will-change: opacity, transform, clip-path, height;
+}
+
+.ui-disclosure-body.is-disclosure-entering {
+  overflow: hidden;
+  transition: height var(--ui-motion-panel) var(--ui-ease-enter);
+  animation: ui-motion-disclosure-enter var(--ui-motion-panel) var(--ui-ease-enter) both;
+}
+
+.ui-disclosure-body.is-disclosure-exiting {
+  pointer-events: none;
+  overflow: hidden;
+  transition: height var(--ui-motion-base) var(--ui-ease-exit);
+  animation: ui-motion-disclosure-exit var(--ui-motion-base) var(--ui-ease-exit) both;
+}
+
+.ui-disclosure-card :is(.toggle-preset-card, .toggle-memory, .toggle-worldbook-entry, .toggle-workshop-rule, .provider-collapse, .memory-icon-button, .preset-icon-button, .icon-button) {
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease-feedback),
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    color var(--ui-motion-fast) var(--ui-ease-feedback),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-feedback) !important;
+  transform: none !important;
+}
+
+.ui-disclosure-card.is-disclosure-opening :is(.toggle-preset-card, .toggle-memory, .toggle-worldbook-entry, .toggle-workshop-rule, .provider-collapse, .memory-icon-button, .preset-icon-button, .icon-button),
+.ui-disclosure-card.is-disclosure-closing :is(.toggle-preset-card, .toggle-memory, .toggle-worldbook-entry, .toggle-workshop-rule, .provider-collapse, .memory-icon-button, .preset-icon-button, .icon-button) {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent),
+    0 4px 12px color-mix(in srgb, var(--accent) 12%, transparent) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) :is(
+  details.config-advanced-group,
+  details.preset-advanced-fields,
+  details.role-state-advanced,
+  details.card-state-journal-advanced
+) > summary {
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease-feedback),
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    color var(--ui-motion-fast) var(--ui-ease-feedback),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) :is(
+  details.config-advanced-group,
+  details.preset-advanced-fields,
+  details.role-state-advanced,
+  details.card-state-journal-advanced
+)[open] > :not(summary) {
+  animation: ui-motion-disclosure-enter var(--ui-motion-panel) var(--ui-ease-enter) both;
+}
+
+@media (min-width: 981px) {
+  body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel,
+  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel {
+    animation: ui-motion-nav-disclosure var(--ui-motion-panel) var(--ui-ease-enter) both;
+  }
+
+  body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel .navlink,
+  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel .navlink {
+    animation: ui-motion-nav-link-in var(--ui-motion-base) var(--ui-ease-enter) both;
+  }
+}
+
+@keyframes ui-motion-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-motion-pop-in {
+  from { opacity: 0; transform: translateY(calc(-1 * var(--ui-motion-distance-sm))) scale(var(--ui-motion-scale-subtle)); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ui-motion-slide-up {
+  from { opacity: 0; transform: translateY(var(--ui-motion-distance-sm)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ui-motion-slide-down {
+  from { opacity: 0; transform: translateY(calc(-1 * var(--ui-motion-distance-sm))); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ui-motion-disclosure-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--ui-motion-distance-md)));
+    clip-path: inset(0 0 100% 0 round 14px);
+  }
+  58% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0 round 14px);
+  }
+}
+
+@keyframes ui-motion-disclosure-exit {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0 round 14px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--ui-motion-distance-sm)));
+    clip-path: inset(0 0 100% 0 round 14px);
+  }
+}
+
+@keyframes ui-motion-nav-disclosure {
+  0% {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--ui-motion-distance-sm)));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ui-motion-nav-link-in {
+  0% {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--ui-motion-distance-xs)));
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ui-motion-item-pulse {
+  0% {
+    box-shadow:
+      inset 3px 0 0 color-mix(in srgb, var(--accent) 82%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--accent) 24%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    box-shadow:
+      inset 3px 0 0 color-mix(in srgb, var(--accent) 0%, transparent),
+      0 0 0 12px transparent;
+    background: transparent;
+  }
+}
+
+@keyframes ui-motion-remove {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--ui-motion-distance-sm)));
+  }
+}
+
+@media (max-width: 980px) {
+  .ui-sticky-toolbar {
+    top: var(--ui-sticky-top-mobile, 8px);
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .ui-object-picker {
+    flex-basis: 100%;
+    min-width: 100%;
+  }
+
+  .ui-theme-toggle {
+    top: 12px;
+    right: 12px;
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ui-motion-instant: 1ms;
+    --ui-motion-fast: 1ms;
+    --ui-motion-base: 1ms;
+    --ui-motion-panel: 1ms;
+    --ui-motion-emphasis: 1ms;
+    --ui-motion-theme: 1ms;
+    --ui-motion-distance-xs: 0px;
+    --ui-motion-distance-sm: 0px;
+    --ui-motion-distance-md: 0px;
+    --ui-motion-lift: 0px;
+    --ui-motion-scale-subtle: 1;
+  }
+
+  .ui-motion-fade-in,
+  .ui-motion-pop-in,
+  .ui-motion-slide-up,
+  .ui-motion-slide-down,
+  .ui-motion-item-pulse,
+  .ui-motion-remove,
+  .ui-disclosure-body.is-disclosure-entering,
+  .ui-disclosure-body.is-disclosure-exiting,
+  body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel,
+  body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel .navlink,
+  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel,
+  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel .navlink,
+  body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) :is(
+    details.config-advanced-group,
+    details.preset-advanced-fields,
+    details.role-state-advanced,
+    details.card-state-journal-advanced
+  )[open] > :not(summary),
+  .ui-popover:not([hidden]),
+  .ui-menu-popover:not([hidden]),
+  .ui-object-picker-menu:not([hidden]),
+  .ui-danger-confirm:not([hidden]),
+  .ui-action-more[open] > .ui-action-more-menu,
+  .ui-action-more-menu:not([hidden]),
+  :where(.ui-status-pill.is-saving)::before {
+    animation: none !important;
+  }
+
+  .ui-theme-toggle.is-switching,
+  .ui-theme-burst {
+    animation: none !important;
+  }
+}
+
+
+/* Stage 2 config-page unification: opt-in sticky action rows on remaining config pages. */
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar,
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  z-index: var(--ui-z-sticky);
+}
+
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar {
+  top: 10px;
+  margin-bottom: 14px;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  padding: 8px;
+}
+
+
+/* Stage 2 compact overrides for route/workshop action rows. */
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+}
+
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar .route-switch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar .route-switch-actions > * {
+  flex: 0 0 auto;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  margin: 0 0 18px;
+  border-top-width: 1px;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar button,
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar .button-link {
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar button:first-child {
+  min-height: 40px !important;
+  font-size: 0.94rem !important;
+}
+
+@media (max-width: 680px) {
+  body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  body.route-forwarding-page .route-switch-topbar.ui-sticky-toolbar .route-switch-actions,
+  body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+    justify-content: flex-start;
+  }
+}
+
+
+/* Stage 2 final compact action-bar corrections. */
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 8px !important;
+}
+
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar > * {
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar button,
+body.route-forwarding-page .route-switch-actions.ui-sticky-toolbar input {
+  min-height: 36px !important;
+}
+
+body.workshop-config-page .workshop-panel-actions.ui-sticky-toolbar {
+  top: 10px;
+  align-self: stretch;
+}
+
+
+body.workshop-config-page .workshop-main-card:has(.workshop-panel-actions.ui-sticky-toolbar) {
+  overflow: visible;
+}
+
+/* =========================================================
+   Stage 3A shared workbench pattern
+   ---------------------------------------------------------
+   Opt-in classes extracted from the verified /config/card sample.
+   These classes describe reusable structure only; page-level files may
+   still provide exact positioning while each page is migrated safely.
+   ========================================================= */
+.ui-readable-canvas {
+  --ui-readable-canvas-bg: color-mix(in srgb, var(--panel-strong) 88%, transparent);
+  --ui-readable-canvas-border: color-mix(in srgb, var(--border, var(--line)) 76%, transparent);
+  --ui-readable-canvas-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--ui-readable-canvas-border);
+  border-radius: var(--ui-card-radius);
+  background: var(--ui-readable-canvas-bg);
+  box-shadow: var(--ui-readable-canvas-shadow);
+  transition: var(--ui-transition-surface);
+}
+
+:root[data-theme="dark"] .ui-readable-canvas {
+  --ui-readable-canvas-bg: rgba(18, 27, 37, 0.82);
+  --ui-readable-canvas-border: color-mix(in srgb, var(--border, var(--line)) 68%, transparent);
+  --ui-readable-canvas-shadow: 0 22px 52px rgba(0, 0, 0, 0.26);
+}
+
+:root[data-theme="light"] .ui-readable-canvas {
+  --ui-readable-canvas-bg: rgba(255, 248, 238, 0.88);
+  --ui-readable-canvas-border: rgba(151, 103, 69, 0.28);
+  --ui-readable-canvas-shadow: 0 18px 42px rgba(92, 66, 42, 0.14);
+}
+
+.ui-action-dock {
+  position: sticky;
+  top: var(--ui-action-dock-top, 10px);
+  z-index: var(--ui-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: 20px;
+  background: var(--ui-toolbar-bg);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+  transition: var(--ui-transition-surface);
+}
+
+.ui-action-dock.is-vertical {
+  flex-direction: column;
+  align-items: stretch;
+  width: var(--ui-action-dock-width, 188px);
+}
+
+.ui-action-dock-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ui-action-dock.is-vertical .ui-action-dock-primary {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.ui-action-dock.is-vertical button,
+.ui-action-dock.is-vertical summary,
+.ui-action-dock.is-vertical .ui-preference-toggle {
+  width: 100%;
+}
+
+.ui-action-more {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.ui-action-more > summary {
+  list-style: none;
+  cursor: pointer;
+  transition: var(--ui-transition-control);
+}
+
+.ui-action-more > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.ui-action-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-action-more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--ui-z-popover);
+  min-width: 190px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border, var(--line)) 72%, transparent);
+  border-radius: 18px;
+  background: rgba(18, 27, 37, 0.92);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform-origin: var(--ui-motion-origin, top right);
+}
+
+.ui-action-more[open] > .ui-action-more-menu,
+.ui-action-more-menu:not([hidden]) {
+  animation: ui-motion-pop-in var(--ui-motion-base) var(--ui-ease-enter) both;
+}
+
+:root[data-theme="light"] .ui-action-more-menu {
+  border-color: rgba(151, 103, 69, 0.34);
+  background: rgba(255, 248, 238, 0.97);
+  box-shadow: 0 18px 42px rgba(92, 66, 42, 0.18);
+}
+
+.ui-action-more-menu button,
+.ui-action-more-menu .button-link {
+  justify-content: flex-start;
+}
+
+.ui-preference-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid var(--ui-toolbar-border);
+  border-radius: var(--ui-radius-pill);
+  background: color-mix(in srgb, var(--input-bg) 88%, transparent);
+  color: var(--text);
+  font: var(--ui-font-helper);
+  font-weight: 760;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: var(--ui-transition-control);
+}
+
+.ui-preference-toggle:hover,
+.ui-preference-toggle:focus-visible,
+.ui-preference-toggle:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 56%, var(--ui-toolbar-border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 24%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.ui-preference-toggle:focus-visible,
+.ui-preference-toggle:focus-within {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.ui-preference-toggle input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+:root[data-theme="light"] .ui-action-dock {
+  border-color: rgba(151, 103, 69, 0.30);
+  background: rgba(255, 248, 238, 0.88);
+  box-shadow: 0 16px 36px rgba(92, 66, 42, 0.14);
+}
+
+:root[data-theme="light"] .ui-action-dock button,
+:root[data-theme="light"] .ui-action-dock summary,
+:root[data-theme="light"] .ui-preference-toggle {
+  border-color: rgba(151, 103, 69, 0.22);
+}
+
+
+/* Stage 4 config-family action consistency.
+   Opt-in only: normalizes remaining config pages without changing business DOM ids. */
+body.modern-setting-page .stage4-action-row.ui-action-dock,
+body.global-config-page .stage4-action-row.ui-action-dock,
+body.user-config-page .stage4-action-row.ui-action-dock,
+body.worldbook-config-page .stage4-action-row.ui-action-dock,
+body.route-forwarding-page .stage4-action-row.ui-action-dock,
+body.workshop-config-page .stage4-action-row.ui-action-dock {
+  --ui-action-dock-top: 10px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 0;
+  gap: 8px;
+  padding: 8px;
+  margin: 0 0 14px;
+  border-radius: var(--ui-radius-lg);
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+body.global-config-page .config-sticky-buttons.stage4-action-row,
+body.user-config-page .config-sticky-buttons.stage4-action-row,
+body.worldbook-config-page .worldbook-workbench-actions.stage4-action-row,
+body.route-forwarding-page .route-switch-actions.stage4-action-row,
+body.workshop-config-page .workshop-panel-actions.stage4-action-row {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+}
+
+body.global-config-page .stage4-action-row button,
+body.global-config-page .stage4-action-row .button-link,
+body.user-config-page .stage4-action-row button,
+body.user-config-page .stage4-action-row .button-link,
+body.worldbook-config-page .stage4-action-row button,
+body.worldbook-config-page .stage4-action-row .button-link,
+body.route-forwarding-page .stage4-action-row button,
+body.route-forwarding-page .stage4-action-row .button-link,
+body.workshop-config-page .stage4-action-row button,
+body.workshop-config-page .stage4-action-row .button-link {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 38px !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap;
+}
+
+body.global-config-page .stage4-action-row button:first-child,
+body.user-config-page .stage4-action-row button:first-child,
+body.worldbook-config-page .stage4-action-row button:last-child,
+body.route-forwarding-page .stage4-action-row #save-route-forwarding,
+body.workshop-config-page .stage4-action-row #save-workshop {
+  min-height: 42px !important;
+  padding-inline: 18px !important;
+}
+
+body.user-config-page .stage4-local-actions {
+  justify-content: flex-start;
+  margin-top: 16px;
+  opacity: 0.88;
+}
+
+body.user-config-page .stage4-local-actions #save-user-profile {
+  background: var(--ui-control-bg) !important;
+  color: var(--text) !important;
+  border-color: var(--ui-toolbar-border) !important;
+  box-shadow: none !important;
+}
+
+body.workshop-config-page .stage4-danger-action,
+body.workshop-config-page .stage4-action-row .stage4-danger-action {
+  color: color-mix(in srgb, #ff8b8b 78%, var(--text)) !important;
+  border-color: rgba(220, 84, 84, 0.42) !important;
+  background: color-mix(in srgb, rgba(220, 84, 84, 0.14) 50%, var(--ui-control-bg)) !important;
+}
+
+:root[data-theme="light"] body.workshop-config-page .stage4-danger-action,
+:root[data-theme="light"] body.workshop-config-page .stage4-action-row .stage4-danger-action {
+  color: #8b2f2f !important;
+  border-color: rgba(177, 73, 58, 0.38) !important;
+  background: rgba(255, 238, 232, 0.88) !important;
+}
+
+@media (max-width: 760px) {
+  body.modern-setting-page .stage4-action-row.ui-action-dock,
+  body.global-config-page .stage4-action-row.ui-action-dock,
+  body.user-config-page .stage4-action-row.ui-action-dock,
+  body.worldbook-config-page .stage4-action-row.ui-action-dock,
+  body.route-forwarding-page .stage4-action-row.ui-action-dock,
+  body.workshop-config-page .stage4-action-row.ui-action-dock {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+
+/* Stage 4 user page: keep one visible page-level save entry in the unified dock. */
+body.user-config-page .stage4-local-actions {
+  display: none !important;
+}
+
+
+/* Stage 4 workshop correction: keep actions inside the workbench and compact side states. */
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row.ui-action-dock {
+  position: static !important;
+  top: auto !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  margin: 12px 0 18px !important;
+  padding: 8px !important;
+  border-radius: 18px !important;
+  border-color: color-mix(in srgb, var(--border) 66%, transparent) !important;
+  background: color-mix(in srgb, var(--panel-strong) 68%, transparent) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  justify-content: flex-start !important;
+}
+
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row button,
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row .button-link {
+  min-height: 38px !important;
+  height: 38px !important;
+  padding-inline: 14px !important;
+  font-size: 0.88rem !important;
+}
+
+body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row #save-workshop {
+  min-height: 40px !important;
+  height: 40px !important;
+  padding-inline: 16px !important;
+}
+
+:root[data-theme="light"] body.workshop-config-page .workshop-main-card .workshop-panel-actions.stage4-action-row.ui-action-dock {
+  border-color: rgba(151, 103, 69, 0.24) !important;
+  background: rgba(255, 248, 238, 0.54) !important;
+}
+
+body.workshop-config-page .workshop-side-summary {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 10px !important;
+}
+
+body.workshop-config-page .workshop-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+body.workshop-config-page .workshop-summary-grid .workshop-summary-item {
+  min-height: 74px;
+  padding: 10px 11px;
+  border-radius: 14px;
+  align-content: center;
+}
+
+body.workshop-config-page .workshop-summary-grid .workshop-summary-item span {
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+body.workshop-config-page .workshop-summary-grid .workshop-summary-item strong {
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+@media (max-width: 1180px) {
+  body.workshop-config-page .workshop-summary-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+
+
+/* Stage 4 workshop side panel correction: actions live in the right Workshop Panel. */
+body.workshop-config-page .workshop-main-card > .task-status,
+body.workshop-config-page .workshop-main-card > .workshop-panel-actions {
+  display: none !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 12px 13px !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--panel-strong) 76%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent) !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel #status-text {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel .workshop-panel-actions.stage4-action-row.ui-action-dock {
+  position: static !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel .workshop-panel-actions button,
+body.workshop-config-page .workshop-side-actions-panel .workshop-panel-actions .button-link {
+  width: 100% !important;
+  min-height: 38px !important;
+  height: auto !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+}
+
+body.workshop-config-page .workshop-side-actions-panel #save-workshop {
+  min-height: 42px !important;
+}
+
+:root[data-theme="light"] body.workshop-config-page .workshop-side-actions-panel {
+  border-color: rgba(151, 103, 69, 0.26) !important;
+  background: rgba(255, 248, 238, 0.62) !important;
+}
+
+/* P6-5B: visible hover/focus states for shared action-more menus. */
+.ui-action-more-menu button,
+.ui-action-more-menu .button-link,
+.ui-action-more-menu select {
+  transition: background var(--ui-motion-fast) var(--ui-ease-feedback), border-color var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback), transform var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+.ui-action-more-menu button:hover,
+.ui-action-more-menu button:focus-visible,
+.ui-action-more-menu .button-link:hover,
+.ui-action-more-menu .button-link:focus-visible,
+.ui-action-more-menu select:hover,
+.ui-action-more-menu select:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 64%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--accent) 26%, var(--input-bg)) !important;
+  color: var(--text) !important;
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--accent) 90%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent), 0 8px 18px color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+.ui-action-more-menu button:active,
+.ui-action-more-menu .button-link:active {
+  transform: translateY(1px);
+}
+
+.ui-action-more-menu button.is-danger:hover,
+.ui-action-more-menu button.is-danger:focus-visible,
+.ui-action-more-menu .danger-menu-item:hover,
+.ui-action-more-menu .danger-menu-item:focus-visible {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger) 14%, var(--input-bg)) !important;
+  color: color-mix(in srgb, var(--danger) 84%, var(--text)) !important;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--danger) 82%, transparent), 0 0 0 1px color-mix(in srgb, var(--danger) 16%, transparent) !important;
+}
+
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu {
+  min-width: 190px !important;
+  padding: 8px !important;
+  gap: 6px !important;
+  border-radius: 18px !important;
+}
+
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu button,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button,
+body.worldbook-manager-page .worldbook-more-menu.ui-action-more-menu button {
+  min-height: 38px !important;
+  border-radius: 14px !important;
+  padding: 10px 14px !important;
+}
+
+/* P6-5B hardening: beat page-level button backgrounds in existing more menus. */
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu button:hover,
+body.modern-setting-page.card-config-page .card-more-menu.ui-action-more-menu button:focus-visible,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button:hover,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button:focus-visible,
+body.modern-setting-page.memory-config-page .memory-transfer-menu.ui-action-more-menu select:hover,
+body.modern-setting-page.memory-config-page .memory-transfer-menu.ui-action-more-menu select:focus-visible,
+body.worldbook-manager-page .worldbook-more-menu.ui-action-more-menu button:hover,
+body.worldbook-manager-page .worldbook-more-menu.ui-action-more-menu button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--accent) 28%, var(--input-bg)) !important;
+  color: var(--text) !important;
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--accent) 92%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent), 0 8px 18px color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button.is-danger:hover,
+body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu button.is-danger:focus-visible {
+  border-color: color-mix(in srgb, var(--danger) 62%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger) 16%, var(--input-bg)) !important;
+  color: color-mix(in srgb, var(--danger) 86%, var(--text)) !important;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--danger) 86%, transparent), 0 0 0 1px color-mix(in srgb, var(--danger) 18%, transparent) !important;
+}
+
+
+/* P7-2B: worldbook manager entry rows inherit the same motion language without touching table columns. */
+body.worldbook-manager-page .worldbook-entry-card,
+body.worldbook-manager-page .worldbook-rule-card {
+  transition:
+    border-color var(--ui-motion-panel) var(--ui-ease-standard),
+    background var(--ui-motion-panel) var(--ui-ease-standard),
+    box-shadow var(--ui-motion-panel) var(--ui-ease-standard),
+    opacity var(--ui-motion-base) var(--ui-ease-standard) !important;
+}
+
+body.worldbook-manager-page .worldbook-entry-card:hover,
+body.worldbook-manager-page .worldbook-entry-card:focus-within,
+body.worldbook-manager-page .worldbook-rule-card:hover,
+body.worldbook-manager-page .worldbook-rule-card:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border, var(--line)) 68%) !important;
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--accent) 34%, transparent),
+    0 8px 20px color-mix(in srgb, var(--accent) 9%, transparent) !important;
+}
+
+body.worldbook-manager-page .worldbook-rule-card.is-disclosure-open,
+body.worldbook-manager-page .worldbook-rule-card[data-collapsed="false"] {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border, var(--line)) 74%) !important;
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 46%, transparent) !important;
+}
+
+body.worldbook-manager-page .worldbook-rule-card.is-disclosure-opening,
+body.worldbook-manager-page .worldbook-rule-card.is-disclosure-closing {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border, var(--line)) 66%) !important;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--accent) 62%, transparent),
+    0 10px 24px color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+body.worldbook-manager-page .worldbook-entry-card .toggle-worldbook-entry,
+body.worldbook-manager-page .worldbook-entry-card .remove-worldbook-entry,
+body.worldbook-manager-page .worldbook-entry-card .icon-button,
+body.worldbook-manager-page .worldbook-entry-card .wb-quick-enabled-switch,
+body.worldbook-manager-page .worldbook-entry-card .wb-selected,
+body.worldbook-manager-page .worldbook-entry-card .worldbook-summary-chip,
+body.worldbook-manager-page .worldbook-entry-card .worldbook-entry-group-label {
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease-feedback),
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    color var(--ui-motion-fast) var(--ui-ease-feedback),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-feedback),
+    opacity var(--ui-motion-fast) var(--ui-ease-feedback) !important;
+}
+
+body.worldbook-manager-page .worldbook-entry-card .toggle-worldbook-entry:hover,
+body.worldbook-manager-page .worldbook-entry-card .toggle-worldbook-entry:focus-visible,
+body.worldbook-manager-page .worldbook-entry-card .icon-button:hover,
+body.worldbook-manager-page .worldbook-entry-card .icon-button:focus-visible,
+body.worldbook-manager-page .worldbook-entry-card .wb-quick-enabled-switch:hover,
+body.worldbook-manager-page .worldbook-entry-card .wb-quick-enabled-switch:focus-within,
+body.worldbook-manager-page .worldbook-entry-card .wb-selected:hover,
+body.worldbook-manager-page .worldbook-entry-card .wb-selected:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border, var(--line)) 42%) !important;
+  background: color-mix(in srgb, var(--accent) 16%, var(--input-bg)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent) !important;
+  transform: none !important;
+}
+
+body.worldbook-manager-page .worldbook-entry-card .remove-worldbook-entry:hover,
+body.worldbook-manager-page .worldbook-entry-card .remove-worldbook-entry:focus-visible,
+body.worldbook-manager-page .worldbook-entry-card .danger-icon-button:hover,
+body.worldbook-manager-page .worldbook-entry-card .danger-icon-button:focus-visible {
+  border-color: color-mix(in srgb, var(--danger, #dc5454) 78%, var(--border, var(--line))) !important;
+  background: color-mix(in srgb, var(--danger, #dc5454) 24%, var(--input-bg)) !important;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--danger, #dc5454) 20%, transparent),
+    0 6px 14px color-mix(in srgb, var(--danger, #dc5454) 10%, transparent) !important;
+  transform: none !important;
+}
+
+body.worldbook-manager-page .worldbook-entry-card .worldbook-summary-chip:hover,
+body.worldbook-manager-page .worldbook-entry-card .worldbook-entry-group-label:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border, var(--line)) 58%) !important;
+  background: color-mix(in srgb, var(--accent) 10%, var(--input-bg)) !important;
+}
+
+/* P7-2B: card page side action dock typography/weight consistency. */
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock {
+  --ui-action-dock-width: 188px;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock button,
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .ui-action-more > summary,
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .ui-preference-toggle {
+  font-size: 1rem !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
+  line-height: normal !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock #add-persona,
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock #load-card,
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .ui-action-more > summary {
+  min-height: 44px !important;
+  font-size: 1rem !important;
+  font-weight: 400 !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock #save-card {
+  min-height: 44px !important;
+  font-size: 0.92rem !important;
+  font-weight: 400 !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .ui-preference-toggle {
+  min-height: 44px !important;
+  justify-content: flex-start !important;
+  gap: 9px !important;
+  color: color-mix(in srgb, var(--text) 92%, var(--muted)) !important;
+  white-space: nowrap !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .ui-preference-toggle input {
+  flex: 0 0 auto !important;
+}
+
+body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .ui-preference-toggle span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font: inherit !important;
+  font-weight: 400 !important;
+}
+
+
+@media (min-width: 1720px) {
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .card-actions-primary {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  body.modern-setting-page.card-config-page .card-workbench-actions.ui-action-dock .ui-preference-toggle {
+    width: 100% !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding-block: 9px !important;
+  }
+}
+
+
+
+/* P7-3: status continuity and operation feedback. */
+:where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).ui-status-change,
+:where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).is-status-changing {
+  position: relative;
+  overflow: hidden;
+  animation: ui-motion-status-change var(--ui-motion-theme) var(--ui-ease-feedback) both;
+}
+
+:where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).ui-status-change::after,
+:where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).is-status-changing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, currentColor 24%, transparent) 46%,
+    transparent 100%
+  );
+  animation: ui-motion-status-sheen var(--ui-motion-theme) var(--ui-ease-enter) both;
+}
+
+body.modern-setting-page :where(button, .button-link, a.secondary).ui-status-change,
+body.modern-setting-page :where(button, .button-link, a.secondary).is-status-changing {
+  animation: ui-motion-control-confirm var(--ui-motion-theme) var(--ui-ease-feedback) both;
+}
+
+body.modern-setting-page :where(button, .button-link, a.secondary).is-loading {
+  border-color: color-mix(in srgb, var(--accent) 66%, var(--ui-control-border, var(--line))) !important;
+  background: color-mix(in srgb, var(--accent) 24%, var(--input-bg)) !important;
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--accent) 32%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent) !important;
+}
+
+body.modern-setting-page :where(button, .button-link, a.secondary).is-success {
+  border-color: color-mix(in srgb, #68ad7b 68%, var(--ui-control-border, var(--line))) !important;
+  background: color-mix(in srgb, #68ad7b 32%, var(--input-bg)) !important;
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, #68ad7b 42%, transparent),
+    0 0 0 2px color-mix(in srgb, #68ad7b 18%, transparent) !important;
+}
+
+:where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).is-error.ui-status-change,
+:where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).is-error.is-status-changing,
+body.modern-setting-page :where(button, .button-link, a.secondary).is-error.ui-status-change,
+body.modern-setting-page :where(button, .button-link, a.secondary).is-error.is-status-changing {
+  animation-name: ui-motion-status-error;
+}
+
+body.modern-setting-page .config-toast-host .app-toast {
+  transition:
+    opacity var(--ui-motion-base) var(--ui-ease-enter),
+    transform var(--ui-motion-base) var(--ui-ease-enter),
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+body.modern-setting-page .config-toast-host .app-toast.show {
+  animation: ui-motion-toast-settle var(--ui-motion-theme) var(--ui-ease-enter) both;
+}
+
+@keyframes ui-motion-status-change {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 transparent;
+  }
+  24% {
+    transform: translateY(calc(-1 * var(--ui-motion-lift)));
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, currentColor 24%, transparent),
+      0 10px 24px color-mix(in srgb, currentColor 16%, transparent);
+  }
+  62% {
+    transform: translateY(0);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, currentColor 14%, transparent),
+      0 6px 16px color-mix(in srgb, currentColor 10%, transparent);
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes ui-motion-status-sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-125%);
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(125%);
+  }
+}
+
+@keyframes ui-motion-control-confirm {
+  0% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 transparent;
+  }
+  28% {
+    transform: translateY(calc(-1 * var(--ui-motion-lift)));
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent),
+      0 10px 24px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  68% {
+    transform: translateY(0);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent),
+      0 5px 14px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes ui-motion-status-error {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  55% { transform: translateX(2px); }
+  78% { transform: translateX(-1px); }
+}
+
+@keyframes ui-motion-toast-settle {
+  0% {
+    opacity: 0;
+    transform: translateY(calc(var(--ui-motion-distance-md) * 1.15));
+  }
+  48% {
+    opacity: 1;
+    transform: translateY(calc(-1 * var(--ui-motion-lift)));
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).ui-status-change,
+  :where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).is-status-changing,
+  body.modern-setting-page :where(button, .button-link, a.secondary).ui-status-change,
+  body.modern-setting-page :where(button, .button-link, a.secondary).is-status-changing,
+  body.modern-setting-page .config-toast-host .app-toast.show {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  :where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).ui-status-change::after,
+  :where(.ui-status-pill, .config-status-pill, .task-status, .ui-status-token, .provider-status).is-status-changing::after {
+    content: none !important;
+  }
+}
+
+/* P7-2C: worldbook manager secondary disclosure motion consistency. */
+body.worldbook-manager-page .worldbook-bulk-editor.ui-disclosure-card {
+  border-top-color: color-mix(in srgb, var(--accent) 24%, rgba(148, 163, 184, 0.14));
+}
+
+body.worldbook-manager-page .worldbook-bulk-editor.ui-disclosure-card.is-disclosure-open,
+body.worldbook-manager-page .worldbook-bulk-editor.ui-disclosure-card.is-disclosure-opening,
+body.worldbook-manager-page .worldbook-bulk-editor.ui-disclosure-card.is-disclosure-closing {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+body.worldbook-manager-page .worldbook-bulk-editor.ui-disclosure-body {
+  transform-origin: top center;
+}
+
+body.worldbook-manager-page .worldbook-bulk-editor.ui-disclosure-body.is-disclosure-entering,
+body.worldbook-manager-page .worldbook-bulk-editor.ui-disclosure-body.is-disclosure-exiting {
+  display: grid !important;
+}
+
+body.worldbook-manager-page details.role-state-advanced.wb-external-advanced > summary {
+  border-radius: 10px;
+  transition:
+    background var(--ui-motion-fast) var(--ui-ease-feedback),
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    color var(--ui-motion-fast) var(--ui-ease-feedback),
+    box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
+}
+
+body.worldbook-manager-page details.role-state-advanced.wb-external-advanced > summary:hover,
+body.worldbook-manager-page details.role-state-advanced.wb-external-advanced > summary:focus-visible,
+body.worldbook-manager-page details.role-state-advanced.wb-external-advanced[open] > summary {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+body.worldbook-manager-page details.role-state-advanced.wb-external-advanced[open] > :not(summary) {
+  animation: ui-motion-disclosure-enter var(--ui-motion-panel) var(--ui-ease-enter) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.worldbook-manager-page details.role-state-advanced.wb-external-advanced[open] > :not(summary) {
+    animation: none !important;
+  }
+}
+
+
+/* P7-2C: global config advanced details disclosure motion. */
+body.modern-setting-page.global-config-page .config-advanced-summary:hover,
+body.modern-setting-page.global-config-page .config-advanced-summary:focus-visible {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  outline: none;
+}
+
+body.modern-setting-page.global-config-page details.config-advanced-group.ui-disclosure-card.is-disclosure-open,
+body.modern-setting-page.global-config-page details.config-advanced-group.ui-disclosure-card.is-disclosure-opening,
+body.modern-setting-page.global-config-page details.config-advanced-group.ui-disclosure-card.is-disclosure-closing {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line) 76%);
+}
+
+body.modern-setting-page.global-config-page details.config-advanced-group .config-retrieval-panel.ui-disclosure-body.is-disclosure-entering {
+  animation: ui-motion-disclosure-enter var(--ui-motion-panel) var(--ui-ease-enter) both;
+}
+
+body.modern-setting-page.global-config-page details.config-advanced-group .config-retrieval-panel.ui-disclosure-body.is-disclosure-exiting {
+  animation: ui-motion-disclosure-exit var(--ui-motion-base) var(--ui-ease-exit) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.modern-setting-page.global-config-page details.config-advanced-group .config-retrieval-panel.ui-disclosure-body.is-disclosure-entering,
+  body.modern-setting-page.global-config-page details.config-advanced-group .config-retrieval-panel.ui-disclosure-body.is-disclosure-exiting {
+    animation: none !important;
+  }
+}

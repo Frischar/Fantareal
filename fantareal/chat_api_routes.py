@@ -5,13 +5,84 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
-from .app_models import ChatHistoryEditRequest, ChatHistoryRerollRequest, ChatRequest, SlotSummaryBufferPayload
+from .app_models import (
+    ChatHistoryEditRequest,
+    ChatHistoryRerollRequest,
+    ChatRequest,
+    DirectorNoteDeletePayload,
+    DirectorNotePayload,
+    SlotSummaryBufferPayload,
+)
 
 
 def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
     @app.get("/api/history")
     async def api_get_history() -> list[dict[str, Any]]:
         return ctx.get_conversation()
+
+    @app.post("/api/chat/history/mod-message")
+    async def api_append_mod_message(payload: dict[str, Any]) -> dict[str, Any]:
+        role = str(payload.get("role") or "").strip()
+        if role not in {"user", "assistant", "system"}:
+            raise HTTPException(status_code=400, detail="Invalid message role.")
+        content = str(payload.get("content") or "").strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="Message cannot be empty.")
+        mod_message_id = str(payload.get("mod_message_id") or "").strip()
+        if not mod_message_id:
+            raise HTTPException(status_code=400, detail="mod_message_id is required.")
+
+        history = ctx.get_conversation()
+        for index, item in enumerate(history):
+            if str(item.get("mod_message_id") or "") == mod_message_id:
+                return {"ok": True, "created": False, "index": index}
+
+        history.append(
+            {
+                "role": role,
+                "content": content,
+                "created_at": str(payload.get("created_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                "message_id": mod_message_id,
+                "mod_message_id": mod_message_id,
+                "source": str(payload.get("source") or "mod").strip() or "mod",
+            }
+        )
+        item = history[-1]
+        turn_id = str(payload.get("turn_id") or payload.get("turnId") or "").strip()
+        if turn_id:
+            item["turn_id"] = turn_id
+            item["state_journal_turn"] = turn_id
+        try:
+            turn_index = int(payload.get("turn_index", payload.get("turnIndex", 0)) or 0)
+        except (TypeError, ValueError):
+            turn_index = 0
+        if turn_index > 0:
+            item["turn_index"] = turn_index
+        content_hash = str(payload.get("content_hash") or payload.get("contentHash") or "").strip()
+        if content_hash:
+            item["content_hash"] = content_hash
+            if role == "assistant":
+                item["assistant_hash"] = content_hash
+        ctx.persist_json(
+            ctx.conversation_path(),
+            history,
+            detail="Mod message save failed. Please check disk space or file permissions.",
+        )
+        return {"ok": True, "created": True, "index": len(history) - 1}
+
+    @app.get("/api/chat/director-notes")
+    async def api_get_director_notes() -> dict[str, Any]:
+        return {"items": ctx.get_director_notes(ctx.get_active_slot_id())}
+
+    @app.post("/api/chat/director-notes")
+    async def api_create_director_note(payload: DirectorNotePayload) -> dict[str, Any]:
+        items = ctx.create_director_note(payload.model_dump(), ctx.get_active_slot_id())
+        return {"items": items}
+
+    @app.post("/api/chat/director-notes/delete")
+    async def api_delete_director_note(payload: DirectorNoteDeletePayload) -> dict[str, Any]:
+        items = ctx.delete_director_note(payload.id, ctx.get_active_slot_id())
+        return {"items": items}
 
 
     @app.post("/api/chat/history/message-meta")
@@ -215,6 +286,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         if reply.strip():
             entries.append(("assistant", reply))
         ctx.append_messages(entries)
+        director_notes = ctx.consume_director_notes_turn(ctx.get_active_slot_id())
 
         worldbook_debug = ctx.build_worldbook_debug_payload(
             message,
@@ -233,6 +305,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             "memory_item": None,
             "preset_debug": preset_debug,
             "prompt_package": prompt_package,
+            "director_notes": director_notes,
         }
 
     @app.post("/api/chat/prompt-preview")
@@ -243,14 +316,17 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
         runtime_overrides = payload.runtime_config or {}
         retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
+        preset_context = ctx.build_active_preset_context()
         active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
-        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_stage_tags)
+        active_tag_context = ctx.build_active_tag_context(active_stage_tags, preset_context)
+        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_tag_context)
         worldbook_debug_snapshot = ctx.get_worldbook_debug_snapshot()
         prompt_package = ctx.build_prompt_package(
             message,
             retrieved_items,
             runtime_overrides=runtime_overrides,
             worldbook_matches=worldbook_matches,
+            preset_context=preset_context,
         )
         return {
             "retrieved_items": retrieved_items,
@@ -260,8 +336,9 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 worldbook_matches,
                 debug_snapshot=worldbook_debug_snapshot,
             ),
-            "preset_debug": ctx.build_preset_debug_payload(),
+            "preset_debug": ctx.build_preset_debug_payload(preset_context=preset_context),
             "prompt_package": prompt_package,
+            "director_notes": ctx.get_director_notes(ctx.get_active_slot_id()),
         }
 
     @app.post("/api/chat/stream")
@@ -273,20 +350,23 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         runtime_overrides = payload.runtime_config or {}
         llm_config = ctx.get_runtime_chat_config(runtime_overrides)
         retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
+        preset_context = ctx.build_active_preset_context()
         active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
-        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_stage_tags)
+        active_tag_context = ctx.build_active_tag_context(active_stage_tags, preset_context)
+        worldbook_matches = ctx.match_worldbook_entries(message, external_active_tags=active_tag_context)
         worldbook_debug_snapshot = ctx.get_worldbook_debug_snapshot()
         worldbook_debug = ctx.build_worldbook_debug_payload(
             message,
             worldbook_matches,
             debug_snapshot=worldbook_debug_snapshot,
         )
-        preset_debug = ctx.build_preset_debug_payload()
+        preset_debug = ctx.build_preset_debug_payload(preset_context=preset_context)
         prompt_package = ctx.build_prompt_package(
             message,
             retrieved_items,
             runtime_overrides=runtime_overrides,
             worldbook_matches=worldbook_matches,
+            preset_context=preset_context,
         )
 
         if not (llm_config["base_url"] and llm_config["model"]):
@@ -305,9 +385,11 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                     "worldbook_debug": worldbook_debug,
                     "preset_debug": preset_debug,
                     "prompt_package": prompt_package,
+                    "director_notes": ctx.get_director_notes(ctx.get_active_slot_id()),
                 }
                 yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
-                done = {"type": "done", "reply": "", "sprite_tag": "", "worldbook_enforced": False}
+                director_notes = ctx.consume_director_notes_turn(ctx.get_active_slot_id())
+                done = {"type": "done", "reply": "", "sprite_tag": "", "worldbook_enforced": False, "director_notes": director_notes}
                 yield f"data: {json.dumps(done, ensure_ascii=False)}\n\n"
 
             return StreamingResponse(demo_event_stream(), media_type="text/event-stream")
@@ -320,6 +402,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 "worldbook_debug": worldbook_debug,
                 "preset_debug": preset_debug,
                 "prompt_package": prompt_package,
+                "director_notes": ctx.get_director_notes(ctx.get_active_slot_id()),
             }
             yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
 
@@ -334,6 +417,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 ):
                     if item.get("type") == "done":
                         final_reply_result = item
+                        continue
                     yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
             except HTTPException as exc:
                 error_event = {"type": "error", "detail": exc.detail if isinstance(exc.detail, str) else str(exc.detail)}
@@ -351,6 +435,11 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             if stored_reply_text:
                 entries.append(("assistant", stored_reply_text))
             ctx.append_messages(entries)
+            director_notes = ctx.consume_director_notes_turn(ctx.get_active_slot_id())
+            done_payload = dict(final_reply_result or {})
+            done_payload.setdefault("type", "done")
+            done_payload["director_notes"] = director_notes
+            yield f"data: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
 
         return StreamingResponse(
             event_stream(),

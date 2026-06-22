@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自动叙事模式</title>
+    <link rel="stylesheet" href="./static/auto-saga-admin.css?v=auto-saga-v0-5-4">
+  </head>
+  <body>
+    <main class="saga-shell">
+      <header class="saga-hero">
+        <div>
+          <p class="eyebrow">FANTAREAL PLUGIN</p>
+          <h1>自动叙事模式</h1>
+          <p class="hero-copy">旁白推进环境，多个角色依据人设与关系自主决定是否开口。</p>
+        </div>
+        <div class="hero-orbit" aria-hidden="true">
+          <span>ACT</span>
+          <strong id="heroTurn">{{ state.turn }}</strong>
+        </div>
+      </header>
+
+      <section class="saga-layout">
+        <div class="saga-main">
+          <section class="saga-card control-card">
+            <div class="section-head">
+              <div>
+                <p class="section-index">01 / RUN</p>
+                <h2>运行方式</h2>
+              </div>
+              <label class="saga-switch">
+                <input id="enabledInput" type="checkbox" {% if state.settings.enabled %}checked{% endif %}>
+                <span></span>
+              </label>
+            </div>
+            <label class="setting-row compact-row">
+              <div>
+                <strong>角色自行互动</strong>
+                <p>开启后每隔 30 秒让角色自由发言，同时保留选项供玩家随时插手。</p>
+              </div>
+              <input id="autoInteractInput" type="checkbox" {% if state.settings.auto_interact %}checked{% endif %}>
+            </label>
+            <label class="setting-row compact-row">
+              <div>
+                <strong>旁观模式</strong>
+                <p>开启后下一轮不返回选项；关闭后下一轮恢复选项。</p>
+              </div>
+              <input id="observerModeInput" type="checkbox" {% if state.settings.observer_mode %}checked{% endif %}>
+            </label>
+            <label class="setting-row compact-row">
+              <div>
+                <strong>显示沉默判定</strong>
+                <p>角色没有发言时，也在聊天区显示“沉默不语”。</p>
+              </div>
+              <input id="showSilentInput" type="checkbox" {% if state.settings.show_silent %}checked{% endif %}>
+            </label>
+          </section>
+
+          <section class="saga-card">
+            <div class="section-head cast-head">
+              <div>
+                <p class="section-index">02 / CAST</p>
+                <h2>参与角色</h2>
+              </div>
+              <div class="cast-actions">
+                <button id="selectImportButton" class="secondary-button" type="button">选择导入</button>
+                <button id="syncPersonaButton" class="secondary-button" type="button">导入当前角色卡</button>
+                <input id="roleCardFileInput" type="file" accept=".json,.txt,application/json,text/plain" hidden>
+              </div>
+            </div>
+            <p class="section-note">支持 Fantareal JSON/TXT 角色卡。导入会读取主角色和 personas，并按名字合并，不会清空已有角色。</p>
+            <div id="characterList" class="character-list"></div>
+          </section>
+
+          <section class="saga-card prompt-card">
+            <div class="section-head">
+              <div>
+                <p class="section-index">03 / DIRECTOR</p>
+                <h2>自动推进依据</h2>
+              </div>
+            </div>
+            <div class="prompt-flow">
+              <span>参与角色人设</span><i>+</i><span>主聊天最近对话</span><i>+</i><span>玩家选择</span>
+              <b>→</b><span>随机事件旁白</span><i>+</i><span>角色回应</span><i>+</i><span>三个新选项</span>
+            </div>
+            <p class="section-note">事件导演会结合所有参与角色的背景、性格、当前场景和最近剧情生成事件。</p>
+          </section>
+        </div>
+
+        <aside class="saga-side">
+          <section class="saga-card model-card">
+            <div class="model-card-head">
+              <div>
+                <p class="section-index">MODEL</p>
+                <h2>沿用全局模型</h2>
+              </div>
+              <span id="modelStatus" class="model-status{% if state.model_config.configured %} configured{% endif %}">
+                {{ "已配置" if state.model_config.configured else "未配置" }}
+              </span>
+            </div>
+            <dl>
+              <div><dt>模型</dt><dd id="modelName">{{ state.model_config.model or "未设置" }}</dd></div>
+              <div><dt>API</dt><dd id="modelBaseUrl">{{ state.model_config.base_url or "未设置" }}</dd></div>
+            </dl>
+            <p>自动叙事直接读取 Fantareal 全局设置中的 API Key、模型、温度和超时。</p>
+            <a class="settings-link" href="/config" target="_top">前往全局设置 <span>→</span></a>
+          </section>
+
+          <section class="saga-card status-card">
+            <p class="section-index">STATUS</p>
+            <div class="status-value"><strong id="turnValue">{{ state.turn }}</strong><span>回合</span></div>
+            <dl>
+              <div><dt>当前时间</dt><dd id="envTime">{{ state.env.time }}</dd></div>
+              <div><dt>地点</dt><dd id="envPlace">{{ state.env.place }}</dd></div>
+              <div><dt>天气</dt><dd id="envWeather">{{ state.env.weather }}</dd></div>
+            </dl>
+          </section>
+
+          <section class="saga-card action-card">
+            <h2>维护</h2>
+            <p>重置会清空自动叙事的回合、事件和历史，不影响主聊天记录。</p>
+            <button id="resetButton" class="danger-button" type="button">重置叙事状态</button>
+          </section>
+          <a class="back-link" href="/chat" target="_top">返回聊天页 <span>→</span></a>
+        </aside>
+      </section>
+      <div id="toast" class="toast" role="status"></div>
+    </main>
+    <script src="./static/auto-saga-admin.js?v=auto-saga-v0-5-4"></script>
+  </body>
+</html>
