@@ -23,7 +23,7 @@
 {% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' or current_path == '/config/route-forwarding' %}
 {% set persona_active = current_path == '/config/card' or current_path == '/config/preset' or current_path == '/config/memory' %}
 {% set worldbook_active = current_path.startswith('/config/worldbook') %}
-{% set plugins_active = current_path.startswith('/mods/auto-saga') or current_path.startswith('/mods/tts-studio') or current_path.startswith('/mods/card-writer') or current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/state-journal') or current_path.startswith('/mods/mobile-chat') or current_path.startswith('/mods/challenge-mode') %}
+{% set plugins_active = current_path.startswith('/mods/auto-saga') or current_path.startswith('/mods/tts-studio') or current_path.startswith('/mods/card-writer') or current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/state-journal') or current_path.startswith('/mods/mobile-chat') %}
 {% set game_active = current_path == '/game' or current_path == '/game/flying-chess' %}
 {% set pe_role_active = current_path == '/config/card' or current_path == '/config/user' %}
 {% set pe_knowledge_active = current_path == '/config/memory' or current_path.startswith('/config/worldbook') %}
@@ -32,7 +32,7 @@
 {% set chat_href = '/mobile' if request.query_params.get('mobile') == '1' else '/chat' %}
 
 <nav class="topnav topnav-grouped" aria-label="Primary navigation">
-  <details class="nav-group{% if current_path == '/chat' %} active-group{% endif %}"{% if current_path == '/chat' %} open{% endif %} data-challenge-nav="keep">
+  <details class="nav-group{% if current_path == '/chat' %} active-group{% endif %}"{% if current_path == '/chat' %} open{% endif %}>
     <summary class="nav-group-summary">
       <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 6.5h15a1.8 1.8 0 0 1 1.8 1.8v7.1a1.8 1.8 0 0 1-1.8 1.8H9.2L4.5 20V8.3a1.8 1.8 0 0 1 1.8-1.8Z"/><path d="M8.4 11.8h.1M12 11.8h.1M15.6 11.8h.1"/></svg></span>
       <span class="nav-label">聊天</span>
@@ -117,7 +117,6 @@
         {% if mod_state.has_mobile_chat %}
         <a class="navlink{% if current_path.startswith('/mods/mobile-chat') %} active{% endif %}" href="/mods/mobile-chat{{ mobile_query }}">小手机 · 后台管理</a>
         {% endif %}
-        <a class="navlink challenge-mode-navlink{% if current_path.startswith('/mods/challenge-mode') %} active{% endif %}" href="/mods/challenge-mode{{ mobile_query }}" data-challenge-mode-link hidden>挑战模式</a>
       </div>
     </div>
   </details>
@@ -160,12 +159,6 @@
     <span class="pe-bottom-label">设置</span>
   </a>
 </nav>
-<div class="nav-group standalone-challenge" data-challenge-mode-entry hidden>
-  <a class="nav-group-summary{% if current_path.startswith('/mods/challenge-mode') %} active{% endif %}" href="/mods/challenge-mode{{ mobile_query }}" style="text-decoration:none;cursor:pointer;">
-    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l1.5 4.2L18 9.2l-4.5 1.5L12 15l-1.5-4.3L6 9.2l4.5-1.5L12 3.5Z"/><path d="M18.4 14.5l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1Z"/></svg></span>
-    <span class="nav-label">挑战模式</span>
-  </a>
-</div>
 <script>
   (() => {
     const topbar = document.currentScript?.closest(".topbar") || document;
@@ -212,23 +205,6 @@
       }
     });
 
-    function applyChallengeModeShell() {
-      const challengeUnlocked = localStorage.getItem("fantareal.challengeModeUnlocked") === "true";
-      document.body.classList.toggle("challenge-mode-unlocked", challengeUnlocked);
-      nav.classList.toggle("challenge-mode-unlocked", challengeUnlocked);
-      topbar.querySelectorAll("[data-challenge-mode-link], [data-challenge-mode-entry]").forEach((entry) => {
-        entry.hidden = !challengeUnlocked;
-      });
-      if (challengeUnlocked) {
-        groups.forEach((group) => {
-          if (group.dataset.challengeNav !== "keep" && !(preserveActiveGroups && group.classList.contains("active-group"))) {
-            group.removeAttribute("open");
-          }
-        });
-      }
-    }
-
-    applyChallengeModeShell();
     openActiveGroups();
   })();
 </script>
