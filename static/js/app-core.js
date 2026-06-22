@@ -19,6 +19,10 @@
     rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
   };
 
+  F.applyPerformanceMode = function applyPerformanceMode(enabled) {
+    document.documentElement.setAttribute("data-performance-mode", enabled ? "on" : "off");
+  };
+
   F.applyBackground = function applyBackground(url, overlay) {
     const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
     document.body.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));

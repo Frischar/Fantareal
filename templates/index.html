@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="{{ settings.theme }}">
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantareal Chat</title>
     <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-chat-motion-final-20260622" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
     <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-switch-v1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}

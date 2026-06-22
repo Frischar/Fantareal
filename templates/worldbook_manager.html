@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="{{ settings.theme }}">
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
   </head>
