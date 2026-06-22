@@ -1805,3 +1805,169 @@ body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] 
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
+
+/* P8-0 preflight: keep preset actions visible on 1080p / common desktop widths.
+   The ultra-wide left dock cannot fit beside the sidebar at 1920px. */
+@media (min-width: 1720px) and (max-width: 2439px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock {
+    position: sticky !important;
+    top: 12px !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    grid-column: 1 / -1 !important;
+    align-self: flex-start !important;
+    justify-self: start !important;
+    width: min(100%, 980px) !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 0 14px !important;
+    padding: 8px !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    border-radius: var(--ui-radius-lg) !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-picker-wrap {
+    flex: 0 1 300px !important;
+    width: auto !important;
+    min-width: min(300px, 100%) !important;
+    max-width: 100% !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    width: auto !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #reload-preset,
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary > button,
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary > .preset-more-wrap,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #create-preset,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #preset-more-toggle {
+    width: auto !important;
+    max-width: 100% !important;
+    min-height: 38px !important;
+    height: auto !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top {
+    min-height: 42px !important;
+    border-radius: 999px !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock .preset-header-save-state,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-header-save-state {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 76px !important;
+    max-width: max-content !important;
+    min-height: 38px !important;
+    height: 38px !important;
+    margin-left: auto !important;
+    padding: 7px 16px !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+    align-self: center !important;
+    white-space: nowrap !important;
+    border-radius: 999px !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-picker-toggle {
+    width: 100% !important;
+    min-height: 42px !important;
+    height: auto !important;
+  }
+
+  body.modern-setting-page.preset-config-page #preset-picker-current {
+    max-width: 230px !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu {
+    top: calc(100% + 8px) !important;
+    left: 0 !important;
+    right: auto !important;
+  }
+}
+
+/* P8-0A: preset page performance relief.
+   Large preset libraries can render hundreds of rows; keep hierarchy via borders/backgrounds, not heavy shadows. */
+body.modern-setting-page.preset-config-page :is(
+  .preset-card,
+  .preset-group-item,
+  .preset-card-grid .preset-item,
+  .preset-advanced-fields,
+  .preset-advanced-summary,
+  .preset-advanced-body,
+  .preset-base-template-panel,
+  .preset-assembly-card
+) {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.modern-setting-page.preset-config-page :is(
+  .preset-card,
+  .preset-group-item,
+  .preset-card-grid .preset-item
+) {
+  transition:
+    border-color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    background var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease) !important;
+}
+
+body.modern-setting-page.preset-config-page :is(
+  .preset-card,
+  .preset-group-item,
+  .preset-card-grid .preset-item
+):hover {
+  transform: none !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-body {
+  will-change: auto !important;
+}
+
+body.modern-setting-page.preset-config-page .preset-advanced-body.is-disclosure-entering,
+body.modern-setting-page.preset-config-page .preset-advanced-body.is-disclosure-exiting {
+  will-change: height, opacity, transform, clip-path !important;
+}
+
+body.modern-setting-page.preset-config-page :is(
+  .preset-list,
+  .preset-card-list,
+  .preset-card,
+  .preset-group-items,
+  .preset-card-grid,
+  .module-grid,
+  .preset-advanced-fields
+) :is(
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  span,
+  details,
+  summary,
+  .preset-summary-chip,
+  .preset-pill,
+  .preset-module-chip,
+  .preset-quick-enabled-track,
+  .preset-module-switch-track,
+  .preset-group-item,
+  .preset-advanced-field
+) {
+  box-shadow: none !important;
+}

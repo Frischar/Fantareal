@@ -237,8 +237,57 @@ body.modern-setting-page .config-overview-grid {
 }
 
 body.modern-setting-page .config-overview-actions {
+  display: grid !important;
+  grid-template-columns: minmax(210px, 0.78fr) repeat(3, minmax(150px, 1fr));
+  align-items: stretch;
+  gap: 10px;
   margin-top: 12px;
-  justify-content: flex-start;
+}
+
+body.modern-setting-page .config-overview-actions > button {
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+body.modern-setting-page .config-performance-switch.fr-setting-switch-row {
+  min-height: 40px !important;
+  width: 100% !important;
+  padding: 8px 12px !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border) 82%);
+  border-radius: var(--ui-radius-lg, 18px);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--input-bg) 82%, transparent),
+      color-mix(in srgb, var(--panel) 74%, transparent));
+}
+
+body.modern-setting-page .config-performance-switch.fr-setting-switch-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, var(--input-bg));
+}
+
+body.modern-setting-page .config-performance-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+body.modern-setting-page .config-performance-copy strong {
+  font-size: 0.94rem;
+  line-height: 1.2;
+}
+
+body.modern-setting-page .config-performance-copy small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+html[data-performance-mode="on"] body.modern-setting-page .config-performance-copy small {
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
 }
 
 body.modern-setting-page .danger-action {
@@ -413,6 +462,10 @@ body.modern-setting-page .config-advanced-summary {
   body.modern-setting-page .config-overview-grid {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
+
+  body.modern-setting-page .config-overview-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 860px) {
@@ -438,6 +491,10 @@ body.modern-setting-page .config-advanced-summary {
     flex: 1 1 100%;
   }
   body.modern-setting-page .config-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.modern-setting-page .config-overview-actions {
     grid-template-columns: 1fr;
   }
 }

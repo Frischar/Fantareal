@@ -3777,3 +3777,68 @@ body.worldbook-manager-page .worldbook-toolbar-actions {
 body.worldbook-manager-page .worldbook-toolbar-actions button.secondary {
   min-width: 0 !important;
 }
+
+/* P8-0A: worldbook entries performance relief.
+   Entries can be numerous; avoid per-card glass/shadow cost during scroll. */
+html[data-performance-mode="on"] body.worldbook-manager-page :is(
+  .worldbook-entry-card,
+  .worldbook-rule-card,
+  .worldbook-rule-card .memory-card-head,
+  .worldbook-list-toolbar,
+  .worldbook-filter-strip,
+  .worldbook-quick-filter-panel,
+  .worldbook-health-results,
+  .worldbook-selection-card
+) {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-performance-mode="on"] body.worldbook-manager-page :is(
+  .worldbook-entry-card,
+  .worldbook-rule-card,
+  .worldbook-summary-chip,
+  .worldbook-entry-group-label,
+  .worldbook-quick-filter
+) {
+  transition:
+    border-color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    background var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease) !important;
+}
+
+html[data-performance-mode="on"] body.worldbook-manager-page :is(
+  .worldbook-entry-card,
+  .worldbook-rule-card,
+  .worldbook-summary-chip,
+  .worldbook-entry-group-label,
+  .worldbook-quick-filter
+):hover {
+  transform: none !important;
+}
+
+html[data-performance-mode="on"] body.worldbook-manager-page :is(
+  .worldbook-list-pane,
+  .worldbook-entry-list,
+  .worldbook-rule-card,
+  .worldbook-entry-card,
+  .worldbook-group-panel,
+  .worldbook-filter-strip
+) :is(
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  span,
+  details,
+  summary,
+  .worldbook-summary-chip,
+  .worldbook-entry-group-label,
+  .worldbook-quick-filter,
+  .worldbook-card-summary,
+  .role-state-advanced
+) {
+  box-shadow: none !important;
+}

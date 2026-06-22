@@ -661,16 +661,19 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
     async def api_save_settings(payload: SettingsPayload) -> dict[str, Any]:
         active_slot = ctx.get_active_slot_id()
         raw_settings = payload.model_dump()
+        current_settings = ctx.get_settings(active_slot)
         if "layered_prompt_injection_enabled" not in payload.model_fields_set:
-            raw_settings["layered_prompt_injection_enabled"] = ctx.get_settings(active_slot).get(
+            raw_settings["layered_prompt_injection_enabled"] = current_settings.get(
                 "layered_prompt_injection_enabled",
                 False,
             )
         if "prompt_budget_token_limit" not in payload.model_fields_set:
-            raw_settings["prompt_budget_token_limit"] = ctx.get_settings(active_slot).get(
+            raw_settings["prompt_budget_token_limit"] = current_settings.get(
                 "prompt_budget_token_limit",
                 200000,
             )
+        if "performance_mode" not in payload.model_fields_set:
+            raw_settings["performance_mode"] = current_settings.get("performance_mode", False)
         settings = ctx.sanitize_settings(raw_settings, strict=True, slot_id=active_slot)
         ctx.persist_json(
             ctx.settings_path(active_slot),
