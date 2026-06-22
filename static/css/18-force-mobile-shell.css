@@ -65,8 +65,7 @@ body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topba
 
 body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topnav,
 body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topnav-grouped,
-body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .standalone-about,
-body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .standalone-challenge {
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .standalone-about {
   display: none !important;
 }
 

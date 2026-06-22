@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-switch-v1" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
-    <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=challenge-hide-v1" data-mod-hook="{{ mod.slug }}" />
+    <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=chat-mod-hooks-v1" data-mod-hook="{{ mod.slug }}" />
       {% endfor %}
     {% endfor %}
 
@@ -2576,23 +2576,9 @@
         retrievalBarEl.hidden = false;
       }
 
-      function isChallengeModeUnlocked() {
-        return localStorage.getItem("fantareal.challengeModeUnlocked") === "true";
-      }
-
-      function applyChallengeChatHeader() {
-        if (!isChallengeModeUnlocked()) return;
-        document.body.classList.add("challenge-mode-unlocked");
-        const titleEl = document.getElementById("chat-title");
-        const subtitleEl = document.getElementById("chat-subtitle");
-        if (titleEl) titleEl.textContent = "绪亓";
-        if (subtitleEl) subtitleEl.textContent = "绝望回廊已接入。她正在门后等待回应。";
-      }
-
-      applyChallengeChatHeader();
 
       function setRuntimePanelOpen(open) {
-        const shouldOpen = !!open && !isChallengeModeUnlocked();
+        const shouldOpen = !!open;
         const changed = chatLayoutEl?.classList.contains("runtime-panel-open") !== shouldOpen;
         chatLayoutEl?.classList.toggle("runtime-panel-open", shouldOpen);
         chatLayoutEl?.classList.toggle("runtime-panel-collapsed", !shouldOpen);
