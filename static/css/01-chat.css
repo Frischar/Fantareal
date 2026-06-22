@@ -2349,18 +2349,7 @@ body.chat-page .chat-layout.runtime-panel-open .runtime-panel-handle:focus-visib
   background: #0d1621;
 }
 
-/* Challenge mode keeps the chat surface alone. */
-body.chat-page.challenge-mode-unlocked .runtime-panel,
-body.chat-page.challenge-mode-unlocked .runtime-panel-handle {
-  display: none !important;
-}
 
-body.chat-page.challenge-mode-unlocked .chat-layout,
-body.chat-page.challenge-mode-unlocked .chat-layout.runtime-panel-open,
-body.chat-page.challenge-mode-unlocked .chat-layout.runtime-panel-collapsed {
-  grid-template-columns: minmax(0, 1fr) 0 !important;
-  gap: 0 !important;
-}
 
 /* Chat left sidebar drawer: lets desktop readers collapse navigation for immersion. */
 body.chat-page .left-sidebar-handle {

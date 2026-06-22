@@ -463,11 +463,11 @@ input:checked + .ui-switch::after,
    Legacy mapping v1
    ---------------------------------------------------------
    Keep old templates working while converging pages on one set of
-   tokens. This intentionally excludes chat/game/challenge because
+   tokens. This intentionally excludes chat/game because
    those surfaces have dedicated interaction-heavy layouts.
    ========================================================= */
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) {
   --ui-page-panel-bg:
     linear-gradient(
       180deg,
@@ -478,11 +478,11 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   --ui-page-panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.10);
 }
 
-:root[data-theme="dark"] body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) {
+:root[data-theme="dark"] body.modern-setting-page.app-sidebar-shell:not(.game-page) {
   --ui-page-panel-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .panel.config-panel {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .panel.config-panel {
   border-radius: var(--ui-card-radius);
   border-color: var(--ui-page-panel-border);
   background: var(--ui-page-panel-bg);
@@ -490,18 +490,18 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: var(--ui-transition-surface);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .panel.config-panel.full-span:first-of-type {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .panel.config-panel.full-span:first-of-type {
   border-color: color-mix(in srgb, var(--accent) 30%, var(--ui-page-panel-border));
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .sprite-frame {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .sprite-frame {
   border-radius: 22px;
   border: 1px solid color-mix(in srgb, var(--border, var(--line)) 78%, transparent);
   background: color-mix(in srgb, var(--input-bg) 62%, transparent);
   transition: var(--ui-transition-surface);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"] {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) input[type="file"] {
   width: 100%;
   padding: 8px;
   border-radius: var(--ui-sub-radius);
@@ -510,7 +510,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: var(--ui-transition-control);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"]::file-selector-button {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) input[type="file"]::file-selector-button {
   margin-right: 10px;
   padding: 7px 11px;
   border: 1px solid color-mix(in srgb, var(--border, var(--line)) 80%, transparent);
@@ -522,25 +522,25 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="file"]::file-selector-button:hover {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) input[type="file"]::file-selector-button:hover {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border, var(--line)));
   color: color-mix(in srgb, var(--accent) 84%, var(--text));
   background: color-mix(in srgb, var(--accent) 8%, var(--panel-strong));
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .section-head h2,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .section-head h3 {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .section-head h2,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .section-head h3 {
   letter-spacing: 0;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) label:not(.checkbox-row):not(.check-chip):not(.fr-setting-switch-row) {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) label:not(.checkbox-row):not(.check-chip):not(.fr-setting-switch-row) {
   color: color-mix(in srgb, var(--text) 82%, var(--muted));
   font: var(--ui-font-label);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) textarea {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) textarea {
   border-radius: var(--ui-radius-md);
   border-color: var(--ui-control-border);
   background: color-mix(in srgb, var(--input-bg) 92%, transparent);
@@ -551,7 +551,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
 /* P7-3C: native select polish.
    Keep the real select for existing change handlers; only restyle the closed control and
    supported option colors. Native dropdown open/close animation is browser-controlled. */
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select {
   --ui-select-arrow: color-mix(in srgb, var(--accent) 78%, var(--text));
   --ui-select-bg-top: color-mix(in srgb, var(--input-bg) 96%, transparent);
   --ui-select-bg-bottom: color-mix(in srgb, var(--panel) 78%, transparent);
@@ -576,11 +576,11 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
     transform var(--ui-motion-fast) var(--ui-ease-feedback) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select::-ms-expand {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select::-ms-expand {
   display: none;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:hover {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:hover {
   --ui-select-bg-top: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
   --ui-select-bg-bottom: color-mix(in srgb, var(--accent) 8%, var(--panel));
   border-color: color-mix(in srgb, var(--accent) 52%, var(--ui-control-border));
@@ -590,8 +590,8 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
     0 6px 15px color-mix(in srgb, var(--accent) 9%, transparent) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus-visible {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:focus,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:focus-visible {
   --ui-select-bg-top: color-mix(in srgb, var(--accent) 14%, var(--input-bg));
   --ui-select-bg-bottom: color-mix(in srgb, var(--accent) 10%, var(--panel));
   outline: none;
@@ -603,53 +603,53 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transform: translateY(calc(-1 * min(var(--ui-motion-lift), 2px)));
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:active {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:active {
   transform: translateY(0);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:disabled {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:disabled {
   cursor: not-allowed;
   opacity: 0.62;
   transform: none;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select option {
   background: color-mix(in srgb, var(--panel-strong) 96%, var(--input-bg) 4%);
   color: var(--text);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:checked,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:hover {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select option:checked,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select option:hover {
   background: color-mix(in srgb, var(--accent) 28%, var(--panel-strong));
   color: var(--text);
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select {
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.game-page) select {
   --ui-select-arrow: color-mix(in srgb, var(--accent) 84%, #3d2c20);
   --ui-select-bg-top: rgba(255, 252, 246, 0.99);
   --ui-select-bg-bottom: rgba(255, 244, 231, 0.97);
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option {
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.game-page) select option {
   background: #fff8ec;
   color: #3d2c20;
 }
 
-html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:checked,
-html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select option:hover {
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.game-page) select option:checked,
+html:not([data-theme="dark"]) body.modern-setting-page.app-sidebar-shell:not(.game-page) select option:hover {
   background: color-mix(in srgb, var(--accent) 24%, #fff8ec);
   color: #2c2018;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):focus,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) textarea:focus {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):focus,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:focus,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) textarea:focus {
   border-color: color-mix(in srgb, var(--accent) 46%, var(--line) 54%);
   box-shadow: var(--ui-focus-ring);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) select:focus-visible {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:focus,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) select:focus-visible {
   border-color: color-mix(in srgb, var(--accent) 62%, var(--ui-control-border));
   box-shadow:
     var(--ui-focus-ring),
@@ -657,79 +657,79 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
     0 8px 18px color-mix(in srgb, var(--accent) 12%, transparent) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) input[type="range"] {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) input[type="range"] {
   accent-color: var(--accent);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-row,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .action-group,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .inline-field {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .button-row,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .action-group,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .inline-field {
   gap: var(--ui-space-3);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) button,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .button-link,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ghost-link,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) a.secondary {
   min-height: var(--ui-control-height);
   border-radius: var(--ui-control-radius);
   transform: translateY(0) !important;
   transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback), opacity var(--ui-motion-fast) var(--ui-ease-feedback), transform var(--ui-motion-fast) var(--ui-ease-feedback) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:hover {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) button:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ghost-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) a.secondary:hover {
   transform: translateY(calc(-1 * var(--ui-motion-lift))) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ui-action-more-menu button:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ui-action-more-menu .button-link:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.icon:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .icon-button:hover {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ui-action-more-menu button:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ui-action-more-menu .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) button.icon:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .icon-button:hover {
   transform: none !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.secondary,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) button.secondary,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) a.secondary,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .button-link,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ghost-link {
   border: 1px solid var(--ui-control-border);
   background: var(--ui-control-bg);
   color: var(--text);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button.secondary:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:hover,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:hover {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) button.secondary:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) a.secondary:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .button-link:hover,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ghost-link:hover {
   background: color-mix(in srgb, var(--accent) 12%, var(--ui-control-hover-bg));
   border-color: color-mix(in srgb, var(--accent) 42%, var(--ui-control-border));
   box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 30%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button:focus-visible,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:focus-visible,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:focus-visible,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:focus-visible {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) button:focus-visible,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .button-link:focus-visible,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ghost-link:focus-visible,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) a.secondary:focus-visible {
   outline: none;
   border-color: color-mix(in srgb, var(--accent) 52%, var(--ui-control-border));
   box-shadow: var(--ui-focus-ring), inset 0 -2px 0 color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) button:active,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .button-link:active,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .ghost-link:active,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) a.secondary:active {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) button:active,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .button-link:active,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .ghost-link:active,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) a.secondary:active {
   transform: translateY(0) !important;
   background: color-mix(in srgb, var(--accent) 17%, var(--ui-control-hover-bg));
   box-shadow: inset 0 2px 0 color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* Plain checkbox rows: square checkboxes. Switches must use .fr-setting-switch-row. */
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .checkbox-row {
   display: inline-flex;
   align-items: center;
   gap: var(--ui-space-3);
@@ -745,7 +745,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: var(--ui-transition-control);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"] {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .checkbox-row input[type="checkbox"] {
   appearance: none !important;
   -webkit-appearance: none !important;
   position: relative !important;
@@ -762,17 +762,17 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: var(--ui-transition-control);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]::before {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .checkbox-row input[type="checkbox"]::before {
   content: none !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:checked {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .checkbox-row input[type="checkbox"]:checked {
   border-color: transparent !important;
   background: var(--accent) !important;
   box-shadow: var(--ui-focus-ring);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:checked::after {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .checkbox-row input[type="checkbox"]:checked::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -785,12 +785,12 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transform: translate(-50%, -58%) rotate(-45deg);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .checkbox-row input[type="checkbox"]:focus-visible {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .checkbox-row input[type="checkbox"]:focus-visible {
   outline: none;
   box-shadow: var(--ui-focus-ring);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .fr-setting-switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -805,7 +805,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   user-select: none;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"] {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .fr-setting-switch-row input[type="checkbox"] {
   appearance: none !important;
   -webkit-appearance: none !important;
   box-sizing: border-box !important;
@@ -825,7 +825,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: background var(--ui-motion-fast) var(--ui-ease-feedback), border-color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]::before {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .fr-setting-switch-row input[type="checkbox"]::before {
   content: "";
   position: absolute;
   top: 50%;
@@ -839,27 +839,27 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: transform var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked {
   border-color: color-mix(in srgb, var(--accent) 70%, transparent) !important;
   background: var(--accent) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked::before {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .fr-setting-switch-row input[type="checkbox"]:checked::before {
   transform: translate(var(--ui-switch-shift), -50%);
   background: #fff;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .fr-setting-switch-row input[type="checkbox"]:focus-visible {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .fr-setting-switch-row input[type="checkbox"]:focus-visible {
   outline: none;
   box-shadow: var(--ui-focus-ring) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .field-chip-row {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .field-chip-row {
   gap: var(--ui-space-2);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip {
   position: relative;
   min-height: 38px;
   margin: 0 !important;
@@ -868,7 +868,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   background: transparent !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"] {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip input[type="checkbox"] {
   position: absolute;
   opacity: 0;
   width: 1px;
@@ -876,7 +876,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   pointer-events: none;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip span {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip span {
   display: inline-flex;
   align-items: center;
   gap: var(--ui-space-2);
@@ -890,14 +890,14 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   transition: border-color var(--ui-motion-fast) var(--ui-ease-feedback), background var(--ui-motion-fast) var(--ui-ease-feedback), color var(--ui-motion-fast) var(--ui-ease-feedback), box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip:hover span,
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:focus-visible + span {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip:hover span,
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip input[type="checkbox"]:focus-visible + span {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--ui-control-border));
   background: color-mix(in srgb, var(--accent) 12%, var(--ui-control-hover-bg));
   box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 24%, transparent), 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip span::before {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip span::before {
   content: "";
   width: 14px;
   height: 14px;
@@ -906,13 +906,13 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   background: color-mix(in srgb, var(--panel-strong) 78%, transparent);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:checked + span {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip input[type="checkbox"]:checked + span {
   color: color-mix(in srgb, var(--text) 90%, var(--accent));
   border-color: color-mix(in srgb, var(--accent) 42%, var(--ui-control-border));
   background: color-mix(in srgb, var(--accent) 10%, var(--input-bg));
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) .check-chip input[type="checkbox"]:checked + span::before {
+body.modern-setting-page.app-sidebar-shell:not(.game-page) .check-chip input[type="checkbox"]:checked + span::before {
   content: "";
   border-color: transparent;
   background:
@@ -1567,7 +1567,7 @@ body.modern-setting-page.preset-config-page .config-workbench-actions .ui-menu-p
     0 4px 12px color-mix(in srgb, var(--accent) 12%, transparent) !important;
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) :is(
+body.modern-setting-page.app-sidebar-shell:not(.game-page) :is(
   details.config-advanced-group,
   details.preset-advanced-fields,
   details.role-state-advanced,
@@ -1580,7 +1580,7 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
     box-shadow var(--ui-motion-fast) var(--ui-ease-feedback);
 }
 
-body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) :is(
+body.modern-setting-page.app-sidebar-shell:not(.game-page) :is(
   details.config-advanced-group,
   details.preset-advanced-fields,
   details.role-state-advanced,
@@ -1591,12 +1591,12 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
 
 @media (min-width: 981px) {
   body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel,
-  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel {
+  body.app-sidebar-shell:not(.chat-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel {
     animation: ui-motion-nav-disclosure var(--ui-motion-panel) var(--ui-ease-enter) both;
   }
 
   body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel .navlink,
-  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel .navlink {
+  body.app-sidebar-shell:not(.chat-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel .navlink {
     animation: ui-motion-nav-link-in var(--ui-motion-base) var(--ui-ease-enter) both;
   }
 }
@@ -1744,9 +1744,9 @@ body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-p
   .ui-disclosure-body.is-disclosure-exiting,
   body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel,
   body.chat-page .topbar.topbar-chat .nav-group[open] > .nav-group-panel .navlink,
-  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel,
-  body.app-sidebar-shell:not(.chat-page):not(.challenge-mode-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel .navlink,
-  body.modern-setting-page.app-sidebar-shell:not(.challenge-mode-page):not(.game-page) :is(
+  body.app-sidebar-shell:not(.chat-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel,
+  body.app-sidebar-shell:not(.chat-page):not(.game-page) .topbar-stack > .topbar .nav-group[open] > .nav-group-panel .navlink,
+  body.modern-setting-page.app-sidebar-shell:not(.game-page) :is(
     details.config-advanced-group,
     details.preset-advanced-fields,
     details.role-state-advanced,
