@@ -95,6 +95,27 @@ def _sanitize_external_ref(value: Any) -> dict[str, str]:
     }
 
 
+def _sanitize_metadata(value: Any, *, depth: int = 0) -> Any:
+    if depth > 3:
+        return ""
+    if isinstance(value, dict):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            clean_key = str(key or "").strip()[:80]
+            if clean_key:
+                result[clean_key] = _sanitize_metadata(item, depth=depth + 1)
+            if len(result) >= 64:
+                break
+        return result
+    if isinstance(value, list):
+        return [_sanitize_metadata(item, depth=depth + 1) for item in value[:128]]
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    return str(value or "").strip()[:1200]
+
+
 def _normalize_group_operator(value: Any, default: str = "and") -> str:
     text = str(value or "").strip().lower()
     if text in {"and", "all"}:
@@ -315,7 +336,13 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
     external_source = str(raw.get("external_source", "")).strip()[:80]
     external_ref = _sanitize_external_ref(raw.get("external_ref"))
     activation_tags = _normalize_activation_tags(raw.get("activation_tags"))
-    if entry_type == "external_tag" and not activation_tags and external_ref.get("role_id") and external_ref.get("stage_key"):
+    if (
+        entry_type == "external_tag"
+        and external_source == "state_journal"
+        and not activation_tags
+        and external_ref.get("role_id")
+        and external_ref.get("stage_key")
+    ):
         activation_tags = [f"state_journal.stage.{external_ref['role_id']}.{external_ref['stage_key']}"]
 
     return {
@@ -348,6 +375,7 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
         "case_sensitive": case_sensitive,
         "whole_word": whole_word,
         "comment": comment[:240],
+        "metadata": _sanitize_metadata(raw.get("metadata")),
     }
 
 

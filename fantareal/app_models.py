@@ -20,6 +20,16 @@ class ChatHistoryRerollRequest(BaseModel):
     message_index: int = Field(ge=0)
 
 
+class DirectorNotePayload(BaseModel):
+    content: str = Field(default="", max_length=12000)
+    remaining_turns: int = Field(default=1, ge=1, le=20)
+    position: str = "after_char_defs"
+
+
+class DirectorNoteDeletePayload(BaseModel):
+    id: str = ""
+
+
 class PersonaPayload(BaseModel):
     name: str
     system_prompt: str
@@ -33,9 +43,11 @@ class SettingsPayload(BaseModel):
     theme: str = "dark"
     temperature: float = 0.85
     history_limit: int = 20
+    prompt_budget_token_limit: int = 200000
     request_timeout: int = 120
     demo_mode: bool = False
     ui_opacity: float = 0.84
+    card_canvas_follow_opacity: bool = False
     background_image_url: str = "/assets/default.jpg"
     background_overlay: float = 0.42
     font_family_url: str = ""
@@ -55,6 +67,7 @@ class SettingsPayload(BaseModel):
     rerank_api_key: str = ""
     rerank_model: str = ""
     rerank_top_n: int = 3
+    layered_prompt_injection_enabled: bool = False
     memory_summary_length: str = "medium"
     memory_summary_max_chars: int = 520
 
@@ -65,6 +78,8 @@ class MemoryItemPayload(BaseModel):
     content: str = ""
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
+    memory_status: str = "active"
+    archived_at: str = ""
 
 
 class MemoryListPayload(BaseModel):
@@ -109,7 +124,19 @@ class MemoryMergePayload(BaseModel):
     merged_title: str = ""
     outline_title: str = ""
     delete_sources: bool = True
+    source_action: str = ""
     runtime_config: dict[str, Any] | None = None
+
+
+class MemoryWorldbookSyncPayload(BaseModel):
+    include_core: bool = True
+    include_index: bool = True
+    include_details: bool = True
+    recent_constant_count: int = 3
+    detail_entry_limit: int = 80
+    index_entry_limit: int = 80
+    replace_existing: bool = True
+    confirm_replace_existing: bool = False
 
 
 class UserProfilePayload(BaseModel):
@@ -162,6 +189,7 @@ class WorldbookEntryPayload(BaseModel):
     external_source: str = ""
     external_ref: dict[str, Any] = Field(default_factory=dict)
     activation_tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class WorldbookSettingsPayload(BaseModel):
@@ -205,6 +233,12 @@ class PresetPromptPayload(BaseModel):
     enabled: bool = True
     content: str = ""
     order: int = 100
+    placement: str | None = None
+    kind: str | None = None
+    strength: str | None = None
+    required: bool | None = None
+    tokenBudget: int | None = None
+    activation_tags: list[str] | None = None
 
 
 class PresetPromptGroupItemPayload(BaseModel):
@@ -212,6 +246,12 @@ class PresetPromptGroupItemPayload(BaseModel):
     name: str = ""
     enabled: bool = True
     content: str = ""
+    placement: str | None = None
+    kind: str | None = None
+    strength: str | None = None
+    required: bool | None = None
+    tokenBudget: int | None = None
+    activation_tags: list[str] | None = None
 
 
 class PresetPromptGroupPayload(BaseModel):

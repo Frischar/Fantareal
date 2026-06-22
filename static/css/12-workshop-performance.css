@@ -358,3 +358,110 @@ body.workshop-config-page .workshop-binding-pills .micro-badge.active {
   border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
   background: color-mix(in srgb, var(--accent) 10%, rgba(var(--input-rgb), var(--input-alpha)));
 }
+
+/* Workshop UIdebug pass: keep compact switches, soft cards, and live opacity in sync. */
+body.workshop-config-page .workshop-opening-config-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.workshop-config-page .workshop-opening-config-head .muted.compact {
+  max-width: 780px;
+  line-height: 1.58;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+body.workshop-config-page .workshop-opening-config-head > .fr-setting-switch-row {
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: min(100%, 260px) !important;
+  padding-inline: 12px !important;
+}
+
+body.workshop-config-page .workshop-opening-inline-toggle {
+  min-width: 0 !important;
+}
+
+body.workshop-config-page .workshop-control-panel {
+  gap: 14px !important;
+  padding: 20px !important;
+  border-radius: 24px !important;
+  overflow: hidden;
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-control-panel .workshop-panel-block {
+  gap: 11px;
+  padding: 14px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent) !important;
+  border-radius: 18px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+body.workshop-config-page .workshop-control-panel .workshop-side-summary {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.workshop-config-page .workshop-card-binding-panel,
+body.workshop-config-page .workshop-runtime-panel-side,
+body.workshop-config-page .workshop-summary-item {
+  border-radius: 18px !important;
+}
+
+body.workshop-config-page .workshop-summary-item {
+  padding: 14px 16px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-card-binding-panel {
+  padding: 14px !important;
+}
+
+body.workshop-config-page .workshop-binding-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+body.workshop-config-page .workshop-dynamic-config-block {
+  padding: 18px !important;
+  border-radius: 24px !important;
+  overflow: hidden;
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+}
+
+body.workshop-config-page .dynamic-scene-card {
+  padding: 18px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent) !important;
+  border-radius: 22px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+body.workshop-config-page .dynamic-scene-head {
+  min-width: 0;
+}
+
+body.workshop-config-page .dynamic-trigger-panel,
+body.workshop-config-page .dynamic-content-panel,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .workshop-empty-note {
+  border-radius: 18px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-ambience-config-block {
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card,
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card input,
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card select {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}

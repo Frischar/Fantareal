@@ -142,7 +142,7 @@ body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
   border-radius: 14px;
   border: 1px solid rgba(190, 152, 121, 0.30);
   background:
-    url("/static/fantareal_icon.ico") center / cover no-repeat,
+    url("/static/fantareal_icon.ico?v=ui-debug-icon-1") center / cover no-repeat,
     rgba(255, 252, 248, 0.94);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.55),
@@ -181,7 +181,7 @@ body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
 :root[data-theme="dark"] body.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
   border-color: rgba(195, 217, 244, 0.30);
   background:
-    url("/static/fantareal_icon.ico") center / cover no-repeat,
+    url("/static/fantareal_icon.ico?v=ui-debug-icon-1") center / cover no-repeat,
     rgba(240, 246, 255, 0.96);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.34),
@@ -802,3 +802,39 @@ body.app-sidebar-shell:not(.chat-page) .slot-toolbar {
   }
 }
 
+
+/* Chat left sidebar drawer final override: loaded after 01-chat.css so the rail moves away like the runtime panel. */
+@media (min-width: 821px) {
+  body.chat-page #chat-left-sidebar.topbar.topbar-chat {
+    transition: transform 0.22s ease, opacity 0.18s ease;
+    will-change: transform;
+  }
+
+  body.chat-page.left-sidebar-collapsed #chat-left-sidebar.topbar.topbar-chat {
+    transform: translateX(calc(-1 * var(--app-sidebar-width, 286px))) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  body.chat-page.left-sidebar-collapsed .chat-shell {
+    padding-left: 32px !important;
+  }
+
+  body.chat-page .left-sidebar-handle {
+    left: calc(var(--app-sidebar-width, 286px) - 6px) !important;
+  }
+
+  body.chat-page .left-sidebar-handle:hover,
+  body.chat-page .left-sidebar-handle:focus-visible {
+    left: calc(var(--app-sidebar-width, 286px) - 4px) !important;
+  }
+
+  body.chat-page.left-sidebar-collapsed .left-sidebar-handle {
+    left: 0 !important;
+  }
+
+  body.chat-page.left-sidebar-collapsed .left-sidebar-handle:hover,
+  body.chat-page.left-sidebar-collapsed .left-sidebar-handle:focus-visible {
+    left: 2px !important;
+  }
+}

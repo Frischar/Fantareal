@@ -1,0 +1,204 @@
+﻿#fantareal-mobile-chat-root {
+  --mc-accent: var(--fmcp-blue, #4f83e8);
+  --mc-accent-strong: var(--fmcp-blue-strong, #3d72dc);
+  --mc-accent-soft: var(--fmcp-blue-soft, rgba(79, 131, 232, 0.18));
+  --mc-surface: var(--fmcp-card, rgba(255, 255, 255, 0.055));
+  --mc-surface-strong: var(--fmcp-card-strong, rgba(255, 255, 255, 0.085));
+  --mc-border: var(--fmcp-border, rgba(184, 205, 231, 0.18));
+  --mc-border-soft: var(--fmcp-border-soft, rgba(184, 205, 231, 0.1));
+  --mc-text: var(--fmcp-text, #f3f7ff);
+  --mc-muted: var(--fmcp-muted, rgba(205, 217, 234, 0.62));
+  --mc-danger: var(--fmcp-danger, #ff9a9f);
+  --mc-radius-sm: 10px;
+  --mc-radius-md: 12px;
+  --mc-radius-lg: 16px;
+  --mc-control-min: 38px;
+}
+
+#fantareal-mobile-chat-root .mc-safe-text,
+#fantareal-mobile-chat-root .fmcp-title,
+#fantareal-mobile-chat-root .fmcp-subtitle,
+#fantareal-mobile-chat-root .fmcp-app-card strong,
+#fantareal-mobile-chat-root .fmcp-app-card small,
+#fantareal-mobile-chat-root .fmcp-event-card strong,
+#fantareal-mobile-chat-root .fmcp-mail-row,
+#fantareal-mobile-chat-root .fmcp-call-session strong,
+#fantareal-mobile-chat-root .fmcp-call-session span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#fantareal-mobile-chat-root .mc-wrap-text,
+#fantareal-mobile-chat-root .fmcp-event-card p,
+#fantareal-mobile-chat-root .fmcp-event-card-copy,
+#fantareal-mobile-chat-root .fmcp-feed-detail-body,
+#fantareal-mobile-chat-root .fmcp-forum-detail-body,
+#fantareal-mobile-chat-root .fmcp-diary-detail-body {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#fantareal-mobile-chat-root .mc-clamp-2,
+#fantareal-mobile-chat-root .fmcp-event-card-copy,
+#fantareal-mobile-chat-root .fmcp-mail-card .fmcp-event-card-copy,
+#fantareal-mobile-chat-root .fmcp-diary-card .fmcp-event-card-copy,
+#fantareal-mobile-chat-root .fmcp-calendar-card .fmcp-event-card-copy {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+#fantareal-mobile-chat-root .mc-btn,
+#fantareal-mobile-chat-root .fmcp-button,
+#fantareal-mobile-chat-root .fmcp-tab {
+  min-height: var(--mc-control-min);
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-color: var(--mc-border);
+  border-radius: var(--mc-radius-md);
+  background: var(--mc-surface);
+  color: var(--mc-text);
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+}
+
+#fantareal-mobile-chat-root .mc-btn-primary,
+#fantareal-mobile-chat-root .fmcp-button-primary {
+  border-color: color-mix(in srgb, var(--mc-accent) 72%, white 8%);
+  background: linear-gradient(135deg, var(--mc-accent-strong), var(--mc-accent));
+}
+
+#fantareal-mobile-chat-root .mc-icon-btn,
+#fantareal-mobile-chat-root .fmcp-icon-btn,
+#fantareal-mobile-chat-root .fmcp-composer-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-color: var(--mc-border);
+  border-radius: var(--mc-radius-md);
+  background: var(--mc-surface);
+}
+
+#fantareal-mobile-chat-root .mc-btn:disabled,
+#fantareal-mobile-chat-root .fmcp-button:disabled,
+#fantareal-mobile-chat-root .fmcp-icon-btn:disabled,
+#fantareal-mobile-chat-root .fmcp-composer-icon:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: saturate(0.75);
+}
+
+#fantareal-mobile-chat-root .mc-card,
+#fantareal-mobile-chat-root .fmcp-event-card,
+#fantareal-mobile-chat-root .fmcp-group-card,
+#fantareal-mobile-chat-root .fmcp-import-card,
+#fantareal-mobile-chat-root .fmcp-role-row,
+#fantareal-mobile-chat-root .fmcp-create-options,
+#fantareal-mobile-chat-root .fmcp-settings-card {
+  border-color: var(--mc-border);
+  background: var(--mc-surface);
+}
+
+#fantareal-mobile-chat-root .mc-chip,
+#fantareal-mobile-chat-root .fmcp-tag-row span,
+#fantareal-mobile-chat-root .fmcp-draft-badge,
+#fantareal-mobile-chat-root .fmcp-forum-pin {
+  max-width: 100%;
+  border: 1px solid var(--mc-border-soft);
+  border-radius: 999px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#fantareal-mobile-chat-root .mc-input,
+#fantareal-mobile-chat-root .mc-textarea,
+#fantareal-mobile-chat-root .fmcp-input,
+#fantareal-mobile-chat-root .fmcp-textarea,
+#fantareal-mobile-chat-root .fmcp-channel-compose input,
+#fantareal-mobile-chat-root .fmcp-channel-compose textarea,
+#fantareal-mobile-chat-root .fmcp-channel-reply-form textarea,
+#fantareal-mobile-chat-root .fmcp-mail-draft textarea,
+#fantareal-mobile-chat-root .fmcp-phone-say-popover textarea {
+  max-width: 100%;
+  border-color: var(--mc-border);
+  border-radius: var(--mc-radius-md);
+  background: color-mix(in srgb, var(--mc-surface) 78%, black 10%);
+  color: var(--mc-text);
+  overflow-wrap: anywhere;
+}
+
+#fantareal-mobile-chat-root .mc-empty,
+#fantareal-mobile-chat-root .fmcp-empty {
+  color: var(--mc-muted);
+}
+
+#fantareal-mobile-chat-root .mc-error,
+#fantareal-mobile-chat-root .fmcp-error,
+#fantareal-mobile-chat-root .fmcp-event-card.is-fallback {
+  border-color: color-mix(in srgb, var(--mc-danger) 44%, transparent);
+  background: color-mix(in srgb, var(--mc-danger) 16%, transparent);
+}
+
+#fantareal-mobile-chat-root .mc-toolbar,
+#fantareal-mobile-chat-root .fmcp-toolbar,
+#fantareal-mobile-chat-root .fmcp-form-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+#fantareal-mobile-chat-root .fmcp-channel-feed {
+  --mc-accent: #4f8cff;
+  --mc-accent-strong: #3f73de;
+  --mc-surface: #ffffff;
+  --mc-border: rgba(88, 110, 140, 0.2);
+}
+
+#fantareal-mobile-chat-root .fmcp-channel-forum {
+  --mc-accent: #7665e8;
+  --mc-accent-strong: #5c4acb;
+  --mc-surface: #ffffff;
+  --mc-border: rgba(96, 84, 142, 0.22);
+}
+
+#fantareal-mobile-chat-root .fmcp-channel-mail,
+#fantareal-mobile-chat-root .fmcp-mail-client {
+  --mc-accent: #2f7f9f;
+  --mc-accent-strong: #276a86;
+  --mc-surface: #ffffff;
+  --mc-border: rgba(69, 106, 122, 0.2);
+}
+
+#fantareal-mobile-chat-root .fmcp-channel-diary,
+#fantareal-mobile-chat-root .fmcp-diary-app {
+  --mc-accent: #9a6a46;
+  --mc-accent-strong: #7a5338;
+  --mc-surface: #fffaf4;
+  --mc-border: rgba(132, 98, 64, 0.22);
+}
+
+#fantareal-mobile-chat-root .fmcp-channel-calendar,
+#fantareal-mobile-chat-root .fmcp-calendar-app {
+  --mc-accent: #3b8f73;
+  --mc-accent-strong: #2f745d;
+  --mc-surface: #ffffff;
+  --mc-border: rgba(70, 122, 101, 0.2);
+}
+
+#fantareal-mobile-chat-root .fmcp-phone-app {
+  --mc-accent: #46b4a8;
+  --mc-accent-strong: #2f8f87;
+  --mc-border: rgba(96, 217, 207, 0.22);
+}
+
+#fantareal-mobile-chat-root .fmcp-notification-app {
+  --mc-accent: #f0a85f;
+  --mc-accent-strong: #c97a39;
+  --mc-border: rgba(194, 129, 57, 0.24);
+}

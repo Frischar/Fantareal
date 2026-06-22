@@ -4,10 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>User - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=v161" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 </head>
     <body class="modern-setting-page app-sidebar-shell user-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
     <div id="user-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
     <div class="topbar-stack">
       <div class="topbar">
@@ -26,18 +27,19 @@
         </div>
       </div>
 
+    </div>
+
       <div class="config-sticky-actions user-layout-a-toolbar" aria-label="用户资料保存状态">
         <div class="config-sticky-copy">
           <span class="config-sticky-kicker">Workbench</span>
           <strong>用户工作台</strong>
           <p id="status-text" class="task-status is-idle">已准备 · 修改资料后点击保存，上传头像会立即写入。</p>
         </div>
-        <div class="config-sticky-buttons">
+        <div class="config-sticky-buttons ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
           <button id="save-user-profile-sticky" type="button" data-user-action="save">保存用户资料</button>
           <button id="reload-user-profile-sticky" type="button" class="secondary compact" data-user-action="reload">重新读取</button>
         </div>
       </div>
-    </div>
 
     <div class="config-shell compact config-workbench-shell user-workbench-shell user-layout-a">
       <section class="panel config-panel user-profile-main-card">
@@ -58,7 +60,7 @@
           <label for="profile-notes">备注</label>
           <textarea id="profile-notes" rows="4" placeholder="补充说明，可选。">{{ user_profile.notes }}</textarea>
 
-        <div class="button-row user-form-actions">
+        <div class="button-row user-form-actions stage4-local-actions">
           <button id="save-user-profile" type="button" data-user-action="save">保存用户资料</button>
         </div>
       </section>
@@ -66,41 +68,61 @@
       <aside class="panel config-panel user-avatar-card user-layout-a-side">
         <div class="section-head user-section-head">
           <p class="eyebrow">Avatar</p>
-          <h2>用户头像</h2>
-          <p class="muted">聊天页右侧会优先使用这里上传的头像。</p>
+          <h2>聊天头像</h2>
+          <p class="muted">设置聊天中“你”和当前角色显示的头像。</p>
         </div>
 
-        <div class="user-avatar-stack">
-              <div class="sprite-frame user-avatar-frame">
-                {% if user_profile.avatar_url %}
-                <img id="user-avatar-preview" class="sprite-image user-avatar-image" src="{{ user_profile.avatar_url }}" alt="用户头像" />
-                {% else %}
-                <div id="user-avatar-preview" class="sprite-placeholder">当前未设置用户头像</div>
-                {% endif %}
+        <div class="user-avatar-stack chat-avatar-grid">
+          <div class="chat-avatar-tile">
+            <div class="chat-avatar-tile-head">
+              <div>
+                <span>用户头像</span>
+                <strong id="profile-display-name">{{ user_profile.display_name or "我" }}</strong>
               </div>
-
-          <div class="user-side-summary">
-            <div class="user-summary-item">
-              <span>显示名</span>
-              <strong id="profile-display-name">{{ user_profile.display_name or "我" }}</strong>
+              <em id="profile-avatar-status">{{ "已上传" if user_profile.avatar_url else "未设置" }}</em>
             </div>
-            <div class="user-summary-item">
-              <span>当前头像</span>
-              <strong id="profile-avatar-status">{{ "已上传" if user_profile.avatar_url else "未设置" }}</strong>
+            <div class="sprite-frame user-avatar-frame">
+              {% if user_profile.avatar_url %}
+              <img id="user-avatar-preview" class="sprite-image user-avatar-image" src="{{ user_profile.avatar_url }}" alt="用户头像" />
+              {% else %}
+              <div id="user-avatar-preview" class="sprite-placeholder">当前未设置用户头像</div>
+              {% endif %}
+            </div>
+            <div class="user-avatar-controls">
+              <label for="user-avatar-file">选择用户头像</label>
+              <input id="user-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <button id="upload-user-avatar" type="button">上传用户头像</button>
             </div>
           </div>
 
-          <div class="user-avatar-controls">
-            <label for="user-avatar-file">上传头像</label>
-            <input id="user-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-            <p class="muted helper-text">建议使用正方形头像。上传后会立即写入。</p>
-            <button id="upload-user-avatar" type="button">上传头像</button>
+          <div class="chat-avatar-tile">
+            <div class="chat-avatar-tile-head">
+              <div>
+                <span>角色头像</span>
+                <strong>当前角色</strong>
+              </div>
+              <em id="profile-role-avatar-status">{{ "已上传" if user_profile.role_avatar_url else "未设置" }}</em>
+            </div>
+            <div class="sprite-frame user-avatar-frame">
+              {% if user_profile.role_avatar_url %}
+              <img id="role-avatar-preview" class="sprite-image user-avatar-image" src="{{ user_profile.role_avatar_url }}" alt="角色头像" />
+              {% else %}
+              <div id="role-avatar-preview" class="sprite-placeholder">当前未设置角色头像</div>
+              {% endif %}
+            </div>
+            <div class="user-avatar-controls">
+              <label for="role-avatar-file">选择角色头像</label>
+              <input id="role-avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <button id="upload-role-avatar" type="button">上传角色头像</button>
+            </div>
           </div>
         </div>
       </aside>
     </div>
 
     <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const statusEl = document.getElementById("status-text");
       const toastHostEl = document.getElementById("user-toast-host");
@@ -108,15 +130,25 @@
       const currentOpacity = {{ settings.ui_opacity | tojson }};
       const currentBackground = {{ settings.background_image_url | tojson }};
       const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
 
       const { inferStatusKind, applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
 
       function setStatus(text, kind = null) {
         if (!statusEl) return;
         const statusKind = kind || inferStatusKind(text);
-        statusEl.textContent = text || "已准备";
-        statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
-        statusEl.classList.add("task-status", `is-${statusKind}`);
+        const label = text || "已准备";
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: label,
+          state: statusKind,
+          stateClasses: ["is-idle", "is-busy", "is-success", "is-error"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = label;
+          statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
+          statusEl.classList.add("task-status", `is-${statusKind}`);
+        }
       }
 
       function showToast(message, type = "info") {
@@ -138,17 +170,20 @@
         button.disabled = state === "loading";
         if (state === "loading") {
           button.classList.add("is-loading");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "处理中…";
           return;
         }
         if (state === "success") {
           button.classList.add("is-success");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "已完成 ✓";
           window.setTimeout(() => setButtonState(button, "idle"), 1200);
           return;
         }
         if (state === "error") {
           button.classList.add("is-error");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "操作失败";
           window.setTimeout(() => setButtonState(button, "idle"), 1500);
           return;
@@ -178,6 +213,7 @@
       function applyProfile(profile) {
         const displayName = profile.display_name || "我";
         const avatarStatus = profile.avatar_url ? "已上传" : "未设置";
+        const roleAvatarStatus = profile.role_avatar_url ? "已上传" : "未设置";
         const displayNameInput = document.getElementById("display-name");
         const nicknameInput = document.getElementById("nickname");
         const profileTextInput = document.getElementById("profile-text");
@@ -188,15 +224,26 @@
         if (notesInput) notesInput.value = profile.notes || "";
         updateText("profile-display-name", displayName);
         updateText("profile-avatar-status", avatarStatus);
+        updateText("profile-role-avatar-status", roleAvatarStatus);
         updateText("profile-panel-display-name", displayName);
         updateText("profile-panel-avatar-status", avatarStatus);
 
         const preview = document.getElementById("user-avatar-preview");
-        if (!preview) return;
-        if (profile.avatar_url) {
-          preview.outerHTML = `<img id="user-avatar-preview" class="sprite-image user-avatar-image" src="${profile.avatar_url}" alt="用户头像" />`;
-        } else {
-          preview.outerHTML = `<div id="user-avatar-preview" class="sprite-placeholder">当前未设置用户头像</div>`;
+        if (preview) {
+          if (profile.avatar_url) {
+            preview.outerHTML = `<img id="user-avatar-preview" class="sprite-image user-avatar-image" src="${profile.avatar_url}" alt="用户头像" />`;
+          } else {
+            preview.outerHTML = `<div id="user-avatar-preview" class="sprite-placeholder">当前未设置用户头像</div>`;
+          }
+        }
+
+        const rolePreview = document.getElementById("role-avatar-preview");
+        if (rolePreview) {
+          if (profile.role_avatar_url) {
+            rolePreview.outerHTML = `<img id="role-avatar-preview" class="sprite-image user-avatar-image" src="${profile.role_avatar_url}" alt="角色头像" />`;
+          } else {
+            rolePreview.outerHTML = `<div id="role-avatar-preview" class="sprite-placeholder">当前未设置角色头像</div>`;
+          }
         }
       }
 
@@ -271,6 +318,38 @@
         }
       }
 
+      async function uploadRoleAvatarAction(button = null) {
+        const input = document.getElementById("role-avatar-file");
+        const file = input?.files?.[0];
+        if (!file) {
+          setStatus("请先选择一张角色头像图片。", "error");
+          setButtonState(button, "error", "未选择图片");
+          showToast("请先选择角色头像图片", "warn");
+          return;
+        }
+        setButtonState(button, "loading", "上传中…");
+        setStatus("正在上传角色头像…", "busy");
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch("/api/role-avatar", { method: "POST", body: formData });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "上传失败");
+          }
+          const data = await response.json();
+          applyProfile(data.profile || {});
+          input.value = "";
+          setStatus("已完成：角色头像已上传。", "success");
+          setButtonState(button, "success", "已上传 ✓");
+          showToast("角色头像已上传", "success");
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`, "error");
+          setButtonState(button, "error", "上传失败");
+          showToast(`上传失败：${error.message}`, "error");
+        }
+      }
+
       document.querySelectorAll("[data-user-action='save']").forEach((button) => {
         button.addEventListener("click", (event) => saveProfileAction(event.currentTarget));
       });
@@ -281,6 +360,10 @@
 
       document.getElementById("upload-user-avatar")?.addEventListener("click", (event) => {
         uploadAvatarAction(event.currentTarget);
+      });
+
+      document.getElementById("upload-role-avatar")?.addEventListener("click", (event) => {
+        uploadRoleAvatarAction(event.currentTarget);
       });
 
       applyTheme(currentTheme);

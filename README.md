@@ -9,7 +9,7 @@
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-WebUI-009688?style=flat-square&logo=fastapi&logoColor=white">
-  <img alt="License" src="https://img.shields.io/badge/License-GPL--3.0-orange?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-orange?style=flat-square">
   <img alt="Status" src="https://img.shields.io/badge/Status-In%20Development-5C7CFA?style=flat-square">
 </p>
 
@@ -79,9 +79,7 @@ http://127.0.0.1:8000
 
 本仓库里也保留了一些补充资料：
 
-- [新手写卡指南](./新手教程/Fantareal-你们心中的-幻想乡-从零开始的写卡指南.md)：从角色卡到设定写法，适合新手慢慢读。
 - `mods/state_journal/docs/`：心笺相关说明，适合想了解状态记录和长期剧情辅助的人。
-- `mods/status panel/状态栏使用说明.md`：状态栏的普通用户教程。
 
 README 先放主入口。更细的“主程序、角色、记忆、世界书”教程，建议放在 Discord 或 docs 目录里分章节维护。
 
@@ -125,13 +123,11 @@ mods/               Mod 扩展
 cards/              角色卡
 data/               运行时数据
 assets/             示例素材、预设、README 图片
-新手教程/           面向普通用户的教程
-预设示例模板/       预设模板与示例
 ```
 
 ## 开源协议
 
-本项目基于 [GPL-3.0](./LICENSE) 许可证开源。
+本项目基于 [AGPL-3.0](./LICENSE) 许可证开源。
 
 ## 免责声明
 

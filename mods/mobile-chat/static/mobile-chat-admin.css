@@ -1,0 +1,1105 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0f1721;
+  color: #edf5fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(95, 145, 255, 0.16), transparent 34rem),
+    radial-gradient(circle at bottom left, rgba(70, 205, 178, 0.12), transparent 32rem),
+    #0f1721;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+code {
+  color: #aeeade;
+}
+
+.fmca-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.fmca-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 24px 18px;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 20, 30, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.fmca-brand {
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fmca-brand p,
+.fmca-kicker {
+  margin: 0 0 8px;
+  color: #87d9cb;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.fmca-brand h1,
+.fmca-topbar h2,
+.fmca-panel h3 {
+  margin: 0;
+}
+
+.fmca-brand h1 {
+  font-size: 25px;
+}
+
+#fmca-status {
+  display: inline-flex;
+  margin-top: 14px;
+  padding: 5px 9px;
+  border: 1px solid rgba(135, 217, 203, 0.38);
+  border-radius: 999px;
+  color: #baf3e8;
+  font-size: 12px;
+}
+
+.fmca-nav {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.fmca-nav button {
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: rgba(237, 245, 251, 0.72);
+  cursor: pointer;
+  text-align: left;
+  padding: 9px 12px;
+}
+
+.fmca-nav button:hover,
+.fmca-nav button:focus-visible,
+.fmca-nav button.is-active {
+  border-color: rgba(135, 217, 203, 0.28);
+  background: rgba(84, 154, 255, 0.14);
+  color: #ffffff;
+}
+
+.fmca-main {
+  width: min(1180px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 30px 0 40px;
+}
+
+.fmca-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 22px;
+  background: rgba(24, 36, 50, 0.82);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.24);
+}
+
+.fmca-topbar h2 {
+  font-size: clamp(24px, 4vw, 34px);
+}
+
+.fmca-topbar p,
+.fmca-panel p,
+.fmca-card span,
+.fmca-list-card span,
+.fmca-list-card p,
+.fmca-placeholder,
+.fmca-empty {
+  color: rgba(219, 231, 241, 0.68);
+}
+
+.fmca-top-actions,
+.fmca-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.fmca-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fmca-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fmca-card,
+.fmca-panel,
+.fmca-list-card {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px;
+  background: rgba(24, 36, 50, 0.82);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.18);
+}
+
+.fmca-card {
+  display: grid;
+  gap: 8px;
+  padding: 17px;
+}
+
+.fmca-card strong {
+  overflow-wrap: anywhere;
+  font-size: 22px;
+}
+
+.fmca-panel {
+  margin-bottom: 14px;
+  padding: 22px;
+}
+
+.fmca-panel h3 {
+  margin-bottom: 8px;
+  font-size: 20px;
+}
+
+.fmca-tab {
+  display: none;
+}
+
+.fmca-tab.is-active {
+  display: block;
+}
+
+.fmca-button {
+  display: inline-flex;
+  min-height: 39px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #eef5f5;
+  cursor: pointer;
+  font-weight: 760;
+  text-decoration: none;
+}
+
+.fmca-button:hover,
+.fmca-button:focus-visible {
+  border-color: rgba(135, 217, 203, 0.58);
+  background: rgba(135, 217, 203, 0.12);
+}
+
+.fmca-primary {
+  background: rgba(78, 137, 255, 0.28);
+}
+
+.fmca-danger {
+  color: #ffb9b9;
+}
+
+.fmca-form {
+  display: grid;
+  gap: 14px;
+}
+
+.fmca-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 260px);
+  align-items: center;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fmca-row:last-of-type {
+  border-bottom: 0;
+}
+
+.fmca-row input[type="checkbox"] {
+  justify-self: end;
+  width: 20px;
+  height: 20px;
+  accent-color: #58d2bd;
+}
+
+.fmca-row input[type="number"],
+.fmca-row input[type="text"],
+.fmca-row input[type="password"],
+.fmca-row input[type="url"],
+.fmca-row select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 7px 10px;
+}
+
+.fmca-api-preset-row,
+.fmca-api-row {
+  grid-template-columns: minmax(150px, 180px) minmax(0, 1fr);
+}
+
+.fmca-api-preset-row {
+  display: grid;
+  align-items: end;
+  gap: 12px;
+  padding: 6px 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fmca-api-preset-row label {
+  display: grid;
+  gap: 7px;
+}
+
+.fmca-api-preset-row label span {
+  color: rgba(219, 231, 241, 0.72);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.fmca-api-preset-row select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 7px 10px;
+}
+
+.fmca-model-combo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.fmca-model-menu-toggle {
+  min-width: 42px;
+  padding-inline: 0;
+}
+
+.fmca-model-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(10, 18, 29, 0.98);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+  padding: 6px;
+}
+
+.fmca-model-menu-item {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(237, 245, 251, 0.9);
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.fmca-model-menu-item:hover,
+.fmca-model-menu-item:focus-visible {
+  background: rgba(88, 210, 189, 0.15);
+  color: #fff;
+}
+
+.fmca-model-menu-empty {
+  padding: 10px;
+  color: rgba(219, 231, 241, 0.62);
+  font-size: 13px;
+}
+
+.fmca-facts {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.fmca-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fmca-facts dt {
+  color: rgba(219, 231, 241, 0.64);
+}
+
+.fmca-facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.fmca-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.fmca-list-card {
+  padding: 14px;
+}
+
+.fmca-list-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.fmca-list-card p {
+  margin: 8px 0 0;
+}
+
+.fmca-mini-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fmca-pre {
+  max-height: 520px;
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(8, 13, 20, 0.68);
+  color: #d9edf8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fmca-list-card.is-disabled {
+  opacity: 0.62;
+}
+
+.fmca-list-card.is-selected {
+  border-color: rgba(135, 217, 203, 0.5);
+  background: rgba(63, 113, 145, 0.24);
+}
+
+.fmca-list-card header,
+.fmca-list-head,
+.fmca-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fmca-list-card .fmca-actions {
+  margin-top: 10px;
+}
+
+.fmca-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fmca-field {
+  display: grid;
+  gap: 7px;
+}
+
+.fmca-form-grid > label {
+  display: grid;
+  gap: 7px;
+}
+
+.fmca-field.is-wide,
+.fmca-form-grid > label.fmca-wide,
+.fmca-member-grid,
+.fmca-manifest-list {
+  grid-column: 1 / -1;
+}
+
+.fmca-field span,
+.fmca-form-grid > label > span,
+.fmca-member-grid > span {
+  color: rgba(219, 231, 241, 0.72);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.fmca-field input,
+.fmca-field textarea,
+.fmca-field select,
+.fmca-form-grid > label input,
+.fmca-form-grid > label textarea,
+.fmca-form-grid > label select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 8px 10px;
+}
+
+.fmca-field textarea,
+.fmca-form-grid > label textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.fmca-prompt-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.fmca-prompt-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.fmca-prompt-toolbar label:first-child {
+  display: grid;
+  gap: 7px;
+}
+
+.fmca-prompt-toolbar label:first-child span,
+.fmca-prompt-note {
+  color: rgba(219, 231, 241, 0.68);
+  font-size: 13px;
+}
+
+.fmca-prompt-toolbar select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 8px 10px;
+}
+
+.fmca-prompt-switch {
+  min-height: 40px;
+  align-self: end;
+}
+
+.fmca-prompt-textarea textarea {
+  min-height: 340px;
+  line-height: 1.55;
+}
+
+.fmca-prompt-details {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fmca-prompt-details summary {
+  cursor: pointer;
+  color: #d9edf8;
+  font-weight: 800;
+}
+
+.fmca-prompt-details[open] summary {
+  margin-bottom: 10px;
+}
+
+.fmca-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(237, 245, 251, 0.84);
+}
+
+.fmca-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: #58d2bd;
+}
+
+.fmca-chip-checks,
+.fmca-chip-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fmca-chip-check {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fmca-chip-check input {
+  width: 15px;
+  height: 15px;
+}
+
+.fmca-chip-line {
+  align-items: center;
+  margin-top: 8px;
+}
+
+.fmca-chip-line em {
+  color: rgba(219, 231, 241, 0.62);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+.fmca-chip-line span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(88, 210, 189, 0.13);
+  color: rgba(237, 245, 251, 0.84);
+  font-size: 12px;
+}
+
+.fmca-chip-line.is-muted span {
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(219, 231, 241, 0.66);
+}
+
+.fmca-role-generator-result {
+  margin-top: 16px;
+}
+
+.fmca-role-draft-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.fmca-role-draft-editor .fmca-form-grid {
+  gap: 12px;
+}
+
+.fmca-member-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fmca-member-list label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fmca-muted {
+  color: rgba(219, 231, 241, 0.6);
+  font-size: 12px;
+}
+
+.fmca-manifest-list {
+  display: grid;
+  gap: 10px;
+}
+
+.fmca-manifest-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fmca-sticker-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.fmca-manifest-row small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(219, 231, 241, 0.6);
+  word-break: break-all;
+}
+
+.fmca-placeholder,
+.fmca-empty {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed rgba(135, 217, 203, 0.28);
+  border-radius: 14px;
+  background: rgba(135, 217, 203, 0.07);
+}
+
+.fmca-error,
+.fmca-toast {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.fmca-error {
+  border: 1px solid rgba(255, 120, 120, 0.36);
+  background: rgba(255, 120, 120, 0.1);
+  color: #ffc1c1;
+}
+
+.fmca-toast {
+  border: 1px solid rgba(135, 217, 203, 0.34);
+  background: rgba(135, 217, 203, 0.12);
+  color: #c9fff4;
+}
+
+@media (max-width: 920px) {
+  .fmca-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .fmca-sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .fmca-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .fmca-grid,
+  .fmca-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .fmca-main {
+    width: min(100% - 20px, 1180px);
+    padding-top: 14px;
+  }
+
+  .fmca-topbar {
+    flex-direction: column;
+  }
+
+  .fmca-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fmca-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fmca-api-preset-row,
+  .fmca-model-combo,
+  .fmca-prompt-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .fmca-model-menu {
+    position: static;
+    margin-top: 8px;
+  }
+
+  .fmca-form-grid,
+  .fmca-role-app-scope-grid,
+  .fmca-role-app-usage-grid,
+  .fmca-manifest-row {
+    grid-template-columns: 1fr;
+  }
+
+  .fmca-row input[type="checkbox"] {
+    justify-self: start;
+  }
+}
+
+.fmca-prompt-test {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.fmca-prompt-test h4 {
+  margin: 0 0 6px;
+  color: #1d4ed8;
+}
+
+.fmca-prompt-test p {
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.fmca-prompt-test-result {
+  margin-top: 12px;
+  max-height: 520px;
+}
+
+.fmca-role-app-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.fmca-role-app-summary span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.fmca-role-app-pools {
+  margin-top: 16px;
+}
+
+.fmca-role-app-pools h4 {
+  margin: 0 0 4px;
+}
+
+.fmca-role-app-pools p {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.fmca-role-app-pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.fmca-role-app-pool-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.fmca-role-app-pool-stats {
+  margin: 8px 0;
+  color: rgba(100, 116, 139, 0.95);
+  font-size: 12px;
+}
+
+.fmca-role-app-pools-head,
+.fmca-role-filter-notice {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.fmca-role-filter-notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1e3a8a;
+}
+
+.fmca-role-app-pool-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.fmca-role-app-pool-card:hover,
+.fmca-role-app-pool-card:focus-visible,
+.fmca-role-app-pool-card.is-active {
+  border-color: rgba(37, 99, 235, 0.65);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.12);
+}
+
+.fmca-role-app-pool-card.is-active {
+  background: rgba(239, 246, 255, 0.96);
+}
+
+.fmca-prompt-block-help {
+  margin: 6px 0 10px;
+  color: #93a4b8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fmca-prompt-details > p {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f8fafc;
+}
+
+.fmca-role-app-bind-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(94, 234, 212, 0.38);
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.fmca-role-app-bind-panel header {
+  display: grid;
+  gap: 4px;
+}
+
+.fmca-role-app-bind-panel header strong {
+  color: #e2f8ff;
+  font-size: 15px;
+}
+
+.fmca-role-app-bind-panel header span {
+  color: rgba(219, 231, 241, 0.82);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.fmca-role-app-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fmca-role-app-scope-group,
+.fmca-role-app-usage-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.32);
+}
+
+.fmca-role-app-scope-group > strong,
+.fmca-role-app-usage-panel strong {
+  color: #f4fbff;
+  font-size: 13px;
+}
+
+.fmca-role-app-scope-group p,
+.fmca-role-app-usage-panel p {
+  margin: 0;
+  color: rgba(219, 231, 241, 0.68);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fmca-role-app-check:has(input:checked) {
+  border-color: rgba(94, 234, 212, 0.58);
+  background: rgba(20, 184, 166, 0.16);
+  color: #f8ffff;
+}
+
+.fmca-role-app-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.fmca-role-app-usage-row {
+  display: grid;
+  grid-template-columns: minmax(74px, 112px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fmca-role-app-usage-row span {
+  color: rgba(219, 231, 241, 0.76);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.fmca-role-app-usage-row input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(7, 13, 21, 0.58);
+  color: #eef5f5;
+  padding: 8px 10px;
+}
+
+.fmca-field input::placeholder,
+.fmca-field textarea::placeholder,
+.fmca-form-grid > label input::placeholder,
+.fmca-form-grid > label textarea::placeholder,
+.fmca-role-app-usage-row input::placeholder {
+  color: rgba(226, 232, 240, 0.58);
+}
+
+.fmca-prompt-test {
+  border-color: rgba(94, 234, 212, 0.34);
+  background: rgba(15, 23, 42, 0.78);
+  color: #e5eef8;
+}
+
+.fmca-prompt-test h4 {
+  color: #8fdcff;
+}
+
+.fmca-prompt-test p {
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.fmca-prompt-test select,
+.fmca-prompt-test textarea,
+.fmca-prompt-test .fmca-prompt-test-result {
+  background: rgba(2, 6, 23, 0.78);
+  color: #edf6ff;
+  border-color: rgba(148, 163, 184, 0.42);
+}
+
+.fmca-prompt-test textarea::placeholder {
+  color: rgba(226, 232, 240, 0.62);
+}
+
+
+.fmca-role-app-pool-card.is-active {
+  background: rgba(30, 64, 175, 0.42);
+  border-color: rgba(125, 211, 252, 0.85);
+  color: #f8fbff;
+  box-shadow: 0 12px 30px rgba(14, 165, 233, 0.18);
+}
+
+.fmca-role-app-pool-card.is-active header strong,
+.fmca-role-app-pool-card.is-active header span {
+  color: #ffffff;
+}
+
+.fmca-role-app-pool-card.is-active .fmca-chip-line span {
+  background: rgba(15, 23, 42, 0.58);
+  color: #f8fbff;
+  border: 1px solid rgba(186, 230, 253, 0.45);
+}
+
+.fmca-sticker-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.fmca-sticker-preview-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.fmca-sticker-preview-card strong {
+  color: #f8fafc;
+}
+
+.fmca-sticker-preview-card span {
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+
+/* BUG-029/030 admin UX contrast fixes */
+.fmca-role-app-pool-card.is-active {
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.92), rgba(30, 64, 175, 0.92));
+  border-color: rgba(186, 230, 253, 0.95);
+  box-shadow: 0 14px 34px rgba(14, 116, 144, 0.28);
+}
+
+.fmca-role-app-pool-card.is-active header strong,
+.fmca-role-app-pool-card.is-active header span,
+.fmca-role-app-pool-card.is-active em,
+.fmca-role-app-pool-card.is-active .fmca-role-app-pool-stats {
+  color: #ffffff;
+}
+
+.fmca-role-app-pool-card.is-active .fmca-chip-line span {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #ffffff;
+}
+
+.fmca-list-card.is-selected {
+  border-color: rgba(94, 234, 212, 0.55);
+  box-shadow: 0 10px 28px rgba(20, 184, 166, 0.14);
+}
+
+.fmca-sticker-preview-thumb {
+  display: grid;
+  place-items: center;
+  min-height: 70px;
+}
+
+
+.fmca-data-mini-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.fmca-data-mini-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fmca-data-mini-list span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

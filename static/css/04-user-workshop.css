@@ -125,28 +125,11 @@ body.modern-setting-page .user-side-summary {
 }
 
 body.modern-setting-page .user-summary-item {
-  display: grid;
-  gap: 4px;
-  padding: 12px 13px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--input-bg) 72%, transparent),
-      color-mix(in srgb, var(--panel) 82%, transparent));
-}
-
-body.modern-setting-page .user-summary-item span {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 820;
-  letter-spacing: 0.03em;
+  min-width: 0;
 }
 
 body.modern-setting-page .user-summary-item strong {
-  color: var(--text);
-  font-size: 1rem;
-  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 body.modern-setting-page .user-avatar-controls {
@@ -157,6 +140,93 @@ body.modern-setting-page .user-avatar-controls {
 body.modern-setting-page .user-avatar-controls button,
 body.modern-setting-page .user-panel-actions button {
   width: 100%;
+}
+
+body.user-config-page .chat-avatar-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+body.user-config-page .chat-avatar-tile {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent 28%);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+}
+
+body.user-config-page .chat-avatar-tile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.user-config-page .chat-avatar-tile-head span,
+body.user-config-page .chat-avatar-tile-head em {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+  line-height: 1.2;
+}
+
+body.user-config-page .chat-avatar-tile-head strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+body.user-config-page .chat-avatar-tile-head em {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent 78%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel-strong) 70%, transparent 30%);
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-frame {
+  aspect-ratio: 1 / 1;
+  min-height: 0 !important;
+  border-radius: 16px;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-image {
+  border-radius: 13px;
+}
+
+body.user-config-page .chat-avatar-tile .sprite-placeholder {
+  padding: 12px;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls {
+  gap: 7px;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.78rem;
+}
+
+body.user-config-page .chat-avatar-tile .user-avatar-controls button {
+  min-height: 34px !important;
+  padding: 7px 10px !important;
+  font-size: 0.82rem !important;
 }
 
 body.modern-setting-page .user-layout-a .user-layout-a-side {
@@ -214,6 +284,12 @@ body.modern-setting-page .user-panel-actions button {
 
   body.modern-setting-page .user-layout-a-toolbar .config-sticky-copy {
     grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  body.user-config-page .chat-avatar-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -371,7 +447,7 @@ body.modern-setting-page .workshop-summary-item strong {
   line-height: 1.35;
 }
 
-body.modern-setting-page .workshop-runtime-panel-side .checkbox-row {
+body.modern-setting-page .workshop-runtime-panel-side .fr-setting-switch-row {
   width: 100%;
 }
 
@@ -558,7 +634,7 @@ body.modern-setting-page .stat-box strong {
   line-height: 1.35;
 }
 
-body.modern-setting-page label:not(.checkbox-row):not(.check-chip) {
+body.modern-setting-page label:not(.checkbox-row):not(.check-chip):not(.fr-setting-switch-row) {
   font-weight: 850;
   color: color-mix(in srgb, var(--text) 82%, var(--muted));
 }
@@ -1057,12 +1133,6 @@ body.modern-setting-page .workshop-asset-pick::before {
   font-weight: 900;
 }
 
-body.modern-setting-page .sprite-frame {
-  border-radius: 22px;
-  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
-  background: color-mix(in srgb, var(--input-bg) 62%, transparent);
-}
-
 body.modern-setting-page .topbar-stack {
   gap: 12px;
 }
@@ -1077,32 +1147,6 @@ body.modern-setting-page .slot-badge {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-/* Native file button polish for user avatar and workshop local assets. */
-body.modern-setting-page input[type="file"] {
-  width: 100%;
-  padding: 8px;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--input-bg) 70%, transparent);
-}
-
-body.modern-setting-page input[type="file"]::file-selector-button {
-  margin-right: 10px;
-  padding: 7px 11px;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--panel-strong) 88%, transparent);
-  color: var(--text);
-  font-weight: 760;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
-}
-
-body.modern-setting-page input[type="file"]::file-selector-button:hover {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
-  color: color-mix(in srgb, var(--accent) 84%, var(--text));
-  background: color-mix(in srgb, var(--accent) 8%, var(--panel-strong));
-}
 
 body.modern-setting-page input[type="range"] {
   accent-color: var(--accent);
