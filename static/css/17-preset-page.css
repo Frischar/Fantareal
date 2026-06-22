@@ -625,11 +625,20 @@
   border-radius: 16px;
   padding: 10px;
   background: rgba(255, 255, 255, 0.04);
+  transition:
+    border-color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    background var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    box-shadow var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease);
+}
+
+.preset-group-item.is-group-item-collapsed {
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border) 82%);
+  background: color-mix(in srgb, var(--panel-strong) 52%, transparent);
 }
 
 .preset-group-item-head {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
@@ -731,6 +740,62 @@
 
 .preset-group-item-select:has(input.preset-group-item-selected:checked) .preset-group-item-select-label {
   color: var(--text);
+}
+
+.preset-group-item-toggle {
+  flex: 0 0 auto;
+}
+
+.preset-group-item-title-stack {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.preset-group-item-summary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.preset-group-item-summary-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.preset-group-item-mini-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--input-bg) 66%, transparent);
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.preset-group-item-mini-chip.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border) 54%);
+  background: color-mix(in srgb, var(--accent) 16%, var(--input-bg));
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+}
+
+.preset-group-item-mini-chip.is-advanced {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border) 60%);
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+}
+
+.preset-group-item-body {
+  transform-origin: top center;
 }
 
 .preset-group-item textarea {
@@ -964,9 +1029,26 @@ html:not([data-theme="dark"]) .preset-item.active-editor:not(.current-runtime) {
   .preset-card-grid,
   .preset-block-body-grid,
   .preset-group-body-grid,
-  .preset-group-item-head,
   .preset-meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .preset-group-item-head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .preset-group-item-select {
+    grid-column: 1 / -1;
+    width: max-content;
+  }
+
+  .preset-group-item-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .preset-group-item-summary-chips {
+    flex-wrap: wrap;
   }
 
   .preset-card-head {
@@ -1395,6 +1477,33 @@ body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] 
   width: fit-content;
   max-width: 100%;
   justify-self: start;
+}
+
+/* P7-3E: distinguish fixed rule blocks from rule groups in compact rows. */
+body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-block {
+  color: #ffd89a;
+  background: linear-gradient(135deg, rgba(238, 169, 79, 0.22), rgba(238, 169, 79, 0.10));
+  border-color: rgba(238, 169, 79, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 222, 160, 0.08);
+}
+
+body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-group {
+  color: #e5c8ff;
+  background: linear-gradient(135deg, rgba(166, 92, 255, 0.34), rgba(125, 65, 214, 0.18));
+  border-color: rgba(196, 137, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(236, 213, 255, 0.12), 0 0 0 1px rgba(166, 92, 255, 0.08);
+}
+
+html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-block {
+  color: #8a4f00;
+  background: linear-gradient(135deg, rgba(238, 169, 79, 0.28), rgba(255, 237, 198, 0.82));
+  border-color: rgba(196, 119, 24, 0.34);
+}
+
+html:not([data-theme="dark"]) body.modern-setting-page.preset-config-page .preset-summary-chip.preset-chip-rule-group {
+  color: #5a2494;
+  background: linear-gradient(135deg, rgba(181, 112, 255, 0.34), rgba(245, 231, 255, 0.90));
+  border-color: rgba(132, 63, 205, 0.42);
 }
 
 /* P6-3 migrated from 09-preset-memory.css: preset collapsed table rows now live with preset page CSS. */

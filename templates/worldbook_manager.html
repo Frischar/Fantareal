@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
   </head>
@@ -88,7 +88,7 @@
                 <span id="active-health-filter" class="muted helper-text">问题筛选：未启用</span>
                 <button id="collapse-all-worldbook" type="button" class="secondary">全部折叠</button>
                 <button id="expand-all-worldbook" type="button" class="secondary">全部展开</button>
-                <button id="select-all-visible-worldbook-toolbar" type="button" class="secondary">选择当前结果</button>
+                <button id="select-all-visible-worldbook-toolbar" type="button" class="secondary">选择当前</button>
               </div>
             </div>
 
@@ -314,7 +314,7 @@
         </div>
         <div class="worldbook-selection-content">
           <div class="worldbook-selection-actions">
-            <button id="toggle-bulk-editor" type="button" class="secondary full-row">批量编辑</button>
+            <button id="toggle-bulk-editor" type="button" class="secondary full-row" aria-expanded="false">批量编辑</button>
             <button id="bulk-enable-selected" type="button" class="secondary">启用</button>
             <button id="bulk-disable-selected" type="button" class="secondary">禁用</button>
             <button id="delete-selected-worldbook" type="button" class="secondary danger-button">删除选中</button>
@@ -629,7 +629,8 @@
     </template>
 
     <script src="/static/js/app-core.js?v=v161"></script>
-    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -741,9 +742,19 @@
       function setStatus(text) {
         const message = worldbookDirty ? `${text}（有未保存修改）` : text;
         const kind = getWorldbookStatusKind(message);
-        statusEl.textContent = getCompactWorldbookStatusLabel(message, kind);
-        statusEl.title = message;
-        document.getElementById("worldbook-status-box")?.setAttribute("title", message);
+        const label = getCompactWorldbookStatusLabel(message, kind);
+        const statusBox = document.getElementById("worldbook-status-box");
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: message,
+          state: kind === "loading" ? "saving" : kind,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle", "is-loading"],
+          pulseTarget: statusBox || statusEl,
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = message;
+        }
+        statusBox?.setAttribute("title", message);
         updateWorldbookStatusClass(message);
       }
 
@@ -1035,10 +1046,7 @@
       function setEntryCollapsed(card, collapsed) {
         const body = card.querySelector(".worldbook-entry-body");
         const toggleBtn = card.querySelector(".toggle-worldbook-entry");
-        card.dataset.collapsed = collapsed ? "true" : "false";
-        if (body) {
-          body.style.display = collapsed ? "none" : "";
-        }
+        window.Fantareal?.motion?.setDisclosureCollapsed(card, body, collapsed, { hiddenMode: "display" });
         if (toggleBtn) {
           toggleBtn.textContent = collapsed ? "▸" : "▾";
           toggleBtn.title = collapsed ? "展开词条" : "折叠词条";
@@ -1144,11 +1152,16 @@
         });
       }
 
-      function setBulkEditorOpen(open) {
+      function setBulkEditorOpen(open, immediate = false) {
         const editor = document.getElementById("worldbook-bulk-editor");
         const toggle = document.getElementById("toggle-bulk-editor");
         if (!editor) return;
-        editor.classList.toggle("is-collapsed", !open);
+        window.Fantareal?.motion?.setDisclosureCollapsed(editor, editor, !open, {
+          collapsedClass: "is-collapsed",
+          dataAttribute: "bulkEditorCollapsed",
+          hiddenMode: "display",
+          immediate,
+        }) ?? editor.classList.toggle("is-collapsed", !open);
         editor.setAttribute("aria-hidden", open ? "false" : "true");
         if (toggle) {
           toggle.textContent = open ? "收起批量编辑" : "批量编辑";
@@ -1417,12 +1430,13 @@
           removeBtn.setAttribute("aria-label", "删除词条");
           removeBtn.classList.add("icon-button", "danger-icon-button");
           removeBtn.addEventListener("click", () => {
-            card.remove();
-            updateCount();
-            updateSelectedCount();
-            refreshWorldbookNavigation();
-            applyWorldbookSearch();
-            markWorldbookDirty("已删除一条世界书词条，记得保存。");
+            (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+              updateCount();
+              updateSelectedCount();
+              refreshWorldbookNavigation();
+              applyWorldbookSearch();
+              markWorldbookDirty("已删除一条世界书词条，记得保存。");
+            });
           });
         }
 
@@ -1970,6 +1984,7 @@
           updateCardTitle(card);
         }
         worldbookListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
         updateCount();
         updateSelectedCount();
         refreshWorldbookNavigation();
@@ -2185,13 +2200,14 @@
           `确定删除选中的 ${cards.length} 条世界书词条吗？\n\n这一步只会先从页面移除，点击“保存全部词条”后才会写入文件。`
         );
         if (!confirmed) return;
-        cards.forEach((card) => card.remove());
-        updateCount();
-        updateSelectedCount();
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        Promise.all(cards.map((card) => window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove()))).then(() => {
+          updateCount();
+          updateSelectedCount();
+          refreshWorldbookNavigation();
+          analyzeWorldbookHealth();
+          updateHealthFilterLabel();
+          applyWorldbookSearch();
+        });
         markWorldbookDirty(`已从页面移除 ${cards.length} 条词条，确认无误后请保存。`);
       });
 
@@ -2306,6 +2322,7 @@
         event.returnValue = "";
       });
 
+      setBulkEditorOpen(false, true);
       updateCount();
       updateSelectedCount();
       refreshWorldbookNavigation();

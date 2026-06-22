@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p6-final-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
 </head>
@@ -368,6 +368,7 @@
       </div>
     </div>
 
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
       const rootEl = document.documentElement;
       const bodyEl = document.body;
@@ -390,6 +391,10 @@
       const resultModalBodyEl = document.getElementById("result-modal-body");
       const presetHelperEl = document.getElementById("preset-helper");
       const toastHostEl = document.getElementById("config-toast-host");
+      const configAdvancedGroupEl = document.querySelector(".config-advanced-group");
+      const configAdvancedPanelEl = configAdvancedGroupEl?.querySelector(".config-retrieval-panel");
+      const configAdvancedSummaryEl = configAdvancedGroupEl?.querySelector(".config-advanced-summary");
+      let configAdvancedOpenState = Boolean(configAdvancedGroupEl?.open);
       const DEFAULT_BACKGROUND_PRESET = {
         label: "默认背景",
         url: "/assets/default.jpg",
@@ -436,6 +441,69 @@
         },
       };
 
+      function setConfigAdvancedSummaryState(open) {
+        configAdvancedSummaryEl?.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      function setConfigAdvancedOpen(open, immediate = false) {
+        if (!configAdvancedGroupEl || !configAdvancedPanelEl) return;
+        configAdvancedOpenState = Boolean(open);
+        setConfigAdvancedSummaryState(configAdvancedOpenState);
+        const motion = window.Fantareal?.motion;
+        const options = {
+          collapsedClass: "is-collapsed",
+          dataAttribute: "advancedCollapsed",
+          hiddenMode: "display",
+          immediate,
+        };
+
+        if (configAdvancedOpenState) {
+          configAdvancedGroupEl.open = true;
+          if (motion?.setDisclosureCollapsed) {
+            motion.setDisclosureCollapsed(configAdvancedGroupEl, configAdvancedPanelEl, false, options);
+          } else {
+            configAdvancedPanelEl.style.display = "";
+            configAdvancedPanelEl.setAttribute("aria-hidden", "false");
+          }
+          return;
+        }
+
+        if (motion?.setDisclosureCollapsed) {
+          const animated = motion.setDisclosureCollapsed(configAdvancedGroupEl, configAdvancedPanelEl, true, options);
+          const finishClose = () => {
+            if (!configAdvancedOpenState) configAdvancedGroupEl.open = false;
+          };
+          if (animated) {
+            motion.afterMotion?.(configAdvancedPanelEl, finishClose, 340) ?? window.setTimeout(finishClose, 340);
+          } else {
+            finishClose();
+          }
+        } else {
+          configAdvancedPanelEl.style.display = "none";
+          configAdvancedPanelEl.setAttribute("aria-hidden", "true");
+          configAdvancedGroupEl.open = false;
+        }
+      }
+
+      function initConfigAdvancedDisclosure() {
+        if (!configAdvancedGroupEl || !configAdvancedPanelEl) return;
+        const initiallyOpen = configAdvancedGroupEl.open;
+        configAdvancedOpenState = initiallyOpen;
+        if (!initiallyOpen) configAdvancedGroupEl.open = true;
+        window.Fantareal?.motion?.setDisclosureCollapsed(configAdvancedGroupEl, configAdvancedPanelEl, !initiallyOpen, {
+          collapsedClass: "is-collapsed",
+          dataAttribute: "advancedCollapsed",
+          hiddenMode: "display",
+          immediate: true,
+        });
+        if (!initiallyOpen) configAdvancedGroupEl.open = false;
+        setConfigAdvancedSummaryState(initiallyOpen);
+        configAdvancedSummaryEl?.addEventListener("click", (event) => {
+          event.preventDefault();
+          setConfigAdvancedOpen(!configAdvancedOpenState);
+        });
+      }
+
       function showBundleExportModal() {
         bundleExportModalEl.hidden = false;
         bundleExportConfirmEl?.focus();
@@ -478,9 +546,18 @@
       function setStatus(text, kind = null) {
         if (!statusEl) return;
         const statusKind = kind || inferStatusKind(text);
-        statusEl.textContent = text || "已准备";
-        statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
-        statusEl.classList.add("task-status", `is-${statusKind}`);
+        const label = text || "已准备";
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: label,
+          state: statusKind,
+          stateClasses: ["is-idle", "is-busy", "is-success", "is-error"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = label;
+          statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
+          statusEl.classList.add("task-status", `is-${statusKind}`);
+        }
       }
 
       function showToast(message, type = "info") {
@@ -511,17 +588,20 @@
         button.disabled = state === "loading";
         if (state === "loading") {
           button.classList.add("is-loading");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "处理中…";
           return;
         }
         if (state === "success") {
           button.classList.add("is-success");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "已完成 ✓";
           window.setTimeout(() => setButtonState(button, "idle"), 1200);
           return;
         }
         if (state === "error") {
           button.classList.add("is-error");
+          window.Fantareal?.motion?.pulseStatus?.(button);
           button.textContent = label || "操作失败";
           window.setTimeout(() => setButtonState(button, "idle"), 1500);
           return;
@@ -560,8 +640,20 @@
         }, delay);
       }
 
+      function getAppliedTheme() {
+        return rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      }
+
       function applyTheme(theme) {
-        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+        const normalizedTheme = theme === "dark" ? "dark" : "light";
+        rootEl.setAttribute("data-theme", normalizedTheme);
+        if (themeSelectEl && themeSelectEl.value !== normalizedTheme) {
+          themeSelectEl.value = normalizedTheme;
+        }
+        window.FantarealThemeToggle = {
+          ...(window.FantarealThemeToggle || {}),
+          theme: normalizedTheme,
+        };
         applyUiOpacity(uiOpacityEl.value);
       }
 
@@ -732,7 +824,7 @@
           llm_base_url: document.getElementById("llm-base-url").value.trim(),
           llm_api_key: document.getElementById("llm-api-key").value.trim(),
           llm_model: document.getElementById("llm-model").value.trim(),
-          theme: themeSelectEl.value,
+          theme: getAppliedTheme(),
           temperature: Number(document.getElementById("temperature").value || 0.85),
           history_limit: Number(document.getElementById("history-limit").value || 20),
           prompt_budget_token_limit: normalizePromptBudgetInput(document.getElementById("prompt-budget-token-limit"), true),
@@ -1280,6 +1372,7 @@
       applyBackground({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
       window.FantarealThemeToggle = { uiOpacity: {{ settings.ui_opacity | tojson }} };
       window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground, postJson };
+      initConfigAdvancedDisclosure();
       applyFontSettings({
         font_family_url: {{ settings.font_family_url | tojson }},
         font_family_name: {{ settings.font_family_name | tojson }},
@@ -1288,6 +1381,6 @@
         font_color: {{ settings.font_color | tojson }}
       });
     </script>
-    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-20260619"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
   </body>
 </html>
