@@ -17,8 +17,8 @@
 @import url("./css/12-workshop-performance.css?v=ui-debug-workshop-2");
 @import url("./css/13-route-forwarding.css?v=v161");
 @import url("./css/14-game.css?v=v161");
-@import url("./css/15-ui-system.css?v=ui-p8-performance-mode-3-20260623");
-@import url("./css/17-preset-page.css?v=ui-p8-0a-perf-relief-2-20260622");
+@import url("./css/15-ui-system.css?v=ui-p8-action-dock-responsive-20260623");
+@import url("./css/17-preset-page.css?v=ui-p8-action-dock-responsive-20260623");
 @import url("./css/99-mobile-responsive.css?v=ui-v174-mobile-responsive");
 
 /* v161: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */

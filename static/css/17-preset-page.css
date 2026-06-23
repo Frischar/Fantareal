@@ -1971,3 +1971,88 @@ body.modern-setting-page.preset-config-page :is(
 ) {
   box-shadow: none !important;
 }
+
+/* P8-0B: preset action dock follows the same narrow-desktop fallback as the
+   other workbench pages: once the left gutter is unsafe, keep actions inside
+   the content flow as a wrapped toolbar. */
+@media (min-width: 769px) and (max-width: 1180px) {
+  body.modern-setting-page.preset-config-page .preset-workbench-actions.ui-action-dock {
+    position: sticky !important;
+    top: 12px !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    align-self: flex-start !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 0 14px !important;
+    padding: 8px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    border-radius: var(--ui-radius-lg) !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-picker-wrap {
+    flex: 1 1 280px !important;
+    width: auto !important;
+    min-width: min(280px, 100%) !important;
+    max-width: 100% !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #reload-preset,
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary > button,
+  body.modern-setting-page.preset-config-page .preset-actions-primary.ui-action-dock-primary > .preset-more-wrap,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #create-preset,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #preset-more-toggle,
+  body.modern-setting-page.preset-config-page .preset-workbench-actions .preset-header-save-state {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 38px !important;
+    height: auto !important;
+    box-sizing: border-box !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-workbench-actions #save-preset-top {
+    min-height: 42px !important;
+    border-radius: 999px !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-picker-toggle {
+    width: 100% !important;
+    min-height: 42px !important;
+    height: auto !important;
+  }
+
+  body.modern-setting-page.preset-config-page #preset-picker-current {
+    max-width: min(260px, 46vw) !important;
+  }
+
+  body.modern-setting-page.preset-config-page .preset-more-menu.ui-action-more-menu {
+    top: calc(100% + 8px) !important;
+    left: 0 !important;
+    right: auto !important;
+  }
+}
