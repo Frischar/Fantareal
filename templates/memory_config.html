@@ -921,13 +921,23 @@
         const motion = window.Fantareal?.motion;
         const panel = outlineDetailPanelEl;
         const durationMs = 560;
+        const collapseDurationMs = 460;
         const reduceMotion = motion?.prefersReducedMotion?.() === true;
+        let isShrinking = false;
         panel.classList.remove("outline-detail-motion-in", "outline-detail-resizing");
         void panel.offsetWidth;
 
         if (!reduceMotion && Number(previousHeight) > 0) {
           const nextHeight = panel.scrollHeight || panel.getBoundingClientRect().height;
+          isShrinking = nextHeight > 0 && nextHeight < previousHeight - 2;
           if (nextHeight > 0 && Math.abs(nextHeight - previousHeight) > 2) {
+            panel.style.setProperty("--outline-detail-resize-duration", isShrinking ? `${collapseDurationMs}ms` : `${durationMs}ms`);
+            panel.style.setProperty(
+              "--outline-detail-resize-ease",
+              isShrinking
+                ? "var(--ui-ease-exit, cubic-bezier(0.4, 0, 1, 1))"
+                : "var(--ui-ease-enter, cubic-bezier(0.2, 0.8, 0.2, 1))"
+            );
             panel.style.height = `${previousHeight}px`;
             panel.style.overflow = "hidden";
             panel.classList.add("outline-detail-resizing");
@@ -937,9 +947,15 @@
             window.setTimeout(() => {
               panel.style.height = "";
               panel.style.overflow = "";
+              panel.style.removeProperty("--outline-detail-resize-duration");
+              panel.style.removeProperty("--outline-detail-resize-ease");
               panel.classList.remove("outline-detail-resizing");
-            }, durationMs + 40);
+            }, (isShrinking ? collapseDurationMs : durationMs) + 40);
           }
+        }
+
+        if (isShrinking) {
+          return;
         }
 
         if (motion?.pulseItem) {
