@@ -5,20 +5,20 @@
 @import url("./css/01-chat.css?v=ui-p7-chat-motion-final-20260622");
 @import url("./css/02-sidebar.css?v=ui-sidebar-drawer-v1");
 @import url("./css/16-pe-shell.css?v=ui-v170-pe-shell");
-@import url("./css/03-config-global.css?v=v161");
+@import url("./css/03-config-global.css?v=ui-p8-performance-mode-20260623");
 @import url("./css/04-user-workshop.css?v=ui-p6-final-20260621");
 @import url("./css/05-config-helpers.css?v=ui-p7-3d-fixes-20260621");
 @import url("./css/06-workshop-controls.css?v=ui-debug-workshop-2");
 @import url("./css/07-card-editor.css?v=ui-p6-final-20260621");
 @import url("./css/08-config-fields.css?v=v161");
-@import url("./css/09-preset-memory.css?v=ui-p7-3d-fixes-20260621");
-@import url("./css/10-worldbook.css?v=ui-p6-final-20260621");
+@import url("./css/09-preset-memory.css?v=ui-p8-0a-memory-fix-20260623");
+@import url("./css/10-worldbook.css?v=ui-p8-performance-mode-2-20260623");
 @import url("./css/11-workshop-opening.css?v=v161");
 @import url("./css/12-workshop-performance.css?v=ui-debug-workshop-2");
 @import url("./css/13-route-forwarding.css?v=v161");
 @import url("./css/14-game.css?v=v161");
-@import url("./css/15-ui-system.css?v=ui-p7-3c-select-20260621");
-@import url("./css/17-preset-page.css?v=ui-p7-3f-rule-chip-20260621");
+@import url("./css/15-ui-system.css?v=ui-p8-performance-mode-3-20260623");
+@import url("./css/17-preset-page.css?v=ui-p8-0a-perf-relief-2-20260622");
 @import url("./css/99-mobile-responsive.css?v=ui-v174-mobile-responsive");
 
 /* v161: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */

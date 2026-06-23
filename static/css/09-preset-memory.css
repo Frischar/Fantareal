@@ -1279,7 +1279,7 @@ body.memory-config-page .outline-detail-shell.outline-detail-motion-in {
 }
 
 body.memory-config-page .outline-detail-shell.outline-detail-resizing {
-  transition: height 0.56s var(--ui-ease-enter, cubic-bezier(0.2, 0.8, 0.2, 1));
+  transition: height var(--outline-detail-resize-duration, 0.56s) var(--outline-detail-resize-ease, var(--ui-ease-enter, cubic-bezier(0.2, 0.8, 0.2, 1)));
   will-change: height, opacity, transform, clip-path;
 }
 
@@ -2611,4 +2611,111 @@ body.modern-setting-page.memory-config-page .memory-card.selectable .toggle-memo
 body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memory {
   flex: 0 0 26px !important;
   max-width: 26px !important;
+}
+
+/* P8-0A: memory page performance relief.
+   Memory rows and outline tables should scroll cheaply; keep semantic borders, drop repeated glass/shadows. */
+body.modern-setting-page.memory-config-page :is(
+  .memory-card,
+  .merged-card,
+  .outline-overview-shell,
+  .outline-table-wrap,
+  .memory-tool-block,
+  .memory-projection-panel,
+  .memory-workbench-settings
+) {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.modern-setting-page.memory-config-page :is(
+  .memory-card,
+  .merged-card,
+  .memory-icon-button,
+  .outline-row,
+  .outline-table tr
+) {
+  transition:
+    border-color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    background var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease),
+    color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease) !important;
+}
+
+body.modern-setting-page.memory-config-page :is(
+  .memory-card,
+  .merged-card,
+  .memory-icon-button
+):hover {
+  transform: none !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body {
+  will-change: auto !important;
+}
+
+body.modern-setting-page.memory-config-page .memory-card-body.is-disclosure-entering,
+body.modern-setting-page.memory-config-page .memory-card-body.is-disclosure-exiting {
+  will-change: height, opacity, transform, clip-path !important;
+}
+
+body.modern-setting-page.memory-config-page :is(
+  .memory-list,
+  .memory-card,
+  .merged-list-grid,
+  .merged-card,
+  .outline-overview-shell,
+  .memory-tool-stack
+) :is(
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  span,
+  details,
+  summary,
+  .memory-overview-pill,
+  .memory-icon-button,
+  .selection-chip
+) {
+  box-shadow: none !important;
+}
+
+/* P8-0A memory follow-up: make outline collapse feel natural and prevent merged rows from squeezing. */
+body.modern-setting-page.memory-config-page .outline-detail-shell.outline-detail-resizing {
+  overflow: hidden !important;
+}
+
+body.modern-setting-page.memory-config-page .merged-list-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 620px), 1fr)) !important;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-head {
+  grid-template-columns: minmax(152px, auto) minmax(0, 1fr) 62px !important;
+  gap: 12px !important;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-time {
+  min-width: 152px !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-title {
+  grid-template-columns: minmax(0, 1fr) max-content !important;
+  column-gap: 10px !important;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-title h3 {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+body.modern-setting-page.memory-config-page .merged-card.is-collapsed .merged-card-subline {
+  min-width: max-content !important;
 }

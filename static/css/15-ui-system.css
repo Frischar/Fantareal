@@ -2746,3 +2746,124 @@ body.modern-setting-page.global-config-page details.config-advanced-group .confi
     animation: none !important;
   }
 }
+
+/* P8-0A: performance relief baseline.
+   Keep the visible motion, but avoid keeping hundreds of list bodies promoted forever. */
+.ui-disclosure-body {
+  will-change: auto !important;
+}
+
+.ui-disclosure-body.is-disclosure-entering,
+.ui-disclosure-body.is-disclosure-exiting {
+  will-change: height, opacity, transform, clip-path !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.game-page) :is(
+  .preset-card,
+  .preset-group-item,
+  .memory-card,
+  .merged-card,
+  .worldbook-entry-card,
+  .worldbook-rule-card
+).ui-disclosure-card {
+  transition:
+    border-color var(--ui-motion-fast) var(--ui-ease-feedback),
+    background var(--ui-motion-fast) var(--ui-ease-feedback) !important;
+}
+
+body.modern-setting-page.app-sidebar-shell:not(.game-page) :is(
+  .preset-card,
+  .preset-group-item,
+  .memory-card,
+  .merged-card,
+  .worldbook-entry-card,
+  .worldbook-rule-card
+).ui-disclosure-card.is-disclosure-opening {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 56%, transparent) !important;
+}
+
+/* P8: optional global performance mode.
+   Keeps the normal design as default; when enabled, reduce costly blur/shadow/long motion. */
+html[data-performance-mode="on"] {
+  --ui-motion-fast: 0.10s;
+  --ui-motion-normal: 0.14s;
+  --ui-motion-emphasis: 0.18s;
+}
+
+html[data-performance-mode="on"] body:not(.game-page) :is(
+  .panel,
+  .config-panel,
+  .ui-sticky-toolbar,
+  .ui-action-dock,
+  .stat-box,
+  .message,
+  .message-bubble,
+  .bubble,
+  .chat-input-shell,
+  .right-sidebar,
+  .runtime-sidebar,
+  .model-menu,
+  .ui-object-picker-menu,
+  .preset-card,
+  .memory-card,
+  .merged-card,
+  .outline-overview-shell,
+  .outline-detail-shell,
+  .outline-table-wrap,
+  .worldbook-entry-card,
+  .worldbook-rule-card
+) {
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-performance-mode="on"] body.modern-setting-page.app-sidebar-shell:not(.card-config-page):not(.chat-page):not(.game-page) :is(
+  .panel,
+  .config-panel,
+  .config-sticky-actions,
+  .slot-toolbar
+) {
+  background:
+    linear-gradient(180deg,
+      rgba(var(--panel-strong-rgb), 0.86),
+      rgba(var(--panel-rgb), 0.80)
+    ) !important;
+}
+
+
+/* P8: role card editor already uses transparent structural panels.
+   Do not paint those panels in performance mode, otherwise they appear as square back cards. */
+html[data-performance-mode="on"] body.card-config-page :is(
+  .config-shell > .panel.config-panel,
+  .card-builder.card-dossier-editor
+) {
+  background: transparent !important;
+}
+
+
+html[data-performance-mode="on"] body:not(.game-page) :is(
+  .panel,
+  .config-panel,
+  .preset-card,
+  .memory-card,
+  .merged-card,
+  .worldbook-entry-card,
+  .worldbook-rule-card,
+  .ui-object-picker-toggle,
+  button
+):hover {
+  transform: none !important;
+}
+
+html[data-performance-mode="on"] body:not(.game-page) :is(.ui-theme-burst, .chat-compose-glow) {
+  display: none !important;
+}
+
+html[data-performance-mode="on"] body:not(.game-page) :is(
+  .outline-detail-motion-in,
+  .is-disclosure-entering,
+  .is-disclosure-exiting
+) {
+  animation-duration: 0.18s !important;
+}

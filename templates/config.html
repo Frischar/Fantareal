@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="{{ settings.theme }}">
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p7-3d-fixes-20260621" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
 </head>
@@ -67,6 +67,13 @@
           </div>
         </div>
         <div class="button-row config-overview-actions">
+          <label class="config-performance-switch fr-setting-switch-row" for="performance-mode" title="降低毛玻璃、阴影和部分动效开销，适合低帧率或滚动掉帧时启用。">
+            <span class="config-performance-copy">
+              <strong>性能模式</strong>
+              <small id="performance-mode-label">{{ '已开启' if settings.performance_mode else '已关闭' }}</small>
+            </span>
+            <input id="performance-mode" type="checkbox" {% if settings.performance_mode %}checked{% endif %} />
+          </label>
           <button id="export-current-bundle" type="button" class="secondary export-action">导出当前人设存档 ZIP</button>
           <button id="import-bundle" type="button" class="secondary import-action">导入人设存档 ZIP</button>
           <button id="export-logs" type="button" class="secondary export-action">导出日志</button>
@@ -380,6 +387,8 @@
       const backgroundOverlayEl = document.getElementById("background-overlay");
       const backgroundOverlayValueEl = document.getElementById("background-overlay-value");
       const backgroundPreviewEl = document.getElementById("background-preview");
+      const performanceModeEl = document.getElementById("performance-mode");
+      const performanceModeLabelEl = document.getElementById("performance-mode-label");
       const resultModalEl = document.getElementById("result-modal");
       const bundleExportModalEl = document.getElementById("bundle-export-modal");
       const bundleExportMemoriesEl = document.getElementById("bundle-export-memories");
@@ -394,6 +403,7 @@
       const configAdvancedGroupEl = document.querySelector(".config-advanced-group");
       const configAdvancedPanelEl = configAdvancedGroupEl?.querySelector(".config-retrieval-panel");
       const configAdvancedSummaryEl = configAdvancedGroupEl?.querySelector(".config-advanced-summary");
+      const saveTimers = { settings: null };
       let configAdvancedOpenState = Boolean(configAdvancedGroupEl?.open);
       const DEFAULT_BACKGROUND_PRESET = {
         label: "默认背景",
@@ -672,6 +682,17 @@
         rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
       }
 
+      function applyPerformanceMode(enabled) {
+        const active = Boolean(enabled);
+        rootEl.setAttribute("data-performance-mode", active ? "on" : "off");
+        if (performanceModeEl && performanceModeEl.checked !== active) {
+          performanceModeEl.checked = active;
+        }
+        if (performanceModeLabelEl) {
+          performanceModeLabelEl.textContent = active ? "已开启" : "已关闭";
+        }
+      }
+
       function applyBackground(url, overlay) {
         const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
         backgroundOverlayValueEl.textContent = normalizedOverlay.toFixed(2);
@@ -831,6 +852,7 @@
           request_timeout: Number(document.getElementById("request-timeout").value || 120),
           demo_mode: document.getElementById("demo-mode").checked,
           ui_opacity: Number(uiOpacityEl.value || 0.84),
+          performance_mode: Boolean(performanceModeEl?.checked),
           background_image_url: backgroundUrlEl.value.trim(),
           background_overlay: Number(backgroundOverlayEl.value || 0.42),
           font_family_url: document.getElementById("font-family-url").value.trim(),
@@ -867,6 +889,7 @@
         applyTheme(data.settings.theme);
         applyUiOpacity(data.settings.ui_opacity);
         applyBackground(data.settings.background_image_url, data.settings.background_overlay);
+        applyPerformanceMode(data.settings.performance_mode);
         applyFontSettings(data.settings);
         document.getElementById("font-family-name").value = data.settings.font_family_name || "";
         document.getElementById("font-name-display").textContent =
@@ -908,6 +931,15 @@
 
       document.getElementById("prompt-budget-token-limit")?.addEventListener("change", (event) => {
         normalizePromptBudgetInput(event.currentTarget, true);
+      });
+
+      performanceModeEl?.addEventListener("change", () => {
+        applyPerformanceMode(performanceModeEl.checked);
+        scheduleSave(
+          saveSettings,
+          performanceModeEl.checked ? "性能模式已开启，正在保存..." : "性能模式已关闭，正在保存...",
+          180
+        );
       });
 
       document.getElementById("save-settings").addEventListener("click", async () => {
@@ -1369,9 +1401,10 @@
       applyPresetSelection("custom");
       applyTheme({{ settings.theme | tojson }});
       applyUiOpacity({{ settings.ui_opacity | tojson }});
+      applyPerformanceMode({{ settings.performance_mode | tojson }});
       applyBackground({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
       window.FantarealThemeToggle = { uiOpacity: {{ settings.ui_opacity | tojson }} };
-      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground, postJson };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground, applyPerformanceMode, postJson };
       initConfigAdvancedDisclosure();
       applyFontSettings({
         font_family_url: {{ settings.font_family_url | tojson }},

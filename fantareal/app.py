@@ -438,6 +438,7 @@ DEFAULT_SETTINGS = {
     "demo_mode": False,
     "ui_opacity": 0.84,
     "card_canvas_follow_opacity": False,
+    "performance_mode": False,
     "background_image_url": DEFAULT_BACKGROUND_IMAGE_URL,
     "background_overlay": 0.42,
     "font_family_url": "",
@@ -1187,6 +1188,7 @@ def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_
         "demo_mode": parse_bool(settings.get("demo_mode"), False),
         "ui_opacity": clamp_float(settings.get("ui_opacity"), 0.2, 1.0, 0.84),
         "card_canvas_follow_opacity": parse_bool(settings.get("card_canvas_follow_opacity"), False),
+        "performance_mode": parse_bool(settings.get("performance_mode"), False),
         "background_image_url": sanitize_background_image_url(
             settings.get("background_image_url", ""),
             strict=strict,
