@@ -21,9 +21,16 @@ class ChatHistoryRerollRequest(BaseModel):
 
 
 class DirectorNotePayload(BaseModel):
+    title: str = Field(default="", max_length=120)
     content: str = Field(default="", max_length=12000)
     remaining_turns: int = Field(default=1, ge=1, le=20)
     position: str = "after_char_defs"
+    mode: str = "basic"
+    enabled: bool = True
+    source: str = "user"
+    scope: str = "slot"
+    inject: dict[str, Any] | None = None
+    raw: str = Field(default="", max_length=2000)
 
 
 class DirectorNoteDeletePayload(BaseModel):
@@ -105,12 +112,21 @@ class MemoryOutlineItemPayload(BaseModel):
     id: str = ""
     title: str = ""
     summary: str = ""
+    story_time: str = ""
+    chapter: str = ""
+    location: str = ""
     characters: str = ""
     relationship_progress: str = ""
+    emotion_shift: str = ""
     key_events: list[str] = Field(default_factory=list)
     conflicts: str = ""
+    foreshadowing: str = ""
+    unresolved_items: str = ""
+    important_items: str = ""
     next_hooks: str = ""
     notes: str = ""
+    participate_recall: bool = True
+    project_to_worldbook: bool = True
     source_memory_ids: list[str] = Field(default_factory=list)
     merged_memory_id: str = ""
     updated_at: str = ""
@@ -335,6 +351,12 @@ class WorkshopEvaluatePayload(BaseModel):
 
 class WorkshopSavePayload(BaseModel):
     creativeWorkshop: dict[str, Any]
+
+
+class WorkshopTriggeredScenePayload(BaseModel):
+    token: str = ""
+    scene_id: str = ""
+    reason: str = "dynamic_scene"
 
 
 class SlotMetadata(BaseModel):

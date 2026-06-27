@@ -49,6 +49,183 @@ def _sanitize_tags(value: Any) -> list[str]:
     return tags[:8]
 
 
+RP_IMPORTANT_ITEM_KEYWORDS = (
+    "钥匙",
+    "玉牌",
+    "令牌",
+    "信物",
+    "戒指",
+    "项链",
+    "吊坠",
+    "账本",
+    "契约",
+    "契书",
+    "文书",
+    "密信",
+    "信件",
+    "药",
+    "药剂",
+    "毒",
+    "配方",
+    "地图",
+    "卷轴",
+    "碎片",
+    "印记",
+    "刻印",
+    "徽记",
+    "债",
+    "债务",
+    "欠款",
+    "银两",
+    "金",
+    "证据",
+    "线索",
+    "暗号",
+    "密码",
+    "门",
+    "密室",
+    "机关",
+)
+
+RP_UNRESOLVED_HINTS = (
+    "未",
+    "尚未",
+    "仍需",
+    "需要",
+    "待",
+    "等待",
+    "继续",
+    "后续",
+    "之后",
+    "尚待",
+    "未解",
+    "未定",
+    "未完成",
+    "未处理",
+    "仍",
+    "还需",
+    "不得",
+    "风险",
+)
+
+RP_FORESHADOWING_HINTS = (
+    "伏笔",
+    "暗示",
+    "预兆",
+    "隐患",
+    "谜",
+    "秘密",
+    "真相",
+    "揭示",
+    "线索",
+    "暗号",
+    "密信",
+    "尚未揭",
+    "日后",
+    "埋下",
+    "疑点",
+)
+
+
+def _split_rp_candidate_sentences(*values: Any) -> list[str]:
+    seen: set[str] = set()
+    rows: list[str] = []
+    for value in values:
+        if isinstance(value, list):
+            raw_parts = [str(item or "") for item in value]
+        else:
+            raw_parts = re.split(r"[\n。；;!?！？]+", str(value or ""))
+        for part in raw_parts:
+            text = re.sub(r"\s+", " ", str(part or "")).strip(" ，,、：:")
+            if len(text) < 3:
+                continue
+            if text in seen:
+                continue
+            seen.add(text)
+            rows.append(text)
+    return rows
+
+
+def _pick_rp_sentences(candidates: list[str], keywords: tuple[str, ...], *, limit: int = 4, char_limit: int = 180) -> str:
+    picked: list[str] = []
+    for text in candidates:
+        if any(keyword and keyword in text for keyword in keywords):
+            picked.append(_compact_text(text, 70))
+        if len(picked) >= limit:
+            break
+    return "；".join(picked)[:char_limit]
+
+
+def _extract_rp_location(candidates: list[str]) -> str:
+    patterns = (
+        r"(?:在|于|至|到|前往|抵达|进入|回到)([^，。；;、]{2,18}(?:宫|阁|院|府|城|镇|村|山|谷|湖|河|海|岛|寺|庙|塔|楼|馆|室|厅|门|桥|街|巷|店|营|宅|庄|殿|祠|苑|园|司|署|牢|狱|关|口|境|地))",
+        r"([^，。；;、]{2,18}(?:宫|阁|院|府|城|镇|村|山|谷|湖|河|海|岛|寺|庙|塔|楼|馆|室|厅|门|桥|街|巷|店|营|宅|庄|殿|祠|苑|园|司|署|牢|狱|关|口|境|地))(?:中|内|外|前|后|里)",
+    )
+    for text in candidates:
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                return _compact_text(match.group(1).strip(" ，,、：:"), 40)
+    return ""
+
+
+def _extract_rp_story_time(candidates: list[str]) -> str:
+    patterns = (
+        r"(第[一二三四五六七八九十百千万0-9]+[日天夜年月回幕章场段][^，。；;]{0,8})",
+        r"([今昨明前后]夜|[今昨明前后]日|清晨|拂晓|黎明|上午|正午|午后|黄昏|傍晚|深夜|子时|丑时|寅时|卯时|辰时|巳时|午时|未时|申时|酉时|戌时|亥时)",
+        r"([春夏秋冬][日夜]|冬至|除夕|元宵|中秋|雨夜|雪夜)",
+    )
+    for text in candidates:
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                return _compact_text(match.group(1).strip(), 40)
+    return ""
+
+
+def _augment_outline_item_fields(outline_item: dict[str, Any], selected_memories: list[dict[str, Any]]) -> dict[str, Any]:
+    memory_text_parts: list[Any] = []
+    for item in selected_memories:
+        memory_text_parts.extend([item.get("title", ""), item.get("content", ""), item.get("notes", ""), item.get("tags", [])])
+
+    key_events = outline_item.get("key_events", []) if isinstance(outline_item.get("key_events"), list) else []
+    candidates = _split_rp_candidate_sentences(
+        outline_item.get("title", ""),
+        outline_item.get("summary", ""),
+        outline_item.get("relationship_progress", ""),
+        outline_item.get("conflicts", ""),
+        outline_item.get("next_hooks", ""),
+        outline_item.get("notes", ""),
+        key_events,
+        *memory_text_parts,
+    )
+
+    if not str(outline_item.get("location", "")).strip():
+        outline_item["location"] = _extract_rp_location(candidates)
+    if not str(outline_item.get("story_time", "")).strip():
+        story_time_candidates = _split_rp_candidate_sentences(
+            outline_item.get("title", ""),
+            outline_item.get("summary", ""),
+            key_events,
+            *memory_text_parts,
+        )
+        outline_item["story_time"] = _extract_rp_story_time(story_time_candidates)
+    if not str(outline_item.get("important_items", "")).strip():
+        outline_item["important_items"] = _pick_rp_sentences(candidates, RP_IMPORTANT_ITEM_KEYWORDS, limit=4, char_limit=220)
+    if not str(outline_item.get("unresolved_items", "")).strip():
+        outline_item["unresolved_items"] = _pick_rp_sentences(candidates, RP_UNRESOLVED_HINTS, limit=3, char_limit=200)
+    if not str(outline_item.get("foreshadowing", "")).strip():
+        outline_item["foreshadowing"] = _pick_rp_sentences(candidates, RP_FORESHADOWING_HINTS, limit=3, char_limit=200)
+    if not str(outline_item.get("emotion_shift", "")).strip():
+        outline_item["emotion_shift"] = _pick_rp_sentences(
+            candidates,
+            ("情绪", "愧", "怒", "恨", "怕", "恐", "惧", "信任", "依赖", "心软", "动摇", "释然", "悲", "喜", "羞", "怜", "怨"),
+            limit=2,
+            char_limit=160,
+        )
+    return outline_item
+
+
 def _sanitize_memory_item(item: Any, *, fallback_id: str) -> dict[str, Any]:
     if not isinstance(item, dict):
         item = {}
@@ -65,6 +242,20 @@ def _sanitize_memory_item(item: Any, *, fallback_id: str) -> dict[str, Any]:
         "memory_status": memory_status,
         "archived_at": str(item.get("archived_at", "")).strip() if memory_status == "archived" else "",
     }
+
+
+def _parse_bool(value: Any, default: bool = True) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return True
+        if text in {"0", "false", "no", "off"}:
+            return False
+    if value is None:
+        return default
+    return bool(value)
 
 
 def _sanitize_memory_list(items: Any) -> list[dict[str, Any]]:
@@ -128,12 +319,21 @@ def _sanitize_outline_item(item: Any, *, fallback_index: int) -> dict[str, Any]:
         "id": str(item.get("id", "")).strip() or f"memory-outline-{fallback_index}",
         "title": str(item.get("title", "")).strip(),
         "summary": str(item.get("summary", "")).strip(),
+        "story_time": str(item.get("story_time", "")).strip(),
+        "chapter": str(item.get("chapter", "")).strip(),
+        "location": str(item.get("location", "")).strip(),
         "characters": str(item.get("characters", "")).strip(),
         "relationship_progress": str(item.get("relationship_progress", "")).strip(),
+        "emotion_shift": str(item.get("emotion_shift", "")).strip(),
         "key_events": _sanitize_string_list(item.get("key_events", []), limit=16),
         "conflicts": str(item.get("conflicts", "")).strip(),
+        "foreshadowing": str(item.get("foreshadowing", "")).strip(),
+        "unresolved_items": str(item.get("unresolved_items", "")).strip(),
+        "important_items": str(item.get("important_items", "")).strip(),
         "next_hooks": str(item.get("next_hooks", "")).strip(),
         "notes": str(item.get("notes", "")).strip(),
+        "participate_recall": _parse_bool(item.get("participate_recall"), True),
+        "project_to_worldbook": _parse_bool(item.get("project_to_worldbook"), True),
         "source_memory_ids": _sanitize_string_list(item.get("source_memory_ids", []), limit=128),
         "merged_memory_id": str(item.get("merged_memory_id", "")).strip(),
         "updated_at": str(item.get("updated_at", "")).strip() or _now_text(),
@@ -227,10 +427,17 @@ def build_memory_merge_prompt(
         '  "outline_item": {\n'
         '    "title": "大纲标题",\n'
         '    "summary": "这一批记忆的大纲总结",\n'
+        '    "story_time": "剧情时间或章节内时间，可为空",\n'
+        '    "chapter": "章节、幕次或剧情段落，可为空",\n'
+        '    "location": "主要地点，可为空",\n'
         '    "characters": "涉及角色，可为空",\n'
         '    "relationship_progress": "关系推进，可为空",\n'
+        '    "emotion_shift": "情绪变化，可为空",\n'
         '    "key_events": ["事件1", "事件2"],\n'
         '    "conflicts": "矛盾点或问题，可为空",\n'
+        '    "foreshadowing": "伏笔，可为空",\n'
+        '    "unresolved_items": "未解决事项，可为空",\n'
+        '    "important_items": "重要物品或线索，可为空",\n'
         '    "next_hooks": "后续可延展钩子，可为空",\n'
         '    "notes": "额外补充，可为空"\n'
         '  }\n'
@@ -243,10 +450,21 @@ def build_memory_merge_prompt(
         "1. 输出必须是一个严格 JSON 对象，不要输出 markdown，不要解释。\n"
         "2. merged_memory.content 要尽量保留事实，不要空泛。\n"
         "3. outline_item.summary 要偏大纲摘要；key_events 要列关键事件。\n"
-        "4. 如果原记忆中有重复内容，请自动去重合并。\n"
-        "5. 不要虚构原记忆中没有的信息。\n"
-        f"6. 合并记忆标题优先参考：{title_hint}\n"
-        f"7. 大纲标题优先参考：{outline_hint}\n\n"
+        "4. outline_item 要主动填写 RP 剧情档案字段，宁可给用户一个可编辑草稿，也不要把明显信息留空。\n"
+        "5. 分类规则：\n"
+        "   - story_time：第几日、夜晚、雨夜、某章节内时间等。\n"
+        "   - chapter：篇章、幕次、阶段名、事件线名称。\n"
+        "   - location：明确发生地点、去向、门厅、宫室、城镇等。\n"
+        "   - emotion_shift：角色态度、信任、愧疚、恐惧、依赖、敌意、心软等变化。\n"
+        "   - foreshadowing：未来可能揭示的秘密、疑点、暗示、隐患、未明真相。\n"
+        "   - unresolved_items：仍需处理、尚未完成、后续必须解决的事。\n"
+        "   - important_items：钥匙、玉牌、信物、账本、契约、密信、药、债务、欠款、证据、暗号、机关等物品或线索。\n"
+        "6. 如果原文出现“玉牌、信物、契约、债务、密信、账本、钥匙、药、地图、证据、暗号、机关”，通常应写入 important_items。\n"
+        "7. 如果原文出现“后续、仍需、尚未、待、未解、不得、风险”，通常应写入 unresolved_items 或 next_hooks。\n"
+        "8. 只能从原记忆中提取和压缩，不要虚构原记忆中没有的信息；确实没有依据才保持空字符串。\n"
+        "9. 如果原记忆中有重复内容，请自动去重合并。\n"
+        f"10. 合并记忆标题优先参考：{title_hint}\n"
+        f"11. 大纲标题优先参考：{outline_hint}\n\n"
         f"格式示例：\n{schema_hint}\n\n"
         f"待合并记忆：\n\n{chr(10).join(lines)}"
     )
@@ -301,12 +519,21 @@ def _fallback_merge_result(
         "outline_item": {
             "title": auto_outline_title[:80],
             "summary": outline_summary[:900] or merged_content[:300],
+            "story_time": "",
+            "chapter": "",
+            "location": "",
             "characters": "",
             "relationship_progress": "",
+            "emotion_shift": "",
             "key_events": event_titles[:10],
             "conflicts": "",
+            "foreshadowing": "",
+            "unresolved_items": "",
+            "important_items": "",
             "next_hooks": "",
             "notes": "该大纲项由本地回退逻辑生成，未使用模型结构化总结。",
+            "participate_recall": True,
+            "project_to_worldbook": True,
         },
     }
 
@@ -469,16 +696,26 @@ def _build_final_outline_item(
         "id": f"outline-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
         "title": outline_title.strip() or str(data.get("title", "")).strip() or "记忆大纲",
         "summary": str(data.get("summary", "")).strip(),
+        "story_time": str(data.get("story_time", "")).strip(),
+        "chapter": str(data.get("chapter", "")).strip(),
+        "location": str(data.get("location", "")).strip(),
         "characters": str(data.get("characters", "")).strip(),
         "relationship_progress": str(data.get("relationship_progress", "")).strip(),
+        "emotion_shift": str(data.get("emotion_shift", "")).strip(),
         "key_events": _sanitize_string_list(data.get("key_events", []), limit=16),
         "conflicts": str(data.get("conflicts", "")).strip(),
+        "foreshadowing": str(data.get("foreshadowing", "")).strip(),
+        "unresolved_items": str(data.get("unresolved_items", "")).strip(),
+        "important_items": str(data.get("important_items", "")).strip(),
         "next_hooks": str(data.get("next_hooks", "")).strip(),
         "notes": str(data.get("notes", "")).strip(),
+        "participate_recall": True,
+        "project_to_worldbook": True,
         "source_memory_ids": source_ids,
         "merged_memory_id": merged_memory_id,
         "updated_at": _now_text(),
     }
+    outline_item = _augment_outline_item_fields(outline_item, selected_memories)
     return _sanitize_outline_item(outline_item, fallback_index=1)
 
 

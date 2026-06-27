@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memory - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    <link rel="stylesheet" href="/static/styles.css?v=p6-memory-rp-dossier-20260627" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="app-sidebar-shell modern-setting-page memory-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
@@ -217,9 +217,11 @@
                 <thead>
                   <tr>
                     <th style="width: 150px;">时间</th>
-                    <th style="width: 220px;">标题</th>
+                    <th style="width: 260px;">标题 / 档案</th>
+                    <th style="width: 170px;">剧情位置</th>
                     <th style="width: 180px;">角色</th>
                     <th style="width: 200px;">关系推进</th>
+                    <th style="width: 150px;">使用方式</th>
                     <th>关键事件</th>
                   </tr>
                 </thead>
@@ -606,6 +608,45 @@
         return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
       }
 
+      function outlineFlagEnabled(item, key) {
+        return item?.[key] !== false;
+      }
+
+      function outlineFlagLabel(item, key, enabledLabel, disabledLabel) {
+        return outlineFlagEnabled(item, key) ? enabledLabel : disabledLabel;
+      }
+
+      function buildOutlineLocationText(item) {
+        const parts = [
+          item?.chapter ? `章节：${item.chapter}` : "",
+          item?.story_time ? `时间：${item.story_time}` : "",
+          item?.location ? `地点：${item.location}` : "",
+        ].filter(Boolean);
+        return parts.join(" / ") || "—";
+      }
+
+      function buildOutlineArchiveBadges(item) {
+        const badges = [];
+        if (item?.story_time) badges.push(`时间：${compactText(item.story_time, 18)}`);
+        if (item?.chapter) badges.push(`章节：${compactText(item.chapter, 18)}`);
+        if (item?.location) badges.push(`地点：${compactText(item.location, 18)}`);
+        if (item?.important_items) badges.push(`线索：${compactText(item.important_items, 18)}`);
+        return badges;
+      }
+
+      function buildOutlineUsageBadges(item) {
+        return [
+          {
+            text: outlineFlagLabel(item, "project_to_worldbook", "投影世界书", "不投影世界书"),
+            off: !outlineFlagEnabled(item, "project_to_worldbook"),
+          },
+          {
+            text: outlineFlagLabel(item, "participate_recall", "参与召回", "不参与召回"),
+            off: !outlineFlagEnabled(item, "participate_recall"),
+          },
+        ];
+      }
+
       function outlineItemMatches(row, target) {
         if (!row || !target) return false;
         const rowId = String(row.id || "").trim();
@@ -810,12 +851,21 @@
           ...original,
           title: document.getElementById("outline-edit-title")?.value.trim() || "",
           summary: document.getElementById("outline-edit-summary")?.value.trim() || "",
+          story_time: document.getElementById("outline-edit-story-time")?.value.trim() || "",
+          chapter: document.getElementById("outline-edit-chapter")?.value.trim() || "",
+          location: document.getElementById("outline-edit-location")?.value.trim() || "",
           characters: document.getElementById("outline-edit-characters")?.value.trim() || "",
           relationship_progress: document.getElementById("outline-edit-relationship")?.value.trim() || "",
+          emotion_shift: document.getElementById("outline-edit-emotion-shift")?.value.trim() || "",
           key_events: keyEvents,
           conflicts: document.getElementById("outline-edit-conflicts")?.value.trim() || "",
+          foreshadowing: document.getElementById("outline-edit-foreshadowing")?.value.trim() || "",
+          unresolved_items: document.getElementById("outline-edit-unresolved-items")?.value.trim() || "",
+          important_items: document.getElementById("outline-edit-important-items")?.value.trim() || "",
           next_hooks: document.getElementById("outline-edit-next-hooks")?.value.trim() || "",
           notes: document.getElementById("outline-edit-notes")?.value.trim() || "",
+          participate_recall: document.getElementById("outline-edit-participate-recall")?.checked !== false,
+          project_to_worldbook: document.getElementById("outline-edit-project-worldbook")?.checked !== false,
           source_memory_ids: Array.isArray(original.source_memory_ids) ? original.source_memory_ids : [],
           merged_memory_id: original.merged_memory_id || "",
           updated_at: currentMinuteText(),
@@ -869,6 +919,18 @@
               <label for="outline-edit-characters">涉及角色</label>
               <input id="outline-edit-characters" type="text" value="${escapeHtml(item.characters || "")}" />
             </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-story-time">剧情时间</label>
+              <input id="outline-edit-story-time" type="text" placeholder="例如：第七日夜晚 / 冬至后" value="${escapeHtml(item.story_time || "")}" />
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-chapter">章节 / 段落</label>
+              <input id="outline-edit-chapter" type="text" placeholder="例如：银钥匙篇 / 第二幕" value="${escapeHtml(item.chapter || "")}" />
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-location">地点</label>
+              <input id="outline-edit-location" type="text" placeholder="例如：旧图书馆地下门厅" value="${escapeHtml(item.location || "")}" />
+            </div>
             <div class="outline-editor-field full">
               <label for="outline-edit-summary">摘要</label>
               <textarea id="outline-edit-summary" rows="4">${escapeHtml(item.summary || "")}</textarea>
@@ -876,6 +938,10 @@
             <div class="outline-editor-field">
               <label for="outline-edit-relationship">关系推进</label>
               <textarea id="outline-edit-relationship" rows="3">${escapeHtml(item.relationship_progress || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-emotion-shift">情绪变化</label>
+              <textarea id="outline-edit-emotion-shift" rows="3">${escapeHtml(item.emotion_shift || "")}</textarea>
             </div>
             <div class="outline-editor-field">
               <label for="outline-edit-key-events">关键事件（一行一条）</label>
@@ -886,8 +952,31 @@
               <textarea id="outline-edit-conflicts" rows="3">${escapeHtml(item.conflicts || "")}</textarea>
             </div>
             <div class="outline-editor-field">
+              <label for="outline-edit-foreshadowing">伏笔</label>
+              <textarea id="outline-edit-foreshadowing" rows="3">${escapeHtml(item.foreshadowing || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-unresolved-items">未解决事项</label>
+              <textarea id="outline-edit-unresolved-items" rows="3">${escapeHtml(item.unresolved_items || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-important-items">重要物品 / 线索</label>
+              <textarea id="outline-edit-important-items" rows="3">${escapeHtml(item.important_items || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
               <label for="outline-edit-next-hooks">后续钩子</label>
               <textarea id="outline-edit-next-hooks" rows="3">${escapeHtml(item.next_hooks || "")}</textarea>
+            </div>
+            <div class="outline-editor-field full outline-editor-switches">
+              <label>使用方式</label>
+              <label class="outline-switch-row" for="outline-edit-project-worldbook">
+                <input id="outline-edit-project-worldbook" class="outline-switch-checkbox" type="checkbox" ${outlineFlagEnabled(item, "project_to_worldbook") ? "checked" : ""} />
+                <span><strong>投影到世界书</strong><small>开启后，记忆同步世界书时会使用这条剧情档案。</small></span>
+              </label>
+              <label class="outline-switch-row" for="outline-edit-participate-recall">
+                <input id="outline-edit-participate-recall" class="outline-switch-checkbox" type="checkbox" ${outlineFlagEnabled(item, "participate_recall") ? "checked" : ""} />
+                <span><strong>参与召回</strong><small>开启后，来源原记忆不在活跃记忆区时，会作为剧情档案进入聊天召回候选；如已用世界书管理，可手动关闭。</small></span>
+              </label>
             </div>
             <div class="outline-editor-field full">
               <label for="outline-edit-notes">备注</label>
@@ -982,6 +1071,11 @@
         const keyEvents = Array.isArray(item.key_events) ? item.key_events : [];
         const sourceCount = Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0;
         const currentTime = formatMinuteTime(item.updated_at || "");
+        const locationText = buildOutlineLocationText(item);
+        const usageBadges = buildOutlineUsageBadges(item);
+        const usageBadgeHtml = usageBadges
+          .map((badge) => `<span class="outline-usage-badge${badge.off ? " is-off" : ""}">${escapeHtml(badge.text)}</span>`)
+          .join("");
 
         if (!outlineDetailExpanded) {
           outlineDetailPanelEl.innerHTML = `
@@ -1003,8 +1097,12 @@
 
               <div class="outline-brief-summary">
                 <div class="outline-brief-line"><strong>摘要：</strong><span>${escapeHtml(compactText(item.summary || "—", 150))}</span></div>
+                <div class="outline-brief-line"><strong>位置：</strong><span>${escapeHtml(compactText(locationText, 120))}</span></div>
                 <div class="outline-brief-line"><strong>角色：</strong><span>${escapeHtml(compactText(item.characters || "—", 90))}</span></div>
                 <div class="outline-brief-line"><strong>关系：</strong><span>${escapeHtml(compactText(item.relationship_progress || "—", 110))}</span></div>
+                <div class="outline-brief-line"><strong>情绪：</strong><span>${escapeHtml(compactText(item.emotion_shift || "—", 110))}</span></div>
+                <div class="outline-brief-line"><strong>线索：</strong><span>${escapeHtml(compactText(item.important_items || item.foreshadowing || "—", 120))}</span></div>
+                <div class="outline-usage-badges">${usageBadgeHtml}</div>
               </div>
             </div>
           `;
@@ -1045,8 +1143,28 @@
 
           <div class="outline-detail-grid">
             <div class="outline-detail-block full">
+              <strong>使用方式</strong>
+              <div class="outline-usage-badges">${usageBadgeHtml}</div>
+            </div>
+
+            <div class="outline-detail-block full">
               <strong>摘要</strong>
-              <div class="outline-detail-text">${escapeHtml(item.summary || "")}</div>
+              <div class="outline-detail-text">${escapeHtml(item.summary || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>剧情时间</strong>
+              <div class="outline-detail-text">${escapeHtml(item.story_time || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>章节 / 段落</strong>
+              <div class="outline-detail-text">${escapeHtml(item.chapter || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>地点</strong>
+              <div class="outline-detail-text">${escapeHtml(item.location || "—")}</div>
             </div>
 
             <div class="outline-detail-block">
@@ -1057,6 +1175,11 @@
             <div class="outline-detail-block">
               <strong>关系推进</strong>
               <div class="outline-detail-text">${escapeHtml(item.relationship_progress || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>情绪变化</strong>
+              <div class="outline-detail-text">${escapeHtml(item.emotion_shift || "—")}</div>
             </div>
 
             <div class="outline-detail-block full">
@@ -1071,6 +1194,21 @@
             <div class="outline-detail-block">
               <strong>矛盾点</strong>
               <div class="outline-detail-text">${escapeHtml(item.conflicts || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>伏笔</strong>
+              <div class="outline-detail-text">${escapeHtml(item.foreshadowing || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>未解决事项</strong>
+              <div class="outline-detail-text">${escapeHtml(item.unresolved_items || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>重要物品 / 线索</strong>
+              <div class="outline-detail-text">${escapeHtml(item.important_items || "—")}</div>
             </div>
 
             <div class="outline-detail-block">
@@ -1121,7 +1259,7 @@
         if (!currentOutlineItems.length) {
           outlineTableBodyEl.innerHTML = `
             <tr>
-              <td colspan="5">
+              <td colspan="7">
                 <div class="empty-tip">还没有大纲表项。完成一次记忆合并后，这里会出现宽版总览表格。</div>
               </td>
             </tr>
@@ -1132,6 +1270,14 @@
 
         for (const item of currentOutlineItems) {
           const events = Array.isArray(item.key_events) ? item.key_events : [];
+          const archiveBadges = buildOutlineArchiveBadges(item);
+          const usageBadges = buildOutlineUsageBadges(item);
+          const archiveBadgeHtml = archiveBadges.length
+            ? `<div class="outline-archive-badges">${archiveBadges.map((badge) => `<span>${escapeHtml(badge)}</span>`).join("")}</div>`
+            : "";
+          const usageBadgeHtml = usageBadges
+            .map((badge) => `<span class="outline-usage-badge${badge.off ? " is-off" : ""}">${escapeHtml(badge.text)}</span>`)
+            .join("");
           const row = document.createElement("tr");
           row.dataset.outlineId = item.id || "";
           row.innerHTML = `
@@ -1139,9 +1285,12 @@
             <td class="outline-title-cell">
               <div class="outline-title-main">${escapeHtml(item.title || "未命名大纲")}</div>
               <div class="outline-submeta">来源 ${Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0} 条</div>
+              ${archiveBadgeHtml}
             </td>
+            <td><div class="outline-cell-clamp">${escapeHtml(buildOutlineLocationText(item))}</div></td>
             <td><div class="outline-cell-clamp">${escapeHtml(item.characters || "—")}</div></td>
             <td><div class="outline-cell-clamp">${escapeHtml(item.relationship_progress || "—")}</div></td>
+            <td><div class="outline-usage-badges compact">${usageBadgeHtml}</div></td>
             <td><div class="outline-events-inline outline-cell-clamp">${escapeHtml(events.join(" / ") || "—")}</div></td>
           `;
           row.addEventListener("click", () => {
@@ -1320,6 +1469,9 @@
           "提示：生成词条默认常驻；如需关键词触发，可在世界书词条管理中手动调整。",
           "提示：合并时若保留来源原记忆且也同步世界书，可能出现重复注入；默认删除来源原记忆可避免。",
         ];
+        if (Number(stats.skipped_worldbook_projection_count || 0) > 0) {
+          lines.splice(1, 0, `已按大纲项开关跳过：${stats.skipped_worldbook_projection_count || 0} 条`);
+        }
         if (!stats.source_row_count) {
           lines.push("没有可投影的大纲表/合并记忆。先完成一次记忆合并，再生成世界书投影。");
         }

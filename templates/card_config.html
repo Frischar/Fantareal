@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Card Config - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
 
@@ -32,7 +33,7 @@
         <div class="section-head">
           <p class="eyebrow">Role Card</p>
           <h2>角色卡编辑器</h2>
-          <p class="muted">这里把常用的 JSON 键都拆成了固定输入位。玩家只需要逐项填写，然后点击保存并加载即可。加载后的当前角色卡也支持直接导出。</p>
+          <p class="muted">这里把常用的 JSON 键都拆成了固定输入位。大文本字段可插入 Fantareal 只读宏；导出到其他平台时这些宏可能不会被解析。</p>
         </div>
 
         <div class="card-workbench ui-readable-canvas">
@@ -117,6 +118,7 @@
 
             <div class="card-field-unit card-field-unit-main">
               <label for="card-description">description <span class="field-note">（角色背景 / 设定简介）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-description">{ } 变量</button>
               <textarea id="card-description" rows="7">{{ card_template.description }}</textarea>
             </div>
           </section>
@@ -132,11 +134,13 @@
 
             <div class="card-field-unit card-field-unit-main">
               <label for="card-personality">personality <span class="field-note">（性格关键词 / 行为倾向）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-personality">{ } 变量</button>
               <textarea id="card-personality" rows="7">{{ card_template.personality }}</textarea>
             </div>
 
             <div class="card-field-unit card-field-unit-main">
               <label for="card-scenario">scenario <span class="field-note">（当前世界观 / 场景基调）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-scenario">{ } 变量</button>
               <textarea id="card-scenario" rows="7">{{ card_template.scenario }}</textarea>
             </div>
           </section>
@@ -153,11 +157,13 @@
             <div class="card-field-unit card-field-unit-main">
               <label for="card-first-mes">first_mes <span class="field-note">（开场白 / 初见时第一句）</span></label>
               <p class="field-note card-field-tip">只作为新对话首次展示，不作为常驻提示词反复注入。</p>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-first-mes">{ } 变量</button>
               <textarea id="card-first-mes" rows="7">{{ card_template.first_mes }}</textarea>
             </div>
 
             <div class="card-field-unit card-field-unit-main">
               <label for="card-mes-example">mes_example <span class="field-note">（示例对话 / 说话风格参考）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-mes-example">{ } 变量</button>
               <textarea id="card-mes-example" rows="8">{{ card_template.mes_example }}</textarea>
             </div>
           </section>
@@ -173,6 +179,7 @@
 
             <div class="card-field-unit card-field-unit-main">
               <label for="card-creator-notes">creator_notes <span class="field-note">（隐藏规则 / 对模型的补充说明）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-creator-notes">{ } 变量</button>
               <textarea id="card-creator-notes" rows="12">{{ card_template.creator_notes }}</textarea>
             </div>
 
@@ -208,15 +215,19 @@
             <textarea id="persona-{{ key }}-aliases" rows="2">{{ (persona.aliases or [])|join('\n') }}</textarea>
 
             <label for="persona-{{ key }}-description">description <span class="field-note">（身份 / 背景简介）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-description">{ } 变量</button>
             <textarea id="persona-{{ key }}-description" rows="3">{{ persona.description }}</textarea>
 
             <label for="persona-{{ key }}-personality">personality <span class="field-note">（个性 / 语气倾向）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-personality">{ } 变量</button>
             <textarea id="persona-{{ key }}-personality" rows="3">{{ persona.personality }}</textarea>
 
             <label for="persona-{{ key }}-scenario">scenario <span class="field-note">（该角色所处场景 / 关系定位）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-scenario">{ } 变量</button>
             <textarea id="persona-{{ key }}-scenario" rows="3">{{ persona.scenario }}</textarea>
 
             <label for="persona-{{ key }}-creator-notes">creator_notes <span class="field-note">（仅给模型看的补充说明）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-creator-notes">{ } 变量</button>
             <textarea id="persona-{{ key }}-creator-notes" rows="3">{{ persona.creator_notes }}</textarea>
           </div>
           {% endfor %}
@@ -311,6 +322,7 @@
     <script src="/static/js/app-core.js?v=v161"></script>
     <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
     <script>
       const PERSONA_LABELS = {
         name: "（该角色显示名）",
@@ -935,15 +947,19 @@
           <textarea id="persona-${key}-aliases" rows="2"></textarea>
 
           <label for="persona-${key}-description">description <span class="field-note">${PERSONA_LABELS.description}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-description">{ } 变量</button>
           <textarea id="persona-${key}-description" rows="3"></textarea>
 
           <label for="persona-${key}-personality">personality <span class="field-note">${PERSONA_LABELS.personality}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-personality">{ } 变量</button>
           <textarea id="persona-${key}-personality" rows="3"></textarea>
 
           <label for="persona-${key}-scenario">scenario <span class="field-note">${PERSONA_LABELS.scenario}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-scenario">{ } 变量</button>
           <textarea id="persona-${key}-scenario" rows="3"></textarea>
 
           <label for="persona-${key}-creator-notes">creator_notes <span class="field-note">${PERSONA_LABELS.creator_notes}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-creator-notes">{ } 变量</button>
           <textarea id="persona-${key}-creator-notes" rows="3"></textarea>
         `;
         wrapper.querySelector(`#persona-${key}-name`).value = persona.name || "";

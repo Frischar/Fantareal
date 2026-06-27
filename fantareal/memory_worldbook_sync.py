@@ -91,12 +91,21 @@ def _outline_rows(outline_items: list[dict[str, Any]], merged_items: list[dict[s
                 "source_memory_ids": [str(value).strip() for value in source_ids if str(value).strip()],
                 "title": str(item.get("title", "")).strip() or str(merged.get("title", "")).strip() or f"记忆大纲 {index}",
                 "summary": str(item.get("summary", "")).strip() or str(merged.get("content", "")).strip(),
+                "story_time": str(item.get("story_time", "")).strip(),
+                "chapter": str(item.get("chapter", "")).strip(),
+                "location": str(item.get("location", "")).strip(),
                 "characters": str(item.get("characters", "")).strip(),
                 "relationship_progress": str(item.get("relationship_progress", "")).strip(),
+                "emotion_shift": str(item.get("emotion_shift", "")).strip(),
                 "key_events": item.get("key_events") if isinstance(item.get("key_events"), list) else [],
                 "conflicts": str(item.get("conflicts", "")).strip(),
+                "foreshadowing": str(item.get("foreshadowing", "")).strip(),
+                "unresolved_items": str(item.get("unresolved_items", "")).strip(),
+                "important_items": str(item.get("important_items", "")).strip(),
                 "next_hooks": str(item.get("next_hooks", "")).strip(),
                 "notes": str(item.get("notes", "")).strip(),
+                "participate_recall": item.get("participate_recall") is not False,
+                "project_to_worldbook": item.get("project_to_worldbook") is not False,
                 "updated_at": str(item.get("updated_at", "")).strip(),
             }
         )
@@ -116,12 +125,21 @@ def _outline_rows(outline_items: list[dict[str, Any]], merged_items: list[dict[s
                 "source_memory_ids": [str(value).strip() for value in source_ids if str(value).strip()],
                 "title": str(item.get("title", "")).strip() or f"合并记忆 {index}",
                 "summary": str(item.get("content", "")).strip(),
+                "story_time": "",
+                "chapter": "",
+                "location": "",
                 "characters": "",
                 "relationship_progress": "",
+                "emotion_shift": "",
                 "key_events": [],
                 "conflicts": "",
+                "foreshadowing": "",
+                "unresolved_items": "",
+                "important_items": "",
                 "next_hooks": "",
                 "notes": str(item.get("notes", "")).strip(),
+                "participate_recall": True,
+                "project_to_worldbook": True,
                 "updated_at": str(item.get("created_at", "")).strip(),
             }
         )
@@ -192,8 +210,13 @@ def _base_entry(
 
 def _trigger_terms(row: dict[str, Any], code: str) -> str:
     raw_parts: list[str] = [code, row.get("title", ""), row.get("characters", "")]
+    raw_parts.append(row.get("story_time", ""))
+    raw_parts.append(row.get("chapter", ""))
+    raw_parts.append(row.get("location", ""))
     raw_parts.extend(str(item) for item in row.get("key_events", []) if str(item).strip())
     raw_parts.append(row.get("relationship_progress", ""))
+    raw_parts.append(row.get("emotion_shift", ""))
+    raw_parts.append(row.get("important_items", ""))
     raw_parts.append(row.get("next_hooks", ""))
 
     terms: list[str] = []
@@ -220,18 +243,32 @@ def _detail_content(row: dict[str, Any], code: str) -> str:
     ]
     if row.get("updated_at"):
         lines.append(f"记录时间：{row['updated_at']}")
+    if row.get("story_time"):
+        lines.append(f"剧情时间：{row['story_time']}")
+    if row.get("chapter"):
+        lines.append(f"章节/段落：{row['chapter']}")
+    if row.get("location"):
+        lines.append(f"地点：{row['location']}")
     if row.get("characters"):
         lines.append(f"涉及角色：{row['characters']}")
     if row.get("summary"):
         lines.append(f"摘要：{row['summary']}")
     if row.get("relationship_progress"):
         lines.append(f"关系进展：{row['relationship_progress']}")
+    if row.get("emotion_shift"):
+        lines.append(f"情绪变化：{row['emotion_shift']}")
     events = [str(item).strip() for item in row.get("key_events", []) if str(item).strip()]
     if events:
         lines.append("关键事件：")
         lines.extend(f"- {item}" for item in events[:8])
     if row.get("conflicts"):
         lines.append(f"冲突/风险：{row['conflicts']}")
+    if row.get("foreshadowing"):
+        lines.append(f"伏笔：{row['foreshadowing']}")
+    if row.get("unresolved_items"):
+        lines.append(f"未解决事项：{row['unresolved_items']}")
+    if row.get("important_items"):
+        lines.append(f"重要物品/线索：{row['important_items']}")
     if row.get("next_hooks"):
         lines.append(f"后续钩子：{row['next_hooks']}")
     if row.get("notes"):
@@ -244,7 +281,8 @@ def _build_detail_entries(rows: list[dict[str, Any]], options: dict[str, Any]) -
     if not options["include_details"]:
         return []
     limit = options["detail_entry_limit"]
-    selected_rows = rows[-limit:] if len(rows) > limit else rows
+    projectable_rows = [row for row in rows if row.get("project_to_worldbook") is not False]
+    selected_rows = projectable_rows[-limit:] if len(projectable_rows) > limit else projectable_rows
 
     entries: list[dict[str, Any]] = []
     for local_index, row in enumerate(selected_rows, start=1):
@@ -273,12 +311,16 @@ def _build_core_entry(rows: list[dict[str, Any]], options: dict[str, Any]) -> li
     if not options["include_core"] or not rows:
         return []
     recent_count = min(max(options["recent_constant_count"], 1), len(rows))
-    recent_rows = rows[-recent_count:]
+    projectable_rows = [row for row in rows if row.get("project_to_worldbook") is not False]
+    if not projectable_rows:
+        return []
+    recent_count = min(recent_count, len(projectable_rows))
+    recent_rows = projectable_rows[-recent_count:]
     lines = [
         "【长期记忆核心状态】",
         "以下内容是已经发生过的 RP 事实和当前连续性状态。请隐性使用，不要主动向用户复述为总结。",
         f"同步时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"来源摘要数量：{len(rows)} 条；最近常驻摘要：{recent_count} 条。",
+        f"来源摘要数量：{len(projectable_rows)} 条；最近常驻摘要：{recent_count} 条。",
         "",
         "最近关键摘要：",
     ]
@@ -302,9 +344,9 @@ def _build_core_entry(rows: list[dict[str, Any]], options: dict[str, Any]) -> li
             metadata={
                 "managed_by": MANAGED_SOURCE,
                 "entry_kind": "core",
-                "source_count": len(rows),
+                "source_count": len(projectable_rows),
                 "recent_constant_count": recent_count,
-                "sync_hash": _stable_hash(rows),
+                "sync_hash": _stable_hash(projectable_rows),
             },
         )
     ]
@@ -314,7 +356,10 @@ def _build_index_entry(rows: list[dict[str, Any]], options: dict[str, Any]) -> l
     if not options["include_index"] or not rows:
         return []
     limit = options["index_entry_limit"]
-    selected_rows = rows[-limit:] if len(rows) > limit else rows
+    projectable_rows = [row for row in rows if row.get("project_to_worldbook") is not False]
+    if not projectable_rows:
+        return []
+    selected_rows = projectable_rows[-limit:] if len(projectable_rows) > limit else projectable_rows
     lines = [
         "【长期记忆大纲索引】",
         "以下索引用于了解过往剧情阶段。需要具体细节时，以对应过往记忆条目为准；不要主动朗读索引。",
@@ -336,7 +381,7 @@ def _build_index_entry(rows: list[dict[str, Any]], options: dict[str, Any]) -> l
             metadata={
                 "managed_by": MANAGED_SOURCE,
                 "entry_kind": "index",
-                "source_count": len(rows),
+                "source_count": len(projectable_rows),
                 "listed_count": len(selected_rows),
                 "sync_hash": _stable_hash(selected_rows),
             },
@@ -351,6 +396,7 @@ def build_memory_worldbook_entries(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     options = sanitize_sync_options(raw_options)
     rows = _outline_rows(outline_items, merged_items)
+    projectable_rows = [row for row in rows if row.get("project_to_worldbook") is not False]
     entries: list[dict[str, Any]] = []
     entries.extend(_build_core_entry(rows, options))
     entries.extend(_build_index_entry(rows, options))
@@ -361,7 +407,8 @@ def build_memory_worldbook_entries(
     stats = {
         "source_outline_count": len(outline_items),
         "source_merged_count": len(merged_items),
-        "source_row_count": len(rows),
+        "source_row_count": len(projectable_rows),
+        "skipped_worldbook_projection_count": max(len(rows) - len(projectable_rows), 0),
         "generated_count": len(entries),
         "constant_count": constant_count,
         "keyword_count": keyword_count,

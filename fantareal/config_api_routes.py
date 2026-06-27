@@ -44,6 +44,7 @@ from .app_models import (
     UserProfilePayload,
     WorkshopEvaluatePayload,
     WorkshopSavePayload,
+    WorkshopTriggeredScenePayload,
     WorldbookPayload,
     WorldbookSettingsPayload,
 )
@@ -510,6 +511,10 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             "active_preset": ctx.get_active_preset_from_store(store),
             "preset_debug": ctx.build_preset_debug_payload(active_slot),
         }
+
+    @app.get("/api/macro_variables/catalog")
+    async def api_macro_variables_catalog() -> dict[str, Any]:
+        return ctx.get_macro_catalog()
 
     @app.post("/api/preset")
     async def api_save_preset(payload: PresetStorePayload) -> dict[str, Any]:
@@ -1698,6 +1703,34 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
             "workshop": result["workshop"],
             "state": result["workshop_state"],
             "binding": workshop_card_binding_summary(result["workshop"], result["current_card"]),
+        }
+
+    @app.post("/api/workshop/triggered-scene")
+    async def api_mark_workshop_triggered_scene(payload: WorkshopTriggeredScenePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        token = str(payload.token or "").strip()[:240]
+        if not token:
+            raise HTTPException(status_code=400, detail="Missing triggered scene token.")
+        state = ctx.get_workshop_state(active_slot)
+        triggered = state.get("triggered_scenes", [])
+        if not isinstance(triggered, list):
+            triggered = []
+        normalized = []
+        for item in triggered:
+            value = str(item or "").strip()
+            if value and value not in normalized:
+                normalized.append(value)
+        if token not in normalized:
+            normalized.append(token)
+        state["triggered_scenes"] = normalized[-256:]
+        saved_state = ctx.save_workshop_state(state, active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "token": token,
+            "scene_id": str(payload.scene_id or "").strip()[:80],
+            "reason": str(payload.reason or "dynamic_scene").strip()[:80],
+            "state": saved_state,
         }
 
     @app.post("/api/workshop/clear-card-binding")

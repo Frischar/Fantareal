@@ -239,13 +239,13 @@
             <div>
               <p class="eyebrow">Dynamic Performance</p>
               <h3>动态演出</h3>
-              <p class="muted compact">聊天过程中由系统计数或模型状态块触发的图片、音效和背景切换。它不是关键词触发，也不会进入提示词。</p>
+          <p class="muted compact">聊天过程中由系统计数、模型状态块或心笺 tag 触发的图片、音效和背景切换。它不是关键词触发，也不会进入提示词。</p>
             </div>
             <button id="add-dynamic-scene" type="button" class="secondary compact">+ 新增演出</button>
           </div>
           <div class="workshop-state-tip dynamic-state-tip">
             <strong>状态块触发 Tips：</strong>
-            <span>演出工坊不会因为正文出现“雨夜”“回忆”等词而触发。只有模型明确输出 <code>[FT_EVENT: rain_memory]</code> 或代码块 <code>fantareal_workshop</code> 里的 <code>event: rain_memory</code> 时，才会触发对应演出。触发标记建议使用英文、数字和下划线。</span>
+            <span>演出工坊不会因为正文出现“雨夜”“回忆”等词而触发。模型状态块仍可用 <code>[FT_EVENT: rain_memory]</code>；状态触发则只认心笺 active tag，例如 <code>state_journal.task.find_silver_key.done</code>。</span>
           </div>
           <div id="dynamic-scene-list" class="stack-list dynamic-scene-list"></div>
         </div>
@@ -1701,7 +1701,8 @@
         }, false);
       }
 
-      const DYNAMIC_TRIGGER_TYPES = new Set(["round", "progress", "model", "manual"]);
+      const DYNAMIC_TRIGGER_TYPES = new Set(["round", "model", "manual", "state_journal_tag", "plot_ledger_tag"]);
+      const DEPRECATED_DYNAMIC_TRIGGER_TYPES = new Set(["progress"]);
       const DYNAMIC_REPEAT_MODES = new Set(["once", "session", "always"]);
       const DYNAMIC_CONTENT_TYPES = new Set(["image", "sound", "background"]);
       const DYNAMIC_PRESENTATION_MODES = new Set(["light", "standard", "immersive"]);
@@ -1711,9 +1712,9 @@
           id: `dynamic_scene_${Date.now().toString(36)}_${index}`,
           name: `动态演出 ${index}`,
           enabled: true,
-          trigger: { type: "model", round: 1, progress: 0, event: `scene_${index}`, repeat: "once" },
+          trigger: { type: "model", round: 1, progress: 0, event: `scene_${index}`, tag: "", repeat: "once" },
           content: { type: "image", title: "", imageUrl: "", caption: "", soundUrl: "", backgroundUrl: "" },
-          presentation: { mode: "standard", duration: 6, autoClose: true },
+          presentation: { mode: "standard", duration: 6, autoClose: true, buttonText: "继续", blocking: true },
           audio: { enabled: false, url: "", volume: 0.5, duckAmbience: true },
           note: "",
         };
@@ -1726,7 +1727,10 @@
         const content = source.content && typeof source.content === "object" ? source.content : {};
         const presentation = source.presentation && typeof source.presentation === "object" ? source.presentation : {};
         const audio = source.audio && typeof source.audio === "object" ? source.audio : {};
-        const triggerType = DYNAMIC_TRIGGER_TYPES.has(String(trigger.type || "model")) ? String(trigger.type || "model") : "model";
+        const rawTriggerType = String(trigger.type || "model");
+        const triggerType = DYNAMIC_TRIGGER_TYPES.has(rawTriggerType)
+          ? rawTriggerType
+          : (DEPRECATED_DYNAMIC_TRIGGER_TYPES.has(rawTriggerType) ? "manual" : "model");
         const repeat = DYNAMIC_REPEAT_MODES.has(String(trigger.repeat || "once")) ? String(trigger.repeat || "once") : "once";
         const contentType = DYNAMIC_CONTENT_TYPES.has(String(content.type || "image")) ? String(content.type || "image") : "image";
         const mode = DYNAMIC_PRESENTATION_MODES.has(String(presentation.mode || "standard")) ? String(presentation.mode || "standard") : "standard";
@@ -1739,6 +1743,7 @@
             round: Math.max(1, Math.min(Number(trigger.round || 1) || 1, 9999)),
             progress: Math.max(0, Math.min(Number(trigger.progress || 0) || 0, 9999)),
             event: String(trigger.event || "").trim().slice(0, 64),
+            tag: String(trigger.tag || "").trim().slice(0, 160),
             repeat,
           },
           content: {
@@ -1753,6 +1758,8 @@
             mode,
             duration: clampWorkshopFloat(presentation.duration ?? 6, 0, 60, 6),
             autoClose: presentation.autoClose !== false,
+            buttonText: String(presentation.buttonText || "继续").trim().slice(0, 24) || "继续",
+            blocking: presentation.blocking !== false,
           },
           audio: {
             enabled: audio.enabled === true,
@@ -1795,8 +1802,9 @@
                 <label>触发来源</label>
                 <select class="dynamic-trigger-type">
                   <option value="round" ${scene.trigger.type === "round" ? "selected" : ""}>系统计数：对话回合</option>
-                  <option value="progress" ${scene.trigger.type === "progress" ? "selected" : ""}>系统计数：剧情进度</option>
                   <option value="model" ${scene.trigger.type === "model" ? "selected" : ""}>模型状态块</option>
+                  <option value="state_journal_tag" ${scene.trigger.type === "state_journal_tag" ? "selected" : ""}>心笺阶段 tag</option>
+                  <option value="plot_ledger_tag" ${scene.trigger.type === "plot_ledger_tag" ? "selected" : ""}>剧情账本 tag</option>
                   <option value="manual" ${scene.trigger.type === "manual" ? "selected" : ""}>仅手动 / 测试</option>
                 </select>
               </div>
@@ -1810,8 +1818,9 @@
               </div>
             </div>
             <div class="dynamic-trigger-panel" data-panel="round"><label>第几次角色回复后触发</label><input class="dynamic-trigger-round" type="number" min="1" max="9999" step="1" value="${escapeAttr(scene.trigger.round)}" /></div>
-            <div class="dynamic-trigger-panel" data-panel="progress"><label>剧情进度达到第几段时触发</label><input class="dynamic-trigger-progress" type="number" min="0" max="9999" step="1" value="${escapeAttr(scene.trigger.progress)}" /><p class="muted compact">剧情进度来自工坊运行状态；它不是关键词判断，也不等于默认每次聊天都自动 +1。</p></div>
             <div class="dynamic-trigger-panel" data-panel="model"><label>触发标记</label><input class="dynamic-trigger-event" value="${escapeAttr(scene.trigger.event)}" placeholder="rain_memory" /><p class="muted compact">模型输出 <code>[FT_EVENT: ${escapeHtml(scene.trigger.event || "rain_memory")}]</code> 或 <code>fantareal_workshop</code> 状态块中的 <code>event</code> 值与这里一致时触发。</p></div>
+            <div class="dynamic-trigger-panel" data-panel="state_journal_tag"><label>心笺阶段 tag</label><input class="dynamic-trigger-tag dynamic-trigger-state-tag" value="${escapeAttr(scene.trigger.tag)}" placeholder="state_journal.role.hero.stage.trust" /><p class="muted compact">只匹配心笺当前激活的阶段 tag。演出工坊不读取正文，也不自己判断阶段。</p></div>
+            <div class="dynamic-trigger-panel" data-panel="plot_ledger_tag"><label>剧情账本 tag</label><input class="dynamic-trigger-tag dynamic-trigger-plot-tag" value="${escapeAttr(scene.trigger.tag)}" placeholder="state_journal.task.find_silver_key.done" /><p class="muted compact">只匹配剧情账本当前激活的事件 / 任务 / 线索 tag，例如 active、done 或 failed 状态。</p></div>
             <div class="grid-two">
               <div>
                 <label>演出内容</label>
@@ -1850,6 +1859,10 @@
               <div><label>显示时长（秒）</label><input class="dynamic-duration" type="number" min="0" max="60" step="0.5" value="${escapeAttr(scene.presentation.duration)}" /></div>
               <label class="fr-setting-switch-row"><input class="dynamic-autoclose" type="checkbox" ${scene.presentation.autoClose ? "checked" : ""} /> 到时自动关闭</label>
             </div>
+            <div class="grid-two">
+              <div><label>确认按钮文字</label><input class="dynamic-button-text" maxlength="24" value="${escapeAttr(scene.presentation.buttonText)}" placeholder="继续" /></div>
+              <label class="fr-setting-switch-row"><input class="dynamic-blocking" type="checkbox" ${scene.presentation.blocking ? "checked" : ""} /> 需要点击确认后关闭</label>
+            </div>
             <label>备注</label><textarea class="dynamic-note" rows="2">${escapeHtml(scene.note)}</textarea>
           </div>
         `;
@@ -1867,17 +1880,26 @@
         });
       }
 
+      function cssEscapeWorkshopValue(value) {
+        if (window.CSS?.escape) return CSS.escape(String(value || ""));
+        return String(value || "").replace(/["\\]/g, "\\$&");
+      }
+
       function collectDynamicScenesPayload() {
         if (!dynamicSceneListEl) return [];
-        return [...dynamicSceneListEl.querySelectorAll(".dynamic-scene-card")].map((card, index) => normalizeDynamicScene({
+        return [...dynamicSceneListEl.querySelectorAll(".dynamic-scene-card")].map((card, index) => {
+          const triggerType = card.querySelector(".dynamic-trigger-type")?.value || "model";
+          const activeTagInput = card.querySelector(`.dynamic-trigger-panel[data-panel="${cssEscapeWorkshopValue(triggerType)}"] .dynamic-trigger-tag`);
+          return normalizeDynamicScene({
           id: card.querySelector(".dynamic-scene-id")?.value || `dynamic_scene_${index + 1}`,
           name: card.querySelector(".dynamic-scene-name")?.value || `动态演出 ${index + 1}`,
           enabled: card.querySelector(".dynamic-scene-enabled")?.checked !== false,
           trigger: {
-            type: card.querySelector(".dynamic-trigger-type")?.value || "model",
+            type: triggerType,
             round: card.querySelector(".dynamic-trigger-round")?.value || 1,
-            progress: card.querySelector(".dynamic-trigger-progress")?.value || 0,
+            progress: 0,
             event: card.querySelector(".dynamic-trigger-event")?.value || "",
+            tag: activeTagInput?.value || "",
             repeat: card.querySelector(".dynamic-repeat-mode")?.value || "once",
           },
           content: {
@@ -1892,6 +1914,8 @@
             mode: card.querySelector(".dynamic-presentation-mode")?.value || "standard",
             duration: card.querySelector(".dynamic-duration")?.value || 6,
             autoClose: card.querySelector(".dynamic-autoclose")?.checked !== false,
+            buttonText: card.querySelector(".dynamic-button-text")?.value || "继续",
+            blocking: card.querySelector(".dynamic-blocking")?.checked !== false,
           },
           audio: {
             enabled: Boolean(card.querySelector(".dynamic-sound-url")?.value || ""),
@@ -1900,7 +1924,8 @@
             duckAmbience: true,
           },
           note: card.querySelector(".dynamic-note")?.value || "",
-        }, index + 1));
+        }, index + 1);
+        });
       }
 
       const previousNormalizeCreativeWorkshop = normalizeCreativeWorkshop;
