@@ -790,6 +790,25 @@ body.modern-setting-page.app-sidebar-shell:not(.game-page) .checkbox-row input[t
   box-shadow: var(--ui-focus-ring);
 }
 
+body.modern-setting-page.memory-config-page .config-shell.compact .outline-switch-row input.outline-switch-checkbox {
+  display: inline-block !important;
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  flex: 0 0 18px !important;
+  min-width: 18px !important;
+  width: 18px !important;
+  max-width: 18px !important;
+  min-height: 18px !important;
+  height: 18px !important;
+  max-height: 18px !important;
+  padding: 0 !important;
+  margin: 2px 0 0 !important;
+  border-radius: 4px !important;
+  accent-color: var(--accent);
+}
+
 body.modern-setting-page.app-sidebar-shell:not(.game-page) .fr-setting-switch-row {
   display: flex;
   align-items: center;

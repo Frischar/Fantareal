@@ -7,6 +7,7 @@ import sqlite3
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import httpx
@@ -247,6 +248,14 @@ OPERATION_ALIASES = {
     "delete": "delete",
     "remove": "delete",
 }
+PLOT_LEDGER_TABLE_ID = "plot_ledger"
+PLOT_LEDGER_ENTRY_TYPES = {"event", "task", "clue", "item"}
+PLOT_LEDGER_STATUSES = {"hidden", "active", "done", "failed", "inactive"}
+PLOT_LEDGER_TAG_STATUSES = {"active", "done", "failed"}
+PLOT_LEDGER_WORKER_ROW_LIMIT = 40
+PLOT_LEDGER_WORKER_MAX_INSERTS = 1
+PLOT_LEDGER_WORKER_MAX_UPDATES = 2
+REQUIRED_BUILTIN_TABLE_IDS = [PLOT_LEDGER_TABLE_ID]
 TIME_FMT = "%Y-%m-%d %H:%M:%S"
 STORY_TIME_ADVANCE_MODES = {"explicit", "smart", "manual", "custom"}
 STORY_TIME_DISPLAY_MODES = {"datetime_minute", "datetime_second", "day_slot"}
@@ -339,6 +348,100 @@ def safe_id(value: Any, fallback: str = "table") -> str:
     text = re.sub(r"[^a-z0-9_]+", "_", text)
     text = re.sub(r"_+", "_", text).strip("_")
     return text or fallback
+
+
+def plot_ledger_key(value: Any, fallback: str = "") -> str:
+    raw = str(value or "").strip()
+    text = re.sub(r"\s+", "_", raw.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    if text:
+        return text
+    if raw and fallback:
+        return fallback
+    if raw:
+        digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:10]
+        return f"entry_{digest}"
+    return fallback
+
+
+def normalize_plot_ledger_entry_type(value: Any) -> str:
+    text = plot_ledger_key(value, "")
+    return text if text in PLOT_LEDGER_ENTRY_TYPES else "event"
+
+
+def normalize_plot_ledger_status(value: Any) -> str:
+    text = plot_ledger_key(value, "")
+    return text if text in PLOT_LEDGER_STATUSES else "active"
+
+
+def plot_ledger_activation_tag(entry_type: Any, entry_id: Any, status: Any) -> str:
+    safe_type = normalize_plot_ledger_entry_type(entry_type)
+    safe_entry = plot_ledger_key(entry_id, "")
+    safe_status = normalize_plot_ledger_status(status)
+    if not safe_entry or safe_status not in PLOT_LEDGER_TAG_STATUSES:
+        return ""
+    return f"state_journal.{safe_type}.{safe_entry}.{safe_status}"
+
+
+def validate_plot_ledger_schema_guard(schema: dict[str, Any]) -> None:
+    if not is_plot_ledger_schema(schema):
+        return
+    field_keys = {str(field.get("key") or "") for field in schema.get("fields", []) if isinstance(field, dict)}
+    if schema.get("primary_key") != "entry_id" or "entry_id" not in field_keys:
+        raise HTTPException(status_code=400, detail="剧情运行账本的主键必须保持 entry_id，已拒绝本次保存以避免覆盖世界书 tag。")
+
+
+def validate_builtin_schema_guard(schema: dict[str, Any]) -> None:
+    table_id = safe_id(schema.get("id"), "")
+    template_path = BUILTIN_TEMPLATES_DIR / f"{table_id}.json"
+    if not table_id or not template_path.exists():
+        return
+    template = read_json(template_path, {})
+    template_schema = template.get("schema") if isinstance(template.get("schema"), dict) else template
+    if not isinstance(template_schema, dict):
+        return
+    expected_pk = str(template_schema.get("primary_key") or "").strip()
+    if expected_pk and schema.get("primary_key") != expected_pk:
+        raise HTTPException(status_code=400, detail=f"{schema.get('name') or table_id} 的主键必须保持 {expected_pk}，已拒绝本次保存以避免覆盖表数据。")
+
+
+def normalize_plot_ledger_update_payload(
+    pk_value: str,
+    key_payload: dict[str, Any],
+    set_payload: dict[str, Any],
+) -> tuple[str, dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
+    warnings: list[dict[str, Any]] = []
+    entry_id = plot_ledger_key(pk_value or key_payload.get("entry_id") or set_payload.get("entry_id"), "")
+    canonical_id = ""
+    canonical_status = ""
+    suffix_match = re.match(r"^(.+?)_(?:found|done|completed|finished)$", entry_id)
+    if suffix_match:
+        canonical_id = suffix_match.group(1)
+        canonical_status = "done"
+    if canonical_id and canonical_id != entry_id:
+        warnings.append({
+            "type": "plot_ledger_canonicalized",
+            "message": f"剧情运行账本条目 ID 已规范化：{entry_id} → {canonical_id}。",
+            "table": PLOT_LEDGER_TABLE_ID,
+            "entry_id": canonical_id,
+            "original_entry_id": entry_id,
+        })
+        entry_id = canonical_id
+        key_payload = {**key_payload, "entry_id": entry_id}
+        set_payload = {**set_payload, "entry_id": entry_id}
+    if canonical_status and str(set_payload.get("status") or "").strip() != canonical_status:
+        set_payload = {**set_payload, "status": canonical_status}
+    return entry_id, key_payload, set_payload, warnings
+
+
+def truthy_flag(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value or "").strip().lower()
+    return text in {"1", "true", "yes", "y", "on", "是", "启用", "开启", "锁定"}
 
 
 def qident(identifier: str) -> str:
@@ -1279,6 +1382,8 @@ def sync_physical_table(conn: sqlite3.Connection, schema: dict[str, Any]) -> Non
 
 def save_schema_to_db(conn: sqlite3.Connection, schema: dict[str, Any]) -> dict[str, Any]:
     payload = normalize_schema(schema)
+    validate_builtin_schema_guard(payload)
+    validate_plot_ledger_schema_guard(payload)
     if not payload["fields"]:
         raise HTTPException(status_code=400, detail="至少需要一个字段。")
     if not payload["primary_key"]:
@@ -1510,6 +1615,157 @@ def build_table_snapshot(conn: sqlite3.Connection, table_ids: list[str] | None =
     return snapshots
 
 
+def is_plot_ledger_schema(schema: dict[str, Any] | None) -> bool:
+    return isinstance(schema, dict) and safe_id(schema.get("id"), "") == PLOT_LEDGER_TABLE_ID
+
+
+def find_plot_ledger_snapshot(tables: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    for table in tables or []:
+        if not isinstance(table, dict):
+            continue
+        schema = table.get("schema") if isinstance(table.get("schema"), dict) else {}
+        if is_plot_ledger_schema(schema):
+            return table
+    return None
+
+
+def compact_plot_ledger_row(row: dict[str, Any]) -> dict[str, Any]:
+    entry_type = normalize_plot_ledger_entry_type(row.get("entry_type"))
+    entry_id = str(row.get("entry_id") or "").strip()
+    safe_entry_id = plot_ledger_key(entry_id, "")
+    status = normalize_plot_ledger_status(row.get("status"))
+    return {
+        "entry_id": entry_id,
+        "safe_entry_id": safe_entry_id,
+        "entry_type": entry_type,
+        "title": str(row.get("title") or "").strip(),
+        "status": status,
+        "condition": str(row.get("condition") or "").strip(),
+        "summary": str(row.get("summary") or "").strip(),
+        "evidence": str(row.get("evidence") or "").strip(),
+        "locked": truthy_flag(row.get("locked")),
+        "updated_at": str(row.get("updated_at") or "").strip(),
+    }
+
+
+def plot_ledger_rows_for_worker(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranked = [compact_plot_ledger_row(row) for row in rows if isinstance(row, dict)]
+    status_rank = {"active": 0, "done": 1, "failed": 2, "hidden": 3, "inactive": 4}
+    ranked.sort(key=lambda item: (status_rank.get(str(item.get("status") or ""), 9), str(item.get("updated_at") or ""), str(item.get("entry_id") or "")))
+    return ranked[:PLOT_LEDGER_WORKER_ROW_LIMIT]
+
+
+def limit_plot_ledger_rows_for_worker(tables: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    limited: list[dict[str, Any]] = []
+    for table in tables or []:
+        if not isinstance(table, dict):
+            continue
+        schema = table.get("schema") if isinstance(table.get("schema"), dict) else {}
+        if is_plot_ledger_schema(schema):
+            limited.append({**table, "rows": plot_ledger_rows_for_worker(table.get("rows") if isinstance(table.get("rows"), list) else [])})
+        else:
+            limited.append(table)
+    return limited
+
+
+def build_plot_ledger_worker_context(tables: list[dict[str, Any]]) -> dict[str, Any]:
+    table = find_plot_ledger_snapshot(tables)
+    if not table:
+        return {"enabled": False}
+    rows = table.get("rows") if isinstance(table.get("rows"), list) else []
+    compact_rows = plot_ledger_rows_for_worker(rows)
+    return {
+        "enabled": True,
+        "table_id": PLOT_LEDGER_TABLE_ID,
+        "row_count": len(rows),
+        "provided_row_count": len(compact_rows),
+        "entry_types": sorted(PLOT_LEDGER_ENTRY_TYPES),
+        "statuses": ["hidden", "active", "done", "failed", "inactive"],
+        "tag_statuses": sorted(PLOT_LEDGER_TAG_STATUSES),
+        "max_new_per_turn": PLOT_LEDGER_WORKER_MAX_INSERTS,
+        "max_updates_per_turn": PLOT_LEDGER_WORKER_MAX_UPDATES,
+        "rows": compact_rows,
+    }
+
+
+def build_plot_ledger_worker_rules() -> dict[str, Any]:
+    return {
+        "entry_id_rule": "entry_id 描述剧情目标/悬挂事项，不描述一次结果；同一事项后续只改 status，不另起新 ID。",
+        "stable_id_examples": [
+            {"situation": "寻找银钥匙、找到银钥匙、用银钥匙开门", "entry_id": "find_silver_key"},
+            {"situation": "调查城主失踪案、确认城主下落", "entry_id": "investigate_missing_lord"},
+            {"situation": "确认密信真假、发现密信内容", "entry_id": "verify_secret_letter"},
+        ],
+        "forbidden_id_patterns": [
+            "不要使用 *_found 表示找到结果，例如 silver_key_found；应使用 find_silver_key 并把 status 改为 done。",
+            "不要使用 *_done / *_completed 表示完成结果；应保留原目标 ID 并改 status。",
+        ],
+        "entry_type_rule": {
+            "task": "有明确目标、待办、推进条件或完成条件时优先使用 task。",
+            "item": "只是获得并长期持有、后续可反复使用的关键物品才使用 item；如果它服务于一个明确目标，优先记成 task。",
+            "clue": "情报、谜团、指向下一步的信息。",
+            "event": "已经发生且会改变后续局面的事实。",
+        },
+        "status_rule": {
+            "active": "目标尚未达成但仍影响剧情。",
+            "done": "目标、发现、取得、开启、确认等完成条件已被正文明确满足。",
+            "failed": "失败、错过或无法完成。",
+            "inactive": "废弃或暂不影响剧情。",
+            "hidden": "存在但角色/用户尚未发现。",
+        },
+        "silver_key_canonical": {
+            "entry_id": "find_silver_key",
+            "entry_type": "task",
+            "title": "寻找银钥匙",
+            "when_found_status": "done",
+        },
+    }
+
+
+def plot_ledger_tag_sources_from_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    tags: list[str] = []
+    sources: list[dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        compact = compact_plot_ledger_row(row)
+        tag = plot_ledger_activation_tag(compact.get("entry_type"), compact.get("entry_id"), compact.get("status"))
+        if not tag:
+            continue
+        if tag not in tags:
+            tags.append(tag)
+        title = compact.get("title") or compact.get("entry_id") or "剧情账本"
+        status = compact.get("status") or ""
+        source_ref = {
+            **compact,
+            "tag": tag,
+            "activation_tag": tag,
+            "is_active": True,
+        }
+        entries.append(source_ref)
+        sources.append(
+            {
+                "tag": tag,
+                "source": "state_journal_plot_ledger",
+                "label": f"剧情运行账本 · {title} · {status}",
+                "ref": source_ref,
+            }
+        )
+    return {"active_plot_ledger_tags": tags, "plot_ledger_sources": sources, "plot_ledger_entries": entries}
+
+
+def get_plot_ledger_tags_from_db() -> dict[str, Any]:
+    with connect_db() as conn:
+        init_meta_tables(conn)
+        try:
+            schema = get_schema_from_db(conn, PLOT_LEDGER_TABLE_ID)
+            rows = get_table_rows_from_db(conn, schema, current_card_uid())
+        except HTTPException:
+            rows = []
+    return plot_ledger_tag_sources_from_rows(rows)
+
+
 def save_snapshot(conn: sqlite3.Connection, table_id: str, reason: str = "update") -> None:
     try:
         schema = get_schema_from_db(conn, table_id)
@@ -1524,6 +1780,34 @@ def save_snapshot(conn: sqlite3.Connection, table_id: str, reason: str = "update
         pass
 
 
+def install_builtin_template_if_missing(conn: sqlite3.Connection, table_id: str) -> bool:
+    safe_table_id = safe_id(table_id, "")
+    if not safe_table_id:
+        return False
+    exists = conn.execute("SELECT 1 FROM state_journal_tables WHERE id=?", (safe_table_id,)).fetchone()
+    if exists:
+        return False
+    template_path = BUILTIN_TEMPLATES_DIR / f"{safe_table_id}.json"
+    if not template_path.exists():
+        return False
+    payload = read_json(template_path, {})
+    if not isinstance(payload, dict):
+        return False
+    schema_payload = payload.get("schema") if isinstance(payload.get("schema"), dict) else payload
+    schema = save_schema_to_db(conn, schema_payload)
+    rows = clean_rows(schema, payload.get("rows", []))
+    replace_table_rows(conn, schema, rows)
+    return True
+
+
+def install_required_builtin_templates(conn: sqlite3.Connection) -> list[str]:
+    installed: list[str] = []
+    for table_id in REQUIRED_BUILTIN_TABLE_IDS:
+        if install_builtin_template_if_missing(conn, table_id):
+            installed.append(table_id)
+    return installed
+
+
 def ensure_runtime_data() -> None:
     with connect_db() as conn:
         init_meta_tables(conn)
@@ -1535,6 +1819,7 @@ def ensure_runtime_data() -> None:
                 schema = save_schema_to_db(conn, schema_payload)
                 rows = clean_rows(schema, payload.get("rows", []) if isinstance(payload, dict) else [])
                 replace_table_rows(conn, schema, rows)
+        install_required_builtin_templates(conn)
         sync_visible_metric_tables(conn)
         conn.commit()
 
@@ -1878,8 +2163,11 @@ def resolve_relationship_pk(conn: sqlite3.Connection, schema: dict[str, Any], pk
 def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> dict[str, Any]:
     applied: list[dict[str, Any]] = []
     errors: list[str] = []
+    warnings: list[dict[str, Any]] = []
     touched_tables: set[str] = set()
     safe_card_uid = current_card_uid()
+    plot_ledger_insert_count = 0
+    plot_ledger_update_count = 0
     with connect_db() as conn:
         init_meta_tables(conn)
         schemas = {schema["id"]: schema for schema in list_schemas_from_db(conn)}
@@ -1897,6 +2185,8 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
                 operation = OPERATION_ALIASES.get(str(update.get("operation") or "upsert").strip().lower(), "upsert")
                 key_payload = update.get("key") if isinstance(update.get("key"), dict) else {}
                 set_payload = update.get("set") if isinstance(update.get("set"), dict) else {}
+                if table_id == PLOT_LEDGER_TABLE_ID:
+                    set_payload = {**set_payload}
                 if not primary_key or primary_key not in fmap:
                     errors.append(f"表 {schema.get('name')} 没有有效主键。")
                     continue
@@ -1904,12 +2194,62 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
                 if not pk_value:
                     errors.append(f"第 {index} 条更新缺少主键 {primary_key}。")
                     continue
+                if table_id == PLOT_LEDGER_TABLE_ID:
+                    pk_value, key_payload, set_payload, canonical_warnings = normalize_plot_ledger_update_payload(pk_value, key_payload, set_payload)
+                    warnings.extend(canonical_warnings)
+                if table_id == PLOT_LEDGER_TABLE_ID and operation == "delete":
+                    warnings.append({
+                        "type": "plot_ledger_delete_skipped",
+                        "message": f"剧情运行账本不接受 worker 自动删除：{pk_value}。请改为 status=inactive。",
+                        "table": table_id,
+                        "entry_id": pk_value,
+                    })
+                    continue
 
                 table_name = data_table_name(table_id)
                 sync_physical_table(conn, schema)
                 before = select_row_by_pk(conn, schema, pk_value, safe_card_uid)
                 if table_id == "relationship" and primary_key == "pair_id":
                     pk_value, before, _relation_note = resolve_relationship_pk(conn, schema, pk_value, safe_card_uid)
+                if table_id == PLOT_LEDGER_TABLE_ID:
+                    if before is None:
+                        if "entry_type" in fmap and not str(set_payload.get("entry_type") or "").strip():
+                            set_payload["entry_type"] = "event"
+                        if "status" in fmap and not str(set_payload.get("status") or "").strip():
+                            set_payload["status"] = "active"
+                    else:
+                        if "entry_type" in set_payload and not str(set_payload.get("entry_type") or "").strip():
+                            set_payload.pop("entry_type", None)
+                        if "status" in set_payload and not str(set_payload.get("status") or "").strip():
+                            set_payload.pop("status", None)
+                    if before is not None and truthy_flag(before.get("locked")):
+                        warnings.append({
+                            "type": "plot_ledger_locked_skipped",
+                            "message": f"剧情运行账本已锁定，worker 自动更新已跳过：{pk_value}。",
+                            "table": table_id,
+                            "entry_id": pk_value,
+                        })
+                        continue
+                    if before is None:
+                        if plot_ledger_insert_count >= PLOT_LEDGER_WORKER_MAX_INSERTS:
+                            warnings.append({
+                                "type": "plot_ledger_insert_limit",
+                                "message": f"剧情运行账本本轮最多新增 {PLOT_LEDGER_WORKER_MAX_INSERTS} 条，已跳过：{pk_value}。",
+                                "table": table_id,
+                                "entry_id": pk_value,
+                            })
+                            continue
+                        plot_ledger_insert_count += 1
+                    else:
+                        if plot_ledger_update_count >= PLOT_LEDGER_WORKER_MAX_UPDATES:
+                            warnings.append({
+                                "type": "plot_ledger_update_limit",
+                                "message": f"剧情运行账本本轮最多更新 {PLOT_LEDGER_WORKER_MAX_UPDATES} 条，已跳过：{pk_value}。",
+                                "table": table_id,
+                                "entry_id": pk_value,
+                            })
+                            continue
+                        plot_ledger_update_count += 1
                 if operation == "delete":
                     if before is not None:
                         if table_id not in snapshot_done:
@@ -1978,7 +2318,7 @@ def apply_updates(updates: list[dict[str, Any]], *, dry_run: bool = False) -> di
         except Exception:
             conn.rollback()
             raise
-    return {"applied": applied, "errors": errors, "touched_tables": sorted(touched_tables)}
+    return {"applied": applied, "errors": errors, "warnings": warnings, "touched_tables": sorted(touched_tables)}
 
 
 
@@ -4416,7 +4756,24 @@ def get_active_stage_tags_from_db() -> dict[str, Any]:
             "label": " · ".join([item for item in [role_name, stage_name] if item]) or "心笺阶段",
             "ref": stage_ref,
         })
-    return {"active_stage_tags": tags, "active_stage_sources": sources, "stages": stages}
+    ledger_payload = get_plot_ledger_tags_from_db()
+    ledger_tags = [str(tag).strip() for tag in ledger_payload.get("active_plot_ledger_tags") or [] if str(tag).strip()]
+    ledger_sources = [row for row in ledger_payload.get("plot_ledger_sources") or [] if isinstance(row, dict)]
+    combined_tags = []
+    for tag in [*tags, *ledger_tags]:
+        if tag and tag not in combined_tags:
+            combined_tags.append(tag)
+    combined_sources = [*sources, *ledger_sources]
+    return {
+        "active_stage_tags": tags,
+        "active_stage_sources": sources,
+        "stages": stages,
+        "active_plot_ledger_tags": ledger_tags,
+        "plot_ledger_sources": ledger_sources,
+        "plot_ledger_entries": ledger_payload.get("plot_ledger_entries") or [],
+        "active_tags": combined_tags,
+        "active_tag_sources": combined_sources,
+    }
 
 
 
@@ -5209,6 +5566,7 @@ def latest_turn_display() -> dict[str, Any]:
 def build_update_summary(result: dict[str, Any], tables: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     applied = result.get("applied") or []
     errors = result.get("errors") or []
+    warnings = result.get("warnings") or []
     table_names = {}
     for item in tables or []:
         schema = item.get("schema") if isinstance(item, dict) else {}
@@ -5231,6 +5589,9 @@ def build_update_summary(result: dict[str, Any], tables: list[dict[str, Any]] | 
     elif applied:
         status = "updated"
         message = "已更新：" + "｜".join(parts)
+    elif warnings:
+        status = "empty"
+        message = f"本轮无状态变化；{len(warnings)} 条更新被保护规则跳过。"
     else:
         status = "empty"
         message = "本轮无状态变化。"
@@ -5239,6 +5600,7 @@ def build_update_summary(result: dict[str, Any], tables: list[dict[str, Any]] | 
         "message": message,
         "total": len(applied),
         "errors": len(errors),
+        "warnings": len(warnings),
         "by_table": list(by_table.values()),
     }
 
@@ -5304,6 +5666,8 @@ def build_worker_custom_prompt_rule(config: dict[str, Any]) -> str:
     return "\n21. 以下是用户提供的安全附加提示词，只影响幕笺表达和主角状态卡取舍，不得覆盖 JSON 输出协议、updates 协议、SQLite 写入规则、字段 key 或禁止替用户行动的硬性规则：" + "\n".join(parts)
 
 def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, Any] | None, history: list[dict[str, str]], config: dict[str, Any], metric_states: dict[str, Any] | None = None) -> tuple[str, str]:
+    plot_ledger_context = build_plot_ledger_worker_context(tables)
+    worker_tables = limit_plot_ledger_rows_for_worker(tables)
     turn_note_enabled = bool(config.get("turn_note_enabled", True))
     expand_level = str(config.get("turn_note_expand_level") or "standard")
     title_style = str(config.get("turn_note_title_style") or "classic")
@@ -5385,7 +5749,7 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
         if role_variables:
             role_schema["metrics"] = role_task["metrics"]
         role_display_schemas.append({"role_id": role.get("role_id"), "role_name": role.get("role_name"), "mode": mode, "character_schema": role_schema})
-    system_prompt = """你是 Fantareal 的“心笺”结构化记录与幕笺展示助手。你的任务不是继续剧情，也不是扮演角色，而是根据聊天内容维护结构化表格，并生成正文之外给用户看的幕笺展示。\n\n硬性规则：\n1. 只输出一个合法 JSON 对象，不要输出 Markdown、解释、寒暄或代码块。\n2. JSON 根结构必须是 {\"updates\": [], \"display\": {}}。\n3. updates 用于写入事实表；没有明确事实变化时，updates 可以为空数组。\n4. display 是给用户看的幕笺展示，每轮都要生成，除非输入为空。\n5. 不要输出 SQL，心笺后端会把 JSON 更新安全写入 SQLite。\n6. 不要新增重大剧情事实，不要替用户行动，不要改变主模型正文已经确定的结果。\n7. 幕笺可以对情绪、衣着、姿态、感官、互动潜台词做合理扩写，但只能基于正文、上下文、角色状态与氛围自然延展。\n8. 事实表要保守，幕笺可以写意；不要把展示扩写当成长期事实强行写入 updates。\n9. updates 只能更新表结构中已经存在的字段，不得新增未知字段。\n10. operation 只能使用 upsert、update、delete。
+    system_prompt = """你是 Fantareal 的“心笺”结构化记录与幕笺展示助手。你的任务不是继续剧情，也不是扮演角色，而是根据聊天内容维护结构化表格，并生成正文之外给用户看的幕笺展示。\n\n硬性规则：\n1. 只输出一个合法 JSON 对象，不要输出 Markdown、解释、寒暄或代码块。\n2. JSON 根结构必须是 {\"updates\": [], \"display\": {}}。\n3. updates 用于写入事实表；没有明确事实变化时，updates 可以为空数组；但如果 plot_ledger 规则判定本轮出现关键任务、线索、物品或事件状态变化，updates 不得为空。\n4. display 是给用户看的幕笺展示，每轮都要生成，除非输入为空。\n5. 不要输出 SQL，心笺后端会把 JSON 更新安全写入 SQLite。\n6. 不要新增重大剧情事实，不要替用户行动，不要改变主模型正文已经确定的结果。\n7. 幕笺可以对情绪、衣着、姿态、感官、互动潜台词做合理扩写，但只能基于正文、上下文、角色状态与氛围自然延展。\n8. 事实表要保守，幕笺可以写意；不要把展示扩写当成长期事实强行写入 updates。\n9. updates 只能更新表结构中已经存在的字段，不得新增未知字段。\n10. operation 只能使用 upsert、update、delete。
 11. JSON 字符串内容中不要使用英文双引号；如需引用台词，请使用中文引号“……”或单引号，避免破坏 JSON。"""
     if config.get("strict_mode"):
         system_prompt += "\n12. 严格模式：updates 的字段类型、枚举范围、主键必须完全符合表结构。"
@@ -5437,6 +5801,29 @@ story_time_delta 格式：
 {{"changed": true/false, "delta_seconds": 数字, "delta_text": "自然语言说明", "confidence": "none/low/medium/high", "reason": "判断依据"}}
 """
 
+    if plot_ledger_context.get("enabled"):
+        system_prompt += f"""
+
+【剧情运行账本 plot_ledger】
+当前心笺启用了剧情运行账本。它不是自动总结，也不是长期记忆，只记录仍影响后续剧情判断的事件、任务、线索和物品状态。
+更新规则：
+- 只在出现明确新事实或状态变化时写入 plot_ledger。
+- 每轮最多新增 {PLOT_LEDGER_WORKER_MAX_INSERTS} 条，最多更新 {PLOT_LEDGER_WORKER_MAX_UPDATES} 条。
+- entry_id 必须稳定、简短、英文 snake_case，例如 find_silver_key；不要使用中文、空格或随机编号。
+- entry_id 应描述“剧情目标/悬挂事项”，而不是描述一次结果；同一事项后续只改 status，不要另起新 entry_id。例如“寻找银钥匙来开门”固定用 find_silver_key。
+- 禁止把结果写进 entry_id：不要使用 silver_key_found、*_found、*_done、*_completed；应保留目标 ID，并用 status 表示结果。
+- entry_type 只能是 event/task/clue/item。
+- entry_type 选择规则：有明确目标、待办或完成条件时优先 task；只是获得并长期持有的关键物品才用 item；情报谜团用 clue；已经发生且会改变后续局面的事实用 event。
+- status 只能是 hidden/active/done/failed/inactive。
+- status 选择规则：目标尚未达成但仍影响剧情用 active；目标、发现、取得、开启、确认等完成条件已经被正文明确满足用 done；失败或错过用 failed；废弃或暂不影响剧情用 inactive。
+- condition 写“如何推进/完成/触发”的条件；summary 写当前状态摘要；evidence 写本轮依据，简短引用事实，不要长篇复述。
+- locked=true 的行由系统保护，worker 不得更新、删除或改状态。
+- 不要 delete plot_ledger 行；不再需要时改 status=inactive。
+- 不要把普通情绪、衣着、寒暄、氛围描写写入 plot_ledger。
+- 如果账本为空，且本轮明确出现“正在寻找/已经获得的关键物品”“需要打开/完成的目标”“会影响后续判断的线索或任务”，应优先新增 1 条 plot_ledger，而不是只写 display。
+- 示例：正文明确出现“找到银钥匙，可用于打开旧门”，若上下文目标是寻找银钥匙，则新增或更新 entry_type=task，entry_id=find_silver_key，status=done，evidence 写明“已找到银钥匙且可打开旧门”；不要写成 silver_key_found，也不要仍标 active。
+- 当最新 assistant 正文明示“关键物品已经获得”“任务目标已经完成/失败”“线索已经确认会影响下一步”时，plot_ledger updates 不应为空；这类内容属于运行状态，不属于纯幕笺展示。
+"""
 
     display_schema = {
         "title_style": title_style,
@@ -5466,9 +5853,11 @@ story_time_delta 格式：
 
     user_payload = {
         "storage_engine": "sqlite",
-        "tables": tables,
+        "tables": worker_tables,
         "latest_turn": latest_turn or {},
         "recent_history": history,
+        "plot_ledger": plot_ledger_context,
+        "plot_ledger_rules": build_plot_ledger_worker_rules(),
         "turnNote_display_required": turn_note_enabled,
         "title_generation_style": title_style,
         "title_generation_rule": title_style_rule,
@@ -5538,6 +5927,23 @@ story_time_delta 格式：
             "display": display_schema,
         },
     }
+    if plot_ledger_context.get("enabled"):
+        user_payload["output_example"]["updates"].append(
+            {
+                "table": "plot_ledger",
+                "operation": "upsert",
+                "key": {"entry_id": "find_silver_key"},
+                "set": {
+                    "entry_id": "find_silver_key",
+                    "entry_type": "task",
+                    "title": "寻找银钥匙",
+                    "status": "done",
+                    "condition": "找到银钥匙并确认它能打开旧门。",
+                    "summary": "银钥匙已找到，并确认可用于打开旧门。",
+                    "evidence": "本轮正文明确写到找到银钥匙，且钥匙可打开旧门。",
+                },
+            }
+        )
     user_prompt = "请根据以下表结构、旧数据和聊天内容，完成事实更新与幕笺展示生成。\n" + json.dumps(user_payload, ensure_ascii=False, indent=2)
     return system_prompt, user_prompt
 
@@ -6266,9 +6672,9 @@ async def api_save_table(table_id: str, request: Request) -> dict[str, Any]:
     rows_payload = payload.get("rows", []) if isinstance(payload, dict) else []
     with connect_db() as conn:
         init_meta_tables(conn)
+        save_snapshot(conn, table_id, "manual_save")
         schema = save_schema_to_db(conn, schema_payload or get_schema_from_db(conn, table_id))
         rows = clean_rows(schema, rows_payload)
-        save_snapshot(conn, schema["id"], "manual_save")
         replace_table_rows(conn, schema, rows)
         conn.commit()
     return {"ok": True, "schema": schema, "rows": get_table_rows_for_response(schema)}
@@ -6450,19 +6856,98 @@ async def api_export_debug_log(limit: int = 80) -> JSONResponse:
 
 @app.post("/api/worker/update")
 async def api_worker_update(request: Request) -> dict[str, Any]:
+    profile_started_at = perf_counter()
+    profile_steps: list[dict[str, Any]] = []
+
+    def profile_start() -> float:
+        return perf_counter()
+
+    def profile_end(name: str, started_at: float, **meta: Any) -> None:
+        profile_steps.append({
+            "name": name,
+            "elapsed_ms": round((perf_counter() - started_at) * 1000, 3),
+            **meta,
+        })
+
+    def compact_json_chars(value: Any) -> int:
+        try:
+            return len(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+        except Exception:
+            return 0
+
+    def prompt_component_sizes(user_prompt: str) -> list[dict[str, Any]]:
+        try:
+            payload_text = user_prompt.split("\n", 1)[1] if "\n" in user_prompt else user_prompt
+            prompt_payload = json.loads(payload_text)
+        except Exception:
+            return []
+        if not isinstance(prompt_payload, dict):
+            return []
+        return sorted(
+            [{"key": key, "chars": compact_json_chars(value)} for key, value in prompt_payload.items()],
+            key=lambda item: item["chars"],
+            reverse=True,
+        )
+
+    def table_profile_rows(tables_payload: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows = []
+        for item in tables_payload or []:
+            if not isinstance(item, dict):
+                continue
+            schema = item.get("schema") if isinstance(item.get("schema"), dict) else {}
+            table_rows = item.get("rows") if isinstance(item.get("rows"), list) else []
+            rows.append({
+                "table": schema.get("id") or "",
+                "row_count": len(table_rows),
+                "schema_chars": compact_json_chars(schema),
+                "rows_chars": compact_json_chars(table_rows),
+                "total_chars": compact_json_chars(item),
+            })
+        return sorted(rows, key=lambda item: item["total_chars"], reverse=True)
+
+    request_profile_at = profile_start()
     payload = await request.json()
+    profile_end("request.parse_json", request_profile_at, request_chars=compact_json_chars(payload))
     if not isinstance(payload, dict):
         payload = {}
+    config_profile_at = profile_start()
     config = merge_config_with_main_llm(get_config())
+    profile_enabled = bool(config.get("debug_enabled", True))
+    profile_end(
+        "config.merge_config_with_main_llm",
+        config_profile_at,
+        config_chars=compact_json_chars({key: value for key, value in config.items() if key != "api_key"}),
+        model=bool(str(config.get("model") or "").strip()),
+        api_base_url=bool(str(config.get("api_base_url") or "").strip()),
+    )
+
+    def build_profile_payload(**extra: Any) -> dict[str, Any]:
+        if not profile_enabled:
+            return {}
+        return {
+            "total_elapsed_ms": round((perf_counter() - profile_started_at) * 1000, 3),
+            "steps": profile_steps,
+            **extra,
+        }
     if payload.get("manual") is not True and not config.get("enabled", True):
-        return {"ok": True, "skipped": True, "status": "skipped", "message": "心笺已关闭。", "reason": "心笺已关闭。"}
+        return {"ok": True, "skipped": True, "status": "skipped", "message": "心笺已关闭。", "reason": "心笺已关闭。", "profile": build_profile_payload(status="skipped")}
+    db_snapshot_profile_at = profile_start()
     with connect_db() as conn:
         init_meta_tables(conn)
         table_ids = payload.get("table_ids") if isinstance(payload.get("table_ids"), list) else None
         tables = build_table_snapshot(conn, table_ids)
         metric_states = get_metric_snapshot(conn)
+    profile_end(
+        "db.load_snapshots",
+        db_snapshot_profile_at,
+        table_count=len(tables),
+        metric_character_count=len(metric_states) if isinstance(metric_states, dict) else 0,
+        tables_chars=compact_json_chars(tables),
+        metric_states_chars=compact_json_chars(metric_states),
+        tables=table_profile_rows(tables),
+    )
     if not tables:
-        return {"ok": True, "skipped": True, "status": "skipped", "message": "没有可更新的表。", "reason": "没有可更新的表。"}
+        return {"ok": True, "skipped": True, "status": "skipped", "message": "没有可更新的表。", "reason": "没有可更新的表。", "profile": build_profile_payload(status="skipped")}
     latest_turn = payload.get("latest_turn") if isinstance(payload.get("latest_turn"), dict) else None
     trigger_source = str(payload.get("trigger_source") or payload.get("triggerSource") or payload.get("source") or payload.get("event_type") or "manual_backend").strip() or "manual_backend"
     direct_user_text = str(payload.get("user_text") or payload.get("userText") or "")
@@ -6484,7 +6969,9 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     history_source = payload.get("recent_history") if isinstance(payload.get("recent_history"), list) else payload.get("recentHistory")
     if history_source is None:
         history_source = payload.get("history")
+    history_profile_at = profile_start()
     history = format_history(history_source, int(config.get("input_turn_count", 3) or 3))
+    profile_end("history.format_history", history_profile_at, messages=len(history), chars=compact_json_chars(history))
     turn_id = normalize_turn_id(payload.get("turn_id") or payload.get("turnId") or payload.get("created_at") or payload.get("createdAt") or datetime.now().isoformat(timespec="seconds"))
     message_id = normalize_turn_id(payload.get("assistant_message_id") or payload.get("assistantMessageId") or payload.get("message_id") or payload.get("messageId") or "") if (payload.get("assistant_message_id") or payload.get("assistantMessageId") or payload.get("message_id") or payload.get("messageId")) else ""
     turn_index = payload.get("turn_index") or payload.get("turnIndex")
@@ -6494,6 +6981,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     if isinstance(latest_turn, dict):
         latest_turn = {**latest_turn, "assistant": assistant_text}
     if not payload.get("dry_run", False) and assistant_text.strip():
+        save_ready_profile_at = profile_start()
         save_worker_turn_state(
             turn_id=turn_id,
             user_text=user_text,
@@ -6505,6 +6993,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             trigger_source=trigger_source,
             stale_reason="worker_running",
         )
+        profile_end("db.save_worker_turn_state_running", save_ready_profile_at)
     if trigger_source in {"chat_hook", "dom_fallback"} and not assistant_text.strip():
         result = {"applied": [], "errors": ["心笺未检测到可绑定的 assistant 正文，本轮未生成幕笺。"], "touched_tables": []}
         log_payload = {
@@ -6535,12 +7024,23 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             )
         if config.get("debug_enabled", True):
             save_worker_log(log_payload)
-        return {"ok": False, "status": "error", "error_type": "empty_context", "message": result["errors"][0], "summary": build_update_summary(result, tables), "updates": [], "turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "display": {}, "result": result, "raw_output": ""}
+        summary_profile_at = profile_start()
+        empty_summary = build_update_summary(result, tables)
+        profile_end("summary.build_update_summary", summary_profile_at, status=empty_summary.get("status"))
+        return {"ok": False, "status": "error", "error_type": "empty_context", "message": result["errors"][0], "summary": empty_summary, "updates": [], "turn_id": turn_id, "message_id": message_id, "turn_index": safe_turn_index, "trigger_source": trigger_source, "display": {}, "result": result, "raw_output": "", "profile": build_profile_payload(status="error", error_type="empty_context")}
     raw_output = ""
     system_prompt = ""
     user_prompt = ""
     try:
+        prompt_profile_at = profile_start()
         system_prompt, user_prompt = build_worker_prompt(tables=tables, latest_turn=latest_turn, history=history, config=config, metric_states=metric_states)
+        profile_end(
+            "prompt.build_worker_prompt",
+            prompt_profile_at,
+            system_prompt_chars=len(system_prompt),
+            user_prompt_chars=len(user_prompt),
+            components=prompt_component_sizes(user_prompt),
+        )
     except Exception as exc:
         result = {"applied": [], "errors": [f"心笺内部错误：生成 worker prompt 失败：{exc}"], "touched_tables": []}
         log_payload = {
@@ -6587,10 +7087,14 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             "display": {},
             "result": result,
             "raw_output": "",
+            "profile": build_profile_payload(status="error", error_type="worker_prompt_error"),
         }
     try:
+        model_profile_at = profile_start()
         raw_output = await call_worker_model(config=config, system_prompt=system_prompt, user_prompt=user_prompt)
+        profile_end("model.call_worker_model", model_profile_at, raw_output_chars=len(raw_output))
     except WorkerProviderError as exc:
+        profile_end("model.call_worker_model", model_profile_at, error_type=exc.error_type, status_code=exc.status_code)
         result = {"applied": [], "errors": [exc.message], "touched_tables": []}
         log_payload = {
             "created_at": now_string(),
@@ -6636,6 +7140,7 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             "display": {},
             "result": result,
             "raw_output": "",
+            "profile": build_profile_payload(status="error", error_type=exc.error_type),
         }
     parse_error = ""
     repair_error = ""
@@ -6648,20 +7153,34 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
     story_time_result: dict[str, Any] | None = None
     story_time_delta_missing = False
     try:
+        parse_profile_at = profile_start()
         parsed = extract_json_from_text(raw_output)
+        profile_end("parse.extract_json_from_text", parse_profile_at, parsed_chars=compact_json_chars(parsed), root_keys=list(parsed.keys()) if isinstance(parsed, dict) else [])
+        normalize_updates_profile_at = profile_start()
         updates = normalize_updates(parsed)
+        profile_end("parse.normalize_updates", normalize_updates_profile_at, updates_count=len(updates), updates_chars=compact_json_chars(updates))
         story_time_delta_payload = parsed.get("story_time_delta") if isinstance(parsed, dict) else None
         if config.get("turn_note_enabled", True):
+            normalize_display_profile_at = profile_start()
             display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
+            profile_end("parse.normalize_display_payload", normalize_display_profile_at, display_chars=compact_json_chars(display_payload), characters=len(display_payload.get("characters") or []) if isinstance(display_payload, dict) else 0, relationships=len(display_payload.get("relationships") or []) if isinstance(display_payload, dict) else 0)
     except Exception as exc:
         parse_error = str(exc)
         try:
+            repair_profile_at = profile_start()
             repair_output = await repair_worker_json(config=config, raw_output=raw_output, parse_error=parse_error)
+            profile_end("model.repair_worker_json", repair_profile_at, repair_output_chars=len(repair_output))
+            repair_parse_profile_at = profile_start()
             parsed = extract_json_from_text(repair_output)
+            profile_end("repair.extract_json_from_text", repair_parse_profile_at, parsed_chars=compact_json_chars(parsed), root_keys=list(parsed.keys()) if isinstance(parsed, dict) else [])
+            repair_updates_profile_at = profile_start()
             updates = normalize_updates(parsed)
+            profile_end("repair.normalize_updates", repair_updates_profile_at, updates_count=len(updates), updates_chars=compact_json_chars(updates))
             story_time_delta_payload = parsed.get("story_time_delta") if isinstance(parsed, dict) else None
             if config.get("turn_note_enabled", True):
+                repair_display_profile_at = profile_start()
                 display_payload = normalize_display_payload(parsed, latest_turn=latest_turn, tables=tables)
+                profile_end("repair.normalize_display_payload", repair_display_profile_at, display_chars=compact_json_chars(display_payload), characters=len(display_payload.get("characters") or []) if isinstance(display_payload, dict) else 0, relationships=len(display_payload.get("relationships") or []) if isinstance(display_payload, dict) else 0)
             repair_used = True
             parse_error = ""
         except Exception as repair_exc:
@@ -6685,24 +7204,32 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
             )
     else:
         if not payload.get("dry_run", False):
+            rollback_profile_at = profile_start()
             with connect_db() as conn:
                 init_meta_tables(conn)
                 rollback_turn_effects(conn, turn_id, reason="regenerate_before_update")
                 save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="assistant_ready", state_journal_status="running", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                 conn.commit()
+            profile_end("db.rollback_and_mark_turn_running", rollback_profile_at)
         result = {"applied": [], "errors": [], "touched_tables": []}
         try:
+            apply_updates_profile_at = profile_start()
             result = apply_updates(updates, dry_run=bool(payload.get("dry_run", False)))
+            profile_end("db.apply_updates", apply_updates_profile_at, applied=len(result.get("applied") or []), errors=len(result.get("errors") or []), dry_run=bool(payload.get("dry_run", False)), touched_tables=result.get("touched_tables") or [])
             if config.get("turn_note_enabled", True) and not payload.get("dry_run", False):
+                post_apply_profile_at = profile_start()
                 with connect_db() as conn:
                     init_meta_tables(conn)
+                    metrics_profile_at = profile_start()
                     ensure_display_metrics_for_full_roles(conn, display_payload)
                     metric_applied = []
                     metric_applied.extend(apply_display_metrics(conn, turn_id, display_payload))
                     metric_applied.extend(apply_update_metric_summaries(conn, turn_id, updates))
+                    profile_end("db.apply_metrics", metrics_profile_at, metric_count=len(metric_applied))
                     if metric_applied:
                         result["metrics"] = metric_applied
                         result["metric_count"] = len(metric_applied)
+                    story_profile_at = profile_start()
                     story_time_state_for_update = load_story_time_state(conn)
                     story_time_delta_missing = bool(
                         story_time_state_for_update.get("enabled")
@@ -6715,19 +7242,27 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                         result["story_time"] = story_time_result
                     if story_time_delta_missing:
                         result.setdefault("warnings", []).append({"type": "story_time_delta_missing", "message": "剧情时间已启用，但本轮 worker 输出缺少 story_time_delta，已按 0 秒处理。"})
+                    profile_end("db.apply_story_time", story_profile_at, story_time_changed=bool(story_time_result), story_time_delta_missing=story_time_delta_missing)
+                    stage_profile_at = profile_start()
                     stage_applied = evaluate_stage_rules(conn, turn_id, display_payload, safe_turn_index)
+                    profile_end("db.evaluate_stage_rules", stage_profile_at, stage_count=len(stage_applied), stage_changed=sum(1 for item in stage_applied if item.get("stage_changed")))
                     if stage_applied:
                         result["stages"] = stage_applied
                         result["stage_count"] = len(stage_applied)
+                    save_effects_profile_at = profile_start()
                     save_turn_effects(conn, turn_id, result)
                     save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                     conn.commit()
+                    profile_end("db.save_turn_effects_and_record", save_effects_profile_at, result_chars=compact_json_chars(result))
+                profile_end("db.post_apply_state_updates", post_apply_profile_at)
             elif not payload.get("dry_run", False):
+                save_effects_profile_at = profile_start()
                 with connect_db() as conn:
                     init_meta_tables(conn)
                     save_turn_effects(conn, turn_id, result)
                     save_turn_record(conn, turn_id=turn_id, user_text=user_text, assistant_text=assistant_text, status="completed", state_journal_status="done" if not result.get("errors") else "error", message_id=message_id, turn_index=safe_turn_index, trigger_source=trigger_source)
                     conn.commit()
+                profile_end("db.save_turn_effects_and_record", save_effects_profile_at, result_chars=compact_json_chars(result))
         except Exception as exc:
             worker_error_type = "worker_apply_error"
             result = {"applied": [], "errors": [f"心笺应用失败：{exc}"], "touched_tables": [], "warnings": result.get("warnings") or []}
@@ -6745,17 +7280,31 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
                 )
         if config.get("turn_note_enabled", True) and not payload.get("dry_run", False) and worker_error_type != "worker_apply_error":
             try:
+                display_save_profile_at = profile_start()
                 # Refresh snapshots after fact updates so fallback display can read fresh state.
                 with connect_db() as conn:
                     init_meta_tables(conn)
+                    refresh_tables_profile_at = profile_start()
                     refreshed_tables = build_table_snapshot(conn, table_ids)
+                    profile_end("db.refresh_tables_for_display", refresh_tables_profile_at, table_count=len(refreshed_tables), tables_chars=compact_json_chars(refreshed_tables), tables=table_profile_rows(refreshed_tables))
                 if not display_payload:
+                    fallback_profile_at = profile_start()
                     display_payload = build_fallback_display(latest_turn=latest_turn, tables=refreshed_tables)
+                    profile_end("display.build_fallback_display", fallback_profile_at, display_chars=compact_json_chars(display_payload))
                 if result.get("metrics"):
+                    attach_metrics_profile_at = profile_start()
                     display_payload = attach_metrics_to_display(display_payload, result.get("metrics"))
+                    profile_end("display.attach_metrics_to_display", attach_metrics_profile_at, display_chars=compact_json_chars(display_payload))
+                relationship_profile_at = profile_start()
                 ensure_relationship_fallback(display_payload, metric_records=result.get("metrics") or [])
+                profile_end("display.ensure_relationship_fallback", relationship_profile_at, relationships=len(display_payload.get("relationships") or []) if isinstance(display_payload, dict) else 0)
+                story_display_profile_at = profile_start()
                 display_payload = inject_story_time_display(display_payload, story_time_result)
+                profile_end("display.inject_story_time_display", story_display_profile_at, display_chars=compact_json_chars(display_payload))
+                save_display_profile_at = profile_start()
                 display_payload = save_turn_display(display_payload, turn_id=turn_id, message_id=message_id, content_hash=payload.get("assistant_hash") or payload.get("content_hash") or payload.get("contentHash") or hash_text(assistant_text), turn_index=safe_turn_index, trigger_source=trigger_source)
+                profile_end("db.save_turn_display", save_display_profile_at, display_chars=compact_json_chars(display_payload))
+                profile_end("display.save_pipeline", display_save_profile_at, display_chars=compact_json_chars(display_payload))
             except Exception as exc:
                 result.setdefault("errors", []).append(f"幕笺保存失败：{exc}")
                 save_worker_turn_state(
@@ -6788,9 +7337,15 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         "error_type": worker_error_type,
         "story_time_delta_missing": story_time_delta_missing,
     }
+    if profile_enabled:
+        log_payload["profile"] = build_profile_payload(status="before_log", error_type=worker_error_type, repair_used=repair_used)
     if config.get("debug_enabled", True):
+        log_profile_at = profile_start()
         save_worker_log(log_payload)
+        profile_end("debug.save_worker_log", log_profile_at, log_chars=compact_json_chars(log_payload))
+    summary_profile_at = profile_start()
     summary = build_update_summary(result, tables)
+    profile_end("summary.build_update_summary", summary_profile_at, status=summary.get("status"), total=summary.get("total"))
     has_errors = bool(result.get("errors"))
     ok = not has_errors or bool(result.get("applied"))
     return {
@@ -6809,4 +7364,5 @@ async def api_worker_update(request: Request) -> dict[str, Any]:
         "display": display_payload if config.get("turn_note_enabled", True) and ok else {},
         "result": result,
         "raw_output": raw_output if config.get("debug_enabled") else "",
+        "profile": build_profile_payload(status="error" if has_errors and not result.get("applied") else summary.get("status"), error_type=worker_error_type, repair_used=repair_used),
     }

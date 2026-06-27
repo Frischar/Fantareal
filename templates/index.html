@@ -7,13 +7,14 @@
     <link rel="icon" href="/static/fantareal_icon.ico?v=ui-debug-icon-1" />
     <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
     <link rel="stylesheet" href="/static/css/prompt-debug.css?v=prompt-debug-switch-v1" />
+    <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
     {% for mod in registered_mods or [] %}
       {% for href in mod.hooks.chat_styles or [] %}
     <link rel="stylesheet" href="{{ href }}{% if '?' in href %}&{% else %}?{% endif %}v=chat-mod-hooks-v1" data-mod-hook="{{ mod.slug }}" />
       {% endfor %}
     {% endfor %}
 
-    <link rel="stylesheet" href="/static/css/01b-chat-inline.css?v=ui-p614a-chat-inline-low-risk-prune-20260621" />
+    <link rel="stylesheet" href="/static/css/01b-chat-inline.css?v=p6c-memory-debug-tab-20260627" />
 
   </head>
   <body class="chat-page chat-visual-shell">
@@ -51,11 +52,6 @@
                 <span aria-hidden="true">↺</span>
               </button>
             </div>
-          </div>
-
-          <div class="retrieval-bar" id="retrieval-bar" hidden>
-            <div class="retrieval-title">记忆命中</div>
-            <div class="retrieval-items" id="retrieval-items"></div>
           </div>
 
           <div id="messages" class="messages">
@@ -141,7 +137,9 @@
             <button type="button" class="runtime-tab" data-runtime-tab="settings" role="tab" aria-selected="false">设置</button>
             <button type="button" class="runtime-tab" data-runtime-tab="preset" role="tab" aria-selected="false">预设</button>
             <button type="button" class="runtime-tab" data-runtime-tab="worldbook" role="tab" aria-selected="false">世界书 <span id="worldbook-rail-count" class="runtime-tab-count" hidden>0</span></button>
+            <button type="button" class="runtime-tab" data-runtime-tab="memory" role="tab" aria-selected="false">记忆 <span id="memory-runtime-count" class="runtime-tab-count" hidden>0</span></button>
             <button type="button" class="runtime-tab" data-runtime-tab="prompt" role="tab" aria-selected="false">Prompt <span id="prompt-runtime-dot" class="runtime-tab-dot" hidden></span></button>
+            <button type="button" class="runtime-tab" data-runtime-tab="director-note" role="tab" aria-selected="false">导演注</button>
             <button type="button" class="runtime-tab" data-runtime-tab="prompt-debug" role="tab" aria-selected="false">Prompt Debug</button>
             <button type="button" class="runtime-tab" data-runtime-tab="tts" role="tab" aria-selected="false">TTS</button>
             <button type="button" class="runtime-tab" data-runtime-tab="plugins" role="tab" aria-selected="false">插件 <span id="plugins-runtime-count" class="runtime-tab-count"{% if not registered_mods %} hidden{% endif %}>{{ (registered_mods or []) | length }}</span></button>
@@ -311,14 +309,45 @@
               {% endif %}
             </section>
 
-            <section id="runtime-tab-prompt" class="runtime-tab-panel" data-runtime-panel="prompt" role="tabpanel" hidden>
-              <div class="runtime-card">
+            <section id="runtime-tab-memory" class="runtime-tab-panel" data-runtime-panel="memory" role="tabpanel" hidden>
+              <div class="runtime-card memory-debug-card">
                 <div class="runtime-card-head">
-                  <strong>本轮打包预览</strong>
-                  <button id="preview-prompt-package" type="button" class="secondary compact">预览当前轮 Prompt</button>
+                  <div>
+                    <strong>记忆召回 Debug</strong>
+                    <p class="muted">查看本轮消息先命中了哪些记忆，以及重排后最终会注入哪些材料。</p>
+                  </div>
                 </div>
-                <p class="muted">输入框里有内容时，可以查看系统提示、人设、记忆、世界书、最近聊天和本轮输入如何一起发送给模型。</p>
+                <div id="memory-debug-summary" class="memory-debug-summary">
+                  <span class="memory-debug-chip">等待本轮召回</span>
+                </div>
               </div>
+              <div class="memory-debug-grid">
+                <section class="runtime-card memory-debug-card">
+                  <div class="runtime-card-head">
+                    <div>
+                      <strong>常规召回</strong>
+                      <p class="muted">embedding 相似度先筛出来的候选，按相似度排序。</p>
+                    </div>
+                  </div>
+                  <div id="memory-debug-regular" class="memory-debug-list">
+                    <div class="memory-debug-empty">发送消息或预览 Prompt 后显示本轮常规召回。</div>
+                  </div>
+                </section>
+                <section class="runtime-card memory-debug-card">
+                  <div class="runtime-card-head">
+                    <div>
+                      <strong>重排后召回</strong>
+                      <p id="memory-debug-rerank-note" class="muted">rerank 开启时，这里显示模型二次排序后的最终注入结果。</p>
+                    </div>
+                  </div>
+                  <div id="memory-debug-reranked" class="memory-debug-list">
+                    <div class="memory-debug-empty">重排结果会在这里显示。</div>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section id="runtime-tab-director-note" class="runtime-tab-panel" data-runtime-panel="director-note" role="tabpanel" hidden>
               <div class="drawer-debug-panel runtime-card director-note-panel">
                 <div class="drawer-debug-head">
                   <div class="drawer-debug-meta">
@@ -327,7 +356,16 @@
                   </div>
                 </div>
                 <div class="director-note-form">
-                  <label for="director-note-content">内容</label>
+                  <div class="director-note-mode-row" role="radiogroup" aria-label="导演注模式">
+                    <label><input type="radio" name="director-note-mode" value="basic" checked /> 常规</label>
+                    <label><input type="radio" name="director-note-mode" value="advanced" /> 高级</label>
+                  </div>
+                  <label for="director-note-title" class="director-note-title-field">标题</label>
+                  <input id="director-note-title" class="director-note-title-field" type="text" maxlength="120" placeholder="可选，例如：防抢话纠偏" />
+                  <div class="macro-field-head">
+                    <label for="director-note-content">内容</label>
+                    <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#director-note-content">{ } 变量</button>
+                  </div>
                   <textarea id="director-note-content" placeholder="例如：请遵从格式；现在角色的心态"></textarea>
                   <div class="director-note-grid">
                     <div>
@@ -343,14 +381,68 @@
                       </select>
                     </div>
                   </div>
+                  <div id="director-note-advanced-fields" class="director-note-advanced-fields" hidden>
+                    <div class="director-note-grid">
+                      <label class="fr-setting-switch-row director-note-enabled-row"><input id="director-note-enabled" type="checkbox" checked /> 启用这条高级注入</label>
+                      <div>
+                        <label for="director-note-inject-type">注入方式</label>
+                        <select id="director-note-inject-type">
+                          <option value="placement">固定层级</option>
+                          <option value="depth">聊天深度 d0-d999</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="director-note-grid">
+                      <div>
+                        <label for="director-note-role">消息身份</label>
+                        <select id="director-note-role">
+                          <option value="system" selected>system 规则</option>
+                          <option value="user">user 补充要求</option>
+                          <option value="assistant">assistant 伪历史</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="director-note-order">同层排序</label>
+                        <input id="director-note-order" type="number" min="0" max="999" step="1" value="100" />
+                      </div>
+                    </div>
+                    <div id="director-note-placement-row">
+                      <label for="director-note-advanced-placement">固定层级</label>
+                      <select id="director-note-advanced-placement">
+                        <option value="before_character">角色前</option>
+                        <option value="after_character" selected>角色后</option>
+                        <option value="near_latest_user">本轮用户输入前</option>
+                        <option value="output_guard">输出守卫</option>
+                      </select>
+                    </div>
+                    <div id="director-note-depth-row" hidden>
+                      <label for="director-note-depth">聊天深度</label>
+                      <input id="director-note-depth" type="number" min="0" max="999" step="1" value="0" />
+                    </div>
+                    <p class="muted compact director-note-advanced-hint">高级导演注会真实改变发给模型的 messages。assistant 身份适合续写氛围，不适合写规则。</p>
+                    <div id="director-note-syntax-preview" class="director-note-syntax-preview" aria-live="polite" hidden></div>
+                  </div>
                   <div class="director-note-actions">
                     <p class="muted">只影响后续聊天组包；Prompt 预览会显示位置，但不会消耗回合。</p>
-                    <button id="save-director-note" type="button" class="secondary compact">添加导演注</button>
+                    <div class="button-row director-note-button-row">
+                      <button id="disable-advanced-director-notes" type="button" class="secondary compact ghost">关闭全部高级</button>
+                      <button id="save-director-note" type="button" class="secondary compact">添加导演注</button>
+                    </div>
                   </div>
                 </div>
                 <div id="director-note-list" class="director-note-list">
                   <div class="director-note-empty">当前没有生效中的导演注。</div>
                 </div>
+              </div>
+            </section>
+
+            <section id="runtime-tab-prompt" class="runtime-tab-panel" data-runtime-panel="prompt" role="tabpanel" hidden>
+              <div class="runtime-card">
+                <div class="runtime-card-head">
+                  <strong>本轮打包预览</strong>
+                  <button id="preview-prompt-package" type="button" class="secondary compact">预览当前轮 Prompt</button>
+                </div>
+                <p class="muted">输入框里有内容时，可以查看系统提示、人设、记忆、世界书、最近聊天和本轮输入如何一起发送给模型。</p>
               </div>
               <div id="prompt-package-panel" class="drawer-debug-panel runtime-card" hidden>
                 <div class="drawer-debug-head">
@@ -477,6 +569,7 @@
     <div id="toast-host" class="toast-host" aria-live="polite" aria-atomic="true"></div>
     <script src="/static/js/prompt-debug.js?v=prompt-debug-v1"></script>
     <script src="/static/js/ui-motion.js?v=ui-p7-cde-chat-motion-20260621"></script>
+    <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
     <script>
       const rootEl = document.documentElement;
       const bodyEl = document.body;
@@ -516,6 +609,7 @@
       const runtimeTabButtons = [...document.querySelectorAll("[data-runtime-tab]")];
       const runtimeTabPanels = [...document.querySelectorAll("[data-runtime-panel]")];
       const worldbookRuntimeCountEl = document.getElementById("worldbook-rail-count");
+      const memoryRuntimeCountEl = document.getElementById("memory-runtime-count");
       const runtimeThemeLabelEl = document.getElementById("runtime-theme-label");
       const runtimeModelLabelEl = document.getElementById("runtime-model-label");
       const runtimeHistoryLabelEl = document.getElementById("runtime-history-label");
@@ -563,19 +657,50 @@
       const promptSegmentSummaryEl = document.getElementById("prompt-segment-summary");
       const promptSegmentListEl = document.getElementById("prompt-segment-list");
       const promptDebugPanelEl = document.getElementById("prompt-debug-panel");
+      const memoryDebugSummaryEl = document.getElementById("memory-debug-summary");
+      const memoryDebugRegularEl = document.getElementById("memory-debug-regular");
+      const memoryDebugRerankedEl = document.getElementById("memory-debug-reranked");
+      const memoryDebugRerankNoteEl = document.getElementById("memory-debug-rerank-note");
       const promptLayeredInjectionEl = document.getElementById("prompt-layered-injection-enabled");
       const downloadPromptDebugJsonBtn = document.getElementById("download-prompt-debug-json");
+      const directorNoteModeEls = document.querySelectorAll('input[name="director-note-mode"]');
+      const directorNoteTitleEl = document.getElementById("director-note-title");
       const directorNoteContentEl = document.getElementById("director-note-content");
       const directorNoteTurnsEl = document.getElementById("director-note-turns");
       const directorNotePositionEl = document.getElementById("director-note-position");
+      const directorNoteAdvancedFieldsEl = document.getElementById("director-note-advanced-fields");
+      const directorNoteEnabledEl = document.getElementById("director-note-enabled");
+      const directorNoteInjectTypeEl = document.getElementById("director-note-inject-type");
+      const directorNoteRoleEl = document.getElementById("director-note-role");
+      const directorNoteOrderEl = document.getElementById("director-note-order");
+      const directorNoteAdvancedPlacementEl = document.getElementById("director-note-advanced-placement");
+      const directorNotePlacementRowEl = document.getElementById("director-note-placement-row");
+      const directorNoteDepthEl = document.getElementById("director-note-depth");
+      const directorNoteDepthRowEl = document.getElementById("director-note-depth-row");
+      const directorNoteSyntaxPreviewEl = document.getElementById("director-note-syntax-preview");
       const saveDirectorNoteBtn = document.getElementById("save-director-note");
+      const disableAdvancedDirectorNotesBtn = document.getElementById("disable-advanced-director-notes");
       const directorNoteListEl = document.getElementById("director-note-list");
       const DIRECTOR_NOTE_POSITION_LABELS = {
         before_char_defs: "角色前",
         after_char_defs: "角色后",
         before_user_input: "用户输入前",
       };
+      const DIRECTOR_NOTE_PLACEMENT_LABELS = {
+        before_character: "角色前",
+        after_character: "角色后",
+        near_latest_user: "本轮输入前",
+        output_guard: "输出守卫",
+        at_depth: "历史深度",
+      };
+      const DIRECTOR_NOTE_ROLE_LABELS = {
+        system: "system",
+        user: "user",
+        assistant: "assistant",
+      };
       let directorNotesCache = [];
+      let directorNoteSyntaxPreviewTimer = 0;
+      let directorNoteSyntaxPreviewSeq = 0;
       let presetDebugCollapsed = true;
       const workshopModalEl = document.getElementById("workshop-modal");
       const workshopModalTitleEl = document.getElementById("workshop-modal-title");
@@ -701,6 +826,7 @@
       let historyMutationInFlight = false;
       let worldbookDebugFilter = "all";
       let lastWorldbookDebugPayload = null;
+      let lastMemoryDebugPayload = null;
       const PROMPT_BUDGET_MIN = 1000;
       const PROMPT_BUDGET_MAX = 1000000;
       const PROMPT_BUDGET_DEFAULT = 200000;
@@ -708,6 +834,11 @@
       let runtimeState = { ...serverState };
       const streamingEntries = new Set();
       let runtimeSettingsSaveTimer = null;
+      let composerStateFrame = null;
+      let chatDraftSaveTimer = null;
+      let pendingChatDraftValue = "";
+      const CHAT_DRAFT_SAVE_DEBOUNCE_MS = 300;
+      const TYPEWRITER_CHARS_PER_FRAME = 12;
 
       function normalizePromptBudgetValue(value) {
         const raw = Number(value ?? PROMPT_BUDGET_DEFAULT);
@@ -861,12 +992,28 @@
         syncMessageActionState();
       }
 
-      function syncComposerState() {
-        const hasValue = !!inputEl.value.trim();
-        chatForm?.classList.toggle("has-input", hasValue);
+      function applyComposerTextareaHeight() {
+        composerStateFrame = null;
+        if (!inputEl) return;
         inputEl.style.height = "auto";
         const nextHeight = Math.min(Math.max(inputEl.scrollHeight, 66), 150);
         inputEl.style.height = `${nextHeight}px`;
+      }
+
+      function syncComposerState({ immediate = false } = {}) {
+        const hasValue = !!inputEl.value.trim();
+        chatForm?.classList.toggle("has-input", hasValue);
+        if (immediate || document.hidden) {
+          if (composerStateFrame) {
+            cancelAnimationFrame(composerStateFrame);
+            composerStateFrame = null;
+          }
+          applyComposerTextareaHeight();
+          return;
+        }
+        if (!composerStateFrame) {
+          composerStateFrame = requestAnimationFrame(applyComposerTextareaHeight);
+        }
       }
 
       function pulseChatElement(element, className, fallbackMs = 560) {
@@ -1911,6 +2058,30 @@
         renderTtsVoiceBody(nodes.body, nextBodyText);
       }
 
+      function renderStreamingBubbleContent(bubble, state = {}) {
+        if (!bubble) return;
+        const visible = String(state.visible || "");
+        const think = String(state.think || "");
+        const thinking = Boolean(state.thinking);
+        const nodes = ensureBubbleNodes(bubble);
+
+        if (think) {
+          const thinkNodes = ensureThinkNodes(bubble);
+          thinkNodes.details.open = thinking;
+          thinkNodes.summary.textContent = thinking ? "思考中..." : "查看思考链";
+          if (thinkNodes.content.textContent !== think) {
+            thinkNodes.content.textContent = think;
+          }
+        } else {
+          removeThinkNodes(bubble);
+        }
+
+        const nextBodyText = visible || (think && thinking ? "" : "");
+        if (nodes.body.textContent !== nextBodyText) {
+          nodes.body.textContent = nextBodyText;
+        }
+      }
+
       function ensureMessageMetaText(meta) {
         if (!meta) return null;
         let textEl = meta.querySelector(":scope > .message-meta-text");
@@ -2424,6 +2595,7 @@
           meta,
           framePending: false,
           pendingVisibleChars: [],
+          pendingVisibleOffset: 0,
           typewriterActive: false,
           state: {
             visible: "",
@@ -2482,19 +2654,61 @@
         requestUiFrame(() => {
           const shouldStickToBottom = isMessagesNearBottom(120);
           entry.framePending = false;
-          renderBubbleContent(entry.bubble, entry.state);
+          if (entry.wrapper?.classList?.contains("streaming")) {
+            renderStreamingBubbleContent(entry.bubble, entry.state);
+          } else {
+            renderBubbleContent(entry.bubble, entry.state);
+          }
           settleMessageScroll(shouldStickToBottom, true);
         });
       }
 
-      function flushPendingVisible(entry) {
+      function getPendingVisibleLength(entry) {
+        if (!entry || !Array.isArray(entry.pendingVisibleChars)) return 0;
+        return Math.max(0, entry.pendingVisibleChars.length - Number(entry.pendingVisibleOffset || 0));
+      }
+
+      function getPendingVisibleText(entry) {
+        if (!entry || !Array.isArray(entry.pendingVisibleChars)) return "";
+        const offset = Math.max(0, Number(entry.pendingVisibleOffset || 0));
+        return entry.pendingVisibleChars.slice(offset).join("");
+      }
+
+      function clearPendingVisible(entry) {
         if (!entry) return;
-        if (entry.pendingVisibleChars.length) {
-          entry.state.visible += entry.pendingVisibleChars.join("");
-          entry.pendingVisibleChars = [];
+        entry.pendingVisibleChars = [];
+        entry.pendingVisibleOffset = 0;
+      }
+
+      function appendPendingVisible(entry, text) {
+        if (!entry || !text) return;
+        const chars = Array.from(String(text || ""));
+        if (!chars.length) return;
+        entry.pendingVisibleChars.push(...chars);
+      }
+
+      function consumePendingVisibleBatch(entry) {
+        const pendingLength = getPendingVisibleLength(entry);
+        if (!pendingLength) return "";
+        const offset = Math.max(0, Number(entry.pendingVisibleOffset || 0));
+        const count = Math.min(pendingLength, TYPEWRITER_CHARS_PER_FRAME);
+        const batch = entry.pendingVisibleChars.slice(offset, offset + count).join("");
+        entry.pendingVisibleOffset = offset + count;
+        if (entry.pendingVisibleOffset >= entry.pendingVisibleChars.length) {
+          clearPendingVisible(entry);
+        }
+        return batch;
+      }
+
+      function flushPendingVisible(entry, { render = true } = {}) {
+        if (!entry) return;
+        const pendingText = getPendingVisibleText(entry);
+        if (pendingText) {
+          entry.state.visible += pendingText;
+          clearPendingVisible(entry);
         }
         entry.typewriterActive = false;
-        scheduleBubbleRender(entry);
+        if (render) scheduleBubbleRender(entry);
       }
 
       function scheduleTypewriterTick(entry) {
@@ -2506,7 +2720,7 @@
         entry.typewriterActive = true;
 
         const tick = () => {
-          if (!entry.pendingVisibleChars.length) {
+          if (!getPendingVisibleLength(entry)) {
             entry.typewriterActive = false;
             return;
           }
@@ -2514,7 +2728,7 @@
             flushPendingVisible(entry);
             return;
           }
-          entry.state.visible += entry.pendingVisibleChars.shift();
+          entry.state.visible += consumePendingVisibleBatch(entry);
           scheduleBubbleRender(entry);
           requestUiFrame(tick);
         };
@@ -2524,56 +2738,170 @@
 
       function appendVisibleDelta(entry, delta) {
         if (!entry) return;
-        const chars = Array.from(String(delta || ""));
-        if (!chars.length) return;
+        const text = String(delta || "");
+        if (!text) return;
         if (document.hidden) {
-          entry.state.visible += chars.join("");
+          entry.state.visible += text;
           scheduleBubbleRender(entry);
           return;
         }
-        entry.pendingVisibleChars.push(...chars);
+        appendPendingVisible(entry, text);
         scheduleTypewriterTick(entry);
       }
 
-      function ensureFinalVisible(entry, fullText) {
+      function ensureFinalVisible(entry, fullText, { render = true } = {}) {
         if (!entry) return;
         const target = String(fullText || "");
-        const buffered = entry.state.visible + entry.pendingVisibleChars.join("");
-        if (target === buffered) {
-          scheduleTypewriterTick(entry);
-          return;
-        }
-        if (target.startsWith(buffered)) {
-          entry.pendingVisibleChars.push(...Array.from(target.slice(buffered.length)));
-          scheduleTypewriterTick(entry);
-          return;
-        }
-        if (target.startsWith(entry.state.visible)) {
-          entry.pendingVisibleChars = Array.from(target.slice(entry.state.visible.length));
-          scheduleTypewriterTick(entry);
-          return;
-        }
-        entry.pendingVisibleChars = [];
         entry.state.visible = target;
-        scheduleBubbleRender(entry);
+        clearPendingVisible(entry);
+        entry.typewriterActive = false;
+        if (render) scheduleBubbleRender(entry);
       }
 
       function renderRetrievedItems(items) {
-        if (!Array.isArray(items) || items.length === 0) {
-          retrievalItemsEl.innerHTML = "";
-          retrievalBarEl.hidden = true;
+        // 召回展示统一放到右侧栏“记忆”Tab，聊天正文区不再显示顶部命中条。
+        if (retrievalItemsEl) retrievalItemsEl.innerHTML = "";
+        if (retrievalBarEl) retrievalBarEl.hidden = true;
+      }
+
+      function compactMemoryDebugText(value, limit = 220) {
+        const text = String(value || "").replace(/\s+/g, " ").trim();
+        if (!text) return "";
+        return text.length > limit ? `${text.slice(0, limit).trimEnd()}...` : text;
+      }
+
+      function getMemoryDebugReasonLabel(reason) {
+        const labels = {
+          embedding_not_configured: "嵌入模型未配置，记忆召回未启动。",
+          no_recall_documents: "没有可召回记忆。",
+          embedding_vector_count_mismatch: "向量数量不一致，本轮召回已跳过。",
+          disabled: "重排未启用，最终结果沿用常规召回。",
+          rerank_not_configured: "重排已开启但模型未配置，最终结果沿用常规召回。",
+          enabled: "重排已启用，最终结果来自二次排序。",
+        };
+        return labels[reason] || reason || "";
+      }
+
+      function makeMemoryDebugChip(text, extraClass = "") {
+        const chip = document.createElement("span");
+        chip.className = `memory-debug-chip ${extraClass}`.trim();
+        chip.textContent = text;
+        return chip;
+      }
+
+      function renderMemoryDebugItems(container, items, emptyText) {
+        if (!container) return;
+        const list = Array.isArray(items) ? items : [];
+        container.innerHTML = "";
+        if (!list.length) {
+          const empty = document.createElement("div");
+          empty.className = "memory-debug-empty";
+          empty.textContent = emptyText;
+          container.appendChild(empty);
           return;
         }
-        retrievalItemsEl.innerHTML = "";
-        for (const item of items) {
-          const chip = document.createElement("div");
-          chip.className = "retrieval-chip";
-          const title = item.title || "未命名记忆";
-          const score = typeof item.score === "number" ? ` · ${item.score.toFixed(3)}` : "";
-          chip.textContent = `${title}${score}`;
-          retrievalItemsEl.appendChild(chip);
+
+        list.forEach((item, index) => {
+          const card = document.createElement("article");
+          card.className = "memory-debug-item";
+
+          const head = document.createElement("div");
+          head.className = "memory-debug-item-head";
+          const titleWrap = document.createElement("div");
+          titleWrap.className = "memory-debug-title-wrap";
+          const title = document.createElement("strong");
+          title.className = "memory-debug-title";
+          title.textContent = item?.title || "未命名记忆";
+          const source = document.createElement("span");
+          source.className = "memory-debug-source";
+          source.textContent = item?.source_label || (item?.source_type === "memory_outline" ? "剧情档案" : "长期记忆");
+          titleWrap.appendChild(title);
+          titleWrap.appendChild(source);
+
+          const rank = Number.isFinite(Number(item?.rank)) ? Number(item.rank) : index + 1;
+          const score = typeof item?.score === "number" ? item.score.toFixed(4) : "";
+          const meta = document.createElement("span");
+          meta.className = "memory-debug-score";
+          meta.textContent = score ? `#${rank} · ${score}` : `#${rank}`;
+          head.appendChild(titleWrap);
+          head.appendChild(meta);
+          card.appendChild(head);
+
+          const preview = compactMemoryDebugText(item?.text_preview || item?.text || item?.content || item?.notes, 260);
+          if (preview) {
+            const body = document.createElement("p");
+            body.className = "memory-debug-preview";
+            body.textContent = preview;
+            card.appendChild(body);
+          }
+
+          const tags = Array.isArray(item?.tags) ? item.tags.map((tag) => String(tag || "").trim()).filter(Boolean) : [];
+          const ids = Array.isArray(item?.source_memory_ids) ? item.source_memory_ids.length : 0;
+          if (tags.length || ids || item?.merged_memory_id || item?.outline_id) {
+            const foot = document.createElement("div");
+            foot.className = "memory-debug-meta-row";
+            tags.slice(0, 5).forEach((tag) => foot.appendChild(makeMemoryDebugChip(tag, "soft")));
+            if (ids) foot.appendChild(makeMemoryDebugChip(`源记忆 ${ids} 条`, "soft"));
+            if (item?.outline_id) foot.appendChild(makeMemoryDebugChip("大纲项", "soft"));
+            if (item?.merged_memory_id) foot.appendChild(makeMemoryDebugChip("合并记忆", "soft"));
+            card.appendChild(foot);
+          }
+
+          container.appendChild(card);
+        });
+      }
+
+      function renderMemoryDebug(debug) {
+        lastMemoryDebugPayload = debug && typeof debug === "object" ? debug : null;
+        const finalCount = Array.isArray(lastMemoryDebugPayload?.final_items) ? lastMemoryDebugPayload.final_items.length : 0;
+        if (memoryRuntimeCountEl) {
+          memoryRuntimeCountEl.textContent = String(finalCount);
+          memoryRuntimeCountEl.hidden = !lastMemoryDebugPayload || finalCount <= 0;
         }
-        retrievalBarEl.hidden = false;
+
+        if (!memoryDebugSummaryEl || !memoryDebugRegularEl || !memoryDebugRerankedEl) return;
+        memoryDebugSummaryEl.innerHTML = "";
+
+        if (!lastMemoryDebugPayload) {
+          memoryDebugSummaryEl.appendChild(makeMemoryDebugChip("等待本轮召回"));
+          renderMemoryDebugItems(memoryDebugRegularEl, [], "发送消息或预览 Prompt 后显示本轮常规召回。");
+          renderMemoryDebugItems(memoryDebugRerankedEl, [], "重排结果会在这里显示。");
+          if (memoryDebugRerankNoteEl) memoryDebugRerankNoteEl.textContent = "rerank 开启时，这里显示模型二次排序后的最终注入结果。";
+          return;
+        }
+
+        const status = String(lastMemoryDebugPayload.status || "pending");
+        const reason = String(lastMemoryDebugPayload.reason || "");
+        const counts = lastMemoryDebugPayload.counts || {};
+        const embedding = lastMemoryDebugPayload.embedding || {};
+        const rerank = lastMemoryDebugPayload.rerank || {};
+        const regularItems = Array.isArray(lastMemoryDebugPayload.regular_items) ? lastMemoryDebugPayload.regular_items : [];
+        const finalItems = Array.isArray(lastMemoryDebugPayload.final_items)
+          ? lastMemoryDebugPayload.final_items
+          : (Array.isArray(lastMemoryDebugPayload.reranked_items) ? lastMemoryDebugPayload.reranked_items : []);
+        const statusLabel = status === "ok" ? "召回完成" : status === "skipped" ? "已跳过" : "等待中";
+        memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(statusLabel, status === "ok" ? "active" : ""));
+        if (reason) memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(getMemoryDebugReasonLabel(reason), "soft"));
+        memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(`资料池 ${Number(counts.documents || 0)} 条`, "soft"));
+        memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(`常规 ${regularItems.length} 条`, "soft"));
+        memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(`最终 ${finalItems.length} 条`, finalItems.length ? "active" : "soft"));
+        memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(`top_k ${embedding.top_k ?? "—"}`, "soft"));
+        if (embedding.model) memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(`嵌入 ${embedding.model}`, "soft"));
+        if (Array.isArray(embedding.fields) && embedding.fields.length) {
+          memoryDebugSummaryEl.appendChild(makeMemoryDebugChip(`字段 ${embedding.fields.join(" / ")}`, "soft"));
+        }
+
+        const rerankReason = String(rerank.reason || "");
+        const rerankNote = getMemoryDebugReasonLabel(rerankReason) || "rerank 开启时，这里显示模型二次排序后的最终注入结果。";
+        if (memoryDebugRerankNoteEl) {
+          memoryDebugRerankNoteEl.textContent = rerank.applied
+            ? `${rerankNote}${rerank.model ? ` 模型：${rerank.model}` : ""}`
+            : rerankNote;
+        }
+
+        const emptyReasonText = getMemoryDebugReasonLabel(reason) || "本轮没有命中可注入的记忆。";
+        renderMemoryDebugItems(memoryDebugRegularEl, regularItems, emptyReasonText);
+        renderMemoryDebugItems(memoryDebugRerankedEl, finalItems, rerankReason ? getMemoryDebugReasonLabel(rerankReason) : emptyReasonText);
       }
 
 
@@ -2871,7 +3199,9 @@
           exported_at: new Date().toISOString(),
           prompt_package: lastPromptPackagePayload || {},
           worldbook_debug: lastWorldbookDebugPayload || {},
+          memory_debug: lastMemoryDebugPayload || {},
           tag_relations: buildPromptDebugTagRelations(lastPromptPackagePayload || {}, lastWorldbookDebugPayload || {}),
+          workshop_dynamic_debug: workshopDynamicDebugState || {},
         };
       }
 
@@ -3119,6 +3449,8 @@
         if (!state?.enabled) return;
         const used = Array.isArray(state.used) ? state.used : [];
         const unresolved = Array.isArray(state.unresolved) ? state.unresolved : [];
+        const replacementDetails = Array.isArray(state.replacements) ? state.replacements : [];
+        const unresolvedDetails = Array.isArray(state.unresolved_details) ? state.unresolved_details : [];
         const replacements = Number(state.replacement_count || 0);
         if (!used.length && !unresolved.length && !replacements) return;
 
@@ -3144,10 +3476,95 @@
           .join(" / ");
         body.appendChild(makePromptDebugLine("已解析", resolvedText || "—"));
         body.appendChild(makePromptDebugLine("本轮使用", used.join(" / ") || "—"));
+        if (replacementDetails.length) {
+          const lines = replacementDetails.slice(0, 8).map((item) => {
+            const raw = String(item.raw || item.key || "").trim();
+            const rendered = String(item.rendered || "").replace(/\s+/g, " ").trim();
+            const source = String(item.source || item.source_segment || item.location || "").trim();
+            const shortRendered = rendered.length > 80 ? `${rendered.slice(0, 80).trimEnd()}...` : rendered;
+            return `${raw} → ${shortRendered}${source ? `（${source}）` : ""}`;
+          });
+          body.appendChild(makePromptDebugLine("替换明细", lines.join(" / ")));
+        }
         if (unresolved.length) {
           body.appendChild(makePromptDebugLine("未知/缺失", unresolved.join(" / ")));
         }
+        if (unresolvedDetails.length) {
+          const lines = unresolvedDetails.slice(0, 8).map((item) => {
+            const raw = String(item.raw || item.key || "").trim();
+            const reason = String(item.reason || "unresolved").trim();
+            return `${raw}：${reason}`;
+          });
+          body.appendChild(makePromptDebugLine("未解析原因", lines.join(" / ")));
+        }
         card.appendChild(body);
+        parent.appendChild(card);
+      }
+
+      function appendWorkshopDynamicDebugCard(parent) {
+        if (!parent) return;
+        const debug = workshopDynamicDebugState && typeof workshopDynamicDebugState === "object" ? workshopDynamicDebugState : {};
+        const results = Array.isArray(debug.results) ? debug.results : [];
+        const activeTags = normalizeWorkshopStringList(debug.active_tags);
+        const stageTags = normalizeWorkshopStringList(debug.active_stage_tags);
+        const plotTags = normalizeWorkshopStringList(debug.active_plot_ledger_tags);
+        const card = document.createElement("section");
+        card.className = "prompt-debug-card workshop-dynamic-debug-card";
+        const head = document.createElement("div");
+        head.className = "prompt-debug-card-head";
+        const title = document.createElement("strong");
+        title.className = "prompt-debug-card-title";
+        title.textContent = "演出工坊状态触发";
+        const meta = document.createElement("span");
+        meta.className = "muted";
+        const hitCount = results.filter((item) => item.run).length;
+        meta.textContent = debug.updated_at ? `${hitCount} 个演出命中 · ${debug.source || "state_journal"}` : "等待心笺 tag";
+        head.appendChild(title);
+        head.appendChild(meta);
+        card.appendChild(head);
+
+        const body = document.createElement("div");
+        body.className = "prompt-debug-relation-meta";
+        body.appendChild(makePromptDebugLine("阶段 tag", stageTags.join(" / ") || "—"));
+        body.appendChild(makePromptDebugLine("剧情账本 tag", plotTags.join(" / ") || "—"));
+        if (!stageTags.length && !plotTags.length && activeTags.length) {
+          body.appendChild(makePromptDebugLine("全部 active tag", activeTags.join(" / ")));
+        }
+        card.appendChild(body);
+
+        const list = document.createElement("div");
+        list.className = "prompt-debug-relation-list";
+        const visibleResults = results.filter((item) => item.trigger_type === "state_journal_tag" || item.trigger_type === "plot_ledger_tag" || item.reason !== "non_tag_trigger");
+        if (!visibleResults.length) {
+          list.innerHTML = '<div class="prompt-debug-empty">暂无状态触发演出配置，或尚未收到心笺 active tag。</div>';
+        } else {
+          visibleResults.slice(0, 12).forEach((item) => {
+            const row = document.createElement("article");
+            row.className = "prompt-debug-relation-card";
+            const rowHead = document.createElement("div");
+            rowHead.className = "prompt-debug-relation-head";
+            const name = document.createElement("div");
+            name.className = "prompt-debug-tag-name";
+            name.textContent = item.scene || item.scene_id || "动态演出";
+            const badges = document.createElement("div");
+            badges.className = "prompt-debug-badge-row";
+            badges.appendChild(makePromptDebugBadge(item.run ? "已命中" : "已跳过", item.run ? "hit" : "missing"));
+            if (item.repeat) badges.appendChild(makePromptDebugBadge(`重复：${item.repeat}`, ""));
+            if (item.trigger_type === "plot_ledger_tag") badges.appendChild(makePromptDebugBadge("剧情账本", "base"));
+            if (item.trigger_type === "state_journal_tag") badges.appendChild(makePromptDebugBadge("心笺阶段", "base"));
+            rowHead.appendChild(name);
+            rowHead.appendChild(badges);
+            row.appendChild(rowHead);
+            const rowMeta = document.createElement("div");
+            rowMeta.className = "prompt-debug-relation-meta";
+            rowMeta.appendChild(makePromptDebugLine("监听 tag", item.tag || "—"));
+            rowMeta.appendChild(makePromptDebugLine("结果", item.label || getWorkshopDynamicSkipLabel(item.reason)));
+            if (item.token) rowMeta.appendChild(makePromptDebugLine("去重 token", item.token));
+            row.appendChild(rowMeta);
+            list.appendChild(row);
+          });
+        }
+        card.appendChild(list);
         parent.appendChild(card);
       }
 
@@ -3162,7 +3579,8 @@
         const selectedCount = Array.isArray(debugState.items) ? debugState.items.filter((item) => item.selectedForPrompt).length : 0;
         const droppedCount = Array.isArray(debugState.items) ? debugState.items.filter((item) => !item.selectedForPrompt).length : 0;
 
-        if (!messages.length && !segments.length && !relations.length) {
+        const hasWorkshopDebug = Boolean(workshopDynamicDebugState?.updated_at || normalizeWorkshopStringList(workshopDynamicDebugState?.active_tags).length || (workshopDynamicDebugState?.results || []).length);
+        if (!messages.length && !segments.length && !relations.length && !hasWorkshopDebug) {
           promptDebugPanelEl.innerHTML = '<div class="prompt-debug-empty">生成 Prompt 预览或发送一轮聊天后，这里会显示 Prompt Debug 链路。</div>';
           if (downloadPromptDebugJsonBtn) downloadPromptDebugJsonBtn.disabled = true;
           return;
@@ -3195,6 +3613,7 @@
         appendBaseKernelCard(promptDebugPanelEl, segments);
         appendPromptBudgetCard(promptDebugPanelEl, packagePayload);
         appendMacroVariablesCard(promptDebugPanelEl, packagePayload);
+        appendWorkshopDynamicDebugCard(promptDebugPanelEl);
 
         const tagCard = document.createElement("section");
         tagCard.className = "prompt-debug-card";
@@ -3662,6 +4081,169 @@
         return `${cleanText.slice(0, maxLength).trimEnd()}...`;
       }
 
+      function getDirectorNoteMode() {
+        return document.querySelector('input[name="director-note-mode"]:checked')?.value === "advanced" ? "advanced" : "basic";
+      }
+
+      function updateDirectorNoteModeUi() {
+        const advanced = getDirectorNoteMode() === "advanced";
+        if (directorNoteAdvancedFieldsEl) directorNoteAdvancedFieldsEl.hidden = !advanced;
+        if (directorNoteTitleEl) directorNoteTitleEl.closest(".director-note-title-field")?.classList?.toggle("is-advanced", advanced);
+      }
+
+      function updateDirectorNoteInjectUi() {
+        const isDepth = directorNoteInjectTypeEl?.value === "depth";
+        if (directorNotePlacementRowEl) directorNotePlacementRowEl.hidden = Boolean(isDepth);
+        if (directorNoteDepthRowEl) directorNoteDepthRowEl.hidden = !isDepth;
+      }
+
+      function clampDirectorNoteNumber(value, min, max, fallback) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(Math.max(Math.round(parsed), min), max);
+      }
+
+      function buildDirectorNoteInjectPayload() {
+        const type = directorNoteInjectTypeEl?.value === "depth" ? "depth" : "placement";
+        return {
+          type,
+          depth: clampDirectorNoteNumber(directorNoteDepthEl?.value, 0, 999, 0),
+          role: directorNoteRoleEl?.value || "system",
+          order: clampDirectorNoteNumber(directorNoteOrderEl?.value, 0, 999, 100),
+          placement: type === "depth" ? "at_depth" : (directorNoteAdvancedPlacementEl?.value || "after_character"),
+        };
+      }
+
+      function isDirectorNoteInjectSyntaxText(text) {
+        return /^@(inject|d\d*|d)\b/i.test(String(text || "").trim());
+      }
+
+      function setDirectorNoteMode(mode) {
+        const normalized = mode === "advanced" ? "advanced" : "basic";
+        const target = [...directorNoteModeEls].find((item) => item.value === normalized);
+        if (target && !target.checked) target.checked = true;
+        updateDirectorNoteModeUi();
+      }
+
+      function buildDirectorNotePayloadFromForm() {
+        const content = directorNoteContentEl?.value.trim() || "";
+        const syntaxMode = isDirectorNoteInjectSyntaxText(content);
+        const mode = syntaxMode ? "advanced" : getDirectorNoteMode();
+        const payload = {
+          title: directorNoteTitleEl?.value.trim() || "",
+          content,
+          remaining_turns: Number(directorNoteTurnsEl?.value || 1),
+          position: directorNotePositionEl?.value || "after_char_defs",
+          mode,
+          enabled: mode === "advanced" ? directorNoteEnabledEl?.checked !== false : true,
+          source: "user",
+          scope: "slot",
+        };
+        if (mode === "advanced") {
+          payload.inject = buildDirectorNoteInjectPayload();
+        }
+        return payload;
+      }
+
+      function applyDirectorNoteSyntaxPreview(data) {
+        const note = data?.note || {};
+        if (!data?.detected || note.mode !== "advanced") return;
+        setDirectorNoteMode("advanced");
+        if (directorNoteTurnsEl && note.remaining_turns) directorNoteTurnsEl.value = String(note.remaining_turns);
+        if (directorNoteTitleEl && note.title && !directorNoteTitleEl.value.trim()) directorNoteTitleEl.value = note.title;
+        if (directorNotePositionEl && note.position) directorNotePositionEl.value = note.position;
+        if (directorNoteEnabledEl && typeof note.enabled === "boolean") directorNoteEnabledEl.checked = note.enabled;
+        const inject = note.inject && typeof note.inject === "object" ? note.inject : {};
+        if (directorNoteInjectTypeEl && inject.type) directorNoteInjectTypeEl.value = inject.type === "depth" ? "depth" : "placement";
+        if (directorNoteRoleEl && inject.role) directorNoteRoleEl.value = inject.role;
+        if (directorNoteOrderEl && inject.order !== undefined) directorNoteOrderEl.value = String(inject.order);
+        if (directorNoteDepthEl && inject.depth !== undefined) directorNoteDepthEl.value = String(inject.depth);
+        if (directorNoteAdvancedPlacementEl && inject.placement && inject.placement !== "at_depth") {
+          directorNoteAdvancedPlacementEl.value = inject.placement;
+        }
+        updateDirectorNoteInjectUi();
+      }
+
+      function renderDirectorNoteSyntaxPreview(data, state = "ready") {
+        if (!directorNoteSyntaxPreviewEl) return;
+        if (state === "hidden") {
+          directorNoteSyntaxPreviewEl.hidden = true;
+          directorNoteSyntaxPreviewEl.innerHTML = "";
+          directorNoteSyntaxPreviewEl.classList.remove("is-error", "is-loading");
+          return;
+        }
+        directorNoteSyntaxPreviewEl.hidden = false;
+        directorNoteSyntaxPreviewEl.classList.toggle("is-loading", state === "loading");
+        directorNoteSyntaxPreviewEl.classList.toggle("is-error", Boolean(data && data.valid === false));
+        if (state === "loading") {
+          directorNoteSyntaxPreviewEl.textContent = "正在解析 @INJECT...";
+          return;
+        }
+        const note = data?.note || {};
+        const inject = note.inject && typeof note.inject === "object" ? note.inject : {};
+        const placement = inject.type === "depth"
+          ? `depth=${Number(inject.depth || 0)}`
+          : (DIRECTOR_NOTE_PLACEMENT_LABELS[inject.placement] || inject.placement || "固定层级");
+        const errors = Array.isArray(data?.errors) ? data.errors : [];
+        const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
+        const summary = data?.valid === false
+          ? "语法需要修正"
+          : `将作为 ${inject.role || note.inject?.role || "system"} 消息插入 ${placement}，生效 ${Number(note.remaining_turns || 1)} 回合，order ${Number(inject.order ?? 100)}。`;
+        const content = String(data?.content || note.content || "").trim();
+        directorNoteSyntaxPreviewEl.innerHTML = `
+          <strong>@INJECT 解析预览</strong>
+          <p>${escapeHtml(summary)}</p>
+          ${content ? `<code>${escapeHtml(directorNoteSummary(content, 120))}</code>` : ""}
+          ${errors.length ? `<p class="director-note-syntax-problem">${escapeHtml(errors.join("；"))}</p>` : ""}
+          ${warnings.length ? `<p class="director-note-syntax-warning">${escapeHtml(warnings.join("；"))}</p>` : ""}
+        `;
+      }
+
+      function scheduleDirectorNoteSyntaxPreview() {
+        const content = directorNoteContentEl?.value || "";
+        const detected = isDirectorNoteInjectSyntaxText(content);
+        if (detected) {
+          setDirectorNoteMode("advanced");
+        }
+        if (!detected) {
+          renderDirectorNoteSyntaxPreview(null, "hidden");
+          return;
+        }
+        window.clearTimeout(directorNoteSyntaxPreviewTimer);
+        directorNoteSyntaxPreviewTimer = window.setTimeout(async () => {
+          const seq = ++directorNoteSyntaxPreviewSeq;
+          renderDirectorNoteSyntaxPreview(null, "loading");
+          try {
+            const data = await postJson("/api/chat/director-notes/preview", buildDirectorNotePayloadFromForm());
+            if (seq !== directorNoteSyntaxPreviewSeq) return;
+            applyDirectorNoteSyntaxPreview(data);
+            renderDirectorNoteSyntaxPreview(data);
+          } catch (error) {
+            if (seq !== directorNoteSyntaxPreviewSeq) return;
+            renderDirectorNoteSyntaxPreview({
+              valid: false,
+              errors: [`解析失败：${error.message}`],
+              warnings: [],
+              note: null,
+            });
+          }
+        }, 260);
+      }
+
+      function directorNotePlacementLabel(item) {
+        if (item?.mode === "advanced") {
+          const inject = item.inject && typeof item.inject === "object" ? item.inject : {};
+          if (inject.type === "depth") return `d${Number(inject.depth || 0)}`;
+          return DIRECTOR_NOTE_PLACEMENT_LABELS[inject.placement] || inject.placement || "高级";
+        }
+        return DIRECTOR_NOTE_POSITION_LABELS[item?.position] || item?.position || "未分类";
+      }
+
+      function directorNoteRoleLabel(item) {
+        const inject = item?.inject && typeof item.inject === "object" ? item.inject : {};
+        return DIRECTOR_NOTE_ROLE_LABELS[inject.role] || inject.role || "system";
+      }
+
       function renderDirectorNotes(items) {
         directorNotesCache = Array.isArray(items) ? items.slice() : [];
         if (!directorNoteListEl) return;
@@ -3682,13 +4264,34 @@
 
           const positionChip = document.createElement("span");
           positionChip.className = "director-note-chip";
-          positionChip.textContent = DIRECTOR_NOTE_POSITION_LABELS[item.position] || item.position || "未分类";
+          positionChip.textContent = directorNotePlacementLabel(item);
 
           const turnsChip = document.createElement("span");
           turnsChip.className = "director-note-chip";
           turnsChip.textContent = `剩余 ${Number(item.remaining_turns || 0)} 回合`;
 
+          const modeChip = document.createElement("span");
+          modeChip.className = `director-note-chip ${item.mode === "advanced" ? "is-advanced" : ""}`;
+          modeChip.textContent = item.mode === "advanced" ? "高级" : "常规";
+
           meta.appendChild(positionChip);
+          meta.appendChild(modeChip);
+          if (item.mode === "advanced") {
+            const roleChip = document.createElement("span");
+            roleChip.className = "director-note-chip";
+            roleChip.textContent = directorNoteRoleLabel(item);
+            meta.appendChild(roleChip);
+            const orderChip = document.createElement("span");
+            orderChip.className = "director-note-chip";
+            orderChip.textContent = `order ${Number(item.inject?.order ?? 100)}`;
+            meta.appendChild(orderChip);
+            if (item.enabled === false) {
+              const disabledChip = document.createElement("span");
+              disabledChip.className = "director-note-chip is-disabled";
+              disabledChip.textContent = "已关闭";
+              meta.appendChild(disabledChip);
+            }
+          }
           meta.appendChild(turnsChip);
 
           const removeBtn = document.createElement("button");
@@ -3707,7 +4310,8 @@
 
           const content = document.createElement("p");
           content.className = "director-note-content";
-          content.textContent = directorNoteSummary(item.content || "", 160);
+          const titleText = String(item.title || "").trim();
+          content.textContent = `${titleText ? `${titleText}：` : ""}${directorNoteSummary(item.content || "", 160)}`;
 
           wrapper.appendChild(head);
           wrapper.appendChild(content);
@@ -3735,17 +4339,17 @@
         if (!content) {
           throw new Error("导演注内容不能为空");
         }
-        const turns = Number(directorNoteTurnsEl?.value || 1);
-        const position = directorNotePositionEl?.value || "after_char_defs";
+        const payload = buildDirectorNotePayloadFromForm();
         try {
-          const data = await postJson("/api/chat/director-notes", {
-            content,
-            remaining_turns: turns,
-            position,
-          });
+          const data = await postJson("/api/chat/director-notes", payload);
           renderDirectorNotes(data.items || []);
+          if (directorNoteTitleEl) directorNoteTitleEl.value = "";
           if (directorNoteContentEl) directorNoteContentEl.value = "";
           if (directorNoteTurnsEl) directorNoteTurnsEl.value = "1";
+          if (directorNoteEnabledEl) directorNoteEnabledEl.checked = true;
+          if (directorNoteOrderEl) directorNoteOrderEl.value = "100";
+          if (directorNoteDepthEl) directorNoteDepthEl.value = "0";
+          renderDirectorNoteSyntaxPreview(null, "hidden");
           return data;
         } catch (error) {
           if (String(error.message || "").includes("404")) {
@@ -3754,6 +4358,12 @@
           }
           throw error;
         }
+      }
+
+      async function disableAdvancedDirectorNotes() {
+        const data = await postJson("/api/chat/director-notes/disable-advanced", {});
+        renderDirectorNotes(data.items || []);
+        return data;
       }
 
       async function deleteDirectorNote(noteId) {
@@ -3783,6 +4393,13 @@
         if (event.key === "fantareal:director-notes-updated") {
           refreshDirectorNotesFromExternalEvent();
         }
+      });
+
+      window.addEventListener("state_journal:updated", (event) => {
+        const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
+        window.setTimeout(() => {
+          void refreshWorkshopStateJournalTags({ source: detail.trigger_source || "state_journal_updated", trigger: true });
+        }, 260);
       });
 
       const PROMPT_SEGMENT_SOURCE_LABELS = {
@@ -3927,7 +4544,34 @@
         }
       }
 
+      function cancelPendingChatDraftSave() {
+        if (chatDraftSaveTimer) {
+          window.clearTimeout(chatDraftSaveTimer);
+          chatDraftSaveTimer = null;
+        }
+        pendingChatDraftValue = "";
+      }
+
+      function schedulePersistChatDraft(value) {
+        pendingChatDraftValue = String(value || "");
+        if (chatDraftSaveTimer) window.clearTimeout(chatDraftSaveTimer);
+        chatDraftSaveTimer = window.setTimeout(() => {
+          chatDraftSaveTimer = null;
+          persistChatDraft(pendingChatDraftValue);
+        }, CHAT_DRAFT_SAVE_DEBOUNCE_MS);
+      }
+
+      function flushPendingChatDraft(value = pendingChatDraftValue) {
+        pendingChatDraftValue = String(value || "");
+        if (chatDraftSaveTimer) {
+          window.clearTimeout(chatDraftSaveTimer);
+          chatDraftSaveTimer = null;
+        }
+        persistChatDraft(pendingChatDraftValue);
+      }
+
       function clearChatDraft() {
+        cancelPendingChatDraftSave();
         try {
           localStorage.removeItem(getChatDraftStorageKey());
         } catch (error) {
@@ -3947,7 +4591,7 @@
         if (!inputEl || inputEl.value || composerInputRevision !== revisionAtSubmit) return;
         inputEl.value = messageText;
         composerInputRevision += 1;
-        persistChatDraft(messageText);
+        flushPendingChatDraft(messageText);
         syncComposerState();
         inputEl.focus();
       }
@@ -3955,7 +4599,7 @@
       function handleComposerInput() {
         composerInputRevision += 1;
         syncComposerState();
-        persistChatDraft(inputEl.value);
+        schedulePersistChatDraft(inputEl.value);
       }
 
       function isPromptPackageCacheScopeMatched(rawScope) {
@@ -4029,7 +4673,7 @@
         return text ? directorNoteSummary(text, 18) : "Prompt 预览";
       }
 
-      function createPromptPackageHistoryItem(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload) {
+      function createPromptPackageHistoryItem(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload, memoryDebug = lastMemoryDebugPayload) {
         const now = new Date();
         const timestamp = now.toISOString();
         const messageCount = Number(pkg?.message_count || 0);
@@ -4054,6 +4698,7 @@
           message_count: messageCount,
           prompt_package: pkg,
           worldbook_debug: worldbookDebug && typeof worldbookDebug === "object" ? worldbookDebug : {},
+          memory_debug: memoryDebug && typeof memoryDebug === "object" ? memoryDebug : {},
         };
       }
 
@@ -4121,8 +4766,10 @@
         if (!item) return;
         promptPackageHistory.active_id = item.id;
         lastWorldbookDebugPayload = item.worldbook_debug || lastWorldbookDebugPayload;
+        lastMemoryDebugPayload = item.memory_debug && typeof item.memory_debug === "object" ? item.memory_debug : null;
         persistPromptPackageHistory();
         renderPromptPackageHistorySelector();
+        renderMemoryDebug(lastMemoryDebugPayload);
         renderPromptPackage(item.prompt_package, { skipHistory: true });
         renderPromptDebug(item.prompt_package, lastWorldbookDebugPayload);
       }
@@ -4148,10 +4795,12 @@
         const activeItem = getActivePromptPackageHistoryItem();
         lastPromptPackagePayload = activeItem?.prompt_package || null;
         lastWorldbookDebugPayload = activeItem?.worldbook_debug || lastWorldbookDebugPayload;
+        lastMemoryDebugPayload = activeItem?.memory_debug && typeof activeItem.memory_debug === "object" ? activeItem.memory_debug : null;
         persistPromptPackageHistory();
         renderPromptPackageHistorySelector();
         setPromptExportButtonsEnabled(!!activeItem);
         if (activeItem) {
+          renderMemoryDebug(lastMemoryDebugPayload);
           renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
           renderPromptDebug(activeItem.prompt_package, lastWorldbookDebugPayload);
           return;
@@ -4165,24 +4814,28 @@
           if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = "尚未生成";
           if (promptSegmentSummaryEl) promptSegmentSummaryEl.textContent = "";
           if (promptRuntimeDotEl) promptRuntimeDotEl.hidden = true;
+          renderMemoryDebug(null);
           renderPromptDebug(null, lastWorldbookDebugPayload);
         }
       }
 
-      function addPromptPackageToHistory(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload) {
+      function addPromptPackageToHistory(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload, memoryDebug = lastMemoryDebugPayload) {
         if (!pkg || typeof pkg !== "object") {
           promptPackageHistory = createEmptyPromptPackageHistory();
           lastPromptPackagePayload = null;
+          lastMemoryDebugPayload = null;
           persistPromptPackageHistory();
           renderPromptPackageHistorySelector();
           setPromptExportButtonsEnabled(false);
+          renderMemoryDebug(null);
           renderPromptDebug(null, worldbookDebug);
           return;
         }
-        const item = createPromptPackageHistoryItem(pkg, source, worldbookDebug);
+        const item = createPromptPackageHistoryItem(pkg, source, worldbookDebug, memoryDebug);
         promptPackageHistory.items = [item, ...promptPackageHistory.items].slice(0, PROMPT_PREVIEW_HISTORY_LIMIT);
         promptPackageHistory.active_id = item.id;
         lastPromptPackagePayload = pkg;
+        lastMemoryDebugPayload = item.memory_debug || null;
         persistPromptPackageHistory();
         renderPromptPackageHistorySelector();
         setPromptExportButtonsEnabled(true);
@@ -4196,10 +4849,12 @@
         const nextItem = getActivePromptPackageHistoryItem();
         lastPromptPackagePayload = nextItem?.prompt_package || null;
         lastWorldbookDebugPayload = nextItem?.worldbook_debug || lastWorldbookDebugPayload;
+        lastMemoryDebugPayload = nextItem?.memory_debug && typeof nextItem.memory_debug === "object" ? nextItem.memory_debug : null;
         persistPromptPackageHistory();
         renderPromptPackageHistorySelector();
         setPromptExportButtonsEnabled(!!nextItem);
         if (nextItem) {
+          renderMemoryDebug(lastMemoryDebugPayload);
           renderPromptPackage(nextItem.prompt_package, { skipHistory: true });
           renderPromptDebug(nextItem.prompt_package, lastWorldbookDebugPayload);
           return;
@@ -4212,6 +4867,7 @@
         if (promptPackageSummaryEl) promptPackageSummaryEl.textContent = "尚未生成";
         if (promptSegmentSummaryEl) promptSegmentSummaryEl.textContent = "";
         if (promptRuntimeDotEl) promptRuntimeDotEl.hidden = true;
+        renderMemoryDebug(null);
       }
 
       function downloadPromptPackageJson(pkg) {
@@ -4302,6 +4958,7 @@
           preset_activation_tags: presetActivationTags,
           debug_relations: {
             worldbook_debug: activeItem?.worldbook_debug || lastWorldbookDebugPayload || {},
+            memory_debug: activeItem?.memory_debug || lastMemoryDebugPayload || {},
             tag_relations: buildPromptDebugTagRelations(packagePayload, activeItem?.worldbook_debug || lastWorldbookDebugPayload || {}),
           },
           layers,
@@ -4317,8 +4974,8 @@
         }
       }
 
-      function cachePromptPackage(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload) {
-        addPromptPackageToHistory(pkg, source, worldbookDebug);
+      function cachePromptPackage(pkg, source = "preview", worldbookDebug = lastWorldbookDebugPayload, memoryDebug = lastMemoryDebugPayload) {
+        addPromptPackageToHistory(pkg, source, worldbookDebug, memoryDebug);
       }
 
       function loadCachedPromptPackage() {
@@ -4343,6 +5000,8 @@
           }
           lastPromptPackagePayload = activeItem.prompt_package;
           lastWorldbookDebugPayload = activeItem.worldbook_debug || lastWorldbookDebugPayload;
+          lastMemoryDebugPayload = activeItem.memory_debug && typeof activeItem.memory_debug === "object" ? activeItem.memory_debug : null;
+          renderMemoryDebug(lastMemoryDebugPayload);
           renderPromptPackage(activeItem.prompt_package, { skipHistory: true });
           renderPromptDebug(activeItem.prompt_package, lastWorldbookDebugPayload);
           setRuntimeTab("prompt", { openPanel: false });
@@ -4437,6 +5096,34 @@
               tagRow.appendChild(tagChip);
             });
             detail.appendChild(tagRow);
+          }
+          const directorMeta = segment.kind === "director_note" && segment.metadata && typeof segment.metadata === "object" ? segment.metadata : null;
+          if (directorMeta) {
+            const directorRow = document.createElement("div");
+            directorRow.className = "prompt-segment-tag-row";
+            const directorLabel = document.createElement("span");
+            directorLabel.className = "prompt-segment-tag-label";
+            directorLabel.textContent = "导演注";
+            directorRow.appendChild(directorLabel);
+            [
+              directorMeta.mode === "advanced" ? "高级" : "常规",
+              `role=${directorMeta.final_role || segment.role || "system"}`,
+              directorMeta.depth !== undefined ? `depth=${directorMeta.depth}` : `位置=${getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, directorMeta.final_position || segment.placement, directorMeta.final_position || segment.placement)}`,
+              directorMeta.inject_order !== undefined ? `order=${directorMeta.inject_order}` : "",
+              directorMeta.enabled === false ? "已关闭" : "",
+            ].filter(Boolean).forEach((label) => {
+              const chip = document.createElement("span");
+              chip.className = `prompt-segment-flag ${directorMeta.mode === "advanced" ? "hard" : "soft"}`;
+              chip.textContent = label;
+              directorRow.appendChild(chip);
+            });
+            if (directorMeta.reason) {
+              const reasonChip = document.createElement("span");
+              reasonChip.className = "prompt-segment-flag soft";
+              reasonChip.textContent = directorMeta.reason;
+              directorRow.appendChild(reasonChip);
+            }
+            detail.appendChild(directorRow);
           }
           const baseKernel = segment.metadata?.base_kernel && typeof segment.metadata.base_kernel === "object" ? segment.metadata.base_kernel : null;
           const thinkingProtocol = segment.metadata?.thinking_protocol && typeof segment.metadata.thinking_protocol === "object" ? segment.metadata.thinking_protocol : null;
@@ -4620,6 +5307,7 @@
             runtime_config: buildChatRuntimeConfig(),
           });
           renderRetrievedItems(data.retrieved_items || []);
+          renderMemoryDebug(data.memory_debug || null);
           renderWorldbookHits(data.worldbook_hits || []);
           renderWorldbookDebug(data.worldbook_debug || {});
           renderPresetDebug(data.preset_debug || {}, presetStoreCache);
@@ -4837,6 +5525,15 @@
       let workshopDynamicAudioStopTimer = null;
       let workshopDynamicAudioRestoreAmbience = false;
       let workshopDynamicAudioActive = false;
+      let workshopStateJournalTagsCache = { active_stage_tags: [], active_plot_ledger_tags: [], active_tags: [] };
+      let workshopDynamicDebugState = {
+        updated_at: "",
+        source: "init",
+        active_stage_tags: [],
+        active_plot_ledger_tags: [],
+        active_tags: [],
+        results: [],
+      };
 
       function fadeAudioElement(audioEl, targetVolume, duration = getOpeningTransitionMs()) {
         if (!audioEl) return Promise.resolve();
@@ -5445,18 +6142,122 @@
         return { cleanedText: cleaned.replace(/\n{3,}/g, "\n\n").trim(), events: [...new Set(events.filter(Boolean))] };
       }
 
-      function shouldRunDynamicScene(scene, token) {
-        if (!scene?.enabled) return false;
-        const repeat = scene.trigger?.repeat || "once";
-        if (repeat === "always") return true;
-        const sceneKey = `${scene.id || scene.name}:${token}`;
-        if (workshopDynamicTriggeredSession.has(sceneKey)) return false;
-        workshopDynamicTriggeredSession.add(sceneKey);
-        return true;
-      }
-
       function getDynamicScenes() {
         return Array.isArray(workshopDynamicScenesConfig) ? workshopDynamicScenesConfig : [];
+      }
+
+      function normalizeWorkshopStringList(items) {
+        const values = Array.isArray(items) ? items : [];
+        return [...new Set(values.map((item) => String(item || "").trim()).filter(Boolean))];
+      }
+
+      function normalizeWorkshopTagPayload(payload = {}) {
+        const activeTags = normalizeWorkshopStringList(payload.active_tags);
+        const activeStageTags = normalizeWorkshopStringList(payload.active_stage_tags);
+        const activePlotLedgerTags = normalizeWorkshopStringList(payload.active_plot_ledger_tags);
+        return {
+          active_stage_tags: activeStageTags.length ? activeStageTags : activeTags.filter((tag) => !tag.includes(".task.") && !tag.includes(".event.") && !tag.includes(".clue.") && !tag.includes(".item.")),
+          active_plot_ledger_tags: activePlotLedgerTags.length ? activePlotLedgerTags : activeTags.filter((tag) => tag.includes(".task.") || tag.includes(".event.") || tag.includes(".clue.") || tag.includes(".item.")),
+          active_tags: activeTags,
+          plot_ledger_sources: Array.isArray(payload.plot_ledger_sources) ? payload.plot_ledger_sources : [],
+        };
+      }
+
+      function getWorkshopTriggeredScenesSet() {
+        return new Set(normalizeWorkshopStringList(workshopRuntimeState?.triggered_scenes));
+      }
+
+      function getWorkshopSceneIdentity(scene) {
+        return String(scene?.id || scene?.name || "dynamic_scene").trim().slice(0, 80) || "dynamic_scene";
+      }
+
+      function buildWorkshopDynamicTriggerToken(scene, token) {
+        const raw = String(token || "").trim();
+        return `scene:${getWorkshopSceneIdentity(scene)}:${raw || "manual"}`.slice(0, 240);
+      }
+
+      function getWorkshopDynamicSkipLabel(reason) {
+        const labels = {
+          disabled: "演出已关闭",
+          non_tag_trigger: "非心笺 tag 触发",
+          missing_tag: "没有填写监听 tag",
+          no_match: "当前 active tag 未命中",
+          already_triggered_once: "只触发一次：已触发过",
+          already_triggered_session: "本次会话已触发过",
+        };
+        return labels[reason] || reason || "已跳过";
+      }
+
+      function shouldRunDynamicScene(scene, token, meta = {}) {
+        const triggerToken = buildWorkshopDynamicTriggerToken(scene, token);
+        const repeat = String(scene?.trigger?.repeat || "once").trim() || "once";
+        if (!scene?.enabled) {
+          return { run: false, token: triggerToken, repeat, reason: "disabled", ...meta };
+        }
+        if (repeat === "once" && getWorkshopTriggeredScenesSet().has(triggerToken)) {
+          return { run: false, token: triggerToken, repeat, reason: "already_triggered_once", ...meta };
+        }
+        if (repeat !== "always" && workshopDynamicTriggeredSession.has(triggerToken)) {
+          return { run: false, token: triggerToken, repeat, reason: "already_triggered_session", ...meta };
+        }
+        if (repeat !== "always") workshopDynamicTriggeredSession.add(triggerToken);
+        return { run: true, token: triggerToken, repeat, reason: "matched", ...meta };
+      }
+
+      function recordWorkshopDynamicDebug(source, tagPayload, results = []) {
+        const normalized = normalizeWorkshopTagPayload(tagPayload || {});
+        workshopDynamicDebugState = {
+          updated_at: new Date().toISOString(),
+          source: source || "state_journal",
+          active_stage_tags: normalized.active_stage_tags,
+          active_plot_ledger_tags: normalized.active_plot_ledger_tags,
+          active_tags: normalized.active_tags,
+          results: Array.isArray(results) ? results : [],
+        };
+        renderPromptDebug(lastPromptPackagePayload, lastWorldbookDebugPayload);
+      }
+
+      async function markWorkshopDynamicSceneTriggered(scene, token, reason = "dynamic_scene") {
+        const triggerToken = String(token || "").trim();
+        if (!triggerToken || scene?.trigger?.repeat !== "once") return;
+        try {
+          const response = await postJson("/api/workshop/triggered-scene", {
+            token: triggerToken,
+            scene_id: getWorkshopSceneIdentity(scene),
+            reason,
+          });
+          if (response?.state) {
+            workshopRuntimeState = response.state;
+          }
+        } catch (error) {
+          console.warn("Workshop dynamic triggered-scene save failed:", error);
+        }
+      }
+
+      function completeDynamicSceneRun(scene, context = {}) {
+        if (!context?.triggerToken) return;
+        void markWorkshopDynamicSceneTriggered(scene, context.triggerToken, context.triggerSource || "dynamic_scene");
+      }
+
+      async function refreshWorkshopStateJournalTags({ source = "manual", trigger = true } = {}) {
+        try {
+          const response = await fetch("/mods/state-journal/app/api/role-state/active-tags", { cache: "no-store" });
+          if (!response.ok) {
+            if (response.status !== 404) throw new Error(`HTTP ${response.status}`);
+            recordWorkshopDynamicDebug(source, {}, [{ scene: "心笺", run: false, reason: "active_tags_api_missing", label: "心笺 active tags 接口不可用" }]);
+            return null;
+          }
+          const data = await response.json();
+          const normalized = normalizeWorkshopTagPayload(data || {});
+          workshopStateJournalTagsCache = normalized;
+          if (trigger) triggerDynamicScenesByStateJournalTags(normalized, { source });
+          else recordWorkshopDynamicDebug(source, normalized, []);
+          return normalized;
+        } catch (error) {
+          console.warn("Workshop state journal tag refresh failed:", error);
+          recordWorkshopDynamicDebug(source, workshopStateJournalTagsCache, [{ scene: "心笺", run: false, reason: "active_tags_fetch_failed", label: error.message || "active tags 读取失败" }]);
+          return null;
+        }
       }
 
       function triggerDynamicScenesByModelEvents(events) {
@@ -5465,8 +6266,11 @@
         getDynamicScenes().forEach((scene) => {
           if (scene?.trigger?.type !== "model") return;
           const eventName = String(scene.trigger.event || "").trim();
-          if (eventName && normalized.has(eventName) && shouldRunDynamicScene(scene, `model:${eventName}`)) {
-            runDynamicScene(scene);
+          if (eventName && normalized.has(eventName)) {
+            const decision = shouldRunDynamicScene(scene, `model:${eventName}`, { triggerSource: "model", triggerValue: eventName });
+            if (decision.run) {
+              runDynamicScene(scene, { triggerToken: decision.token, triggerSource: "model", triggerValue: eventName });
+            }
           }
         });
       }
@@ -5477,7 +6281,69 @@
           const target = Number(scene.trigger.round || 1) || 1;
           const repeat = scene.trigger.repeat || "once";
           const matched = repeat === "always" ? roundCount >= target && (roundCount - target) % Math.max(target, 1) === 0 : roundCount === target;
-          if (matched && shouldRunDynamicScene(scene, `round:${roundCount}`)) runDynamicScene(scene);
+          if (matched) {
+            const decision = shouldRunDynamicScene(scene, `round:${roundCount}`, { triggerSource: "round", triggerValue: roundCount });
+            if (decision.run) runDynamicScene(scene, { triggerToken: decision.token, triggerSource: "round", triggerValue: roundCount });
+          }
+        });
+      }
+
+      function triggerDynamicScenesByStateJournalTags(tagPayload, options = {}) {
+        const normalized = normalizeWorkshopTagPayload(tagPayload || {});
+        const stageTags = new Set(normalized.active_stage_tags);
+        const plotTags = new Set(normalized.active_plot_ledger_tags);
+        const allTags = new Set(normalized.active_tags);
+        const results = [];
+        const runnable = [];
+        getDynamicScenes().forEach((scene) => {
+          const triggerType = String(scene?.trigger?.type || "").trim();
+          const sceneName = String(scene?.name || scene?.id || "动态演出").trim();
+          if (!["state_journal_tag", "plot_ledger_tag"].includes(triggerType)) {
+            results.push({ scene: sceneName, scene_id: scene?.id || "", trigger_type: triggerType || "model", run: false, reason: "non_tag_trigger", label: getWorkshopDynamicSkipLabel("non_tag_trigger") });
+            return;
+          }
+          const expectedTag = String(scene?.trigger?.tag || "").trim();
+          const sourceTags = triggerType === "plot_ledger_tag" ? plotTags : stageTags;
+          const matched = expectedTag && (sourceTags.has(expectedTag) || (!sourceTags.size && allTags.has(expectedTag)));
+          if (!scene?.enabled) {
+            results.push({ scene: sceneName, scene_id: scene?.id || "", trigger_type: triggerType, tag: expectedTag, run: false, reason: "disabled", label: getWorkshopDynamicSkipLabel("disabled") });
+            return;
+          }
+          if (!expectedTag) {
+            results.push({ scene: sceneName, scene_id: scene?.id || "", trigger_type: triggerType, run: false, reason: "missing_tag", label: getWorkshopDynamicSkipLabel("missing_tag") });
+            return;
+          }
+          if (!matched) {
+            results.push({ scene: sceneName, scene_id: scene?.id || "", trigger_type: triggerType, tag: expectedTag, run: false, reason: "no_match", label: getWorkshopDynamicSkipLabel("no_match") });
+            return;
+          }
+          const decision = shouldRunDynamicScene(scene, `${triggerType}:${expectedTag}`, {
+            triggerSource: triggerType,
+            triggerValue: expectedTag,
+          });
+          const result = {
+            scene: sceneName,
+            scene_id: scene?.id || "",
+            trigger_type: triggerType,
+            tag: expectedTag,
+            token: decision.token,
+            repeat: decision.repeat,
+            run: decision.run,
+            reason: decision.reason,
+            label: decision.run ? "已命中，准备播放" : getWorkshopDynamicSkipLabel(decision.reason),
+          };
+          results.push(result);
+          if (decision.run) {
+            runnable.push({ scene, decision });
+          }
+        });
+        recordWorkshopDynamicDebug(options.source || "state_journal", normalized, results);
+        runnable.forEach(({ scene, decision }) => {
+          runDynamicScene(scene, {
+            triggerToken: decision.token,
+            triggerSource: decision.triggerSource || scene?.trigger?.type || "state_journal_tag",
+            triggerValue: decision.triggerValue || scene?.trigger?.tag || "",
+          });
         });
       }
 
@@ -5573,34 +6439,38 @@
         }
       }
 
-      function runDynamicScene(scene) {
+      function runDynamicScene(scene, context = {}) {
         const content = scene.content || {};
         const presentation = scene.presentation || {};
         const type = content.type || "image";
         if (type === "sound") {
           const url = content.soundUrl || scene.audio?.url || "";
           playDynamicSound(url, scene.audio?.volume ?? 0.5, presentation);
+          completeDynamicSceneRun(scene, context);
           return;
         }
         if (type === "background") {
           showDynamicBackground(content.backgroundUrl, presentation);
           playDynamicSound(scene.audio?.url || "", scene.audio?.volume ?? 0.5, presentation);
+          completeDynamicSceneRun(scene, context);
           return;
         }
-        showDynamicImage(scene);
+        showDynamicImage(scene, context);
         playDynamicSound(scene.audio?.url || content.soundUrl || "", scene.audio?.volume ?? 0.5, presentation);
       }
 
-      function showDynamicImage(scene) {
+      function showDynamicImage(scene, context = {}) {
         const content = scene.content || {};
         const presentation = scene.presentation || {};
         const mode = presentation.mode || "standard";
+        const blocking = presentation.blocking !== false;
+        const buttonText = String(presentation.buttonText || "继续").trim().slice(0, 24) || "继续";
         const overlay = document.createElement("div");
-        overlay.className = `workshop-dynamic-overlay workshop-dynamic-${mode}`;
+        overlay.className = `workshop-dynamic-overlay workshop-dynamic-${mode}${blocking ? " workshop-dynamic-blocking" : ""}`;
         overlay.innerHTML = `
           <div class="workshop-dynamic-backdrop"></div>
           <section class="workshop-dynamic-card">
-            <button type="button" class="secondary compact workshop-dynamic-close">关闭</button>
+            <button type="button" class="secondary compact workshop-dynamic-close">${escapeHtml(buttonText)}</button>
             ${content.imageUrl ? `<img class="workshop-dynamic-image" src="${content.imageUrl.replace(/["<>]/g, "")}" alt="${(content.title || scene.name || "动态演出").replace(/["<>]/g, "")}" />` : ""}
             <div class="workshop-dynamic-copy">
               <h2>${escapeHtml(content.title || scene.name || "动态演出")}</h2>
@@ -5616,10 +6486,13 @@
           stopDynamicSound({ restoreAmbience: true });
           overlay.classList.add("is-leaving");
           window.setTimeout(() => overlay.remove(), 320);
+          completeDynamicSceneRun(scene, context);
         };
         overlay.querySelector(".workshop-dynamic-close")?.addEventListener("click", close);
-        overlay.querySelector(".workshop-dynamic-backdrop")?.addEventListener("click", close);
-        if (presentation.autoClose !== false && Number(presentation.duration || 0) > 0) {
+        if (!blocking) {
+          overlay.querySelector(".workshop-dynamic-backdrop")?.addEventListener("click", close);
+        }
+        if (!blocking && presentation.autoClose !== false && Number(presentation.duration || 0) > 0) {
           window.setTimeout(close, getDynamicPresentationDurationMs(presentation));
         }
       }
@@ -5839,11 +6712,17 @@
 
       inputEl.addEventListener("input", handleComposerInput);
       inputEl.addEventListener("focus", () => chatForm?.classList.add("composer-focused"));
-      inputEl.addEventListener("blur", () => chatForm?.classList.remove("composer-focused"));
+      inputEl.addEventListener("blur", () => {
+        chatForm?.classList.remove("composer-focused");
+        flushPendingChatDraft(inputEl.value);
+      });
+      window.addEventListener("pagehide", () => {
+        flushPendingChatDraft(inputEl.value);
+      });
       messagesEl?.addEventListener("scroll", () => updateScrollBottomButton(false));
       scrollBottomBtn?.addEventListener("click", scrollMessagesToBottom);
       restoreChatDraft();
-      syncComposerState();
+      syncComposerState({ immediate: true });
       scrollMessagesToBottom();
 
       inputEl.addEventListener("keydown", (event) => {
@@ -5880,6 +6759,7 @@
         const userEntry = addMessage("user", messageText);
         const userMessageMeta = assignTurnToMessage(userEntry.wrapper, chatTurnId, "user", messageText, chatTurnIndex);
         if (clearInput) {
+          cancelPendingChatDraftSave();
           inputEl.value = "";
           syncComposerState();
         }
@@ -5907,6 +6787,7 @@
           }, {
             onMeta(data) {
               renderRetrievedItems(data.retrieved_items || []);
+              renderMemoryDebug(data.memory_debug || null);
               renderWorldbookHits(data.worldbook_hits || []);
               renderWorldbookDebug(data.worldbook_debug || {});
               renderPresetDebug(data.preset_debug || {}, presetStoreCache);
@@ -5941,7 +6822,7 @@
               triggerDynamicScenesByModelEvents(workshopDynamicParse.events);
               workshopRoundCount += 1;
               triggerDynamicScenesByRound(workshopRoundCount);
-              ensureFinalVisible(assistantEntry, finalReply);
+              ensureFinalVisible(assistantEntry, finalReply, { render: false });
               assistantEntry.wrapper.dataset.messageContent = finalReply;
               if (!Array.isArray(data.director_notes)) {
                 loadDirectorNotes().catch((error) => console.warn("Director notes refresh failed:", error));
@@ -5952,7 +6833,6 @@
               assistantEntry.state.thinking = false;
               if (
                 assistantEntry.state.visible.trim()
-                || assistantEntry.pendingVisibleChars.length
                 || assistantEntry.state.think.trim()
               ) {
                 const shouldStickToBottom = isMessagesNearBottom(120);
@@ -6019,6 +6899,7 @@
           const errorEntry = addMessage("assistant", `出错了：${error.message}`);
           errorEntry.wrapper.dataset.transientMessage = "true";
           renderRetrievedItems([]);
+          renderMemoryDebug(null);
           renderWorldbookHits([]);
           renderWorldbookDebug({});
           if (clearInput) {
@@ -6037,6 +6918,7 @@
         event.preventDefault();
         const text = inputEl.value.trim();
         if (!text) return;
+        flushPendingChatDraft(inputEl.value);
         pulseChatElement(chatForm, "chat-composer-submit-pulse", 520);
         await generateChatTurn(text);
       });
@@ -6075,6 +6957,7 @@
           }
           messagesEl.innerHTML = "";
           renderRetrievedItems([]);
+          renderMemoryDebug(null);
           renderWorldbookHits([]);
           const memoryTitle = data.memory_item?.title || "记忆已保存";
           const doneText = `已完成：${memoryTitle}；工坊阶段：${data.workshop_stage || "未知"}`;
@@ -6109,6 +6992,7 @@
       promptLayeredInjectionEl?.addEventListener("change", syncStateFromPromptDebug);
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
+          flushPendingChatDraft(inputEl.value);
           streamingEntries.forEach((entry) => flushPendingVisible(entry));
         }
       });
@@ -6143,6 +7027,39 @@
           });
       });
 
+      directorNoteModeEls?.forEach((item) => {
+        item.addEventListener("change", () => {
+          updateDirectorNoteModeUi();
+          scheduleDirectorNoteSyntaxPreview();
+        });
+      });
+      directorNoteContentEl?.addEventListener("input", scheduleDirectorNoteSyntaxPreview);
+      directorNoteContentEl?.addEventListener("change", scheduleDirectorNoteSyntaxPreview);
+      directorNoteTurnsEl?.addEventListener("input", scheduleDirectorNoteSyntaxPreview);
+      directorNoteTurnsEl?.addEventListener("change", scheduleDirectorNoteSyntaxPreview);
+      directorNoteEnabledEl?.addEventListener("change", scheduleDirectorNoteSyntaxPreview);
+      directorNoteRoleEl?.addEventListener("change", scheduleDirectorNoteSyntaxPreview);
+      directorNoteOrderEl?.addEventListener("input", scheduleDirectorNoteSyntaxPreview);
+      directorNoteOrderEl?.addEventListener("change", scheduleDirectorNoteSyntaxPreview);
+      directorNoteAdvancedPlacementEl?.addEventListener("change", scheduleDirectorNoteSyntaxPreview);
+      directorNoteDepthEl?.addEventListener("input", scheduleDirectorNoteSyntaxPreview);
+      directorNoteDepthEl?.addEventListener("change", scheduleDirectorNoteSyntaxPreview);
+      directorNoteInjectTypeEl?.addEventListener("change", () => {
+        updateDirectorNoteInjectUi();
+        scheduleDirectorNoteSyntaxPreview();
+      });
+      disableAdvancedDirectorNotesBtn?.addEventListener("click", () => {
+        disableAdvancedDirectorNotes()
+          .then(() => {
+            setStatus("高级导演注已全部关闭", "success");
+            showToast("高级导演注已全部关闭", "success");
+          })
+          .catch((error) => {
+            setStatus(`关闭高级导演注失败：${error.message}`, "error");
+            showToast(`关闭高级导演注失败：${error.message}`, "error");
+          });
+      });
+
       workshopModalCloseEl?.addEventListener("click", hideWorkshopImagePopup);
       workshopModalConfirmEl?.addEventListener("click", hideWorkshopImagePopup);
       workshopModalEl?.addEventListener("click", (event) => {
@@ -6173,6 +7090,10 @@
       loadDirectorNotes().catch(() => {
         renderDirectorNotes([]);
       });
+      refreshWorkshopStateJournalTags({ source: "page_init", trigger: true }).catch(() => {});
+      updateDirectorNoteModeUi();
+      updateDirectorNoteInjectUi();
+      scheduleDirectorNoteSyntaxPreview();
 
       window.FantarealThemeToggle = {
         ...(window.FantarealThemeToggle || {}),

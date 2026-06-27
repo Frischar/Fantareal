@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
   </head>
@@ -138,11 +139,17 @@
 
               <div class="grid-two wb-keyword-grid">
                 <div>
-                  <label>主关键词</label>
+                  <div class="macro-field-head">
+                    <label>主关键词</label>
+                    <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-trigger">{ } 变量</button>
+                  </div>
                   <input class="wb-trigger" value="{{ item.trigger }}" placeholder="多个别名可用逗号分隔" />
                 </div>
                 <div>
-                  <label>副关键词</label>
+                  <div class="macro-field-head">
+                    <label>副关键词</label>
+                    <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-secondary-trigger">{ } 变量</button>
+                  </div>
                   <input class="wb-secondary-trigger" value="{{ item.secondary_trigger }}" placeholder="可留空；例如：婚后, 成亲" />
                 </div>
               </div>
@@ -284,7 +291,10 @@
                   <span>完整词匹配</span>
                 </label>
               </div>
-              <label>内容</label>
+              <div class="macro-field-head">
+                <label>内容</label>
+                <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-content">{ } 变量</button>
+              </div>
               <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。">{{ item.content }}</textarea>
 
               <label>备注</label>
@@ -471,11 +481,17 @@
 
           <div class="grid-two wb-keyword-grid">
             <div>
-              <label>主关键词</label>
+              <div class="macro-field-head">
+                <label>主关键词</label>
+                <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-trigger">{ } 变量</button>
+              </div>
               <input class="wb-trigger" placeholder="多个别名可用逗号分隔" />
             </div>
             <div>
-              <label>副关键词</label>
+              <div class="macro-field-head">
+                <label>副关键词</label>
+                <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-secondary-trigger">{ } 变量</button>
+              </div>
               <input class="wb-secondary-trigger" placeholder="可留空；例如：婚后, 成亲" />
             </div>
           </div>
@@ -617,7 +633,10 @@
               <span>完整词匹配</span>
             </label>
           </div>
-          <label>内容</label>
+          <div class="macro-field-head">
+            <label>内容</label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-content">{ } 变量</button>
+          </div>
           <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。"></textarea>
 
           <label>备注</label>
@@ -631,6 +650,7 @@
     <script src="/static/js/app-core.js?v=v161"></script>
     <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
     <script>
       const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -781,7 +801,7 @@
           .replace(/'/g, "&#39;");
       }
 
-      let stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [] };
+      let stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [], active_tags: [], active_plot_ledger_tags: [] };
 
       function optionHtml(value, label, selected = false) {
         return `<option value="${escapeHtml(value)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
@@ -807,9 +827,11 @@
             roles: Array.isArray(payload.roles) ? payload.roles : [],
             tags: Array.isArray(payload.tags) ? payload.tags : [],
             active_stage_tags: Array.isArray(payload.active_stage_tags) ? payload.active_stage_tags : [],
+            active_plot_ledger_tags: Array.isArray(payload.active_plot_ledger_tags) ? payload.active_plot_ledger_tags : [],
+            active_tags: Array.isArray(payload.active_tags) ? payload.active_tags : (Array.isArray(payload.active_stage_tags) ? payload.active_stage_tags : []),
           };
         } catch (error) {
-          stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [] };
+          stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [], active_tags: [], active_plot_ledger_tags: [] };
         }
       }
 
@@ -1558,7 +1580,7 @@
         const manualTags = getManualExternalTags(card);
         const preview = card.querySelector(".wb-external-preview");
         const status = card.querySelector(".wb-external-status");
-        const activeTags = new Set((stateJournalStageCatalog.active_stage_tags || []).map((item) => String(item || "").trim()).filter(Boolean));
+        const activeTags = new Set((stateJournalStageCatalog.active_tags || stateJournalStageCatalog.active_stage_tags || []).map((item) => String(item || "").trim()).filter(Boolean));
         const inCatalog = Boolean(findStageCatalogItem(roleId, stageKey));
         if (preview) {
           if (source === "preset") {

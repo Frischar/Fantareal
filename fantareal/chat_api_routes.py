@@ -79,9 +79,18 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         items = ctx.create_director_note(payload.model_dump(), ctx.get_active_slot_id())
         return {"items": items}
 
+    @app.post("/api/chat/director-notes/preview")
+    async def api_preview_director_note(payload: DirectorNotePayload) -> dict[str, Any]:
+        return ctx.preview_director_note(payload.model_dump())
+
     @app.post("/api/chat/director-notes/delete")
     async def api_delete_director_note(payload: DirectorNoteDeletePayload) -> dict[str, Any]:
         items = ctx.delete_director_note(payload.id, ctx.get_active_slot_id())
+        return {"items": items}
+
+    @app.post("/api/chat/director-notes/disable-advanced")
+    async def api_disable_advanced_director_notes() -> dict[str, Any]:
+        items = ctx.disable_advanced_director_notes(ctx.get_active_slot_id())
         return {"items": items}
 
 
@@ -280,6 +289,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             worldbook_matches,
             prompt_package,
             worldbook_debug_snapshot,
+            memory_debug,
         ) = await ctx.generate_reply(message, runtime_overrides)
         reply = str(reply_result.get("reply", ""))
         entries = [("user", message)]
@@ -299,6 +309,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         return {
             "reply": reply,
             "retrieved_items": retrieved_items,
+            "memory_debug": memory_debug,
             "worldbook_hits": worldbook_matches,
             "worldbook_debug": worldbook_debug,
             "sprite_tag": reply_result.get("sprite_tag", ""),
@@ -315,7 +326,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
         runtime_overrides = payload.runtime_config or {}
-        retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
+        retrieved_items, memory_debug = await ctx.retrieve_memories_with_debug(message, runtime_overrides)
         preset_context = ctx.build_active_preset_context()
         active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
         active_tag_context = ctx.build_active_tag_context(active_stage_tags, preset_context)
@@ -330,6 +341,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
         )
         return {
             "retrieved_items": retrieved_items,
+            "memory_debug": memory_debug,
             "worldbook_hits": worldbook_matches,
             "worldbook_debug": ctx.build_worldbook_debug_payload(
                 message,
@@ -349,7 +361,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
 
         runtime_overrides = payload.runtime_config or {}
         llm_config = ctx.get_runtime_chat_config(runtime_overrides)
-        retrieved_items = await ctx.retrieve_memories(message, runtime_overrides)
+        retrieved_items, memory_debug = await ctx.retrieve_memories_with_debug(message, runtime_overrides)
         preset_context = ctx.build_active_preset_context()
         active_stage_tags = ctx.get_state_journal_active_stage_tags() if hasattr(ctx, "get_state_journal_active_stage_tags") else []
         active_tag_context = ctx.build_active_tag_context(active_stage_tags, preset_context)
@@ -381,6 +393,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
                 meta = {
                     "type": "meta",
                     "retrieved_items": retrieved_items,
+                    "memory_debug": memory_debug,
                     "worldbook_hits": worldbook_matches,
                     "worldbook_debug": worldbook_debug,
                     "preset_debug": preset_debug,
@@ -398,6 +411,7 @@ def register_chat_api_routes(app: FastAPI, *, ctx: Any) -> None:
             meta = {
                 "type": "meta",
                 "retrieved_items": retrieved_items,
+                "memory_debug": memory_debug,
                 "worldbook_hits": worldbook_matches,
                 "worldbook_debug": worldbook_debug,
                 "preset_debug": preset_debug,

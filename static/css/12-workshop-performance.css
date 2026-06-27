@@ -128,8 +128,9 @@ body.workshop-dynamic-background-active::before {
   overflow: hidden;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.22);
-  background: color-mix(in srgb, var(--panel-strong) 92%, transparent);
+  background: color-mix(in srgb, var(--panel-strong) 98%, #10161d 2%);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+  opacity: 1;
 }
 
 .workshop-dynamic-light {
@@ -146,6 +147,14 @@ body.workshop-dynamic-background-active::before {
 .workshop-dynamic-light .workshop-dynamic-card {
   width: min(420px, 86vw);
   border-radius: 22px;
+}
+
+.workshop-dynamic-blocking .workshop-dynamic-backdrop {
+  background: rgba(5, 8, 12, 0.66);
+}
+
+.workshop-dynamic-blocking .workshop-dynamic-close {
+  min-width: 96px;
 }
 
 .workshop-dynamic-immersive .workshop-dynamic-card {

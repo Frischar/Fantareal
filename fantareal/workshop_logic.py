@@ -35,7 +35,7 @@ def _safe_text(value: Any, limit: int = 2000) -> str:
 
 WORKSHOP_OPENING_ANIMATIONS = {"fade", "push", "black", "dream", "curtain", "still"}
 WORKSHOP_OPENING_AFTER_MODES = {"connect_ambience", "continue_opening", "fade_stop"}
-WORKSHOP_DYNAMIC_TRIGGER_TYPES = {"round", "progress", "model", "manual"}
+WORKSHOP_DYNAMIC_TRIGGER_TYPES = {"round", "model", "manual", "state_journal_tag", "plot_ledger_tag"}
 WORKSHOP_DYNAMIC_REPEAT_MODES = {"once", "session", "always"}
 WORKSHOP_DYNAMIC_CONTENT_TYPES = {"image", "sound", "background"}
 WORKSHOP_DYNAMIC_PRESENTATION_MODES = {"light", "standard", "immersive"}
@@ -109,6 +109,7 @@ def default_dynamic_scene() -> dict[str, Any]:
             "round": 1,
             "progress": 0,
             "event": "",
+            "tag": "",
             "repeat": "once",
         },
         "content": {
@@ -123,6 +124,8 @@ def default_dynamic_scene() -> dict[str, Any]:
             "mode": "standard",
             "duration": 6,
             "autoClose": True,
+            "buttonText": "继续",
+            "blocking": True,
         },
         "audio": {
             "enabled": False,
@@ -151,6 +154,8 @@ def normalize_workshop_stage(value: Any) -> str:
 
 def normalize_dynamic_trigger_type(value: Any) -> str:
     trigger_type = str(value or "model").strip().lower()
+    if trigger_type == "progress":
+        return "manual"
     return trigger_type if trigger_type in WORKSHOP_DYNAMIC_TRIGGER_TYPES else "model"
 
 
@@ -258,6 +263,7 @@ def sanitize_dynamic_scene(raw: Any, *, index: int) -> dict[str, Any] | None:
                 "round": _clamp_int(trigger.get("round"), 1, 9999, 1),
                 "progress": _clamp_int(trigger.get("progress"), 0, 9999, 0),
                 "event": _safe_text(trigger.get("event"), 64),
+                "tag": _safe_text(trigger.get("tag"), 160),
                 "repeat": normalize_dynamic_repeat_mode(trigger.get("repeat")),
             },
             "content": {
@@ -272,6 +278,8 @@ def sanitize_dynamic_scene(raw: Any, *, index: int) -> dict[str, Any] | None:
                 "mode": normalize_dynamic_presentation_mode(presentation.get("mode")),
                 "duration": _clamp_float(presentation.get("duration"), 0.0, 60.0, 6.0),
                 "autoClose": _parse_bool(presentation.get("autoClose"), True),
+                "buttonText": _safe_text(presentation.get("buttonText"), 24) or "继续",
+                "blocking": _parse_bool(presentation.get("blocking"), True),
             },
             "audio": {
                 "enabled": _parse_bool(audio.get("enabled"), False),

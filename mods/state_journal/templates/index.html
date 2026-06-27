@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>心笺 - Fantareal</title>
-    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-console-v223" />
+    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-console-v226" />
     <link rel="stylesheet" href="./static/state-journal-stage-table-polish.css?v=state-journal-v211-sync-modal-fit" />
     <link rel="stylesheet" href="./static/state-journal-theme-pack-contract.css?v=state-journal-v210-zoom150-fit" />
   </head>
@@ -37,8 +37,11 @@
           <button class="workspace-nav-btn" type="button" data-workspace="role" data-default-tab="roleState">
             <span class="nav-icon">II</span><span><strong>角色幕笺</strong><small>展示配置</small></span>
           </button>
-          <button class="workspace-nav-btn" type="button" data-workspace="advanced" data-default-tab="data">
-            <span class="nav-icon">III</span><span><strong>高级</strong><small>维护调试</small></span>
+          <button class="workspace-nav-btn" type="button" data-workspace="data" data-default-tab="data">
+            <span class="nav-icon">III</span><span><strong>数据表册</strong><small>后台数据库</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="advanced" data-default-tab="model">
+            <span class="nav-icon">IV</span><span><strong>高级</strong><small>维护调试</small></span>
           </button>
         </aside>
 
@@ -249,87 +252,95 @@
             </section>
           </section>
 
+          <section id="dataWorkspace" class="workspace-page config-workspace-panel data-workspace" data-workspace-page="data" data-active-workspace="data">
+            <div class="page-head">
+              <div>
+                <h2>数据表册</h2>
+                <p class="muted">这里是心笺后台数据库。角色状态、剧情账本、字段规则和表格内容都在这里维护，供幕笺、世界书和宏系统读取。</p>
+              </div>
+            </div>
+
+            <section id="databaseWorkspace" class="tab-page active" data-page="data">
+              <div class="state-journal-grid">
+                <aside class="panel table-list-panel">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">表册</p>
+                      <h2>表册</h2>
+                    </div>
+                    <button id="newTableBtn" class="round-btn" title="新建表">＋</button>
+                  </div>
+                  <div id="tableList" class="table-list"></div>
+                  <div class="panel-actions stacked">
+                    <button id="exportBtn" class="ghost-btn">导出全部</button>
+                    <label class="ghost-btn file-btn">导入 JSON<input id="importInput" type="file" accept="application/json" /></label>
+                  </div>
+                </aside>
+
+                <section class="panel data-panel">
+                  <div class="panel-head split data-panel-head">
+                    <div>
+                      <p class="eyebrow">记录</p>
+                      <h2 id="currentTableTitle">未选择表</h2>
+                      <p id="currentTableDesc" class="muted"></p>
+                    </div>
+                    <div class="panel-actions data-actions">
+                      <div class="view-switch" aria-label="视图切换">
+                        <button id="cardViewBtn" class="view-btn active" type="button">卡片</button>
+                        <button id="tableViewBtn" class="view-btn" type="button">表格</button>
+                      </div>
+                      <button id="refreshBtn" class="ghost-btn">刷新</button>
+                      <button id="saveBtn" class="primary-btn">保存当前表</button>
+                      <button id="openSchemaDrawerBtn" class="ghost-btn">字段</button>
+                      <button id="openRulesDrawerBtn" class="ghost-btn">规则</button>
+                      <button id="addRowBtn" class="ghost-btn">新增行</button>
+                    </div>
+                  </div>
+                  <div id="rowsEditor" class="rows-editor"></div>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-page" data-page="schema">
+              <label>表 ID<input id="schemaId" placeholder="character_status" /></label>
+              <label>表名<input id="schemaName" placeholder="角色状态表" /></label>
+              <label>描述<textarea id="schemaDesc" rows="3"></textarea></label>
+              <label>主键字段<select id="primaryKeySelect"></select></label>
+              <div class="subhead">
+                <strong>字段配置</strong>
+                <button id="addFieldBtn" class="ghost-btn small">新增字段</button>
+              </div>
+              <p class="microcopy">字段默认折叠，点击字段标题展开编辑。设置面板不会再常驻挤占表格。</p>
+              <div id="fieldsEditor" class="fields-editor"></div>
+            </section>
+
+            <section class="tab-page" data-page="rules">
+              <label>Note：这张表记录什么<textarea id="ruleNote" rows="3"></textarea></label>
+              <label>Init：什么时候初始化<textarea id="ruleInit" rows="3"></textarea></label>
+              <label>Insert：什么时候新增<textarea id="ruleInsert" rows="3"></textarea></label>
+              <label>Update：什么时候更新<textarea id="ruleUpdate" rows="3"></textarea></label>
+              <label>Delete：什么时候删除<textarea id="ruleDelete" rows="3"></textarea></label>
+              <label>Ignore：什么时候不要更新<textarea id="ruleIgnore" rows="3"></textarea></label>
+            </section>
+          </section>
+
           <section id="advancedWorkspace" class="workspace-page config-workspace-panel advanced-workspace" data-workspace-page="advanced" data-active-workspace="advanced">
             <div class="page-head">
               <div>
                 <h2>高级维护</h2>
-                <p class="muted">数据结构、模型联动、模板外观本体、调试迁移都放在这里。进入这里代表你正在做维护操作。</p>
+                <p class="muted">模型联动、模板外观本体和调试迁移放在这里。进入这里代表你正在做维护操作。</p>
               </div>
             </div>
 
             <div class="advanced-layout">
               <aside class="advanced-nav" aria-label="高级维护分类">
-                <button class="tab-btn active" type="button" data-tab="data"><strong>数据表册</strong><small>表、行、字段、规则</small></button>
-                <button class="tab-btn" type="button" data-tab="model"><strong>模型与联动</strong><small>API、模型、Hook</small></button>
+                <button class="tab-btn active" type="button" data-tab="model"><strong>模型与联动</strong><small>API、模型、Hook</small></button>
                 <button class="tab-btn" type="button" data-tab="template"><strong>模板外观</strong><small>模板字段、美化包</small></button>
                 <button class="tab-btn" type="button" data-tab="log"><strong>调试迁移</strong><small>导入导出、高风险操作</small></button>
               </aside>
 
               <div class="advanced-main">
-                <section id="databaseWorkspace" class="tab-page active" data-page="data">
-                  <div class="state-journal-grid">
-                    <aside class="panel table-list-panel">
-                      <div class="panel-head">
-                        <div>
-                          <p class="eyebrow">Tables</p>
-                          <h2>表册</h2>
-                        </div>
-                        <button id="newTableBtn" class="round-btn" title="新建表">＋</button>
-                      </div>
-                      <div id="tableList" class="table-list"></div>
-                      <div class="panel-actions stacked">
-                        <button id="exportBtn" class="ghost-btn">导出全部</button>
-                        <label class="ghost-btn file-btn">导入 JSON<input id="importInput" type="file" accept="application/json" /></label>
-                      </div>
-                    </aside>
-
-                    <section class="panel data-panel">
-                      <div class="panel-head split data-panel-head">
-                        <div>
-                          <p class="eyebrow">Rows</p>
-                          <h2 id="currentTableTitle">未选择表</h2>
-                          <p id="currentTableDesc" class="muted"></p>
-                        </div>
-                        <div class="panel-actions data-actions">
-                          <div class="view-switch" aria-label="视图切换">
-                            <button id="cardViewBtn" class="view-btn active" type="button">卡片</button>
-                            <button id="tableViewBtn" class="view-btn" type="button">表格</button>
-                          </div>
-                          <button id="refreshBtn" class="ghost-btn">刷新</button>
-                          <button id="saveBtn" class="primary-btn">保存当前表</button>
-                          <button id="openSchemaDrawerBtn" class="ghost-btn">字段</button>
-                          <button id="openRulesDrawerBtn" class="ghost-btn">规则</button>
-                          <button id="addRowBtn" class="ghost-btn">新增行</button>
-                        </div>
-                      </div>
-                      <div id="rowsEditor" class="rows-editor"></div>
-                    </section>
-                  </div>
-                </section>
-
-                <section class="tab-page" data-page="schema">
-                  <label>表 ID<input id="schemaId" placeholder="character_status" /></label>
-                  <label>表名<input id="schemaName" placeholder="角色状态表" /></label>
-                  <label>描述<textarea id="schemaDesc" rows="3"></textarea></label>
-                  <label>主键字段<select id="primaryKeySelect"></select></label>
-                  <div class="subhead">
-                    <strong>字段配置</strong>
-                    <button id="addFieldBtn" class="ghost-btn small">新增字段</button>
-                  </div>
-                  <p class="microcopy">字段默认折叠，点击字段标题展开编辑。设置面板不会再常驻挤占表格。</p>
-                  <div id="fieldsEditor" class="fields-editor"></div>
-                </section>
-
-                <section class="tab-page" data-page="rules">
-                  <label>Note：这张表记录什么<textarea id="ruleNote" rows="3"></textarea></label>
-                  <label>Init：什么时候初始化<textarea id="ruleInit" rows="3"></textarea></label>
-                  <label>Insert：什么时候新增<textarea id="ruleInsert" rows="3"></textarea></label>
-                  <label>Update：什么时候更新<textarea id="ruleUpdate" rows="3"></textarea></label>
-                  <label>Delete：什么时候删除<textarea id="ruleDelete" rows="3"></textarea></label>
-                  <label>Ignore：什么时候不要更新<textarea id="ruleIgnore" rows="3"></textarea></label>
-                </section>
-
-                <section class="tab-page" data-page="model">
+                <section class="tab-page active" data-page="model">
                   <div class="advanced-subtabs">
                     <button class="tab-btn active" type="button" data-tab="model">模型</button>
                     <button class="tab-btn" type="button" data-tab="generate">生成规则</button>
@@ -535,6 +546,6 @@
       </aside>
       <div id="rowDetailMask" class="drawer-mask" hidden></div>
     </main>
-    <script src="./static/state-journal.js?v=state-journal-console-v223"></script>
+    <script src="./static/state-journal.js?v=state-journal-console-v226"></script>
   </body>
 </html>
