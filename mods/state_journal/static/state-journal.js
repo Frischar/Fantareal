@@ -1,5 +1,18 @@
 (() => {
   const $ = (selector) => document.querySelector(selector);
+  const HOST_THEME_MESSAGE = "fantareal:state-journal:host-theme";
+  function applyHostTheme(theme) {
+    if (theme !== "light" && theme !== "dark") return;
+    document.documentElement.dataset.theme = theme;
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data;
+    if (!data || typeof data !== "object" || data.type !== HOST_THEME_MESSAGE) return;
+    applyHostTheme(data.theme);
+  });
+
   const state = {
     config: {},
     tables: [],
@@ -20,6 +33,7 @@
     storyTimeHistory: [],
     storyTimeExpanded: localStorage.getItem("state_journal:storyTimeExpanded") === "1",
     themePreviewMode: localStorage.getItem("state_journal:themePreviewMode") || "role",
+    workerPromptPreview: null,
   };
 
   const SERVICE_PRESETS = {
@@ -104,6 +118,14 @@
     cfgTurnNoteProtagonistMode: $("#cfgTurnNoteProtagonistMode"),
     cfgTurnNoteProtagonistName: $("#cfgTurnNoteProtagonistName"),
     cfgTurnNoteProtagonistAliases: $("#cfgTurnNoteProtagonistAliases"),
+    cfgTurnNoteWorkerPromptScope: $("#cfgTurnNoteWorkerPromptScope"),
+    cfgTurnNoteWorkerPromptMode: $("#cfgTurnNoteWorkerPromptMode"),
+    cfgTurnNoteWorkerCustomPrompt: $("#cfgTurnNoteWorkerCustomPrompt"),
+    workerPromptEditorLabel: $("#workerPromptEditorLabel"),
+    loadDefaultWorkerPromptBtn: $("#loadDefaultWorkerPromptBtn"),
+    clearWorkerPromptBtn: $("#clearWorkerPromptBtn"),
+    refreshWorkerPromptPreviewBtn: $("#refreshWorkerPromptPreviewBtn"),
+    workerPromptPreview: $("#workerPromptPreview"),
     cfgTurnNoteWorkerPromptEnabled: $("#cfgTurnNoteWorkerPromptEnabled"),
     cfgTurnNoteWorkerStylePrompt: $("#cfgTurnNoteWorkerStylePrompt"),
     cfgTurnNoteWorkerProtagonistPrompt: $("#cfgTurnNoteWorkerProtagonistPrompt"),
@@ -154,8 +176,73 @@
     els.status.className = `status-strip ${type}`.trim();
   }
 
+  function activeWorkspaceName() {
+    return document.querySelector("[data-workspace-page].active")?.dataset.workspacePage || "home";
+  }
+
+  function setWorkbenchStatus(text, type = "success", workspace = activeWorkspaceName()) {
+    const token = document.querySelector(`[data-workbench-status="${CSS.escape(workspace)}"]`) || document.querySelector("[data-workbench-status]");
+    if (!token) return;
+    const classByType = {
+      ok: "is-saved",
+      success: "is-saved",
+      saved: "is-saved",
+      dirty: "is-dirty",
+      saving: "is-saving",
+      warn: "is-dirty",
+      warning: "is-dirty",
+      error: "is-error",
+    };
+    token.textContent = text || "就绪";
+    token.className = `database-workbench-status ui-status-token ${classByType[type] || "is-saved"}`;
+    token.classList.remove("is-status-changing");
+    void token.offsetWidth;
+    token.classList.add("is-status-changing");
+    window.setTimeout(() => token.classList.remove("is-status-changing"), 950);
+  }
+
+  function flashActionButton(button, text = "已完成", type = "success") {
+    if (!button) return;
+    const oldText = button.dataset.feedbackOriginalText || button.textContent;
+    button.dataset.feedbackOriginalText = oldText;
+    button.textContent = text;
+    button.classList.remove("is-loading", "is-success", "is-error", "is-status-changing");
+    button.classList.add(type === "error" ? "is-error" : "is-success", "is-status-changing", "is-feedback");
+    window.setTimeout(() => {
+      button.textContent = button.dataset.feedbackOriginalText || oldText;
+      delete button.dataset.feedbackOriginalText;
+      button.classList.remove("is-success", "is-error", "is-status-changing", "is-feedback");
+    }, 950);
+  }
+
+  async function runFeedbackAction(button, action, successText = "已完成") {
+    if (button) {
+      button.classList.add("is-loading");
+      button.disabled = true;
+    }
+    try {
+      const result = await action();
+      flashActionButton(button, successText, "success");
+      return result;
+    } catch (error) {
+      flashActionButton(button, "失败", "error");
+      throw error;
+    } finally {
+      if (button) {
+        button.classList.remove("is-loading");
+        button.disabled = false;
+      }
+    }
+  }
+
   let toastTimer = null;
   function pageToast(title, detail = "", type = "ok") {
+    if (!["error", "warn", "warning"].includes(type)) {
+      const oldToast = document.getElementById("state-journal-page-toast");
+      oldToast?.classList.remove("show");
+      setWorkbenchStatus(title, "success");
+      return;
+    }
     let toast = document.getElementById("state-journal-page-toast");
     if (!toast) {
       toast = document.createElement("div");
@@ -167,6 +254,7 @@
     toast.className = `state-journal-page-toast ${type}`;
     toast.querySelector("strong").textContent = title;
     toast.querySelector("span").textContent = detail;
+    setWorkbenchStatus(title, type === "error" ? "error" : "warn");
     requestAnimationFrame(() => toast.classList.add("show"));
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => toast.classList.remove("show"), type === "error" ? 6200 : 3600);
@@ -174,9 +262,9 @@
 
   function workerErrorTitle(errorType = "") {
     const titles = {
-      timeout: "心笺生成超时",
-      empty_response: "心笺返回为空",
-      invalid_json: "心笺解析失败",
+      timeout: "数据库记录超时",
+      empty_response: "记录模型返回为空",
+      invalid_json: "数据库解析失败",
       invalid_provider_response: "服务商返回异常",
       rate_limit: "服务商限流",
       auth_error: "鉴权失败",
@@ -184,7 +272,7 @@
       config_error: "配置不完整",
       provider_error: "服务商异常",
     };
-    return titles[errorType] || "心笺生成失败";
+    return titles[errorType] || "数据库记录失败";
   }
 
   function setManualWorkerBusy(busy) {
@@ -193,7 +281,7 @@
     button.disabled = Boolean(busy);
     button.classList.toggle("is-busy", Boolean(busy));
     button.dataset.originalText = button.dataset.originalText || button.textContent || "根据最近对话更新";
-    button.textContent = busy ? "心笺生成中……" : button.dataset.originalText;
+    button.textContent = busy ? "数据库记录中……" : button.dataset.originalText;
   }
 
   async function requestJson(url, options = {}) {
@@ -218,16 +306,16 @@
   }
 
   const ROLE_STATE_MODES = {
-    default: { label: "默认幕笺模板", desc: "使用全局默认幕笺模板，不使用该角色专属变量、阶段或快照字段。" },
-    snapshot_only: { label: "仅专属幕笺", desc: "只使用角色专属状态快照字段，不计算变量，不判断阶段。" },
-    full: { label: "完整心笺：专属幕笺 + 变量阶段", desc: "启用角色专属幕笺、变量更新与阶段判断，并生成世界书 external_tag。" },
-    disabled: { label: "不启用该角色", desc: "该角色不参与心笺记录与幕笺展示。" },
+    default: { label: "默认状态记录模板", desc: "使用全局默认状态记录模板，不使用该角色专属变量、阶段或快照字段。" },
+    snapshot_only: { label: "仅专属状态记录", desc: "只使用角色专属状态快照字段，不计算变量，不判断阶段。" },
+    full: { label: "完整数据库：状态记录 + 变量阶段", desc: "启用角色专属状态记录、变量更新与阶段判断，并生成世界书 external_tag。" },
+    disabled: { label: "不记录该角色", desc: "该角色不参与数据库记录与状态记录展示。" },
   };
 
 
   const ROLE_SOURCE_MODES = {
     auto: { label: "自动识别", desc: "自动识别主卡和有内容的多角色；空占位子角色会自动隐藏。" },
-    main_card: { label: "主卡就是角色", desc: "适合普通单角色卡，心笺会把主卡作为唯一角色记录。" },
+    main_card: { label: "主卡就是角色", desc: "适合普通单角色卡，数据库会把主卡作为唯一角色记录。" },
     personas_only: { label: "主卡旁白，多角色展开", desc: "适合旁白卡、多角色卡；只显示有内容的多角色，不显示主卡。" },
   };
 
@@ -283,10 +371,10 @@
   function roleStateModeShortLabel(role) {
     const mode = normalizeRoleStateMode(role?.mode || role?.stateJournalMode, role || {});
     const labels = {
-      full: "完整心笺",
-      snapshot_only: "专属幕笺",
-      default: "默认幕笺",
-      disabled: "未启用",
+      full: "完整数据库",
+      snapshot_only: "专属状态记录",
+      default: "默认状态记录",
+      disabled: "未记录",
     };
     return labels[mode] || ROLE_STATE_MODES.default.label;
   }
@@ -591,7 +679,7 @@
     if (!pack || typeof pack !== "object") throw new Error("美化包必须是 JSON 对象。");
     const rawKind = String(pack.kind || pack.type || THEME_PACK_KIND).trim() || THEME_PACK_KIND;
     if (![THEME_PACK_KIND, "xinjian_theme_pack", "turn_note_theme_pack"].includes(rawKind)) {
-      throw new Error(`这不是心笺外观模板包：${rawKind}`);
+      throw new Error(`这不是状态记录外观模板包：${rawKind}`);
     }
     const schemaVersion = Number(pack.schema_version || pack.schemaVersion || THEME_PACK_SCHEMA_VERSION);
     if (!Number.isFinite(schemaVersion) || schemaVersion < 1) throw new Error("美化包 schema_version 无效。");
@@ -685,7 +773,7 @@
         <p>将删除：<strong>${escapeHtml(themePackDisplayName(pack))}</strong></p>
         <div class="sync-card-scope">
           <strong>不会影响</strong>
-          <p>心笺数据、幕笺历史、角色变量、阶段规则、世界书标签。</p>
+          <p>数据库数据、状态记录历史、角色变量、阶段规则、世界书标签。</p>
           <strong>删除后</strong>
           <p>如果当前正在使用该外观包，将自动切回「${escapeHtml(nextPacks.find((item) => item?.id === nextThemeId)?.name || "标准样式")}」。</p>
         </div>
@@ -746,7 +834,7 @@
     els.themeMeta.innerHTML = `
       <div class="theme-pack-chip-row">${chips.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
       ${warnings.length ? `<div class="theme-pack-warning">${warnings.map(escapeHtml).join(" · ")}</div>` : ""}
-      <p>美化包只改变幕笺外观与字段呈现；不会修改变量计算、阶段判断、世界书标签或 worker 提示词。</p>
+      <p>外观包只改变状态记录外观与字段呈现；不会修改变量计算、阶段判断、世界书标签或 worker 提示词。</p>
     `;
   }
 
@@ -815,7 +903,7 @@
       els.themePreview.className = `theme-preview-card ${cls}`;
       if (accent) els.themePreview.style.setProperty("--xj-beauty-accent", accent);
       els.themePreview.innerHTML = `
-        <div class="theme-preview-title"><span>${layoutType === "status_panel_pro" ? "STATUS" : layoutType === "storyboard" ? "SCENE" : layoutType === "paper_time" ? "TIME NOTE" : "XINJIAN"}</span><strong>第六笺 · 《旧雨入帘》</strong><em>入夜 · 霜庭书馆 · 小雨初歇 · ${state.themePreviewMode === "standard" ? "标准模板预览" : "角色变量预览"}</em></div>
+        <div class="theme-preview-title"><span>${layoutType === "status_panel_pro" ? "STATUS" : layoutType === "storyboard" ? "SCENE" : layoutType === "paper_time" ? "TIME NOTE" : "DATABASE"}</span><strong>第六条 · 《旧雨入帘》</strong><em>入夜 · 霜庭书馆 · 小雨初歇 · ${state.themePreviewMode === "standard" ? "标准模板预览" : "角色变量预览"}</em></div>
         <div class="theme-preview-role"><h4>沈栖雪 · C阶段</h4><p><b>${fieldLabel("emotion", "情绪")}</b> 温静中带着担忧，主动递灯提醒用户休息。</p><p><b>${fieldLabel("focus", "关注点")}</b> 卷宗风险、用户状态与书馆规矩。</p><p><b>${fieldLabel("summary", "摘要")}</b> 信任稳定上升，照料动作更主动。</p>${progressHtml}</div>
         <div class="theme-preview-role"><h4>陆青鸢 · B阶段</h4><p><b>${fieldLabel("interaction", "互动")}</b> 仍然嘴硬，但开始承认用户的配合与判断。</p></div>
         <div class="theme-preview-relation"><b>阶段变化</b> 沈栖雪：B阶段 → C阶段；陆青鸢：维持 B阶段。</div>
@@ -963,7 +1051,7 @@
       els.nextStepEnabledTitle,
       els.nextStepEnabledStatus,
       enabled,
-      enabled ? "心笺运行环境已启用" : "心笺运行环境未启用",
+      enabled ? "数据库运行环境已启用" : "数据库运行环境未启用",
       enabled ? "完成" : "未开启"
     );
     setNextStepState(
@@ -981,16 +1069,16 @@
     const enabled = cfg.enabled !== false;
     const autoUpdate = !!cfg.auto_update;
     const turnNoteEnabled = cfg.turn_note_enabled !== false;
-    setRuntimeBadge(els.runtimeEnabledBadge, enabled, "心笺启用", "心笺关闭");
+    setRuntimeBadge(els.runtimeEnabledBadge, enabled, "数据库启用", "数据库关闭");
     setRuntimeBadge(els.runtimeAutoBadge, autoUpdate, "自动填表", "手动填表");
-    setRuntimeBadge(els.runtimeTurnNoteBadge, turnNoteEnabled, "幕笺展示", "幕笺关闭");
+    setRuntimeBadge(els.runtimeTurnNoteBadge, turnNoteEnabled, "状态记录展示", "状态记录关闭");
     if (els.runtimeModelBadge) els.runtimeModelBadge.textContent = cfg.model ? `模型 ${cfg.model}` : "模型未配置";
     if (els.runtimeLastRunText) els.runtimeLastRunText.textContent = els.updateSummaryText?.textContent || "暂无填表记录。";
     if (els.runtimeFlowText) {
-      if (!enabled) els.runtimeFlowText.textContent = "当前不会在聊天后运行心笺，也不会写入结构化记录。";
-      else if (!autoUpdate) els.runtimeFlowText.textContent = "心笺已启用，但聊天后自动填表关闭；可手动根据最近对话更新。";
-      else if (!turnNoteEnabled) els.runtimeFlowText.textContent = "聊天后会自动填表并写入 SQLite，但 Chat 页面不显示幕笺。";
-      else els.runtimeFlowText.textContent = "聊天回复完成 → Hook 直传 → 心笺 worker 填表 → 写入 SQLite → Chat 显示幕笺。";
+      if (!enabled) els.runtimeFlowText.textContent = "当前不会在聊天后运行数据库，也不会写入结构化记录。";
+      else if (!autoUpdate) els.runtimeFlowText.textContent = "数据库已启用，但聊天后自动填表关闭；可手动根据最近对话更新。";
+      else if (!turnNoteEnabled) els.runtimeFlowText.textContent = "聊天后会自动填表并写入 SQLite，但 Chat 页面不显示状态记录。";
+      else els.runtimeFlowText.textContent = "聊天回复完成 → Hook 直传 → 记录模型填表 → 写入 SQLite → Chat 显示状态记录。";
     }
     if (els.dashboardEnabled) els.dashboardEnabled.checked = enabled;
     if (els.dashboardAutoUpdate) els.dashboardAutoUpdate.checked = autoUpdate;
@@ -1027,9 +1115,16 @@
     if (els.cfgTurnNoteProtagonistMode) els.cfgTurnNoteProtagonistMode.value = cfg.turn_note_protagonist_card_mode || "when_relevant";
     if (els.cfgTurnNoteProtagonistName) els.cfgTurnNoteProtagonistName.value = cfg.turn_note_protagonist_name || "";
     if (els.cfgTurnNoteProtagonistAliases) els.cfgTurnNoteProtagonistAliases.value = cfg.turn_note_protagonist_aliases || "";
-    if (els.cfgTurnNoteWorkerPromptEnabled) els.cfgTurnNoteWorkerPromptEnabled.checked = !!cfg.turn_note_worker_custom_prompt_enabled;
+    const workerCustomPrompt = (cfg.turn_note_worker_custom_prompt || "").trim() || legacyWorkerPromptText(cfg);
+    const workerPromptMode = ["default", "additive", "override"].includes(cfg.turn_note_worker_prompt_mode)
+      ? cfg.turn_note_worker_prompt_mode
+      : (workerCustomPrompt ? "additive" : "default");
+    if (els.cfgTurnNoteWorkerPromptMode) els.cfgTurnNoteWorkerPromptMode.value = workerPromptMode;
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = workerCustomPrompt;
+    if (els.cfgTurnNoteWorkerPromptEnabled) els.cfgTurnNoteWorkerPromptEnabled.checked = workerPromptMode !== "default" && !!workerCustomPrompt;
     if (els.cfgTurnNoteWorkerStylePrompt) els.cfgTurnNoteWorkerStylePrompt.value = cfg.turn_note_worker_style_prompt || "";
     if (els.cfgTurnNoteWorkerProtagonistPrompt) els.cfgTurnNoteWorkerProtagonistPrompt.value = cfg.turn_note_worker_protagonist_prompt || "";
+    renderWorkerPromptPreview();
     bindTemplateEditor();
     updateTurnNoteStyleHelp();
     els.cfgBaseUrl.value = cfg.api_base_url || "";
@@ -1064,7 +1159,9 @@
       turn_note_protagonist_card_mode: els.cfgTurnNoteProtagonistMode ? els.cfgTurnNoteProtagonistMode.value : "when_relevant",
       turn_note_protagonist_name: els.cfgTurnNoteProtagonistName ? els.cfgTurnNoteProtagonistName.value.trim() : "",
       turn_note_protagonist_aliases: els.cfgTurnNoteProtagonistAliases ? els.cfgTurnNoteProtagonistAliases.value.trim() : "",
-      turn_note_worker_custom_prompt_enabled: els.cfgTurnNoteWorkerPromptEnabled ? els.cfgTurnNoteWorkerPromptEnabled.checked : false,
+      turn_note_worker_prompt_mode: selectedWorkerPromptMode(),
+      turn_note_worker_custom_prompt: els.cfgTurnNoteWorkerCustomPrompt ? els.cfgTurnNoteWorkerCustomPrompt.value.trim() : "",
+      turn_note_worker_custom_prompt_enabled: selectedWorkerPromptMode() !== "default" && !!(els.cfgTurnNoteWorkerCustomPrompt ? els.cfgTurnNoteWorkerCustomPrompt.value.trim() : ""),
       turn_note_worker_style_prompt: els.cfgTurnNoteWorkerStylePrompt ? els.cfgTurnNoteWorkerStylePrompt.value.trim() : "",
       turn_note_worker_protagonist_prompt: els.cfgTurnNoteWorkerProtagonistPrompt ? els.cfgTurnNoteWorkerProtagonistPrompt.value.trim() : "",
       turn_note_template_id: activeTemplateId(),
@@ -1142,6 +1239,72 @@
     const previewEl = document.getElementById("turnNoteStylePreview");
     if (descEl) descEl.textContent = `标题：${titleItem.label}，${titleItem.desc} 附笺：${noteItem.label}，${noteItem.desc}`;
     if (previewEl) previewEl.textContent = `${titleItem.sample}\n\n${noteItem.sample}`;
+  }
+
+  function legacyWorkerPromptText(cfg = state.config || {}) {
+    const parts = [];
+    const style = (cfg.turn_note_worker_style_prompt || "").trim();
+    const protagonist = (cfg.turn_note_worker_protagonist_prompt || "").trim();
+    if (style) parts.push(`状态记录语言风格补充：\n${style}`);
+    if (protagonist) parts.push(`主角状态卡规则：\n${protagonist}`);
+    return parts.join("\n\n").trim();
+  }
+
+  function selectedWorkerPromptMode() {
+    const value = els.cfgTurnNoteWorkerPromptMode?.value || state.config?.turn_note_worker_prompt_mode || "default";
+    return ["default", "additive", "override"].includes(value) ? value : "default";
+  }
+
+  function updateWorkerPromptEditorLabel() {
+    const mode = selectedWorkerPromptMode();
+    if (els.workerPromptEditorLabel) {
+      els.workerPromptEditorLabel.textContent = `${mode === "override" ? "编辑完整 Prompt" : "追加自然语言说明"} · 状态记录 worker`;
+    }
+    if (els.cfgTurnNoteWorkerCustomPrompt) {
+      els.cfgTurnNoteWorkerCustomPrompt.placeholder = mode === "override"
+        ? "完整编辑模式：可先载入默认主体 Prompt，再直接修改 worker 的主体规则。锁定输出契约会自动追加。"
+        : "追加模式：写入你希望状态记录遵守的生成偏好，例如文风、详略、主角状态卡取材范围。";
+    }
+  }
+
+  function readableWorkerPromptPreview(preview = state.workerPromptPreview) {
+    if (!preview) return "保存或刷新后显示当前 worker prompt 预览。";
+    const modeLabels = { default: "默认：使用系统 Prompt", additive: "追加：补充自然语言要求", override: "编辑完整 Prompt：修改默认主体" };
+    return [
+      `模式：${modeLabels[preview.mode] || preview.mode || "default"}`,
+      `表结构数量：${preview.table_count ?? 0}`,
+      `数值角色数量：${preview.metric_character_count ?? 0}`,
+      `--- 当前自定义内容 ---\n${preview.custom_prompt || "（无）"}`,
+      `--- 锁定输出契约 ---\n${preview.locked_contract_text || "（无）"}`,
+      `--- 最终发送给 worker 的 System Prompt ---\n${preview.assembled_prompt || "（无）"}`,
+    ].join("\n\n");
+  }
+
+  function renderWorkerPromptPreview() {
+    updateWorkerPromptEditorLabel();
+    if (els.workerPromptPreview) {
+      els.workerPromptPreview.textContent = readableWorkerPromptPreview();
+    }
+  }
+
+  async function refreshWorkerPromptPreview({ toast = true } = {}) {
+    const preview = await requestJson("./api/worker/prompt-preview", {
+      method: "POST",
+      body: JSON.stringify({ config: readConfig() }),
+    });
+    state.workerPromptPreview = preview;
+    renderWorkerPromptPreview();
+    if (toast) pageToast("Prompt 预览已刷新", "本次只组装提示词，不调用模型、不写入数据库。", "ok");
+    return preview;
+  }
+
+  async function loadDefaultWorkerPromptIntoEditor() {
+    const preview = state.workerPromptPreview || await refreshWorkerPromptPreview({ toast: false });
+    if (els.cfgTurnNoteWorkerPromptMode) els.cfgTurnNoteWorkerPromptMode.value = "override";
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = preview.editable_default_prompt || preview.default_prompt || "";
+    updateWorkerPromptEditorLabel();
+    await refreshWorkerPromptPreview({ toast: false });
+    pageToast("已载入默认主体 Prompt", "可直接修改，保存生成规则后生效。", "ok");
   }
 
   function bindSchema(table) {
@@ -1592,7 +1755,7 @@
       return;
     }
     if (!table.rows?.length) {
-      els.rowsEditor.innerHTML = `<div class="empty-state"><strong>当前表暂无数据。</strong><span>心笺不会在加载角色卡时自动写入状态。你可以先聊天一轮，再点击“根据最近对话更新”；也可以开启“聊天后自动填表”。</span><span>后续版本会加入“从角色卡 / 记忆初始化”。</span></div>`;
+      els.rowsEditor.innerHTML = `<div class="empty-state"><strong>当前表暂无数据。</strong><span>数据库不会在加载角色卡时自动写入状态。你可以先聊天一轮，再点击“根据最近对话更新”；也可以开启“聊天后自动填表”。</span><span>后续版本会加入“从角色卡 / 记忆初始化”。</span></div>`;
       return;
     }
     if (state.viewMode === "table") renderRowsAsTable(table); else renderRowsAsCards(table);
@@ -1621,7 +1784,7 @@
     renderTableList(); bindConfig(); updateViewButtons();
     const dataPanel = els.rowsEditor?.closest(".data-panel");
     if (dataPanel) dataPanel.dataset.tableKind = table?.schema?.id || "";
-    if (!table) { els.currentTitle.textContent = "未选择表"; els.currentDesc.textContent = ""; els.rowsEditor.innerHTML = `<div class="empty-state"><strong>暂无表格。</strong><span>点击左侧“＋”新建表，或导入心笺 JSON。</span></div>`; return; }
+    if (!table) { els.currentTitle.textContent = "未选择表"; els.currentDesc.textContent = ""; els.rowsEditor.innerHTML = `<div class="empty-state"><strong>暂无表格。</strong><span>点击左侧“＋”新建表，或导入数据库 JSON。</span></div>`; return; }
     els.currentTitle.textContent = table.schema.name || table.schema.id;
     els.currentDesc.textContent = table.schema.description || "";
     bindSchema(table); renderFields(table); refreshPrimaryOptions(table.schema.primary_key); renderRows(table);
@@ -1654,14 +1817,14 @@
   };
 
   const TAB_TITLES = {
-    data: "数据表册",
+    data: "剧情账本与数据表",
     schema: "字段设置",
     rules: "规则设置",
     roleState: "角色配置",
     log: "调试与日志",
-    turnNote: "幕笺显示",
+    turnNote: "状态记录显示",
     generate: "生成规则",
-    template: "幕笺模板",
+    template: "状态记录模板",
     theme: "外观模板",
     model: "模型设置",
     link: "聊天联动",
@@ -1704,7 +1867,7 @@
   function openConfigDrawer(tab = "schema") {
     const workspace = TAB_WORKSPACE[tab] || "journal";
     switchWorkspace(workspace, tab);
-    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "心笺设置";
+    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "数据库设置";
     if (tab === "link") refreshHookStatus();
     if (tab === "log") loadLog().catch(() => {});
   }
@@ -1718,7 +1881,7 @@
     document.querySelectorAll(".config-workspace-panel").forEach((page) => {
       page.dataset.activeWorkspace = workspace;
     });
-    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "心笺设置";
+    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "数据库设置";
     document.querySelectorAll(".tab-btn").forEach((item) => item.classList.toggle("active", item.dataset.tab === tab));
     const advancedGroup = ({ schema: "data", rules: "data", generate: "model", link: "model", theme: "template" }[tab]) || tab;
     document.querySelectorAll(".advanced-nav .tab-btn").forEach((item) => {
@@ -1732,6 +1895,29 @@
     if (tab === "roleState") loadRoleStateConfig().catch((error) => pageToast("角色配置载入失败", error.message, "error"));
     if (tab === "link") refreshHookStatus();
     if (tab === "log") loadLog().catch(() => {});
+  }
+
+  function openRouteFromHash() {
+    const raw = decodeURIComponent(String(window.location.hash || "").replace(/^#\/?/, "")).trim();
+    if (!raw) return false;
+    const parts = raw.split(/[/:]/).map((part) => part.trim()).filter(Boolean);
+    if (!parts.length) return false;
+    const requested = parts[parts.length - 1];
+    const workspace = normalizeWorkspace(parts[0] || requested);
+    if (requested === "home" || workspace === "home") {
+      switchWorkspace("home");
+      return true;
+    }
+    const tab = TAB_WORKSPACE[requested] ? requested : WORKSPACE_DEFAULT_TAB[workspace];
+    if (tab) {
+      openConfigDrawer(tab);
+      return true;
+    }
+    if (["role", "data", "advanced"].includes(workspace)) {
+      switchWorkspace(workspace);
+      return true;
+    }
+    return false;
   }
 
   function roleStateStageKey(index) {
@@ -1956,8 +2142,7 @@
           </button>
           <div class="story-time-summary-controls">
             <label class="story-time-switch"><input type="checkbox" data-story-time-field="enabled" ${story.enabled ? "checked" : ""}>启用</label>
-            <label class="story-time-switch"><input type="checkbox" data-story-time-field="show_in_note" ${story.show_in_note ? "checked" : ""}>幕笺</label>
-            <button type="button" class="ghost-btn compact-btn" data-story-time-action="save">保存</button>
+            <label class="story-time-switch"><input type="checkbox" data-story-time-field="show_in_note" ${story.show_in_note ? "checked" : ""}>状态记录</label>
             <button type="button" class="ghost-btn compact-btn" data-story-time-action="toggle" aria-expanded="${expanded ? "true" : "false"}"><span class="story-time-toggle-label">${expanded ? "收起" : "展开"}</span></button>
           </div>
         </div>
@@ -1986,7 +2171,6 @@
           </div>
           ${customSettingsHtml}
           <div class="story-time-actions">
-            <button type="button" class="primary-btn" data-story-time-action="save">保存剧情时间</button>
             <button type="button" class="ghost-btn" data-story-time-action="initialize">初始化剧情时间</button>
             <button type="button" class="ghost-btn" data-story-time-action="calibrate">校准当前时间</button>
             <button type="button" class="ghost-btn danger-soft" data-story-time-action="reset">重置为初始时间</button>
@@ -2102,19 +2286,19 @@
         <div class="role-state-mode-panel">
           <strong>使用方式</strong>
           <select data-role-mode-select>
-            <option value="default" ${roleMode === "default" ? "selected" : ""}>默认幕笺模板</option>
-            <option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属幕笺</option>
-            <option value="full" ${roleMode === "full" ? "selected" : ""}>完整心笺：专属幕笺 + 变量阶段</option>
-            <option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不启用该角色</option>
+            <option value="default" ${roleMode === "default" ? "selected" : ""}>默认状态记录模板</option>
+            <option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属状态记录</option>
+            <option value="full" ${roleMode === "full" ? "selected" : ""}>完整数据库：状态记录 + 变量阶段</option>
+            <option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不记录该角色</option>
           </select>
         </div>
         <p>${escapeHtml(roleModeMeta.desc || ROLE_STATE_MODES.default.desc)}</p>
       </div>
     </div>`;
-    const wrapRoleStateEditor = (actionsHtml, tableHtml) => `${overviewPanel}<div class="role-state-editor-card"><div class="role-state-editor-head"><div><strong>${state.roleStateTab === "stages" ? "阶段规则" : state.roleStateTab === "snapshot" ? "状态快照字段" : "变量表"}</strong><small>${state.roleStateTab === "stages" ? "主表只展示摘要，条件编辑收在配置弹窗。" : state.roleStateTab === "snapshot" ? "只用于心笺 worker 与幕笺展示，不参与阶段判断。" : "记录可累计变量、变化范围与阶段用途。"}</small></div>${actionsHtml}</div>${tableHtml}</div>`;
+    const wrapRoleStateEditor = (actionsHtml, tableHtml) => `${overviewPanel}<div class="role-state-editor-card"><div class="role-state-editor-head"><div><strong>${state.roleStateTab === "stages" ? "阶段规则" : state.roleStateTab === "snapshot" ? "状态快照字段" : "变量表"}</strong><small>${state.roleStateTab === "stages" ? "主表只展示摘要，条件编辑收在配置弹窗。" : state.roleStateTab === "snapshot" ? "只用于记录模型与状态记录展示，不参与阶段判断。" : "记录可累计变量、变化范围与阶段用途。"}</small></div>${actionsHtml}</div>${tableHtml}</div>`;
     if (state.roleStateTab === "snapshot") {
       detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-snapshot-field>＋ 新增快照字段</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-snapshot-table"><thead><tr><th>启用</th><th>字段名</th><th>显示</th><th>生成说明</th><th>操作</th></tr></thead><tbody>
-        ${(role.snapshotFields || []).map((field, index) => `<tr data-snapshot-index="${index}"><td><input type="checkbox" data-snapshot-field="enabled" ${field.enabled !== false ? "checked" : ""}></td><td><input data-snapshot-field="label" value="${escapeAttr(field.label)}"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-snapshot-field="key" value="${escapeAttr(field.key)}"></label></details></td><td><input type="checkbox" data-snapshot-field="display" ${field.display !== false ? "checked" : ""}></td><td><input data-snapshot-field="instruction" value="${escapeAttr(field.instruction || "")}"></td><td><button type="button" class="ghost-btn" data-delete-snapshot-field>删除</button></td></tr>`).join("") || `<tr><td colspan="5">暂无状态快照字段。未配置时会回落到当前全局幕笺模板。</td></tr>`}
+        ${(role.snapshotFields || []).map((field, index) => `<tr data-snapshot-index="${index}"><td><input type="checkbox" data-snapshot-field="enabled" ${field.enabled !== false ? "checked" : ""}></td><td><input data-snapshot-field="label" value="${escapeAttr(field.label)}"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-snapshot-field="key" value="${escapeAttr(field.key)}"></label></details></td><td><input type="checkbox" data-snapshot-field="display" ${field.display !== false ? "checked" : ""}></td><td><input data-snapshot-field="instruction" value="${escapeAttr(field.instruction || "")}"></td><td><button type="button" class="ghost-btn" data-delete-snapshot-field>删除</button></td></tr>`).join("") || `<tr><td colspan="5">暂无状态快照字段。未配置时会回落到当前全局状态记录模板。</td></tr>`}
         </tbody></table></div>`);
     } else if (state.roleStateTab === "stages") {
       detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-stage>＋ 新增阶段</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-stage-table stage-table-polish"><thead><tr><th>当前</th><th>启用</th><th>阶段</th><th>条件摘要</th><th>世界书</th><th>操作</th></tr></thead><tbody>
@@ -2143,7 +2327,7 @@
         </tbody></table></div>`);
     } else {
       detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-variable>＋ 新增变量</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-variable-table"><thead><tr><th>启用</th><th>变量名</th><th>初始值</th><th>范围</th><th>每轮变化</th><th>显示</th><th>阶段</th><th>操作</th></tr></thead><tbody>
-        ${(role.variables || []).map((variable, index) => `<tr data-variable-index="${index}"><td><input type="checkbox" data-var-field="enabled" ${variable.enabled !== false ? "checked" : ""}></td><td><input data-var-field="var_name" value="${escapeAttr(variable.var_name)}" placeholder="变量名"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-var-field="var_key" value="${escapeAttr(variable.var_key)}" placeholder="key"></label></details></td><td><input type="number" data-var-field="default_value" value="${escapeAttr(variable.default_value)}"></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="min_value" value="${escapeAttr(variable.min_value)}"><span>~</span><input class="mini" type="number" data-var-field="max_value" value="${escapeAttr(variable.max_value)}"></div></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="delta_min" value="${escapeAttr(variable.delta_min)}"><span>~</span><input class="mini" type="number" data-var-field="delta_max" value="${escapeAttr(variable.delta_max)}"></div></td><td><input type="checkbox" data-var-field="display" ${variable.display !== false ? "checked" : ""}></td><td><input type="checkbox" data-var-field="stage_relevant" ${variable.stage_relevant !== false ? "checked" : ""}></td><td><button type="button" class="ghost-btn" data-delete-variable>删除</button></td></tr>`).join("") || `<tr><td colspan="8">暂无变量。手动新增默认使用 var_1 / var_2，不自动拼音。</td></tr>`}
+        ${(role.variables || []).map((variable, index) => `<tr data-variable-index="${index}"><td><input type="checkbox" data-var-field="enabled" ${variable.enabled !== false ? "checked" : ""}></td><td><input data-var-field="var_name" value="${escapeAttr(variable.var_name)}" placeholder="变量名"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-var-field="var_key" value="${escapeAttr(variable.var_key)}" placeholder="key"></label><label class="role-state-instruction-field">变量判断说明<textarea data-var-field="instruction" rows="3" placeholder="例如：只有出现明确亲近、信任或保护行为时才变化；普通寒暄保持不变。">${escapeHtml(variable.instruction || "")}</textarea></label></details></td><td><input type="number" data-var-field="default_value" value="${escapeAttr(variable.default_value)}"></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="min_value" value="${escapeAttr(variable.min_value)}"><span>~</span><input class="mini" type="number" data-var-field="max_value" value="${escapeAttr(variable.max_value)}"></div></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="delta_min" value="${escapeAttr(variable.delta_min)}"><span>~</span><input class="mini" type="number" data-var-field="delta_max" value="${escapeAttr(variable.delta_max)}"></div></td><td><input type="checkbox" data-var-field="display" ${variable.display !== false ? "checked" : ""}></td><td><input type="checkbox" data-var-field="stage_relevant" ${variable.stage_relevant !== false ? "checked" : ""}></td><td><button type="button" class="ghost-btn" data-delete-variable>删除</button></td></tr>`).join("") || `<tr><td colspan="8">暂无变量。手动新增默认使用 var_1 / var_2，不自动拼音。</td></tr>`}
         </tbody></table></div>`);
     }
   }
@@ -2282,7 +2466,7 @@
   }
 
   async function initializeStoryTime() {
-    const ok = await confirmAction({ title: "初始化剧情时间", body: "<p>此操作会把当前剧情时间设为初始时间，并影响后续幕笺显示和阶段判断。</p>", confirmText: "初始化" });
+    const ok = await confirmAction({ title: "初始化剧情时间", body: "<p>此操作会把当前剧情时间设为初始时间，并影响后续状态记录显示和阶段判断。</p>", confirmText: "初始化" });
     if (!ok) return;
     const payload = await requestJson("./api/story-time/initialize", { method: "POST", body: JSON.stringify(readStoryTimeForm()) });
     state.storyTime = normalizeStoryTime(payload.story_time || {});
@@ -2291,7 +2475,7 @@
   }
 
   async function resetStoryTime() {
-    const ok = await confirmAction({ title: "重置为初始时间", body: "<p>此操作会回到 base_time，并影响后续幕笺显示和阶段判断。</p>", confirmText: "重置" });
+    const ok = await confirmAction({ title: "重置为初始时间", body: "<p>此操作会回到 base_time，并影响后续状态记录显示和阶段判断。</p>", confirmText: "重置" });
     if (!ok) return;
     const payload = await requestJson("./api/story-time/reset", { method: "POST", body: JSON.stringify({}) });
     state.storyTime = normalizeStoryTime(payload.story_time || {});
@@ -2300,7 +2484,7 @@
   }
 
   async function calibrateStoryTime() {
-    const ok = await confirmAction({ title: "校准当前时间", body: "<p>此操作会把当前时间改为面板中的初始时间数值，并影响后续幕笺显示和阶段判断。</p>", confirmText: "校准" });
+    const ok = await confirmAction({ title: "校准当前时间", body: "<p>此操作会把当前时间改为面板中的初始时间数值，并影响后续状态记录显示和阶段判断。</p>", confirmText: "校准" });
     if (!ok) return;
     const form = readStoryTimeForm();
     const payload = await requestJson("./api/story-time/calibrate", { method: "POST", body: JSON.stringify({ current_year: form.base_year, current_month: form.base_month, current_day: form.base_day, current_hour: form.base_hour, current_minute: form.base_minute, current_second: form.base_second }) });
@@ -2320,7 +2504,20 @@
     state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
     state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
     renderRoleStateWorkspace();
-    pageToast("心笺配置已保存", "变量与阶段配置已写入运行配置。", "ok");
+    pageToast("数据库配置已保存", "变量与阶段配置已写入运行配置。", "ok");
+  }
+
+  async function saveRoleWorkspaceSettings() {
+    const storyTimeForm = readStoryTimeForm();
+    const [rolePayload, storyPayload] = await Promise.all([
+      requestJson("./api/role-state/config", { method: "POST", body: JSON.stringify({ config: state.roleStateConfig }) }),
+      requestJson("./api/story-time/config", { method: "POST", body: JSON.stringify(storyTimeForm) }),
+    ]);
+    state.roleStateConfig = normalizeRoleStateConfig(rolePayload.config || {});
+    state.activeStageRows = Array.isArray(rolePayload.stages) ? rolePayload.stages : state.activeStageRows;
+    state.storyTime = normalizeStoryTime(storyPayload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("本页设置已保存", "角色配置与剧情时间配置已写入。", "ok");
   }
 
   async function readRoleStateFromCard() {
@@ -2353,11 +2550,11 @@
       const roleName = role.role_name || role.role_id || "未命名角色";
       const mode = roleStateModeShortLabel(role);
       return `<li><strong>${escapeHtml(roleName)}</strong><span>${escapeHtml(mode)} · 变量 ${role.variables?.length || 0} · 阶段 ${role.stages?.length || 0} · 快照 ${role.snapshotFields?.length || 0}</span></li>`;
-    }).join("") : `<li><strong>暂无角色</strong><span>当前配置中没有可同步的心笺角色。</span></li>`;
+    }).join("") : `<li><strong>暂无角色</strong><span>当前配置中没有可同步的数据库角色。</span></li>`;
     const warnings = roleStateTempKeyWarnings(config);
     const warningHtml = warnings.length ? `<div class="sync-card-warning"><strong>检测到可能的测试字段</strong><ul>${warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p>如果这些字段只是测试保存 / 放弃修改，可以先删除或改成正式 key 后再同步。</p></div>` : "";
     return `
-      <p>即将把当前心笺角色配置写入角色卡 <code>stateJournal</code>。</p>
+      <p>即将把当前数据库角色配置写入角色卡 <code>stateJournal</code>。</p>
       <div class="sync-card-summary">
         <div><span>角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<small>${escapeHtml(sourceInfo.detected)}</small>` : ""}</div>
         <div><span>同步角色</span><strong>${roles.length}</strong><small>只同步配置模板</small></div>
@@ -2368,7 +2565,7 @@
         <strong>会同步</strong>
         <p>角色来源、角色列表、变量配置、阶段规则、状态快照字段、阶段 activation_tag / 世界书标签。</p>
         <strong>不会同步</strong>
-        <p>当前运行数值、幕笺历史、聊天记录、心笺数据库日志。</p>
+        <p>当前运行数值、状态记录历史、聊天记录、数据库日志。</p>
       </div>
     `;
   }
@@ -2380,7 +2577,7 @@
       body: buildSyncRoleStateConfirmBody(),
       confirmText: "确认写入角色卡",
       finalTitle: "最终确认：写入角色卡",
-      finalBody: "<p>这是第二次确认。继续后会把当前心笺角色配置写入角色卡 <code>stateJournal</code>，可能覆盖角色卡里已有的心笺配置模板。</p><p class=\"danger-text\">如果你只是想保存后台设置，请取消，并使用「保存角色配置」。</p>",
+      finalBody: "<p>这是第二次确认。继续后会把当前数据库角色配置写入角色卡 <code>stateJournal</code>，可能覆盖角色卡里已有的数据库配置模板。</p><p class=\"danger-text\">如果你只是想保存后台设置，请取消，并使用「保存角色配置」。</p>",
       finalConfirmText: "我确认写入角色卡",
     });
     if (!ok) return;
@@ -2399,7 +2596,7 @@
     };
     await saveConfig("turnNote");
     bindConfig();
-    pageToast("已恢复默认幕笺", "已启用 Chat 幕笺，并切回标准状态模板与标准样式。", "ok");
+    pageToast("已恢复默认状态记录", "已启用 Chat 状态记录，并切回标准状态模板与标准样式。", "ok");
   }
 
   async function initCurrentRoleState() {
@@ -2407,7 +2604,7 @@
     const roles = (state.roleStateConfig.roles || []).filter((role) => role.enabled !== false && normalizeRoleStateMode(role.mode || role.stateJournalMode, role) === "full");
     const ok = await confirmDangerousRoleCardAction({
       title: "从角色卡初始化当前状态",
-      body: `<p>此操作会先读取当前角色卡里的 <code>stateJournal</code> 配置，再重建心笺当前变量与阶段。它可能覆盖当前运行中的变量值和当前阶段，但不会删除历史记录。</p><p><strong>当前已加载的完整心笺角色：</strong>${escapeHtml(roles.map((role) => role.role_name || role.role_id).join("、") || "暂无完整心笺角色")}</p><p>适合首轮开局前使用；游玩中请谨慎操作。</p>`,
+      body: `<p>此操作会先读取当前角色卡里的 <code>stateJournal</code> 配置，再重建数据库当前变量与阶段。它可能覆盖当前运行中的变量值和当前阶段，但不会删除历史记录。</p><p><strong>当前已加载的完整数据库角色：</strong>${escapeHtml(roles.map((role) => role.role_name || role.role_id).join("、") || "暂无完整数据库角色")}</p><p>适合首轮开局前使用；游玩中请谨慎操作。</p>`,
       confirmText: "确认从角色卡初始化",
       finalTitle: "最终确认：初始化当前状态",
       finalBody: "<p>这是第二次确认。继续后会按角色卡里的 <code>stateJournal</code> 重建当前运行状态，当前变量值和当前阶段可能被覆盖。</p><p class=\"danger-text\">正式游玩中不建议执行；更适合开局前或排查配置时使用。</p>",
@@ -2433,7 +2630,7 @@
     const next = stages[Math.min(idx + 1, stages.length - 1)] || stages[0];
     const ok = await confirmAction({
       title: "调试推进阶段",
-      body: `<p>这是测试功能，会强制把当前选中角色推进到下一阶段，用于测试世界书 external_tag 与幕笺显示。</p><p><strong>当前角色：</strong>${escapeHtml(role.role_name || role.role_id)}</p><p><strong>当前阶段：</strong>${escapeHtml(roleCurrentStageName(role))} · ${escapeHtml(currentKey)}</p><p><strong>目标阶段：</strong>${escapeHtml(next?.stage_name || "无")} · ${escapeHtml(next?.stage_key || "")}</p><p class="danger-text">不建议正式游玩时使用。</p>`,
+      body: `<p>这是测试功能，会强制把当前选中角色推进到下一阶段，用于测试世界书 external_tag 与状态记录显示。</p><p><strong>当前角色：</strong>${escapeHtml(role.role_name || role.role_id)}</p><p><strong>当前阶段：</strong>${escapeHtml(roleCurrentStageName(role))} · ${escapeHtml(currentKey)}</p><p><strong>目标阶段：</strong>${escapeHtml(next?.stage_name || "无")} · ${escapeHtml(next?.stage_key || "")}</p><p class="danger-text">不建议正式游玩时使用。</p>`,
       confirmText: "确认推进",
       danger: true,
     });
@@ -2466,6 +2663,7 @@
     });
     els.rowDetailDrawer.classList.add("open");
     els.rowDetailDrawer.setAttribute("aria-hidden", "false");
+    els.rowDetailDrawer.removeAttribute("inert");
     els.rowDetailMask.hidden = false;
   }
 
@@ -2473,6 +2671,7 @@
     state.detailIndex = -1;
     els.rowDetailDrawer.classList.remove("open");
     els.rowDetailDrawer.setAttribute("aria-hidden", "true");
+    els.rowDetailDrawer.setAttribute("inert", "");
     els.rowDetailMask.hidden = true;
   }
 
@@ -2517,11 +2716,11 @@
   }
 
   async function loadState() {
-    setStatus("正在载入心笺数据...");
+    setStatus("正在载入数据库...");
     const payload = await requestJson("./api/state");
     state.config = payload.config || {}; state.tables = payload.tables || [];
     if (!state.tables.some((table) => table.schema.id === state.currentId)) state.currentId = state.tables[0]?.schema.id || "";
-    renderAll(); await refreshHookStatus(); setStatus("心笺已就绪。", "ok");
+    renderAll(); await refreshHookStatus(); setStatus("数据库已就绪。", "ok");
   }
 
   async function saveCurrentTable() {
@@ -2541,20 +2740,20 @@
     const titles = {
       model: "模型配置已保存",
       link: "聊天联动设置已保存",
-      turnNote: "幕笺设置已保存",
+      turnNote: "状态记录设置已保存",
       generate: "生成规则已保存",
-      template: "幕笺模板已保存",
-      theme: "幕笺美化已保存",
-      all: "心笺配置已保存",
+      template: "状态记录模板已保存",
+      theme: "状态记录外观已保存",
+      all: "数据库配置已保存",
     };
     const details = {
       model: `${state.config.model || "未填写模型"} · ${state.config.api_base_url || "未填写 API URL"}`,
-      link: `心笺${state.config.enabled === false ? "关闭" : "开启"}｜自动填表${state.config.auto_update ? "开启" : "关闭"}｜聊天提示${state.config.notify_in_chat ? "开启" : "关闭"}｜跟随全局UI${state.config.ui_sync_global ? "开启" : "关闭"}`,
-      turnNote: `幕笺${state.config.turn_note_enabled === false ? "关闭" : "开启"}｜显示：${({ collapsed: "折叠", expanded: "展开", compact: "状态条", hidden: "不显示" }[state.config.turn_note_chat_display_mode || "collapsed"] || "折叠")}｜标题：${state.config.turn_note_title_style || "classic"}｜附笺：${state.config.turn_note_card_style || state.config.turn_note_style || "classic"}｜密度：${state.config.turn_note_density || "standard"}`,
+      link: `数据库${state.config.enabled === false ? "关闭" : "开启"}｜自动填表${state.config.auto_update ? "开启" : "关闭"}｜聊天提示${state.config.notify_in_chat ? "开启" : "关闭"}｜跟随全局UI${state.config.ui_sync_global ? "开启" : "关闭"}`,
+      turnNote: `状态记录${state.config.turn_note_enabled === false ? "关闭" : "开启"}｜显示：${({ collapsed: "折叠", expanded: "展开", compact: "状态条", hidden: "不显示" }[state.config.turn_note_chat_display_mode || "collapsed"] || "折叠")}｜标题：${state.config.turn_note_title_style || "classic"}｜附笺：${state.config.turn_note_card_style || state.config.turn_note_style || "classic"}｜密度：${state.config.turn_note_density || "standard"}`,
       generate: `自动填表${state.config.auto_update ? "开启" : "关闭"}｜读取最近 ${state.config.input_turn_count || 3} 轮｜主角状态卡${state.config.turn_note_protagonist_card_enabled ? "开启" : "关闭"}`,
       template: `${activeTemplate().name || activeTemplate().id}｜字段 ${activeTemplate().fields?.length || 0} 个`,
       theme: `${activeThemePack().name || activeThemePack().id}｜${activeThemePack().description || "美化包已启用"}`,
-      all: `${state.config.model || "未填写模型"} · 幕笺${state.config.turn_note_enabled === false ? "关闭" : "开启"}`,
+      all: `${state.config.model || "未填写模型"} · 状态记录${state.config.turn_note_enabled === false ? "关闭" : "开启"}`,
     };
     const title = titles[kind] || titles.all;
     setStatus(`${title}。`, "ok");
@@ -2586,25 +2785,25 @@
   async function testConnection() {
     setStatus("正在测试连接...");
     const payload = await requestJson("./api/test-connection", { method: "POST", body: JSON.stringify({ config: readConfig() }) });
-    setStatus(payload.message || "连接成功。", "ok"); pageToast("心笺连接测试成功", payload.message || "连接成功。", "ok");
+    setStatus(payload.message || "连接成功。", "ok"); pageToast("数据库连接测试成功", payload.message || "连接成功。", "ok");
   }
 
   async function manualWorkerUpdate() {
     setManualWorkerBusy(true);
     try {
-      setStatus("正在保存当前表，准备请求心笺辅助模型...");
+      setStatus("正在保存当前表，准备请求记录模型...");
       await saveCurrentTable();
       setStatus("正在读取最近聊天记录...");
       const history = await fetch("/api/history").then((res) => res.json()).catch(() => []);
       const timeoutSeconds = Number(els.cfgTimeout?.value || state.config?.request_timeout || 120);
       setStatus(`正在请求辅助模型，最多等待 ${timeoutSeconds} 秒...`);
       const result = await requestJson("./api/worker/update", { method: "POST", body: JSON.stringify({ manual: true, history }) });
-      setStatus("心笺已收到响应，正在刷新状态表...");
+      setStatus("数据库已收到响应，正在刷新状态表...");
       await loadState();
       const count = result.summary?.total ?? result.result?.applied?.length ?? 0;
       const errors = result.result?.errors || [];
-      const displayTitle = result.display?.title ? `｜幕笺：《${result.display.title}》` : "";
-      const msg = (result.message || (count ? `心笺已应用 ${count} 条更新。` : "心笺判断本次无变化。")) + displayTitle;
+      const displayTitle = result.display?.title ? `｜状态记录：《${result.display.title}》` : "";
+      const msg = (result.message || (count ? `数据库已应用 ${count} 条更新。` : "数据库判断本次无变化。")) + displayTitle;
       els.updateSummaryText.textContent = msg;
       if (errors.length || result.ok === false) {
         const title = workerErrorTitle(result.error_type);
@@ -2612,13 +2811,13 @@
         pageToast(title, msg, "error");
       } else {
         setStatus(msg, "ok");
-        pageToast(count ? "心笺已更新" : "心笺无变化", msg, "ok");
+        pageToast(count ? "数据库已更新" : "数据库无变化", msg, "ok");
       }
     } catch (error) {
-      const msg = error.message || "心笺请求异常。";
+      const msg = error.message || "数据库请求异常。";
       els.updateSummaryText.textContent = msg;
       setStatus(msg, "error");
-      pageToast("心笺填表失败", msg, "error");
+      pageToast("数据库填表失败", msg, "error");
     } finally {
       setManualWorkerBusy(false);
     }
@@ -2636,13 +2835,13 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    pageToast("排查日志已导出", "已脱敏 API Key，可用于定位重 roll、编辑与幕笺恢复问题。", "ok");
+    pageToast("排查日志已导出", "已脱敏 API Key，可用于定位重 roll、编辑与状态记录恢复问题。", "ok");
   }
   function addField() { const table = currentTable(); if (!table) return; table.schema.fields.push({ key: `field_${table.schema.fields.length + 1}`, label: "新字段", type: "text", required: false, options: [], note: "" }); renderFields(table); refreshPrimaryOptions(); openConfigDrawer("schema"); }
   function addRow() { const table = currentTable(); if (!table) return; const row = {}; (table.schema.fields || []).forEach((field) => { row[field.key] = field.type === "boolean" ? false : ""; }); table.rows.push(row); renderRows(table); openRowDetail(table.rows.length - 1); }
   function newTable() { const id = `custom_table_${Date.now()}`; state.tables.push({ schema: { id, name: "新表", description: "", primary_key: "id", fields: [{ key: "id", label: "ID", type: "text", required: true, options: [], note: "主键字段" }], rules: { note: "", init: "", insert: "", update: "", delete: "", ignore: "" } }, rows: [] }); state.currentId = id; renderAll(); openConfigDrawer("schema"); }
   async function exportAll() { const payload = await requestJson("./api/export"); const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `state-journal-export-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url); pageToast("导出完成", "默认不包含 API Key，可放心分享表结构与数据。", "ok"); }
-  async function importFile(file) { if (!file) return; const payload = JSON.parse(await file.text()); await requestJson("./api/import", { method: "POST", body: JSON.stringify(payload) }); await loadState(); setStatus("导入完成。", "ok"); pageToast("导入完成", "JSON 数据已写入心笺 SQLite。", "ok"); }
+  async function importFile(file) { if (!file) return; const payload = JSON.parse(await file.text()); await requestJson("./api/import", { method: "POST", body: JSON.stringify(payload) }); await loadState(); setStatus("导入完成。", "ok"); pageToast("导入完成", "JSON 数据已写入数据库 SQLite。", "ok"); }
 
   document.querySelectorAll(".workspace-nav-btn").forEach((button) => button.addEventListener("click", () => {
     const workspace = normalizeWorkspace(button.dataset.workspace || "home");
@@ -2667,7 +2866,10 @@
   els.drawerMask?.addEventListener("click", closeConfigDrawer);
   $("#closeRowDetailBtn").addEventListener("click", closeRowDetail);
   els.rowDetailMask.addEventListener("click", closeRowDetail);
-  $("#saveRowDetailBtn").addEventListener("click", saveRowDetail);
+  $("#saveRowDetailBtn").addEventListener("click", (event) => {
+    saveRowDetail();
+    flashActionButton(event.currentTarget, "已暂存");
+  });
   $("#deleteRowDetailBtn").addEventListener("click", () => { if (state.detailIndex >= 0) { deleteRow(state.detailIndex); closeRowDetail(); } });
   els.rowsEditor.addEventListener("click", (event) => {
     const edit = event.target.closest("[data-edit-row]");
@@ -2676,11 +2878,11 @@
     if (del) deleteRow(Number(del.dataset.deleteRow));
   });
   $("#refreshBtn").addEventListener("click", () => loadState().catch((error) => setStatus(error.message, "error")));
-  $("#saveBtn").addEventListener("click", () => saveCurrentTable().catch((error) => { setStatus(error.message, "error"); pageToast("保存失败", error.message, "error"); }));
-  $("#saveConfigBtn")?.addEventListener("click", () => saveConfig("model").catch((error) => { setStatus(error.message, "error"); pageToast("保存模型配置失败", error.message, "error"); }));
-  $("#saveLinkConfigBtn")?.addEventListener("click", () => saveConfig("link").catch((error) => { setStatus(error.message, "error"); pageToast("保存联动设置失败", error.message, "error"); }));
-  $("#saveTurnNoteConfigBtn")?.addEventListener("click", () => saveConfig("turnNote").catch((error) => { setStatus(error.message, "error"); pageToast("保存幕笺设置失败", error.message, "error"); }));
-  $("#saveGenerateConfigBtn")?.addEventListener("click", () => saveConfig("generate").catch((error) => { setStatus(error.message, "error"); pageToast("保存生成规则失败", error.message, "error"); }));
+  $("#saveBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, saveCurrentTable, "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存失败", error.message, "error"); }));
+  $("#saveConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("model"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存模型配置失败", error.message, "error"); }));
+  $("#saveLinkConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("link"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存联动设置失败", error.message, "error"); }));
+  $("#saveTurnNoteConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("turnNote"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存状态记录设置失败", error.message, "error"); }));
+  $("#saveGenerateConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("generate"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存生成规则失败", error.message, "error"); }));
   function bindRuntimeToggle(input, target, kind) {
     input?.addEventListener("change", () => {
       if (target) target.checked = input.checked;
@@ -2690,18 +2892,37 @@
   bindRuntimeToggle(els.dashboardEnabled, els.cfgEnabled, "link");
   bindRuntimeToggle(els.dashboardAutoUpdate, els.cfgAutoUpdate, "generate");
   bindRuntimeToggle(els.dashboardTurnNote, els.cfgTurnNoteEnabled, "turnNote");
+  els.cfgTurnNoteWorkerPromptMode?.addEventListener("change", () => {
+    updateWorkerPromptEditorLabel();
+    renderWorkerPromptPreview();
+  });
+  els.loadDefaultWorkerPromptBtn?.addEventListener("click", () => {
+    loadDefaultWorkerPromptIntoEditor().catch((error) => pageToast("载入默认主体失败", error.message, "error"));
+  });
+  els.clearWorkerPromptBtn?.addEventListener("click", () => {
+    if (!window.confirm("确定清空当前范围的自定义 Prompt？")) return;
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = "";
+    renderWorkerPromptPreview();
+    pageToast("已清空当前范围", "保存生成规则后生效。", "ok");
+  });
   els.resetWorkerPromptBtn?.addEventListener("click", () => {
+    if (els.cfgTurnNoteWorkerPromptMode) els.cfgTurnNoteWorkerPromptMode.value = "default";
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = "";
     if (els.cfgTurnNoteWorkerPromptEnabled) els.cfgTurnNoteWorkerPromptEnabled.checked = false;
     if (els.cfgTurnNoteWorkerStylePrompt) els.cfgTurnNoteWorkerStylePrompt.value = "";
     if (els.cfgTurnNoteWorkerProtagonistPrompt) els.cfgTurnNoteWorkerProtagonistPrompt.value = "";
-    pageToast("已恢复默认附加提示词", "保存幕笺设置后生效。", "ok");
+    renderWorkerPromptPreview();
+    pageToast("已恢复默认 Prompt", "保存生成规则后生效。", "ok");
   });
-  $("#saveTemplateConfigBtn")?.addEventListener("click", () => saveConfig("template").catch((error) => { setStatus(error.message, "error"); pageToast("保存模板设置失败", error.message, "error"); }));
-  $("#saveThemeConfigBtn")?.addEventListener("click", () => saveConfig("theme").catch((error) => { setStatus(error.message, "error"); pageToast("保存美化设置失败", error.message, "error"); }));
-  $("#refreshHookBtn").addEventListener("click", () => refreshHookStatus().catch((error) => pageToast("刷新 Hook 状态失败", error.message, "error")));
-  $("#fillMainConfigBtn").addEventListener("click", () => fillFromMainConfig().catch((error) => pageToast("读取本体配置失败", error.message, "error")));
-  $("#fetchModelsBtn").addEventListener("click", () => fetchModels().catch((error) => { setStatus(error.message, "error"); pageToast("拉取模型列表失败", error.message, "error"); }));
-  $("#testConnectionBtn").addEventListener("click", () => testConnection().catch((error) => { setStatus(error.message, "error"); pageToast("测试连接失败", error.message, "error"); }));
+  els.refreshWorkerPromptPreviewBtn?.addEventListener("click", () => {
+    refreshWorkerPromptPreview().catch((error) => pageToast("刷新 Prompt 预览失败", error.message, "error"));
+  });
+  $("#saveTemplateConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("template"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存模板设置失败", error.message, "error"); }));
+  $("#saveThemeConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("theme"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存美化设置失败", error.message, "error"); }));
+  $("#refreshHookBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, refreshHookStatus, "已刷新").catch((error) => pageToast("刷新 Hook 状态失败", error.message, "error")));
+  $("#fillMainConfigBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, fillFromMainConfig, "已填入").catch((error) => pageToast("读取本体配置失败", error.message, "error")));
+  $("#fetchModelsBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, fetchModels, "已更新").catch((error) => { setStatus(error.message, "error"); pageToast("拉取模型列表失败", error.message, "error"); }));
+  $("#testConnectionBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, testConnection, "连接正常").catch((error) => { setStatus(error.message, "error"); pageToast("测试连接失败", error.message, "error"); }));
   $("#applyPresetBtn").addEventListener("click", applyServicePreset);
   els.cfgTurnNoteStyle?.addEventListener("change", updateTurnNoteStyleHelp);
   els.cfgTurnNoteTitleStyle?.addEventListener("change", updateTurnNoteStyleHelp);
@@ -2857,8 +3078,8 @@
   });
   $("#toggleApiKeyBtn").addEventListener("click", () => { const hidden = els.cfgApiKey.type === "password"; els.cfgApiKey.type = hidden ? "text" : "password"; $("#toggleApiKeyBtn").textContent = hidden ? "隐藏" : "显示"; });
 
-  document.getElementById("roleStateReadCardBtn")?.addEventListener("click", () => readRoleStateFromCard().catch((error) => pageToast("读取角色卡失败", error.message, "error")));
-  document.getElementById("roleStateSaveBtn")?.addEventListener("click", () => saveRoleStateConfig().catch((error) => pageToast("保存心笺配置失败", error.message, "error")));
+  document.getElementById("roleStateReadCardBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, readRoleStateFromCard, "已读取").catch((error) => pageToast("读取角色卡失败", error.message, "error")));
+  document.getElementById("roleStateSaveBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, saveRoleWorkspaceSettings, "已保存").catch((error) => pageToast("保存本页设置失败", error.message, "error")));
   document.getElementById("roleStateSyncCardBtn")?.addEventListener("click", () => syncRoleStateToCard().catch((error) => pageToast("同步角色卡失败", error.message, "error")));
   document.getElementById("roleStateInitBtn")?.addEventListener("click", () => initCurrentRoleState().catch((error) => pageToast("初始化失败", error.message, "error")));
   document.getElementById("roleStateDebugNextStageBtn")?.addEventListener("click", () => debugAdvanceCurrentStage().catch((error) => pageToast("调试推进失败", error.message, "error")));
@@ -2872,7 +3093,7 @@
     state.roleStateTab = btn.dataset.roleStateTab || "variables";
     renderRoleStateWorkspace();
   }));
-  document.getElementById("resetDefaultTurnNoteBtn")?.addEventListener("click", () => resetDefaultTurnNote().catch((error) => pageToast("恢复默认幕笺失败", error.message, "error")));
+  document.getElementById("resetDefaultTurnNoteBtn")?.addEventListener("click", () => resetDefaultTurnNote().catch((error) => pageToast("恢复默认状态记录失败", error.message, "error")));
 
   function handleStoryTimeFieldChange(event) {
     const storyField = event.target.closest("[data-story-time-field]");
@@ -3064,6 +3285,9 @@
   $("#exportBtn").addEventListener("click", () => exportAll().catch((error) => setStatus(error.message, "error")));
   $("#importInput").addEventListener("change", (event) => importFile(event.target.files?.[0]).catch((error) => { setStatus(error.message, "error"); pageToast("导入失败", error.message, "error"); }));
   window.addEventListener("state_journal:updated", (event) => { els.updateSummaryText.textContent = event.detail?.message || "聊天页自动填表已完成。"; loadState().catch(() => {}); });
+  window.addEventListener("hashchange", () => { openRouteFromHash(); });
 
-  loadState().catch((error) => { setStatus(error.message, "error"); pageToast("心笺载入失败", error.message, "error"); });
+  loadState()
+    .then(() => { openRouteFromHash(); })
+    .catch((error) => { setStatus(error.message, "error"); pageToast("数据库载入失败", error.message, "error"); });
 })();

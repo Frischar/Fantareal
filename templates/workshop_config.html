@@ -239,13 +239,13 @@
             <div>
               <p class="eyebrow">Dynamic Performance</p>
               <h3>动态演出</h3>
-          <p class="muted compact">聊天过程中由系统计数、模型状态块或心笺 tag 触发的图片、音效和背景切换。它不是关键词触发，也不会进入提示词。</p>
+          <p class="muted compact">聊天过程中由系统计数、模型状态块或数据库 tag 触发的图片、音效和背景切换。它不是关键词触发，也不会进入提示词。</p>
             </div>
             <button id="add-dynamic-scene" type="button" class="secondary compact">+ 新增演出</button>
           </div>
           <div class="workshop-state-tip dynamic-state-tip">
             <strong>状态块触发 Tips：</strong>
-            <span>演出工坊不会因为正文出现“雨夜”“回忆”等词而触发。模型状态块仍可用 <code>[FT_EVENT: rain_memory]</code>；状态触发则只认心笺 active tag，例如 <code>state_journal.task.find_silver_key.done</code>。</span>
+            <span>演出工坊不会因为正文出现“雨夜”“回忆”等词而触发。模型状态块仍可用 <code>[FT_EVENT: rain_memory]</code>；状态触发则只认数据库 active tag，例如 <code>state_journal.task.find_silver_key.done</code>。</span>
           </div>
           <div id="dynamic-scene-list" class="stack-list dynamic-scene-list"></div>
         </div>
@@ -281,7 +281,7 @@
             <span id="workshop-binding-ambience" class="micro-badge muted">常驻氛围</span>
             <span id="workshop-binding-dynamic" class="micro-badge muted">动态演出</span>
           </div>
-          <p class="muted compact">只保存资源引用，不打包图片、音乐或音效；不绑定主程序 UI、模型、心笺或状态栏设置。</p>
+          <p class="muted compact">只保存资源引用，不打包图片、音乐或音效；不绑定主程序 UI、模型、数据库或状态栏设置。</p>
         </div>
 
         <div class="workshop-panel-block workshop-runtime-panel-side">
@@ -1803,7 +1803,7 @@
                 <select class="dynamic-trigger-type">
                   <option value="round" ${scene.trigger.type === "round" ? "selected" : ""}>系统计数：对话回合</option>
                   <option value="model" ${scene.trigger.type === "model" ? "selected" : ""}>模型状态块</option>
-                  <option value="state_journal_tag" ${scene.trigger.type === "state_journal_tag" ? "selected" : ""}>心笺阶段 tag</option>
+                  <option value="state_journal_tag" ${scene.trigger.type === "state_journal_tag" ? "selected" : ""}>状态阶段 tag</option>
                   <option value="plot_ledger_tag" ${scene.trigger.type === "plot_ledger_tag" ? "selected" : ""}>剧情账本 tag</option>
                   <option value="manual" ${scene.trigger.type === "manual" ? "selected" : ""}>仅手动 / 测试</option>
                 </select>
@@ -1819,7 +1819,7 @@
             </div>
             <div class="dynamic-trigger-panel" data-panel="round"><label>第几次角色回复后触发</label><input class="dynamic-trigger-round" type="number" min="1" max="9999" step="1" value="${escapeAttr(scene.trigger.round)}" /></div>
             <div class="dynamic-trigger-panel" data-panel="model"><label>触发标记</label><input class="dynamic-trigger-event" value="${escapeAttr(scene.trigger.event)}" placeholder="rain_memory" /><p class="muted compact">模型输出 <code>[FT_EVENT: ${escapeHtml(scene.trigger.event || "rain_memory")}]</code> 或 <code>fantareal_workshop</code> 状态块中的 <code>event</code> 值与这里一致时触发。</p></div>
-            <div class="dynamic-trigger-panel" data-panel="state_journal_tag"><label>心笺阶段 tag</label><input class="dynamic-trigger-tag dynamic-trigger-state-tag" value="${escapeAttr(scene.trigger.tag)}" placeholder="state_journal.role.hero.stage.trust" /><p class="muted compact">只匹配心笺当前激活的阶段 tag。演出工坊不读取正文，也不自己判断阶段。</p></div>
+            <div class="dynamic-trigger-panel" data-panel="state_journal_tag"><label>状态阶段 tag</label><input class="dynamic-trigger-tag dynamic-trigger-state-tag" value="${escapeAttr(scene.trigger.tag)}" placeholder="state_journal.role.hero.stage.trust" /><p class="muted compact">只匹配数据库当前激活的阶段 tag。演出工坊不读取正文，也不自己判断阶段。</p></div>
             <div class="dynamic-trigger-panel" data-panel="plot_ledger_tag"><label>剧情账本 tag</label><input class="dynamic-trigger-tag dynamic-trigger-plot-tag" value="${escapeAttr(scene.trigger.tag)}" placeholder="state_journal.task.find_silver_key.done" /><p class="muted compact">只匹配剧情账本当前激活的事件 / 任务 / 线索 tag，例如 active、done 或 failed 状态。</p></div>
             <div class="grid-two">
               <div>

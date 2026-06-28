@@ -511,7 +511,6 @@
                     {% if mod.slug == 'auto-saga' %}<a href="/mods/auto-saga" class="secondary compact">自动叙事模式</a>{% endif %}
                     {% if mod.slug == 'tts-studio' %}<a href="/mods/tts-studio" class="secondary compact">语声 · 语音 TTS</a>{% endif %}
                     {% if mod.slug == 'tavern-card-converter' %}<a href="/mods/tavern-card-converter" class="secondary compact">渡笺 · 酒馆卡转换器</a>{% endif %}
-                    {% if mod.slug == 'state-journal' %}<a href="/mods/state-journal" class="secondary compact">心笺 · 状态数据库</a>{% endif %}
                     {% if mod.slug == 'mobile-chat' %}<a href="/mods/mobile-chat" class="secondary compact">小手机 · 后台管理</a>{% endif %}
                   {% endfor %}
                 </div>
@@ -3157,7 +3156,7 @@
         const source = String(row?.source || "external").trim();
         const label = String(row?.label || "").trim();
         if (source === "preset") return label ? `预设 · ${label}` : "预设";
-        if (source === "state_journal") return label ? `心笺 · ${label}` : "心笺阶段";
+        if (source === "state_journal") return label ? `数据库 · ${label}` : "状态阶段";
         if (source === "manual") return label ? `手动 · ${label}` : "手动";
         return label ? `${source} · ${label}` : source;
       }
@@ -3518,7 +3517,7 @@
         const meta = document.createElement("span");
         meta.className = "muted";
         const hitCount = results.filter((item) => item.run).length;
-        meta.textContent = debug.updated_at ? `${hitCount} 个演出命中 · ${debug.source || "state_journal"}` : "等待心笺 tag";
+        meta.textContent = debug.updated_at ? `${hitCount} 个演出命中 · ${debug.source || "state_journal"}` : "等待数据库状态标签";
         head.appendChild(title);
         head.appendChild(meta);
         card.appendChild(head);
@@ -3536,7 +3535,7 @@
         list.className = "prompt-debug-relation-list";
         const visibleResults = results.filter((item) => item.trigger_type === "state_journal_tag" || item.trigger_type === "plot_ledger_tag" || item.reason !== "non_tag_trigger");
         if (!visibleResults.length) {
-          list.innerHTML = '<div class="prompt-debug-empty">暂无状态触发演出配置，或尚未收到心笺 active tag。</div>';
+          list.innerHTML = '<div class="prompt-debug-empty">暂无状态触发演出配置，或尚未收到数据库 active tag。</div>';
         } else {
           visibleResults.slice(0, 12).forEach((item) => {
             const row = document.createElement("article");
@@ -3551,7 +3550,7 @@
             badges.appendChild(makePromptDebugBadge(item.run ? "已命中" : "已跳过", item.run ? "hit" : "missing"));
             if (item.repeat) badges.appendChild(makePromptDebugBadge(`重复：${item.repeat}`, ""));
             if (item.trigger_type === "plot_ledger_tag") badges.appendChild(makePromptDebugBadge("剧情账本", "base"));
-            if (item.trigger_type === "state_journal_tag") badges.appendChild(makePromptDebugBadge("心笺阶段", "base"));
+            if (item.trigger_type === "state_journal_tag") badges.appendChild(makePromptDebugBadge("状态阶段", "base"));
             rowHead.appendChild(name);
             rowHead.appendChild(badges);
             row.appendChild(rowHead);
@@ -3594,7 +3593,7 @@
         const flow = document.createElement("div");
         flow.className = "prompt-debug-summary-flow";
         [
-          [`Active Tags ${relations.length}`, "来自预设 / 心笺 / 手动标签"],
+          [`Active Tags ${relations.length}`, "来自预设 / 数据库 / 手动标签"],
           [`Matched ${relations.filter((item) => item.matchedEntries.length).length}`, "命中 external_tag 监听词条"],
           [`Injected ${selectedCount}`, droppedCount ? `Dropped ${droppedCount}` : "本轮已进入 Prompt"],
         ].forEach(([title, meta]) => {
@@ -6179,7 +6178,7 @@
       function getWorkshopDynamicSkipLabel(reason) {
         const labels = {
           disabled: "演出已关闭",
-          non_tag_trigger: "非心笺 tag 触发",
+          non_tag_trigger: "非数据库 tag 触发",
           missing_tag: "没有填写监听 tag",
           no_match: "当前 active tag 未命中",
           already_triggered_once: "只触发一次：已触发过",
@@ -6244,7 +6243,7 @@
           const response = await fetch("/mods/state-journal/app/api/role-state/active-tags", { cache: "no-store" });
           if (!response.ok) {
             if (response.status !== 404) throw new Error(`HTTP ${response.status}`);
-            recordWorkshopDynamicDebug(source, {}, [{ scene: "心笺", run: false, reason: "active_tags_api_missing", label: "心笺 active tags 接口不可用" }]);
+            recordWorkshopDynamicDebug(source, {}, [{ scene: "数据库", run: false, reason: "active_tags_api_missing", label: "数据库 active tags 接口不可用" }]);
             return null;
           }
           const data = await response.json();
@@ -6255,7 +6254,7 @@
           return normalized;
         } catch (error) {
           console.warn("Workshop state journal tag refresh failed:", error);
-          recordWorkshopDynamicDebug(source, workshopStateJournalTagsCache, [{ scene: "心笺", run: false, reason: "active_tags_fetch_failed", label: error.message || "active tags 读取失败" }]);
+          recordWorkshopDynamicDebug(source, workshopStateJournalTagsCache, [{ scene: "数据库", run: false, reason: "active_tags_fetch_failed", label: error.message || "active tags 读取失败" }]);
           return null;
         }
       }

@@ -228,6 +228,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "turn_note_protagonist_name": "",
     "turn_note_protagonist_aliases": "",
     "turn_note_worker_custom_prompt_enabled": False,
+    "turn_note_worker_prompt_mode": "default",
+    "turn_note_worker_custom_prompt": "",
     "turn_note_worker_style_prompt": "",
     "turn_note_worker_protagonist_prompt": "",
     "turn_note_template_id": "standard_metrics",
@@ -806,8 +808,19 @@ def active_turn_note_theme_pack(config: dict[str, Any]) -> dict[str, Any]:
             return pack
     return packs[0]
 
+def legacy_worker_custom_prompt(config: dict[str, Any]) -> str:
+    parts: list[str] = []
+    style_prompt = str(config.get("turn_note_worker_style_prompt") or "").strip()
+    protagonist_prompt = str(config.get("turn_note_worker_protagonist_prompt") or "").strip()
+    if style_prompt:
+        parts.append("状态记录语言风格补充：\n" + style_prompt)
+    if protagonist_prompt:
+        parts.append("主角状态卡规则：\n" + protagonist_prompt)
+    return "\n\n".join(parts).strip()
+
 def normalize_config(config: Any) -> dict[str, Any]:
     source = config if isinstance(config, dict) else {}
+    source_has_worker_prompt_mode = "turn_note_worker_prompt_mode" in source
     merged = {**DEFAULT_CONFIG, **source}
     try:
         merged["input_turn_count"] = max(1, min(10, int(merged.get("input_turn_count", 3) or 3)))
@@ -823,8 +836,18 @@ def normalize_config(config: Any) -> dict[str, Any]:
         merged["temperature"] = 0
     for key in ["enabled", "auto_update", "notify_in_chat", "ui_sync_global", "strict_mode", "debug_enabled", "turn_note_enabled", "turn_note_title_card", "turn_note_card", "turn_note_default_collapsed", "turn_note_protagonist_card_enabled", "turn_note_worker_custom_prompt_enabled"]:
         merged[key] = bool(merged.get(key))
-    for key in ["api_type", "api_base_url", "api_key", "model", "turn_note_style", "turn_note_title_style", "turn_note_card_style", "turn_note_expand_level", "turn_note_density", "turn_note_chat_display_mode", "turn_note_character_filter", "turn_note_character_names", "turn_note_protagonist_card_mode", "turn_note_protagonist_name", "turn_note_protagonist_aliases", "turn_note_worker_style_prompt", "turn_note_worker_protagonist_prompt", "turn_note_template_id", "turn_note_theme_id"]:
+    for key in ["api_type", "api_base_url", "api_key", "model", "turn_note_style", "turn_note_title_style", "turn_note_card_style", "turn_note_expand_level", "turn_note_density", "turn_note_chat_display_mode", "turn_note_character_filter", "turn_note_character_names", "turn_note_protagonist_card_mode", "turn_note_protagonist_name", "turn_note_protagonist_aliases", "turn_note_worker_prompt_mode", "turn_note_worker_custom_prompt", "turn_note_worker_style_prompt", "turn_note_worker_protagonist_prompt", "turn_note_template_id", "turn_note_theme_id"]:
         merged[key] = str(merged.get(key) or "").strip()
+    if len(merged.get("turn_note_worker_custom_prompt", "")) > 30000:
+        merged["turn_note_worker_custom_prompt"] = merged["turn_note_worker_custom_prompt"][:30000].strip()
+    legacy_worker_prompt = legacy_worker_custom_prompt(merged)
+    if not merged.get("turn_note_worker_custom_prompt") and merged.get("turn_note_worker_custom_prompt_enabled") and legacy_worker_prompt:
+        merged["turn_note_worker_custom_prompt"] = legacy_worker_prompt
+    if not source_has_worker_prompt_mode and merged.get("turn_note_worker_custom_prompt"):
+        merged["turn_note_worker_prompt_mode"] = "additive"
+    if merged.get("turn_note_worker_prompt_mode") not in {"default", "additive", "override"}:
+        merged["turn_note_worker_prompt_mode"] = "additive" if merged.get("turn_note_worker_custom_prompt") or merged.get("turn_note_worker_custom_prompt_enabled") else "default"
+    merged["turn_note_worker_custom_prompt_enabled"] = merged.get("turn_note_worker_prompt_mode") != "default" and bool(merged.get("turn_note_worker_custom_prompt"))
     legacy_style = merged.get("turn_note_style") or "classic"
     if merged.get("turn_note_title_style") not in {"classic", "gufeng", "chapter"}:
         merged["turn_note_title_style"] = legacy_style if legacy_style in {"classic", "gufeng"} else "classic"
@@ -1847,6 +1870,53 @@ def save_config(config: dict[str, Any]) -> dict[str, Any]:
         )
         conn.commit()
     return payload
+
+def worker_prompt_preview_payload(config_override: dict[str, Any] | None = None) -> dict[str, Any]:
+    base_config = get_config()
+    if isinstance(config_override, dict):
+        preview_source = {**base_config, **config_override}
+        override_has_prompt = any(
+            key in config_override
+            for key in (
+                "turn_note_worker_custom_prompt",
+                "turn_note_worker_custom_prompt_enabled",
+                "turn_note_worker_style_prompt",
+                "turn_note_worker_protagonist_prompt",
+            )
+        )
+        if override_has_prompt and "turn_note_worker_prompt_mode" not in config_override:
+            preview_source.pop("turn_note_worker_prompt_mode", None)
+        preview_config = normalize_config(preview_source)
+    else:
+        preview_config = base_config
+    config = merge_config_with_main_llm(preview_config)
+    with connect_db() as conn:
+        init_meta_tables(conn)
+        tables = build_table_snapshot(conn)
+        metric_states = get_metric_snapshot(conn)
+    default_system_prompt, user_prompt = build_worker_prompt(
+        tables=tables,
+        latest_turn={},
+        history=[],
+        config=config,
+        metric_states=metric_states,
+        apply_custom_prompt=False,
+    )
+    assembled_prompt = assemble_worker_system_prompt(default_system_prompt, config)
+    custom_prompt = worker_custom_prompt_for_config(config)
+    return {
+        "ok": True,
+        "mode": worker_prompt_mode(config),
+        "custom_prompt": custom_prompt,
+        "default_prompt": default_system_prompt,
+        "editable_default_prompt": default_system_prompt,
+        "locked_contract_text": worker_locked_contract_text(config),
+        "assembled_prompt": assembled_prompt,
+        "user_prompt_preview": user_prompt,
+        "table_count": len(tables),
+        "metric_character_count": len(metric_states) if isinstance(metric_states, dict) else 0,
+        "config": {key: value for key, value in config.items() if key != "api_key"},
+    }
 
 
 def get_config_value(key: str, default: Any = None) -> Any:
@@ -5651,21 +5721,68 @@ def build_protagonist_prompt_rule(config: dict[str, Any]) -> str:
         mode_line = "生成方式：明显涉及时生成。只有本轮正文、用户输入、最近上下文或旧状态明确涉及主角的身体状态、伤势、调息、位置、气息、被照料或与他人的互动时，才生成主角状态卡。"
     return "\n20. 当前设置启用主角状态卡。" + name_line + alias_line + mode_line + "主角状态卡只记录可观察状态、身体状态、衣着、姿态、位置、气息与互动关系；不得替用户决定未发生的行动、台词、心理活动和选择。"
 
-def build_worker_custom_prompt_rule(config: dict[str, Any]) -> str:
-    if not config.get("turn_note_worker_custom_prompt_enabled"):
-        return ""
-    parts: list[str] = []
-    style_prompt = str(config.get("turn_note_worker_style_prompt") or "").strip()
-    protagonist_prompt = str(config.get("turn_note_worker_protagonist_prompt") or "").strip()
-    if style_prompt:
-        parts.append("用户自定义幕笺语言风格补充：" + style_prompt)
-    if protagonist_prompt:
-        parts.append("用户自定义主角状态卡规则：" + protagonist_prompt)
-    if not parts:
-        return ""
-    return "\n21. 以下是用户提供的安全附加提示词，只影响幕笺表达和主角状态卡取舍，不得覆盖 JSON 输出协议、updates 协议、SQLite 写入规则、字段 key 或禁止替用户行动的硬性规则：" + "\n".join(parts)
+def worker_prompt_mode(config: dict[str, Any]) -> str:
+    mode = str(config.get("turn_note_worker_prompt_mode") or "").strip()
+    if mode in {"default", "additive", "override"}:
+        return mode
+    if config.get("turn_note_worker_custom_prompt_enabled"):
+        return "additive"
+    return "default"
 
-def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, Any] | None, history: list[dict[str, str]], config: dict[str, Any], metric_states: dict[str, Any] | None = None) -> tuple[str, str]:
+def worker_custom_prompt_for_config(config: dict[str, Any]) -> str:
+    custom = str(config.get("turn_note_worker_custom_prompt") or "").strip()
+    if custom:
+        return custom[:30000].strip()
+    if config.get("turn_note_worker_custom_prompt_enabled"):
+        return legacy_worker_custom_prompt(config)
+    return ""
+
+def build_worker_custom_prompt_rule(config: dict[str, Any]) -> str:
+    if worker_prompt_mode(config) != "additive":
+        return ""
+    custom_prompt = worker_custom_prompt_for_config(config)
+    if not custom_prompt:
+        return ""
+    return (
+        "\n\n【用户自定义生成补充规则】\n"
+        "以下内容由用户在数据库后台配置，只能影响状态记录的表达、取材、详略、主角状态卡与展示偏好；"
+        "不得覆盖 JSON 输出协议、updates 协议、SQLite 写入规则、字段 key、剧情事实边界或禁止替用户行动的硬性规则。\n"
+        + custom_prompt
+    )
+
+def worker_locked_contract_text(config: dict[str, Any] | None = None) -> str:
+    strict_line = "\n- 严格模式开启时，updates 的字段类型、枚举范围、主键必须完全符合表结构。" if (config or {}).get("strict_mode") else ""
+    return (
+        "【锁定输出契约】\n"
+        "无论上方 Prompt 主体如何编辑，worker 都必须遵守以下契约：\n"
+        "- 只输出一个合法 JSON 对象，不输出 Markdown、解释、寒暄或代码块。\n"
+        "- JSON 根结构必须至少包含 {\"updates\": [], \"display\": {}}。\n"
+        "- updates 只允许写入现有表结构和现有字段，不得新增未知字段或输出 SQL。\n"
+        "- operation 只能使用 upsert、update、delete。\n"
+        "- 事实表要保守；展示文本可以写意，但不得把展示扩写强行写入长期事实。\n"
+        "- 不得新增重大剧情事实，不得替用户行动、选择、说话或决定内心。\n"
+        "- 后端会把 JSON 安全写入 SQLite；不要要求模型自行写库、改表或改变字段 key。"
+        f"{strict_line}"
+    )
+
+def strip_worker_locked_contract(text: str, config: dict[str, Any] | None = None) -> str:
+    value = str(text or "").strip()
+    contract = worker_locked_contract_text(config).strip()
+    if value and contract and value.endswith(contract):
+        value = value[: -len(contract)].strip()
+    return value
+
+def assemble_worker_system_prompt(default_system_prompt: str, config: dict[str, Any]) -> str:
+    mode = worker_prompt_mode(config)
+    custom_prompt = worker_custom_prompt_for_config(config)
+    if mode == "override" and custom_prompt:
+        body = strip_worker_locked_contract(custom_prompt, config)
+        return f"{body}\n\n{worker_locked_contract_text(config)}".strip()
+    if mode == "additive" and custom_prompt:
+        return f"{default_system_prompt}{build_worker_custom_prompt_rule(config)}".strip()
+    return default_system_prompt.strip()
+
+def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, Any] | None, history: list[dict[str, str]], config: dict[str, Any], metric_states: dict[str, Any] | None = None, apply_custom_prompt: bool = True) -> tuple[str, str]:
     plot_ledger_context = build_plot_ledger_worker_context(tables)
     worker_tables = limit_plot_ledger_rows_for_worker(tables)
     turn_note_enabled = bool(config.get("turn_note_enabled", True))
@@ -5775,7 +5892,6 @@ def build_worker_prompt(*, tables: list[dict[str, Any]], latest_turn: dict[str, 
                 system_prompt += "\n24. snapshotFields 只用于幕笺展示，不参与阶段判断，不发给世界书；阶段与 external_tag 只由变量阶段系统处理。"
             system_prompt += "\n25. display.relationships 尽量输出角色与用户/主要互动对象的关系变化；如果无明显变化也可以简短写保持稳定。"
         system_prompt += build_protagonist_prompt_rule(config)
-        system_prompt += build_worker_custom_prompt_rule(config)
     if story_time_state.get("enabled") and story_time_state.get("current_time"):
         advance_mode = story_time_state.get("advance_mode") or "smart"
         mode_rule = {
@@ -5824,6 +5940,9 @@ story_time_delta 格式：
 - 示例：正文明确出现“找到银钥匙，可用于打开旧门”，若上下文目标是寻找银钥匙，则新增或更新 entry_type=task，entry_id=find_silver_key，status=done，evidence 写明“已找到银钥匙且可打开旧门”；不要写成 silver_key_found，也不要仍标 active。
 - 当最新 assistant 正文明示“关键物品已经获得”“任务目标已经完成/失败”“线索已经确认会影响下一步”时，plot_ledger updates 不应为空；这类内容属于运行状态，不属于纯幕笺展示。
 """
+
+    if apply_custom_prompt:
+        system_prompt = assemble_worker_system_prompt(system_prompt, config)
 
     display_schema = {
         "title_style": title_style,
@@ -6133,6 +6252,16 @@ async def api_save_config(request: Request) -> dict[str, Any]:
     payload = await request.json()
     config = save_config(payload.get("config", payload) if isinstance(payload, dict) else {})
     return {"ok": True, "config": config, "card": current_card_summary()}
+
+@app.get("/api/worker/prompt-preview")
+async def api_worker_prompt_preview() -> dict[str, Any]:
+    return worker_prompt_preview_payload()
+
+@app.post("/api/worker/prompt-preview")
+async def api_worker_prompt_preview_with_config(request: Request) -> dict[str, Any]:
+    payload = await request.json()
+    config_override = payload.get("config", payload) if isinstance(payload, dict) else {}
+    return worker_prompt_preview_payload(config_override if isinstance(config_override, dict) else {})
 
 
 @app.get("/api/main-config")

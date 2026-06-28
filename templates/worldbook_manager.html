@@ -155,19 +155,19 @@
               </div>
               <div class="wb-external-tag-panel" hidden>
                 <div class="grid-two wb-wide-grid">
-                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if (item.external_source or 'state_journal') == 'state_journal' %}selected{% endif %}>心笺 · 角色阶段</option><option value="preset" {% if item.external_source == 'preset' %}selected{% endif %}>预设标签</option><option value="manual" {% if item.external_source == 'manual' %}selected{% endif %}>手动标签</option></select></div>
+                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if (item.external_source or 'state_journal') == 'state_journal' %}selected{% endif %}>数据库 · 状态阶段</option><option value="preset" {% if item.external_source == 'preset' %}selected{% endif %}>预设标签</option><option value="manual" {% if item.external_source == 'manual' %}selected{% endif %}>手动标签</option></select></div>
                   <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
                 </div>
                 <div class="wb-external-tags-row">
                   <label class="wb-external-tags-label">自定义触发标签（可选）</label>
-                  <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用心笺角色 / 阶段生成标签">{{ (item.activation_tags or []) | join('&#10;') }}</textarea>
-                  <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成心笺阶段标签。</p>
+                  <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用数据库角色 / 阶段生成标签">{{ (item.activation_tags or []) | join('&#10;') }}</textarea>
+                  <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成状态阶段标签。</p>
                 </div>
                 <div class="wb-stage-select-row">
-                  <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
+                  <div><label>角色</label><select class="wb-external-role-select"><option value="">读取数据库阶段中…</option></select></div>
                   <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
                 </div>
-                <p class="muted helper-text wb-external-stage-hint">选择心笺角色与阶段；上方标签留空时会自动生成机器标签。</p>
+                <p class="muted helper-text wb-external-stage-hint">选择数据库角色与阶段；上方标签留空时会自动生成机器标签。</p>
                 <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
                   <div class="grid-two wb-wide-grid">
                     <div><label>角色名</label><input class="wb-external-role-name" value="{{ (item.external_ref or {}).get('role_name', '') }}" placeholder="例如：苏怜烟" /></div>
@@ -241,7 +241,7 @@
                   <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="{{ item.cooldown_turns if item.cooldown_turns is not none else 0 }}" />
                 </div>
               </div>
-              <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当心笺阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
+              <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当数据库阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
 
               <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
                 <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
@@ -497,19 +497,19 @@
           </div>
           <div class="wb-external-tag-panel" hidden>
             <div class="grid-two wb-wide-grid">
-              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">心笺 · 角色阶段</option><option value="preset">预设标签</option><option value="manual">手动标签</option></select></div>
+              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">数据库 · 状态阶段</option><option value="preset">预设标签</option><option value="manual">手动标签</option></select></div>
               <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
             </div>
             <div class="wb-external-tags-row">
               <label class="wb-external-tags-label">自定义触发标签（可选）</label>
-              <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用心笺角色 / 阶段生成标签"></textarea>
-              <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成心笺阶段标签。</p>
+              <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用数据库角色 / 阶段生成标签"></textarea>
+              <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成状态阶段标签。</p>
             </div>
             <div class="wb-stage-select-row">
-              <div><label>角色</label><select class="wb-external-role-select"><option value="">读取心笺阶段中…</option></select></div>
+              <div><label>角色</label><select class="wb-external-role-select"><option value="">读取数据库阶段中…</option></select></div>
               <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
             </div>
-            <p class="muted helper-text wb-external-stage-hint">选择心笺角色与阶段；上方标签留空时会自动生成机器标签。</p>
+            <p class="muted helper-text wb-external-stage-hint">选择数据库角色与阶段；上方标签留空时会自动生成机器标签。</p>
             <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
               <div class="grid-two wb-wide-grid">
                 <div><label>角色名</label><input class="wb-external-role-name" placeholder="例如：苏怜烟" /></div>
@@ -583,7 +583,7 @@
               <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="0" />
             </div>
           </div>
-          <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当心笺阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
+          <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当数据库阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
 
           <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
             <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
@@ -855,8 +855,8 @@
         const currentStageKey = card.querySelector(".wb-external-stage-key")?.value.trim() || "";
         const roles = stateJournalStageCatalog.roles || [];
         roleSelect.innerHTML = roles.length
-          ? optionHtml("", "请选择心笺角色", !currentRoleId) + roles.map((role) => optionHtml(role.role_id || "", role.role_name || role.role_id || "未命名角色", String(role.role_id || "") === currentRoleId)).join("")
-          : optionHtml("", "未读取到心笺阶段", true);
+          ? optionHtml("", "请选择数据库角色", !currentRoleId) + roles.map((role) => optionHtml(role.role_id || "", role.role_name || role.role_id || "未命名角色", String(role.role_id || "") === currentRoleId)).join("")
+          : optionHtml("", "未读取到数据库阶段", true);
         const selectedRole = findStageCatalogRole(currentRoleId) || null;
         const stages = selectedRole?.stages || [];
         stageSelect.innerHTML = stages.length
@@ -873,11 +873,11 @@
           updateExternalTagPreview(card);
           updateCardTitle(card);
           applyWorldbookSearch();
-          markWorldbookDirty("已选择心笺角色阶段，记得保存世界书。");
+          markWorldbookDirty("已选择数据库角色阶段，记得保存世界书。");
         };
         stageSelect.onchange = () => {
           applyExternalStageSelection(card, roleSelect.value, stageSelect.value);
-          markWorldbookDirty("已选择心笺阶段，记得保存世界书。");
+          markWorldbookDirty("已选择数据库阶段，记得保存世界书。");
         };
         updateExternalTagPreview(card);
       }
@@ -1541,12 +1541,12 @@
         if (tagsInput) {
           if (source === "preset") tagsInput.placeholder = "一行一个，例如 preset.style.daily-prose";
           else if (source === "manual") tagsInput.placeholder = "一行一个，例如 runtime.custom.scene-tag";
-          else tagsInput.placeholder = "留空时自动使用心笺角色 / 阶段生成标签";
+          else tagsInput.placeholder = "留空时自动使用数据库角色 / 阶段生成标签";
         }
         if (tagsHelper) {
-          if (source === "preset") tagsHelper.textContent = "只使用这里填写的预设标签；留空会保存为空，不自动生成心笺标签。";
-          else if (source === "manual") tagsHelper.textContent = "只使用这里填写的外部标签；留空会保存为空，不自动生成心笺标签。";
-          else tagsHelper.textContent = "留空时自动使用下方角色 / 阶段生成心笺阶段标签。";
+          if (source === "preset") tagsHelper.textContent = "只使用这里填写的预设标签；留空会保存为空，不自动生成数据库标签。";
+          else if (source === "manual") tagsHelper.textContent = "只使用这里填写的外部标签；留空会保存为空，不自动生成数据库标签。";
+          else tagsHelper.textContent = "留空时自动使用下方角色 / 阶段生成状态阶段标签。";
         }
       }
 
@@ -1586,15 +1586,15 @@
           if (source === "preset") {
             preview.textContent = manualTags.length
               ? `监听预设标签：${manualTags.join(" / ")}`
-              : "未填写预设标签；保存后 activation_tags 为空，不会自动生成心笺标签。";
+              : "未填写预设标签；保存后 activation_tags 为空，不会自动生成数据库标签。";
           } else if (source === "manual") {
             preview.textContent = manualTags.length
               ? `监听外部标签：${manualTags.join(" / ")}`
-              : "未填写外部标签；保存后 activation_tags 为空，不会自动生成心笺标签。";
+              : "未填写外部标签；保存后 activation_tags 为空，不会自动生成数据库标签。";
           } else if (manualTags.length) {
             preview.textContent = `使用自定义标签触发：${manualTags.join(" / ")}`;
           } else {
-            preview.textContent = stageTag ? `当「${roleName}」处于「${stageName}」阶段时触发。机器标签：${stageTag}` : "请选择心笺角色与阶段；标签留空时会自动生成心笺阶段标签。";
+            preview.textContent = stageTag ? `当「${roleName}」处于「${stageName}」阶段时触发。机器标签：${stageTag}` : "请选择数据库角色与阶段；标签留空时会自动生成状态阶段标签。";
           }
         }
         if (status) {

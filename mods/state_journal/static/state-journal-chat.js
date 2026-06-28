@@ -872,7 +872,7 @@
       .state-journal-storyboard-note-table.is-cut-sheet .state-journal-storyboard-row strong { color:#f6ecd7; font-weight:520; line-height:1.72; }
 
 
-      /* v1.19.2：状态面板类外观包在 Chat 实际幕笺的“本轮数值变化”中也使用进度条。 */
+      /* v1.19.2：状态面板类外观包在 Chat 实际状态记录的“本轮数值变化”中也使用进度条。 */
       .state-journal-metric-diary-row.is-meter-row {
         border-color: rgba(72,188,255,.18);
         background: rgba(5,16,30,.42);
@@ -1167,7 +1167,7 @@
         <strong class="state-journal-chat-bubble-title"></strong>
         <span class="state-journal-chat-bubble-desc"></span>
       </span>
-      <button type="button" class="state-journal-chat-bubble-close" aria-label="关闭心笺提示">×</button>
+      <button type="button" class="state-journal-chat-bubble-close" aria-label="关闭数据库提示">×</button>
     `;
     bubble.querySelector(".state-journal-chat-bubble-close")?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1261,13 +1261,13 @@
     const timeoutMs = Math.max(slowMs + 60000, Math.min((timeoutSeconds + 75) * 1000, 240000));
     const slowTimer = window.setTimeout(() => {
       if (!inFlightTurns.has(key)) return;
-      attachInlineTurnStatus(targetMessage, key, "心笺生成较慢，仍在等待辅助模型返回……", "pending");
-      showBubble("pending", "心笺生成较慢", "辅助模型仍在处理，本轮完成后会自动挂载幕笺。", 5200);
+      attachInlineTurnStatus(targetMessage, key, "数据库记录较慢，仍在等待辅助模型返回……", "pending");
+      showBubble("pending", "数据库记录较慢", "辅助模型仍在处理，本轮完成后会自动挂载状态记录。", 5200);
     }, slowMs);
     const timeoutTimer = window.setTimeout(() => {
       if (!inFlightTurns.has(key)) return;
-      attachInlineTurnStatus(targetMessage, key, "心笺生成等待时间过长，可点击重试。", "error", { retryDetail });
-      showBubble("error", "心笺生成较慢", "本轮仍未返回结果，可点击消息下方重试。", 9000);
+      attachInlineTurnStatus(targetMessage, key, "数据库记录等待时间过长，可点击重试。", "error", { retryDetail });
+      showBubble("error", "数据库记录较慢", "本轮仍未返回结果，可点击消息下方重试。", 9000);
     }, timeoutMs);
     workerStatusTimers.set(key, [slowTimer, timeoutTimer]);
   }
@@ -1452,8 +1452,8 @@
       if (Date.now() - startedAt > 30000) {
         clearDomFallback(turn.turnId);
         const target = findAssistantMessageForDetail({ turnId: turn.turnId }) || findLatestAssistantMessage();
-        if (target) attachInlineTurnStatus(target, turn.turnId, "心笺未检测到新回复完成，可刷新或稍后重试。", "error");
-        showBubble("error", "心笺等待超时", "未检测到可绑定的新回复，已停止等待。", 8000);
+      if (target) attachInlineTurnStatus(target, turn.turnId, "数据库未检测到新回复完成，可刷新或稍后重试。", "error");
+      showBubble("error", "数据库等待超时", "未检测到可绑定的新回复，已停止等待。", 8000);
       }
     }, 1000);
     fallbackTimers.set(turn.turnId, timer);
@@ -1851,7 +1851,7 @@
 
   function buildPaperTimeSceneCard(display, turnId = "") {
     const scene = display?.scene || {};
-    const title = display?.title || scene.title || "本轮幕笺";
+    const title = display?.title || scene.title || "本轮状态记录";
     const subtitle = display?.subtitle || scene.subtitle || scene.atmosphere || "";
     const seq = display?.sequence_label || scene.sequence_label || "";
     const card = document.createElement("details");
@@ -1877,13 +1877,13 @@
     card.querySelector(".state-journal-scene-paper-rows").innerHTML = sceneRows(display)
       .map(([key, label, value]) => `<div class="state-journal-paper-time-row"><i>${escapeHtml(tokenForLabel(label, key))}</i><b>${escapeHtml(label)}</b><span>${escapeHtml(value)}</span></div>`)
       .join("");
-    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "心笺已生成本轮幕题。";
+    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "数据库已生成本轮标题。";
     return card;
   }
 
   function buildStatusPanelSceneCard(display, turnId = "") {
     const scene = display?.scene || {};
-    const title = display?.title || scene.title || "本轮幕笺";
+    const title = display?.title || scene.title || "本轮状态记录";
     const subtitle = display?.subtitle || scene.event_summary || scene.atmosphere || "";
     const seq = display?.sequence_label || scene.sequence_label || "";
     const card = document.createElement("details");
@@ -1914,14 +1914,14 @@
 
   function buildStoryboardSceneCard(display, turnId = "") {
     const scene = display?.scene || {};
-    const title = display?.title || scene.title || "本轮幕笺";
+    const title = display?.title || scene.title || "本轮状态记录";
     const subtitle = display?.subtitle || scene.atmosphere || "";
     const seq = display?.sequence_label || scene.sequence_label || "";
     const media = activeThemeMedia();
     const imageUrl = resolveThemeAssetUrl(media?.scene_image_data || media?.scene_image_url || media?.scene_image || media?.hero_image || media?.image);
     const placeholder = media?.scene_image === "chat_background" ? "背景裁切 / 胶片占位" : "SCENE FRAME";
     const frameHtml = imageUrl
-      ? `<div class="state-journal-storyboard-frame has-image"><img src="${escapeHtml(imageUrl)}" alt="心笺分镜图" loading="lazy" data-xj-frame-image="1"></div>`
+      ? `<div class="state-journal-storyboard-frame has-image"><img src="${escapeHtml(imageUrl)}" alt="状态记录分镜图" loading="lazy" data-xj-frame-image="1"></div>`
       : `<div class="state-journal-storyboard-frame"><span>${escapeHtml(placeholder)}</span><small>NO IMAGE / SAFE PLACEHOLDER</small></div>`;
     const card = document.createElement("details");
     card.className = "state-journal-inline-scene-card is-layout-storyboard";
@@ -1961,13 +1961,13 @@
       ["气氛", scene.atmosphere || scene.weather || "氛围未明"],
     ];
     card.querySelector(".state-journal-storyboard-meta").innerHTML = meta.map(([label, value]) => `<p><b>${escapeHtml(label)}：</b>${escapeHtml(value)}</p>`).join("");
-    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "心笺已生成本轮幕题。";
+    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "数据库已生成本轮标题。";
     return card;
   }
 
   function buildTimeSceneCard(display, turnId = "") {
     const scene = display?.scene || {};
-    const title = display?.title || scene.title || "本轮幕笺";
+    const title = display?.title || scene.title || "本轮状态记录";
     const subtitle = display?.subtitle || scene.subtitle || scene.atmosphere || "";
     const seq = display?.sequence_label || scene.sequence_label || "";
     const card = document.createElement("details");
@@ -2001,7 +2001,7 @@
       ["time_delta", "本轮推进", scene.time_delta || ""],
     ].filter((row) => row[2]);
     card.querySelector(".state-journal-scene-meta").innerHTML = rows.map(([key, label, value]) => `<span class="state-journal-scene-chip"><i>${escapeHtml(tokenForLabel(label, key))}</i><b>${escapeHtml(label)}：</b><span>${escapeHtml(value)}</span></span>`).join("");
-    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "心笺已生成本轮幕题。";
+    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "数据库已生成本轮标题。";
     return card;
   }
 
@@ -2014,7 +2014,7 @@
     if (["storyboard", "storyboard_frame", "scene_board"].includes(sceneLayout)) return buildStoryboardSceneCard(display, turnId);
     if (["time_card", "time_panel"].includes(sceneLayout)) return buildTimeSceneCard(display, turnId);
     const scene = display?.scene || {};
-    const title = display?.title || scene.title || "本轮幕笺";
+    const title = display?.title || scene.title || "本轮状态记录";
     const subtitle = display?.subtitle || scene.subtitle || scene.atmosphere || "";
     const seq = display?.sequence_label || scene.sequence_label || "";
     const card = document.createElement("details");
@@ -2023,7 +2023,7 @@
     card.dataset.stateJournalScene = turnId;
     card.innerHTML = `
       <summary>
-        <span class="state-journal-scene-kicker">XINJIAN · 幕题${seq ? ` · ${escapeHtml(seq)}` : ""}</span>
+        <span class="state-journal-scene-kicker">DATABASE · 状态记录${seq ? ` · ${escapeHtml(seq)}` : ""}</span>
         <span class="state-journal-scene-title-line"><strong class="state-journal-scene-title">${seq ? `${escapeHtml(seq)} · ` : ""}《${escapeHtml(title)}》</strong><span class="state-journal-scene-toggle">展开</span></span>
         <span class="state-journal-scene-subtitle">${escapeHtml(subtitle)}</span>
       </summary>
@@ -2047,7 +2047,7 @@
       scene.time_delta ? `本轮推进：${scene.time_delta}` : "",
     ].filter(Boolean);
     card.querySelector(".state-journal-scene-meta").innerHTML = metaItems.map((item) => `<span class="state-journal-scene-chip">${escapeHtml(item)}</span>`).join("");
-    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "心笺已生成本轮幕题。";
+    card.querySelector(".state-journal-scene-event").textContent = scene.event_summary || subtitle || "数据库已生成本轮标题。";
     return card;
   }
 
@@ -2074,7 +2074,7 @@
     status.className = `state-journal-turn-status is-${kind}`;
     status.dataset.stateJournalTurn = turnId;
     const label = document.createElement("span");
-    label.textContent = text || (kind === "error" ? "心笺生成失败，可稍后重试。" : "心笺正在生成幕笺……");
+    label.textContent = text || (kind === "error" ? "数据库记录失败，可稍后重试。" : "数据库正在生成状态记录……");
     status.appendChild(label);
     const retryDetail = options.retryDetail || retryTurnDetails.get(turnId);
     if (kind === "error" && retryDetail) {
@@ -2404,9 +2404,9 @@
     const scene = display?.scene || {};
     const line = characters.length
       ? characters.slice(0, 3).map(compactCharacterLine).join("｜")
-      : (scene.event_summary || display?.subtitle || "本轮幕笺已生成");
+      : (scene.event_summary || display?.subtitle || "本轮状态记录已生成");
     const location = scene.location ? `｜场景：${compactText(scene.location, 18)}` : "";
-    note.innerHTML = `<strong>心笺</strong><span>${escapeHtml(line)}${escapeHtml(location)}</span>`;
+    note.innerHTML = `<strong>数据库</strong><span>${escapeHtml(line)}${escapeHtml(location)}</span>`;
     return note;
   }
 
@@ -2424,7 +2424,7 @@
     const allCharacters = Array.isArray(display.characters) ? display.characters : [];
     const characters = filterCharacters(allCharacters);
     const relationships = Array.isArray(display.relationships) ? display.relationships : [];
-    const changed = payload?.summary?.by_table?.map((item) => `${item.name || item.table} +${item.count || 0}`).join("｜") || "本轮幕笺已生成";
+    const changed = payload?.summary?.by_table?.map((item) => `${item.name || item.table} +${item.count || 0}`).join("｜") || "本轮状态记录已生成";
     const densityLabel = { compact: "简洁", standard: "标准", detailed: "详细" }[configCache?.turn_note_density || "standard"] || "标准";
     const filterLabel = { turn: "本轮生成", heroine: "双女主", protagonist: "主角相关", custom: "自定义", all: "全部" }[configCache?.turn_note_character_filter || "turn"] || "本轮生成";
     const noteStyleLabel = { classic: "经典状态", gufeng: "古风旁白", sensory: "感官标签" }[noteStyle] || "经典状态";
@@ -2434,7 +2434,7 @@
       : "";
     note.innerHTML = `
       <summary>
-        <span class="state-journal-turn-summary-main"><span class="state-journal-note-dot"></span><span>心笺有新记 · ${escapeHtml(changed)}</span></span>
+        <span class="state-journal-turn-summary-main"><span class="state-journal-note-dot"></span><span>数据库有新记 · ${escapeHtml(changed)}</span></span>
         <span>${characters.length ? `${characters.length} 人物` : "展开"}</span>
       </summary>
       <div class="state-journal-note-body">
@@ -2461,7 +2461,7 @@
               return html || `<pre class="state-journal-note-template-output">${escapeHtml(renderedTemplate)}</pre>`;
             })()}
           </section>`;
-        }).join("") : `<div class="state-journal-note-empty">当前显示范围下没有可展示角色。可以在心笺设置里切换为“全部角色”或“自定义名单”。</div>`}
+        }).join("") : `<div class="state-journal-note-empty">当前显示范围下没有可展示角色。可以在数据库设置里切换为“全部角色”或“自定义名单”。</div>`}
         ${renderTurnMetricSummary(characters, display)}
         ${relationships.length ? `<section class="state-journal-note-section state-journal-note-section-${safeLayoutClass(layoutType)}"><h4>${escapeHtml(["storyboard", "storyboard_frame", "scene_board"].includes(layoutType) ? "导演注 / 关系推进" : ["status_panel", "status_panel_pro", "hud"].includes(layoutType) ? "RELATION LOG" : ["paper_time", "paper_time_card"].includes(layoutType) ? "情节旁注" : "关系变化")}</h4><div class="state-journal-relation-list">${relationships.map((item) => `<div><strong>${escapeHtml(item.pair || "关系")}</strong>${item.stage ? ` · ${escapeHtml(item.stage)}` : ""}<br>${escapeHtml(item.change || "")}</div>`).join("")}</div></section>` : ""}
       </div>
@@ -2546,7 +2546,7 @@
     const config = await loadConfig().catch(() => configCache || {});
     if (!config?.enabled) return null;
     if (!config?.auto_update && !isLifecycleRebuild) {
-      pingHook("turn_auto_update_skipped", "聊天后自动填表已关闭，本轮普通聊天不自动生成心笺。", detail.turnId || detail.turn_id || "");
+      pingHook("turn_auto_update_skipped", "聊天后自动填表已关闭，本轮普通聊天不自动生成数据库记录。", detail.turnId || detail.turn_id || "");
       return null;
     }
     if (pendingTurn?.turnId) clearDomFallback(pendingTurn.turnId);
@@ -2566,9 +2566,9 @@
       source,
     };
     if (source === "reroll" || source === "edit") {
-      showBubble("pending", "心笺已标记本轮重算", "正在等待新回复完成……");
+      showBubble("pending", "数据库已标记本轮重算", "正在等待新回复完成……");
     } else {
-      showBubble("pending", "心笺已接管本轮", "正在记录用户输入，等待正文完成……");
+      showBubble("pending", "数据库已接管本轮", "正在记录用户输入，等待正文完成……");
     }
     try {
       await requestJson(new URL("turn/start", apiBase).toString(), {
@@ -2591,9 +2591,9 @@
     processedTurns.clear();
     invalidateMessageDisplaysForDetail(detail);
     if (reason === "reroll" || reason === "edit_user" || reason === "edit") {
-      showBubble("pending", "心笺已标记本轮重算", "旧幕笺已失效，正在等待新回复完成……");
+      showBubble("pending", "数据库已标记本轮重算", "旧状态记录已失效，正在等待新回复完成……");
     } else {
-      showBubble("pending", "心笺已标记记录过期", "旧幕笺已失效，等待后续重建或重新生成……");
+      showBubble("pending", "数据库已标记记录过期", "旧状态记录已失效，等待后续重建或重新生成……");
     }
     try {
       await requestJson(new URL("turn/invalidate", apiBase).toString(), {
@@ -2605,13 +2605,13 @@
         }),
       });
       processedTurns.clear();
-      pingHook("turn_invalidated", turnId ? `已标记心笺轮次过期：${turnId}` : "已标记心笺记录过期。", turnId);
+      pingHook("turn_invalidated", turnId ? `已标记数据库轮次过期：${turnId}` : "已标记数据库记录过期。", turnId);
     } catch (error) {
       console.warn("State Journal turn invalidate failed:", error);
     }
   }
 
-  async function pingHook(event = "loaded", message = "聊天页心笺脚本已加载。", turnId = "", extra = {}) {
+  async function pingHook(event = "loaded", message = "聊天页数据库脚本已加载。", turnId = "", extra = {}) {
     try {
       await requestJson(new URL("hook/ping", apiBase).toString(), {
         method: "POST",
@@ -2732,7 +2732,7 @@
         restored += 1;
       });
       const suffix = fallbackRestored ? `（含兜底 ${fallbackRestored} 条）` : "";
-      pingHook("restore_display", `已恢复 ${restored} 条幕笺${suffix}。`);
+      pingHook("restore_display", `已恢复 ${restored} 条状态记录${suffix}。`);
     } catch (error) {
       console.warn("State Journal recent display restore failed:", error);
     }
@@ -2775,13 +2775,13 @@
     }
 
     if (!assistantText) {
-      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, "心笺未检测到可绑定的 assistant 正文，本轮未生成幕笺。", "error");
-      showBubble("error", "心笺未生成", "没有拿到本轮 assistant 正文。", 7000);
+      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, "数据库未检测到可绑定的 assistant 正文，本轮未生成状态记录。", "error");
+      showBubble("error", "数据库未生成", "没有拿到本轮 assistant 正文。", 7000);
       return;
     }
     if (!messageId) {
-      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, "心笺未获取到消息编号，本轮未生成幕笺。", "error");
-      showBubble("error", "心笺未生成", "没有拿到本轮消息编号。", 7000);
+      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, "数据库未获取到消息编号，本轮未生成状态记录。", "error");
+      showBubble("error", "数据库未生成", "没有拿到本轮消息编号。", 7000);
       return;
     }
 
@@ -2800,10 +2800,10 @@
     const isRebuild = ["reroll", "edit", "dom_fallback"].includes(String(normalized.source || triggerSource || ""));
     showBubble(
       "pending",
-      isRebuild ? "心笺正在重新填表……" : (config.turn_note_enabled ? "心笺正在生成幕笺……" : "心笺正在填表……"),
+      isRebuild ? "数据库正在重新填表……" : (config.turn_note_enabled ? "数据库正在生成状态记录……" : "数据库正在填表……"),
       triggerSource === "dom_fallback" ? "Hook 未触发，已启用 DOM 兜底扫描。" : (config.turn_note_enabled ? "已通过 Chat hook 接收本轮正文。" : "已通过 Chat hook 接收本轮正文。")
     );
-    pingHook(triggerSource === "dom_fallback" ? "dom_fallback_start" : "chat_hook_start", triggerSource === "dom_fallback" ? "DOM 兜底触发心笺生成。" : "Chat hook 触发心笺生成。", turnId);
+    pingHook(triggerSource === "dom_fallback" ? "dom_fallback_start" : "chat_hook_start", triggerSource === "dom_fallback" ? "DOM 兜底触发数据库记录。" : "Chat hook 触发数据库记录。", turnId);
 
     try {
       const history = Array.isArray(normalized.recentHistory) && normalized.recentHistory.length
@@ -2833,7 +2833,7 @@
       };
       retryTurnDetails.set(turnId, retryDetail);
       if (targetMessage) {
-        attachInlineTurnStatus(targetMessage, turnId, config.turn_note_enabled ? "心笺正在生成本轮幕笺……" : "心笺正在整理本轮状态……");
+        attachInlineTurnStatus(targetMessage, turnId, config.turn_note_enabled ? "数据库正在生成本轮状态记录……" : "数据库正在整理本轮状态……");
         scheduleWorkerStatusTimers(targetMessage, turnId, retryDetail, Number(config.request_timeout || 120));
       }
 
@@ -2887,16 +2887,16 @@
       }
 
       if (payload.skipped) {
-        showBubble("empty", "心笺未运行", payload.message || payload.reason || "已跳过本轮更新", 2800);
+        showBubble("empty", "数据库未运行", payload.message || payload.reason || "已跳过本轮更新", 2800);
       } else if (failedPayload) {
-        if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, payload.message || errors[0] || "心笺生成失败，本轮未写入新数据。", "error", { retryDetail });
-        showBubble("error", "心笺生成失败", `${payload.message || errors[0] || "辅助模型返回异常"}，点击查看日志`, 9000);
+        if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, payload.message || errors[0] || "数据库记录失败，本轮未写入新数据。", "error", { retryDetail });
+        showBubble("error", "数据库记录失败", `${payload.message || errors[0] || "辅助模型返回异常"}，点击查看日志`, 9000);
       } else if (count) {
-        showBubble("success", isRebuild ? "心笺已重算" : (payload.display ? "心笺已生成幕笺" : "心笺已更新"), `${triggerSource === "dom_fallback" ? "DOM兜底｜" : "Hook｜"}${isRebuild ? "本轮幕笺已替换｜" : ""}${formatSummary(payload)}`, 3600);
+        showBubble("success", isRebuild ? "数据库已重算" : (payload.display ? "状态记录已生成" : "数据库已更新"), `${triggerSource === "dom_fallback" ? "DOM兜底｜" : "Hook｜"}${isRebuild ? "本轮状态记录已替换｜" : ""}${formatSummary(payload)}`, 3600);
       } else {
-        showBubble("empty", payload.display ? "幕笺已生成" : "心笺无变化", `${triggerSource === "dom_fallback" ? "DOM兜底｜" : "Hook｜"}${payload.message || "本轮没有需要写入的状态"}`, 3000);
+        showBubble("empty", payload.display ? "状态记录已生成" : "数据库无变化", `${triggerSource === "dom_fallback" ? "DOM兜底｜" : "Hook｜"}${payload.message || "本轮没有需要写入的状态"}`, 3000);
       }
-      pingHook(payload.ok === false || payload.status === "error" ? "auto_update_error" : (isRebuild ? "auto_rebuild_done" : "auto_update_done"), payload.message || "自动填表与幕笺生成已完成。", turnId, {
+      pingHook(payload.ok === false || payload.status === "error" ? "auto_update_error" : (isRebuild ? "auto_rebuild_done" : "auto_update_done"), payload.message || "自动填表与状态记录生成已完成。", turnId, {
         backend_status: payload.status || "",
         error_type: payload.error_type || "",
         warnings: payload.warnings || payload.result?.warnings || [],
@@ -2907,8 +2907,8 @@
       if (isRebuild) scheduleRestoreRecentDisplays(800);
     } catch (error) {
       const retryDetail = retryTurnDetails.get(turnId) || normalized;
-      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, error.message || "心笺生成失败，本轮未写入新数据。", "error", { retryDetail });
-      showBubble("error", "心笺生成失败", `${error.message || "未知错误"}，点击查看日志`, 9000);
+      if (targetMessage) attachInlineTurnStatus(targetMessage, turnId, error.message || "数据库记录失败，本轮未写入新数据。", "error", { retryDetail });
+      showBubble("error", "数据库记录失败", `${error.message || "未知错误"}，点击查看日志`, 9000);
       pingHook("auto_update_error", error.message || "自动填表失败。", turnId, requestErrorDetail(error));
       console.warn("State Journal auto update failed:", error);
     } finally {
@@ -2940,7 +2940,7 @@
     invalidateTrackedTurn,
   };
 
-  pingHook("loaded", "聊天页心笺脚本已加载。 ");
+  pingHook("loaded", "聊天页数据库脚本已加载。 ");
   loadConfig()
     .then(restoreRecentDisplays)
     .catch((error) => console.warn("State Journal config/display load failed:", error));
