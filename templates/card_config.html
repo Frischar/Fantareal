@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Card Config - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-variable-instruction-20260628" />
     <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
@@ -237,15 +237,15 @@
         <div id="state-journal-card-panel" class="card-block card-state-journal-panel" hidden>
           <div class="persona-toolbar">
             <div>
-              <h3>心笺变量与阶段配置</h3>
-              <p class="helper-text">此配置仅用于心笺初始化与分享，不进入 prompt，也不保存运行时当前值或阶段历史。</p>
+              <h3>数据库变量与阶段配置</h3>
+              <p class="helper-text">此配置仅用于数据库初始化与分享，不进入 prompt，也不保存运行时当前值或阶段历史。</p>
             </div>
             <div class="button-row">
               <button id="state-journal-refresh-roles" type="button" class="secondary compact">同步角色列表</button>
             </div>
           </div>
           <div class="card-state-journal-source-card">
-            <label>心笺角色来源
+            <label>数据库角色来源
               <select id="state-journal-role-source-mode">
                 <option value="auto">自动识别</option>
                 <option value="main_card">主卡就是角色</option>
@@ -260,7 +260,7 @@
               <tbody id="state-journal-role-table-body"></tbody>
             </table>
           </div>
-          <p class="helper-text">心笺关闭时本区块隐藏；导入卡内已有配置会继续保留，并随角色卡保存。</p>
+          <p class="helper-text">数据库关闭时本区块隐藏；导入卡内已有配置会继续保留，并随角色卡保存。</p>
         </div>
       </section>
 
@@ -271,8 +271,8 @@
       <div class="card-state-journal-dialog-card" role="dialog" aria-modal="true" aria-labelledby="state-journal-dialog-title">
         <div class="card-state-journal-dialog-head">
           <div>
-            <p class="eyebrow">心笺</p>
-            <h3 id="state-journal-dialog-title">心笺变量与阶段</h3>
+            <p class="eyebrow">数据库</p>
+            <h3 id="state-journal-dialog-title">数据库变量与阶段</h3>
             <p id="state-journal-dialog-subtitle" class="helper-text"></p>
           </div>
           <button id="state-journal-close-dialog" type="button" class="secondary compact">关闭</button>
@@ -294,7 +294,7 @@
           <div class="button-row"><button id="state-journal-add-snapshot-field" type="button" class="secondary compact">＋ 新增快照字段</button></div>
           <div class="card-state-journal-table-wrap"><table class="card-state-journal-table"><thead><tr><th>启用</th><th>字段名</th><th>显示</th><th>生成说明</th><th>操作</th></tr></thead><tbody id="state-journal-snapshot-table-body"></tbody></table></div>
         </section>
-        <div class="helper-text" style="margin-top:12px;">状态快照字段只用于心笺 worker 与幕笺展示，不参与阶段判断、不发给世界书、不进入主 prompt。未点击“保存配置”前，本弹窗内新增或修改不会写入角色卡当前编辑状态。</div>
+        <div class="helper-text" style="margin-top:12px;">状态快照字段只用于记录模型与状态记录展示，不参与阶段判断、不发给世界书、不进入主 prompt。未点击“保存配置”前，本弹窗内新增或修改不会写入角色卡当前编辑状态。</div>
         <div class="card-state-journal-dialog-footer">
           <button id="state-journal-cancel-dialog" type="button" class="secondary compact">放弃修改</button>
           <button id="state-journal-save-dialog" type="button" class="primary compact">保存配置</button>
@@ -1055,10 +1055,10 @@
       }
 
       const STATE_JOURNAL_ROLE_MODES = {
-        default: "默认幕笺模板",
-        snapshot_only: "仅专属幕笺（不计算变量/阶段）",
-        full: "完整心笺：专属幕笺 + 变量阶段",
-        disabled: "不启用该角色",
+        default: "默认状态记录模板",
+        snapshot_only: "仅专属状态记录（不计算变量/阶段）",
+        full: "完整数据库：状态记录 + 变量阶段",
+        disabled: "不记录该角色",
       };
 
 
@@ -1069,7 +1069,7 @@
         },
         main_card: {
           label: "主卡就是角色",
-          desc: "适合普通单角色卡，心笺会把主卡作为唯一角色记录。",
+          desc: "适合普通单角色卡，数据库会把主卡作为唯一角色记录。",
         },
         personas_only: {
           label: "主卡旁白，多角色展开",
@@ -1274,7 +1274,7 @@
         if (!isPlaceholderStateJournalRoleLabel(name)) return false;
         const fields = ["description", "personality", "scenario", "creator-notes"];
         const hasContent = fields.some((field) => (card.querySelector(`#persona-${key}-${field}`)?.value || "").trim());
-        // Role A/B/C 这类占位多角色不作为心笺角色来源；原始 personas 仍随角色卡保存。
+        // Role A/B/C 这类占位多角色不作为数据库角色来源；原始 personas 仍随角色卡保存。
         return !hasContent || isPlaceholderStateJournalRoleLabel(name);
       }
 
@@ -1346,7 +1346,7 @@
         if (!tbody) return;
         tbody.innerHTML = "";
         if (!currentStateJournal.roles.length) {
-          tbody.innerHTML = `<tr><td colspan="4"><div class="card-state-journal-empty">暂无角色配置。点击“同步角色列表”会按当前心笺角色来源生成空配置。</div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="4"><div class="card-state-journal-empty">暂无角色配置。点击“同步角色列表”会按当前数据库角色来源生成空配置。</div></td></tr>`;
           return;
         }
         currentStateJournal.roles.forEach((role) => {
@@ -1354,7 +1354,7 @@
           const roleMode = normalizeStateJournalMode(role.mode || role.stateJournalMode, role);
           tr.innerHTML = `
             <td><strong>${escapeHtml(role.role_name || role.role_id)}</strong></td>
-            <td><select data-sj-role-mode><option value="default" ${roleMode === "default" ? "selected" : ""}>默认幕笺模板</option><option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属幕笺</option><option value="full" ${roleMode === "full" ? "selected" : ""}>完整心笺：专属幕笺 + 变量阶段</option><option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不启用该角色</option></select></td>
+            <td><select data-sj-role-mode><option value="default" ${roleMode === "default" ? "selected" : ""}>默认状态记录模板</option><option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属状态记录</option><option value="full" ${roleMode === "full" ? "selected" : ""}>完整数据库：状态记录 + 变量阶段</option><option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不记录该角色</option></select></td>
             <td><span class="card-state-journal-badge">变量 ${role.variables?.length || 0}</span> <span class="card-state-journal-badge">阶段 ${role.stages?.length || 0}</span> <span class="card-state-journal-badge">快照 ${role.snapshotFields?.length || 0}</span></td>
             <td><button type="button" class="secondary compact" data-sj-config-role="${escapeAttr(role.role_id)}">配置</button></td>
           `;
@@ -1510,8 +1510,8 @@
       function renderStateJournalDialog() {
         const role = activeStateJournalRole();
         if (!role) return;
-        document.getElementById("state-journal-dialog-title").textContent = `${role.role_name || role.role_id} · 心笺配置`;
-        document.getElementById("state-journal-dialog-subtitle").textContent = `${STATE_JOURNAL_ROLE_MODES[normalizeStateJournalMode(role.mode || role.stateJournalMode, role)] || "默认幕笺模板"}｜变量 ${role.variables?.length || 0} 个｜阶段 ${role.stages?.length || 0} 个｜快照字段 ${role.snapshotFields?.length || 0} 个`;
+        document.getElementById("state-journal-dialog-title").textContent = `${role.role_name || role.role_id} · 数据库配置`;
+        document.getElementById("state-journal-dialog-subtitle").textContent = `${STATE_JOURNAL_ROLE_MODES[normalizeStateJournalMode(role.mode || role.stateJournalMode, role)] || "默认状态记录模板"}｜变量 ${role.variables?.length || 0} 个｜阶段 ${role.stages?.length || 0} 个｜快照字段 ${role.snapshotFields?.length || 0} 个`;
         renderStateJournalVariableRows(role);
         renderStateJournalStageRows(role);
         renderStateJournalSnapshotRows(role);
@@ -1530,15 +1530,15 @@
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td><span class="card-state-journal-check"><input type="checkbox" title="启用变量" ${variable.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
-            <td><input class="card-state-journal-name-input" value="${escapeAttr(variable.var_name || variable.var_key)}" data-field="var_name"><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(variable.var_key)}" data-field="var_key"></label></details></td>
+            <td><input class="card-state-journal-name-input" value="${escapeAttr(variable.var_name || variable.var_key)}" data-field="var_name"><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(variable.var_key)}" data-field="var_key"></label><label class="card-state-journal-instruction-field">变量判断说明<textarea class="card-state-journal-instruction-input" rows="3" data-field="instruction" placeholder="例如：只有出现明确亲近、信任或保护行为时才变化；普通寒暄保持不变。">${escapeHtml(variable.instruction || "")}</textarea></label></details></td>
             <td><input class="card-state-journal-num-input" type="number" value="${Number(variable.default_value ?? 0)}" data-field="default_value"></td>
             <td><span class="card-state-journal-range-inputs"><input class="card-state-journal-num-input" type="number" value="${Number(variable.min_value ?? 0)}" data-field="min_value"> <span>~</span> <input class="card-state-journal-num-input" type="number" value="${Number(variable.max_value ?? 100)}" data-field="max_value"></span></td>
             <td><span class="card-state-journal-range-inputs"><input class="card-state-journal-num-input" type="number" value="${Number(variable.delta_min ?? -5)}" data-field="delta_min"> <span>~</span> <input class="card-state-journal-num-input" type="number" value="${Number(variable.delta_max ?? 5)}" data-field="delta_max"></span></td>
-            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在幕笺" ${variable.display !== false ? "checked" : ""} data-field="display"></span></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在状态记录" ${variable.display !== false ? "checked" : ""} data-field="display"></span></td>
             <td><span class="card-state-journal-check"><input type="checkbox" title="参与阶段判断" ${variable.stage_relevant !== false ? "checked" : ""} data-field="stage_relevant"></span></td>
             <td><button type="button" class="secondary compact" data-remove-variable-index="${index}">删除</button></td>
           `;
-          tr.querySelectorAll("input").forEach((input) => input.addEventListener("change", () => {
+          tr.querySelectorAll("input, textarea").forEach((input) => input.addEventListener("change", () => {
             const field = input.dataset.field;
             if (["enabled", "display", "stage_relevant"].includes(field)) variable[field] = input.checked;
             else if (["default_value", "min_value", "max_value", "delta_min", "delta_max"].includes(field)) variable[field] = Number(input.value || 0);
@@ -1561,7 +1561,7 @@
         if (!tbody) return;
         tbody.innerHTML = "";
         if (!role.stages?.length) {
-          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无阶段规则。心笺会使用这里的条件判断阶段标签。</div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无阶段规则。数据库会使用这里的条件判断阶段标签。</div></td></tr>`;
           return;
         }
         role.stages.forEach((stage, index) => {
@@ -1612,7 +1612,7 @@
         tbody.innerHTML = "";
         const fields = Array.isArray(role.snapshotFields) ? role.snapshotFields : [];
         if (!fields.length) {
-          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无状态快照字段。未配置时会回落到当前全局幕笺模板。</div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无状态快照字段。未配置时会回落到当前全局状态记录模板。</div></td></tr>`;
           return;
         }
         fields.forEach((field, index) => {
@@ -1620,7 +1620,7 @@
           tr.innerHTML = `
             <td><span class="card-state-journal-check"><input type="checkbox" title="启用字段" ${field.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
             <td><input class="card-state-journal-name-input" value="${escapeAttr(field.label || field.key)}" data-field="label"><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(field.key)}" data-field="key"></label></details></td>
-            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在幕笺" ${field.display !== false ? "checked" : ""} data-field="display"></span></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在状态记录" ${field.display !== false ? "checked" : ""} data-field="display"></span></td>
             <td><input class="card-state-journal-wide-input" value="${escapeAttr(field.instruction || "")}" data-field="instruction"></td>
             <td><button type="button" class="secondary compact" data-remove-snapshot-field-index="${index}">删除</button></td>
           `;

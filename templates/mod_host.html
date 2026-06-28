@@ -1,9 +1,11 @@
+{% set is_database_page = mod.slug == 'state-journal' %}
+{% set host_label = '数据库' if is_database_page else mod.label %}
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="{{ settings.theme }}">
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{ mod.label }} - Fantareal</title>
+    <title>{{ host_label }} - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=ui-debug-icon-1" />
     <style>
       .mod-host-page {
@@ -50,6 +52,85 @@
         margin-top: 0.7rem;
         color: var(--muted);
         font-size: 0.88rem;
+      }
+
+      .database-host-shell .mod-host-page {
+        padding: 0 18px 18px;
+      }
+
+      .database-host-shell {
+        --database-host-content-width: min(1640px, calc(100vw - var(--app-sidebar-width, 260px) - 36px));
+      }
+
+      .database-host-shell .mod-host-shell {
+        width: var(--database-host-content-width);
+        max-width: var(--database-host-content-width);
+        gap: 0;
+      }
+
+      .database-host-shell .mod-intro-panel,
+      .database-host-shell .mod-frame-hint {
+        display: none;
+      }
+
+      .database-host-shell .mod-frame-panel {
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+      }
+
+      .database-host-shell .mod-frame {
+        height: auto;
+        min-height: 0;
+        border-radius: 22px;
+        background: transparent !important;
+        color-scheme: normal;
+      }
+
+      .database-host-shell .topbar-stack > .slot-toolbar {
+        width: var(--database-host-content-width);
+        max-width: var(--database-host-content-width);
+        margin: 18px auto 0 !important;
+        position: relative;
+        left: 0;
+        min-height: 76px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        align-items: center;
+      }
+
+      .database-host-shell .topbar-stack > .slot-toolbar .slot-toolbar-left {
+        align-items: center;
+        height: 100%;
+      }
+
+      .database-host-shell .topbar-stack > .slot-toolbar .slot-meta {
+        display: flex;
+        min-height: 44px;
+        flex-direction: column;
+        justify-content: center;
+        gap: 3px;
+      }
+
+      .database-host-shell .topbar-stack > .slot-toolbar .slot-meta strong {
+        margin-bottom: 0;
+        line-height: 1.25;
+      }
+
+      .database-host-shell .topbar-stack > .slot-toolbar .slot-hint {
+        margin: 0;
+        color: color-mix(in srgb, var(--text) 66%, var(--muted));
+        line-height: 1.45;
+      }
+
+      html[data-theme="dark"] .database-host-shell .topbar-stack > .slot-toolbar .slot-hint {
+        color: rgba(222, 232, 246, 0.76);
+      }
+
+      html:not([data-theme="dark"]) .database-host-shell .topbar-stack > .slot-toolbar .slot-hint {
+        color: rgba(55, 43, 34, 0.82);
       }
 
 
@@ -101,10 +182,22 @@
         .mod-frame {
           min-height: calc(100vh - 190px);
         }
+
+        .database-host-shell .mod-host-shell,
+        .database-host-shell .topbar-stack > .slot-toolbar {
+          width: min(100%, calc(100vw - 24px));
+          max-width: min(100%, calc(100vw - 24px));
+        }
+
+        .database-host-shell .topbar-stack > .slot-toolbar {
+          min-height: auto;
+          left: 0;
+        }
       }
     </style>
   </head>
-  <body class="app-sidebar-shell">
+  <body class="app-sidebar-shell{% if is_database_page %} modern-setting-page database-main-page pe-shell database-host-shell{% endif %}">
+    {% if is_database_page %}{% include "_theme_toggle.html" %}{% endif %}
     <div class="topbar-stack">
       <div class="topbar">
         <div class="topbar-left">
@@ -114,10 +207,16 @@
       </div>
       <div class="slot-toolbar">
         <div class="slot-toolbar-left">
-          <span class="slot-badge">Mods</span>
+          <span class="slot-badge">{{ '数据库' if is_database_page else 'Mods' }}</span>
           <div class="slot-meta">
-            <strong>{{ mod.label }}</strong>
-            <p class="slot-hint">当前页面承载的是 `mods` 目录下的附属工具，并且把更多可视空间留给模块本体。</p>
+            <strong>{{ host_label }}</strong>
+            <p class="slot-hint">
+              {% if is_database_page %}
+              管理剧情状态、角色变量、阶段规则、剧情账本和状态记录。
+              {% else %}
+              当前页面承载的是 `mods` 目录下的附属工具，并且把更多可视空间留给模块本体。
+              {% endif %}
+            </p>
           </div>
         </div>
       </div>
@@ -127,35 +226,115 @@
       <div class="mod-host-shell">
         <section class="panel config-panel full-span mod-intro-panel">
           <div class="section-head">
-            <p class="eyebrow">Mods</p>
-            <h2>{{ mod.label }}</h2>
-            <p class="muted">这个页面承载的是 `{{ mod.name }}` 模块，内容来自仓库里的 `mods` 目录。</p>
+            <p class="eyebrow">{{ 'Core' if is_database_page else 'Mods' }}</p>
+            <h2>{{ host_label }}</h2>
+            <p class="muted">
+              {% if is_database_page %}
+              数据库负责记录剧情状态、状态记录、阶段标签和剧情账本；当前仍沿用兼容路径运行。
+              {% else %}
+              这个页面承载的是 `{{ mod.name }}` 模块，内容来自仓库里的 `mods` 目录。
+              {% endif %}
+            </p>
           </div>
         </section>
 
         <section class="panel config-panel full-span mod-frame-panel">
           <iframe
             class="mod-frame"
-            src="{{ mod.mount_path }}/"
-            title="{{ mod.label }}"
+            src="{{ mod.mount_path }}/{% if is_database_page %}?host_theme={{ settings.theme }}{% endif %}"
+            title="{{ host_label }}"
             loading="lazy"
+            allowtransparency="true"
             referrerpolicy="same-origin"
           ></iframe>
           <div class="mod-frame-hint">
-            <span>模块仍然运行在 Xuqi_LLM 内部，只是宿主页把更多空间让给了模块本体。</span>
-            <a class="ghost-link button-link" href="{{ mod.mount_path }}/" target="_blank" rel="noopener noreferrer">新窗口打开模块</a>
+            <span>
+              {% if is_database_page %}
+              数据库仍使用兼容路径运行，聊天页、世界书和演出工坊会继续读取这里的状态。
+              {% else %}
+              模块仍然运行在 Xuqi_LLM 内部，只是宿主页把更多空间让给了模块本体。
+              {% endif %}
+            </span>
+            <a class="ghost-link button-link" href="{{ mod.mount_path }}/" target="_blank" rel="noopener noreferrer">{{ '新窗口打开数据库' if is_database_page else '新窗口打开模块' }}</a>
           </div>
         </section>
       </div>
     </div>
+    {% if is_database_page %}
+    <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script>
+      (() => {
+        const { applyTheme, applyUiOpacity, applyBackground, applyPerformanceMode } = window.Fantareal || {};
+        applyTheme?.({{ settings.theme | tojson }});
+        applyUiOpacity?.({{ settings.ui_opacity | tojson }});
+        applyPerformanceMode?.({{ settings.performance_mode | tojson }});
+        applyBackground?.({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
+      })();
+    </script>
+    {% endif %}
     <script>
       (() => {
         const backToChatTypes = new Set([
           "fantareal:mobile-chat:back-to-chat",
           "fantareal:plugin:back-to-chat",
         ]);
+        {% if is_database_page %}
+        const databaseFrame = () => document.querySelector(".mod-frame");
+        const currentDatabaseTheme = () => document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const postDatabaseThemeToFrame = () => {
+          const frame = databaseFrame();
+          if (!frame?.contentWindow) return;
+          frame.contentWindow.postMessage({
+            type: "fantareal:state-journal:host-theme",
+            theme: currentDatabaseTheme(),
+          }, window.location.origin);
+        };
+        const syncDatabaseHashToFrame = () => {
+          const frame = databaseFrame();
+          if (!frame) return;
+          const hash = window.location.hash || "";
+          const current = new URL(frame.getAttribute("src") || frame.src, window.location.href);
+          const theme = currentDatabaseTheme();
+          let changed = false;
+          if (current.hash !== hash) {
+            current.hash = hash;
+            changed = true;
+          }
+          if (current.searchParams.get("host_theme") !== theme) {
+            current.searchParams.set("host_theme", theme);
+            changed = true;
+          }
+          if (!changed) return;
+          frame.src = current.pathname + current.search + current.hash;
+        };
+        syncDatabaseHashToFrame();
+        databaseFrame()?.addEventListener("load", postDatabaseThemeToFrame);
+        window.addEventListener("hashchange", syncDatabaseHashToFrame);
+        if ("MutationObserver" in window) {
+          const themeObserver = new MutationObserver((mutations) => {
+            if (mutations.some((mutation) => mutation.attributeName === "data-theme")) {
+              postDatabaseThemeToFrame();
+            }
+          });
+          themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+        }
+        window.requestAnimationFrame(postDatabaseThemeToFrame);
+        {% endif %}
         window.addEventListener("message", (event) => {
           const data = event.data;
+          const frame = document.querySelector(".mod-frame");
+          if (
+            data?.type === "fantareal:state-journal:resize" &&
+            frame &&
+            event.source === frame.contentWindow
+          ) {
+            const height = Math.ceil(Number(data.height || 0));
+            if (height > 0) {
+              frame.style.height = `${Math.max(height, 360)}px`;
+            }
+            return;
+          }
           if (!data || typeof data !== "object" || !backToChatTypes.has(data.type)) return;
           window.location.href = "/chat";
         });

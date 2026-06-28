@@ -1946,6 +1946,8 @@ body.modern-setting-page.card-config-page .card-workbench-head > .card-workbench
       .card-state-journal-advanced { margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
       .card-state-journal-advanced summary { cursor: pointer; opacity: 0.72; }
       .card-state-journal-advanced label { display: grid; gap: 4px; margin-top: 6px; }
+      .card-state-journal-instruction-field { min-width: 260px; max-width: 420px; white-space: normal; }
+      .card-state-journal-instruction-input { width: 100%; min-height: 76px; resize: vertical; white-space: normal; line-height: 1.55; font-family: inherit; }
       .card-state-journal-advanced code { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 6px; }
 
       .card-state-journal-condition-editor { min-width: 420px; max-width: 560px; }
