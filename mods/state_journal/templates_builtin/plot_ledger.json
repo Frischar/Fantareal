@@ -1,0 +1,76 @@
+{
+  "schema": {
+    "id": "plot_ledger",
+    "name": "剧情运行账本",
+    "description": "记录仍会影响后续剧情判断的事件、任务、线索和物品状态；它不是自动总结，也不是长期记忆。",
+    "primary_key": "entry_id",
+    "fields": [
+      {
+        "key": "entry_id",
+        "label": "条目 ID",
+        "type": "text",
+        "required": true,
+        "note": "稳定英文 snake_case 主键，例如 find_silver_key；会影响世界书 tag 与 ledger 宏。"
+      },
+      {
+        "key": "entry_type",
+        "label": "条目类型",
+        "type": "enum",
+        "options": ["event", "task", "clue", "item"],
+        "note": "event=重要事件；task=任务；clue=线索；item=物品。"
+      },
+      {
+        "key": "title",
+        "label": "标题",
+        "type": "text",
+        "note": "给用户看的短标题。"
+      },
+      {
+        "key": "status",
+        "label": "状态",
+        "type": "enum",
+        "options": ["hidden", "active", "done", "failed", "inactive"],
+        "note": "hidden=未公开；active=进行中；done=完成；failed=失败；inactive=废弃或暂不影响。"
+      },
+      {
+        "key": "condition",
+        "label": "推进条件",
+        "type": "textarea",
+        "note": "记录如何触发、推进、完成或失败。"
+      },
+      {
+        "key": "summary",
+        "label": "当前摘要",
+        "type": "textarea",
+        "note": "记录此条目当前状态，只写仍影响后续剧情的部分。"
+      },
+      {
+        "key": "evidence",
+        "label": "判断依据",
+        "type": "textarea",
+        "note": "简短记录最近一次状态判断的正文依据；done/failed 必须有明确依据。"
+      },
+      {
+        "key": "locked",
+        "label": "锁定",
+        "type": "boolean",
+        "note": "开启后 worker 不会自动改写此行；用户手动编辑不受限制。"
+      },
+      {
+        "key": "updated_at",
+        "label": "更新时间",
+        "type": "text",
+        "note": "由心笺自动写入。"
+      }
+    ],
+    "rules": {
+      "note": "只记录仍会影响剧情运行的悬挂事项，不记录普通氛围、衣着、情绪寒暄或每轮摘要。",
+      "init": "当正文明确出现需要后续追踪的任务、重要事件、线索或物品时初始化。",
+      "insert": "每轮最多新增 1 条；新条目必须有明确剧情意义和稳定 entry_id。",
+      "update": "每轮最多更新 2 条；只有状态、条件、摘要或证据明确变化时才更新。",
+      "delete": "不要自动删除；废弃或暂不影响剧情时改为 inactive。",
+      "ignore": "没有明确推进证据时保持原状态；done/failed 必须有正文依据。"
+    }
+  },
+  "rows": []
+}

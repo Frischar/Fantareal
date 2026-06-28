@@ -1204,7 +1204,7 @@ body.memory-config-page .outline-table-scroll {
 table.outline-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1080px;
+  min-width: 1240px;
 }
 
 body.memory-config-page .outline-table thead th {
@@ -1254,6 +1254,49 @@ body.memory-config-page .outline-title-cell {
 body.memory-config-page .outline-title-main {
   font-weight: 700;
   color: var(--text);
+}
+
+body.memory-config-page .outline-archive-badges,
+body.memory-config-page .outline-usage-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+body.memory-config-page .outline-archive-badges {
+  margin-top: 8px;
+}
+
+body.memory-config-page .outline-archive-badges span,
+body.memory-config-page .outline-usage-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel) 92%);
+  color: color-mix(in srgb, var(--text) 88%, var(--accent));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+body.memory-config-page .outline-usage-badges.compact {
+  gap: 5px;
+}
+
+body.memory-config-page .outline-usage-badges.compact .outline-usage-badge {
+  width: 100%;
+  justify-content: center;
+  padding-inline: 7px;
+}
+
+body.memory-config-page .outline-usage-badge.is-off {
+  border-color: color-mix(in srgb, var(--muted) 34%, var(--line));
+  background: color-mix(in srgb, var(--muted) 8%, var(--panel) 92%);
+  color: var(--muted);
 }
 
 body.memory-config-page .outline-submeta {
@@ -1599,6 +1642,52 @@ body.memory-config-page .outline-editor-field label {
 
 body.memory-config-page .outline-editor-field textarea {
   resize: vertical;
+}
+
+body.memory-config-page .outline-editor-switches {
+  gap: 10px;
+}
+
+body.memory-config-page .outline-switch-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--input-bg) 58%, transparent 42%);
+  cursor: pointer;
+}
+
+body.memory-config-page .outline-switch-row input[type="checkbox"],
+body.memory-config-page .outline-switch-row .outline-switch-checkbox,
+body.memory-config-page .config-shell.compact .outline-switch-row .outline-switch-checkbox {
+  appearance: auto;
+  -webkit-appearance: auto;
+  min-width: 18px;
+  width: 18px;
+  max-width: 18px;
+  min-height: 18px;
+  height: 18px;
+  max-height: 18px;
+  margin-top: 2px;
+  padding: 0;
+  border-radius: 4px;
+  accent-color: var(--accent);
+}
+
+body.memory-config-page .outline-switch-row strong,
+body.memory-config-page .outline-switch-row small {
+  display: block;
+}
+
+body.memory-config-page .outline-switch-row small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 body.memory-config-page .merged-meta {
@@ -2078,8 +2167,8 @@ body.memory-config-page .outline-table-scroll {
 
 body.memory-config-page table.outline-table,
 body.memory-config-page .outline-table {
-  width: max(100%, 1180px) !important;
-  min-width: 1180px !important;
+  width: max(100%, 1320px) !important;
+  min-width: 1320px !important;
   table-layout: fixed !important;
   border-collapse: collapse !important;
 }
@@ -2091,22 +2180,32 @@ body.memory-config-page .outline-table td:nth-child(1) {
 
 body.memory-config-page .outline-table th:nth-child(2),
 body.memory-config-page .outline-table td:nth-child(2) {
-  width: 220px !important;
+  width: 260px !important;
 }
 
 body.memory-config-page .outline-table th:nth-child(3),
 body.memory-config-page .outline-table td:nth-child(3) {
-  width: 180px !important;
+  width: 170px !important;
 }
 
 body.memory-config-page .outline-table th:nth-child(4),
 body.memory-config-page .outline-table td:nth-child(4) {
-  width: 240px !important;
+  width: 170px !important;
 }
 
 body.memory-config-page .outline-table th:nth-child(5),
 body.memory-config-page .outline-table td:nth-child(5) {
-  width: 390px !important;
+  width: 220px !important;
+}
+
+body.memory-config-page .outline-table th:nth-child(6),
+body.memory-config-page .outline-table td:nth-child(6) {
+  width: 150px !important;
+}
+
+body.memory-config-page .outline-table th:nth-child(7),
+body.memory-config-page .outline-table td:nth-child(7) {
+  width: 260px !important;
 }
 
 body.memory-config-page .outline-table tbody td {
@@ -2117,6 +2216,7 @@ body.memory-config-page .outline-table tbody td {
 
 body.memory-config-page .outline-table tbody td:nth-child(3),
 body.memory-config-page .outline-table tbody td:nth-child(4),
+body.memory-config-page .outline-table tbody td:nth-child(5),
 body.memory-config-page .outline-events-inline {
   display: -webkit-box !important;
   -webkit-box-orient: vertical !important;
@@ -2138,7 +2238,9 @@ body.memory-config-page .outline-table th {
 
 body.memory-config-page .outline-table tbody td:nth-child(3),
 body.memory-config-page .outline-table tbody td:nth-child(4),
-body.memory-config-page .outline-table tbody td:nth-child(5) {
+body.memory-config-page .outline-table tbody td:nth-child(5),
+body.memory-config-page .outline-table tbody td:nth-child(6),
+body.memory-config-page .outline-table tbody td:nth-child(7) {
   display: table-cell !important;
   vertical-align: top !important;
 }
@@ -2680,6 +2782,24 @@ body.modern-setting-page.memory-config-page :is(
   .selection-chip
 ) {
   box-shadow: none !important;
+}
+
+body.modern-setting-page.memory-config-page .config-shell.compact .outline-editor-field .outline-switch-row input.outline-switch-checkbox,
+body.modern-setting-page.memory-config-page .outline-editor-field .outline-switch-row input[type="checkbox"] {
+  display: inline-block !important;
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+  flex: 0 0 18px !important;
+  min-width: 18px !important;
+  width: 18px !important;
+  max-width: 18px !important;
+  min-height: 18px !important;
+  height: 18px !important;
+  max-height: 18px !important;
+  padding: 0 !important;
+  margin: 2px 0 0 !important;
+  border-radius: 4px !important;
+  accent-color: var(--accent);
 }
 
 /* P8-0A memory follow-up: make outline collapse feel natural and prevent merged rows from squeezing. */

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preset - Fantareal</title>
     <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
   </head>
@@ -132,6 +133,7 @@
           <div class="preset-base-footer">
             <span class="muted helper-text">预设内核：<strong id="base-prompt-count">0</strong> 字</span>
             <div class="preset-editor-actions">
+              <button type="button" class="secondary macro-insert-button" data-macro-insert data-macro-target="#base-system-prompt">{ } 变量</button>
               <button id="insert-base-template" type="button" class="secondary">插入模板</button>
             </div>
           </div>
@@ -198,6 +200,7 @@
     <script src="/static/js/app-core.js?v=v161"></script>
     <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
     <script>
       const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
@@ -972,7 +975,10 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
             </div>
             <input class="preset-block-id" type="hidden" value="${escapeHtml(item.id || "")}" />
           </div>
-          <label>正文</label>
+          <div class="macro-field-head">
+            <label>正文</label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".preset-card" data-macro-target=".preset-block-content">{ } 变量</button>
+          </div>
           <textarea class="preset-block-content" rows="5" placeholder="这里填写要拼进系统规则的文本。">${escapeHtml(item.content || "")}</textarea>
           ${renderSegmentAdvancedFields(item, "block")}
         `;
@@ -1001,6 +1007,10 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
             <button type="button" class="secondary preset-icon-button preset-group-item-remove" title="删除规则项">×</button>
           </div>
           <div class="preset-group-item-body">
+            <div class="macro-field-head">
+              <label>规则项正文</label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".preset-group-item" data-macro-target=".preset-group-item-content">{ } 变量</button>
+            </div>
             <textarea class="preset-group-item-content" rows="4" placeholder="这里填写这个规则项被选中后要拼进 prompt 的文本。">${escapeHtml(item.content || "")}</textarea>
             ${renderSegmentAdvancedFields(item, "group-item")}
           </div>

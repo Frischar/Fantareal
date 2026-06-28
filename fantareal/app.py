@@ -6,6 +6,7 @@ from logging.handlers import RotatingFileHandler
 import os
 import random
 import re
+import shlex
 import shutil
 import sqlite3
 import sys
@@ -25,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from .chat_api_routes import register_chat_api_routes
 from .config_api_routes import register_config_api_routes
-from .macro_variables import build_macro_context, render_macro_variables
+from .macro_variables import build_macro_catalog, build_macro_context, render_macro_variables
 from .mod_api_routes import register_mod_api_routes
 from .mods_runtime import mount_discovered_mods
 from .page_routes import register_page_routes
@@ -64,6 +65,7 @@ from .worldbook_logic import (
     sanitize_worldbook_store,
     split_trigger_aliases,
 )
+from .memory_merge_logic import get_memory_outline
 
 from .prompt_builder import (
     build_conversation_transcript,
@@ -807,11 +809,316 @@ def default_user_profile() -> dict[str, Any]:
 
 
 DIRECTOR_NOTE_POSITIONS = {"before_char_defs", "after_char_defs", "before_user_input"}
+DIRECTOR_NOTE_MODES = {"basic", "advanced"}
+DIRECTOR_NOTE_SOURCES = {"user", "import", "card", "worldbook", "preset"}
+DIRECTOR_NOTE_SCOPES = {"slot", "global"}
+DIRECTOR_NOTE_ROLES = {"system", "user", "assistant"}
+DIRECTOR_NOTE_INJECT_TYPES = {"placement", "depth"}
+DIRECTOR_NOTE_ADVANCED_PLACEMENTS = {"before_character", "after_character", "near_latest_user", "output_guard"}
+DIRECTOR_NOTE_POSITION_TO_PLACEMENT = {
+    "before_char_defs": "before_character",
+    "after_char_defs": "after_character",
+    "before_user_input": "near_latest_user",
+}
+DIRECTOR_NOTE_PLACEMENT_TO_POSITION = {value: key for key, value in DIRECTOR_NOTE_POSITION_TO_PLACEMENT.items()}
 
 
 def normalize_director_note_position(value: Any) -> str:
     text = str(value or "").strip()
     return text if text in DIRECTOR_NOTE_POSITIONS else "after_char_defs"
+
+
+def normalize_director_note_mode(value: Any, *, default: str = "basic") -> str:
+    text = str(value or "").strip().lower()
+    return text if text in DIRECTOR_NOTE_MODES else default
+
+
+def normalize_director_note_source(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in DIRECTOR_NOTE_SOURCES else "user"
+
+
+def normalize_director_note_scope(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in DIRECTOR_NOTE_SCOPES else "slot"
+
+
+def normalize_director_note_role(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in DIRECTOR_NOTE_ROLES else "system"
+
+
+def normalize_director_note_inject_type(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in DIRECTOR_NOTE_INJECT_TYPES else "placement"
+
+
+def normalize_director_note_advanced_placement(value: Any, *, fallback_position: Any = None) -> str:
+    text = str(value or "").strip()
+    if text in DIRECTOR_NOTE_ADVANCED_PLACEMENTS:
+        return text
+    position = normalize_director_note_position(fallback_position)
+    return DIRECTOR_NOTE_POSITION_TO_PLACEMENT.get(position, "after_character")
+
+
+def sanitize_director_note_inject(raw: Any, *, fallback_position: Any = None) -> dict[str, Any]:
+    source = raw if isinstance(raw, dict) else {}
+    inject_type = normalize_director_note_inject_type(source.get("type"))
+    placement = normalize_director_note_advanced_placement(source.get("placement"), fallback_position=fallback_position)
+    if inject_type == "depth":
+        placement = "at_depth"
+    return {
+        "type": inject_type,
+        "depth": clamp_int(source.get("depth"), 0, 999, 0),
+        "role": normalize_director_note_role(source.get("role")),
+        "order": clamp_int(source.get("order"), 0, 999, 100),
+        "placement": placement,
+        "target": str(source.get("target", "") or "").strip()[:80],
+        "index": source.get("index") if isinstance(source.get("index"), int) else None,
+        "at": str(source.get("at", "before") or "before").strip().lower() if str(source.get("at", "before") or "before").strip().lower() in {"before", "after"} else "before",
+        "pos": source.get("pos") if isinstance(source.get("pos"), int) else None,
+        "regex": str(source.get("regex", "") or "").strip()[:240],
+    }
+
+
+DIRECTOR_NOTE_SYNTAX_COMMAND_RE = re.compile(r"^@(inject|d\d*|d)\b", re.IGNORECASE)
+DIRECTOR_NOTE_DEPTH_TOKEN_RE = re.compile(r"^d(\d{1,3})$", re.IGNORECASE)
+DIRECTOR_NOTE_TRUE_VALUES = {"1", "true", "yes", "on", "enable", "enabled", "open", "开启", "启用"}
+DIRECTOR_NOTE_FALSE_VALUES = {"0", "false", "no", "off", "disable", "disabled", "close", "关闭", "禁用"}
+DIRECTOR_NOTE_PLACEMENT_ALIASES = {
+    "before_character": "before_character",
+    "before_char": "before_character",
+    "before_char_defs": "before_character",
+    "char_before": "before_character",
+    "character_before": "before_character",
+    "角色前": "before_character",
+    "after_character": "after_character",
+    "after_char": "after_character",
+    "after_char_defs": "after_character",
+    "char_after": "after_character",
+    "character_after": "after_character",
+    "角色后": "after_character",
+    "near_latest_user": "near_latest_user",
+    "before_user": "near_latest_user",
+    "before_user_input": "near_latest_user",
+    "latest_user": "near_latest_user",
+    "user_before": "near_latest_user",
+    "用户输入前": "near_latest_user",
+    "output_guard": "output_guard",
+    "guard": "output_guard",
+    "answer_guard": "output_guard",
+    "输出守卫": "output_guard",
+}
+
+
+def _parse_director_note_syntax_bool(value: Any) -> bool | None:
+    text = str(value or "").strip().lower()
+    if text in DIRECTOR_NOTE_TRUE_VALUES:
+        return True
+    if text in DIRECTOR_NOTE_FALSE_VALUES:
+        return False
+    return None
+
+
+def _parse_director_note_syntax_int(value: Any, *, min_value: int, max_value: int, default: int) -> tuple[int, bool]:
+    text = str(value or "").strip().lower()
+    depth_match = DIRECTOR_NOTE_DEPTH_TOKEN_RE.match(text)
+    if depth_match:
+        text = depth_match.group(1)
+    try:
+        parsed = int(float(text))
+    except (TypeError, ValueError):
+        return default, True
+    clipped = max(min_value, min(parsed, max_value))
+    return clipped, clipped != parsed
+
+
+def _director_note_syntax_tokens(header: str) -> list[str]:
+    try:
+        return shlex.split(header, comments=False, posix=True)
+    except ValueError:
+        return header.split()
+
+
+def parse_director_note_inject_syntax(payload: dict[str, Any] | None) -> dict[str, Any]:
+    source = dict(payload or {})
+    text = str(source.get("content", "") or "").strip()
+    result: dict[str, Any] = {
+        "detected": False,
+        "valid": True,
+        "errors": [],
+        "warnings": [],
+        "raw": "",
+        "content": text,
+        "inject": None,
+        "remaining_turns": None,
+        "title": "",
+        "enabled": None,
+    }
+    if not text:
+        return result
+
+    lines = text.splitlines()
+    header = lines[0].strip()
+    if not DIRECTOR_NOTE_SYNTAX_COMMAND_RE.match(header):
+        return result
+
+    result["detected"] = True
+    result["raw"] = header[:2000]
+    result["content"] = "\n".join(lines[1:]).strip()
+
+    tokens = _director_note_syntax_tokens(header)
+    if not tokens:
+        result["valid"] = False
+        result["errors"].append("@INJECT 语法为空。")
+        return result
+
+    command = str(tokens[0] or "").strip().lower()
+    params = tokens[1:]
+    parsed: dict[str, Any] = {}
+
+    depth_token = DIRECTOR_NOTE_DEPTH_TOKEN_RE.match(command[1:] if command.startswith("@") else command)
+    if depth_token:
+        parsed["depth"] = depth_token.group(1)
+        parsed["type"] = "depth"
+
+    for token in params:
+        raw_token = str(token or "").strip()
+        if not raw_token:
+            continue
+        if "=" in raw_token:
+            key, value = raw_token.split("=", 1)
+        elif ":" in raw_token:
+            key, value = raw_token.split(":", 1)
+        else:
+            lower_token = raw_token.lower()
+            depth_match = DIRECTOR_NOTE_DEPTH_TOKEN_RE.match(lower_token)
+            if depth_match:
+                parsed["depth"] = depth_match.group(1)
+                parsed["type"] = "depth"
+            elif lower_token in DIRECTOR_NOTE_ROLES:
+                parsed["role"] = lower_token
+            elif lower_token in DIRECTOR_NOTE_PLACEMENT_ALIASES:
+                parsed["placement"] = DIRECTOR_NOTE_PLACEMENT_ALIASES[lower_token]
+                parsed.setdefault("type", "placement")
+            else:
+                result["warnings"].append(f"未识别参数：{raw_token}")
+            continue
+
+        key = key.strip().lower()
+        value = value.strip()
+        if key in {"depth", "d"}:
+            parsed["depth"] = value
+            parsed["type"] = "depth"
+        elif key in {"role", "r"}:
+            parsed["role"] = value
+        elif key in {"turns", "turn", "remaining_turns", "ttl"}:
+            parsed["turns"] = value
+        elif key in {"order", "o", "priority"}:
+            parsed["order"] = value
+        elif key in {"placement", "place", "position", "pos"}:
+            parsed["placement"] = value
+            parsed.setdefault("type", "placement")
+        elif key in {"type", "inject", "mode"}:
+            parsed["type"] = value
+        elif key in {"enabled", "enable"}:
+            parsed["enabled"] = value
+        elif key in {"title", "name"}:
+            parsed["title"] = value
+        else:
+            result["warnings"].append(f"未识别参数：{key}")
+
+    if not result["content"]:
+        result["valid"] = False
+        result["errors"].append("@INJECT 下一行需要填写要注入的正文。")
+
+    inject_type = normalize_director_note_inject_type(parsed.get("type"))
+    placement_value = str(parsed.get("placement", "") or "").strip()
+    placement = DIRECTOR_NOTE_PLACEMENT_ALIASES.get(placement_value.lower(), placement_value)
+    if inject_type == "depth" or "depth" in parsed:
+        inject_type = "depth"
+        placement = "at_depth"
+    elif placement not in DIRECTOR_NOTE_ADVANCED_PLACEMENTS:
+        placement = normalize_director_note_advanced_placement(placement, fallback_position=source.get("position"))
+
+    depth, depth_clipped = _parse_director_note_syntax_int(parsed.get("depth", 0), min_value=0, max_value=999, default=0)
+    order, order_clipped = _parse_director_note_syntax_int(parsed.get("order", source.get("inject", {}).get("order", 100) if isinstance(source.get("inject"), dict) else 100), min_value=0, max_value=999, default=100)
+    turns, turns_clipped = _parse_director_note_syntax_int(parsed.get("turns", source.get("remaining_turns", 1)), min_value=1, max_value=20, default=1)
+    if depth_clipped:
+        result["warnings"].append("depth 已限制到 0-999。")
+    if order_clipped:
+        result["warnings"].append("order 已限制到 0-999。")
+    if turns_clipped:
+        result["warnings"].append("turns 已限制到 1-20。")
+
+    role = normalize_director_note_role(parsed.get("role", source.get("inject", {}).get("role", "system") if isinstance(source.get("inject"), dict) else "system"))
+    if parsed.get("role") is not None and str(parsed.get("role", "")).strip().lower() not in DIRECTOR_NOTE_ROLES:
+        result["warnings"].append("role 仅支持 system / user / assistant，已回退为 system。")
+
+    enabled = _parse_director_note_syntax_bool(parsed.get("enabled"))
+    result.update(
+        {
+            "inject": {
+                "type": inject_type,
+                "depth": depth,
+                "role": role,
+                "order": order,
+                "placement": placement,
+            },
+            "remaining_turns": turns,
+            "title": str(parsed.get("title", "") or "").strip()[:120],
+            "enabled": enabled,
+        }
+    )
+    return result
+
+
+def expand_director_note_inject_syntax(payload: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
+    source = dict(payload or {})
+    syntax = parse_director_note_inject_syntax(source)
+    if not syntax.get("detected"):
+        return source, syntax
+
+    expanded = dict(source)
+    expanded["mode"] = "advanced"
+    expanded["content"] = str(syntax.get("content", "") or "").strip()
+    expanded["raw"] = str(syntax.get("raw", "") or "").strip()
+    if syntax.get("title") and not str(expanded.get("title", "") or "").strip():
+        expanded["title"] = syntax["title"]
+    if syntax.get("remaining_turns") is not None:
+        expanded["remaining_turns"] = syntax["remaining_turns"]
+    if syntax.get("enabled") is not None:
+        expanded["enabled"] = syntax["enabled"]
+    if isinstance(syntax.get("inject"), dict):
+        expanded["inject"] = syntax["inject"]
+    if expanded.get("inject", {}).get("placement") in DIRECTOR_NOTE_PLACEMENT_TO_POSITION:
+        expanded["position"] = DIRECTOR_NOTE_PLACEMENT_TO_POSITION[expanded["inject"]["placement"]]
+    return expanded, syntax
+
+
+def preview_director_note(payload: dict[str, Any] | None) -> dict[str, Any]:
+    expanded, syntax = expand_director_note_inject_syntax(payload)
+    note = sanitize_director_note(
+        {
+            **expanded,
+            "id": "director_note_preview",
+            "created_at": "",
+            "updated_at": "",
+        }
+    )
+    valid = bool(note) and bool(syntax.get("valid", True))
+    errors = list(syntax.get("errors") or [])
+    if not note:
+        errors.append("导演注正文不能为空。")
+    return {
+        "detected": bool(syntax.get("detected")),
+        "valid": valid,
+        "errors": errors,
+        "warnings": list(syntax.get("warnings") or []),
+        "raw": str(syntax.get("raw", "") or ""),
+        "content": str(expanded.get("content", "") or ""),
+        "note": note,
+    }
 
 
 def sanitize_director_note(raw: Any) -> dict[str, Any] | None:
@@ -827,11 +1134,25 @@ def sanitize_director_note(raw: Any) -> dict[str, Any] | None:
     remaining_turns = clamp_int(raw.get("remaining_turns"), 1, 20, 1)
     created_at = str(raw.get("created_at", "") or "").strip()
     updated_at = str(raw.get("updated_at", "") or "").strip()
+    source = normalize_director_note_source(raw.get("source"))
+    mode_default = "advanced" if isinstance(raw.get("inject"), dict) else "basic"
+    mode = normalize_director_note_mode(raw.get("mode"), default=mode_default)
+    default_enabled = source == "user"
+    enabled = parse_bool(raw.get("enabled"), default_enabled)
+    inject = sanitize_director_note_inject(raw.get("inject"), fallback_position=raw.get("position"))
+    position = normalize_director_note_position(raw.get("position") or DIRECTOR_NOTE_PLACEMENT_TO_POSITION.get(inject.get("placement"), "after_char_defs"))
     return {
         "id": note_id,
+        "title": str(raw.get("title", "") or "").strip()[:120],
         "content": content[:12000],
+        "mode": mode,
+        "enabled": enabled,
+        "source": source,
+        "scope": normalize_director_note_scope(raw.get("scope")),
         "remaining_turns": remaining_turns,
-        "position": normalize_director_note_position(raw.get("position")),
+        "position": position,
+        "inject": inject,
+        "raw": str(raw.get("raw", "") or "").strip()[:2000],
         "created_at": created_at,
         "updated_at": updated_at,
     }
@@ -870,19 +1191,22 @@ def save_director_notes(items: list[dict[str, Any]], slot_id: str | None = None)
 
 
 def create_director_note(payload: dict[str, Any], slot_id: str | None = None) -> list[dict[str, Any]]:
+    payload, syntax = expand_director_note_inject_syntax(payload)
     content = str(payload.get("content", "") or "").strip()
     if not content:
+        if syntax.get("detected") and syntax.get("errors"):
+            raise HTTPException(status_code=400, detail="；".join(str(item) for item in syntax.get("errors", []) if item))
         raise HTTPException(status_code=400, detail="导演注内容不能为空。")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     seed = f"{now}|{content}|{random.random()}"
-    note = {
+    note = sanitize_director_note({
+        **payload,
         "id": "director_note_" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:12],
-        "content": content[:12000],
-        "remaining_turns": clamp_int(payload.get("remaining_turns"), 1, 20, 1),
-        "position": normalize_director_note_position(payload.get("position")),
         "created_at": now,
         "updated_at": now,
-    }
+    })
+    if not note:
+        raise HTTPException(status_code=400, detail="导演注内容不能为空。")
     items = get_director_notes(slot_id)
     items.append(note)
     return save_director_notes(items, slot_id)
@@ -894,11 +1218,28 @@ def delete_director_note(note_id: str, slot_id: str | None = None) -> list[dict[
     return save_director_notes(items, slot_id)
 
 
+def disable_advanced_director_notes(slot_id: str | None = None) -> list[dict[str, Any]]:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    changed = False
+    items: list[dict[str, Any]] = []
+    for item in get_director_notes(slot_id):
+        if item.get("mode") == "advanced" and item.get("enabled", True):
+            item = dict(item)
+            item["enabled"] = False
+            item["updated_at"] = now
+            changed = True
+        items.append(item)
+    return save_director_notes(items, slot_id) if changed else items
+
+
 def consume_director_notes_turn(slot_id: str | None = None) -> list[dict[str, Any]]:
     changed = False
     items: list[dict[str, Any]] = []
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for item in get_director_notes(slot_id):
+        if item.get("enabled") is False:
+            items.append(item)
+            continue
         remaining = max(0, int(item.get("remaining_turns", 1) or 1) - 1)
         if remaining <= 0:
             changed = True
@@ -2657,6 +2998,103 @@ def build_memory_text(memory: dict[str, Any], fields: list[str]) -> str:
     return "\n".join(parts).strip()
 
 
+OUTLINE_RECALL_MODE = "assist"
+
+
+def build_memory_outline_recall_text(item: dict[str, Any]) -> str:
+    parts: list[str] = []
+    field_map = (
+        ("title", "Title"),
+        ("summary", "Summary"),
+        ("story_time", "Story Time"),
+        ("chapter", "Chapter"),
+        ("location", "Location"),
+        ("characters", "Characters"),
+        ("relationship_progress", "Relationship"),
+        ("emotion_shift", "Emotion"),
+        ("conflicts", "Conflict"),
+        ("foreshadowing", "Foreshadowing"),
+        ("unresolved_items", "Unresolved"),
+        ("important_items", "Important Items"),
+        ("next_hooks", "Next Hooks"),
+        ("notes", "Notes"),
+    )
+    for key, label in field_map:
+        value = str(item.get(key, "") or "").strip()
+        if value:
+            parts.append(f"{label}: {value}")
+
+    key_events = item.get("key_events", [])
+    if isinstance(key_events, list):
+        events = [str(value or "").strip() for value in key_events if str(value or "").strip()]
+        if events:
+            parts.append("Key Events:\n" + "\n".join(f"- {event}" for event in events[:10]))
+
+    return "\n".join(parts).strip()
+
+
+def build_memory_recall_documents(memories: list[dict[str, Any]], fields: list[str]) -> list[dict[str, Any]]:
+    documents: list[dict[str, Any]] = []
+    for item in memories:
+        text = build_memory_text(item, fields)
+        if not text:
+            continue
+        documents.append(
+            {
+                **item,
+                "id": str(item.get("id", "")).strip(),
+                "source_type": "memory",
+                "source_label": "长期记忆",
+                "text": text,
+            }
+        )
+    return documents
+
+
+def build_outline_recall_documents(
+    outline_items: list[dict[str, Any]],
+    *,
+    active_memory_ids: set[str],
+    mode: str = OUTLINE_RECALL_MODE,
+) -> list[dict[str, Any]]:
+    normalized_mode = str(mode or "assist").strip().lower()
+    if normalized_mode == "off":
+        return []
+
+    documents: list[dict[str, Any]] = []
+    for item in outline_items:
+        if item.get("participate_recall") is False:
+            continue
+        source_ids = [str(value or "").strip() for value in item.get("source_memory_ids", []) if str(value or "").strip()] if isinstance(item.get("source_memory_ids"), list) else []
+        if normalized_mode == "assist" and any(source_id in active_memory_ids for source_id in source_ids):
+            continue
+        text = build_memory_outline_recall_text(item)
+        if not text:
+            continue
+        outline_id = str(item.get("id", "")).strip() or f"outline-{len(documents) + 1}"
+        documents.append(
+            {
+                "id": outline_id,
+                "title": str(item.get("title", "")).strip() or "剧情档案",
+                "content": str(item.get("summary", "")).strip(),
+                "tags": ["memory-outline", "剧情档案"],
+                "notes": str(item.get("notes", "")).strip(),
+                "text": text,
+                "source_type": "memory_outline",
+                "source_label": "剧情档案",
+                "source_memory_ids": source_ids,
+                "merged_memory_id": str(item.get("merged_memory_id", "")).strip(),
+                "outline_id": outline_id,
+            }
+        )
+    return documents
+
+
+def get_runtime_memory_outline(slot_id: str | None = None) -> list[dict[str, Any]]:
+    ctx = SimpleNamespace(read_json=read_json, memories_path=memories_path)
+    return get_memory_outline(ctx, slot_id or get_active_slot_id())
+
+
 def normalize_base_url(base_url: str) -> str:
     return base_url.strip().rstrip("/")
 
@@ -3271,7 +3709,7 @@ def _evaluate_worldbook_keyword_entry(
 
 
 def _worldbook_macro_context() -> dict[str, Any]:
-    return build_macro_context(persona=get_persona(), user_profile=get_user_profile(), role_card=get_current_card())
+    return get_macro_context()
 
 
 def _render_worldbook_item_macros(item: dict[str, Any], macro_context: dict[str, Any]) -> dict[str, Any]:
@@ -3284,12 +3722,15 @@ def _render_worldbook_item_macros(item: dict[str, Any], macro_context: dict[str,
             if field in {"trigger", "secondary_trigger"}:
                 rendered = re.sub(r"[\u3001;；]+", ",", rendered)
             rendered_item[field] = rendered
+        if debug.get("replacements") or debug.get("unresolved"):
             macro_debug[field] = {
                 "raw": original,
                 "rendered": rendered,
                 "replacements": int(debug.get("replacements", 0) or 0),
                 "used": debug.get("used", []),
                 "unresolved": debug.get("unresolved", []),
+                "replacement_details": debug.get("replacement_details", []),
+                "unresolved_details": debug.get("unresolved_details", []),
             }
     if macro_debug:
         rendered_item["_macro_debug"] = macro_debug
@@ -3442,6 +3883,324 @@ def get_state_journal_active_stage_rows() -> list[dict[str, Any]]:
     return result
 
 
+STATE_JOURNAL_TIME_SLOT_LABELS = {
+    "late_night": "深夜",
+    "dawn": "清晨",
+    "morning": "上午",
+    "noon": "正午",
+    "afternoon": "下午",
+    "dusk": "黄昏",
+    "night": "夜晚",
+    "day": "白日",
+}
+STATE_JOURNAL_SEASON_LABELS = {
+    "spring": "春",
+    "summer": "夏",
+    "autumn": "秋",
+    "winter": "冬",
+}
+
+
+def _state_journal_db_path() -> Path:
+    return BASE_DIR / "data" / "mods" / "state_journal" / "state_journal.db"
+
+
+PLOT_LEDGER_DATA_TABLE = "state_journal_data_plot_ledger"
+PLOT_LEDGER_TAG_STATUSES = {"active", "done", "failed"}
+PLOT_LEDGER_ENTRY_TYPES = {"event", "task", "clue", "item"}
+PLOT_LEDGER_STATUSES = {"hidden", "active", "done", "failed", "inactive"}
+
+
+def _state_journal_table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)).fetchone()
+    return bool(row)
+
+
+def _plot_ledger_key(value: Any, fallback: str = "") -> str:
+    raw = str(value or "").strip()
+    text = re.sub(r"\s+", "_", raw.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    if text:
+        return text
+    if raw:
+        digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:10]
+        return f"entry_{digest}"
+    return fallback
+
+
+def _plot_ledger_entry_type(value: Any) -> str:
+    text = _plot_ledger_key(value, "")
+    return text if text in PLOT_LEDGER_ENTRY_TYPES else "event"
+
+
+def _plot_ledger_status(value: Any) -> str:
+    text = _plot_ledger_key(value, "")
+    return text if text in PLOT_LEDGER_STATUSES else "active"
+
+
+def _plot_ledger_activation_tag(entry_type: Any, entry_id: Any, status: Any) -> str:
+    safe_entry = _plot_ledger_key(entry_id, "")
+    safe_type = _plot_ledger_entry_type(entry_type)
+    safe_status = _plot_ledger_status(status)
+    if not safe_entry or safe_status not in PLOT_LEDGER_TAG_STATUSES:
+        return ""
+    return f"state_journal.{safe_type}.{safe_entry}.{safe_status}"
+
+
+def get_state_journal_plot_ledger_rows() -> list[dict[str, Any]]:
+    db_path = _state_journal_db_path()
+    if not db_path.exists():
+        return []
+    card_uid = get_state_journal_current_card_uid()
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            if not _state_journal_table_exists(conn, PLOT_LEDGER_DATA_TABLE):
+                return []
+            rows = conn.execute(
+                f"""
+                SELECT entry_id, entry_type, title, status, condition, summary, evidence, locked, updated_at
+                FROM {PLOT_LEDGER_DATA_TABLE}
+                WHERE state_journal_card_uid=?
+                ORDER BY updated_at DESC, entry_id ASC
+                """,
+                (card_uid,),
+            ).fetchall()
+    except Exception:
+        return []
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        entry_id = str(row["entry_id"] or "").strip()
+        if not entry_id:
+            continue
+        entry_type = _plot_ledger_entry_type(row["entry_type"])
+        status = _plot_ledger_status(row["status"])
+        tag = _plot_ledger_activation_tag(entry_type, entry_id, status)
+        result.append(
+            {
+                "entry_id": entry_id,
+                "safe_entry_id": _plot_ledger_key(entry_id, ""),
+                "entry_type": entry_type,
+                "title": str(row["title"] or "").strip(),
+                "status": status,
+                "condition": str(row["condition"] or "").strip(),
+                "summary": str(row["summary"] or "").strip(),
+                "evidence": str(row["evidence"] or "").strip(),
+                "locked": parse_bool(row["locked"]),
+                "updated_at": str(row["updated_at"] or "").strip(),
+                "activation_tag": tag,
+                "tag": tag,
+            }
+        )
+    return result
+
+
+def _parse_macro_story_time(value: Any) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _derive_macro_time_slot(hour: int) -> str:
+    if hour < 5:
+        return "late_night"
+    if hour < 7:
+        return "dawn"
+    if hour < 11:
+        return "morning"
+    if hour < 14:
+        return "noon"
+    if hour < 18:
+        return "afternoon"
+    if hour < 20:
+        return "dusk"
+    return "night"
+
+
+def _derive_macro_season(month: int) -> str:
+    if month in {3, 4, 5}:
+        return "spring"
+    if month in {6, 7, 8}:
+        return "summer"
+    if month in {9, 10, 11}:
+        return "autumn"
+    return "winter"
+
+
+def _format_macro_number(value: Any) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value or "").strip()
+    if number.is_integer():
+        return str(int(number))
+    return f"{number:.4f}".rstrip("0").rstrip(".")
+
+
+def _macro_story_time_context(row: sqlite3.Row | dict[str, Any] | None) -> dict[str, Any]:
+    if not row:
+        return {}
+    data = dict(row)
+    current_dt = _parse_macro_story_time(data.get("current_time"))
+    if not current_dt:
+        return {}
+    try:
+        elapsed_seconds = int(data.get("elapsed_seconds") or 0)
+    except (TypeError, ValueError):
+        elapsed_seconds = 0
+    slot_key = str(data.get("time_slot") or "").strip() or _derive_macro_time_slot(current_dt.hour)
+    season_key = str(data.get("season") or "").strip() or _derive_macro_season(current_dt.month)
+    slot_label = STATE_JOURNAL_TIME_SLOT_LABELS.get(slot_key, slot_key)
+    season_label = STATE_JOURNAL_SEASON_LABELS.get(season_key, season_key)
+    mode = str(data.get("display_mode") or "datetime_minute").strip()
+    if mode == "datetime_second":
+        display = f"{current_dt.year}年{current_dt.month}月{current_dt.day}日 {current_dt:%H:%M:%S}"
+    elif mode == "day_slot":
+        display = f"第 {elapsed_seconds // 86400 + 1} 日 · {slot_label}"
+    else:
+        display = f"{current_dt.year}年{current_dt.month}月{current_dt.day}日 {current_dt:%H:%M}"
+    return {
+        "display": display,
+        "current": current_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "elapsed_seconds": str(elapsed_seconds),
+        "elapsed_hours": str(elapsed_seconds // 3600),
+        "elapsed_days": str(elapsed_seconds // 86400),
+        "current_hour": str(current_dt.hour),
+        "current_date": current_dt.strftime("%Y-%m-%d"),
+        "time_slot": slot_label,
+        "time_slot_key": slot_key,
+        "season": season_label,
+        "season_key": season_key,
+    }
+
+
+def get_macro_state_journal_context() -> dict[str, Any]:
+    db_path = _state_journal_db_path()
+    if not db_path.exists():
+        return {}
+    card_uid = get_state_journal_current_card_uid()
+    stages = get_state_journal_active_stage_rows()
+    ledger_rows = get_state_journal_plot_ledger_rows()
+    stage_map = {
+        _normalize_state_journal_card_key(row.get("role_id"), ""): row
+        for row in stages
+        if row.get("role_id")
+    }
+    ledger_map = {
+        _plot_ledger_key(row.get("entry_id"), ""): row
+        for row in ledger_rows
+        if row.get("entry_id")
+    }
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            story_row = conn.execute(
+                "SELECT * FROM state_journal_story_time_state WHERE card_uid=?",
+                (card_uid,),
+            ).fetchone()
+            role_rows = conn.execute(
+                """
+                SELECT role_id, role_name, variables_json
+                FROM state_journal_role_state_configs
+                WHERE card_uid=?
+                ORDER BY role_name ASC
+                """,
+                (card_uid,),
+            ).fetchall()
+            metric_rows = conn.execute(
+                """
+                SELECT character_name, metric_key, label, current_value, max_value, raw_value, updated_at
+                FROM state_journal_metric_states
+                WHERE card_uid=?
+                ORDER BY character_name ASC, metric_key ASC
+                """,
+                (card_uid,),
+            ).fetchall()
+    except Exception:
+        return {"stages": stages, "stage_map": stage_map, "ledger": ledger_rows, "ledger_map": ledger_map}
+
+    role_name_to_id: dict[str, str] = {}
+    role_labels: dict[str, str] = {}
+    variable_labels: dict[tuple[str, str], str] = {}
+    for row in role_rows:
+        role_id = _normalize_state_journal_card_key(row["role_id"], "")
+        role_name = str(row["role_name"] or role_id).strip()
+        if not role_id:
+            continue
+        role_labels[role_id] = role_name
+        role_name_to_id[_normalize_state_journal_card_key(role_name, role_id)] = role_id
+        try:
+            variables = json.loads(row["variables_json"] or "[]")
+        except ValueError:
+            variables = []
+        for variable in variables if isinstance(variables, list) else []:
+            if not isinstance(variable, dict):
+                continue
+            metric_key = _normalize_state_journal_card_key(variable.get("var_key") or variable.get("key"), "")
+            if metric_key:
+                variable_labels[(role_id, metric_key)] = str(variable.get("var_name") or variable.get("label") or metric_key).strip()
+
+    metrics: list[dict[str, Any]] = []
+    state_map: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in metric_rows:
+        character_name = str(row["character_name"] or "").strip()
+        role_id = role_name_to_id.get(_normalize_state_journal_card_key(character_name, ""))
+        if not role_id:
+            role_id = _normalize_state_journal_card_key(character_name, "")
+        metric_key = _normalize_state_journal_card_key(row["metric_key"], "")
+        if not role_id or not metric_key:
+            continue
+        value = _format_macro_number(row["current_value"])
+        max_value = _format_macro_number(row["max_value"])
+        raw_value = str(row["raw_value"] or "").strip()
+        label = str(row["label"] or variable_labels.get((role_id, metric_key)) or metric_key).strip()
+        metric = {
+            "role_id": role_id,
+            "role_name": role_labels.get(role_id) or character_name or role_id,
+            "metric_key": metric_key,
+            "label": label,
+            "value": value,
+            "raw": raw_value or value,
+            "max": max_value,
+            "updated_at": str(row["updated_at"] or "").strip(),
+        }
+        state_map.setdefault(role_id, {})[metric_key] = metric
+        metrics.append(metric)
+
+    return {
+        "story_time": _macro_story_time_context(story_row),
+        "stages": stages,
+        "stage_map": stage_map,
+        "metrics": metrics,
+        "state_map": state_map,
+        "ledger": ledger_rows,
+        "ledger_map": ledger_map,
+    }
+
+
+def get_macro_context() -> dict[str, Any]:
+    return build_macro_context(
+        persona=get_persona(),
+        user_profile=get_user_profile(),
+        role_card=get_current_card(),
+        state_journal_context=get_macro_state_journal_context(),
+    )
+
+
+def get_macro_catalog() -> dict[str, Any]:
+    return build_macro_catalog(get_macro_context())
+
+
 def get_state_journal_active_stage_tag_sources() -> list[dict[str, Any]]:
     return [
         {
@@ -3462,8 +4221,39 @@ def get_state_journal_active_stage_tag_sources() -> list[dict[str, Any]]:
     ]
 
 
+def get_state_journal_plot_ledger_tag_sources() -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = []
+    for row in get_state_journal_plot_ledger_rows():
+        tag = str(row.get("activation_tag") or "").strip()
+        if not tag:
+            continue
+        title = str(row.get("title") or row.get("entry_id") or "剧情账本").strip()
+        status = str(row.get("status") or "").strip()
+        sources.append(
+            {
+                "tag": tag,
+                "source": "state_journal_plot_ledger",
+                "label": f"剧情运行账本 · {title} · {status}",
+                "ref": {
+                    "entry_id": row.get("entry_id", ""),
+                    "safe_entry_id": row.get("safe_entry_id", ""),
+                    "entry_type": row.get("entry_type", ""),
+                    "title": row.get("title", ""),
+                    "status": row.get("status", ""),
+                    "condition": row.get("condition", ""),
+                    "summary": row.get("summary", ""),
+                    "evidence": row.get("evidence", ""),
+                    "locked": row.get("locked", False),
+                    "is_active": True,
+                    "updated_at": row.get("updated_at", ""),
+                },
+            }
+        )
+    return sources
+
+
 def get_state_journal_active_stage_tags() -> list[dict[str, Any]]:
-    return get_state_journal_active_stage_tag_sources()
+    return [*get_state_journal_active_stage_tag_sources(), *get_state_journal_plot_ledger_tag_sources()]
 
 
 def _normalize_active_tag_context(value: Any, default_source: str = "external") -> dict[str, Any]:
@@ -4083,31 +4873,116 @@ def extract_stream_visible_reply(raw_text: str) -> tuple[str, str]:
     return str(reply_parts["sprite_tag"]), str(reply_parts["visible"])
 
 
-async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def build_memory_recall_debug_item(item: dict[str, Any], rank: int) -> dict[str, Any]:
+    text = str(item.get("text", "") or "").strip()
+    return {
+        "rank": rank,
+        "id": str(item.get("id", "") or ""),
+        "title": str(item.get("title", "") or ""),
+        "source_type": item.get("source_type", "memory"),
+        "source_label": item.get("source_label", "长期记忆"),
+        "score": item.get("score"),
+        "content": str(item.get("content", "") or ""),
+        "notes": str(item.get("notes", "") or ""),
+        "tags": item.get("tags", []),
+        "text": text,
+        "text_preview": re.sub(r"\s+", " ", text)[:320],
+        "source_memory_ids": item.get("source_memory_ids", []),
+        "merged_memory_id": item.get("merged_memory_id", ""),
+        "outline_id": item.get("outline_id", ""),
+    }
+
+
+def build_memory_recall_result_item(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": item["id"],
+        "title": item["title"],
+        "content": item["content"],
+        "tags": item["tags"],
+        "notes": item["notes"],
+        "text": item["text"],
+        "score": item["score"],
+        "source_type": item.get("source_type", "memory"),
+        "source_label": item.get("source_label", "长期记忆"),
+        "source_memory_ids": item.get("source_memory_ids", []),
+        "merged_memory_id": item.get("merged_memory_id", ""),
+        "outline_id": item.get("outline_id", ""),
+    }
+
+
+async def retrieve_memories_with_debug(
+    query: str,
+    runtime_overrides: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     embedding = get_runtime_embedding_config(runtime_overrides)
+    rerank = get_runtime_rerank_config(runtime_overrides)
+    embedding_fields = list(embedding.get("fields") or DEFAULT_SETTINGS["embedding_fields"])
+    top_k_value = int(embedding.get("top_k") or 0)
+    base_debug: dict[str, Any] = {
+        "query": str(query or ""),
+        "status": "pending",
+        "reason": "",
+        "embedding": {
+            "configured": bool(embedding["base_url"] and embedding["model"]),
+            "model": embedding.get("model", ""),
+            "fields": embedding_fields,
+            "top_k": top_k_value,
+        },
+        "rerank": {
+            "enabled": bool(rerank.get("enabled")),
+            "configured": bool(rerank.get("base_url") and rerank.get("model")),
+            "model": rerank.get("model", ""),
+            "top_n": rerank.get("top_n"),
+            "applied": False,
+            "reason": "",
+        },
+        "counts": {
+            "active_memories": 0,
+            "outline_documents": 0,
+            "documents": 0,
+            "vectors": 0,
+            "regular_selected": 0,
+            "final_selected": 0,
+        },
+        "candidate_items": [],
+        "regular_items": [],
+        "reranked_items": [],
+        "final_items": [],
+    }
     memories = [
         item for item in get_memories()
         if str(item.get("memory_status", item.get("status", "active")) or "active").strip().lower() != "archived"
     ]
-    if not memories:
-        return []
+    base_debug["counts"]["active_memories"] = len(memories)
     if not (embedding["base_url"] and embedding["model"]):
-        return []
+        base_debug["status"] = "skipped"
+        base_debug["reason"] = "embedding_not_configured"
+        return [], base_debug
 
-    documents: list[dict[str, Any]] = []
-    for item in memories:
-        text = build_memory_text(item, list(embedding["fields"]))
-        if text:
-            documents.append({**item, "text": text})
+    active_memory_ids = {str(item.get("id", "")).strip() for item in memories if str(item.get("id", "")).strip()}
+    documents = build_memory_recall_documents(memories, embedding_fields)
+    outline_documents = build_outline_recall_documents(
+        get_runtime_memory_outline(),
+        active_memory_ids=active_memory_ids,
+    )
+    documents.extend(outline_documents)
+    base_debug["counts"]["outline_documents"] = len(outline_documents)
+    base_debug["counts"]["documents"] = len(documents)
 
     if not documents:
-        return []
+        base_debug["status"] = "skipped"
+        base_debug["reason"] = "no_recall_documents"
+        return [], base_debug
 
     vectors = await fetch_embeddings([query] + [item["text"] for item in documents], runtime_overrides)
+    base_debug["counts"]["vectors"] = len(vectors)
     expected_count = len(documents) + 1
     if len(vectors) != expected_count:
         logger.warning("向量数量不对，跳过本轮记忆召回：预计 %s，实际 %s。", expected_count, len(vectors))
-        return []
+        base_debug["status"] = "skipped"
+        base_debug["reason"] = "embedding_vector_count_mismatch"
+        base_debug["expected_vector_count"] = expected_count
+        return [], base_debug
 
     query_vector = vectors[0]
     scored: list[dict[str, Any]] = []
@@ -4115,22 +4990,40 @@ async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None
         scored.append({**doc, "score": round(cosine_similarity(query_vector, doc_vector), 4)})
 
     scored.sort(key=lambda item: item["score"], reverse=True)
-    top_k = min(int(embedding["top_k"]), len(scored))
+    top_k = min(top_k_value, len(scored))
     selected = scored[:top_k]
-    reranked = await rerank_documents(query, selected, runtime_overrides)
-
-    return [
-        {
-            "id": item["id"],
-            "title": item["title"],
-            "content": item["content"],
-            "tags": item["tags"],
-            "notes": item["notes"],
-            "text": item["text"],
-            "score": item["score"],
-        }
-        for item in reranked
+    base_debug["candidate_items"] = [
+        build_memory_recall_debug_item(item, rank)
+        for rank, item in enumerate(scored[:20], start=1)
     ]
+    base_debug["regular_items"] = [
+        build_memory_recall_debug_item(item, rank)
+        for rank, item in enumerate(selected, start=1)
+    ]
+    base_debug["counts"]["regular_selected"] = len(selected)
+    reranked = await rerank_documents(query, selected, runtime_overrides)
+    base_debug["reranked_items"] = [
+        build_memory_recall_debug_item(item, rank)
+        for rank, item in enumerate(reranked, start=1)
+    ]
+    base_debug["final_items"] = base_debug["reranked_items"]
+    base_debug["counts"]["final_selected"] = len(reranked)
+    if rerank.get("enabled"):
+        if rerank.get("base_url") and rerank.get("model"):
+            base_debug["rerank"]["applied"] = True
+            base_debug["rerank"]["reason"] = "enabled"
+        else:
+            base_debug["rerank"]["reason"] = "rerank_not_configured"
+    else:
+        base_debug["rerank"]["reason"] = "disabled"
+    base_debug["status"] = "ok"
+
+    return [build_memory_recall_result_item(item) for item in reranked], base_debug
+
+
+async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    items, _debug = await retrieve_memories_with_debug(query, runtime_overrides)
+    return items
 
 
 async def request_model_reply(
@@ -4472,9 +5365,9 @@ async def stream_model_reply(
 async def generate_reply(
     user_message: str,
     runtime_overrides: dict[str, Any] | None = None,
-) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]], dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]], dict[str, Any], dict[str, Any], dict[str, Any]]:
     llm_config = get_runtime_chat_config(runtime_overrides)
-    retrieved = await retrieve_memories(user_message, runtime_overrides)
+    retrieved, memory_debug = await retrieve_memories_with_debug(user_message, runtime_overrides)
     preset_context = build_active_preset_context()
     active_stage_tags = get_state_journal_active_stage_tags()
     active_tag_context = build_active_tag_context(active_stage_tags, preset_context)
@@ -4494,7 +5387,7 @@ async def generate_reply(
                 status_code=400,
                 detail="Please configure the chat model API URL and model name first, or enable demo mode.",
             )
-        return {"reply": "", "sprite_tag": ""}, retrieved, worldbook_matches, prompt_package, worldbook_debug_snapshot
+        return {"reply": "", "sprite_tag": ""}, retrieved, worldbook_matches, prompt_package, worldbook_debug_snapshot, memory_debug
 
     reply = await request_model_reply(
         user_message,
@@ -4503,7 +5396,7 @@ async def generate_reply(
         worldbook_matches=worldbook_matches,
         prompt_package=prompt_package,
     )
-    return reply, retrieved, worldbook_matches, prompt_package, worldbook_debug_snapshot
+    return reply, retrieved, worldbook_matches, prompt_package, worldbook_debug_snapshot, memory_debug
 
 
 def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str, Any]:
@@ -4858,6 +5751,7 @@ configure_prompt_builder(
     build_preset_prompt=build_preset_prompt,
     build_preset_observation_segments=build_preset_observation_segments,
     get_director_notes=get_director_notes,
+    get_macro_state_journal_context=get_macro_state_journal_context,
 )
 
 load_env_file()
@@ -4929,7 +5823,9 @@ route_ctx = SimpleNamespace(
     duplicate_preset_in_store=duplicate_preset_in_store,
     evaluate_creative_workshop=evaluate_creative_workshop,
     create_director_note=create_director_note,
+    preview_director_note=preview_director_note,
     delete_director_note=delete_director_note,
+    disable_advanced_director_notes=disable_advanced_director_notes,
     consume_director_notes_turn=consume_director_notes_turn,
     director_notes_path=director_notes_path,
     fetch_available_models=fetch_available_models,
@@ -4942,6 +5838,9 @@ route_ctx = SimpleNamespace(
     get_current_card=get_current_card,
     get_director_notes=get_director_notes,
     get_memories=get_memories,
+    get_macro_catalog=get_macro_catalog,
+    get_macro_context=get_macro_context,
+    get_macro_state_journal_context=get_macro_state_journal_context,
     get_mod=lambda slug: next(
         (mod.to_dict() for mod in registered_mods if mod.slug == slug), None
     ),
@@ -4984,6 +5883,7 @@ route_ctx = SimpleNamespace(
     request_minimal_model_reply=request_minimal_model_reply,
     reset_slot_data=reset_slot_data,
     reset_workshop_state=reset_workshop_state,
+    retrieve_memories_with_debug=retrieve_memories_with_debug,
     retrieve_memories=retrieve_memories,
     memories_path=memories_path,
     sanitize_creative_workshop=sanitize_creative_workshop,

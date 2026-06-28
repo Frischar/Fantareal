@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
-from .macro_variables import build_macro_context, render_messages_with_macros, render_prompt_segments_with_macros
+from .macro_variables import build_macro_context, render_macro_variables, render_messages_with_macros, render_prompt_segments_with_macros
 
 _DEPS: dict[str, Callable[..., Any]] = {}
 
@@ -133,13 +133,13 @@ def _segment_map(prompt_segments: list[dict[str, Any]]) -> dict[str, str]:
     }
 
 
-def _segment_contents_by(
+def _segments_by(
     prompt_segments: list[dict[str, Any]],
     *,
     kind: str | None = None,
     placement: str | None = None,
     id_prefix: str | None = None,
-) -> list[str]:
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for segment in prompt_segments:
         if kind is not None and str(segment.get("kind", "") or "") != kind:
@@ -153,7 +153,55 @@ def _segment_contents_by(
         if content:
             rows.append(segment)
     rows.sort(key=lambda item: int(item.get("order", 0) or 0))
+    return rows
+
+
+def _segment_contents_by(
+    prompt_segments: list[dict[str, Any]],
+    *,
+    kind: str | None = None,
+    placement: str | None = None,
+    id_prefix: str | None = None,
+) -> list[str]:
+    rows = _segments_by(prompt_segments, kind=kind, placement=placement, id_prefix=id_prefix)
     return [str(item.get("content", "") or "").strip() for item in rows]
+
+
+def _segments_to_messages(segments: list[dict[str, Any]]) -> list[dict[str, str]]:
+    messages: list[dict[str, str]] = []
+    pending_role = ""
+    pending_sections: list[str] = []
+
+    def flush() -> None:
+        nonlocal pending_role, pending_sections
+        if pending_sections:
+            _append_joined_message(messages, pending_role or "system", pending_sections)
+        pending_role = ""
+        pending_sections = []
+
+    for segment in segments:
+        role = str(segment.get("role", "system") or "system").strip() or "system"
+        content = str(segment.get("content", "") or "").strip()
+        if not content:
+            continue
+        if pending_sections and role != pending_role:
+            flush()
+        pending_role = role
+        pending_sections.append(content)
+    flush()
+    return messages
+
+
+def _segment_director_depth(segment: dict[str, Any]) -> int | None:
+    if str(segment.get("kind", "") or "") != "director_note":
+        return None
+    if str(segment.get("placement", "") or "") != "at_depth":
+        return None
+    metadata = segment.get("metadata", {}) if isinstance(segment.get("metadata"), dict) else {}
+    try:
+        return max(0, min(int(metadata.get("depth", 0)), 999))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _build_legacy_messages_from_segments(prompt_segments: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -177,6 +225,8 @@ def _build_legacy_messages_from_segments(prompt_segments: list[dict[str, Any]]) 
             continue
         if str(segment.get("kind", "") or "") == "director_note" and str(segment.get("placement", "") or "") == "near_latest_user":
             continue
+        if _segment_director_depth(segment) == 0:
+            continue
         if segment_id == "runtime.user_input":
             continue
 
@@ -189,19 +239,17 @@ def _build_legacy_messages_from_segments(prompt_segments: list[dict[str, Any]]) 
 
     _append_joined_message(messages, "system", system_sections)
 
-    output_guard_sections = _segment_contents_by(prompt_segments, placement="output_guard")
-    if output_guard_sections:
-        messages.append({"role": "system", "content": "\n\n".join(output_guard_sections)})
+    messages.extend(_segments_to_messages(_segments_by(prompt_segments, placement="output_guard")))
 
-    near_user_director_sections = _segment_contents_by(prompt_segments, kind="director_note", placement="near_latest_user")
-    if near_user_director_sections:
-        messages.append({"role": "system", "content": "\n\n".join(near_user_director_sections)})
+    messages.extend(_segments_to_messages(_segments_by(prompt_segments, kind="director_note", placement="near_latest_user")))
 
     user_input = next(
         (str(segment.get("content", "") or "").strip() for segment in prompt_segments if str(segment.get("id", "") or "") == "runtime.user_input"),
         "",
     )
     messages.append({"role": "user", "content": user_input})
+    depth_zero_segments = [segment for segment in _segments_by(prompt_segments, kind="director_note", placement="at_depth") if _segment_director_depth(segment) == 0]
+    messages.extend(_segments_to_messages(depth_zero_segments))
     return messages
 
 
@@ -214,37 +262,162 @@ def _director_note_placement(position: Any) -> str:
     return "after_character"
 
 
+def _director_note_mode(note: dict[str, Any]) -> str:
+    value = str(note.get("mode", "basic") or "basic").strip().lower()
+    return value if value in {"basic", "advanced"} else "basic"
+
+
+def _director_note_inject(note: dict[str, Any]) -> dict[str, Any]:
+    inject = note.get("inject", {}) if isinstance(note.get("inject"), dict) else {}
+    inject_type = str(inject.get("type", "placement") or "placement").strip().lower()
+    if inject_type not in {"placement", "depth"}:
+        inject_type = "placement"
+    role = str(inject.get("role", "system") or "system").strip().lower()
+    if role not in {"system", "user", "assistant"}:
+        role = "system"
+    placement = str(inject.get("placement", "") or "").strip()
+    if placement not in {"before_character", "after_character", "near_latest_user", "output_guard", "at_depth"}:
+        placement = _director_note_placement(note.get("position"))
+    try:
+        depth = max(0, min(int(inject.get("depth", 0)), 999))
+    except (TypeError, ValueError):
+        depth = 0
+    try:
+        order = max(0, min(int(inject.get("order", 100)), 999))
+    except (TypeError, ValueError):
+        order = 100
+    if inject_type == "depth":
+        placement = "at_depth"
+    return {
+        "type": inject_type,
+        "role": role,
+        "placement": placement,
+        "depth": depth,
+        "order": order,
+    }
+
+
+def _director_note_effective_role(note: dict[str, Any]) -> str:
+    if _director_note_mode(note) == "advanced":
+        return _director_note_inject(note).get("role", "system")
+    return "system"
+
+
+def _director_note_effective_order(note: dict[str, Any], fallback: int) -> int:
+    if _director_note_mode(note) == "advanced":
+        return int(_director_note_inject(note).get("order", 100) or 100)
+    return fallback
+
+
 def _format_director_note(note: dict[str, Any], index: int) -> str:
     content = str(note.get("content", "") or "").strip()
     if not content:
         return ""
     remaining_turns = note.get("remaining_turns", 1)
+    title = str(note.get("title", "") or "").strip()
+    mode = _director_note_mode(note)
+    label = "高级导演注" if mode == "advanced" else "临时导演注"
+    inject = _director_note_inject(note)
+    advanced_line = ""
+    if mode == "advanced":
+        if inject.get("type") == "depth":
+            advanced_line = f"注入：role={inject.get('role')} depth={inject.get('depth')} order={inject.get('order')}\n"
+        else:
+            advanced_line = f"注入：role={inject.get('role')} placement={inject.get('placement')} order={inject.get('order')}\n"
     return (
-        f"【临时导演注 {index}】\n"
+        f"【{label} {index}{f'：{title}' if title else ''}】\n"
         "以下内容是用户临时添加的本轮/短期提示，只用于辅助当前 Chat 组包；"
         "不得覆盖 BASE、角色卡、世界书、记忆或输出守卫。\n"
+        f"{advanced_line}"
         f"剩余生效回合：{remaining_turns}\n"
         f"内容：{content}"
     )
 
 
 def _bucket_director_notes(notes: list[dict[str, Any]] | None) -> dict[str, list[dict[str, Any]]]:
-    buckets = {"before_character": [], "after_character": [], "near_latest_user": []}
+    buckets: dict[str, Any] = {"before_character": [], "after_character": [], "near_latest_user": [], "output_guard": [], "at_depth": {}}
     for index, note in enumerate(notes or [], start=1):
         if not isinstance(note, dict):
+            continue
+        if note.get("enabled") is False:
             continue
         content = str(note.get("content", "") or "").strip()
         if not content:
             continue
         item = dict(note)
         item["_prompt_text"] = _format_director_note(item, index)
-        placement = _director_note_placement(item.get("position"))
+        item["_effective_role"] = _director_note_effective_role(item)
+        item["_effective_order"] = _director_note_effective_order(item, index * 10)
+        if _director_note_mode(item) == "advanced":
+            inject = _director_note_inject(item)
+            if inject.get("type") == "depth":
+                depth = int(inject.get("depth", 0) or 0)
+                buckets.setdefault("at_depth", {}).setdefault(depth, []).append(item)
+                continue
+            placement = str(inject.get("placement") or _director_note_placement(item.get("position")))
+        else:
+            placement = _director_note_placement(item.get("position"))
         buckets.setdefault(placement, []).append(item)
+    for key in ("before_character", "after_character", "near_latest_user", "output_guard"):
+        buckets[key] = sorted(buckets.get(key, []), key=lambda item: int(item.get("_effective_order", 0) or 0))
+    depth_buckets = buckets.get("at_depth", {})
+    if isinstance(depth_buckets, dict):
+        for depth, rows in list(depth_buckets.items()):
+            depth_buckets[depth] = sorted(rows, key=lambda item: int(item.get("_effective_order", 0) or 0))
     return buckets
 
 
 def _director_note_sections(buckets: dict[str, list[dict[str, Any]]], placement: str) -> list[str]:
     return [str(item.get("_prompt_text", "") or "").strip() for item in buckets.get(placement, []) if str(item.get("_prompt_text", "") or "").strip()]
+
+
+def _director_note_items(buckets: dict[str, Any], placement: str, *, depth: int | None = None) -> list[dict[str, Any]]:
+    if placement == "at_depth":
+        depth_buckets = buckets.get("at_depth", {})
+        if not isinstance(depth_buckets, dict):
+            return []
+        rows = depth_buckets.get(depth or 0, [])
+    else:
+        rows = buckets.get(placement, [])
+    if not isinstance(rows, list):
+        return []
+    return [item for item in rows if isinstance(item, dict) and str(item.get("_prompt_text", "") or "").strip()]
+
+
+def _director_note_messages(buckets: dict[str, Any], placement: str, *, depth: int | None = None) -> list[dict[str, str]]:
+    segments = [
+        {
+            "role": str(item.get("_effective_role", "system") or "system"),
+            "content": str(item.get("_prompt_text", "") or "").strip(),
+            "order": int(item.get("_effective_order", 0) or 0),
+        }
+        for item in _director_note_items(buckets, placement, depth=depth)
+    ]
+    return _segments_to_messages(segments)
+
+
+def _render_director_note_buckets_with_macros(buckets: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    rendered_buckets: dict[str, Any] = {}
+
+    def render_item(item: Any) -> Any:
+        if not isinstance(item, dict):
+            return item
+        next_item = dict(item)
+        rendered_text, _debug = render_macro_variables(next_item.get("_prompt_text", ""), context)
+        next_item["_prompt_text"] = rendered_text
+        return next_item
+
+    for key, value in buckets.items():
+        if key == "at_depth" and isinstance(value, dict):
+            rendered_buckets[key] = {
+                depth: [render_item(item) for item in rows] if isinstance(rows, list) else rows
+                for depth, rows in value.items()
+            }
+        elif isinstance(value, list):
+            rendered_buckets[key] = [render_item(item) for item in value]
+        else:
+            rendered_buckets[key] = value
+    return rendered_buckets
 
 
 def _is_layerable_preset_segment(segment: dict[str, Any]) -> bool:
@@ -372,18 +545,23 @@ def _build_layered_messages(
 
     system_core_sections = preset_sections("system_core") + legacy_preset_sections
     _append_joined_message(messages, "system", system_core_sections)
+    _append_joined_message(messages, "system", [worldbook_before_char_defs_prompt, *preset_sections("before_character")])
+    messages.extend(_director_note_messages(director_note_buckets, "before_character"))
     _append_joined_message(
         messages,
         "system",
         [
-            worldbook_before_char_defs_prompt,
-            *preset_sections("before_character"),
-            *_director_note_sections(director_note_buckets, "before_character"),
             system_prompt,
             worldbook_stable_prompt,
             worldbook_after_char_defs_prompt,
             *preset_sections("after_character"),
-            *_director_note_sections(director_note_buckets, "after_character"),
+        ],
+    )
+    messages.extend(_director_note_messages(director_note_buckets, "after_character"))
+    _append_joined_message(
+        messages,
+        "system",
+        [
             memory_recap_prompt,
             user_profile_prompt,
             *preset_sections("memory_context"),
@@ -401,23 +579,24 @@ def _build_layered_messages(
 
     def append_in_chat_bucket(depth: int) -> None:
         bucket = in_chat_buckets.get(depth, []) if hasattr(in_chat_buckets, "get") else []
-        if not bucket:
-            return
-        role_groups: list[tuple[str, list[dict[str, Any]]]] = []
-        for item in bucket:
-            role = normalize_worldbook_injection_role(item.get("injection_role", "system"), "system")
-            if not role_groups or role_groups[-1][0] != role:
-                role_groups.append((role, [item]))
-            else:
-                role_groups[-1][1].append(item)
-        for role, role_items in role_groups:
-            content = build_worldbook_prompt_fn(
-                role_items,
-                heading=f"The following are in-chat worldbook notes at depth {depth}.",
-            )
-            message = _message(role, content)
-            if message:
-                messages.append(message)
+        if bucket:
+            role_groups: list[tuple[str, list[dict[str, Any]]]] = []
+            for item in bucket:
+                role = normalize_worldbook_injection_role(item.get("injection_role", "system"), "system")
+                if not role_groups or role_groups[-1][0] != role:
+                    role_groups.append((role, [item]))
+                else:
+                    role_groups[-1][1].append(item)
+            for role, role_items in role_groups:
+                content = build_worldbook_prompt_fn(
+                    role_items,
+                    heading=f"The following are in-chat worldbook notes at depth {depth}.",
+                )
+                message = _message(role, content)
+                if message:
+                    messages.append(message)
+        if depth > 0:
+            messages.extend(_director_note_messages(director_note_buckets, "at_depth", depth=depth))
 
     for index, item in enumerate(recent_history):
         tail_depth = history_count - index
@@ -429,11 +608,13 @@ def _build_layered_messages(
 
     append_in_chat_bucket(0)
     _append_joined_message(messages, "system", preset_sections("output_guard") + [worldbook_output_guard_prompt])
+    messages.extend(_director_note_messages(director_note_buckets, "output_guard"))
     _append_joined_message(messages, "system", preset_sections("near_latest_user"))
-    _append_joined_message(messages, "system", _director_note_sections(director_note_buckets, "near_latest_user"))
+    messages.extend(_director_note_messages(director_note_buckets, "near_latest_user"))
     message = _message("user", clean_user_message)
     if message:
         messages.append(message)
+    messages.extend(_director_note_messages(director_note_buckets, "at_depth", depth=0))
     return messages, state
 
 
@@ -830,12 +1011,15 @@ def build_retrieval_prompt(retrieved_items: list[dict[str, Any]]) -> str:
         return ""
 
     blocks = [
-        "The following are the most relevant long-term memories for the current message.",
+        "The following are the most relevant memory materials for the current message.",
         "Use them as supporting context, but do not hallucinate details that are not present.",
     ]
     for index, item in enumerate(retrieved_items, start=1):
         title = str(item.get("title", "")).strip() or f"Memory {index}"
-        blocks.append(f"{index}. {title}\n{item.get('text', '')}")
+        source_label = str(item.get("source_label", "")).strip()
+        if not source_label:
+            source_label = "剧情档案" if item.get("source_type") == "memory_outline" else "长期记忆"
+        blocks.append(f"{index}. [{source_label}] {title}\n{item.get('text', '')}")
     return "\n\n".join(blocks)
 
 
@@ -1002,6 +1186,7 @@ def build_prompt_package(
     build_preset_output_guard = _optional_dep("build_preset_output_guard")
     get_director_notes = _optional_dep("get_director_notes")
     get_current_card = _optional_dep("get_current_card")
+    get_macro_state_journal_context = _optional_dep("get_macro_state_journal_context")
 
     persona = get_persona()
     history = get_conversation()
@@ -1175,6 +1360,44 @@ def build_prompt_package(
             metadata=metadata,
         )
 
+    def append_director_note_segment(note: dict[str, Any], *, placement: str, depth: int | None = None) -> None:
+        inject = _director_note_inject(note)
+        mode = _director_note_mode(note)
+        role = str(note.get("_effective_role") or _director_note_effective_role(note) or "system")
+        metadata = {
+            "layer_id": "director_notes",
+            "note_id": str(note.get("id", "")),
+            "title": str(note.get("title", "") or ""),
+            "mode": mode,
+            "enabled": note.get("enabled") is not False,
+            "position": str(note.get("position", "")),
+            "remaining_turns": int(note.get("remaining_turns", 1) or 1),
+            "inject_type": str(inject.get("type", "placement")),
+            "inject_role": role,
+            "inject_order": int(inject.get("order", note.get("_effective_order", 100)) or 100),
+            "final_role": role,
+            "final_position": f"depth:{depth}" if depth is not None else placement,
+            "applied": True,
+            "reason": (
+                f"高级导演注：作为 {role} 消息插入 depth={depth}。"
+                if depth is not None
+                else f"{'高级' if mode == 'advanced' else '常规'}导演注：插入 {placement}。"
+            ),
+        }
+        if depth is not None:
+            metadata["depth"] = depth
+        append_segment(
+            str(note.get("id", "director_note")),
+            source="runtime",
+            kind="director_note",
+            role=role,
+            content=str(note.get("_prompt_text", "") or ""),
+            placement="at_depth" if depth is not None else placement,
+            required=True,
+            strength="soft",
+            metadata=metadata,
+        )
+
     if preset_observation_segments:
         for preset_segment in preset_observation_segments:
             segment_order += 10
@@ -1218,22 +1441,7 @@ def build_prompt_package(
         metadata={"layer_id": "worldbook_before_char_defs", "hit_count": len(worldbook_buckets.get("before_char_defs", []))},
     )
     for note in director_note_buckets.get("before_character", []):
-        append_segment(
-            str(note.get("id", "director_note")),
-            source="runtime",
-            kind="director_note",
-            role="system",
-            content=str(note.get("_prompt_text", "") or ""),
-            placement="before_character",
-            required=True,
-            strength="soft",
-            metadata={
-                "layer_id": "director_notes",
-                "note_id": str(note.get("id", "")),
-                "position": str(note.get("position", "")),
-                "remaining_turns": int(note.get("remaining_turns", 1) or 1),
-            },
-        )
+        append_director_note_segment(note, placement="before_character")
     append_segment(
         "character.definition",
         source="character",
@@ -1266,22 +1474,7 @@ def build_prompt_package(
         metadata={"layer_id": "worldbook_after_char_defs", "hit_count": len(worldbook_buckets.get("after_char_defs", []))},
     )
     for note in director_note_buckets.get("after_character", []):
-        append_segment(
-            str(note.get("id", "director_note")),
-            source="runtime",
-            kind="director_note",
-            role="system",
-            content=str(note.get("_prompt_text", "") or ""),
-            placement="after_character",
-            required=True,
-            strength="soft",
-            metadata={
-                "layer_id": "director_notes",
-                "note_id": str(note.get("id", "")),
-                "position": str(note.get("position", "")),
-                "remaining_turns": int(note.get("remaining_turns", 1) or 1),
-            },
-        )
+        append_director_note_segment(note, placement="after_character")
     append_segment(
         "memory.recap",
         source="memory",
@@ -1338,22 +1531,7 @@ def build_prompt_package(
         metadata={"layer_id": "worldbook_answer_guard", "hit_count": len(matched_worldbook_entries)},
     )
     for note in director_note_buckets.get("near_latest_user", []):
-        append_segment(
-            str(note.get("id", "director_note")),
-            source="runtime",
-            kind="director_note",
-            role="system",
-            content=str(note.get("_prompt_text", "") or ""),
-            placement="near_latest_user",
-            required=True,
-            strength="soft",
-            metadata={
-                "layer_id": "director_notes",
-                "note_id": str(note.get("id", "")),
-                "position": str(note.get("position", "")),
-                "remaining_turns": int(note.get("remaining_turns", 1) or 1),
-            },
-        )
+        append_director_note_segment(note, placement="near_latest_user")
     append_segment(
         "runtime.sprite",
         source="runtime",
@@ -1367,29 +1545,32 @@ def build_prompt_package(
     def append_in_chat_segments(depth: int) -> None:
         bucket = in_chat_buckets.get(depth, [])
         if not bucket:
-            return
+            role_groups = []
+        else:
+            role_groups: list[tuple[str, list[dict[str, Any]]]] = []
+            for item in bucket:
+                role = normalize_worldbook_injection_role(item.get("injection_role", "system"), "system")
+                if not role_groups or role_groups[-1][0] != role:
+                    role_groups.append((role, [item]))
+                else:
+                    role_groups[-1][1].append(item)
 
-        role_groups: list[tuple[str, list[dict[str, Any]]]] = []
-        for item in bucket:
-            role = normalize_worldbook_injection_role(item.get("injection_role", "system"), "system")
-            if not role_groups or role_groups[-1][0] != role:
-                role_groups.append((role, [item]))
-            else:
-                role_groups[-1][1].append(item)
-
-        for group_index, (role, role_items) in enumerate(role_groups, start=1):
-            append_segment(
-                f"worldbook.in_chat.depth_{depth}.{group_index}",
-                source="worldbook",
-                kind="lore_policy",
-                role=role,
-                content=build_worldbook_prompt(
-                    role_items,
-                    heading=f"The following are in-chat worldbook notes at depth {depth}.",
-                ),
-                placement="at_depth",
-                metadata={"layer_id": f"worldbook_in_chat_depth_{depth}", "depth": depth, "hit_count": len(role_items)},
-            )
+            for group_index, (role, role_items) in enumerate(role_groups, start=1):
+                append_segment(
+                    f"worldbook.in_chat.depth_{depth}.{group_index}",
+                    source="worldbook",
+                    kind="lore_policy",
+                    role=role,
+                    content=build_worldbook_prompt(
+                        role_items,
+                        heading=f"The following are in-chat worldbook notes at depth {depth}.",
+                    ),
+                    placement="at_depth",
+                    metadata={"layer_id": f"worldbook_in_chat_depth_{depth}", "depth": depth, "hit_count": len(role_items)},
+                )
+        if depth > 0:
+            for note in _director_note_items(director_note_buckets, "at_depth", depth=depth):
+                append_director_note_segment(note, placement="at_depth", depth=depth)
 
     for index, item in enumerate(recent_history, start=1):
         tail_depth = history_count - (index - 1)
@@ -1428,6 +1609,8 @@ def build_prompt_package(
         strength="hard",
         metadata={"layer_id": "final_output_guard", "hit_count": len(worldbook_buckets.get("output_guard", []))},
     )
+    for note in director_note_buckets.get("output_guard", []):
+        append_director_note_segment(note, placement="output_guard")
     append_segment(
         "runtime.user_input",
         source="runtime",
@@ -1439,8 +1622,17 @@ def build_prompt_package(
         strength="hard",
         metadata={"layer_id": "user_input", "char_count": len(clean_user_message)},
     )
+    for note in _director_note_items(director_note_buckets, "at_depth", depth=0):
+        append_director_note_segment(note, placement="at_depth", depth=0)
 
-    macro_context = build_macro_context(persona=persona, user_profile=user_profile, role_card=role_card)
+    state_journal_macro_context = get_macro_state_journal_context() if get_macro_state_journal_context else {}
+    macro_context = build_macro_context(
+        persona=persona,
+        user_profile=user_profile,
+        role_card=role_card,
+        state_journal_context=state_journal_macro_context,
+    )
+    director_note_buckets = _render_director_note_buckets_with_macros(director_note_buckets, macro_context)
     prompt_segments, macro_variables = render_prompt_segments_with_macros(prompt_segments, macro_context)
     content_by_segment_id = _segment_map(prompt_segments)
 
@@ -1549,6 +1741,16 @@ def build_prompt_package(
         macro_variables["used"] = sorted(existing_used)
         macro_variables["unresolved"] = sorted(existing_unresolved)
         macro_variables["replacement_count"] = int(macro_variables.get("replacement_count", 0) or 0) + int(message_macro_debug.get("replacements", 0) or 0)
+        macro_variables.setdefault("replacements", [])
+        if isinstance(macro_variables["replacements"], list):
+            macro_variables["replacements"].extend(
+                item for item in message_macro_debug.get("replacement_details", []) if isinstance(item, dict)
+            )
+        macro_variables.setdefault("unresolved_details", [])
+        if isinstance(macro_variables["unresolved_details"], list):
+            macro_variables["unresolved_details"].extend(
+                item for item in message_macro_debug.get("unresolved_details", []) if isinstance(item, dict)
+            )
 
     layers: list[dict[str, Any]] = []
 

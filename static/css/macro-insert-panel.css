@@ -1,0 +1,189 @@
+.macro-insert-button {
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.macro-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.macro-field-head label {
+  margin: 0;
+}
+
+.macro-insert-panel {
+  position: fixed;
+  z-index: 1200;
+  max-height: min(72vh, 620px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid rgba(132, 106, 82, 0.24);
+  border-radius: 8px;
+  background: rgb(255, 250, 244);
+  box-shadow: 0 22px 60px rgba(35, 28, 20, 0.22);
+  color: var(--text, #241b16);
+}
+
+.macro-insert-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(132, 106, 82, 0.16);
+}
+
+.macro-insert-head strong,
+.macro-insert-head span {
+  display: block;
+}
+
+.macro-insert-head span {
+  margin-top: 2px;
+  color: var(--muted, #76685d);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.macro-insert-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.macro-insert-search {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(132, 106, 82, 0.12);
+}
+
+.macro-insert-search span {
+  color: var(--muted, #76685d);
+  font-size: 12px;
+}
+
+.macro-insert-search input {
+  min-width: 0;
+  height: 34px;
+}
+
+.macro-insert-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  box-sizing: border-box;
+  max-height: var(--macro-insert-body-max-height, calc(min(72vh, 620px) - 110px));
+  overflow: auto;
+  padding: 8px;
+}
+
+.macro-insert-group {
+  padding: 4px 0 8px;
+}
+
+.macro-insert-group h3 {
+  margin: 6px 6px 8px;
+  color: var(--muted, #76685d);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.macro-insert-items {
+  display: grid;
+  gap: 6px;
+}
+
+.macro-insert-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(84px, 34%);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgba(132, 106, 82, 0.14);
+  border-radius: 8px;
+  background: rgb(255, 255, 255);
+  color: inherit;
+  text-align: left;
+}
+
+.macro-insert-item:hover {
+  border-color: rgba(132, 106, 82, 0.32);
+  background: rgb(255, 244, 235);
+}
+
+.macro-insert-item-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.macro-insert-item-main strong,
+.macro-insert-item-main code,
+.macro-insert-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.macro-insert-item-main strong {
+  font-size: 13px;
+}
+
+.macro-insert-item-main code {
+  color: var(--accent, #8a5636);
+  font-size: 12px;
+}
+
+.macro-insert-preview {
+  color: var(--muted, #76685d);
+  font-size: 12px;
+  text-align: right;
+}
+
+.macro-insert-empty {
+  margin: 10px;
+  color: var(--muted, #76685d);
+  font-size: 13px;
+}
+
+html[data-theme="dark"] .macro-insert-panel {
+  border-color: rgba(222, 192, 156, 0.22);
+  background: rgb(24, 31, 39);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme="dark"] .macro-insert-item {
+  border-color: rgba(222, 192, 156, 0.14);
+  background: rgb(31, 40, 50);
+}
+
+html[data-theme="dark"] .macro-insert-item:hover {
+  border-color: rgba(222, 192, 156, 0.3);
+  background: rgb(39, 50, 62);
+}
+
+@media (max-width: 640px) {
+  .macro-insert-panel {
+    left: 10px !important;
+    right: 10px;
+    width: auto !important;
+  }
+
+  .macro-insert-item {
+    grid-template-columns: 1fr;
+  }
+
+  .macro-insert-preview {
+    text-align: left;
+  }
+}

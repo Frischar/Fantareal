@@ -1187,6 +1187,9 @@ select option:disabled {
 .relationship-row-card {
   border-left: 3px solid rgba(232,185,116,.48);
 }
+.ledger-row-card {
+  border-left: 3px solid rgba(103,194,161,.52);
+}
 .readable-row-head {
   align-items: flex-start;
   border-bottom: 1px solid var(--xj-line);
@@ -1227,6 +1230,27 @@ select option:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ledger-status-badge {
+  color: #d8f5df;
+  border-color: rgba(103,194,161,.28);
+  background: rgba(103,194,161,.12);
+}
+.ledger-status-badge.status-done {
+  color: #dfe9ff;
+  border-color: rgba(127,157,255,.28);
+  background: rgba(127,157,255,.12);
+}
+.ledger-status-badge.status-failed {
+  color: #ffd6d6;
+  border-color: rgba(255,120,120,.30);
+  background: rgba(255,120,120,.12);
+}
+.ledger-status-badge.status-inactive,
+.ledger-status-badge.status-hidden {
+  color: var(--xj-muted);
+  border-color: var(--xj-line);
+  background: rgba(255,255,255,.045);
 }
 .row-summary-block {
   display: grid;
@@ -1277,6 +1301,40 @@ select option:disabled {
 }
 .rows-table-wrap {
   overflow-x: auto;
+}
+.ledger-table-wrap {
+  border-color: rgba(103,194,161,.22);
+}
+.ledger-table th:nth-child(1) { min-width: 180px; }
+.ledger-table th:nth-child(2),
+.ledger-table th:nth-child(3) { min-width: 92px; }
+.ledger-table th:nth-child(4),
+.ledger-table th:nth-child(5) { min-width: 230px; }
+.ledger-title-cell {
+  display: grid;
+  gap: 4px;
+}
+.ledger-title-cell strong {
+  color: var(--xj-text);
+  font-weight: 900;
+}
+.ledger-title-cell small {
+  color: var(--xj-muted);
+  font-size: .76rem;
+  font-weight: 700;
+}
+.ledger-type-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.3rem;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(232,185,116,.20);
+  color: var(--xj-accent);
+  background: rgba(232,185,116,.075);
+  font-size: .78rem;
+  font-weight: 900;
 }
 .rows-table-cell.long {
   white-space: normal;
@@ -3093,7 +3151,7 @@ body {
   }
 }
 
-/* v2.2.0 · 心笺三入口控制台：按 v0.2 方案重排首页、角色幕笺和高级维护 */
+/* v2.2.0 · 心笺控制台：按 v0.2 方案重排首页、角色幕笺、数据表册和高级维护 */
 :root {
   --xj-radius-v2: 8px;
   --xj-console-bg: rgba(12, 13, 12, .90);
@@ -3682,6 +3740,33 @@ body {
   min-height: 620px;
 }
 
+.data-workspace > .tab-page.active {
+  width: 100%;
+  max-width: none;
+}
+
+.data-workspace .state-journal-grid {
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 0;
+}
+
+.data-workspace .table-list-panel {
+  position: static;
+}
+
+.data-workspace .data-panel {
+  min-height: 620px;
+}
+
+.data-workspace > .tab-page[data-page="schema"],
+.data-workspace > .tab-page[data-page="rules"] {
+  padding: 18px;
+  border: 1px solid var(--xj-border);
+  border-radius: var(--xj-radius-v2);
+  background: var(--xj-console-panel);
+}
+
 .advanced-main .tab-page[data-page="schema"],
 .advanced-main .tab-page[data-page="rules"],
 .advanced-main .tab-page[data-page="model"],
@@ -3718,6 +3803,7 @@ body {
 
   .home-grid,
   .advanced-layout,
+  .data-workspace .state-journal-grid,
   .advanced-main .state-journal-grid {
     grid-template-columns: 1fr;
   }
@@ -3751,7 +3837,7 @@ body {
   }
 
   .state-journal-console-v2 .workspace-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     border-right: 0;
     border-bottom: 1px solid var(--xj-border);
     padding: 16px;

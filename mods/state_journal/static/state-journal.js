@@ -1163,7 +1163,7 @@
   function readSchema() {
     const table = currentTable();
     const oldSchema = table?.schema || { fields: [] };
-    const fields = [...document.querySelectorAll(".field-card")].map((card) => ({
+    const fields = [...(els.fieldsEditor?.querySelectorAll(".field-card") || [])].map((card) => ({
       key: card.querySelector("[data-field-key]").value.trim(),
       label: card.querySelector("[data-field-label]").value.trim(),
       type: card.querySelector("[data-field-type]").value,
@@ -1198,7 +1198,8 @@
     state.tables.forEach((table) => {
       const button = document.createElement("button");
       button.className = `table-item ${table.schema.id === state.currentId ? "active" : ""}`;
-      button.innerHTML = `<strong>${escapeHtml(table.schema.name || table.schema.id)}</strong><span>${escapeHtml(table.schema.id)} · ${table.rows.length} 行</span>`;
+      button.title = table.schema.id ? `机器 ID：${table.schema.id}` : "";
+      button.innerHTML = `<strong>${escapeHtml(table.schema.name || table.schema.id)}</strong><span>${table.rows.length} 行记录</span>`;
       button.addEventListener("click", () => { closeRowDetail(); state.currentId = table.schema.id; renderAll(); });
       els.tableList.appendChild(button);
     });
@@ -1254,9 +1255,13 @@
   function getDisplayFields(table) {
     const fields = table.schema.fields || [];
     const hiddenKeys = new Set(["updated_at"]);
+    if (table.schema?.id === "plot_ledger") {
+      ["entry_id", "entry_type", "status"].forEach((key) => hiddenKeys.add(key));
+    }
     const preferredByTable = {
       character_status: [table.schema.primary_key, "location", "mood", "metrics_summary", "condition", "summary"],
       relationship: [table.schema.primary_key, "from", "to", "relation", "metrics_summary", "summary"],
+      plot_ledger: ["title", "condition", "summary", "evidence", "locked"],
       metric_history: ["character_name", "metric_label", "old_value", "new_value", "delta_display", "raw_value"],
     };
     const preferred = (preferredByTable[table.schema.id] || [table.schema.primary_key, "location", "mood", "condition", "metrics_summary", "summary"]).filter(Boolean);
@@ -1292,6 +1297,92 @@
     return primaryFallback;
   }
 
+  const LEDGER_TYPE_LABELS = {
+    event: "事件",
+    task: "任务",
+    clue: "线索",
+    item: "物品",
+    external_tag: "外部标记",
+  };
+
+  const LEDGER_STATUS_LABELS = {
+    hidden: "隐藏",
+    active: "进行中",
+    done: "已完成",
+    failed: "失败",
+    inactive: "已停用",
+  };
+
+  function ledgerTypeLabel(value) {
+    const key = String(value ?? "").trim();
+    return LEDGER_TYPE_LABELS[key] || key || "未分类";
+  }
+
+  function ledgerStatusLabel(value) {
+    const key = String(value ?? "").trim();
+    return LEDGER_STATUS_LABELS[key] || key || "未标记";
+  }
+
+  function ledgerTitle(row, fallback) {
+    return textValue(row.title).trim() || textValue(row.summary).trim() || fallback || "未命名剧情事项";
+  }
+
+  function ledgerMetaText(row) {
+    const parts = [ledgerTypeLabel(row.entry_type), ledgerStatusLabel(row.status)];
+    if (row.locked) parts.push("已锁定");
+    return parts.filter(Boolean).join(" · ");
+  }
+
+  function renderLedgerStatusBadge(row) {
+    const raw = String(row.status ?? "").trim() || "unknown";
+    return `<span class="row-status-badge ledger-status-badge status-${escapeAttr(raw)}">${escapeHtml(ledgerStatusLabel(raw))}</span>`;
+  }
+
+  function renderLedgerTable(table) {
+    const wrap = document.createElement("div");
+    wrap.className = "rows-table-wrap ledger-table-wrap";
+    const tableEl = document.createElement("table");
+    tableEl.className = "rows-table ledger-table";
+    tableEl.innerHTML = `
+      <thead>
+        <tr>
+          <th>剧情事项</th>
+          <th>类型</th>
+          <th>状态</th>
+          <th>推进条件</th>
+          <th>当前摘要</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>`;
+    const tbody = tableEl.querySelector("tbody");
+    (table.rows || []).forEach((row, index) => {
+      const tr = document.createElement("tr");
+      tr.tabIndex = 0;
+      tr.title = "点击查看/编辑详情";
+      const title = ledgerTitle(row, `第 ${index + 1} 行`);
+      tr.innerHTML = `
+        <td>
+          <span class="rows-table-cell ledger-title-cell">
+            <strong>${escapeHtml(compactText(title, 46))}</strong>
+            <small>${escapeHtml(ledgerMetaText(row))}</small>
+          </span>
+        </td>
+        <td><span class="ledger-type-pill">${escapeHtml(ledgerTypeLabel(row.entry_type))}</span></td>
+        <td>${renderLedgerStatusBadge(row)}</td>
+        <td><span class="rows-table-cell long">${escapeHtml(compactText(row.condition, 88))}</span></td>
+        <td><span class="rows-table-cell long">${escapeHtml(compactText(row.summary, 88))}</span></td>
+        <td><button class="ghost-btn small" type="button" data-edit-row="${index}">详情</button> <button class="delete-btn" type="button" data-delete-row="${index}">删除</button></td>`;
+      tr.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        openRowDetail(index);
+      });
+      tbody.appendChild(tr);
+    });
+    wrap.appendChild(tableEl);
+    els.rowsEditor.appendChild(wrap);
+  }
+
   function renderRowsAsCards(table) {
     const fields = table.schema.fields || [];
     const primary = table.schema.primary_key || fields[0]?.key;
@@ -1300,9 +1391,9 @@
     list.className = `row-card-list ${table.schema?.id === "relationship" ? "relationship-list" : ""}`;
     (table.rows || []).forEach((row, index) => {
       const card = document.createElement("article");
-      card.className = `row-card readable-row-card ${table.schema?.id === "character_status" ? "character-row-card" : ""} ${table.schema?.id === "relationship" ? "relationship-row-card" : ""}`;
+      card.className = `row-card readable-row-card ${table.schema?.id === "character_status" ? "character-row-card" : ""} ${table.schema?.id === "relationship" ? "relationship-row-card" : ""} ${table.schema?.id === "plot_ledger" ? "ledger-row-card" : ""}`;
       const primaryTitle = primary ? (row[primary] || `第 ${index + 1} 行`) : `第 ${index + 1} 行`;
-      const title = table.schema?.id === "relationship" ? relationTitle(row, primaryTitle) : primaryTitle;
+      const title = table.schema?.id === "relationship" ? relationTitle(row, primaryTitle) : table.schema?.id === "plot_ledger" ? ledgerTitle(row, primaryTitle) : primaryTitle;
       const summaryField = cardSummaryForRow(table, row, fields, displayFields);
       const summary = summaryField ? compactText(row[summaryField.key], 150) : "暂无摘要。";
       const chipFields = displayFields
@@ -1311,11 +1402,12 @@
         .slice(0, 5);
       const badgeField = pickField(fields, ["relation", "mood", "condition", "status", "state"]);
       const badgeText = badgeField ? compactText(row[badgeField.key], 18) : (table.schema?.name || "记录");
+      const metaText = table.schema?.id === "plot_ledger" ? ledgerMetaText(row) : (table.schema?.name || table.schema?.id || "记录");
       card.innerHTML = `
         <div class="row-card-head readable-row-head">
-          <span class="row-card-title"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(table.schema?.name || table.schema?.id || "记录")}</small></span>
+          <span class="row-card-title"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(metaText)}</small></span>
           <div class="row-card-head-actions">
-            <span class="row-status-badge">${escapeHtml(badgeText)}</span>
+            ${table.schema?.id === "plot_ledger" ? renderLedgerStatusBadge(row) : `<span class="row-status-badge">${escapeHtml(badgeText)}</span>`}
             <button class="ghost-btn small" type="button" data-edit-row="${index}">详情</button>
           </div>
         </div>
@@ -1452,6 +1544,10 @@
   }
 
   function renderRowsAsTable(table) {
+    if (table.schema?.id === "plot_ledger") {
+      renderLedgerTable(table);
+      return;
+    }
     const fields = table.schema.fields || [];
     const displayFields = getDisplayFields(table);
     const primary = table.schema.primary_key || displayFields[0]?.key;
@@ -1504,8 +1600,9 @@
 
   function refreshPrimaryOptions(preferred) {
     const oldValue = preferred || els.primaryKey.value;
-    const source = document.querySelectorAll(".field-card").length
-      ? [...document.querySelectorAll(".field-card")].map((card) => ({ key: card.querySelector("[data-field-key]").value.trim(), label: card.querySelector("[data-field-label]").value.trim() })).filter((field) => field.key)
+    const fieldCards = [...(els.fieldsEditor?.querySelectorAll(".field-card") || [])];
+    const source = fieldCards.length
+      ? fieldCards.map((card) => ({ key: card.querySelector("[data-field-key]").value.trim(), label: card.querySelector("[data-field-label]").value.trim() })).filter((field) => field.key)
       : (currentTable()?.schema.fields || []).map((field) => ({ key: field.key, label: field.label }));
     els.primaryKey.innerHTML = "";
     source.forEach((field, index) => {
@@ -1527,7 +1624,7 @@
     if (!table) { els.currentTitle.textContent = "未选择表"; els.currentDesc.textContent = ""; els.rowsEditor.innerHTML = `<div class="empty-state"><strong>暂无表格。</strong><span>点击左侧“＋”新建表，或导入心笺 JSON。</span></div>`; return; }
     els.currentTitle.textContent = table.schema.name || table.schema.id;
     els.currentDesc.textContent = table.schema.description || "";
-    bindSchema(table); renderFields(table); renderRows(table);
+    bindSchema(table); renderFields(table); refreshPrimaryOptions(table.schema.primary_key); renderRows(table);
   }
 
   const WORKSPACE_DEFAULT_TAB = {
@@ -1536,15 +1633,16 @@
     role: "roleState",
     roleState: "roleState",
     turnNote: "turnNote",
-    advanced: "data",
+    data: "data",
+    advanced: "model",
     beauty: "template",
     settings: "model",
   };
 
   const TAB_WORKSPACE = {
-    data: "advanced",
-    schema: "advanced",
-    rules: "advanced",
+    data: "data",
+    schema: "data",
+    rules: "data",
     roleState: "role",
     turnNote: "role",
     log: "advanced",
@@ -2378,15 +2476,21 @@
     els.rowDetailMask.hidden = true;
   }
 
-  function saveRowDetail() {
+  function commitRowDetailToState() {
     const table = currentTable();
-    if (!table || state.detailIndex < 0) return;
+    if (!table || state.detailIndex < 0) return false;
     const row = {};
     (table.schema.fields || []).forEach((field) => {
       const input = els.rowDetailBody.querySelector(`[data-row-key="${CSS.escape(field.key)}"]`);
       row[field.key] = field.type === "boolean" ? !!input?.checked : (input?.value ?? "");
     });
     table.rows[state.detailIndex] = row;
+    return true;
+  }
+
+  function saveRowDetail() {
+    if (!commitRowDetailToState()) return;
+    const table = currentTable();
     renderRows(table);
     pageToast("行已暂存", "点击“保存当前表”后写入 SQLite。", "ok");
     closeRowDetail();
@@ -2421,6 +2525,7 @@
   }
 
   async function saveCurrentTable() {
+    commitRowDetailToState();
     const schema = readSchema(); const rows = readRows();
     const payload = await requestJson(`./api/table/${encodeURIComponent(state.currentId || schema.id)}`, { method: "POST", body: JSON.stringify({ schema, rows }) });
     const existing = state.tables.findIndex((item) => item.schema.id === payload.schema.id);
@@ -2493,7 +2598,7 @@
       const history = await fetch("/api/history").then((res) => res.json()).catch(() => []);
       const timeoutSeconds = Number(els.cfgTimeout?.value || state.config?.request_timeout || 120);
       setStatus(`正在请求辅助模型，最多等待 ${timeoutSeconds} 秒...`);
-      const result = await requestJson("./api/worker/update", { method: "POST", body: JSON.stringify({ manual: true, history, table_ids: [state.currentId] }) });
+      const result = await requestJson("./api/worker/update", { method: "POST", body: JSON.stringify({ manual: true, history }) });
       setStatus("心笺已收到响应，正在刷新状态表...");
       await loadState();
       const count = result.summary?.total ?? result.result?.applied?.length ?? 0;
