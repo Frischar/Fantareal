@@ -11,7 +11,7 @@
       {"key": "appearance", "label": "外观姿态", "type": "textarea", "note": "衣着、姿态、表情、外观变化。"},
       {"key": "condition", "label": "身体状态", "type": "textarea", "note": "伤势、异常、疲惫、病弱、状态效果等。"},
       {"key": "summary", "label": "状态摘要", "type": "textarea", "note": "用一两句话概括角色当前状态。"},
-      {"key": "updated_at", "label": "更新时间", "type": "text", "note": "由心笺自动写入。"}
+      {"key": "updated_at", "label": "更新时间", "type": "text", "note": "由数据库自动写入。"}
     ],
     "rules": {
       "note": "只记录剧情中已经明确出现的重要角色，不记录路人。",

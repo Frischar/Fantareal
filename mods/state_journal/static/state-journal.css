@@ -227,7 +227,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(232,185,116,.55);
 @media (max-width: 1180px) { .state-journal-grid { grid-template-columns: 220px minmax(0,1fr); } .data-actions { justify-content: flex-start; } }
 @media (max-width: 840px) { .state-journal-shell { width: min(100% - 16px, 100%); } .state-journal-hero, .panel-head.split { flex-direction: column; align-items: stretch; } .state-journal-grid { grid-template-columns: 1fr; } .table-list-panel { position: static; } .grid-two, .preset-row, .field-grid { grid-template-columns: 1fr; } .rows-editor, .rows-table-wrap { max-height: none; } }
 
-/* 心笺 v0.2：幕笺模式设置 */
+/* 数据库 v0.2：状态记录模式设置 */
 .turn-note-config-card {
   border: 1px solid var(--xj-border);
   border-radius: 18px;
@@ -249,7 +249,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(232,185,116,.55);
   font-weight: 800;
 }
 
-/* v0.2.3：幕笺风格说明与预览 */
+/* v0.2.3：状态记录风格说明与预览 */
 .turn-note-style-help {
   display: grid;
   gap: 8px;
@@ -272,7 +272,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(232,185,116,.55);
   font-size: .82rem;
 }
 
-/* v0.5 幕笺模板开放 */
+/* v0.5 状态记录模板开放 */
 .template-fields-editor {
   display: grid;
   gap: 10px;
@@ -329,7 +329,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(232,185,116,.55);
   font-size: 13px;
 }
 
-/* v0.6 幕笺美化包 */
+/* v0.6 状态记录外观包 */
 .theme-preview-wrap {
   border: 1px solid rgba(232,194,122,0.24);
   background: rgba(232,194,122,0.06);
@@ -610,7 +610,7 @@ select option:disabled {
   white-space: nowrap;
 }
 
-/* 心笺后台 UI 重构 v0.1：五区工作台布局 */
+/* 数据库后台 UI 重构 v0.1：五区工作台布局 */
 .state-journal-workbench {
   display: grid;
   grid-template-columns: 238px minmax(0, 1fr);
@@ -844,7 +844,7 @@ select option:disabled {
 }
 
 
-/* 心笺后台 UI 重构 v0.1.1：编辑器居中、字段折叠、按钮收束 */
+/* 数据库后台 UI 重构 v0.1.1：编辑器居中、字段折叠、按钮收束 */
 .config-workspace-panel {
   width: min(100%, 1180px);
   max-width: 1180px;
@@ -970,7 +970,7 @@ select option:disabled {
   .preset-row > .inline-action-group { justify-self: stretch; }
 }
 
-/* 心笺后台 UI 重构 v0.1.2：日志归位、数值变化时间线 */
+/* 数据库后台 UI 重构 v0.1.2：日志归位、数值变化时间线 */
 .metric-history-view {
   display: grid;
   gap: 14px;
@@ -1157,7 +1157,7 @@ select option:disabled {
 }
 .data-panel[data-table-kind="metric_history"] .view-switch { display: none; }
 
-/* 心笺后台 UI 重构 v0.1.3-rework：单页 tab 精简 + 数据卡片可读性修正 */
+/* 数据库后台 UI 重构 v0.1.3-rework：单页 tab 精简 + 数据卡片可读性修正 */
 .config-workspace-panel[data-active-workspace="turnNote"] .drawer-tabs,
 .config-workspace-panel[data-active-workspace="generate"] .drawer-tabs {
   display: none !important;
@@ -1956,7 +1956,7 @@ select option:disabled {
 .role-state-variable-table input.mini { width: 100%; min-width: 0; padding-left: 7px; padding-right: 7px; }
 
 
-/* v1.1.2-fix5 · 角色心笺模式、确认弹窗与阶段条件编辑器 */
+/* v1.1.2-fix5 · 角色数据库模式、确认弹窗与阶段条件编辑器 */
 .role-state-mode-panel {
   display: grid;
   grid-template-columns: auto minmax(220px, 320px) minmax(260px, 1fr);
@@ -2062,6 +2062,24 @@ select option:disabled {
 .role-state-advanced input {
   min-height: 30px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.role-state-instruction-field {
+  min-width: 260px;
+  max-width: 420px;
+  white-space: normal;
+}
+.role-state-advanced textarea {
+  width: 100%;
+  min-height: 76px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--xj-border);
+  background: var(--xj-input-bg, rgba(255,255,255,0.06));
+  color: var(--xj-text);
+  resize: vertical;
+  line-height: 1.55;
+  font-family: inherit;
+  box-sizing: border-box;
 }
 .role-state-advanced code {
   display: block;
@@ -3151,7 +3169,7 @@ body {
   }
 }
 
-/* v2.2.0 · 心笺控制台：按 v0.2 方案重排首页、角色幕笺、数据表册和高级维护 */
+/* v2.2.0 · 数据库控制台：按 v0.2 方案重排总览、状态记录、剧情账本和高级维护 */
 :root {
   --xj-radius-v2: 8px;
   --xj-console-bg: rgba(12, 13, 12, .90);
@@ -3294,7 +3312,7 @@ body {
 }
 
 .state-journal-console-v2 .workspace-nav::before {
-  content: "心笺";
+  content: "数据库";
   margin: 0 10px 8px;
   color: var(--xj-accent);
   text-transform: none;
@@ -3979,5 +3997,3240 @@ body {
 
   .state-journal-console-v2 #homeWorkspace .runtime-overview {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 360px) !important;
+  }
+}
+
+/* v2.3.0-main-app-integration: make Database read as a Fantareal core page. */
+:root,
+:root[data-state-journal-ui-sync="global"] {
+  --xj-bg: #0f141c;
+  --xj-card: rgba(18, 27, 37, 0.82);
+  --xj-card-strong: rgba(20, 30, 41, 0.92);
+  --xj-card-soft: rgba(92, 167, 255, 0.075);
+  --xj-border: rgba(152, 190, 233, 0.14);
+  --xj-line: rgba(152, 190, 233, 0.10);
+  --xj-text: #edf5ff;
+  --xj-muted: #9db1c8;
+  --xj-accent: #5ca7ff;
+  --xj-accent-dark: #3e85d8;
+  --xj-ok: #63d384;
+  --xj-danger: #ff6b6b;
+  --xj-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  --xj-radius-v2: 14px;
+  --xj-console-bg: transparent;
+  --xj-console-panel: rgba(20, 30, 41, 0.82);
+  --xj-console-panel-soft: rgba(11, 18, 26, 0.62);
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(92, 167, 255, 0.16), transparent 28rem),
+    radial-gradient(circle at 96% 8%, rgba(29, 153, 134, 0.10), transparent 24rem),
+    linear-gradient(135deg, #0f141c, #111b27 48%, #0f141c);
+}
+
+body {
+  color: var(--xj-text);
+}
+
+.state-journal-console-v2 {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100vh - 2px);
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .state-journal-hero {
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--xj-border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(22, 34, 48, 0.90), rgba(16, 25, 36, 0.88));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px) saturate(1.04);
+}
+
+.state-journal-console-v2 .brand-mark {
+  border-color: rgba(152, 190, 233, 0.24);
+  color: var(--xj-accent);
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.10), transparent 46%),
+    rgba(92, 167, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.state-journal-console-v2 .version-line,
+.state-journal-console-v2 .hero-desc,
+.state-journal-console-v2 .muted,
+.state-journal-console-v2 .microcopy {
+  color: var(--xj-muted);
+}
+
+.state-journal-console-v2 .state-journal-workbench {
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.state-journal-console-v2 .workspace-main {
+  padding: 0;
+}
+
+.state-journal-console-v2 .workspace-nav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  min-height: calc(100vh - 176px);
+  padding: 18px 14px;
+  border: 1px solid var(--xj-border);
+  border-radius: 18px;
+  background: rgba(18, 29, 41, 0.88);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+}
+
+.state-journal-console-v2 .workspace-nav::before {
+  margin: 0 10px 10px;
+  color: var(--xj-muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.state-journal-console-v2 .workspace-nav-btn {
+  min-height: 64px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--xj-muted);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.state-journal-console-v2 .workspace-nav-btn:hover {
+  transform: none;
+  background: rgba(92, 167, 255, 0.08);
+  color: var(--xj-text);
+}
+
+.state-journal-console-v2 .workspace-nav-btn.active {
+  color: var(--xj-text);
+  border-color: transparent;
+  background: rgba(92, 167, 255, 0.14);
+  box-shadow: inset 3px 0 0 var(--xj-accent);
+}
+
+.state-journal-console-v2 .workspace-nav-btn .nav-icon {
+  width: 30px;
+  height: 30px;
+  border-color: rgba(152, 190, 233, 0.18);
+  border-radius: 12px;
+  color: var(--xj-accent);
+  background: rgba(92, 167, 255, 0.10);
+}
+
+.state-journal-console-v2 .workspace-nav-btn strong {
+  color: inherit;
+  font-size: 15px;
+}
+
+.state-journal-console-v2 .workspace-nav-btn small {
+  color: color-mix(in srgb, var(--xj-muted) 78%, transparent);
+}
+
+.state-journal-console-v2 .panel,
+.state-journal-console-v2 .turn-note-config-card,
+.state-journal-console-v2 .model-status-card,
+.state-journal-console-v2 .advanced-main .tab-page[data-page],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"],
+.state-journal-console-v2 .role-state-overview-card,
+.state-journal-console-v2 .role-state-editor-card {
+  border-color: var(--xj-border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(20, 30, 41, 0.84), rgba(18, 27, 37, 0.80));
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(14px) saturate(1.03);
+}
+
+.state-journal-console-v2 .panel {
+  padding: 16px;
+}
+
+.state-journal-console-v2 .status-strip,
+.state-journal-console-v2 .update-summary,
+.state-journal-console-v2 .runtime-state-cell,
+.state-journal-console-v2 .next-step-item,
+.state-journal-console-v2 .home-note-preview article,
+.state-journal-console-v2 .template-preview-card,
+.state-journal-console-v2 .role-state-placeholder,
+.state-journal-console-v2 .role-state-role-card,
+.state-journal-console-v2 .role-state-stat-card,
+.state-journal-console-v2 .field-card,
+.state-journal-console-v2 .metric-event-card,
+.state-journal-console-v2 .story-time-current-card,
+.state-journal-console-v2 .story-time-history-row,
+.state-journal-console-v2 .theme-pack-meta-panel,
+.state-journal-console-v2 .empty-state {
+  border-color: var(--xj-border);
+  border-radius: 14px;
+  background: rgba(11, 18, 26, 0.48);
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .summary-dot {
+  background: var(--xj-accent);
+  box-shadow: 0 0 0 4px rgba(92, 167, 255, 0.14);
+}
+
+.state-journal-console-v2 .primary-btn,
+.state-journal-console-v2 .ghost-btn,
+.state-journal-console-v2 .file-btn,
+.state-journal-console-v2 button,
+.state-journal-console-v2 .tab-btn,
+.state-journal-console-v2 .view-btn,
+.state-journal-console-v2 .delete-btn,
+.state-journal-console-v2 .tiny-btn {
+  border-radius: 12px;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.state-journal-console-v2 .primary-btn {
+  border-color: rgba(92, 167, 255, 0.44);
+  background: linear-gradient(180deg, #68b0ff, #438fe8);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(92, 167, 255, 0.18);
+  font-weight: 800;
+}
+
+.state-journal-console-v2 .primary-btn:hover {
+  border-color: rgba(141, 195, 255, 0.62);
+  background: linear-gradient(180deg, #76b8ff, #4c98ee);
+}
+
+.state-journal-console-v2 .ghost-btn,
+.state-journal-console-v2 .file-btn,
+.state-journal-console-v2 .delete-btn,
+.state-journal-console-v2 .tiny-btn {
+  border-color: var(--xj-border);
+  background: rgba(148, 190, 233, 0.08);
+  color: var(--xj-text);
+}
+
+.state-journal-console-v2 .ghost-btn:hover,
+.state-journal-console-v2 .file-btn:hover,
+.state-journal-console-v2 .delete-btn:hover,
+.state-journal-console-v2 .tiny-btn:hover {
+  border-color: rgba(92, 167, 255, 0.34);
+  background: rgba(92, 167, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.state-journal-console-v2 .ghost-btn.danger,
+.state-journal-console-v2 .delete-btn {
+  color: var(--xj-danger);
+  border-color: color-mix(in srgb, var(--xj-danger) 42%, var(--xj-border));
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.state-journal-console-v2 .view-switch,
+.state-journal-console-v2 .role-workspace-tabs,
+.state-journal-console-v2 .advanced-subtabs,
+.state-journal-console-v2 .role-state-tabs,
+.state-journal-console-v2 .action-group {
+  border-color: var(--xj-border);
+  border-radius: 14px;
+  background: rgba(11, 18, 26, 0.56);
+}
+
+.state-journal-console-v2 .view-btn.active,
+.state-journal-console-v2 .role-workspace-tabs .tab-btn.active,
+.state-journal-console-v2 .advanced-subtabs .tab-btn.active,
+.state-journal-console-v2 .tab-btn.active,
+.state-journal-console-v2 .role-state-tab.active {
+  color: #fff;
+  border-color: rgba(92, 167, 255, 0.32);
+  background: rgba(92, 167, 255, 0.28);
+  box-shadow: inset 0 -2px 0 rgba(92, 167, 255, 0.42);
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn {
+  border-color: var(--xj-border);
+  border-radius: 14px;
+  background: rgba(11, 18, 26, 0.46);
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn.active {
+  border-color: rgba(92, 167, 255, 0.38);
+  background: rgba(92, 167, 255, 0.12);
+  box-shadow: inset 3px 0 0 var(--xj-accent);
+}
+
+.state-journal-console-v2 input,
+.state-journal-console-v2 textarea,
+.state-journal-console-v2 select {
+  border-color: var(--xj-border);
+  border-radius: 12px;
+  background: rgba(11, 18, 26, 0.72);
+  color: var(--xj-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.state-journal-console-v2 input:focus,
+.state-journal-console-v2 textarea:focus,
+.state-journal-console-v2 select:focus {
+  border-color: rgba(92, 167, 255, 0.56);
+  box-shadow: 0 0 0 3px rgba(92, 167, 255, 0.16);
+  outline: none;
+}
+
+.state-journal-console-v2 label,
+.state-journal-console-v2 .subhead,
+.state-journal-console-v2 .eyebrow {
+  color: color-mix(in srgb, var(--xj-text) 82%, var(--xj-muted));
+}
+
+.state-journal-console-v2 .eyebrow {
+  color: var(--xj-accent);
+  letter-spacing: 0.08em;
+}
+
+.state-journal-console-v2 .table-item {
+  border-color: var(--xj-border);
+  border-radius: 14px;
+  background: rgba(11, 18, 26, 0.40);
+}
+
+.state-journal-console-v2 .table-item:hover {
+  border-color: rgba(92, 167, 255, 0.30);
+  background: rgba(92, 167, 255, 0.08);
+}
+
+.state-journal-console-v2 .table-item.active {
+  border-color: rgba(92, 167, 255, 0.42);
+  background: rgba(92, 167, 255, 0.14);
+  box-shadow: inset 3px 0 0 var(--xj-accent);
+}
+
+.state-journal-console-v2 .rows-table-wrap,
+.state-journal-console-v2 .ledger-table-wrap,
+.state-journal-console-v2 .role-state-table-wrap,
+.state-journal-console-v2 .log-box {
+  border-color: var(--xj-border);
+  border-radius: 14px;
+  background: rgba(11, 18, 26, 0.54);
+}
+
+.state-journal-console-v2 .rows-table th,
+.state-journal-console-v2 .ledger-table th,
+.state-journal-console-v2 .role-state-table th {
+  background: #121d29;
+  color: var(--xj-muted);
+}
+
+.state-journal-console-v2 .rows-table th,
+.state-journal-console-v2 .rows-table td,
+.state-journal-console-v2 .ledger-table th,
+.state-journal-console-v2 .ledger-table td,
+.state-journal-console-v2 .role-state-table th,
+.state-journal-console-v2 .role-state-table td {
+  border-color: var(--xj-line);
+}
+
+.state-journal-console-v2 .runtime-badge,
+.state-journal-console-v2 .role-state-chip,
+.state-journal-console-v2 .role-stage-pill,
+.state-journal-console-v2 .ledger-type-pill,
+.state-journal-console-v2 .ledger-status-badge,
+.state-journal-console-v2 .theme-pack-chip-row span,
+.state-journal-console-v2 .micro-badge {
+  border-color: var(--xj-border);
+  background: rgba(92, 167, 255, 0.08);
+  color: var(--xj-muted);
+}
+
+.state-journal-console-v2 .runtime-state-cell input {
+  border-color: rgba(152, 190, 233, 0.28);
+  background: rgba(148, 190, 233, 0.14);
+}
+
+.state-journal-console-v2 .runtime-state-cell input:checked {
+  background: rgba(92, 167, 255, 0.26);
+}
+
+.state-journal-console-v2 .runtime-state-cell input::after {
+  background: var(--xj-muted);
+}
+
+.state-journal-console-v2 .runtime-state-cell input:checked::after {
+  background: #fff;
+}
+
+.state-journal-console-v2 .recent-row,
+.state-journal-console-v2 .runtime-last-line,
+.state-journal-console-v2 .data-panel-head,
+.state-journal-console-v2 .drawer-toolbar {
+  border-color: var(--xj-line);
+}
+
+.state-journal-console-v2 .next-step-item > span,
+.state-journal-console-v2 .recent-row em,
+.state-journal-console-v2 .next-step-item em,
+.state-journal-console-v2 .role-state-mode-badge.is-on,
+.state-journal-console-v2 .role-state-overview-chip.is-on {
+  border-color: rgba(99, 211, 132, 0.30);
+  background: rgba(99, 211, 132, 0.08);
+  color: #a9efbb;
+}
+
+.state-journal-console-v2 .next-step-item.needs-action > span,
+.state-journal-console-v2 .next-step-item.is-pending em,
+.state-journal-console-v2 .role-state-mode-badge.is-off,
+.state-journal-console-v2 .role-state-overview-chip.is-off {
+  border-color: rgba(255, 107, 107, 0.30);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffb6b6;
+}
+
+.state-journal-console-v2 .home-note-preview strong,
+.state-journal-console-v2 .ledger-title-cell strong,
+.state-journal-console-v2 .role-state-editor-head strong,
+.state-journal-console-v2 .role-state-stat-card strong {
+  color: var(--xj-text);
+}
+
+.state-journal-console-v2 .home-note-preview article {
+  border-color: rgba(92, 167, 255, 0.16);
+}
+
+.state-journal-console-v2 .home-note-preview strong,
+.state-journal-console-v2 .theme-preview-title span,
+.state-journal-console-v2 .theme-preview-relation b {
+  color: var(--xj-accent);
+}
+
+.state-journal-console-v2 .risk-note {
+  border-color: rgba(255, 107, 107, 0.30);
+  background: rgba(255, 107, 107, 0.08);
+  color: #ffc5c5;
+}
+
+.state-journal-console-v2 .state-journal-page-toast,
+.state-journal-console-v2 .row-detail-drawer,
+.state-journal-console-v2 .config-drawer-panel,
+.state-journal-console-v2 .role-state-modal-card,
+.state-journal-console-v2 .state-journal-confirm-card {
+  border-color: var(--xj-border);
+  background:
+    linear-gradient(180deg, rgba(20, 30, 41, 0.98), rgba(13, 21, 31, 0.98));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.state-journal-console-v2 .drawer-mask,
+.state-journal-confirm-backdrop {
+  background: rgba(5, 9, 14, 0.58);
+}
+
+@media (max-width: 1360px) and (min-width: 821px) {
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 204px minmax(0, 1fr) !important;
+    gap: 14px !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav {
+    border: 1px solid var(--xj-border) !important;
+    border-radius: 18px !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav-btn {
+    min-height: 64px !important;
+  }
+}
+
+@media (max-width: 820px) {
+  .state-journal-console-v2 {
+    min-height: 100vh;
+  }
+
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  .state-journal-console-v2 .workspace-nav {
+    position: static;
+    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    border: 1px solid var(--xj-border) !important;
+    border-radius: 18px;
+  }
+
+  .state-journal-console-v2 .workspace-nav::before {
+    display: block;
+    grid-column: 1 / -1 !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav-btn {
+    min-height: 58px !important;
+  }
+}
+
+/* v2.4.0-main-workbench-parity: align Database with Preset/Worldbook workbench pages. */
+:root,
+:root[data-state-journal-ui-sync="global"] {
+  --xj-bg: transparent;
+  --xj-card: rgba(61, 73, 88, 0.36);
+  --xj-card-strong: rgba(34, 45, 59, 0.54);
+  --xj-card-soft: rgba(255, 255, 255, 0.075);
+  --xj-border: rgba(173, 204, 239, 0.24);
+  --xj-line: rgba(205, 224, 247, 0.14);
+  --xj-muted: rgba(213, 228, 245, 0.74);
+  --xj-accent: #5ca7ff;
+  --xj-console-panel: rgba(36, 48, 63, 0.48);
+  --xj-console-panel-soft: rgba(16, 25, 36, 0.38);
+  --xj-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
+}
+
+html,
+body {
+  background: transparent !important;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.state-journal-console-v2 {
+  width: 100%;
+  min-height: auto;
+  margin: 0;
+  padding: 0;
+  color: var(--xj-text);
+  background: transparent !important;
+}
+
+.state-journal-console-v2 .state-journal-hero {
+  position: relative;
+  min-height: 198px;
+  margin: 0 0 16px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--xj-accent) 20%, var(--xj-border));
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(92, 167, 255, 0.16), transparent 34rem),
+    linear-gradient(135deg, rgba(88, 102, 118, 0.52), rgba(49, 64, 82, 0.38));
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(22px) saturate(1.12);
+}
+
+.state-journal-console-v2 .state-journal-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    radial-gradient(circle at 86% 20%, rgba(148, 190, 233, 0.12), transparent 22rem);
+  opacity: 0.72;
+}
+
+.state-journal-console-v2 .brand-row,
+.state-journal-console-v2 .top-status {
+  position: relative;
+  z-index: 1;
+}
+
+.state-journal-console-v2 .brand-row {
+  gap: 16px;
+}
+
+.state-journal-console-v2 .brand-mark {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--xj-accent) 34%, var(--xj-border));
+  background: rgba(92, 167, 255, 0.13);
+  color: #dcecff;
+  font-size: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.state-journal-console-v2 h1 {
+  margin: 0 0 6px;
+  font-size: clamp(28px, 2.2vw, 38px);
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.state-journal-console-v2 .version-line {
+  margin: 0 0 6px;
+  color: rgba(223, 235, 249, 0.82);
+  font-size: 15px;
+}
+
+.state-journal-console-v2 .hero-desc {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(219, 232, 247, 0.76);
+}
+
+.state-journal-console-v2 .top-status {
+  width: min(560px, 38%);
+  display: grid;
+  gap: 10px;
+}
+
+.state-journal-console-v2 .status-strip,
+.state-journal-console-v2 .update-summary {
+  margin: 0;
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: rgba(13, 23, 34, 0.42);
+  box-shadow: none;
+  backdrop-filter: blur(14px) saturate(1.06);
+}
+
+.state-journal-console-v2 .state-journal-workbench {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 18px;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--xj-border) 86%, transparent);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(92, 167, 255, 0.08), transparent 32rem),
+    linear-gradient(180deg, rgba(72, 88, 106, 0.36), rgba(38, 51, 66, 0.30));
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(22px) saturate(1.12);
+}
+
+.state-journal-console-v2 .workspace-nav {
+  position: sticky;
+  top: 12px;
+  min-height: 0;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--xj-border) 92%, transparent);
+  border-radius: 20px;
+  background: rgba(16, 26, 38, 0.42);
+  box-shadow: none;
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.state-journal-console-v2 .workspace-nav::before {
+  margin: 0 0 12px;
+  color: rgba(221, 234, 249, 0.70);
+  letter-spacing: 0.08em;
+}
+
+.state-journal-console-v2 .workspace-nav-btn {
+  min-height: 62px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .workspace-nav-btn + .workspace-nav-btn {
+  margin-top: 8px;
+}
+
+.state-journal-console-v2 .workspace-nav-btn:hover {
+  border-color: rgba(92, 167, 255, 0.22);
+  background: rgba(92, 167, 255, 0.10);
+}
+
+.state-journal-console-v2 .workspace-nav-btn.active {
+  border-color: rgba(92, 167, 255, 0.46);
+  background: linear-gradient(90deg, rgba(92, 167, 255, 0.28), rgba(92, 167, 255, 0.12));
+  box-shadow: inset 4px 0 0 var(--xj-accent);
+}
+
+.state-journal-console-v2 .workspace-main {
+  padding: 0;
+  overflow: visible;
+}
+
+.state-journal-console-v2 .page-head {
+  min-height: 86px;
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(173, 204, 239, 0.16);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(32, 44, 58, 0.34), rgba(22, 33, 46, 0.26));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+.state-journal-console-v2 .page-head .muted {
+  max-width: 880px;
+}
+
+.state-journal-console-v2 .panel,
+.state-journal-console-v2 .turn-note-config-card,
+.state-journal-console-v2 .model-status-card,
+.state-journal-console-v2 .advanced-main .tab-page[data-page],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"],
+.state-journal-console-v2 .role-state-overview-card,
+.state-journal-console-v2 .role-state-editor-card {
+  border-color: rgba(173, 204, 239, 0.18);
+  background:
+    linear-gradient(180deg, rgba(28, 40, 54, 0.40), rgba(17, 29, 42, 0.34));
+  box-shadow: none;
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+.state-journal-console-v2 .runtime-overview,
+.state-journal-console-v2 .recent-panel,
+.state-journal-console-v2 .next-step-panel,
+.state-journal-console-v2 .note-preview-panel,
+.state-journal-console-v2 .table-list-panel,
+.state-journal-console-v2 .data-panel {
+  border-radius: 20px;
+}
+
+.state-journal-console-v2 .runtime-state-cell,
+.state-journal-console-v2 .next-step-item,
+.state-journal-console-v2 .home-note-preview article,
+.state-journal-console-v2 .template-preview-card,
+.state-journal-console-v2 .role-state-placeholder,
+.state-journal-console-v2 .role-state-role-card,
+.state-journal-console-v2 .role-state-stat-card,
+.state-journal-console-v2 .field-card,
+.state-journal-console-v2 .metric-event-card,
+.state-journal-console-v2 .story-time-current-card,
+.state-journal-console-v2 .story-time-history-row,
+.state-journal-console-v2 .theme-pack-meta-panel,
+.state-journal-console-v2 .empty-state,
+.state-journal-console-v2 .table-item {
+  border-color: rgba(173, 204, 239, 0.16);
+  background: rgba(8, 17, 28, 0.26);
+}
+
+.state-journal-console-v2 .primary-btn {
+  border-color: rgba(92, 167, 255, 0.58);
+  background: linear-gradient(180deg, #63adff, #4a96ec);
+  box-shadow: 0 8px 20px rgba(74, 150, 236, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.state-journal-console-v2 .ghost-btn,
+.state-journal-console-v2 .file-btn,
+.state-journal-console-v2 .delete-btn,
+.state-journal-console-v2 .tiny-btn,
+.state-journal-console-v2 .tab-btn {
+  border-color: rgba(173, 204, 239, 0.18);
+  background: rgba(18, 31, 46, 0.40);
+}
+
+.state-journal-console-v2 .view-switch,
+.state-journal-console-v2 .role-workspace-tabs,
+.state-journal-console-v2 .advanced-subtabs,
+.state-journal-console-v2 .role-state-tabs,
+.state-journal-console-v2 .action-group {
+  border-color: rgba(173, 204, 239, 0.16);
+  background: rgba(8, 17, 28, 0.34);
+}
+
+.state-journal-console-v2 input,
+.state-journal-console-v2 textarea,
+.state-journal-console-v2 select {
+  border-color: rgba(173, 204, 239, 0.18);
+  background: rgba(8, 17, 28, 0.50);
+}
+
+.state-journal-console-v2 .rows-table th,
+.state-journal-console-v2 .ledger-table th,
+.state-journal-console-v2 .role-state-table th {
+  background: rgba(17, 29, 42, 0.94);
+}
+
+.state-journal-console-v2 .rows-table th:first-child,
+.state-journal-console-v2 .rows-table td:first-child {
+  background: rgba(16, 27, 39, 0.96);
+}
+
+@media (max-width: 1360px) and (min-width: 821px) {
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 220px minmax(0, 1fr) !important;
+    gap: 16px !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav {
+    padding: 14px !important;
+    border-radius: 20px !important;
+  }
+}
+
+@media (max-width: 1120px) {
+  .state-journal-console-v2 .state-journal-hero {
+    min-height: 0;
+  }
+
+  .state-journal-console-v2 .top-status {
+    width: 100%;
+  }
+}
+
+@media (max-width: 820px) {
+  .state-journal-console-v2 .state-journal-hero,
+  .state-journal-console-v2 .state-journal-workbench {
+    border-radius: 18px;
+  }
+
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 1fr !important;
+    padding: 12px;
+  }
+
+  .state-journal-console-v2 .workspace-nav {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+  }
+
+  .state-journal-console-v2 .workspace-nav-btn + .workspace-nav-btn {
+    margin-top: 0;
+  }
+}
+
+/* v2.5.0-workbench-recut: remove duplicated hero and make maintenance pages feel native. */
+html,
+body,
+.state-journal-console-v2 {
+  min-height: 0 !important;
+}
+
+body {
+  background: transparent !important;
+}
+
+.state-journal-shell.state-journal-console-v2 {
+  width: 100%;
+  margin: 0;
+  padding: 0 0 4px;
+}
+
+.state-journal-console-v2 .state-journal-hero {
+  display: none !important;
+}
+
+.state-journal-console-v2 .state-journal-hero::after {
+  content: none;
+}
+
+.state-journal-console-v2 .brand-row {
+  display: none;
+}
+
+.state-journal-console-v2 .top-status {
+  position: relative;
+  width: min(100%, 520px);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.state-journal-console-v2 .status-strip,
+.state-journal-console-v2 .update-summary {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(16, 27, 39, 0.50);
+  border-color: rgba(173, 204, 239, 0.18);
+}
+
+.state-journal-console-v2 .status-strip {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.state-journal-console-v2 .update-summary {
+  max-width: 270px;
+}
+
+.state-journal-console-v2 .update-summary strong {
+  flex: 0 0 auto;
+}
+
+.state-journal-console-v2 .update-summary span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.state-journal-console-v2 .state-journal-workbench {
+  grid-template-columns: 224px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  align-items: start;
+  min-height: 0;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(42, 55, 71, 0.46), rgba(22, 33, 45, 0.34));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.state-journal-console-v2 .workspace-nav {
+  top: 10px;
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.state-journal-console-v2 .workspace-nav::before {
+  content: "数据库";
+  margin: 0 0 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  color: rgba(226, 238, 252, 0.70);
+}
+
+.state-journal-console-v2 .workspace-nav-btn {
+  min-height: 58px;
+  border-radius: 14px;
+}
+
+.state-journal-console-v2 .workspace-nav-btn .nav-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 11px;
+}
+
+.state-journal-console-v2 .workspace-nav-btn strong {
+  font-size: 14px;
+}
+
+.state-journal-console-v2 .workspace-nav-btn small {
+  font-size: 12px;
+}
+
+.state-journal-console-v2 .page-head {
+  min-height: 0;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  align-items: center;
+}
+
+.state-journal-console-v2 .page-head .eyebrow {
+  margin-bottom: 5px;
+}
+
+.state-journal-console-v2 .page-head h2 {
+  font-size: 22px;
+}
+
+.state-journal-console-v2 .page-head-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.advanced-workspace,
+.data-workspace,
+.config-workspace-panel {
+  width: 100%;
+  max-width: none;
+}
+
+.state-journal-console-v2 .advanced-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.state-journal-console-v2 .advanced-nav {
+  position: sticky;
+  top: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn {
+  min-height: 64px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 4px;
+  background: rgba(8, 17, 28, 0.34);
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn.active {
+  background: linear-gradient(90deg, rgba(92, 167, 255, 0.24), rgba(92, 167, 255, 0.10));
+  box-shadow: inset 3px 0 0 var(--xj-accent);
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn small {
+  color: rgba(213, 228, 245, 0.66);
+}
+
+.state-journal-console-v2 .advanced-main {
+  min-width: 0;
+  display: block;
+}
+
+.state-journal-console-v2 .advanced-main > .tab-page.active,
+.state-journal-console-v2 .advanced-main .tab-page[data-page],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"] {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(173, 204, 239, 0.18);
+  background:
+    linear-gradient(180deg, rgba(31, 43, 57, 0.42), rgba(17, 29, 42, 0.30));
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .advanced-subtabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border-radius: 14px;
+}
+
+.state-journal-console-v2 .advanced-main .tab-page[data-page="template"] .advanced-subtabs,
+.state-journal-console-v2 .advanced-main .tab-page[data-page="theme"] .advanced-subtabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.state-journal-console-v2 .advanced-subtabs .tab-btn {
+  min-height: 34px;
+  border-radius: 10px;
+}
+
+.state-journal-console-v2 .advanced-main .microcopy {
+  margin-bottom: 14px;
+}
+
+.state-journal-console-v2 .preset-row {
+  align-items: end;
+}
+
+.state-journal-console-v2 .inline-field {
+  align-items: stretch;
+}
+
+.state-journal-console-v2 .inline-field .ghost-btn,
+.state-journal-console-v2 .inline-field .primary-btn {
+  align-self: end;
+}
+
+.state-journal-console-v2 .model-tools.pinned,
+.state-journal-console-v2 .drawer-actions.pinned {
+  position: static;
+  margin-top: 12px;
+  padding: 12px 0 0;
+  border-top: 1px solid rgba(173, 204, 239, 0.12);
+  background: transparent !important;
+}
+
+.state-journal-console-v2 .model-tools.pinned::before,
+.state-journal-console-v2 .drawer-actions.pinned::before {
+  content: none;
+}
+
+@media (max-width: 1360px) and (min-width: 821px) {
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 210px minmax(0, 1fr) !important;
+    gap: 14px !important;
+    padding: 14px;
+  }
+
+  .state-journal-console-v2 .advanced-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 980px) {
+  .state-journal-console-v2 .top-status {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .state-journal-console-v2 .advanced-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .state-journal-console-v2 .advanced-nav {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .state-journal-console-v2 .state-journal-hero {
+    margin-bottom: 8px;
+  }
+
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 1fr !important;
+    padding: 12px;
+  }
+
+  .state-journal-console-v2 .workspace-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav::before {
+    grid-column: 1 / -1;
+  }
+}
+
+/* v2.6.0-main-workbench-flat: flatten the Database workbench into the main app shell. */
+:root,
+:root[data-state-journal-ui-sync="global"] {
+  --xj-bg: transparent;
+  --xj-card: rgba(20, 31, 44, 0.82);
+  --xj-card-strong: rgba(24, 36, 50, 0.90);
+  --xj-card-soft: rgba(15, 25, 38, 0.70);
+  --xj-border: rgba(174, 205, 239, 0.22);
+  --xj-line: rgba(207, 225, 247, 0.13);
+  --xj-text: #edf5ff;
+  --xj-muted: rgba(219, 231, 246, 0.72);
+  --xj-accent: #5ca7ff;
+  --xj-accent-dark: #3f87d8;
+  --xj-ok: #7bd99d;
+  --xj-danger: #ff7979;
+  --xj-warn: #eeb173;
+  --xj-console-panel: rgba(20, 31, 44, 0.84);
+  --xj-console-panel-soft: rgba(10, 19, 30, 0.58);
+  --xj-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  --xj-radius-v2: 16px;
+}
+
+html,
+body,
+.state-journal-console-v2 {
+  background: transparent !important;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.state-journal-shell.state-journal-console-v2 {
+  width: 100%;
+  max-width: none;
+  min-height: 0 !important;
+  margin: 0;
+  padding: 0 0 6px;
+  border: 0;
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .state-journal-workbench {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  align-items: start;
+  min-height: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.state-journal-console-v2 .workspace-main {
+  min-width: 0;
+  padding: 0 !important;
+  overflow: visible;
+}
+
+.state-journal-console-v2 .workspace-nav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  min-height: 0;
+  padding: 14px;
+  border: 1px solid rgba(174, 205, 239, 0.18) !important;
+  border-radius: 24px !important;
+  background:
+    radial-gradient(circle at top left, rgba(92, 167, 255, 0.10), transparent 15rem),
+    linear-gradient(180deg, rgba(24, 36, 50, 0.88), rgba(15, 25, 38, 0.80)) !important;
+  box-shadow: var(--xj-shadow) !important;
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.state-journal-console-v2 .workspace-nav::before {
+  content: "数据库导航";
+  margin: 0 4px 12px;
+  color: rgba(225, 238, 252, 0.74);
+  font-size: 13px;
+  font-weight: 820;
+  letter-spacing: 0;
+}
+
+.state-journal-console-v2 .workspace-nav-btn {
+  min-height: 56px !important;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 16px !important;
+  background: transparent;
+  color: var(--xj-muted);
+}
+
+.state-journal-console-v2 .workspace-nav-btn + .workspace-nav-btn {
+  margin-top: 6px;
+}
+
+.state-journal-console-v2 .workspace-nav-btn:hover {
+  border-color: rgba(92, 167, 255, 0.24);
+  background: rgba(92, 167, 255, 0.09);
+  color: var(--xj-text);
+  transform: none;
+}
+
+.state-journal-console-v2 .workspace-nav-btn.active {
+  border-color: rgba(92, 167, 255, 0.42);
+  background:
+    linear-gradient(90deg, rgba(92, 167, 255, 0.22), rgba(92, 167, 255, 0.08));
+  box-shadow: inset 3px 0 0 var(--xj-accent);
+  color: var(--xj-text);
+}
+
+.state-journal-console-v2 .workspace-nav-btn .nav-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 12px;
+  border-color: rgba(174, 205, 239, 0.20);
+  background: rgba(92, 167, 255, 0.10);
+  color: #b9dcff;
+  font-size: 12px;
+}
+
+.state-journal-console-v2 .workspace-nav-btn strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.state-journal-console-v2 .workspace-nav-btn small {
+  margin-top: 2px;
+  color: rgba(219, 231, 246, 0.58);
+  font-size: 12px;
+}
+
+.state-journal-console-v2 .page-head {
+  min-height: 0;
+  margin-bottom: 14px;
+  padding: 17px 20px;
+  border: 1px solid rgba(174, 205, 239, 0.17);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(92, 167, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(26, 39, 54, 0.86), rgba(15, 25, 38, 0.76));
+  box-shadow: var(--xj-shadow);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.state-journal-console-v2 .page-head .eyebrow {
+  margin: 0 0 5px;
+  color: #80beff;
+  font-size: 12px;
+  font-weight: 860;
+  letter-spacing: 0.08em;
+}
+
+.state-journal-console-v2 .page-head h2 {
+  font-size: 24px;
+  line-height: 1.18;
+}
+
+.state-journal-console-v2 .page-head .muted {
+  max-width: 920px;
+  margin-top: 7px;
+}
+
+.state-journal-console-v2 .panel,
+.state-journal-console-v2 .turn-note-config-card,
+.state-journal-console-v2 .model-status-card,
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"],
+.state-journal-console-v2 .role-state-overview-card,
+.state-journal-console-v2 .role-state-editor-card {
+  border-color: rgba(174, 205, 239, 0.18);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(22, 34, 48, 0.86), rgba(13, 23, 35, 0.78));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.20);
+  backdrop-filter: blur(16px) saturate(1.06);
+}
+
+.state-journal-console-v2 .panel {
+  padding: 16px;
+}
+
+.state-journal-console-v2 .home-grid {
+  gap: 14px;
+}
+
+.state-journal-console-v2 .home-main-stack,
+.state-journal-console-v2 .home-side-stack,
+.state-journal-console-v2 .role-state-workspace {
+  gap: 14px;
+}
+
+.state-journal-console-v2 .runtime-overview,
+.state-journal-console-v2 .recent-panel,
+.state-journal-console-v2 .next-step-panel,
+.state-journal-console-v2 .note-preview-panel,
+.state-journal-console-v2 .table-list-panel,
+.state-journal-console-v2 .data-panel {
+  border-radius: 22px;
+}
+
+.state-journal-console-v2 .runtime-state-cell,
+.state-journal-console-v2 .next-step-item,
+.state-journal-console-v2 .recent-row,
+.state-journal-console-v2 .home-note-preview article,
+.state-journal-console-v2 .table-item,
+.state-journal-console-v2 .role-state-role-card,
+.state-journal-console-v2 .role-state-placeholder,
+.state-journal-console-v2 .role-state-stat-card,
+.state-journal-console-v2 .field-card,
+.state-journal-console-v2 .metric-event-card,
+.state-journal-console-v2 .story-time-current-card,
+.state-journal-console-v2 .story-time-history-row,
+.state-journal-console-v2 .theme-pack-meta-panel,
+.state-journal-console-v2 .template-preview-card,
+.state-journal-console-v2 .empty-state {
+  border-color: rgba(174, 205, 239, 0.16);
+  border-radius: 16px;
+  background: rgba(7, 16, 27, 0.36);
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .recent-row {
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.state-journal-console-v2 .primary-btn,
+.state-journal-console-v2 .ghost-btn,
+.state-journal-console-v2 .file-btn,
+.state-journal-console-v2 .delete-btn,
+.state-journal-console-v2 .tiny-btn,
+.state-journal-console-v2 .tab-btn,
+.state-journal-console-v2 .view-btn {
+  border-radius: 999px;
+}
+
+.state-journal-console-v2 .primary-btn {
+  border-color: rgba(92, 167, 255, 0.58);
+  background: linear-gradient(180deg, #66b0ff, #448fe5);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(68, 143, 229, 0.22);
+}
+
+.state-journal-console-v2 .ghost-btn,
+.state-journal-console-v2 .file-btn,
+.state-journal-console-v2 .delete-btn,
+.state-journal-console-v2 .tiny-btn,
+.state-journal-console-v2 .tab-btn,
+.state-journal-console-v2 .view-btn {
+  border-color: rgba(174, 205, 239, 0.18);
+  background: rgba(16, 28, 42, 0.60);
+  color: var(--xj-text);
+}
+
+.state-journal-console-v2 .ghost-btn:hover,
+.state-journal-console-v2 .file-btn:hover,
+.state-journal-console-v2 .tiny-btn:hover,
+.state-journal-console-v2 .tab-btn:hover,
+.state-journal-console-v2 .view-btn:hover {
+  border-color: rgba(92, 167, 255, 0.36);
+  background: rgba(92, 167, 255, 0.13);
+  transform: none;
+}
+
+.state-journal-console-v2 input,
+.state-journal-console-v2 textarea,
+.state-journal-console-v2 select {
+  border-color: rgba(174, 205, 239, 0.20);
+  border-radius: 14px;
+  background: rgba(7, 16, 27, 0.66);
+  color: var(--xj-text);
+}
+
+.state-journal-console-v2 input:focus,
+.state-journal-console-v2 textarea:focus,
+.state-journal-console-v2 select:focus {
+  border-color: rgba(92, 167, 255, 0.58);
+  box-shadow: 0 0 0 3px rgba(92, 167, 255, 0.16);
+  outline: none;
+}
+
+.state-journal-console-v2 .view-switch,
+.state-journal-console-v2 .role-workspace-tabs,
+.state-journal-console-v2 .advanced-subtabs,
+.state-journal-console-v2 .role-state-tabs,
+.state-journal-console-v2 .action-group {
+  border-color: rgba(174, 205, 239, 0.16);
+  border-radius: 18px;
+  background: rgba(7, 16, 27, 0.42);
+}
+
+.state-journal-console-v2 .view-btn.active,
+.state-journal-console-v2 .role-workspace-tabs .tab-btn.active,
+.state-journal-console-v2 .advanced-subtabs .tab-btn.active,
+.state-journal-console-v2 .tab-btn.active,
+.state-journal-console-v2 .role-state-tab.active {
+  border-color: rgba(92, 167, 255, 0.36);
+  background: rgba(92, 167, 255, 0.24);
+  color: #fff;
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .advanced-layout {
+  display: block;
+}
+
+.state-journal-console-v2 .advanced-nav {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 6px;
+  border: 1px solid rgba(174, 205, 239, 0.16);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(16, 28, 42, 0.66), rgba(9, 18, 29, 0.54));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(16px) saturate(1.06);
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn {
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 3px;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
+  text-align: left;
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn.active {
+  border-color: rgba(92, 167, 255, 0.34);
+  background:
+    linear-gradient(90deg, rgba(92, 167, 255, 0.25), rgba(92, 167, 255, 0.10));
+  box-shadow: none;
+}
+
+.state-journal-console-v2 .advanced-nav .tab-btn small {
+  color: rgba(219, 231, 246, 0.60);
+}
+
+.state-journal-console-v2 .advanced-main {
+  min-width: 0;
+}
+
+.state-journal-console-v2 .advanced-main > .tab-page.active,
+.state-journal-console-v2 .advanced-main .tab-page[data-page],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+.state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"] {
+  padding: 18px;
+  border: 1px solid rgba(174, 205, 239, 0.18);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(22, 34, 48, 0.88), rgba(13, 23, 35, 0.78));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.20);
+  backdrop-filter: blur(16px) saturate(1.06);
+}
+
+.state-journal-console-v2 .advanced-main > .tab-page.active > .turn-note-config-card.standalone {
+  display: grid;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.state-journal-console-v2 .advanced-subtabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 18px;
+}
+
+.state-journal-console-v2 .advanced-main .tab-page[data-page="template"] .advanced-subtabs,
+.state-journal-console-v2 .advanced-main .tab-page[data-page="theme"] .advanced-subtabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.state-journal-console-v2 .advanced-subtabs .tab-btn {
+  min-height: 36px;
+  border-radius: 14px;
+}
+
+.state-journal-console-v2 .model-tools.pinned,
+.state-journal-console-v2 .drawer-actions.pinned {
+  position: static;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding: 14px 0 0;
+  border-top: 1px solid rgba(174, 205, 239, 0.13);
+  background: transparent !important;
+}
+
+.state-journal-console-v2 .model-tools.pinned::before,
+.state-journal-console-v2 .drawer-actions.pinned::before {
+  content: none;
+}
+
+.state-journal-console-v2 .state-journal-grid,
+.state-journal-console-v2 .data-workspace .state-journal-grid {
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.state-journal-console-v2 .table-list-panel {
+  position: sticky;
+  top: 0;
+}
+
+.state-journal-console-v2 .data-panel {
+  min-height: 560px;
+}
+
+.state-journal-console-v2 .rows-table-wrap,
+.state-journal-console-v2 .ledger-table-wrap,
+.state-journal-console-v2 .role-state-table-wrap,
+.state-journal-console-v2 .log-box {
+  border-color: rgba(174, 205, 239, 0.16);
+  border-radius: 16px;
+  background: rgba(7, 16, 27, 0.50);
+}
+
+.state-journal-console-v2 .rows-table th,
+.state-journal-console-v2 .ledger-table th,
+.state-journal-console-v2 .role-state-table th {
+  background: rgba(16, 28, 42, 0.96);
+  color: var(--xj-muted);
+}
+
+.state-journal-console-v2 .risk-note {
+  border-color: rgba(255, 121, 121, 0.34);
+  background: rgba(255, 121, 121, 0.10);
+  color: #ffd0d0;
+}
+
+@media (max-width: 1360px) and (min-width: 821px) {
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 214px minmax(0, 1fr) !important;
+    gap: 14px !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav {
+    padding: 12px !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav-btn {
+    min-height: 54px !important;
+    padding: 9px 10px;
+  }
+
+  .state-journal-console-v2 .state-journal-grid,
+  .state-journal-console-v2 .data-workspace .state-journal-grid {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1080px) {
+  .state-journal-console-v2 .home-grid,
+  .state-journal-console-v2 .state-journal-grid,
+  .state-journal-console-v2 .data-workspace .state-journal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .state-journal-console-v2 .table-list-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 980px) {
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 1fr !important;
+  }
+
+  .state-journal-console-v2 .workspace-nav {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+  }
+
+  .state-journal-console-v2 .workspace-nav::before {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .state-journal-console-v2 .workspace-nav,
+  .state-journal-console-v2 .advanced-nav,
+  .state-journal-console-v2 .advanced-subtabs,
+  .state-journal-console-v2 .advanced-main .tab-page[data-page="template"] .advanced-subtabs,
+  .state-journal-console-v2 .advanced-main .tab-page[data-page="theme"] .advanced-subtabs {
+    grid-template-columns: 1fr !important;
+  }
+
+  .state-journal-console-v2 .page-head {
+    display: grid;
+    gap: 12px;
+  }
+
+  .state-journal-console-v2 .page-head-status {
+    justify-content: flex-start;
+  }
+}
+
+/* v2.6.1-light-host-parity: follow the host light theme without using host opacity. */
+:root[data-theme="light"] {
+  --xj-card: rgba(255, 250, 242, 0.92);
+  --xj-card-strong: rgba(255, 246, 234, 0.96);
+  --xj-card-soft: rgba(255, 255, 255, 0.62);
+  --xj-border: rgba(135, 101, 75, 0.24);
+  --xj-line: rgba(135, 101, 75, 0.14);
+  --xj-text: #332820;
+  --xj-muted: rgba(79, 63, 51, 0.70);
+  --xj-accent: #d06f3f;
+  --xj-accent-dark: #a85a34;
+  --xj-ok: #2f8f5f;
+  --xj-danger: #b94b4b;
+  --xj-warn: #b87531;
+  --xj-console-panel: rgba(255, 250, 242, 0.92);
+  --xj-console-panel-soft: rgba(255, 255, 255, 0.62);
+  --xj-shadow: 0 14px 32px rgba(92, 62, 38, 0.14);
+  color-scheme: light;
+}
+
+:root[data-theme="light"] body {
+  color: var(--xj-text);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav {
+  border-color: rgba(135, 101, 75, 0.18) !important;
+  background:
+    radial-gradient(circle at top left, rgba(208, 111, 63, 0.10), transparent 15rem),
+    linear-gradient(180deg, rgba(255, 250, 242, 0.94), rgba(245, 235, 223, 0.90)) !important;
+  box-shadow: var(--xj-shadow) !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav::before {
+  color: rgba(69, 54, 43, 0.70);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav-btn {
+  color: rgba(77, 63, 52, 0.72);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav-btn:hover {
+  border-color: rgba(208, 111, 63, 0.22);
+  background: rgba(208, 111, 63, 0.08);
+  color: var(--xj-text);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav-btn.active {
+  border-color: rgba(208, 111, 63, 0.36);
+  background: linear-gradient(90deg, rgba(208, 111, 63, 0.18), rgba(208, 111, 63, 0.06));
+  box-shadow: inset 3px 0 0 var(--xj-accent);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav-btn .nav-icon {
+  border-color: rgba(208, 111, 63, 0.20);
+  background: rgba(208, 111, 63, 0.10);
+  color: #b76037;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav-btn small {
+  color: rgba(79, 63, 51, 0.58);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .page-head {
+  border-color: rgba(135, 101, 75, 0.16);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(208, 111, 63, 0.10), transparent 18rem),
+    linear-gradient(180deg, rgba(255, 250, 242, 0.94), rgba(246, 237, 226, 0.86));
+  box-shadow: var(--xj-shadow);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .page-head .eyebrow,
+:root[data-theme="light"] .state-journal-console-v2 .eyebrow {
+  color: var(--xj-accent);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .panel,
+:root[data-theme="light"] .state-journal-console-v2 .turn-note-config-card,
+:root[data-theme="light"] .state-journal-console-v2 .model-status-card,
+:root[data-theme="light"] .state-journal-console-v2 .advanced-main > .tab-page.active,
+:root[data-theme="light"] .state-journal-console-v2 .advanced-main .tab-page[data-page],
+:root[data-theme="light"] .state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+:root[data-theme="light"] .state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"],
+:root[data-theme="light"] .state-journal-console-v2 .role-state-overview-card,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-editor-card {
+  border-color: rgba(135, 101, 75, 0.17);
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.94), rgba(247, 239, 229, 0.88));
+  box-shadow: var(--xj-shadow);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-state-cell,
+:root[data-theme="light"] .state-journal-console-v2 .next-step-item,
+:root[data-theme="light"] .state-journal-console-v2 .home-note-preview article,
+:root[data-theme="light"] .state-journal-console-v2 .table-item,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-role-card,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-placeholder,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-stat-card,
+:root[data-theme="light"] .state-journal-console-v2 .field-card,
+:root[data-theme="light"] .state-journal-console-v2 .metric-event-card,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-current-card,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-history-row,
+:root[data-theme="light"] .state-journal-console-v2 .theme-pack-meta-panel,
+:root[data-theme="light"] .state-journal-console-v2 .template-preview-card,
+:root[data-theme="light"] .state-journal-console-v2 .empty-state {
+  border-color: rgba(135, 101, 75, 0.15);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .recent-row {
+  background: transparent;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .ghost-btn,
+:root[data-theme="light"] .state-journal-console-v2 .file-btn,
+:root[data-theme="light"] .state-journal-console-v2 .delete-btn,
+:root[data-theme="light"] .state-journal-console-v2 .tiny-btn,
+:root[data-theme="light"] .state-journal-console-v2 .tab-btn,
+:root[data-theme="light"] .state-journal-console-v2 .view-btn {
+  border-color: rgba(135, 101, 75, 0.18);
+  background: rgba(255, 247, 238, 0.72);
+  color: var(--xj-text);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .ghost-btn:hover,
+:root[data-theme="light"] .state-journal-console-v2 .file-btn:hover,
+:root[data-theme="light"] .state-journal-console-v2 .tiny-btn:hover,
+:root[data-theme="light"] .state-journal-console-v2 .tab-btn:hover,
+:root[data-theme="light"] .state-journal-console-v2 .view-btn:hover {
+  border-color: rgba(208, 111, 63, 0.34);
+  background: rgba(208, 111, 63, 0.09);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .primary-btn {
+  border-color: rgba(208, 111, 63, 0.48);
+  background: linear-gradient(180deg, #df8451, #ca6739);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(202, 103, 57, 0.20);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 input,
+:root[data-theme="light"] .state-journal-console-v2 textarea,
+:root[data-theme="light"] .state-journal-console-v2 select {
+  border-color: rgba(135, 101, 75, 0.22);
+  background: rgba(255, 252, 247, 0.88);
+  color: var(--xj-text);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 input:focus,
+:root[data-theme="light"] .state-journal-console-v2 textarea:focus,
+:root[data-theme="light"] .state-journal-console-v2 select:focus {
+  border-color: rgba(208, 111, 63, 0.54);
+  box-shadow: 0 0 0 3px rgba(208, 111, 63, 0.14);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .view-switch,
+:root[data-theme="light"] .state-journal-console-v2 .role-workspace-tabs,
+:root[data-theme="light"] .state-journal-console-v2 .advanced-subtabs,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-tabs,
+:root[data-theme="light"] .state-journal-console-v2 .action-group,
+:root[data-theme="light"] .state-journal-console-v2 .advanced-nav {
+  border-color: rgba(135, 101, 75, 0.15);
+  background: rgba(255, 250, 242, 0.78);
+  box-shadow: var(--xj-shadow);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .view-btn.active,
+:root[data-theme="light"] .state-journal-console-v2 .role-workspace-tabs .tab-btn.active,
+:root[data-theme="light"] .state-journal-console-v2 .advanced-subtabs .tab-btn.active,
+:root[data-theme="light"] .state-journal-console-v2 .tab-btn.active,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-tab.active {
+  border-color: rgba(208, 111, 63, 0.34);
+  background: rgba(208, 111, 63, 0.16);
+  color: var(--xj-text);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .advanced-nav .tab-btn.active {
+  border-color: rgba(208, 111, 63, 0.34);
+  background: linear-gradient(90deg, rgba(208, 111, 63, 0.18), rgba(208, 111, 63, 0.06));
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .advanced-nav .tab-btn small {
+  color: rgba(79, 63, 51, 0.58);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .rows-table-wrap,
+:root[data-theme="light"] .state-journal-console-v2 .ledger-table-wrap,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table-wrap,
+:root[data-theme="light"] .state-journal-console-v2 .log-box {
+  border-color: rgba(135, 101, 75, 0.15);
+  background: rgba(255, 255, 255, 0.56);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .rows-table th,
+:root[data-theme="light"] .state-journal-console-v2 .ledger-table th,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table th,
+:root[data-theme="light"] .state-journal-console-v2 .rows-table th:first-child,
+:root[data-theme="light"] .state-journal-console-v2 .rows-table td:first-child {
+  background: rgba(247, 237, 225, 0.96);
+  color: var(--xj-muted);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .risk-note {
+  border-color: rgba(185, 75, 75, 0.28);
+  background: rgba(185, 75, 75, 0.08);
+  color: #8f3737;
+}
+
+/* v2.6.2-light-readable-sync: increase contrast for host light mode. */
+:root[data-theme="light"] {
+  --xj-muted: rgba(58, 45, 36, 0.84);
+  --xj-ok: #176f49;
+  --xj-danger: #9e3f3f;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .muted,
+:root[data-theme="light"] .state-journal-console-v2 .microcopy,
+:root[data-theme="light"] .state-journal-console-v2 .runtime-flow-text,
+:root[data-theme="light"] .state-journal-console-v2 .runtime-last-line,
+:root[data-theme="light"] .state-journal-console-v2 .workspace-nav-btn small,
+:root[data-theme="light"] .state-journal-console-v2 .panel-head p,
+:root[data-theme="light"] .state-journal-console-v2 .home-note-preview p,
+:root[data-theme="light"] .state-journal-console-v2 .model-status-card span,
+:root[data-theme="light"] .state-journal-console-v2 .field-title small,
+:root[data-theme="light"] .state-journal-console-v2 .row-detail-field small,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-role-card span,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-role-card small,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-overview-card p,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-editor-head small {
+  color: rgba(58, 45, 36, 0.84);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-badge,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-chip,
+:root[data-theme="light"] .state-journal-console-v2 .role-stage-pill,
+:root[data-theme="light"] .state-journal-console-v2 .ledger-type-pill,
+:root[data-theme="light"] .state-journal-console-v2 .ledger-status-badge,
+:root[data-theme="light"] .state-journal-console-v2 .theme-pack-chip-row span,
+:root[data-theme="light"] .state-journal-console-v2 .micro-badge {
+  border-color: rgba(111, 82, 61, 0.28);
+  background: rgba(255, 252, 247, 0.82);
+  color: rgba(61, 47, 38, 0.88);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-badge.muted,
+:root[data-theme="light"] .state-journal-console-v2 .role-stage-pill.muted {
+  color: rgba(76, 60, 49, 0.78);
+  background: rgba(255, 252, 247, 0.68);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .next-step-item > span,
+:root[data-theme="light"] .state-journal-console-v2 .recent-row em,
+:root[data-theme="light"] .state-journal-console-v2 .next-step-item em,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-mode-badge.is-on,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-overview-chip.is-on,
+:root[data-theme="light"] .state-journal-console-v2 .ledger-status-badge.status-done {
+  border-color: rgba(23, 111, 73, 0.34);
+  background: rgba(232, 248, 238, 0.92);
+  color: #176f49;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .next-step-item.needs-action > span,
+:root[data-theme="light"] .state-journal-console-v2 .next-step-item.is-pending em,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-mode-badge.is-off,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-overview-chip.is-off,
+:root[data-theme="light"] .state-journal-console-v2 .ledger-status-badge.status-failed {
+  border-color: rgba(158, 63, 63, 0.32);
+  background: rgba(255, 235, 235, 0.90);
+  color: #9e3f3f;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .recent-row {
+  color: rgba(58, 45, 36, 0.84);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .recent-row span {
+  color: rgba(65, 50, 40, 0.76);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .next-step-item strong,
+:root[data-theme="light"] .state-journal-console-v2 .recent-row strong,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-role-card strong,
+:root[data-theme="light"] .state-journal-console-v2 .runtime-title-row strong {
+  color: #2f251e;
+}
+
+/* v2.6.3-align-toast-switches: align host shell, soften dark panels, keep notices off controls. */
+:root[data-theme="dark"] {
+  --xj-card: rgba(36, 51, 68, 0.72);
+  --xj-card-strong: rgba(41, 57, 76, 0.78);
+  --xj-card-soft: rgba(44, 61, 82, 0.42);
+  --xj-console-panel: rgba(34, 49, 66, 0.70);
+  --xj-console-panel-soft: rgba(38, 53, 72, 0.38);
+  --xj-shadow: 0 16px 34px rgba(3, 9, 17, 0.16);
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .state-journal-workbench {
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 8% 18%, rgba(92, 167, 255, 0.10), transparent 18rem),
+    linear-gradient(180deg, rgba(44, 58, 74, 0.20), rgba(31, 44, 60, 0.14)) !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .workspace-nav {
+  background:
+    radial-gradient(circle at top left, rgba(92, 167, 255, 0.16), transparent 15rem),
+    linear-gradient(180deg, rgba(39, 55, 74, 0.76), rgba(30, 44, 62, 0.64)) !important;
+  box-shadow: 0 14px 30px rgba(3, 9, 17, 0.18) !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .page-head,
+:root[data-theme="dark"] .state-journal-console-v2 .panel,
+:root[data-theme="dark"] .state-journal-console-v2 .turn-note-config-card,
+:root[data-theme="dark"] .state-journal-console-v2 .model-status-card,
+:root[data-theme="dark"] .state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+:root[data-theme="dark"] .state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"],
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-overview-card,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-editor-card,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-main > .tab-page.active,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-main .tab-page[data-page] {
+  border-color: rgba(174, 205, 239, 0.20);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(92, 167, 255, 0.10), transparent 18rem),
+    linear-gradient(180deg, rgba(39, 55, 74, 0.72), rgba(28, 42, 60, 0.58));
+  box-shadow: 0 14px 30px rgba(3, 9, 17, 0.16);
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .runtime-state-cell,
+:root[data-theme="dark"] .state-journal-console-v2 .next-step-item,
+:root[data-theme="dark"] .state-journal-console-v2 .home-note-preview article,
+:root[data-theme="dark"] .state-journal-console-v2 .table-item,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-role-card,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-placeholder,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-stat-card,
+:root[data-theme="dark"] .state-journal-console-v2 .field-card,
+:root[data-theme="dark"] .state-journal-console-v2 .metric-event-card,
+:root[data-theme="dark"] .state-journal-console-v2 .story-time-current-card,
+:root[data-theme="dark"] .state-journal-console-v2 .story-time-history-row,
+:root[data-theme="dark"] .state-journal-console-v2 .theme-pack-meta-panel,
+:root[data-theme="dark"] .state-journal-console-v2 .template-preview-card,
+:root[data-theme="dark"] .state-journal-console-v2 .empty-state,
+:root[data-theme="dark"] .state-journal-console-v2 .rows-table-wrap,
+:root[data-theme="dark"] .state-journal-console-v2 .ledger-table-wrap,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-table-wrap,
+:root[data-theme="dark"] .state-journal-console-v2 .log-box,
+:root[data-theme="dark"] .state-journal-console-v2 .view-switch,
+:root[data-theme="dark"] .state-journal-console-v2 .role-workspace-tabs,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-subtabs,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-tabs,
+:root[data-theme="dark"] .state-journal-console-v2 .action-group,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-nav {
+  border-color: rgba(174, 205, 239, 0.18);
+  background: rgba(39, 55, 74, 0.34);
+}
+
+.state-journal-page-toast {
+  top: auto;
+  right: auto;
+  bottom: 18px;
+  left: 50%;
+  z-index: 1500;
+  min-width: min(360px, calc(100vw - 32px));
+  max-width: min(440px, calc(100vw - 32px));
+  border-color: rgba(174, 205, 239, 0.28);
+  background:
+    linear-gradient(180deg, rgba(43, 58, 76, 0.96), rgba(31, 44, 60, 0.94));
+  color: #eef6ff;
+  box-shadow: 0 16px 38px rgba(3, 9, 17, 0.22);
+  transform: translate(-50%, 0.65rem);
+}
+
+.state-journal-page-toast.show {
+  transform: translate(-50%, 0);
+}
+
+.state-journal-page-toast strong {
+  color: #f6fbff;
+}
+
+.state-journal-page-toast span {
+  color: rgba(226, 237, 249, 0.80);
+}
+
+.state-journal-page-toast.ok {
+  border-color: rgba(47, 142, 96, 0.46);
+}
+
+.state-journal-page-toast.error {
+  border-color: rgba(185, 75, 75, 0.52);
+}
+
+.state-journal-console-v2 .runtime-state-cell input,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"],
+.state-journal-console-v2 .runtime-toggle input {
+  border-color: rgba(91, 115, 137, 0.42);
+  background: rgba(91, 103, 112, 0.30);
+}
+
+.state-journal-console-v2 .runtime-state-cell input:checked,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"]:checked,
+.state-journal-console-v2 .runtime-toggle input:checked {
+  border-color: rgba(24, 128, 84, 0.72);
+  background: linear-gradient(180deg, #35b878, #188052);
+  box-shadow: 0 0 0 2px rgba(24, 128, 84, 0.16);
+}
+
+.state-journal-console-v2 .runtime-state-cell input::after,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"]::before,
+.state-journal-console-v2 .runtime-toggle input::before {
+  background: #f7fbff;
+  box-shadow: 0 2px 5px rgba(20, 34, 48, 0.26);
+}
+
+.state-journal-console-v2 .runtime-state-cell input:checked::after,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"]:checked::before,
+.state-journal-console-v2 .runtime-toggle input:checked::before {
+  background: #ffffff;
+}
+
+.state-journal-console-v2 .check-row input[type="checkbox"],
+.state-journal-console-v2 .role-state-table input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(91, 115, 137, 0.42);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.70);
+  cursor: pointer;
+}
+
+.state-journal-console-v2 .check-row input[type="checkbox"]::after,
+.state-journal-console-v2 .role-state-table input[type="checkbox"]::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  opacity: 0;
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.state-journal-console-v2 .check-row input[type="checkbox"]:checked,
+.state-journal-console-v2 .role-state-table input[type="checkbox"]:checked {
+  border-color: rgba(24, 128, 84, 0.78);
+  background: #188052;
+  box-shadow: 0 0 0 2px rgba(24, 128, 84, 0.14);
+}
+
+.state-journal-console-v2 .check-row input[type="checkbox"]:checked::after,
+.state-journal-console-v2 .role-state-table input[type="checkbox"]:checked::after {
+  opacity: 1;
+}
+
+:root[data-theme="light"] .state-journal-page-toast {
+  border-color: rgba(135, 101, 75, 0.22);
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(246, 236, 225, 0.96));
+  color: #30241c;
+  box-shadow: 0 16px 34px rgba(92, 62, 38, 0.16);
+}
+
+:root[data-theme="light"] .state-journal-page-toast strong {
+  color: #30241c;
+}
+
+:root[data-theme="light"] .state-journal-page-toast span {
+  color: rgba(58, 45, 36, 0.82);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-state-cell input,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-switch input[type="checkbox"],
+:root[data-theme="light"] .state-journal-console-v2 .runtime-toggle input {
+  border-color: rgba(135, 101, 75, 0.26);
+  background: rgba(255, 252, 247, 0.88);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-state-cell input:checked,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-switch input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .runtime-toggle input:checked {
+  border-color: rgba(23, 111, 73, 0.58);
+  background: linear-gradient(180deg, #3fc783, #168456);
+  box-shadow: 0 0 0 2px rgba(23, 111, 73, 0.14);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .check-row input[type="checkbox"],
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table input[type="checkbox"] {
+  border-color: rgba(135, 101, 75, 0.30);
+  background: rgba(255, 252, 247, 0.94);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .check-row input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table input[type="checkbox"]:checked {
+  border-color: rgba(23, 111, 73, 0.62);
+  background: #168456;
+}
+
+/* v2.6.4-toolbar-toast-contrast: center the host header, lift dark panels, and harden switch contrast. */
+:root[data-theme="dark"] {
+  --xj-card: rgba(47, 63, 82, 0.78);
+  --xj-card-strong: rgba(54, 70, 91, 0.84);
+  --xj-card-soft: rgba(70, 88, 112, 0.34);
+  --xj-console-panel: rgba(48, 64, 84, 0.72);
+  --xj-console-panel-soft: rgba(52, 68, 88, 0.42);
+  --xj-line: rgba(190, 216, 246, 0.18);
+  --xj-shadow: 0 16px 34px rgba(3, 9, 17, 0.14);
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .state-journal-workbench {
+  background:
+    radial-gradient(circle at 8% 18%, rgba(92, 167, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(62, 76, 94, 0.30), rgba(49, 64, 83, 0.26)) !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .workspace-nav {
+  background:
+    radial-gradient(circle at top left, rgba(92, 167, 255, 0.18), transparent 15rem),
+    linear-gradient(180deg, rgba(52, 68, 89, 0.82), rgba(43, 59, 79, 0.72)) !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .page-head,
+:root[data-theme="dark"] .state-journal-console-v2 .panel,
+:root[data-theme="dark"] .state-journal-console-v2 .turn-note-config-card,
+:root[data-theme="dark"] .state-journal-console-v2 .model-status-card,
+:root[data-theme="dark"] .state-journal-console-v2 .data-workspace > .tab-page[data-page="schema"],
+:root[data-theme="dark"] .state-journal-console-v2 .data-workspace > .tab-page[data-page="rules"],
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-overview-card,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-editor-card,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-main > .tab-page.active,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-main .tab-page[data-page] {
+  border-color: rgba(190, 216, 246, 0.22) !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(92, 167, 255, 0.12), transparent 18rem),
+    linear-gradient(180deg, rgba(52, 68, 89, 0.82), rgba(43, 59, 79, 0.70)) !important;
+  box-shadow: 0 14px 30px rgba(3, 9, 17, 0.14) !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 .runtime-state-cell,
+:root[data-theme="dark"] .state-journal-console-v2 .next-step-item,
+:root[data-theme="dark"] .state-journal-console-v2 .home-note-preview article,
+:root[data-theme="dark"] .state-journal-console-v2 .table-item,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-role-card,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-placeholder,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-stat-card,
+:root[data-theme="dark"] .state-journal-console-v2 .field-card,
+:root[data-theme="dark"] .state-journal-console-v2 .metric-event-card,
+:root[data-theme="dark"] .state-journal-console-v2 .story-time-current-card,
+:root[data-theme="dark"] .state-journal-console-v2 .story-time-history-row,
+:root[data-theme="dark"] .state-journal-console-v2 .theme-pack-meta-panel,
+:root[data-theme="dark"] .state-journal-console-v2 .template-preview-card,
+:root[data-theme="dark"] .state-journal-console-v2 .empty-state,
+:root[data-theme="dark"] .state-journal-console-v2 .rows-table-wrap,
+:root[data-theme="dark"] .state-journal-console-v2 .ledger-table-wrap,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-table-wrap,
+:root[data-theme="dark"] .state-journal-console-v2 .log-box,
+:root[data-theme="dark"] .state-journal-console-v2 .view-switch,
+:root[data-theme="dark"] .state-journal-console-v2 .role-workspace-tabs,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-subtabs,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-tabs,
+:root[data-theme="dark"] .state-journal-console-v2 .action-group,
+:root[data-theme="dark"] .state-journal-console-v2 .advanced-nav {
+  border-color: rgba(190, 216, 246, 0.20) !important;
+  background: rgba(55, 72, 94, 0.48) !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 input,
+:root[data-theme="dark"] .state-journal-console-v2 textarea,
+:root[data-theme="dark"] .state-journal-console-v2 select {
+  border-color: rgba(190, 216, 246, 0.24);
+  background: rgba(39, 55, 75, 0.74);
+}
+
+.state-journal-page-toast {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: max(20px, env(safe-area-inset-bottom)) !important;
+  left: 50% !important;
+  z-index: 1600 !important;
+  transform: translate(-50%, 0.7rem) !important;
+}
+
+.state-journal-page-toast.show {
+  transform: translate(-50%, 0) !important;
+}
+
+.state-journal-console-v2 .runtime-toggle,
+.state-journal-console-v2 .story-time-switch {
+  color: color-mix(in srgb, var(--xj-text) 86%, var(--xj-muted));
+}
+
+.state-journal-console-v2 .runtime-state-cell input,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"],
+.state-journal-console-v2 .runtime-toggle input {
+  border-color: rgba(77, 96, 116, 0.56) !important;
+  background: rgba(93, 105, 116, 0.36) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.state-journal-console-v2 .runtime-state-cell input:checked,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"]:checked,
+.state-journal-console-v2 .runtime-toggle input:checked {
+  border-color: rgba(10, 126, 73, 0.92) !important;
+  background: linear-gradient(180deg, #2fc879, #0b8f51) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 0 2px rgba(11, 143, 81, 0.18) !important;
+}
+
+.state-journal-console-v2 .runtime-state-cell input::after,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"]::before,
+.state-journal-console-v2 .runtime-toggle input::before {
+  background: #f8fbff !important;
+  box-shadow: 0 2px 6px rgba(14, 30, 46, 0.30) !important;
+}
+
+.state-journal-console-v2 .check-row input[type="checkbox"],
+.state-journal-console-v2 .role-state-table input[type="checkbox"] {
+  border-color: rgba(77, 96, 116, 0.58) !important;
+  background: rgba(248, 251, 255, 0.90) !important;
+}
+
+.state-journal-console-v2 .check-row input[type="checkbox"]:checked,
+.state-journal-console-v2 .role-state-table input[type="checkbox"]:checked {
+  border-color: rgba(10, 126, 73, 0.92) !important;
+  background: #0b8f51 !important;
+  box-shadow: 0 0 0 2px rgba(11, 143, 81, 0.18) !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-toggle,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-switch {
+  color: #2f251e;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-state-cell input,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-switch input[type="checkbox"],
+:root[data-theme="light"] .state-journal-console-v2 .runtime-toggle input {
+  border-color: rgba(100, 75, 56, 0.38) !important;
+  background: rgba(255, 252, 247, 0.96) !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-state-cell input:checked,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-switch input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .runtime-toggle input:checked {
+  border-color: rgba(9, 119, 68, 0.78) !important;
+  background: linear-gradient(180deg, #2fc879, #0b8f51) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 0 2px rgba(11, 143, 81, 0.18) !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .check-row input[type="checkbox"],
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table input[type="checkbox"] {
+  border-color: rgba(100, 75, 56, 0.40) !important;
+  background: rgba(255, 252, 247, 0.98) !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .check-row input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table input[type="checkbox"]:checked {
+  border-color: rgba(9, 119, 68, 0.82) !important;
+  background: #0b8f51 !important;
+}
+
+/* v2.6.5-main-workbench-polish: workspace headers, inline save state, main-app controls. */
+.state-journal-console-v2 .workbench-head {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px !important;
+}
+
+.state-journal-console-v2 .workbench-copy {
+  min-width: 0;
+}
+
+.state-journal-console-v2 .workbench-titleline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+.state-journal-console-v2 .workbench-titleline .eyebrow {
+  margin: 0 !important;
+}
+
+.state-journal-console-v2 .ui-status-token,
+.state-journal-console-v2 .database-workbench-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 6px 11px;
+  border: 1px solid color-mix(in srgb, var(--xj-border) 76%, var(--xj-accent) 24%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xj-card-soft) 78%, transparent);
+  color: var(--xj-muted);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.state-journal-console-v2 .ui-status-token::before,
+.state-journal-console-v2 .database-workbench-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.state-journal-console-v2 .ui-status-token.is-saved,
+.state-journal-console-v2 .ui-status-token.is-success,
+.state-journal-console-v2 .database-workbench-status.is-saved {
+  color: #73c58d;
+  border-color: color-mix(in srgb, #73c58d 46%, var(--xj-border));
+  background: color-mix(in srgb, #73c58d 10%, var(--xj-card-soft));
+}
+
+.state-journal-console-v2 .ui-status-token.is-saving,
+.state-journal-console-v2 .ui-status-token.is-dirty,
+.state-journal-console-v2 .database-workbench-status.is-saving,
+.state-journal-console-v2 .database-workbench-status.is-dirty {
+  color: color-mix(in srgb, var(--xj-accent) 78%, var(--xj-text));
+  border-color: color-mix(in srgb, var(--xj-accent) 50%, var(--xj-border));
+  background: color-mix(in srgb, var(--xj-accent) 13%, var(--xj-card-soft));
+}
+
+.state-journal-console-v2 .ui-status-token.is-error,
+.state-journal-console-v2 .database-workbench-status.is-error {
+  color: #ff8c8c;
+  border-color: color-mix(in srgb, #ff8c8c 54%, var(--xj-border));
+  background: color-mix(in srgb, #ff8c8c 10%, var(--xj-card-soft));
+}
+
+.state-journal-console-v2 .ui-status-token.is-status-changing,
+.state-journal-console-v2 .database-workbench-status.is-status-changing {
+  animation: state-journal-status-pulse 0.72s ease both;
+}
+
+.state-journal-console-v2 .workbench-actions,
+.state-journal-console-v2 .workbench-tabs {
+  justify-self: end;
+}
+
+.state-journal-console-v2 .workbench-actions.ui-action-dock {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--xj-border) 82%, var(--xj-accent) 18%);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--xj-card-soft) 78%, transparent);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn, .file-btn, .tab-btn, .view-btn, .tiny-btn, .delete-btn) {
+  min-height: 34px;
+  border-radius: 999px !important;
+  transition:
+    transform 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn, .file-btn, .tab-btn, .view-btn, .tiny-btn, .delete-btn):not(:disabled) {
+  cursor: pointer;
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn, .file-btn, .tab-btn, .view-btn, .tiny-btn, .delete-btn):hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn, .file-btn, .tab-btn, .view-btn, .tiny-btn, .delete-btn):active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn, .file-btn, .tab-btn, .view-btn, .tiny-btn, .delete-btn):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--xj-accent) 58%, transparent);
+  outline-offset: 2px;
+}
+
+.state-journal-console-v2 .primary-btn {
+  border-color: color-mix(in srgb, var(--xj-accent) 58%, var(--xj-border)) !important;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--xj-accent) 92%, #fff 8%),
+      color-mix(in srgb, var(--xj-accent-dark, var(--xj-accent)) 88%, #000 12%)) !important;
+  color: #fff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 10px 24px color-mix(in srgb, var(--xj-accent) 20%, transparent) !important;
+  font-weight: 850;
+}
+
+.state-journal-console-v2 .ghost-btn,
+.state-journal-console-v2 .file-btn,
+.state-journal-console-v2 .tiny-btn,
+.state-journal-console-v2 .delete-btn {
+  border-color: color-mix(in srgb, var(--xj-border) 86%, var(--xj-accent) 14%) !important;
+  background: color-mix(in srgb, var(--xj-card-soft) 78%, transparent) !important;
+  color: var(--xj-text) !important;
+  box-shadow: none !important;
+}
+
+.state-journal-console-v2 :is(.ghost-btn, .file-btn, .tiny-btn, .delete-btn):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--xj-accent) 42%, var(--xj-border)) !important;
+  background: color-mix(in srgb, var(--xj-accent) 11%, var(--xj-card-soft)) !important;
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn).is-loading {
+  opacity: 0.82;
+  pointer-events: none;
+  box-shadow:
+    inset 0 -2px 0 color-mix(in srgb, var(--xj-accent) 28%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--xj-accent) 13%, transparent) !important;
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn).is-success,
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn).is-feedback {
+  border-color: color-mix(in srgb, var(--xj-accent) 64%, var(--xj-border)) !important;
+  background: color-mix(in srgb, var(--xj-accent) 24%, var(--xj-card-soft)) !important;
+  color: color-mix(in srgb, var(--xj-accent) 72%, var(--xj-text)) !important;
+  animation: state-journal-button-confirm 0.72s ease both;
+}
+
+.state-journal-console-v2 :is(button, .primary-btn, .ghost-btn).is-error {
+  border-color: rgba(255, 124, 124, 0.58) !important;
+  background: rgba(255, 124, 124, 0.14) !important;
+  color: #ffc6c6 !important;
+  animation: state-journal-status-error 0.46s ease both;
+}
+
+.state-journal-console-v2 .runtime-state-cell input,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"],
+.state-journal-console-v2 .runtime-toggle input {
+  border-color: color-mix(in srgb, var(--xj-border) 82%, var(--xj-accent) 18%) !important;
+  background: color-mix(in srgb, var(--xj-card-soft) 82%, transparent) !important;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.state-journal-console-v2 .runtime-state-cell input:checked,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"]:checked,
+.state-journal-console-v2 .runtime-toggle input:checked {
+  border-color: color-mix(in srgb, var(--xj-accent) 76%, var(--xj-border)) !important;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--xj-accent) 86%, #fff 14%),
+      color-mix(in srgb, var(--xj-accent-dark, var(--xj-accent)) 90%, #000 10%)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0 0 2px color-mix(in srgb, var(--xj-accent) 18%, transparent) !important;
+}
+
+.state-journal-console-v2 .runtime-state-cell input::after,
+.state-journal-console-v2 .story-time-switch input[type="checkbox"]::before,
+.state-journal-console-v2 .runtime-toggle input::before {
+  background: #fff !important;
+  box-shadow: 0 2px 6px rgba(14, 30, 46, 0.26) !important;
+}
+
+.state-journal-console-v2 .check-row input[type="checkbox"]:checked,
+.state-journal-console-v2 .role-state-table input[type="checkbox"]:checked {
+  border-color: color-mix(in srgb, var(--xj-accent) 76%, var(--xj-border)) !important;
+  background: color-mix(in srgb, var(--xj-accent) 88%, var(--xj-accent-dark, var(--xj-accent))) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--xj-accent) 16%, transparent) !important;
+}
+
+.state-journal-console-v2 #roleWorkspace > .tab-page.active,
+.state-journal-console-v2 #dataWorkspace > #databaseWorkspace.tab-page.active {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.state-journal-console-v2 .role-state-workspace {
+  background: transparent !important;
+}
+
+.state-journal-console-v2 .role-state-global,
+.state-journal-console-v2 .role-state-sidebar,
+.state-journal-console-v2 .role-state-detail {
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--xj-accent) 9%, transparent), transparent 18rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--xj-card) 92%, transparent), color-mix(in srgb, var(--xj-card-strong) 86%, transparent)) !important;
+}
+
+.state-journal-page-toast {
+  top: auto !important;
+  right: 22px !important;
+  bottom: max(22px, env(safe-area-inset-bottom)) !important;
+  left: auto !important;
+  min-width: min(320px, calc(100vw - 32px)) !important;
+  max-width: min(420px, calc(100vw - 32px)) !important;
+  transform: translate(0, 0.7rem) !important;
+}
+
+.state-journal-page-toast.show {
+  transform: translate(0, 0) !important;
+}
+
+.state-journal-page-toast.warn,
+.state-journal-page-toast.warning {
+  border-color: color-mix(in srgb, var(--xj-accent) 54%, var(--xj-border));
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .ui-status-token.is-saved,
+:root[data-theme="light"] .state-journal-console-v2 .ui-status-token.is-success,
+:root[data-theme="light"] .state-journal-console-v2 .database-workbench-status.is-saved {
+  color: #2f8f63;
+  border-color: rgba(47, 143, 99, 0.34);
+  background: rgba(235, 249, 241, 0.88);
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .ui-status-token.is-saving,
+:root[data-theme="light"] .state-journal-console-v2 .ui-status-token.is-dirty,
+:root[data-theme="light"] .state-journal-console-v2 .database-workbench-status.is-saving,
+:root[data-theme="light"] .state-journal-console-v2 .database-workbench-status.is-dirty {
+  color: var(--xj-accent-dark);
+  border-color: color-mix(in srgb, var(--xj-accent) 44%, rgba(135, 101, 75, 0.20));
+  background: color-mix(in srgb, var(--xj-accent) 9%, rgba(255, 252, 247, 0.94));
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .workbench-actions.ui-action-dock,
+:root[data-theme="light"] .state-journal-console-v2 .workbench-tabs {
+  background: rgba(255, 252, 247, 0.72);
+}
+
+@keyframes state-journal-status-pulse {
+  0% { transform: translateY(0); box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 18%, transparent); }
+  42% { transform: translateY(-1px); box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 10%, transparent); }
+  100% { transform: translateY(0); box-shadow: 0 0 0 0 transparent; }
+}
+
+@keyframes state-journal-button-confirm {
+  0% { transform: translateY(0) scale(1); }
+  45% { transform: translateY(-1px) scale(1.015); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes state-journal-status-error {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  55% { transform: translateX(2px); }
+  80% { transform: translateX(-1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-journal-console-v2 .ui-status-token.is-status-changing,
+  .state-journal-console-v2 .database-workbench-status.is-status-changing,
+  .state-journal-console-v2 :is(button, .primary-btn, .ghost-btn).is-success,
+  .state-journal-console-v2 :is(button, .primary-btn, .ghost-btn).is-feedback,
+  .state-journal-console-v2 :is(button, .primary-btn, .ghost-btn).is-error {
+    animation: none !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .state-journal-console-v2 .workbench-head {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .state-journal-console-v2 .workbench-actions,
+  .state-journal-console-v2 .workbench-tabs {
+    justify-self: stretch;
+  }
+
+  .state-journal-console-v2 .workbench-titleline {
+    flex-wrap: wrap;
+  }
+}
+
+/* v2.6.6-main-workbench-detail-polish: keep role actions compact and remove legacy green switches in light theme. */
+.state-journal-console-v2 .role-state-toolbar .role-state-actions.grouped-actions {
+  display: inline-flex !important;
+  width: auto !important;
+  max-width: min(100%, 520px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.state-journal-console-v2 .role-state-toolbar .role-state-actions.grouped-actions .ghost-btn,
+.state-journal-console-v2 .role-state-toolbar .role-state-actions.grouped-actions .primary-btn {
+  width: auto !important;
+  min-width: 136px;
+  flex: 0 0 auto;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-state-cell input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-switch input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .runtime-toggle input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .check-row input[type="checkbox"]:checked,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table input[type="checkbox"]:checked {
+  border-color: color-mix(in srgb, var(--xj-accent) 78%, rgba(135, 101, 75, 0.22)) !important;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--xj-accent) 88%, #fff 12%),
+      color-mix(in srgb, var(--xj-accent-dark) 88%, #000 12%)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 0 0 2px color-mix(in srgb, var(--xj-accent) 18%, transparent) !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .runtime-state-cell input[type="checkbox"]::after,
+:root[data-theme="light"] .state-journal-console-v2 .story-time-switch input[type="checkbox"]::before,
+:root[data-theme="light"] .state-journal-console-v2 .runtime-toggle input[type="checkbox"]::before,
+:root[data-theme="light"] .state-journal-console-v2 .check-row input[type="checkbox"]::after,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table input[type="checkbox"]::after {
+  background: #fffaf3 !important;
+  box-shadow: 0 2px 8px rgba(116, 72, 42, 0.24) !important;
+}
+
+@media (max-width: 760px) {
+  .state-journal-console-v2 .role-state-toolbar .role-state-actions.grouped-actions {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  .state-journal-console-v2 .role-state-toolbar .role-state-actions.grouped-actions .ghost-btn,
+  .state-journal-console-v2 .role-state-toolbar .role-state-actions.grouped-actions .primary-btn {
+    width: 100% !important;
+    min-width: 0;
+  }
+}
+
+/* v2.6.7-role-workspace-usability: single page save, tighter role list cards, themed native select menu. */
+.state-journal-console-v2 .story-time-actions {
+  gap: 8px;
+}
+
+.state-journal-console-v2 .story-time-actions .ghost-btn {
+  min-height: 34px;
+}
+
+.state-journal-console-v2 #roleStateRoleList {
+  gap: 8px;
+}
+
+.state-journal-console-v2 .role-state-role-card.role-state-role-card-v115,
+.state-journal-console-v2 .role-state-empty-role-card {
+  display: grid;
+  gap: 7px;
+  padding: 10px 11px !important;
+  border-radius: 8px !important;
+  min-height: 0;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--xj-card-soft) 72%, transparent),
+      color-mix(in srgb, var(--xj-card) 48%, transparent)) !important;
+  box-shadow: none !important;
+}
+
+.state-journal-console-v2 .role-state-role-card.role-state-role-card-v115.active {
+  border-color: color-mix(in srgb, var(--xj-accent) 46%, var(--xj-border)) !important;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--xj-accent) 9%, var(--xj-card-soft)),
+      color-mix(in srgb, var(--xj-card) 52%, transparent)) !important;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--xj-accent) 78%, var(--xj-text)),
+    0 8px 18px color-mix(in srgb, var(--xj-accent) 9%, transparent) !important;
+}
+
+.state-journal-console-v2 .role-state-role-card-v115 .role-state-card-head {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.state-journal-console-v2 .role-state-role-card-v115 .role-state-card-head strong {
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.state-journal-console-v2 .role-state-role-card-v115 .role-stage-pill {
+  flex: 0 0 auto;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.state-journal-console-v2 .role-state-role-card-v115 .role-state-chip-row {
+  gap: 5px;
+}
+
+.state-journal-console-v2 .role-state-role-card-v115 .role-state-chip,
+.state-journal-console-v2 .role-state-role-card-v115 .role-state-mode-badge {
+  min-height: 21px;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.state-journal-console-v2 select,
+.state-journal-console-v2 select option,
+.state-journal-console-v2 select optgroup {
+  color-scheme: light dark;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 select,
+:root[data-theme="light"] .state-journal-console-v2 select option,
+:root[data-theme="light"] .state-journal-console-v2 select optgroup {
+  background-color: #fffaf3 !important;
+  color: #2f251e !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 select option:checked,
+:root[data-theme="light"] .state-journal-console-v2 select option:hover,
+:root[data-theme="light"] .state-journal-console-v2 select option:focus {
+  background-color: #f1d7c4 !important;
+  color: #2f251e !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 select,
+:root[data-theme="dark"] .state-journal-console-v2 select option,
+:root[data-theme="dark"] .state-journal-console-v2 select optgroup {
+  background-color: #29394d !important;
+  color: #edf5ff !important;
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 select option:checked,
+:root[data-theme="dark"] .state-journal-console-v2 select option:hover,
+:root[data-theme="dark"] .state-journal-console-v2 select option:focus {
+  background-color: #3c5f88 !important;
+  color: #ffffff !important;
+}
+
+/* v2.6.9-empty-space-soften: remove the dark blank board behind the main workbench. */
+:root[data-theme="dark"] .state-journal-console-v2 .state-journal-workbench,
+:root[data-theme="dark"] .state-journal-console-v2 .workspace-main,
+:root[data-theme="dark"] .state-journal-console-v2 .workspace-page.active,
+:root[data-theme="dark"] .state-journal-console-v2 #roleWorkspace > .tab-page.active,
+:root[data-theme="dark"] .state-journal-console-v2 #dataWorkspace > #databaseWorkspace.tab-page.active {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.state-journal-console-v2 .role-state-placeholder {
+  min-height: 0 !important;
+}
+
+/* v2.7.0-remove-blank-canvas: do not let the iframe paint a dark page canvas. */
+:root,
+:root[data-theme="dark"],
+:root[data-theme="light"] {
+  color-scheme: normal !important;
+}
+
+html,
+body,
+.state-journal-shell.state-journal-console-v2,
+.state-journal-console-v2 .state-journal-workbench,
+.state-journal-console-v2 .workspace-main,
+.state-journal-console-v2 .workspace-page,
+.state-journal-console-v2 .workspace-page.active,
+.state-journal-console-v2 .role-state-workspace,
+.state-journal-console-v2 .role-state-layout {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.state-journal-shell.state-journal-console-v2 {
+  padding-bottom: 0 !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* v2.7.2-frosted-canvas: replace copied wallpaper with one quiet glass layer. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 22% 14%, rgba(255, 255, 255, 0.14), transparent 28rem),
+    linear-gradient(180deg, rgba(255, 250, 244, 0.30), rgba(244, 236, 226, 0.22));
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+:root[data-theme="dark"] body::before {
+  background:
+    radial-gradient(circle at 22% 14%, rgba(120, 174, 236, 0.12), transparent 28rem),
+    linear-gradient(180deg, rgba(20, 31, 44, 0.30), rgba(13, 22, 34, 0.24));
+}
+
+/* v2.7.3-main-page-space-and-controls: align controls with Fantareal and give tables room. */
+:root[data-theme="light"] .state-journal-console-v2 {
+  --xj-fr-primary: #c8673b;
+  --xj-fr-primary-dark: #a84f28;
+  --xj-fr-primary-soft: rgba(200, 103, 59, 0.10);
+  --xj-fr-primary-ring: rgba(200, 103, 59, 0.18);
+}
+
+:root[data-theme="dark"] .state-journal-console-v2 {
+  --xj-fr-primary: #5ca7ff;
+  --xj-fr-primary-dark: #3e85d8;
+  --xj-fr-primary-soft: rgba(92, 167, 255, 0.12);
+  --xj-fr-primary-ring: rgba(92, 167, 255, 0.18);
+}
+
+.state-journal-console-v2 .state-journal-workbench {
+  grid-template-columns: 244px minmax(0, 1fr) !important;
+  gap: 18px !important;
+}
+
+.state-journal-console-v2 .workspace-nav {
+  padding: 18px 16px !important;
+}
+
+.state-journal-console-v2 .workspace-main,
+.state-journal-console-v2 .workspace-page.active,
+.state-journal-console-v2 #roleWorkspace > .tab-page.active,
+.state-journal-console-v2 #dataWorkspace > #databaseWorkspace.tab-page.active {
+  min-width: 0;
+  width: 100%;
+}
+
+.state-journal-console-v2 .page-head {
+  padding: 20px 24px !important;
+}
+
+.state-journal-console-v2 .primary-btn {
+  border-color: color-mix(in srgb, var(--xj-fr-primary) 52%, var(--xj-border)) !important;
+  background: var(--xj-fr-primary) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--xj-fr-primary) 16%, transparent) !important;
+}
+
+.state-journal-console-v2 .primary-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--xj-fr-primary-dark) 58%, var(--xj-border)) !important;
+  background: var(--xj-fr-primary-dark) !important;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--xj-fr-primary) 18%, transparent) !important;
+}
+
+.state-journal-console-v2 .ghost-btn,
+.state-journal-console-v2 .file-btn,
+.state-journal-console-v2 .tiny-btn,
+.state-journal-console-v2 .delete-btn,
+.state-journal-console-v2 .tab-btn,
+.state-journal-console-v2 .view-btn {
+  border-color: color-mix(in srgb, var(--xj-fr-primary) 20%, var(--xj-border)) !important;
+  background: color-mix(in srgb, var(--xj-fr-primary) 6%, var(--xj-card-soft)) !important;
+}
+
+.state-journal-console-v2 :is(.ghost-btn, .file-btn, .tiny-btn, .delete-btn, .tab-btn, .view-btn):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--xj-fr-primary) 34%, var(--xj-border)) !important;
+  background: color-mix(in srgb, var(--xj-fr-primary) 11%, var(--xj-card-soft)) !important;
+}
+
+.state-journal-console-v2 .workspace-nav-btn.active,
+.state-journal-console-v2 .table-item.active,
+.state-journal-console-v2 .advanced-nav .tab-btn.active {
+  border-color: color-mix(in srgb, var(--xj-fr-primary) 36%, var(--xj-border)) !important;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--xj-fr-primary) 16%, transparent), transparent 88%) !important;
+  box-shadow: inset 3px 0 0 var(--xj-fr-primary) !important;
+}
+
+.state-journal-console-v2 .workspace-nav-btn .nav-icon {
+  color: var(--xj-fr-primary) !important;
+  border-color: color-mix(in srgb, var(--xj-fr-primary) 26%, var(--xj-border)) !important;
+  background: color-mix(in srgb, var(--xj-fr-primary) 12%, transparent) !important;
+}
+
+.state-journal-console-v2 .view-btn.active,
+.state-journal-console-v2 .role-workspace-tabs .tab-btn.active,
+.state-journal-console-v2 .advanced-subtabs .tab-btn.active,
+.state-journal-console-v2 .tab-btn.active,
+.state-journal-console-v2 .role-state-tab.active {
+  border-color: color-mix(in srgb, var(--xj-fr-primary) 38%, var(--xj-border)) !important;
+  background: color-mix(in srgb, var(--xj-fr-primary) 18%, var(--xj-card-soft)) !important;
+  color: color-mix(in srgb, var(--xj-text) 88%, var(--xj-fr-primary)) !important;
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--xj-fr-primary) 44%, transparent) !important;
+}
+
+.state-journal-console-v2 :is(
+  .runtime-state-cell input,
+  .story-time-switch input[type="checkbox"],
+  .runtime-toggle input,
+  .check-row input[type="checkbox"],
+  .role-state-table input[type="checkbox"]
+):checked {
+  border-color: color-mix(in srgb, var(--xj-fr-primary) 58%, var(--xj-border)) !important;
+  background: var(--xj-fr-primary) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 2px var(--xj-fr-primary-ring) !important;
+}
+
+.state-journal-console-v2 .role-state-workspace {
+  gap: 18px !important;
+}
+
+.state-journal-console-v2 .role-state-toolbar.turn-note-config-card.standalone,
+.state-journal-console-v2 .role-state-global.turn-note-config-card.standalone {
+  padding: 18px 20px !important;
+}
+
+.state-journal-console-v2 .role-state-layout {
+  grid-template-columns: minmax(270px, 320px) minmax(0, 1fr) !important;
+  gap: 18px !important;
+  align-items: start;
+}
+
+.state-journal-console-v2 .role-state-sidebar.turn-note-config-card.soft-card,
+.state-journal-console-v2 .role-state-detail.turn-note-config-card.standalone {
+  min-height: 0 !important;
+  padding: 18px !important;
+}
+
+.state-journal-console-v2 .role-state-detail {
+  overflow: visible !important;
+}
+
+.state-journal-console-v2 .role-state-detail .role-state-tabs {
+  margin-bottom: 16px;
+}
+
+.state-journal-console-v2 .role-state-placeholder {
+  width: 100%;
+  min-height: 0 !important;
+  padding: 18px !important;
+}
+
+.state-journal-console-v2 .role-state-table-wrap {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.state-journal-console-v2 .role-state-table {
+  min-width: 900px;
+}
+
+.state-journal-console-v2 .data-workspace .state-journal-grid,
+.state-journal-console-v2 #databaseWorkspace .state-journal-grid {
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) !important;
+  gap: 18px !important;
+}
+
+.state-journal-console-v2 .table-list-panel,
+.state-journal-console-v2 .data-panel {
+  padding: 20px !important;
+}
+
+.state-journal-console-v2 .data-panel {
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.state-journal-console-v2 .data-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
+}
+
+.state-journal-console-v2 .data-actions {
+  justify-content: flex-end;
+}
+
+.state-journal-console-v2 .rows-editor {
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding-right: 0 !important;
+}
+
+.state-journal-console-v2 .rows-table-wrap,
+.state-journal-console-v2 .ledger-table-wrap {
+  max-height: none !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.state-journal-console-v2 .rows-table {
+  width: 100%;
+}
+
+.state-journal-console-v2 .ledger-table {
+  min-width: 1120px;
+}
+
+.state-journal-console-v2 .metric-history-view {
+  gap: 16px;
+}
+
+.state-journal-console-v2 .metric-history-toolbar {
+  align-items: flex-start;
+  padding: 16px 18px !important;
+}
+
+.state-journal-console-v2 .metric-filter-grid {
+  flex: 0 0 min(100%, 520px);
+}
+
+.state-journal-console-v2 .metric-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.state-journal-console-v2 .metric-summary-chip {
+  min-width: 0;
+}
+
+.state-journal-console-v2 .metric-event-list {
+  max-height: none !important;
+  overflow: visible !important;
+  gap: 12px;
+}
+
+/* v2.7.4-metric-list-boundary: large ledgers need a bounded reading pane, not an endless page. */
+.state-journal-console-v2 .data-panel[data-table-kind="metric_history"] .metric-event-list {
+  max-height: clamp(380px, 46vh, 620px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.state-journal-console-v2 .data-panel[data-table-kind="metric_history"] .metric-event-list::-webkit-scrollbar {
+  width: 9px;
+}
+
+.state-journal-console-v2 .data-panel[data-table-kind="metric_history"] .metric-event-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--xj-fr-primary) 32%, rgba(132, 118, 104, 0.34));
+  background-clip: padding-box;
+}
+
+.state-journal-console-v2 .data-panel[data-table-kind="metric_history"] .metric-event-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.state-journal-console-v2 .metric-event-card {
+  grid-template-columns: minmax(0, 1fr) minmax(54px, auto) auto;
+  padding: 14px 16px !important;
+}
+
+.state-journal-console-v2 .metric-event-actions {
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 1360px) and (min-width: 821px) {
+  .state-journal-console-v2 .state-journal-workbench {
+    grid-template-columns: 226px minmax(0, 1fr) !important;
+  }
+
+  .state-journal-console-v2 .role-state-layout,
+  .state-journal-console-v2 .data-workspace .state-journal-grid,
+  .state-journal-console-v2 #databaseWorkspace .state-journal-grid {
+    grid-template-columns: minmax(250px, 290px) minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .state-journal-console-v2 .state-journal-workbench,
+  .state-journal-console-v2 .role-state-layout,
+  .state-journal-console-v2 .data-workspace .state-journal-grid,
+  .state-journal-console-v2 #databaseWorkspace .state-journal-grid,
+  .state-journal-console-v2 .data-panel-head {
+    grid-template-columns: 1fr !important;
+  }
+
+  .state-journal-console-v2 .data-actions,
+  .state-journal-console-v2 .metric-filter-grid {
+    justify-content: flex-start;
+  }
+
+  .state-journal-console-v2 .metric-event-card {
+    grid-template-columns: 1fr;
+  }
+
+  .state-journal-console-v2 .metric-event-actions {
+    justify-content: flex-start;
+  }
+
+.state-journal-console-v2 .data-panel[data-table-kind="metric_history"] .metric-event-list {
+    max-height: clamp(360px, 58vh, 560px) !important;
+  }
+}
+
+/* v2.7.5-checkbox-mark-fix: checkbox ticks are line marks, switch knobs stay solid. */
+.state-journal-console-v2 .check-row input[type="checkbox"]::after,
+.state-journal-console-v2 .role-state-table input[type="checkbox"]::after {
+  display: block !important;
+  box-sizing: border-box !important;
+  content: "\2713" !important;
+  width: auto !important;
+  height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  font-family: "Segoe UI Symbol", "Arial", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  transform: none !important;
+}
+
+:root[data-theme="light"] .state-journal-console-v2 .check-row input[type="checkbox"]::after,
+:root[data-theme="light"] .state-journal-console-v2 .role-state-table input[type="checkbox"]::after,
+:root[data-theme="dark"] .state-journal-console-v2 .check-row input[type="checkbox"]::after,
+:root[data-theme="dark"] .state-journal-console-v2 .role-state-table input[type="checkbox"]::after {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  transform: none !important;
+}
+
+/* v2.7.9-worker-prompt-editor: phone-style prompt editing for Database worker. */
+.state-journal-console-v2 .worker-prompt-card {
+  gap: 14px !important;
+}
+
+.state-journal-console-v2 .worker-prompt-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(260px, 1fr);
+  gap: 12px;
+}
+
+.state-journal-console-v2 .worker-prompt-card textarea {
+  min-height: 260px;
+  font-family: "Cascadia Mono", "Consolas", "Menlo", monospace;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.state-journal-console-v2 .worker-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.state-journal-console-v2 .worker-prompt-preview-box {
+  border: 1px solid var(--xj-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--xj-card-soft) 72%, transparent);
+  overflow: hidden;
+}
+
+.state-journal-console-v2 .worker-prompt-preview-box summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: var(--xj-text);
+  font-weight: 800;
+}
+
+.state-journal-console-v2 .worker-prompt-preview-box pre {
+  max-height: clamp(320px, 48vh, 640px);
+  margin: 0;
+  padding: 14px;
+  border-top: 1px solid var(--xj-line);
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--xj-text);
+  background: color-mix(in srgb, var(--xj-console-panel-soft) 86%, transparent);
+  font-family: "Cascadia Mono", "Consolas", "Menlo", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .state-journal-console-v2 .worker-prompt-toolbar {
+    grid-template-columns: 1fr;
   }
 }

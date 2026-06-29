@@ -11,7 +11,7 @@
       {"key": "relation", "label": "关系阶段", "type": "enum", "options": ["陌生", "警惕", "信任", "依赖", "暧昧", "恋慕", "敌对"], "note": "当前关系的阶段判断。"},
       {"key": "attitude", "label": "当前态度", "type": "textarea", "note": "角色A对角色B的态度。"},
       {"key": "summary", "label": "关系摘要", "type": "textarea", "note": "关系现状与最近变化。"},
-      {"key": "updated_at", "label": "更新时间", "type": "text", "note": "由心笺自动写入。"}
+      {"key": "updated_at", "label": "更新时间", "type": "text", "note": "由数据库自动写入。"}
     ],
     "rules": {
       "note": "只记录主要角色之间有持续意义的关系，不记录一次性互动。",

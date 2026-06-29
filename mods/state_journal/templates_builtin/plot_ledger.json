@@ -60,7 +60,7 @@
         "key": "updated_at",
         "label": "更新时间",
         "type": "text",
-        "note": "由心笺自动写入。"
+        "note": "由数据库自动写入。"
       }
     ],
     "rules": {

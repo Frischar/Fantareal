@@ -23,7 +23,8 @@
 {% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' or current_path == '/config/route-forwarding' %}
 {% set persona_active = current_path == '/config/card' or current_path == '/config/preset' or current_path == '/config/memory' %}
 {% set worldbook_active = current_path.startswith('/config/worldbook') %}
-{% set plugins_active = current_path.startswith('/mods/auto-saga') or current_path.startswith('/mods/tts-studio') or current_path.startswith('/mods/card-writer') or current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/state-journal') or current_path.startswith('/mods/mobile-chat') %}
+{% set database_active = current_path.startswith('/mods/state-journal') %}
+{% set plugins_active = current_path.startswith('/mods/auto-saga') or current_path.startswith('/mods/tts-studio') or current_path.startswith('/mods/card-writer') or current_path.startswith('/mods/tavern-card-converter') or current_path.startswith('/mods/mobile-chat') %}
 {% set game_active = current_path == '/game' or current_path == '/game/flying-chess' %}
 {% set pe_role_active = current_path == '/config/card' or current_path == '/config/user' %}
 {% set pe_knowledge_active = current_path == '/config/memory' or current_path.startswith('/config/worldbook') %}
@@ -90,7 +91,22 @@
     </div>
   </details>
 
-  {% if mod_state.has_auto_saga or mod_state.has_tts_studio or mod_state.has_card_writer or mod_state.has_tavern_card_converter or mod_state.has_state_journal or mod_state.has_mobile_chat %}
+  {% if mod_state.has_state_journal %}
+  <details class="nav-group{% if database_active %} active-group{% endif %}"{% if database_active %} open{% endif %}>
+    <summary class="nav-group-summary">
+      <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.5 6.8c0-1.7 3.4-3 7.5-3s7.5 1.3 7.5 3-3.4 3-7.5 3-7.5-1.3-7.5-3Z"/><path d="M4.5 6.8v5.2c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6.8"/><path d="M4.5 12v5.2c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V12"/><path d="M8.2 9.7c1.1.4 2.4.6 3.8.6s2.7-.2 3.8-.6"/></svg></span>
+      <span class="nav-label">数据库</span>
+      <span class="nav-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span>
+    </summary>
+    <div class="nav-group-panel">
+      <div class="nav-group-links">
+        <a class="navlink{% if database_active %} active{% endif %}" href="/mods/state-journal{{ mobile_query }}">数据库</a>
+      </div>
+    </div>
+  </details>
+  {% endif %}
+
+  {% if mod_state.has_auto_saga or mod_state.has_tts_studio or mod_state.has_card_writer or mod_state.has_tavern_card_converter or mod_state.has_mobile_chat %}
   <details class="nav-group{% if plugins_active %} active-group{% endif %}"{% if plugins_active %} open{% endif %} data-plugin-nav-group>
     <summary class="nav-group-summary">
       <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l1.5 4.2L18 9.2l-4.5 1.5L12 15l-1.5-4.3L6 9.2l4.5-1.5L12 3.5Z"/><path d="M18.4 14.5l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8.8-2.1Z"/><path d="M5.1 15.8l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5.5-1.3Z"/></svg></span>
@@ -110,9 +126,6 @@
         {% endif %}
         {% if mod_state.has_tavern_card_converter %}
         <a class="navlink{% if current_path.startswith('/mods/tavern-card-converter') %} active{% endif %}" href="/mods/tavern-card-converter{{ mobile_query }}">渡笺 · 酒馆卡转换器</a>
-        {% endif %}
-        {% if mod_state.has_state_journal %}
-        <a class="navlink{% if current_path.startswith('/mods/state-journal') %} active{% endif %}" href="/mods/state-journal{{ mobile_query }}">心笺 · 状态数据库</a>
         {% endif %}
         {% if mod_state.has_mobile_chat %}
         <a class="navlink{% if current_path.startswith('/mods/mobile-chat') %} active{% endif %}" href="/mods/mobile-chat{{ mobile_query }}">小手机 · 后台管理</a>
