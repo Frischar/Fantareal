@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from io import BytesIO
@@ -133,6 +134,94 @@ def parse_json_import_payload(raw_json: str, *, label: str) -> Any:
             raise HTTPException(status_code=400, detail=f"{label} JSON parse failed: {exc}") from exc
 
 
+def _normalize_card_runtime_key(value: Any, fallback: str = "global") -> str:
+    text = str(value or "").strip() or fallback
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+
+def _workspace_card_identity_payload(card: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(card, dict):
+        return {}
+    source_name = Path(str(card.get("source_name", "")).strip()).name
+    raw_value = card.get("raw")
+    raw = raw_value if isinstance(raw_value, dict) else card
+    return {
+        "source_name": source_name,
+        "card_uid": card.get("card_uid", ""),
+        "raw": raw,
+    }
+
+
+def _extract_workspace_card_uid(card: dict[str, Any] | None) -> str:
+    if not isinstance(card, dict):
+        return ""
+    payload = _workspace_card_identity_payload(card)
+    raw = payload.get("raw", {}) if isinstance(payload.get("raw", {}), dict) else {}
+    state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
+    for value in (
+        payload.get("card_uid"),
+        state_journal.get("card_uid"),
+        raw.get("card_uid"),
+        raw.get("uid"),
+        raw.get("id"),
+        card.get("uid"),
+        card.get("id"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return _normalize_card_runtime_key(text, "global")
+    return ""
+
+
+def _legacy_workspace_card_uid(card: dict[str, Any] | None) -> str:
+    payload = _workspace_card_identity_payload(card)
+    raw = payload.get("raw", {}) if isinstance(payload.get("raw", {}), dict) else {}
+    fingerprint_payload = {
+        "source_name": Path(str(payload.get("source_name", "")).strip()).name,
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
+
+
+def _has_workspace_card_identity(card: dict[str, Any] | None) -> bool:
+    payload = _workspace_card_identity_payload(card)
+    raw = payload.get("raw", {}) if isinstance(payload.get("raw", {}), dict) else {}
+    return any(
+        str(value or "").strip()
+        for value in (
+            payload.get("source_name"),
+            raw.get("name"),
+            raw.get("role_name"),
+            raw.get("personas") if isinstance(raw.get("personas"), dict) else "",
+        )
+    )
+
+
+def resolve_workspace_import_card_uid(raw_card: dict[str, Any], existing_card: dict[str, Any] | None = None) -> str:
+    imported_uid = _extract_workspace_card_uid(raw_card)
+    if imported_uid:
+        return imported_uid
+    if _has_workspace_card_identity(raw_card):
+        return _legacy_workspace_card_uid(raw_card)
+    return _extract_workspace_card_uid(existing_card)
+
+
+def _stamp_workspace_card_uid(raw: dict[str, Any], card_uid: str) -> dict[str, Any]:
+    safe_uid = _normalize_card_runtime_key(card_uid, "")
+    if not isinstance(raw, dict) or not safe_uid:
+        return raw
+    raw["card_uid"] = safe_uid
+    state_journal = raw.get("stateJournal")
+    if isinstance(state_journal, dict):
+        state_journal["card_uid"] = safe_uid
+    return raw
+
+
 def _worldbook_field_present(row: dict[str, Any], key: str) -> bool:
     if key not in row:
         return False
@@ -142,6 +231,51 @@ def _worldbook_field_present(row: dict[str, Any], key: str) -> bool:
     if isinstance(value, str):
         return bool(value.strip())
     return True
+
+
+def _normalize_import_worldbook_position(value: Any) -> str:
+    text = str(value if value is not None else "").strip().lower()
+    aliases = {
+        "0": "before_char_defs",
+        "1": "after_char_defs",
+        "4": "in_chat",
+        "before_character": "before_char_defs",
+        "before_char": "before_char_defs",
+        "after_character": "after_char_defs",
+        "after_char": "after_char_defs",
+        "depth": "in_chat",
+        "at_depth": "in_chat",
+        "in-chat": "in_chat",
+        "inchat": "in_chat",
+        "d_system": "at_depth_system",
+        "depth_system": "at_depth_system",
+        "at_depth_sys": "at_depth_system",
+        "d_user": "at_depth_user",
+        "depth_user": "at_depth_user",
+        "d_ai": "at_depth_assistant",
+        "d_assistant": "at_depth_assistant",
+        "depth_ai": "at_depth_assistant",
+        "depth_assistant": "at_depth_assistant",
+        "assistant": "at_depth_assistant",
+        "ai": "at_depth_assistant",
+    }
+    text = aliases.get(text, text)
+    valid = {
+        "before_char_defs",
+        "after_char_defs",
+        "in_chat",
+        "at_depth_system",
+        "at_depth_user",
+        "at_depth_assistant",
+    }
+    return text if text in valid else ""
+
+
+def _normalize_import_worldbook_role(value: Any) -> str:
+    text = str(value if value is not None else "").strip().lower()
+    aliases = {"0": "system", "1": "user", "2": "assistant", "ai": "assistant", "model": "assistant"}
+    text = aliases.get(text, text)
+    return text if text in {"system", "user", "assistant"} else ""
 
 
 def _apply_worldbook_import_options(
@@ -155,7 +289,7 @@ def _apply_worldbook_import_options(
     if policy not in {"follow_defaults", "force_before_char_defs", "force_after_char_defs", "force_in_chat"}:
         policy = "follow_defaults"
 
-    normalized_depth = max(0, min(int(force_in_chat_depth or 0), 3))
+    normalized_depth = max(0, min(int(force_in_chat_depth or 0), 999))
     processed: list[Any] = []
     for item in entries:
         if not isinstance(item, dict):
@@ -163,6 +297,30 @@ def _apply_worldbook_import_options(
             continue
 
         row = dict(item)
+        if not _worldbook_field_present(row, "insertion_position"):
+            if _worldbook_field_present(row, "insertionPosition"):
+                row["insertion_position"] = row.get("insertionPosition")
+            elif _worldbook_field_present(row, "position"):
+                row["insertion_position"] = row.get("position")
+        normalized_position = _normalize_import_worldbook_position(row.get("insertion_position"))
+        if normalized_position:
+            row["insertion_position"] = normalized_position
+
+        if not _worldbook_field_present(row, "injection_depth"):
+            if _worldbook_field_present(row, "injectionDepth"):
+                row["injection_depth"] = row.get("injectionDepth")
+            elif _worldbook_field_present(row, "depth"):
+                row["injection_depth"] = row.get("depth")
+
+        if not _worldbook_field_present(row, "injection_role"):
+            if _worldbook_field_present(row, "injectionRole"):
+                row["injection_role"] = row.get("injectionRole")
+            elif _worldbook_field_present(row, "role"):
+                row["injection_role"] = row.get("role")
+        normalized_role = _normalize_import_worldbook_role(row.get("injection_role"))
+        if normalized_role:
+            row["injection_role"] = normalized_role
+
         if policy != "follow_defaults":
             if not _worldbook_field_present(row, "insertion_position"):
                 if policy == "force_before_char_defs":
@@ -173,7 +331,7 @@ def _apply_worldbook_import_options(
                     row["insertion_position"] = "in_chat"
 
             effective_position = str(row.get("insertion_position", "") or "").strip().lower()
-            if effective_position == "in_chat" and not _worldbook_field_present(row, "injection_depth"):
+            if effective_position in {"in_chat", "at_depth_system", "at_depth_user", "at_depth_assistant"} and not _worldbook_field_present(row, "injection_depth"):
                 row["injection_depth"] = normalized_depth
 
             if not _worldbook_field_present(row, "injection_role"):
@@ -1872,7 +2030,15 @@ def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
         raw_card = parsed.get("current_card")
         if isinstance(raw_card, dict):
             existing_card = ctx.read_json(ctx.current_card_path(), {})
-            merged_card = {**existing_card, **raw_card}
+            merged_card = {**existing_card, **raw_card} if isinstance(existing_card, dict) else dict(raw_card)
+            merged_raw = merged_card.get("raw", {}) if isinstance(merged_card.get("raw", {}), dict) else {}
+            card_uid = resolve_workspace_import_card_uid(
+                raw_card,
+                existing_card if isinstance(existing_card, dict) else None,
+            )
+            merged_card["card_uid"] = card_uid
+            if isinstance(merged_raw, dict) and card_uid:
+                merged_card["raw"] = _stamp_workspace_card_uid(dict(merged_raw), card_uid)
             ctx.persist_json(
                 ctx.current_card_path(),
                 merged_card,

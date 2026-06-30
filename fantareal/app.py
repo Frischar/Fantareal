@@ -17,6 +17,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
 import colorama
 import httpx
@@ -1742,6 +1743,114 @@ def card_runtime_dir(card_uid: str) -> Path:
     return CARD_RUNTIME_DIR / safe_uid
 
 
+def _generate_card_uid() -> str:
+    return f"card_{uuid4().hex[:16]}"
+
+
+def _legacy_card_runtime_uid(card: dict[str, Any] | None) -> str:
+    current_card = card if isinstance(card, dict) else {}
+    raw_value = current_card.get("raw")
+    raw = raw_value if isinstance(raw_value, dict) else current_card
+    fingerprint_payload = {
+        "source_name": Path(str(current_card.get("source_name", "")).strip()).name,
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
+
+
+def _extract_card_uid(card: dict[str, Any] | None) -> str:
+    if not isinstance(card, dict):
+        return ""
+    raw = card.get("raw", {}) if isinstance(card.get("raw", {}), dict) else {}
+    raw_like = raw if raw else card
+    state_journal = raw_like.get("stateJournal") if isinstance(raw_like.get("stateJournal"), dict) else {}
+    for value in (
+        card.get("card_uid"),
+        state_journal.get("card_uid"),
+        raw_like.get("card_uid"),
+        raw_like.get("uid"),
+        raw_like.get("id"),
+        card.get("uid"),
+        card.get("id"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return _normalize_card_runtime_key(text, "global")
+    return ""
+
+
+def _card_identity_payload(card: dict[str, Any] | None, source_name: str = "") -> dict[str, Any]:
+    if not isinstance(card, dict):
+        return {}
+    normalized_source_name = Path(str(source_name or card.get("source_name", "")).strip()).name
+    raw_value = card.get("raw")
+    if isinstance(raw_value, dict):
+        payload = dict(card)
+        if normalized_source_name:
+            payload["source_name"] = normalized_source_name
+        return payload
+    return {
+        "source_name": normalized_source_name,
+        "card_uid": card.get("card_uid", ""),
+        "raw": card,
+    }
+
+
+def _has_card_identity_payload(card: dict[str, Any] | None) -> bool:
+    if not isinstance(card, dict):
+        return False
+    raw_value = card.get("raw")
+    raw = raw_value if isinstance(raw_value, dict) else card
+    return any(
+        str(value or "").strip()
+        for value in (
+            card.get("source_name"),
+            raw.get("name"),
+            raw.get("role_name"),
+            raw.get("personas") if isinstance(raw.get("personas"), dict) else "",
+        )
+    )
+
+
+def _stamp_card_uid(card: dict[str, Any], card_uid: str) -> dict[str, Any]:
+    safe_uid = _normalize_card_runtime_key(card_uid, "")
+    if not isinstance(card, dict) or not safe_uid:
+        return card
+    card["card_uid"] = safe_uid
+    state_journal = card.get("stateJournal")
+    if isinstance(state_journal, dict):
+        state_journal["card_uid"] = safe_uid
+    return card
+
+
+def _build_current_card_uid(
+    current_card: dict[str, Any] | None,
+    source_name: str,
+    target_card: dict[str, Any] | None = None,
+) -> str:
+    normalized_source_name = Path(str(source_name or "").strip()).name
+    current_source_name = Path(str(current_card.get("source_name", "")).strip()).name if isinstance(current_card, dict) else ""
+    target_identity = _card_identity_payload(target_card, normalized_source_name)
+    target_uid = _extract_card_uid(target_identity)
+    if target_uid:
+        return target_uid
+
+    existing_uid = _extract_card_uid(current_card)
+
+    if current_source_name and normalized_source_name and current_source_name == normalized_source_name:
+        return existing_uid or _legacy_card_runtime_uid(current_card)
+
+    if not current_source_name and not normalized_source_name and existing_uid:
+        return existing_uid
+
+    if _has_card_identity_payload(target_identity):
+        return _legacy_card_runtime_uid(target_identity)
+
+    return _generate_card_uid()
+
+
 def _normalize_card_runtime_key(value: Any, fallback: str = "global") -> str:
     text = str(value or "").strip() or fallback
     text = re.sub(r"\s+", "_", text.lower())
@@ -1754,27 +1863,41 @@ def current_memory_card_uid(slot_id: str | None = None) -> str:
     stored = read_json(global_current_card_path(), {})
     if not isinstance(stored, dict):
         return "global"
-    identity_raw = stored.get("raw", {}) if isinstance(stored.get("raw", {}), dict) else {}
     current_card = get_current_card(slot_id)
+    identity_raw = stored.get("raw", {}) if isinstance(stored.get("raw", {}), dict) else {}
     raw = current_card.get("raw", {}) if isinstance(current_card, dict) else {}
     if not isinstance(raw, dict) or not raw:
         return "global"
-    default_card = default_role_card()
     source_name = str(current_card.get("source_name", "")).strip() if isinstance(current_card, dict) else ""
-    has_identity = any(str(identity_raw.get(key, "") or "").strip() for key in ("card_uid", "uid", "id"))
+    has_identity = any(
+        str(value or "").strip()
+        for value in (
+            current_card.get("card_uid") if isinstance(current_card, dict) else "",
+            identity_raw.get("card_uid"),
+            identity_raw.get("uid"),
+            identity_raw.get("id"),
+        )
+    )
     has_card_name = bool(str(raw.get("name") or raw.get("role_name") or "").strip())
     if not source_name and not has_identity and not has_card_name:
         return "global"
 
-    for key in ("card_uid", "uid", "id"):
-        text = str(identity_raw.get(key, "") or "").strip()
+    for value in (
+        current_card.get("card_uid") if isinstance(current_card, dict) else "",
+        identity_raw.get("card_uid"),
+        identity_raw.get("uid"),
+        identity_raw.get("id"),
+    ):
+        text = str(value or "").strip()
         if text:
             return _normalize_card_runtime_key(text, "global")
 
     fingerprint_payload = {
         "source_name": source_name,
-        "name": raw.get("name") or raw.get("role_name") or "",
-        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+        "name": str(identity_raw.get("name") or raw.get("name") or raw.get("role_name") or "").strip(),
+        "personas": identity_raw.get("personas") if isinstance(identity_raw.get("personas"), dict) else (
+            raw.get("personas") if isinstance(raw.get("personas"), dict) else {}
+        ),
     }
     digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
     return f"card_{digest}"
@@ -1955,6 +2078,14 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
     card["tags"] = sanitize_tags(raw.get("tags", []))
     card["stateJournal"] = sanitize_state_journal_config(raw.get("stateJournal", {}))
     card["creativeWorkshop"] = sanitize_creative_workshop(raw.get("creativeWorkshop", {}))
+    for identity_key in ("card_uid", "uid", "id"):
+        identity_value = str(raw.get(identity_key, "") or "").strip()
+        if identity_value:
+            card[identity_key] = identity_value
+    raw_state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
+    state_journal_card_uid = str(raw_state_journal.get("card_uid", "") or "").strip()
+    if state_journal_card_uid and isinstance(card.get("stateJournal"), dict):
+        card["stateJournal"]["card_uid"] = state_journal_card_uid
 
     # Preserve every imported persona instead of mapping into the default 1/2/3 slots.
     raw_personas = raw.get("personas", {})
@@ -2612,9 +2743,10 @@ def save_worldbook_settings(settings: dict[str, Any], slot_id: str | None = None
 def get_current_card(slot_id: str | None = None) -> dict[str, Any]:
     data = read_json(global_current_card_path(), {})
     if not isinstance(data, dict):
-        return {"source_name": "", "raw": default_role_card()}
+        return {"source_name": "", "card_uid": "", "raw": default_role_card()}
     return {
         "source_name": str(data.get("source_name", "")).strip(),
+        "card_uid": _extract_card_uid(data),
         "raw": normalize_role_card(data.get("raw", {})),
     }
 
@@ -2768,6 +2900,11 @@ def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str
     normalized_card = normalize_role_card(card)
     target_slot = sanitize_slot_id(slot_id, get_active_slot_id())
     next_source_name = Path(str(source_name or "").strip()).name
+    current_card = get_current_card(target_slot)
+    if not next_source_name:
+        next_source_name = str(current_card.get("source_name", "")).strip()
+    current_card_uid = _build_current_card_uid(current_card, next_source_name, normalized_card)
+    normalized_card = _stamp_card_uid(normalized_card, current_card_uid)
     persona = build_persona_from_role_card(normalized_card)
     current_settings = get_settings(target_slot)
     current_memories = get_memories(target_slot)
@@ -2780,6 +2917,7 @@ def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str
     )
     current_card = {
         "source_name": next_source_name,
+        "card_uid": current_card_uid,
         "raw": normalized_card,
     }
     persist_json(
@@ -2820,6 +2958,8 @@ def save_workshop_card(workshop: dict[str, Any], *, slot_id: str | None = None) 
     if not source_name.lower().endswith(tuple(ROLE_CARD_EXTENSIONS)):
         source_name = f"{source_name}.json"
     source_path = CARDS_DIR / Path(source_name).name
+    current_card_uid = _build_current_card_uid(current_card, source_name, normalized_card)
+    normalized_card = _stamp_card_uid(normalized_card, current_card_uid)
 
     persist_json(
         source_path,
@@ -2828,6 +2968,7 @@ def save_workshop_card(workshop: dict[str, Any], *, slot_id: str | None = None) 
     )
     current_card_payload = {
         "source_name": source_path.name,
+        "card_uid": current_card_uid,
         "raw": normalized_card,
     }
     persist_json(
@@ -3504,19 +3645,56 @@ def save_route_forwarding_config(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _normalize_worldbook_insertion_position(value: Any, default: str = "after_char_defs") -> str:
-    text = str(value or "").strip().lower()
-    return text if text in {"before_char_defs", "after_char_defs", "in_chat"} else default
+    text = str(value if value is not None else "").strip().lower()
+    aliases = {
+        "0": "before_char_defs",
+        "1": "after_char_defs",
+        "4": "in_chat",
+        "before_character": "before_char_defs",
+        "before_char": "before_char_defs",
+        "character_before": "before_char_defs",
+        "after_character": "after_char_defs",
+        "after_char": "after_char_defs",
+        "character_after": "after_char_defs",
+        "depth": "in_chat",
+        "at_depth": "in_chat",
+        "in-chat": "in_chat",
+        "inchat": "in_chat",
+        "d_system": "at_depth_system",
+        "depth_system": "at_depth_system",
+        "at_depth_sys": "at_depth_system",
+        "d_user": "at_depth_user",
+        "depth_user": "at_depth_user",
+        "d_ai": "at_depth_assistant",
+        "d_assistant": "at_depth_assistant",
+        "depth_ai": "at_depth_assistant",
+        "depth_assistant": "at_depth_assistant",
+        "assistant": "at_depth_assistant",
+        "ai": "at_depth_assistant",
+    }
+    text = aliases.get(text, text)
+    valid = {
+        "before_char_defs",
+        "after_char_defs",
+        "in_chat",
+        "at_depth_system",
+        "at_depth_user",
+        "at_depth_assistant",
+    }
+    return text if text in valid else default
 
 
 def _normalize_worldbook_injection_role(value: Any, default: str = "system") -> str:
-    text = str(value or "").strip().lower()
+    text = str(value if value is not None else "").strip().lower()
+    aliases = {"0": "system", "1": "user", "2": "assistant", "ai": "assistant", "model": "assistant"}
+    text = aliases.get(text, text)
     if text in {"system", "user", "assistant"}:
         return text
     return default
 
 
 def _normalize_worldbook_injection_depth(value: Any, default: int = 0) -> int:
-    return clamp_int(value, 0, 3, default)
+    return clamp_int(value, 0, 999, default)
 
 
 def _normalize_worldbook_injection_order(value: Any, default: int = 100) -> int:
@@ -3530,7 +3708,7 @@ def _normalize_worldbook_prompt_layer(value: Any, default: str = "follow_positio
 
 def _worldbook_position_priority(item: dict[str, Any]) -> int:
     position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
-    if position == "in_chat":
+    if position in {"in_chat", "at_depth_system", "at_depth_user", "at_depth_assistant"}:
         return 0
     if position == "after_char_defs":
         return 1
@@ -3572,15 +3750,29 @@ def bucket_worldbook_matches(matches: list[dict[str, Any]] | None) -> dict[str, 
             continue
 
         position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
-        if position == "in_chat":
+        if position in {"in_chat", "at_depth_system", "at_depth_user", "at_depth_assistant"}:
             depth = _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0)
-            buckets["in_chat"].setdefault(depth, []).append(item)
+            next_item = dict(item)
+            if position == "at_depth_system":
+                next_item["injection_role"] = "system"
+            elif position == "at_depth_user":
+                next_item["injection_role"] = "user"
+            elif position == "at_depth_assistant":
+                next_item["injection_role"] = "assistant"
+            buckets["in_chat"].setdefault(depth, []).append(next_item)
         elif position == "before_char_defs":
             buckets["before_char_defs"].append(item)
         else:
             buckets["after_char_defs"].append(item)
 
-    for key in ("stable", "current_state", "dynamic", "output_guard", "before_char_defs", "after_char_defs"):
+    for key in (
+        "stable",
+        "current_state",
+        "dynamic",
+        "output_guard",
+        "before_char_defs",
+        "after_char_defs",
+    ):
         buckets[key].sort(key=_worldbook_bucket_sort_key)
     for depth, items in list(buckets["in_chat"].items()):
         items.sort(key=_worldbook_bucket_sort_key)
@@ -3831,11 +4023,18 @@ def _normalize_state_journal_card_key(value: Any, fallback: str = "") -> str:
 
 
 def get_state_journal_current_card_uid() -> str:
-    raw = get_current_card().get("raw", {})
+    current_card = get_current_card()
+    raw = current_card.get("raw", {})
     if not isinstance(raw, dict) or not raw:
         return "global"
     state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
-    for value in (state_journal.get("card_uid"), raw.get("card_uid"), raw.get("uid"), raw.get("id")):
+    for value in (
+        current_card.get("card_uid"),
+        state_journal.get("card_uid"),
+        raw.get("card_uid"),
+        raw.get("uid"),
+        raw.get("id"),
+    ):
         text = str(value or "").strip()
         if text:
             return _normalize_state_journal_card_key(text, "global")

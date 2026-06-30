@@ -361,6 +361,12 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         ["soft", "软提示"],
         ["hard", "硬规则"],
       ];
+      const SEGMENT_ROLE_OPTIONS = [
+        ["", "默认 system"],
+        ["system", "system"],
+        ["user", "user"],
+        ["assistant", "assistant"],
+      ];
 
       function renderSegmentSelectOptions(options, selectedValue) {
         const selected = String(selectedValue || "").trim();
@@ -392,6 +398,8 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
       function hasSegmentAdvancedFields(item = {}) {
         if (!item || typeof item !== "object") return false;
         if (String(item.placement || "").trim()) return true;
+        if (String(item.role || "").trim()) return true;
+        if (Number(item.depth || 0) > 0) return true;
         if (String(item.kind || "").trim()) return true;
         if (String(item.strength || "").trim()) return true;
         if (item.required === true) return true;
@@ -403,6 +411,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         const detailsClass = variant === "group-item" ? "preset-advanced-fields preset-group-item-advanced" : "preset-advanced-fields";
         const openAttr = hasSegmentAdvancedFields(item) ? " open" : "";
         const tokenBudget = Number(item.tokenBudget || 0) > 0 ? Number(item.tokenBudget || 0) : "";
+        const depth = Number(item.depth || 0) > 0 ? Number(item.depth || 0) : "";
         return `
           <details class="${detailsClass}"${openAttr}>
             <summary class="preset-advanced-summary">
@@ -410,11 +419,19 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
               <span class="preset-advanced-summary-note">可选，普通预设可保持默认</span>
             </summary>
             <div class="preset-advanced-body">
-              <p class="muted helper-text preset-advanced-note">这些字段用于 PromptSegment 观察与后续高级编排；不懂可保持默认。</p>
+              <p class="muted helper-text preset-advanced-note">这些字段会参与真实 Prompt 编排；普通预设可保持默认。</p>
               <div class="preset-advanced-grid">
                 <label class="preset-advanced-field">
                   <span>注入层级 placement</span>
                   <select class="preset-segment-placement">${renderSegmentSelectOptions(SEGMENT_PLACEMENT_OPTIONS, item.placement)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>消息角色 role</span>
+                  <select class="preset-segment-role">${renderSegmentSelectOptions(SEGMENT_ROLE_OPTIONS, item.role)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>聊天深度 depth</span>
+                  <input class="preset-segment-depth" type="number" min="0" max="999" step="1" value="${escapeHtml(depth)}" placeholder="仅 placement=at_depth" />
                 </label>
                 <label class="preset-advanced-field">
                   <span>片段类型 kind</span>
@@ -446,12 +463,16 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         const result = {};
         if (!scopeEl) return result;
         const placement = scopeEl.querySelector(".preset-segment-placement")?.value.trim() || "";
+        const role = scopeEl.querySelector(".preset-segment-role")?.value.trim() || "";
+        const depth = Number(scopeEl.querySelector(".preset-segment-depth")?.value || 0);
         const kind = scopeEl.querySelector(".preset-segment-kind")?.value.trim() || "";
         const strength = scopeEl.querySelector(".preset-segment-strength")?.value.trim() || "";
         const required = scopeEl.querySelector(".preset-segment-required")?.checked === true;
         const tokenBudget = Number(scopeEl.querySelector(".preset-segment-token-budget")?.value || 0);
         const activationTags = parseActivationTags(scopeEl.querySelector(".preset-segment-activation-tags")?.value || "");
         if (placement) result.placement = placement;
+        if (role) result.role = role;
+        if (Number.isFinite(depth) && depth > 0) result.depth = Math.min(Math.floor(depth), 999);
         if (kind) result.kind = kind;
         if (strength) result.strength = strength;
         if (required) result.required = true;
