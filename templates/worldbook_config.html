@@ -194,7 +194,10 @@
                   <select id="wb-default-insertion-position">
                     <option value="before_char_defs" {% if worldbook_settings.default_insertion_position == 'before_char_defs' %}selected{% endif %}>角色定义前</option>
                     <option value="after_char_defs" {% if (worldbook_settings.default_insertion_position or 'after_char_defs') == 'after_char_defs' %}selected{% endif %}>角色定义后</option>
-                    <option value="in_chat" {% if worldbook_settings.default_insertion_position == 'in_chat' %}selected{% endif %}>聊天内注入</option>
+                    <option value="in_chat" {% if worldbook_settings.default_insertion_position == 'in_chat' %}selected{% endif %}>@D 自定义角色在深度</option>
+                    <option value="at_depth_system" {% if worldbook_settings.default_insertion_position == 'at_depth_system' %}selected{% endif %}>@D system 在深度</option>
+                    <option value="at_depth_user" {% if worldbook_settings.default_insertion_position == 'at_depth_user' %}selected{% endif %}>@D user 在深度</option>
+                    <option value="at_depth_assistant" {% if worldbook_settings.default_insertion_position == 'at_depth_assistant' %}selected{% endif %}>@D assistant 在深度</option>
                   </select>
                 </div>
 
@@ -205,7 +208,7 @@
                   </div>
                   <div>
                     <label for="wb-default-injection-depth">默认聊天深度</label>
-                    <input id="wb-default-injection-depth" type="number" min="0" max="3" step="1" value="{{ worldbook_settings.default_injection_depth if worldbook_settings.default_injection_depth is not none else 0 }}" />
+                    <input id="wb-default-injection-depth" type="number" min="0" max="999" step="1" value="{{ worldbook_settings.default_injection_depth if worldbook_settings.default_injection_depth is not none else 0 }}" />
                   </div>
                 </div>
 
@@ -214,6 +217,8 @@
                     <label for="wb-default-injection-role">默认注入角色</label>
                     <select id="wb-default-injection-role">
                       <option value="system" {% if (worldbook_settings.default_injection_role or 'system') == 'system' %}selected{% endif %}>system</option>
+                      <option value="user" {% if worldbook_settings.default_injection_role == 'user' %}selected{% endif %}>user</option>
+                      <option value="assistant" {% if worldbook_settings.default_injection_role == 'assistant' %}selected{% endif %}>assistant</option>
                     </select>
                   </div>
                   <div class="worldbook-compact-checks">

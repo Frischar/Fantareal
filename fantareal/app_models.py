@@ -251,6 +251,8 @@ class PresetPromptPayload(BaseModel):
     content: str = ""
     order: int = 100
     placement: str | None = None
+    role: str | None = None
+    depth: int | None = None
     kind: str | None = None
     strength: str | None = None
     required: bool | None = None
@@ -264,6 +266,8 @@ class PresetPromptGroupItemPayload(BaseModel):
     enabled: bool = True
     content: str = ""
     placement: str | None = None
+    role: str | None = None
+    depth: int | None = None
     kind: str | None = None
     strength: str | None = None
     required: bool | None = None

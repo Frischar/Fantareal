@@ -267,6 +267,7 @@ PRESET_SEGMENT_KINDS = {
     "mod",
 }
 PRESET_SEGMENT_STRENGTHS = {"hard", "soft"}
+PRESET_SEGMENT_ROLES = {"system", "user", "assistant"}
 
 
 def normalize_preset_segment_placement(value: Any, default: str | None = None) -> str | None:
@@ -284,6 +285,17 @@ def normalize_preset_segment_kind(value: Any, default: str = "style") -> str:
 def normalize_preset_segment_strength(value: Any, default: str = "soft") -> str:
     text = str(value or "").strip()
     return text if text in PRESET_SEGMENT_STRENGTHS else default
+
+
+def normalize_preset_segment_role(value: Any, default: str = "system") -> str:
+    text = str(value or "").strip().lower()
+    if text in {"ai", "model"}:
+        text = "assistant"
+    return text if text in PRESET_SEGMENT_ROLES else default
+
+
+def normalize_preset_segment_depth(value: Any, default: int = 0) -> int:
+    return parse_int(value, default, min_value=0, max_value=999)
 
 
 def sanitize_activation_tags(value: Any) -> list[str]:
@@ -307,6 +319,11 @@ def apply_prompt_segment_fields(target: dict[str, Any], raw: dict[str, Any]) -> 
     strength = normalize_preset_segment_strength(raw.get("strength"), "")
     if strength:
         target["strength"] = strength
+    role = normalize_preset_segment_role(raw.get("role"), "")
+    if role:
+        target["role"] = role
+    if "depth" in raw:
+        target["depth"] = normalize_preset_segment_depth(raw.get("depth"), 0)
     if "required" in raw:
         target["required"] = parse_bool(raw.get("required"), False)
     token_budget = parse_int(raw.get("tokenBudget"), 0, min_value=0, max_value=999999)
@@ -609,16 +626,22 @@ def build_preset_observation_segments_from_preset(preset: dict[str, Any]) -> lis
         metadata: dict[str, Any] | None = None,
         token_budget: int | None = None,
         activation_tags: list[str] | None = None,
+        role: str = "system",
+        depth: int | None = None,
     ) -> None:
         text = str(content or "").strip()
         if not text:
             return
         resolved_placement = placement or ("system_core" if kind in {"base", "output_rule"} else "before_history")
+        resolved_role = normalize_preset_segment_role(role, "system")
+        segment_metadata = dict(metadata or {})
+        if resolved_placement == "at_depth":
+            segment_metadata["depth"] = normalize_preset_segment_depth(depth, 0)
         segment: dict[str, Any] = {
             "id": segment_id,
             "source": "preset",
             "kind": kind,
-            "role": "system",
+            "role": resolved_role,
             "content": text,
             "enabled": True,
             "placement": resolved_placement,
@@ -631,8 +654,8 @@ def build_preset_observation_segments_from_preset(preset: dict[str, Any]) -> lis
             segment["tokenBudget"] = token_budget
         if activation_tags:
             segment["activation_tags"] = activation_tags
-        if metadata:
-            segment["metadata"] = metadata
+        if segment_metadata:
+            segment["metadata"] = segment_metadata
         segments.append(segment)
 
     base_prompt = str(sanitized.get("base_system_prompt", "")).strip()
@@ -720,6 +743,8 @@ def build_preset_observation_segments_from_preset(preset: dict[str, Any]) -> lis
                 placement=normalize_preset_segment_placement(item_options.get("placement"), "before_history"),
                 token_budget=parse_int(item_options.get("tokenBudget"), 0, min_value=0, max_value=999999) or None,
                 activation_tags=sanitize_activation_tags(item_options.get("activation_tags")),
+                role=normalize_preset_segment_role(item_options.get("role"), "system"),
+                depth=normalize_preset_segment_depth(item_options.get("depth"), 0),
                 metadata={
                     "group_id": group.get("id"),
                     "group_name": group_name,
@@ -746,6 +771,8 @@ def build_preset_observation_segments_from_preset(preset: dict[str, Any]) -> lis
             placement=normalize_preset_segment_placement(item.get("placement"), "before_history"),
             token_budget=parse_int(item.get("tokenBudget"), 0, min_value=0, max_value=999999) or None,
             activation_tags=sanitize_activation_tags(item.get("activation_tags")),
+            role=normalize_preset_segment_role(item.get("role"), "system"),
+            depth=normalize_preset_segment_depth(item.get("depth"), 0),
             metadata={"item_id": item.get("id"), "item_name": name},
         )
 

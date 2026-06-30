@@ -33,9 +33,49 @@ def _compact_text(value: Any, limit: int) -> str:
     return text[: max(limit - 3, 0)].rstrip() + "..."
 
 
+def _text_quality_score(text: str) -> int:
+    """Score readable text higher than common UTF-8-as-Latin-1 mojibake."""
+
+    score = 0
+    for char in text:
+        codepoint = ord(char)
+        if "\u4e00" <= char <= "\u9fff":
+            score += 3
+        elif char in "，。！？；：（）《》、“”‘’":
+            score += 1
+        elif 0x80 <= codepoint <= 0x9F:
+            score -= 5
+        elif char == "\ufffd":
+            score -= 5
+    return score
+
+
+def repair_mojibake_text(value: Any) -> str:
+    """Repair text that was stored after decoding UTF-8 bytes as Latin-1."""
+
+    text = str(value or "")
+    if not text:
+        return ""
+
+    try:
+        repaired = text.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return text
+
+    if repaired == text:
+        return text
+
+    original_score = _text_quality_score(text)
+    repaired_score = _text_quality_score(repaired)
+    improvement_threshold = max(3, len(text) // 20)
+    if repaired_score >= original_score + improvement_threshold:
+        return repaired
+    return text
+
+
 def _sanitize_tags(value: Any) -> list[str]:
     if isinstance(value, str):
-        raw = value.replace("，", ",").replace("、", ",").split(",")
+        raw = repair_mojibake_text(value).replace("，", ",").replace("、", ",").split(",")
     elif isinstance(value, list):
         raw = value
     else:
@@ -43,7 +83,7 @@ def _sanitize_tags(value: Any) -> list[str]:
 
     tags: list[str] = []
     for item in raw:
-        text = str(item or "").strip()
+        text = repair_mojibake_text(item).strip()
         if text and text not in tags:
             tags.append(text)
     return tags[:8]
@@ -235,10 +275,10 @@ def _sanitize_memory_item(item: Any, *, fallback_id: str) -> dict[str, Any]:
 
     return {
         "id": str(item.get("id", "")).strip() or fallback_id,
-        "title": str(item.get("title", "")).strip(),
-        "content": str(item.get("content", "")).strip(),
+        "title": repair_mojibake_text(item.get("title", "")).strip(),
+        "content": repair_mojibake_text(item.get("content", "")).strip(),
         "tags": _sanitize_tags(item.get("tags", [])),
-        "notes": str(item.get("notes", "")).strip(),
+        "notes": repair_mojibake_text(item.get("notes", "")).strip(),
         "memory_status": memory_status,
         "archived_at": str(item.get("archived_at", "")).strip() if memory_status == "archived" else "",
     }
@@ -270,9 +310,14 @@ def _sanitize_memory_list(items: Any) -> list[dict[str, Any]]:
 
 def _sanitize_string_list(value: Any, *, limit: int = 12) -> list[str]:
     if isinstance(value, str):
-        raw = [part.strip() for part in re.split(r"[,\n，、]+", value) if part.strip()]
+        repaired_value = repair_mojibake_text(value)
+        raw = [part.strip() for part in re.split(r"[,\n，、]+", repaired_value) if part.strip()]
     elif isinstance(value, list):
-        raw = [str(part or "").strip() for part in value if str(part or "").strip()]
+        raw = []
+        for part in value:
+            text = repair_mojibake_text(part).strip()
+            if text:
+                raw.append(text)
     else:
         raw = []
 
@@ -292,10 +337,10 @@ def _sanitize_merged_memory_item(item: Any, *, fallback_index: int) -> dict[str,
 
     return {
         "id": str(item.get("id", "")).strip() or f"merged-memory-{fallback_index}",
-        "title": str(item.get("title", "")).strip(),
-        "content": str(item.get("content", "")).strip(),
+        "title": repair_mojibake_text(item.get("title", "")).strip(),
+        "content": repair_mojibake_text(item.get("content", "")).strip(),
         "tags": tags,
-        "notes": str(item.get("notes", "")).strip(),
+        "notes": repair_mojibake_text(item.get("notes", "")).strip(),
         "source_memory_ids": source_ids,
         "created_at": str(item.get("created_at", "")).strip() or _now_text(),
     }
@@ -317,21 +362,21 @@ def _sanitize_outline_item(item: Any, *, fallback_index: int) -> dict[str, Any]:
 
     return {
         "id": str(item.get("id", "")).strip() or f"memory-outline-{fallback_index}",
-        "title": str(item.get("title", "")).strip(),
-        "summary": str(item.get("summary", "")).strip(),
-        "story_time": str(item.get("story_time", "")).strip(),
-        "chapter": str(item.get("chapter", "")).strip(),
-        "location": str(item.get("location", "")).strip(),
-        "characters": str(item.get("characters", "")).strip(),
-        "relationship_progress": str(item.get("relationship_progress", "")).strip(),
-        "emotion_shift": str(item.get("emotion_shift", "")).strip(),
+        "title": repair_mojibake_text(item.get("title", "")).strip(),
+        "summary": repair_mojibake_text(item.get("summary", "")).strip(),
+        "story_time": repair_mojibake_text(item.get("story_time", "")).strip(),
+        "chapter": repair_mojibake_text(item.get("chapter", "")).strip(),
+        "location": repair_mojibake_text(item.get("location", "")).strip(),
+        "characters": repair_mojibake_text(item.get("characters", "")).strip(),
+        "relationship_progress": repair_mojibake_text(item.get("relationship_progress", "")).strip(),
+        "emotion_shift": repair_mojibake_text(item.get("emotion_shift", "")).strip(),
         "key_events": _sanitize_string_list(item.get("key_events", []), limit=16),
-        "conflicts": str(item.get("conflicts", "")).strip(),
-        "foreshadowing": str(item.get("foreshadowing", "")).strip(),
-        "unresolved_items": str(item.get("unresolved_items", "")).strip(),
-        "important_items": str(item.get("important_items", "")).strip(),
-        "next_hooks": str(item.get("next_hooks", "")).strip(),
-        "notes": str(item.get("notes", "")).strip(),
+        "conflicts": repair_mojibake_text(item.get("conflicts", "")).strip(),
+        "foreshadowing": repair_mojibake_text(item.get("foreshadowing", "")).strip(),
+        "unresolved_items": repair_mojibake_text(item.get("unresolved_items", "")).strip(),
+        "important_items": repair_mojibake_text(item.get("important_items", "")).strip(),
+        "next_hooks": repair_mojibake_text(item.get("next_hooks", "")).strip(),
+        "notes": repair_mojibake_text(item.get("notes", "")).strip(),
         "participate_recall": _parse_bool(item.get("participate_recall"), True),
         "project_to_worldbook": _parse_bool(item.get("project_to_worldbook"), True),
         "source_memory_ids": _sanitize_string_list(item.get("source_memory_ids", []), limit=128),
