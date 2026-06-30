@@ -357,8 +357,14 @@
                 </div>
                 <div class="director-note-form">
                   <div class="director-note-mode-row" role="radiogroup" aria-label="导演注模式">
-                    <label><input type="radio" name="director-note-mode" value="basic" checked /> 常规</label>
-                    <label><input type="radio" name="director-note-mode" value="advanced" /> 高级</label>
+                    <label class="director-note-mode-card">
+                      <input type="radio" name="director-note-mode" value="basic" checked />
+                      <span class="director-note-mode-title">常规</span>
+                    </label>
+                    <label class="director-note-mode-card">
+                      <input type="radio" name="director-note-mode" value="advanced" />
+                      <span class="director-note-mode-title">高阶</span>
+                    </label>
                   </div>
                   <label for="director-note-title" class="director-note-title-field">标题</label>
                   <input id="director-note-title" class="director-note-title-field" type="text" maxlength="120" placeholder="可选，例如：防抢话纠偏" />
@@ -382,8 +388,17 @@
                     </div>
                   </div>
                   <div id="director-note-advanced-fields" class="director-note-advanced-fields" hidden>
+                    <div class="director-note-advanced-head">
+                      <div>
+                        <strong>高级注入设置</strong>
+                        <span>用于精确控制这条导演注进入 messages 的方式。</span>
+                      </div>
+                      <label class="director-note-toggle-row director-note-enabled-row">
+                        <span>启用</span>
+                        <input id="director-note-enabled" type="checkbox" checked />
+                      </label>
+                    </div>
                     <div class="director-note-grid">
-                      <label class="fr-setting-switch-row director-note-enabled-row"><input id="director-note-enabled" type="checkbox" checked /> 启用这条高级注入</label>
                       <div>
                         <label for="director-note-inject-type">注入方式</label>
                         <select id="director-note-inject-type">
@@ -419,14 +434,14 @@
                       <label for="director-note-depth">聊天深度</label>
                       <input id="director-note-depth" type="number" min="0" max="999" step="1" value="0" />
                     </div>
-                    <p class="muted compact director-note-advanced-hint">高级导演注会真实改变发给模型的 messages。assistant 身份适合续写氛围，不适合写规则。</p>
+                    <p class="muted compact director-note-advanced-hint">高级导演注会真实改变发给模型的 messages；assistant 身份适合续写氛围，不适合写规则。</p>
                     <div id="director-note-syntax-preview" class="director-note-syntax-preview" aria-live="polite" hidden></div>
                   </div>
                   <div class="director-note-actions">
                     <p class="muted">只影响后续聊天组包；Prompt 预览会显示位置，但不会消耗回合。</p>
                     <div class="button-row director-note-button-row">
-                      <button id="disable-advanced-director-notes" type="button" class="secondary compact ghost">关闭全部高级</button>
-                      <button id="save-director-note" type="button" class="secondary compact">添加导演注</button>
+                      <button id="disable-advanced-director-notes" type="button" class="secondary compact ghost director-note-disable-action" title="不会删除内容，只是停用全部高级导演注">停用高级注</button>
+                      <button id="save-director-note" type="button" class="secondary compact director-note-save-action">添加导演注</button>
                     </div>
                   </div>
                 </div>
@@ -691,6 +706,14 @@
         near_latest_user: "本轮输入前",
         output_guard: "输出守卫",
         at_depth: "历史深度",
+      };
+      const DIRECTOR_NOTE_FINAL_POSITION_LABELS = {
+        before_character: "角色前",
+        after_character: "角色后",
+        before_latest_user: "本轮用户输入前",
+        after_latest_user: "本轮用户输入后",
+        output_guard: "输出守卫",
+        not_found: "未在最终 messages 中找到",
       };
       const DIRECTOR_NOTE_ROLE_LABELS = {
         system: "system",
@@ -3500,6 +3523,83 @@
         parent.appendChild(card);
       }
 
+      function formatDirectorNoteFinalPosition(value) {
+        const raw = String(value || "").trim();
+        if (!raw) return "—";
+        if (DIRECTOR_NOTE_FINAL_POSITION_LABELS[raw]) return DIRECTOR_NOTE_FINAL_POSITION_LABELS[raw];
+        if (raw.startsWith("history_depth_")) return `聊天历史 depth ${raw.replace("history_depth_", "")}`;
+        return getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, raw, raw);
+      }
+
+      function appendDirectorNoteObservabilityCard(parent, pkg) {
+        if (!parent) return;
+        const state = pkg?.director_note_observability && typeof pkg.director_note_observability === "object"
+          ? pkg.director_note_observability
+          : null;
+        const items = Array.isArray(state?.items) ? state.items : [];
+        if (!state?.enabled && !items.length) return;
+
+        const card = document.createElement("section");
+        card.className = `prompt-debug-card director-note-observability-card ${Number(state?.missing_count || 0) > 0 ? "is-warning" : ""}`;
+        const head = document.createElement("div");
+        head.className = "prompt-debug-card-head";
+        const title = document.createElement("strong");
+        title.className = "prompt-debug-card-title";
+        title.textContent = "导演注注入落点";
+        const meta = document.createElement("span");
+        meta.className = "muted";
+        meta.textContent = `${Number(state?.advanced_count || 0)} 条高级 · ${Number(state?.applied_count || 0)}/${Number(state?.total_count || items.length || 0)} 已进入 messages`;
+        head.appendChild(title);
+        head.appendChild(meta);
+        card.appendChild(head);
+
+        const body = document.createElement("div");
+        body.className = "prompt-debug-relation-meta";
+        body.appendChild(makePromptDebugLine("说明", state?.notes || "仅观察导演注最终落点，不评价模型是否遵守。"));
+        body.appendChild(makePromptDebugLine("messages", `${Number(state?.message_count || 0)} 条`));
+        card.appendChild(body);
+
+        const list = document.createElement("div");
+        list.className = "prompt-debug-relation-list";
+        if (!items.length) {
+          list.innerHTML = '<div class="prompt-debug-empty">当前轮没有导演注进入 PromptSegment。</div>';
+        } else {
+          items.forEach((item, index) => {
+            const row = document.createElement("article");
+            row.className = `prompt-debug-relation-card ${item.applied ? "" : "is-warning"}`;
+            const rowHead = document.createElement("div");
+            rowHead.className = "prompt-debug-relation-head";
+            const name = document.createElement("div");
+            name.className = "prompt-debug-tag-name";
+            const titleText = String(item.title || "").trim();
+            name.textContent = titleText || item.note_id || item.segment_id || `导演注 ${index + 1}`;
+            const badges = document.createElement("div");
+            badges.className = "prompt-debug-badge-row";
+            badges.appendChild(makePromptDebugBadge(item.mode === "advanced" ? "高级" : "常规", item.mode === "advanced" ? "base" : ""));
+            badges.appendChild(makePromptDebugBadge(item.applied ? "已注入" : "未找到", item.applied ? "hit" : "missing"));
+            if (item.merged_into_message) badges.appendChild(makePromptDebugBadge("合并进 message", ""));
+            rowHead.appendChild(name);
+            rowHead.appendChild(badges);
+            row.appendChild(rowHead);
+
+            const rowMeta = document.createElement("div");
+            rowMeta.className = "prompt-debug-relation-meta";
+            const configuredPlacement = item.depth !== null && item.depth !== undefined
+              ? `depth=${item.depth}`
+              : getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, item.placement, item.placement || "—");
+            rowMeta.appendChild(makePromptDebugLine("配置", `role=${item.role || item.segment_role || "system"} · ${configuredPlacement} · order=${Number(item.order || 0)}`));
+            rowMeta.appendChild(makePromptDebugLine("最终 role", item.final_message_role || item.final_role || "—"));
+            rowMeta.appendChild(makePromptDebugLine("最终位置", item.applied ? `messages[${item.final_message_index}] · ${formatDirectorNoteFinalPosition(item.final_position)}` : "未在最终 messages 中匹配到"));
+            rowMeta.appendChild(makePromptDebugLine("剩余回合", `${Number(item.remaining_turns || 0)} 回合`));
+            if (item.content_preview) rowMeta.appendChild(makePromptDebugLine("内容预览", item.content_preview));
+            row.appendChild(rowMeta);
+            list.appendChild(row);
+          });
+        }
+        card.appendChild(list);
+        parent.appendChild(card);
+      }
+
       function appendWorkshopDynamicDebugCard(parent) {
         if (!parent) return;
         const debug = workshopDynamicDebugState && typeof workshopDynamicDebugState === "object" ? workshopDynamicDebugState : {};
@@ -3612,6 +3712,7 @@
         appendBaseKernelCard(promptDebugPanelEl, segments);
         appendPromptBudgetCard(promptDebugPanelEl, packagePayload);
         appendMacroVariablesCard(promptDebugPanelEl, packagePayload);
+        appendDirectorNoteObservabilityCard(promptDebugPanelEl, packagePayload);
         appendWorkshopDynamicDebugCard(promptDebugPanelEl);
 
         const tagCard = document.createElement("section");
@@ -5096,7 +5197,13 @@
             });
             detail.appendChild(tagRow);
           }
-          const directorMeta = segment.kind === "director_note" && segment.metadata && typeof segment.metadata === "object" ? segment.metadata : null;
+          const directorMeta = segment.kind === "director_note"
+            && segment.source === "runtime"
+            && segment.metadata
+            && typeof segment.metadata === "object"
+            && segment.metadata.layer_id === "director_notes"
+              ? segment.metadata
+              : null;
           if (directorMeta) {
             const directorRow = document.createElement("div");
             directorRow.className = "prompt-segment-tag-row";
@@ -5109,6 +5216,10 @@
               `role=${directorMeta.final_role || segment.role || "system"}`,
               directorMeta.depth !== undefined ? `depth=${directorMeta.depth}` : `位置=${getPromptSegmentLabel(PROMPT_SEGMENT_PLACEMENT_LABELS, directorMeta.final_position || segment.placement, directorMeta.final_position || segment.placement)}`,
               directorMeta.inject_order !== undefined ? `order=${directorMeta.inject_order}` : "",
+              directorMeta.final_message_index !== undefined && directorMeta.final_message_index !== null ? `messages[${directorMeta.final_message_index}]` : "",
+              directorMeta.final_message_role ? `最终role=${directorMeta.final_message_role}` : "",
+              directorMeta.observed_final_position ? `落点=${formatDirectorNoteFinalPosition(directorMeta.observed_final_position)}` : "",
+              directorMeta.merged_into_message ? "合并进message" : "",
               directorMeta.enabled === false ? "已关闭" : "",
             ].filter(Boolean).forEach((label) => {
               const chip = document.createElement("span");

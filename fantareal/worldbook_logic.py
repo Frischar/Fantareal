@@ -18,9 +18,9 @@ DEFAULT_WORLDBOOK_SETTINGS = {
     "default_cooldown_turns": 0,             # >= 0
 
     # 节点版世界书注入默认值
-    "default_insertion_position": "after_char_defs",  # before_char_defs / after_char_defs / in_chat
-    "default_injection_depth": 0,                     # 仅 in_chat 时使用
-    "default_injection_role": "system",               # 当前节点只真正支持 system
+    "default_insertion_position": "after_char_defs",
+    "default_injection_depth": 0,                     # in_chat / @D depth 时使用
+    "default_injection_role": "system",
     "default_injection_order": 100,                   # 同位置内的二次排序
 
     # RP 分层：默认保持旧逻辑，不主动改变老词条位置
@@ -29,6 +29,50 @@ DEFAULT_WORLDBOOK_SETTINGS = {
     # 递归 V1
     "recursive_scan_enabled": False,
     "recursion_max_depth": 2,
+}
+
+WORLDBOOK_INSERTION_POSITIONS = {
+    "before_char_defs",
+    "after_char_defs",
+    "in_chat",
+    "at_depth_system",
+    "at_depth_user",
+    "at_depth_assistant",
+}
+
+WORLDBOOK_INSERTION_ALIASES = {
+    "0": "before_char_defs",
+    "1": "after_char_defs",
+    "4": "in_chat",
+    "before_character": "before_char_defs",
+    "before_char": "before_char_defs",
+    "character_before": "before_char_defs",
+    "after_character": "after_char_defs",
+    "after_char": "after_char_defs",
+    "character_after": "after_char_defs",
+    "depth": "in_chat",
+    "at_depth": "in_chat",
+    "in-chat": "in_chat",
+    "inchat": "in_chat",
+    "d_system": "at_depth_system",
+    "depth_system": "at_depth_system",
+    "at_depth_sys": "at_depth_system",
+    "d_user": "at_depth_user",
+    "depth_user": "at_depth_user",
+    "d_ai": "at_depth_assistant",
+    "d_assistant": "at_depth_assistant",
+    "depth_ai": "at_depth_assistant",
+    "depth_assistant": "at_depth_assistant",
+    "assistant": "at_depth_assistant",
+    "ai": "at_depth_assistant",
+}
+
+WORLDBOOK_ROLE_ALIASES = {
+    "0": "system",
+    "1": "user",
+    "2": "assistant",
+    "ai": "assistant",
+    "model": "assistant",
 }
 
 
@@ -126,19 +170,21 @@ def _normalize_group_operator(value: Any, default: str = "and") -> str:
 
 
 def _normalize_insertion_position(value: Any, default: str = "after_char_defs") -> str:
-    text = str(value or "").strip().lower()
-    return text if text in {"before_char_defs", "after_char_defs", "in_chat"} else default
+    text = str(value if value is not None else "").strip().lower()
+    text = WORLDBOOK_INSERTION_ALIASES.get(text, text)
+    return text if text in WORLDBOOK_INSERTION_POSITIONS else default
 
 
 def _normalize_injection_role(value: Any, default: str = "system") -> str:
-    text = str(value or "").strip().lower()
+    text = str(value if value is not None else "").strip().lower()
+    text = WORLDBOOK_ROLE_ALIASES.get(text, text)
     if text in {"system", "user", "assistant"}:
         return text
     return default
 
 
 def _normalize_injection_depth(value: Any, default: int = 0) -> int:
-    return _clamp_int(value, 0, 3, default)
+    return _clamp_int(value, 0, 999, default)
 
 
 def _normalize_injection_order(value: Any, default: int = 100) -> int:
@@ -299,18 +345,34 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
     raw_order = raw.get("order", raw.get("priority", 100))
     order = _clamp_int(raw_order, 0, 999999, 100)
 
+    raw_insertion_position = raw.get("insertion_position")
+    if raw_insertion_position in (None, ""):
+        raw_insertion_position = raw.get("position")
+    raw_injection_depth = raw.get("injection_depth")
+    if raw_injection_depth in (None, ""):
+        raw_injection_depth = raw.get("depth")
+    raw_injection_role = raw.get("injection_role")
+    if raw_injection_role in (None, ""):
+        raw_injection_role = raw.get("role")
+
     insertion_position = _normalize_insertion_position(
-        raw.get("insertion_position"),
+        raw_insertion_position,
         str(settings.get("default_insertion_position", "after_char_defs")),
     )
     injection_depth = _normalize_injection_depth(
-        raw.get("injection_depth"),
+        raw_injection_depth,
         int(settings.get("default_injection_depth", 0)),
     )
     injection_role = _normalize_injection_role(
-        raw.get("injection_role"),
+        raw_injection_role,
         str(settings.get("default_injection_role", "system")),
     )
+    if insertion_position == "at_depth_system":
+        injection_role = "system"
+    elif insertion_position == "at_depth_user":
+        injection_role = "user"
+    elif insertion_position == "at_depth_assistant":
+        injection_role = "assistant"
     injection_order = _normalize_injection_order(
         raw.get("injection_order", raw_order),
         int(settings.get("default_injection_order", 100)),

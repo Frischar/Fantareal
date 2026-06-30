@@ -250,7 +250,10 @@
                   <select class="wb-insertion-position">
                     <option value="before_char_defs" {% if item.insertion_position == 'before_char_defs' %}selected{% endif %}>角色定义前</option>
                     <option value="after_char_defs" {% if (item.insertion_position or 'after_char_defs') == 'after_char_defs' %}selected{% endif %}>角色定义后</option>
-                    <option value="in_chat" {% if item.insertion_position == 'in_chat' %}selected{% endif %}>聊天内注入</option>
+                    <option value="in_chat" {% if item.insertion_position == 'in_chat' %}selected{% endif %}>@D 自定义角色在深度</option>
+                    <option value="at_depth_system" {% if item.insertion_position == 'at_depth_system' %}selected{% endif %}>@D system 在深度</option>
+                    <option value="at_depth_user" {% if item.insertion_position == 'at_depth_user' %}selected{% endif %}>@D user 在深度</option>
+                    <option value="at_depth_assistant" {% if item.insertion_position == 'at_depth_assistant' %}selected{% endif %}>@D assistant 在深度</option>
                   </select>
                 </div>
                 <div>
@@ -259,12 +262,14 @@
                 </div>
                 <div>
                   <label>聊天深度</label>
-                  <input class="wb-injection-depth" type="number" min="0" max="3" step="1" value="{{ item.injection_depth if item.injection_depth is not none else 0 }}" />
+                  <input class="wb-injection-depth" type="number" min="0" max="999" step="1" value="{{ item.injection_depth if item.injection_depth is not none else 0 }}" />
                 </div>
                 <div>
                   <label>注入角色</label>
                   <select class="wb-injection-role">
                     <option value="system" {% if (item.injection_role or 'system') == 'system' %}selected{% endif %}>system</option>
+                    <option value="user" {% if item.injection_role == 'user' %}selected{% endif %}>user</option>
+                    <option value="assistant" {% if item.injection_role == 'assistant' %}selected{% endif %}>assistant</option>
                   </select>
                 </div>
               </div>
@@ -340,12 +345,15 @@
                   <select id="bulk-insertion-position">
                     <option value="before_char_defs">角色定义前</option>
                     <option value="after_char_defs" selected>角色定义后</option>
-                    <option value="in_chat">聊天内注入</option>
+                    <option value="in_chat">@D 自定义角色在深度</option>
+                    <option value="at_depth_system">@D system 在深度</option>
+                    <option value="at_depth_user">@D user 在深度</option>
+                    <option value="at_depth_assistant">@D assistant 在深度</option>
                   </select>
                 </div>
                 <div>
                   <label for="bulk-injection-depth">聊天深度</label>
-                  <input id="bulk-injection-depth" type="number" min="0" max="3" step="1" value="0" />
+                  <input id="bulk-injection-depth" type="number" min="0" max="999" step="1" value="0" />
                 </div>
               </div>
               <div>
@@ -429,7 +437,7 @@
               </div>
               <div>
                 <label for="import-force-in-chat-depth">强制聊天深度</label>
-                <input id="import-force-in-chat-depth" type="number" min="0" max="3" step="1" value="0" />
+                <input id="import-force-in-chat-depth" type="number" min="0" max="999" step="1" value="0" />
                 <p class="muted helper-text">仅在“统一补到聊天内注入”时生效。</p>
               </div>
             </div>
@@ -592,7 +600,10 @@
               <select class="wb-insertion-position">
                 <option value="before_char_defs">角色定义前</option>
                 <option value="after_char_defs" selected>角色定义后</option>
-                <option value="in_chat">聊天内注入</option>
+                <option value="in_chat">@D 自定义角色在深度</option>
+                <option value="at_depth_system">@D system 在深度</option>
+                <option value="at_depth_user">@D user 在深度</option>
+                <option value="at_depth_assistant">@D assistant 在深度</option>
               </select>
             </div>
             <div>
@@ -601,12 +612,14 @@
             </div>
             <div>
               <label>聊天深度</label>
-              <input class="wb-injection-depth" type="number" min="0" max="3" step="1" value="0" />
+              <input class="wb-injection-depth" type="number" min="0" max="999" step="1" value="0" />
             </div>
             <div>
               <label>注入角色</label>
               <select class="wb-injection-role">
                 <option value="system" selected>system</option>
+                <option value="user">user</option>
+                <option value="assistant">assistant</option>
               </select>
             </div>
           </div>
@@ -907,9 +920,67 @@
         const mapping = {
           before_char_defs: "角色前",
           after_char_defs: "角色后",
-          in_chat: "聊天注入",
+          in_chat: "@D自定义",
+          at_depth_system: "@D system",
+          at_depth_user: "@D user",
+          at_depth_assistant: "@D assistant",
         };
         return mapping[value] || value || "角色定义后";
+      }
+
+      function isDepthInsertionPosition(value) {
+        return ["in_chat", "at_depth_system", "at_depth_user", "at_depth_assistant"].includes(String(value || ""));
+      }
+
+      function fixedRoleForInsertionPosition(value) {
+        if (value === "at_depth_system") return "system";
+        if (value === "at_depth_user") return "user";
+        if (value === "at_depth_assistant") return "assistant";
+        return "";
+      }
+
+      function normalizeImportedWorldbookPositionValue(value) {
+        const key = String(value ?? "").trim().toLowerCase();
+        const mapping = {
+          "0": "before_char_defs",
+          "1": "after_char_defs",
+          "4": "in_chat",
+          before_character: "before_char_defs",
+          before_char: "before_char_defs",
+          after_character: "after_char_defs",
+          after_char: "after_char_defs",
+          depth: "in_chat",
+          at_depth: "in_chat",
+          "in-chat": "in_chat",
+          inchat: "in_chat",
+          d_system: "at_depth_system",
+          depth_system: "at_depth_system",
+          at_depth_sys: "at_depth_system",
+          d_user: "at_depth_user",
+          depth_user: "at_depth_user",
+          d_ai: "at_depth_assistant",
+          d_assistant: "at_depth_assistant",
+          depth_ai: "at_depth_assistant",
+          depth_assistant: "at_depth_assistant",
+          assistant: "at_depth_assistant",
+          ai: "at_depth_assistant",
+        };
+        const normalized = mapping[key] || key;
+        return [
+          "before_char_defs",
+          "after_char_defs",
+          "in_chat",
+          "at_depth_system",
+          "at_depth_user",
+          "at_depth_assistant",
+        ].includes(normalized) ? normalized : "";
+      }
+
+      function normalizeImportedWorldbookRoleValue(value) {
+        const key = String(value ?? "").trim().toLowerCase();
+        const mapping = { "0": "system", "1": "user", "2": "assistant", ai: "assistant", model: "assistant" };
+        const normalized = mapping[key] || key;
+        return ["system", "user", "assistant"].includes(normalized) ? normalized : "";
       }
 
       function getTrimmedValue(card, selector) {
@@ -1032,7 +1103,7 @@
         if (activeQuickFilter === "constant") return entryType === "constant";
         if (activeQuickFilter === "keyword") return entryType === "keyword";
         if (["stable", "current_state", "dynamic", "output_guard"].includes(activeQuickFilter)) return promptLayer === activeQuickFilter;
-        if (activeQuickFilter === "in_chat") return insertionPosition === "in_chat";
+        if (activeQuickFilter === "in_chat") return isDepthInsertionPosition(insertionPosition);
         if (activeQuickFilter === "before_char_defs") return insertionPosition === "before_char_defs";
         if (activeQuickFilter === "after_char_defs") return insertionPosition === "after_char_defs";
         if (activeQuickFilter === "ungrouped") return getCardGroupKey(card) === "__ungrouped__";
@@ -1129,10 +1200,18 @@
         });
 
         const depthInput = card.querySelector(".wb-injection-depth");
+        const roleInput = card.querySelector(".wb-injection-role");
+        const fixedRole = fixedRoleForInsertionPosition(position);
+        if (roleInput && fixedRole) roleInput.value = fixedRole;
         if (depthInput && !layerOverridden) {
-          const disabled = position !== "in_chat";
+          const disabled = !isDepthInsertionPosition(position);
           depthInput.disabled = disabled;
-          depthInput.title = disabled ? "仅在“聊天内注入”时生效" : "";
+          depthInput.title = disabled ? "仅在 @D 深度注入时生效" : "";
+        }
+        if (roleInput && !layerOverridden) {
+          const disabled = !isDepthInsertionPosition(position) || Boolean(fixedRole);
+          roleInput.disabled = disabled;
+          roleInput.title = fixedRole ? "该 @D 位置已固定角色" : (disabled ? "仅在 @D 自定义角色在深度时生效" : "");
         }
       }
 
@@ -1161,9 +1240,9 @@
       function syncBulkInjectionUi() {
         const policy = bulkInsertionPositionEl?.value || "after_char_defs";
         if (bulkInjectionDepthEl) {
-          const disabled = policy !== "in_chat";
+          const disabled = !isDepthInsertionPosition(policy);
           bulkInjectionDepthEl.disabled = disabled;
-          bulkInjectionDepthEl.title = disabled ? "仅在“聊天内注入”时生效" : "";
+          bulkInjectionDepthEl.title = disabled ? "仅在 @D 深度注入时生效" : "";
         }
       }
 
@@ -1859,16 +1938,36 @@
       function applyImportOptionsToRow(item, index, existingIds) {
         const row = item && typeof item === "object" && !Array.isArray(item) ? { ...item } : {};
         const policy = importMissingInjectionPolicyEl?.value || "follow_defaults";
-        const forceDepth = Math.min(Math.max(Number(importForceInChatDepthEl?.value || 0), 0), 3);
+        const forceDepth = Math.min(Math.max(Number(importForceInChatDepthEl?.value || 0), 0), 999);
         const forceOrderRaw = importForceInjectionOrderEl?.value?.trim() || "";
         const forceOrder = forceOrderRaw ? Number(forceOrderRaw) : null;
+
+        const rawPosition = worldbookFieldPresent(row, "insertion_position")
+          ? row.insertion_position
+          : (worldbookFieldPresent(row, "insertionPosition") ? row.insertionPosition : row.position);
+        const importedPosition = normalizeImportedWorldbookPositionValue(rawPosition);
+        if (importedPosition) row.insertion_position = importedPosition;
+
+        if (!worldbookFieldPresent(row, "injection_depth")) {
+          const rawDepth = worldbookFieldPresent(row, "injectionDepth") ? row.injectionDepth : row.depth;
+          const importedDepth = Number(rawDepth);
+          if (Number.isFinite(importedDepth)) {
+            row.injection_depth = Math.min(Math.max(Math.floor(importedDepth), 0), 999);
+          }
+        }
+
+        const rawRole = worldbookFieldPresent(row, "injection_role")
+          ? row.injection_role
+          : (worldbookFieldPresent(row, "injectionRole") ? row.injectionRole : row.role);
+        const importedRole = normalizeImportedWorldbookRoleValue(rawRole);
+        if (importedRole) row.injection_role = importedRole;
 
         if (policy !== "follow_defaults" && !worldbookFieldPresent(row, "insertion_position")) {
           if (policy === "force_before_char_defs") row.insertion_position = "before_char_defs";
           if (policy === "force_after_char_defs") row.insertion_position = "after_char_defs";
           if (policy === "force_in_chat") row.insertion_position = "in_chat";
         }
-        if (String(row.insertion_position || "").trim() === "in_chat" && !worldbookFieldPresent(row, "injection_depth")) {
+        if (isDepthInsertionPosition(String(row.insertion_position || "").trim()) && !worldbookFieldPresent(row, "injection_depth")) {
           row.injection_depth = forceDepth;
         }
         if (!worldbookFieldPresent(row, "injection_role")) {

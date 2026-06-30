@@ -535,9 +535,22 @@ def convert_worldbook_to_xuqi(tavern_wb: dict) -> tuple[dict, dict]:
         # depth → injection_depth
         depth = entry.get("depth", ENTRY_DEFAULTS["injection_depth"])
         try:
-            depth = int(depth)
+            depth = max(0, min(int(depth), 999))
         except (TypeError, ValueError):
             depth = ENTRY_DEFAULTS["injection_depth"]
+
+        raw_role = entry.get("role", ENTRY_DEFAULTS["injection_role"])
+        role_key = str(raw_role).strip().lower()
+        role_map = {
+            "0": "system",
+            "1": "user",
+            "2": "assistant",
+            "ai": "assistant",
+            "model": "assistant",
+        }
+        injection_role = role_map.get(role_key, role_key)
+        if injection_role not in {"system", "user", "assistant"}:
+            injection_role = ENTRY_DEFAULTS["injection_role"]
 
         # probability → chance
         probability = entry.get("probability", ENTRY_DEFAULTS["chance"])
@@ -561,17 +574,49 @@ def convert_worldbook_to_xuqi(tavern_wb: dict) -> tuple[dict, dict]:
         note = "\n".join(note_parts)
 
         # Map position
-        position = str(entry.get("position") or "").strip()
+        position = str(entry.get("position") if "position" in entry else "").strip().lower()
         if not position:
             position = WORLDBOOK_SETTINGS["default_insertion_position"]
         position_map = {
             "0": "before_char_defs",
             "1": "after_char_defs",
-            "2": "in_chat",
+            "4": "in_chat",
+            "before_character": "before_char_defs",
+            "before_char": "before_char_defs",
+            "after_character": "after_char_defs",
+            "after_char": "after_char_defs",
+            "depth": "in_chat",
+            "at_depth": "in_chat",
+            "in-chat": "in_chat",
+            "inchat": "in_chat",
+            "d_system": "at_depth_system",
+            "depth_system": "at_depth_system",
+            "at_depth_sys": "at_depth_system",
+            "d_user": "at_depth_user",
+            "depth_user": "at_depth_user",
+            "d_ai": "at_depth_assistant",
+            "d_assistant": "at_depth_assistant",
+            "depth_ai": "at_depth_assistant",
+            "depth_assistant": "at_depth_assistant",
+            "assistant": "at_depth_assistant",
+            "ai": "at_depth_assistant",
         }
         position = position_map.get(position, position)
-        if position not in {"before_char_defs", "after_char_defs", "in_chat"}:
+        if position not in {
+            "before_char_defs",
+            "after_char_defs",
+            "in_chat",
+            "at_depth_system",
+            "at_depth_user",
+            "at_depth_assistant",
+        }:
             position = "after_char_defs"
+        if position == "at_depth_system":
+            injection_role = "system"
+        elif position == "at_depth_user":
+            injection_role = "user"
+        elif position == "at_depth_assistant":
+            injection_role = "assistant"
 
         xuqi_entry: dict = {
             **ENTRY_DEFAULTS,
@@ -582,6 +627,7 @@ def convert_worldbook_to_xuqi(tavern_wb: dict) -> tuple[dict, dict]:
             "order": order,
             "insertion_position": position,
             "injection_depth": depth,
+            "injection_role": injection_role,
             "chance": probability,
             "enabled": enabled,
             "note": note,
@@ -600,7 +646,7 @@ def convert_worldbook_to_xuqi(tavern_wb: dict) -> tuple[dict, dict]:
         "fields_mapped_from_tavern": [
             "key[0]→trigger", "key[1:]→secondary_trigger", "content→content",
             "constant→entry_type", "priority/insertion_order/order→order",
-            "depth→injection_depth", "probability→chance",
+            "depth→injection_depth", "role→injection_role", "probability→chance",
             "disable→enabled", "comment+name→note",
             "position→insertion_position",
         ],
