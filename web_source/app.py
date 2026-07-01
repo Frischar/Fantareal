@@ -1,0 +1,4217 @@
+import asyncio
+import copy
+import difflib
+import hashlib
+import json
+import logging
+import os
+import re
+import shutil
+import sys
+import unicodedata
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote, urlparse
+from uuid import uuid4
+
+import httpx
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
+from starlette.requests import Request
+
+
+def get_runtime_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        try:
+            exe_dir.mkdir(parents=True, exist_ok=True)
+            probe_path = exe_dir / ".xuqi_write_test"
+            probe_path.write_text("ok", encoding="utf-8")
+            probe_path.unlink(missing_ok=True)
+            return exe_dir
+        except OSError:
+            local_app_data = os.environ.get("LOCALAPPDATA")
+            if local_app_data:
+                return Path(local_app_data) / "XuqiLLMChat"
+            return Path.home() / "AppData" / "Local" / "XuqiLLMChat"
+    return Path(__file__).resolve().parent
+
+
+def get_resource_dir() -> Path:
+    if getattr(sys, "_MEIPASS", None):
+        return Path(sys._MEIPASS)
+    return Path(__file__).resolve().parent
+
+
+BASE_DIR = get_runtime_base_dir()
+RESOURCE_DIR = get_resource_dir()
+DATA_DIR = BASE_DIR / "data"
+SLOTS_DIR = DATA_DIR / "slots"
+STATIC_DIR = BASE_DIR / "static"
+RESOURCE_STATIC_DIR = RESOURCE_DIR / "static"
+TEMPLATES_DIR = RESOURCE_DIR / "templates"
+UPLOAD_DIR = STATIC_DIR / "uploads"
+SPRITES_DIR = STATIC_DIR / "sprites"
+CARDS_DIR = BASE_DIR / "cards"
+RESOURCE_CARDS_DIR = RESOURCE_DIR / "cards"
+SLOT_META_PATH = DATA_DIR / "save_slots.json"
+EXPORT_DIR = BASE_DIR / "exports"
+MEMORY_TOMBSTONE_FILENAME = "memory_tombstones.json"
+LEGACY_PERSONA_PATH = DATA_DIR / "persona.json"
+LEGACY_CONVERSATION_PATH = DATA_DIR / "conversations.json"
+LEGACY_SETTINGS_PATH = DATA_DIR / "settings.json"
+LEGACY_MEMORIES_PATH = DATA_DIR / "memories.json"
+LEGACY_WORLDBOOK_PATH = DATA_DIR / "worldbook.json"
+LEGACY_CURRENT_CARD_PATH = DATA_DIR / "current_role_card.json"
+SLOT_MIGRATION_MARKER_PATH = DATA_DIR / ".slot_migration_done"
+
+ALLOWED_EMBEDDING_FIELDS = ("title", "content", "tags", "notes")
+ALLOWED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+ALLOWED_BACKGROUND_SCHEMES = {"http", "https"}
+MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
+REQUEST_RETRY_ATTEMPTS = 5
+REQUEST_RETRY_BASE_DELAY_SECONDS = 1.0
+DEFAULT_SPRITE_BASE_PATH = "/static/sprites"
+DEFAULT_SLOT_IDS = ("slot_1", "slot_2", "slot_3")
+SUMMARY_TRANSCRIPT_SOFT_LIMIT_CHARS = 12000
+SUMMARY_CHUNK_TARGET_CHARS = 4000
+SUMMARY_CHUNK_OVERLAP_MESSAGES = 2
+SUMMARY_MAX_TOMBSTONES = 40
+PROMPT_VISIBLE_TOMBSTONES = 8
+
+logger = logging.getLogger("xuqi_llm_chat")
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO)
+
+
+def bootstrap_runtime_layout() -> None:
+    STATIC_DIR.mkdir(parents=True, exist_ok=True)
+    if RESOURCE_STATIC_DIR.exists() and not (STATIC_DIR / "styles.css").exists():
+        shutil.copytree(RESOURCE_STATIC_DIR, STATIC_DIR, dirs_exist_ok=True)
+
+    if RESOURCE_CARDS_DIR.exists() and not CARDS_DIR.exists():
+        shutil.copytree(RESOURCE_CARDS_DIR, CARDS_DIR, dirs_exist_ok=True)
+
+    if (RESOURCE_DIR / "data").exists() and not DATA_DIR.exists():
+        shutil.copytree(RESOURCE_DIR / "data", DATA_DIR, dirs_exist_ok=True)
+
+DEFAULT_PERSONA = {
+    "name": "Companion",
+    "system_prompt": (
+        "You are a gentle, patient, and attentive AI companion. "
+        "Respond naturally, show care, and avoid overly templated phrasing."
+    ),
+    "greeting": "What would you like to talk about today? I am here with you.",
+}
+
+DEFAULT_SETTINGS = {
+    "llm_base_url": "",
+    "llm_api_key": "",
+    "llm_model": "",
+    "theme": "light",
+    "temperature": 0.85,
+    "history_limit": 20,
+    "request_timeout": 120,
+    "demo_mode": False,
+    "ui_opacity": 0.84,
+    "background_image_url": "",
+    "background_overlay": 0.42,
+    "font_size": 15,
+    "embedding_base_url": "",
+    "embedding_api_key": "",
+    "embedding_model": "",
+    "embedding_fields": ["title", "content", "tags"],
+    "retrieval_top_k": 4,
+    "rerank_enabled": False,
+    "rerank_base_url": "",
+    "rerank_api_key": "",
+    "rerank_model": "",
+    "rerank_top_n": 3,
+    "sprite_enabled": True,
+    "sprite_base_path": DEFAULT_SPRITE_BASE_PATH,
+    "memory_summary_length": "medium",
+    "memory_summary_max_chars": 180,
+}
+
+
+def default_slot_registry() -> dict[str, Any]:
+    slots = [{"id": slot_id, "name": f"Slot {index}"} for index, slot_id in enumerate(DEFAULT_SLOT_IDS, start=1)]
+    return {"active_slot": DEFAULT_SLOT_IDS[0], "slots": slots}
+
+
+def default_sprite_base_path_for_slot(slot_id: str | None = None) -> str:
+    target = sanitize_slot_id(slot_id, DEFAULT_SLOT_IDS[0] if DEFAULT_SLOT_IDS else "slot_1")
+    return f"{DEFAULT_SPRITE_BASE_PATH}/{target}"
+
+
+def sprite_dir_path(slot_id: str | None = None) -> Path:
+    target = sanitize_slot_id(slot_id, DEFAULT_SLOT_IDS[0] if DEFAULT_SLOT_IDS else "slot_1")
+    return SPRITES_DIR / target
+
+
+def sanitize_sprite_filename_tag(value: str) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r'[\\/:*?"<>|]+', "_", text)
+    return text[:64].strip(" ._")
+
+
+def list_sprite_assets(slot_id: str | None = None) -> list[dict[str, Any]]:
+    directory = sprite_dir_path(slot_id)
+    if not directory.exists():
+        return []
+
+    items: list[dict[str, Any]] = []
+    for path in sorted(directory.iterdir(), key=lambda item: item.name.lower()):
+        if not path.is_file() or path.suffix.lower() not in ALLOWED_IMAGE_SUFFIXES:
+            continue
+        items.append(
+            {
+                "filename": path.name,
+                "tag": path.stem,
+                "url": f"{default_sprite_base_path_for_slot(slot_id)}/{path.name}",
+                "size": path.stat().st_size,
+                "updated_at": datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
+    return items
+
+
+def default_role_card() -> dict[str, Any]:
+    return {
+        "name": "",
+        "description": "",
+        "personality": "",
+        "first_mes": "",
+        "mes_example": "",
+        "scenario": "",
+        "creator_notes": "",
+        "tags": [],
+        "plotStages": {
+            "A": {"description": "", "rules": ""},
+            "B": {"description": "", "rules": ""},
+            "C": {"description": "", "rules": ""},
+        },
+        "personas": {
+            "1": {
+                "name": "",
+                "description": "",
+                "personality": "",
+                "scenario": "",
+                "creator_notes": "",
+            },
+            "2": {
+                "name": "",
+                "description": "",
+                "personality": "",
+                "scenario": "",
+                "creator_notes": "",
+            },
+            "3": {
+                "name": "",
+                "description": "",
+                "personality": "",
+                "scenario": "",
+                "creator_notes": "",
+            },
+        },
+    }
+
+
+def load_env_file() -> None:
+    env_path = BASE_DIR / ".env"
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+def read_json(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning("读取 JSON 失败，使用默认值: %s (%s)", path, exc)
+        return default
+
+
+def write_json(path: Path, payload: Any) -> None:
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def persist_json(path: Path, payload: Any, *, detail: str, status_code: int = 500) -> None:
+    try:
+        write_json(path, payload)
+    except OSError as exc:
+        logger.exception("写入 JSON 失败: %s", path)
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+def parse_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    if value is None:
+        return default
+    return bool(value)
+
+
+def clamp_int(value: Any, minimum: int, maximum: int, default: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return min(max(number, minimum), maximum)
+
+
+def clamp_float(value: Any, minimum: float, maximum: float, default: float) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return min(max(number, minimum), maximum)
+
+
+def sanitize_background_image_url(value: Any, *, strict: bool = False) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+
+    if text.startswith("/static/uploads/"):
+        return text
+
+    parsed = urlparse(text)
+    if parsed.scheme in ALLOWED_BACKGROUND_SCHEMES and parsed.netloc:
+        return text
+
+    if strict:
+        raise HTTPException(
+            status_code=400,
+            detail="背景图地址只允许 http/https 远程地址或 /static/uploads/ 本地图片路径。",
+        )
+    return ""
+
+
+def sanitize_embedding_fields(value: Any) -> list[str]:
+    raw_fields = value if isinstance(value, list) else DEFAULT_SETTINGS["embedding_fields"]
+    normalized_fields: list[str] = []
+    for field_name in raw_fields:
+        field_value = str(field_name).strip()
+        if field_value in ALLOWED_EMBEDDING_FIELDS and field_value not in normalized_fields:
+            normalized_fields.append(field_value)
+    return normalized_fields or list(DEFAULT_SETTINGS["embedding_fields"])
+
+
+def sanitize_settings(raw: dict[str, Any] | None, *, strict: bool = False, slot_id: str | None = None) -> dict[str, Any]:
+    settings = DEFAULT_SETTINGS.copy()
+    if raw:
+        settings.update(raw)
+
+    default_sprite_path = default_sprite_base_path_for_slot(slot_id)
+    sprite_base_path = str(settings.get("sprite_base_path", default_sprite_path)).strip() or default_sprite_path
+    if sprite_base_path == DEFAULT_SPRITE_BASE_PATH:
+        sprite_base_path = default_sprite_path
+
+    return {
+        "llm_base_url": str(settings.get("llm_base_url", "")).strip(),
+        "llm_api_key": str(settings.get("llm_api_key", "")).strip(),
+        "llm_model": str(settings.get("llm_model", "")).strip(),
+        "theme": "dark" if str(settings.get("theme", "light")).strip() == "dark" else "light",
+        "temperature": clamp_float(settings.get("temperature"), 0.0, 2.0, 0.85),
+        "history_limit": clamp_int(settings.get("history_limit"), 1, 100, 20),
+        "request_timeout": clamp_int(settings.get("request_timeout"), 10, 600, 120),
+        "demo_mode": parse_bool(settings.get("demo_mode"), False),
+        "ui_opacity": clamp_float(settings.get("ui_opacity"), 0.2, 1.0, 0.84),
+        "background_image_url": sanitize_background_image_url(
+            settings.get("background_image_url", ""),
+            strict=strict,
+        ),
+        "background_overlay": clamp_float(settings.get("background_overlay"), 0.0, 0.85, 0.42),
+        "font_size": clamp_int(settings.get("font_size"), 10, 28, 15),
+        "sprite_enabled": parse_bool(settings.get("sprite_enabled"), True),
+        "sprite_base_path": sprite_base_path,
+        "embedding_base_url": str(settings.get("embedding_base_url", "")).strip(),
+        "embedding_api_key": str(settings.get("embedding_api_key", "")).strip(),
+        "embedding_model": str(settings.get("embedding_model", "")).strip(),
+        "embedding_fields": sanitize_embedding_fields(settings.get("embedding_fields")),
+        "retrieval_top_k": clamp_int(settings.get("retrieval_top_k"), 1, 12, 4),
+        "rerank_enabled": parse_bool(settings.get("rerank_enabled"), False),
+        "rerank_base_url": str(settings.get("rerank_base_url", "")).strip(),
+        "rerank_api_key": str(settings.get("rerank_api_key", "")).strip(),
+        "rerank_model": str(settings.get("rerank_model", "")).strip(),
+        "rerank_top_n": clamp_int(settings.get("rerank_top_n"), 1, 12, 3),
+        "memory_summary_length": str(settings.get("memory_summary_length", "medium")).strip() if str(settings.get("memory_summary_length", "medium")).strip() in {"short", "medium", "long", "custom"} else "medium",
+        "memory_summary_max_chars": clamp_int(settings.get("memory_summary_max_chars"), 80, 2000, 180),
+    }
+
+
+def sanitize_tags(value: Any) -> list[str]:
+    if isinstance(value, str):
+        raw_tags = value.replace("?", ",").split(",")
+    elif isinstance(value, list):
+        raw_tags = value
+    else:
+        raw_tags = []
+
+    tags: list[str] = []
+    for item in raw_tags:
+        text = str(item).strip()
+        if text and text not in tags:
+            tags.append(text)
+    return tags
+
+
+def sanitize_memories(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+
+    items: list[dict[str, Any]] = []
+    for index, item in enumerate(raw, start=1):
+        if not isinstance(item, dict):
+            continue
+        memory_id = str(item.get("id", "")).strip() or f"memory-{index}"
+        items.append(
+            {
+                "id": memory_id,
+                "title": str(item.get("title", "")).strip(),
+                "content": str(item.get("content", "")).strip(),
+                "tags": sanitize_tags(item.get("tags", [])),
+                "notes": str(item.get("notes", "")).strip(),
+            }
+        )
+    return items
+
+
+def sanitize_memory_tombstones(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+
+    sanitized: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str, str]] = set()
+    for index, item in enumerate(raw, start=1):
+        if not isinstance(item, dict):
+            continue
+        memory = sanitize_memories([item])[0]
+        deleted_at = str(item.get("deleted_at", "")).strip()
+        signature = (
+            normalize_memory_match_text(memory.get("id", "")),
+            normalize_memory_match_text(memory.get("title", "")),
+            normalize_memory_match_text(memory.get("content", "")),
+        )
+        if signature in seen_keys:
+            continue
+        seen_keys.add(signature)
+        sanitized.append(
+            {
+                "id": memory["id"] or f"deleted-memory-{index}",
+                "title": memory["title"],
+                "content": memory["content"],
+                "tags": memory["tags"],
+                "notes": memory["notes"],
+                "deleted_at": deleted_at,
+            }
+        )
+    return sanitized[:SUMMARY_MAX_TOMBSTONES]
+
+
+def sanitize_worldbook(raw: Any) -> dict[str, str]:
+    if isinstance(raw, dict):
+        source = raw
+    elif isinstance(raw, list):
+        source = {}
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            trigger = str(item.get("trigger", "")).strip()
+            content = str(item.get("content", "")).strip()
+            if trigger and content:
+                source[trigger] = content
+    else:
+        return {}
+
+    cleaned: dict[str, str] = {}
+    for key, value in source.items():
+        trigger = str(key).strip()
+        content = str(value).strip()
+        if trigger and content:
+            cleaned[trigger] = content
+    return cleaned
+
+
+def normalize_match_text(value: Any) -> str:
+    text = unicodedata.normalize("NFKC", str(value or ""))
+    text = text.strip().lower()
+    return re.sub(r"\s+", "", text)
+
+
+def _deprecated_split_trigger_aliases(trigger: Any) -> list[str]:
+    text = unicodedata.normalize("NFKC", str(trigger or ""))
+    aliases = [part.strip() for part in re.split(r"[|,，、/\n]+", text) if part.strip()]
+    return aliases or ([text.strip()] if text.strip() else [])
+
+
+def sanitize_slot_id(value: Any, default: str | None = None) -> str:
+    slot_id = str(value or "").strip()
+    if slot_id in DEFAULT_SLOT_IDS:
+        return slot_id
+    return default or DEFAULT_SLOT_IDS[0]
+
+
+def sanitize_slot_registry(raw: Any) -> dict[str, Any]:
+    default = default_slot_registry()
+    if not isinstance(raw, dict):
+        return default
+
+    raw_slots = raw.get("slots", [])
+    seen: set[str] = set()
+    slots: list[dict[str, str]] = []
+    if isinstance(raw_slots, list):
+        for index, item in enumerate(raw_slots, start=1):
+            if not isinstance(item, dict):
+                continue
+            slot_id = sanitize_slot_id(item.get("id"), "")
+            if not slot_id or slot_id in seen:
+                continue
+            seen.add(slot_id)
+            name = str(item.get("name", "")).strip() or f"存档 {index}"
+            slots.append({"id": slot_id, "name": name[:32]})
+
+    for index, slot_id in enumerate(DEFAULT_SLOT_IDS, start=1):
+        if slot_id not in seen:
+            slots.append({"id": slot_id, "name": f"存档 {index}"})
+
+    active_slot = sanitize_slot_id(raw.get("active_slot"), DEFAULT_SLOT_IDS[0])
+    return {"active_slot": active_slot, "slots": slots}
+
+
+def get_slot_registry() -> dict[str, Any]:
+    return sanitize_slot_registry(read_json(SLOT_META_PATH, default_slot_registry()))
+
+
+def save_slot_registry(registry: dict[str, Any]) -> dict[str, Any]:
+    sanitized = sanitize_slot_registry(registry)
+    persist_json(
+        SLOT_META_PATH,
+        sanitized,
+        detail="存档列表保存失败，请检查磁盘空间或文件权限。",
+    )
+    return sanitized
+
+
+def get_active_slot_id() -> str:
+    return get_slot_registry()["active_slot"]
+
+
+def get_slot_name(slot_id: str | None = None) -> str:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    for item in get_slot_registry()["slots"]:
+        if item["id"] == target:
+            return item["name"]
+    return target
+
+
+def slot_summary(slot_id: str | None = None) -> dict[str, Any]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    current_card = get_current_card(target)
+    return {
+        "id": target,
+        "name": get_slot_name(target),
+        "persona_name": get_persona(target).get("name", ""),
+        "memory_count": len(get_memories(target)),
+        "worldbook_count": len(get_worldbook(target)),
+        "conversation_count": len(get_conversation(target)),
+        "current_card_name": current_card.get("source_name", ""),
+    }
+
+
+def get_slot_dir(slot_id: str | None = None) -> Path:
+    return SLOTS_DIR / sanitize_slot_id(slot_id, get_active_slot_id())
+
+
+def persona_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "persona.json"
+
+
+def conversation_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "conversations.json"
+
+
+def settings_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "settings.json"
+
+
+def memories_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "memories.json"
+
+
+def worldbook_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "worldbook.json"
+
+
+def current_card_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / "current_role_card.json"
+
+
+def memory_tombstones_path(slot_id: str | None = None) -> Path:
+    return get_slot_dir(slot_id) / MEMORY_TOMBSTONE_FILENAME
+
+
+def reset_slot_data(slot_id: str) -> dict[str, Any]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    persist_json(persona_path(target), DEFAULT_PERSONA, detail="存档重置失败：无法重置人设。")
+    persist_json(conversation_path(target), [], detail="存档重置失败：无法清空聊天记录。")
+    persist_json(settings_path(target), sanitize_settings(DEFAULT_SETTINGS, slot_id=target), detail="存档重置失败：无法重置配置。")
+    persist_json(memories_path(target), [], detail="存档重置失败：无法清空记忆库。")
+    persist_json(memory_tombstones_path(target), [], detail="存档重置失败：无法清空记忆删除记录。")
+    persist_json(worldbook_path(target), {}, detail="存档重置失败：无法清空世界书。")
+    persist_json(current_card_path(target), {}, detail="存档重置失败：无法清空角色卡记录。")
+    return slot_summary(target)
+
+
+def normalize_role_card(raw: Any) -> dict[str, Any]:
+    card = default_role_card()
+    if not isinstance(raw, dict):
+        return card
+
+    for key in [
+        "name",
+        "description",
+        "personality",
+        "first_mes",
+        "mes_example",
+        "scenario",
+        "creator_notes",
+    ]:
+        card[key] = str(raw.get(key, "")).strip()
+
+    card["tags"] = sanitize_tags(raw.get("tags", []))
+
+    plot_stages = raw.get("plotStages", {})
+    if isinstance(plot_stages, dict):
+        for key in card["plotStages"]:
+            value = plot_stages.get(key, {})
+            if isinstance(value, dict):
+                card["plotStages"][key]["description"] = str(value.get("description", "")).strip()
+                card["plotStages"][key]["rules"] = str(value.get("rules", "")).strip()
+
+    personas = raw.get("personas", {})
+    if isinstance(personas, dict):
+        persona_items: list[tuple[str, Any]]
+        if any(str(key) in card["personas"] for key in personas):
+            persona_items = [(key, personas.get(key, {})) for key in card["personas"]]
+        else:
+            persona_items = list(personas.items())[: len(card["personas"])]
+
+        for slot, item in zip(card["personas"], persona_items):
+            source_key, value = item
+            if isinstance(value, dict):
+                source_name = str(source_key).strip()
+                raw_name = str(value.get("name", "")).strip()
+                display_name = raw_name or source_name
+                if not display_name or re.fullmatch(r"[A-Z]", display_name):
+                    extracted_name = extract_persona_name_from_fields(
+                        str(value.get("description", "")).strip(),
+                        str(value.get("scenario", "")).strip(),
+                        str(value.get("personality", "")).strip(),
+                    )
+                    if extracted_name:
+                        display_name = extracted_name
+                    elif source_name and source_name not in {"1", "2", "3"}:
+                        display_name = source_name
+                card["personas"][slot]["name"] = display_name
+                card["personas"][slot]["description"] = str(value.get("description", "")).strip()
+                card["personas"][slot]["personality"] = str(value.get("personality", "")).strip()
+                card["personas"][slot]["scenario"] = str(value.get("scenario", "")).strip()
+                card["personas"][slot]["creator_notes"] = str(value.get("creator_notes", "")).strip()
+
+    return card
+
+
+def extract_persona_name_from_fields(*texts: str) -> str:
+    patterns = [
+        r"姓名[：:]\s*([^\n（(，,。；;]{1,16})",
+        r"名为([^\n（(，,。；;]{1,16})",
+        r"^([^\n（(，,。；;]{1,16})（",
+        r"^([^\n（(，,。；;]{1,16})，",
+    ]
+    for text in texts:
+        content = str(text or "").strip()
+        if not content:
+            continue
+        for pattern in patterns:
+            match = re.search(pattern, content, re.MULTILINE)
+            if match:
+                return match.group(1).strip()
+    return ""
+
+def is_legacy_demo_reply(content: str) -> bool:
+    text = str(content or "").strip()
+    if not text:
+        return False
+
+    markers = [
+        "收到啦：",
+        "我现在处于本地演示模式",
+        "Config 页面填写聊天模型",
+        "鏀跺埌鍟",
+        "鏈湴演示模式",
+        "Config 椤甸潰",
+    ]
+    return any(marker in text for marker in markers)
+
+
+def is_garbled_placeholder_message(content: str) -> bool:
+    text = str(content or "").strip()
+    if len(text) < 3:
+        return False
+    return set(text) <= {"?", "？"}
+
+
+def sanitize_conversation(raw: Any) -> list[dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+
+    cleaned: list[dict[str, Any]] = []
+    changed = False
+    skip_next_assistant = False
+
+    for item in raw:
+        if not isinstance(item, dict):
+            changed = True
+            continue
+
+        role = str(item.get("role", "")).strip()
+        content = str(item.get("content", ""))
+        created_at = str(item.get("created_at", "")).strip()
+
+        if role not in {"user", "assistant", "system"}:
+            changed = True
+            continue
+
+        if role == "assistant" and skip_next_assistant:
+            changed = True
+            skip_next_assistant = False
+            continue
+
+        if role == "user" and is_garbled_placeholder_message(content):
+            changed = True
+            skip_next_assistant = True
+            continue
+
+        if role == "assistant" and is_legacy_demo_reply(content):
+            changed = True
+            continue
+
+        cleaned.append(
+            {
+                "role": role,
+                "content": content,
+                "created_at": created_at,
+            }
+        )
+
+    if changed:
+        logger.info("检测到旧演示消息，已从聊天记录中过滤。")
+    return cleaned
+
+
+def slot_looks_uninitialized(slot_id: str) -> bool:
+    return (
+        get_persona(slot_id) == DEFAULT_PERSONA
+        and get_conversation(slot_id) == []
+        and get_settings(slot_id) == sanitize_settings(DEFAULT_SETTINGS, slot_id=slot_id)
+        and get_memories(slot_id) == []
+        and get_memory_tombstones(slot_id) == []
+        and get_worldbook(slot_id) == {}
+        and read_json(current_card_path(slot_id), {}) == {}
+    )
+
+
+def has_legacy_root_data() -> bool:
+    return any(
+        path.exists()
+        for path in (
+            LEGACY_PERSONA_PATH,
+            LEGACY_CONVERSATION_PATH,
+            LEGACY_SETTINGS_PATH,
+            LEGACY_MEMORIES_PATH,
+            LEGACY_WORLDBOOK_PATH,
+            LEGACY_CURRENT_CARD_PATH,
+        )
+    )
+
+
+def migrate_legacy_root_to_primary_slot() -> None:
+    if SLOT_MIGRATION_MARKER_PATH.exists():
+        return
+    if not has_legacy_root_data():
+        SLOT_MIGRATION_MARKER_PATH.write_text("no-legacy-data", encoding="utf-8")
+        return
+    if not slot_looks_uninitialized(DEFAULT_SLOT_IDS[0]):
+        SLOT_MIGRATION_MARKER_PATH.write_text("slot-1-already-in-use", encoding="utf-8")
+        return
+
+    persist_json(
+        persona_path(DEFAULT_SLOT_IDS[0]),
+        read_json(LEGACY_PERSONA_PATH, DEFAULT_PERSONA),
+        detail="旧版 persona 迁移失败，请检查磁盘空间或文件权限。",
+    )
+    persist_json(
+        conversation_path(DEFAULT_SLOT_IDS[0]),
+        sanitize_conversation(read_json(LEGACY_CONVERSATION_PATH, [])),
+        detail="旧版聊天记录迁移失败，请检查磁盘空间或文件权限。",
+    )
+    persist_json(
+        settings_path(DEFAULT_SLOT_IDS[0]),
+        sanitize_settings(read_json(LEGACY_SETTINGS_PATH, {}), slot_id=DEFAULT_SLOT_IDS[0]),
+        detail="旧版 settings 迁移失败，请检查磁盘空间或文件权限。",
+    )
+    persist_json(
+        memories_path(DEFAULT_SLOT_IDS[0]),
+        sanitize_memories(read_json(LEGACY_MEMORIES_PATH, [])),
+        detail="旧版记忆库迁移失败，请检查磁盘空间或文件权限。",
+    )
+    persist_json(
+        worldbook_path(DEFAULT_SLOT_IDS[0]),
+        sanitize_worldbook(read_json(LEGACY_WORLDBOOK_PATH, {})),
+        detail="旧版世界书迁移失败，请检查磁盘空间或文件权限。",
+    )
+    persist_json(
+        current_card_path(DEFAULT_SLOT_IDS[0]),
+        read_json(LEGACY_CURRENT_CARD_PATH, {}),
+        detail="旧版角色卡迁移失败，请检查磁盘空间或文件权限。",
+    )
+    SLOT_MIGRATION_MARKER_PATH.write_text("migrated-slot-1", encoding="utf-8")
+    logger.info("已将旧版 data 根目录内容迁移到 slot_1。")
+
+
+def ensure_data_files() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    SLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    STATIC_DIR.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SPRITES_DIR.mkdir(parents=True, exist_ok=True)
+    CARDS_DIR.mkdir(parents=True, exist_ok=True)
+    if not SLOT_META_PATH.exists():
+        write_json(SLOT_META_PATH, default_slot_registry())
+
+    registry = get_slot_registry()
+    if registry != read_json(SLOT_META_PATH, default_slot_registry()):
+        write_json(SLOT_META_PATH, registry)
+
+    for slot_id in DEFAULT_SLOT_IDS:
+        slot_dir = get_slot_dir(slot_id)
+        slot_dir.mkdir(parents=True, exist_ok=True)
+        sprite_dir_path(slot_id).mkdir(parents=True, exist_ok=True)
+        if not persona_path(slot_id).exists():
+            write_json(persona_path(slot_id), DEFAULT_PERSONA)
+        if not conversation_path(slot_id).exists():
+            write_json(conversation_path(slot_id), [])
+        if not settings_path(slot_id).exists():
+            write_json(settings_path(slot_id), sanitize_settings(DEFAULT_SETTINGS, slot_id=slot_id))
+        else:
+            raw_settings = read_json(settings_path(slot_id), {})
+            normalized_settings = sanitize_settings(raw_settings, slot_id=slot_id)
+            if normalized_settings != raw_settings:
+                write_json(settings_path(slot_id), normalized_settings)
+        if not memories_path(slot_id).exists():
+            write_json(memories_path(slot_id), [])
+        if not memory_tombstones_path(slot_id).exists():
+            write_json(memory_tombstones_path(slot_id), [])
+        if not worldbook_path(slot_id).exists():
+            write_json(worldbook_path(slot_id), {})
+        if not current_card_path(slot_id).exists():
+            write_json(current_card_path(slot_id), {})
+    migrate_legacy_root_to_primary_slot()
+
+
+def get_persona(slot_id: str | None = None) -> dict[str, Any]:
+    persona = DEFAULT_PERSONA.copy()
+    persona.update(read_json(persona_path(slot_id), {}))
+    return persona
+
+
+def get_conversation(slot_id: str | None = None) -> list[dict[str, Any]]:
+    path = conversation_path(slot_id)
+    history = sanitize_conversation(read_json(path, []))
+    stored = read_json(path, [])
+    if history != stored:
+        persist_json(
+            path,
+            history,
+            detail="聊天记录整理失败，请检查磁盘空间或文件权限。",
+        )
+    return history
+
+
+def get_settings(slot_id: str | None = None) -> dict[str, Any]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    return sanitize_settings(read_json(settings_path(target), {}), slot_id=target)
+
+
+def normalize_memory_match_text(value: Any) -> str:
+    text = unicodedata.normalize("NFKC", str(value or ""))
+    text = text.strip().lower()
+    text = re.sub(r"\s+", "", text)
+    return "".join(char for char in text if char.isalnum() or ("一" <= char <= "龥"))
+
+
+def memory_similarity_score(first: Any, second: Any) -> float:
+    left = normalize_memory_match_text(first)
+    right = normalize_memory_match_text(second)
+    if not left or not right:
+        return 0.0
+    return difflib.SequenceMatcher(None, left, right).ratio()
+
+
+def is_similar_memory(first: dict[str, Any], second: dict[str, Any]) -> bool:
+    if not isinstance(first, dict) or not isinstance(second, dict):
+        return False
+    if first.get("id") and second.get("id") and str(first["id"]).strip() == str(second["id"]).strip():
+        return True
+
+    title_score = memory_similarity_score(first.get("title", ""), second.get("title", ""))
+    content_score = memory_similarity_score(first.get("content", ""), second.get("content", ""))
+    if content_score >= 0.88:
+        return True
+    if title_score >= 0.72 and content_score >= 0.72:
+        return True
+    return False
+
+
+def find_similar_memory(memories: list[dict[str, Any]], candidate: dict[str, Any]) -> dict[str, Any] | None:
+    for item in sanitize_memories(memories):
+        if is_similar_memory(item, candidate):
+            return item
+    return None
+
+
+def deduplicate_memories(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sanitized = sanitize_memories(items)
+    deduped_reversed: list[dict[str, Any]] = []
+    for item in reversed(sanitized):
+        if any(is_similar_memory(item, existing) for existing in deduped_reversed):
+            continue
+        deduped_reversed.append(item)
+    deduped_reversed.reverse()
+    return deduped_reversed
+
+
+def get_memories(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return sanitize_memories(read_json(memories_path(slot_id), []))
+
+
+def get_memory_tombstones(slot_id: str | None = None) -> list[dict[str, Any]]:
+    return sanitize_memory_tombstones(read_json(memory_tombstones_path(slot_id), []))
+
+
+def get_worldbook(slot_id: str | None = None) -> dict[str, str]:
+    return sanitize_worldbook(read_json(worldbook_path(slot_id), {}))
+
+
+def save_memories(items: list[dict[str, Any]], slot_id: str | None = None) -> list[dict[str, Any]]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    previous = get_memories(target)
+    sanitized = deduplicate_memories(items)
+    persist_json(
+        memories_path(target),
+        sanitized,
+        detail="记忆库保存失败，请检查磁盘空间或文件权限。",
+    )
+    sync_memory_tombstones(previous, sanitized, slot_id=target)
+    return sanitized
+
+
+def save_memory_tombstones(items: list[dict[str, Any]], slot_id: str | None = None) -> list[dict[str, Any]]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    sanitized = sanitize_memory_tombstones(items)
+    persist_json(
+        memory_tombstones_path(target),
+        sanitized,
+        detail="记忆删除记录保存失败，请检查磁盘空间或文件权限。",
+    )
+    return sanitized
+
+
+def sync_memory_tombstones(
+    previous_memories: list[dict[str, Any]],
+    current_memories: list[dict[str, Any]],
+    *,
+    slot_id: str | None = None,
+) -> list[dict[str, Any]]:
+    target = sanitize_slot_id(slot_id, get_active_slot_id())
+    previous = sanitize_memories(previous_memories)
+    current = sanitize_memories(current_memories)
+    existing_tombstones = get_memory_tombstones(target)
+
+    current_ids = {str(item.get("id", "")).strip() for item in current if str(item.get("id", "")).strip()}
+    removed = [
+        {**item, "deleted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        for item in previous
+        if str(item.get("id", "")).strip() and str(item.get("id", "")).strip() not in current_ids
+    ]
+
+    kept_tombstones = [
+        tombstone
+        for tombstone in existing_tombstones
+        if not any(is_similar_memory(tombstone, memory) for memory in current)
+    ]
+    combined = removed + kept_tombstones
+    return save_memory_tombstones(combined[:SUMMARY_MAX_TOMBSTONES], target)
+
+
+def save_worldbook(entries: dict[str, str], slot_id: str | None = None) -> dict[str, str]:
+    sanitized = sanitize_worldbook(entries)
+    persist_json(
+        worldbook_path(slot_id),
+        sanitized,
+        detail="世界书保存失败，请检查磁盘空间或文件权限。",
+    )
+    return sanitized
+
+
+def get_current_card(slot_id: str | None = None) -> dict[str, Any]:
+    data = read_json(current_card_path(slot_id), {})
+    if not isinstance(data, dict):
+        return {"source_name": "", "raw": default_role_card()}
+    return {
+        "source_name": str(data.get("source_name", "")).strip(),
+        "raw": normalize_role_card(data.get("raw", {})),
+    }
+
+def list_role_card_files() -> list[dict[str, str]]:
+    cards: list[dict[str, str]] = []
+    for path in sorted(CARDS_DIR.glob("*.json")):
+        cards.append({"filename": path.name, "path": str(path)})
+    return cards
+
+
+def read_role_card_text(path: Path) -> str:
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "utf-16"):
+        try:
+            return path.read_text(encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail="角色卡文件读取失败。") from exc
+    raise HTTPException(status_code=400, detail="角色卡文件编码无法识别，请改成 UTF-8 或 UTF-8 with BOM。")
+
+
+def repair_deepseek_card_json(text: str) -> str:
+    repaired = text.strip()
+    if not repaired:
+        return repaired
+
+    if not repaired.startswith("{"):
+        repaired = "{\n" + repaired
+
+    if not repaired.endswith("}"):
+        repaired = repaired.rstrip(", \r\n\t") + "\n}"
+
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+
+    marker = '"plotStages"'
+    if marker in repaired:
+        marker_index = repaired.find(marker)
+        close_index = repaired.rfind("}", 0, marker_index)
+        open_index = repaired.rfind("{", 0, marker_index)
+        if close_index != -1 and open_index != -1 and close_index > open_index:
+            repaired = repaired[:close_index] + repaired[close_index + 1 :]
+            repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+
+    return repaired
+
+
+def extract_role_card_payload(data: Any) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return {}
+
+    candidate = data
+    if isinstance(data.get("data"), dict):
+        candidate = data["data"]
+    else:
+        for value in data.values():
+            if isinstance(value, dict) and isinstance(value.get("data"), dict):
+                candidate = value["data"]
+                break
+
+    if not isinstance(candidate, dict):
+        return {}
+
+    merged = dict(candidate)
+    for key in ["name", "description", "personality", "first_mes", "mes_example", "scenario", "creator_notes", "tags", "plotStages", "personas"]:
+        if not merged.get(key) and data.get(key):
+            merged[key] = data.get(key)
+
+    return merged
+
+
+def parse_role_card_json(text: str) -> dict[str, Any]:
+    raw = text.strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="??? JSON ?????")
+
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        repaired = repair_deepseek_card_json(raw)
+        try:
+            data = json.loads(repaired)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"??? JSON ?????{exc}") from exc
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="??? JSON ????????")
+    return normalize_role_card(extract_role_card_payload(data))
+
+def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
+    sections: list[str] = []
+
+    description = str(card.get("description", "")).strip()
+    personality = str(card.get("personality", "")).strip()
+    scenario = str(card.get("scenario", "")).strip()
+    creator_notes = str(card.get("creator_notes", "")).strip()
+    mes_example = str(card.get("mes_example", "")).strip()
+
+    if description:
+        sections.append(f"Character Description: {description}")
+    if personality:
+        sections.append(f"Personality: {personality}")
+    if scenario:
+        sections.append(f"Scenario: {scenario}")
+    if creator_notes:
+        sections.append(f"Creator Notes: {creator_notes}")
+    if mes_example:
+        sections.append(f"Dialogue Example: {mes_example}")
+
+    plot_stages = card.get("plotStages", {})
+    if isinstance(plot_stages, dict):
+        stage_lines = []
+        for key, value in plot_stages.items():
+            if not isinstance(value, dict):
+                continue
+            desc = str(value.get("description", "")).strip()
+            rules = str(value.get("rules", "")).strip()
+            if desc or rules:
+                line = f"Stage {key}"
+                if desc:
+                    line += f": {desc}"
+                if rules:
+                    line += f"; Rules: {rules}"
+                stage_lines.append(line)
+        if stage_lines:
+            sections.append("Plot Stages:\n" + "\n".join(stage_lines))
+
+    personas = card.get("personas", {})
+    if isinstance(personas, dict):
+        persona_lines = []
+        for key, value in personas.items():
+            if not isinstance(value, dict):
+                continue
+            name = str(value.get("name", "")).strip() or f"Persona {key}"
+            desc = str(value.get("description", "")).strip()
+            personality_text = str(value.get("personality", "")).strip()
+            scenario_text = str(value.get("scenario", "")).strip()
+            details = [item for item in [desc, personality_text, scenario_text] if item]
+            if details:
+                persona_lines.append(f"{name}: {'; '.join(details)}")
+        if persona_lines:
+            sections.append(
+                "Multi-Character Cast Rules:\n"
+                "This role card contains multiple active characters.\n"
+                "When the scene fits, any of them may appear and speak in the same conversation.\n"
+                "Keep each character's name exactly as listed.\n"
+                "Do not merge different characters into one voice.\n"
+                "Write each speaker in separate paragraphs."
+            )
+            sections.append("Character Cast:\n" + "\n".join(persona_lines))
+
+    return {
+        "name": str(card.get("name", "")).strip() or "Unnamed Character",
+        "greeting": str(card.get("first_mes", "")).strip() or "Hello, let's start chatting.",
+        "system_prompt": "\n\n".join(section for section in sections if section).strip(),
+    }
+
+def build_memories_from_role_card(card: dict[str, Any]) -> list[dict[str, Any]]:
+    memories: list[dict[str, Any]] = []
+
+    tags = sanitize_tags(card.get("tags", []))
+    base_content = "\n".join(
+        part
+        for part in [
+            str(card.get("description", "")).strip(),
+            str(card.get("personality", "")).strip(),
+            str(card.get("scenario", "")).strip(),
+        ]
+        if part
+    ).strip()
+    if base_content:
+        memories.append(
+            {
+                "id": "card-base",
+                "title": str(card.get("name", "")).strip() or "角色基础设定",
+                "content": base_content,
+                "tags": tags,
+                "notes": str(card.get("creator_notes", "")).strip(),
+            }
+        )
+
+    plot_stages = card.get("plotStages", {})
+    if isinstance(plot_stages, dict):
+        for key, value in plot_stages.items():
+            if not isinstance(value, dict):
+                continue
+            content = "\n".join(
+                part
+                for part in [
+                    str(value.get("description", "")).strip(),
+                    str(value.get("rules", "")).strip(),
+                ]
+                if part
+            ).strip()
+            if content:
+                memories.append(
+                    {
+                        "id": f"plot-stage-{key}",
+                        "title": f"剧情阶段 {key}",
+                        "content": content,
+                        "tags": ["plotStage", key],
+                        "notes": "",
+                    }
+                )
+
+    personas = card.get("personas", {})
+    if isinstance(personas, dict):
+        for key, value in personas.items():
+            if not isinstance(value, dict):
+                continue
+            content = "\n".join(
+                part
+                for part in [
+                    str(value.get("description", "")).strip(),
+                    str(value.get("personality", "")).strip(),
+                    str(value.get("scenario", "")).strip(),
+                ]
+                if part
+            ).strip()
+            if content:
+                memories.append(
+                    {
+                        "id": f"persona-{key}",
+                        "title": str(value.get("name", "")).strip() or f"角色 {key}",
+                        "content": content,
+                        "tags": ["persona", key],
+                        "notes": str(value.get("creator_notes", "")).strip(),
+                    }
+                )
+
+    return sanitize_memories(memories)
+
+
+def apply_role_card(card: dict[str, Any], *, source_name: str = "", slot_id: str | None = None) -> dict[str, Any]:
+    normalized_card = normalize_role_card(card)
+    persona = build_persona_from_role_card(normalized_card)
+    target_slot = sanitize_slot_id(slot_id, get_active_slot_id())
+
+    persist_json(
+        persona_path(target_slot),
+        persona,
+        detail="???????????? persona.json?",
+    )
+    persist_json(
+        memories_path(target_slot),
+        [],
+        detail="????????????????",
+    )
+    persist_json(
+        worldbook_path(target_slot),
+        {},
+        detail="????????????????",
+    )
+
+    current_card = {
+        "source_name": source_name,
+        "raw": normalized_card,
+    }
+    persist_json(
+        current_card_path(target_slot),
+        current_card,
+        detail="????????????????????",
+    )
+
+    return {
+        "persona": persona,
+        "card": current_card,
+    }
+
+
+def sanitize_runtime_overrides(raw: dict[str, Any] | None) -> dict[str, Any]:
+    source = raw if isinstance(raw, dict) else {}
+    default_sprite_path = default_sprite_base_path_for_slot(get_active_slot_id())
+    sprite_base_path = str(source.get("sprite_base_path", default_sprite_path)).strip() or default_sprite_path
+    if sprite_base_path == DEFAULT_SPRITE_BASE_PATH:
+        sprite_base_path = default_sprite_path
+    return {
+        "llm_base_url": str(source.get("llm_base_url", "")).strip(),
+        "llm_api_key": str(source.get("llm_api_key", "")).strip(),
+        "llm_model": str(source.get("llm_model", "")).strip(),
+        "temperature": clamp_float(source.get("temperature"), 0.0, 2.0, 0.85),
+        "history_limit": clamp_int(source.get("history_limit"), 1, 100, 20),
+        "request_timeout": clamp_int(source.get("request_timeout"), 10, 600, 120),
+        "demo_mode": parse_bool(source.get("demo_mode"), False),
+        "embedding_base_url": str(source.get("embedding_base_url", "")).strip(),
+        "embedding_api_key": str(source.get("embedding_api_key", "")).strip(),
+        "embedding_model": str(source.get("embedding_model", "")).strip(),
+        "embedding_fields": sanitize_embedding_fields(source.get("embedding_fields")),
+        "retrieval_top_k": clamp_int(source.get("retrieval_top_k"), 1, 12, 4),
+        "rerank_enabled": parse_bool(source.get("rerank_enabled"), False),
+        "rerank_base_url": str(source.get("rerank_base_url", "")).strip(),
+        "rerank_api_key": str(source.get("rerank_api_key", "")).strip(),
+        "rerank_model": str(source.get("rerank_model", "")).strip(),
+        "rerank_top_n": clamp_int(source.get("rerank_top_n"), 1, 12, 3),
+        "sprite_enabled": parse_bool(source.get("sprite_enabled"), True),
+        "sprite_base_path": sprite_base_path,
+    }
+
+
+def resolve_runtime_value(override_value: Any, stored_value: Any, env_key: str | None = None) -> Any:
+    if isinstance(override_value, str):
+        if override_value.strip():
+            return override_value.strip()
+    elif override_value is not None:
+        return override_value
+
+    if isinstance(stored_value, str):
+        if stored_value.strip():
+            return stored_value.strip()
+    elif stored_value is not None:
+        return stored_value
+
+    if env_key:
+        return os.getenv(env_key, "").strip()
+    return stored_value
+
+
+def get_runtime_chat_config(runtime_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    settings = get_settings()
+    overrides = sanitize_runtime_overrides(runtime_overrides)
+    return {
+        "base_url": resolve_runtime_value(overrides.get("llm_base_url"), settings.get("llm_base_url", ""), "LLM_BASE_URL"),
+        "api_key": resolve_runtime_value(overrides.get("llm_api_key"), settings.get("llm_api_key", ""), "LLM_API_KEY"),
+        "model": resolve_runtime_value(overrides.get("llm_model"), settings.get("llm_model", ""), "LLM_MODEL"),
+        "temperature": overrides.get("temperature") if runtime_overrides else settings.get("temperature", 0.85),
+        "history_limit": overrides.get("history_limit") if runtime_overrides else settings.get("history_limit", 20),
+        "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
+        "demo_mode": overrides.get("demo_mode") if runtime_overrides else settings.get("demo_mode", False),
+        "sprite_enabled": overrides.get("sprite_enabled") if runtime_overrides else settings.get("sprite_enabled", True),
+        "sprite_base_path": overrides.get("sprite_base_path") if runtime_overrides else settings.get("sprite_base_path", DEFAULT_SPRITE_BASE_PATH),
+    }
+
+
+def get_runtime_embedding_config(runtime_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    settings = get_settings()
+    overrides = sanitize_runtime_overrides(runtime_overrides)
+    return {
+        "base_url": resolve_runtime_value(overrides.get("embedding_base_url"), settings.get("embedding_base_url", ""), "EMBEDDING_BASE_URL"),
+        "api_key": resolve_runtime_value(overrides.get("embedding_api_key"), settings.get("embedding_api_key", ""), "EMBEDDING_API_KEY"),
+        "model": resolve_runtime_value(overrides.get("embedding_model"), settings.get("embedding_model", ""), "EMBEDDING_MODEL"),
+        "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
+        "fields": overrides.get("embedding_fields") if runtime_overrides else settings.get("embedding_fields", DEFAULT_SETTINGS["embedding_fields"]),
+        "top_k": overrides.get("retrieval_top_k") if runtime_overrides else settings.get("retrieval_top_k", 4),
+    }
+
+
+def get_runtime_rerank_config(runtime_overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    settings = get_settings()
+    overrides = sanitize_runtime_overrides(runtime_overrides)
+    return {
+        "enabled": overrides.get("rerank_enabled") if runtime_overrides else settings.get("rerank_enabled", False),
+        "base_url": resolve_runtime_value(overrides.get("rerank_base_url"), settings.get("rerank_base_url", ""), "RERANK_BASE_URL"),
+        "api_key": resolve_runtime_value(overrides.get("rerank_api_key"), settings.get("rerank_api_key", ""), "RERANK_API_KEY"),
+        "model": resolve_runtime_value(overrides.get("rerank_model"), settings.get("rerank_model", ""), "RERANK_MODEL"),
+        "request_timeout": overrides.get("request_timeout") if runtime_overrides else settings.get("request_timeout", 120),
+        "top_n": overrides.get("rerank_top_n") if runtime_overrides else settings.get("rerank_top_n", 3),
+    }
+
+
+def append_messages(entries: list[tuple[str, str]]) -> None:
+    history = get_conversation()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for role, content in entries:
+        history.append(
+            {
+                "role": role,
+                "content": content,
+                "created_at": timestamp,
+            }
+        )
+
+    persist_json(
+        conversation_path(),
+        history,
+        detail="聊天记录保存失败，请检查磁盘空间或文件权限。",
+    )
+
+
+def build_memory_text(memory: dict[str, Any], fields: list[str]) -> str:
+    parts: list[str] = []
+    if "title" in fields and memory.get("title"):
+        parts.append(f"标题：{memory['title']}")
+    if "content" in fields and memory.get("content"):
+        parts.append(f"正文：{memory['content']}")
+    if "tags" in fields and memory.get("tags"):
+        parts.append(f"标签：{'、'.join(memory['tags'])}")
+    if "notes" in fields and memory.get("notes"):
+        parts.append(f"备注：{memory['notes']}")
+    return "\n".join(parts).strip()
+
+
+def normalize_base_url(base_url: str) -> str:
+    return base_url.strip().rstrip("/")
+
+
+def build_api_url(base_url: str, endpoint: str) -> str:
+    clean_base = normalize_base_url(base_url)
+    clean_endpoint = endpoint.strip("/")
+    if not clean_base:
+        return ""
+    if clean_base.endswith("/" + clean_endpoint) or clean_base.endswith(clean_endpoint):
+        return clean_base
+    return f"{clean_base}/{clean_endpoint}"
+
+
+def build_headers(api_key: str) -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    if api_key.strip():
+        headers["Authorization"] = f"Bearer {api_key.strip()}"
+    return headers
+
+
+async def request_json(
+    *,
+    url: str,
+    api_key: str,
+    payload: dict[str, Any],
+    request_timeout: int,
+) -> dict[str, Any]:
+    last_error: Exception | None = None
+
+    for attempt in range(1, REQUEST_RETRY_ATTEMPTS + 1):
+        try:
+            async with httpx.AsyncClient(timeout=float(request_timeout)) as client:
+                response = await client.post(url, headers=build_headers(api_key), json=payload)
+                response.raise_for_status()
+
+            try:
+                return response.json()
+            except ValueError as exc:
+                last_error = exc
+                logger.warning(
+                    "Upstream JSON parse failed on attempt %s/%s for %s",
+                    attempt,
+                    REQUEST_RETRY_ATTEMPTS,
+                    url,
+                )
+        except httpx.HTTPError as exc:
+            last_error = exc
+            logger.warning(
+                "Upstream request failed on attempt %s/%s for %s: %s",
+                attempt,
+                REQUEST_RETRY_ATTEMPTS,
+                url,
+                exc,
+            )
+
+        if attempt < REQUEST_RETRY_ATTEMPTS:
+            await asyncio.sleep(REQUEST_RETRY_BASE_DELAY_SECONDS * attempt)
+
+    if isinstance(last_error, ValueError):
+        raise HTTPException(status_code=502, detail="模型返回的不是合法 JSON") from last_error
+
+    raise HTTPException(status_code=502, detail=f"模型请求失败: {last_error}") from last_error
+
+
+async def fetch_embeddings(texts: list[str], runtime_overrides: dict[str, Any] | None = None) -> list[list[float]]:
+    embedding = get_runtime_embedding_config(runtime_overrides)
+    if not (embedding["base_url"] and embedding["model"]):
+        return []
+
+    url = build_api_url(embedding["base_url"], "embeddings")
+    payload = {"model": embedding["model"], "input": texts}
+    data = await request_json(
+        url=url,
+        api_key=embedding["api_key"],
+        payload=payload,
+        request_timeout=int(embedding["request_timeout"]),
+    )
+
+    rows = data.get("data", [])
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=502, detail="嵌入模型返回格式不正确")
+
+    vectors: list[list[float]] = []
+    for row in rows:
+        vector = row.get("embedding", []) if isinstance(row, dict) else []
+        if not isinstance(vector, list):
+            raise HTTPException(status_code=502, detail="嵌入模型返回格式不正确")
+        vectors.append([float(value) for value in vector])
+    return vectors
+
+
+def cosine_similarity(left: list[float], right: list[float]) -> float:
+    if not left or not right or len(left) != len(right):
+        return 0.0
+
+    dot = sum(l * r for l, r in zip(left, right))
+    left_norm = sum(value * value for value in left) ** 0.5
+    right_norm = sum(value * value for value in right) ** 0.5
+    if left_norm == 0 or right_norm == 0:
+        return 0.0
+    return dot / (left_norm * right_norm)
+
+
+async def rerank_documents(
+    query: str,
+    documents: list[dict[str, Any]],
+    runtime_overrides: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    rerank = get_runtime_rerank_config(runtime_overrides)
+    if not rerank["enabled"] or not documents:
+        return documents
+    if not (rerank["base_url"] and rerank["model"]):
+        return documents
+
+    url = build_api_url(rerank["base_url"], "rerank")
+    payload = {
+        "model": rerank["model"],
+        "query": query,
+        "documents": [item["text"] for item in documents],
+        "top_n": min(int(rerank["top_n"]), len(documents)),
+    }
+    data = await request_json(
+        url=url,
+        api_key=rerank["api_key"],
+        payload=payload,
+        request_timeout=int(rerank["request_timeout"]),
+    )
+
+    results = data.get("results") or data.get("data") or []
+    if not isinstance(results, list):
+        logger.warning("重排序模型返回了非列表结果，回退原始召回结果。")
+        return documents
+
+    reranked: list[dict[str, Any]] = []
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        index = item.get("index")
+        if not isinstance(index, int) or not (0 <= index < len(documents)):
+            continue
+        updated = documents[index].copy()
+        updated["score"] = round(float(item.get("relevance_score", item.get("score", 0.0))), 4)
+        reranked.append(updated)
+
+    return reranked or documents
+
+
+def _deprecated_match_worldbook_entries(query: str) -> list[dict[str, str]]:
+    text = str(query or "").strip()
+    if not text:
+        return []
+
+    normalized_query = normalize_match_text(text)
+    hits: list[dict[str, str]] = []
+    for trigger, content in get_worldbook().items():
+        aliases = [part.strip() for part in re.split(r"[|,，、\n]+", trigger) if part.strip()]
+        matched_aliases = [alias for alias in aliases if normalize_match_text(alias) in normalized_query]
+        if matched_aliases:
+            hits.append(
+                {
+                    "trigger": trigger,
+                    "content": content,
+                    "matched": " / ".join(matched_aliases),
+                }
+            )
+    return hits
+
+
+def split_trigger_aliases(trigger: Any) -> list[str]:
+    text = unicodedata.normalize("NFKC", str(trigger or ""))
+    aliases = [part.strip() for part in re.split(r"[|,，、/\n]+", text) if part.strip()]
+    return aliases or ([text.strip()] if text.strip() else [])
+
+
+def match_worldbook_entries(query: str) -> list[dict[str, str]]:
+    text = str(query or "").strip()
+    if not text:
+        return []
+
+    normalized_query = normalize_match_text(text)
+    hits: list[dict[str, str]] = []
+    for trigger, content in get_worldbook().items():
+        aliases = split_trigger_aliases(trigger)
+        matched_aliases: list[str] = []
+        for alias in aliases:
+            normalized_alias = normalize_match_text(alias)
+            if normalized_alias and normalized_alias in normalized_query:
+                matched_aliases.append(alias)
+
+        if matched_aliases:
+            hits.append(
+                {
+                    "trigger": trigger,
+                    "content": content,
+                    "matched": " / ".join(matched_aliases),
+                }
+            )
+
+    if hits:
+        logger.info("世界书命中：%s", ", ".join(item["matched"] for item in hits))
+    return hits
+
+
+def build_worldbook_prompt(matches: list[dict[str, str]]) -> str:
+    if not matches:
+        return ""
+
+    blocks = [
+        "以下是本轮消息命中的世界书设定补丁。",
+        "这些内容属于当前对话的高优先级事实背景。",
+        "如果用户正在询问这些词条本身，你必须优先直接依据这些设定回答，不要回避，不要装作不知道，也不要被其他闲聊语气盖过去。",
+        "回答时不要提及你看到了世界书或设定补丁，只需要自然地把事实说出来。",
+    ]
+    for index, item in enumerate(matches, start=1):
+        matched = item.get("matched", "")
+        lines = [f"{index}. 触发词：{item['trigger']}"]
+        if matched:
+            lines.append(f"本轮命中：{matched}")
+        lines.append(f"设定：{item['content']}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def build_worldbook_answer_guard(user_message: str, matches: list[dict[str, str]]) -> str:
+    if not matches:
+        return ""
+
+    text = str(user_message or "").strip()
+    if not text:
+        return ""
+
+    direct_question_markers = ("是", "什么", "谁", "叫做", "介绍", "解释", "？", "?")
+    if not any(marker in text for marker in direct_question_markers):
+        return ""
+
+    primary_match = matches[0]
+    subject = primary_match.get("matched") or primary_match.get("trigger") or "该词条"
+    fact = primary_match.get("content", "").strip()
+    if not fact:
+        return ""
+
+    return (
+        f"本轮用户正在直接询问“{subject}”的含义或身份。"
+        f"你的回答第一句必须先直接说出核心事实，例如：{fact}。"
+        "先直答，再继续保持角色语气补充，不要先吃醋、回避或装作不知道。"
+    )
+
+
+def enforce_worldbook_fact_in_reply(
+    user_message: str,
+    reply_text: str,
+    matches: list[dict[str, str]],
+) -> str:
+    if not matches:
+        return reply_text
+
+    text = str(reply_text or "").strip()
+    if not text:
+        return text
+
+    direct_question_markers = ("是", "什么", "谁", "叫做", "介绍", "解释", "？", "?")
+    if not any(marker in str(user_message or "") for marker in direct_question_markers):
+        return text
+
+    primary_match = matches[0]
+    subject = str(primary_match.get("matched") or primary_match.get("trigger") or "").strip()
+    fact = str(primary_match.get("content") or "").strip()
+    if not subject or not fact:
+        return text
+
+    normalized_reply = normalize_match_text(text)
+    normalized_subject = normalize_match_text(subject)
+    normalized_fact = normalize_match_text(fact[:48])
+    if (normalized_subject and normalized_subject in normalized_reply) or (
+        normalized_fact and normalized_fact in normalized_reply
+    ):
+        return text
+
+    logger.info("世界书兜底生效：已在回复前补充事实。")
+    return f"{fact}\n\n{text}"
+
+
+def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
+    if not llm_config.get("sprite_enabled", True):
+        return ""
+
+    return (
+        "你每次回复的第一段都必须以 [表情:标签] 开头。"
+        "不允许省略，不允许放到中间。"
+        "标签请尽量简短，例如 害羞、生气、平静、委屈、开心、惊讶。"
+        "标签后再开始正文，不要解释这条规则。"
+    )
+
+
+def extract_sprite_tag(reply_text: str) -> tuple[str, str]:
+    text = str(reply_text or "").strip()
+    if not text:
+        return "", ""
+
+    match = re.match(r"^\s*\[(?:表情|emotion)\s*:\s*([^\]\n]{1,32})\]\s*", text, flags=re.IGNORECASE)
+    if not match:
+        return "", text
+
+    tag = match.group(1).strip()
+    cleaned = text[match.end() :].lstrip()
+    return tag, cleaned
+
+
+def extract_stream_visible_reply(raw_text: str) -> tuple[str, str]:
+    text = str(raw_text or "")
+    if not text:
+        return "", ""
+
+    stripped = text.lstrip()
+    if stripped.startswith("[") and "]" not in stripped[:48]:
+        return "", ""
+
+    tag, cleaned = extract_sprite_tag(text)
+    return tag, cleaned or text
+
+
+async def retrieve_memories(query: str, runtime_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    embedding = get_runtime_embedding_config(runtime_overrides)
+    memories = get_memories()
+    if not memories:
+        return []
+    if not (embedding["base_url"] and embedding["model"]):
+        return []
+
+    documents: list[dict[str, Any]] = []
+    for item in memories:
+        text = build_memory_text(item, list(embedding["fields"]))
+        if text:
+            documents.append({**item, "text": text})
+
+    if not documents:
+        return []
+
+    vectors = await fetch_embeddings([query] + [item["text"] for item in documents], runtime_overrides)
+    expected_count = len(documents) + 1
+    if len(vectors) != expected_count:
+        logger.warning(
+            "嵌入模型返回数量异常，预期 %s，实际 %s，本轮跳过记忆召回。",
+            expected_count,
+            len(vectors),
+        )
+        return []
+
+    query_vector = vectors[0]
+    scored: list[dict[str, Any]] = []
+    for doc, doc_vector in zip(documents, vectors[1:]):
+        scored.append({**doc, "score": round(cosine_similarity(query_vector, doc_vector), 4)})
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    top_k = min(int(embedding["top_k"]), len(scored))
+    selected = scored[:top_k]
+    reranked = await rerank_documents(query, selected, runtime_overrides)
+
+    return [
+        {
+            "id": item["id"],
+            "title": item["title"],
+            "content": item["content"],
+            "tags": item["tags"],
+            "notes": item["notes"],
+            "text": item["text"],
+            "score": item["score"],
+        }
+        for item in reranked
+    ]
+
+
+def build_retrieval_prompt(retrieved_items: list[dict[str, Any]]) -> str:
+    if not retrieved_items:
+        return ""
+
+    blocks = [
+        "以下是与当前消息最相关的长期记忆或资料片段。",
+        "你可以自然参考它们，但不要机械复述，也不要编造没有出现在片段里的细节。",
+    ]
+    for index, item in enumerate(retrieved_items, start=1):
+        title = item.get("title") or f"记忆片段 {index}"
+        blocks.append(f"{index}. {title}\n{item.get('text', '')}")
+    return "\n\n".join(blocks)
+
+
+def build_memory_recap_prompt(memories: list[dict[str, Any]]) -> str:
+    if not memories:
+        return ""
+
+    blocks = [
+        "以下是必须长期记住的前情提要与固定记忆。",
+        "回答时请始终把它们当作持续有效的背景信息，除非用户明确要求推翻或修改其中内容。",
+    ]
+    for index, item in enumerate(memories, start=1):
+        title = str(item.get("title", "")).strip() or f"记忆 {index}"
+        content = str(item.get("content", "")).strip()
+        tags = ", ".join(sanitize_tags(item.get("tags", [])))
+        notes = str(item.get("notes", "")).strip()
+        lines = [f"{index}. {title}"]
+        if content:
+            lines.append(f"正文：{content}")
+        if tags:
+            lines.append(f"标签：{tags}")
+        if notes:
+            lines.append(f"备注：{notes}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def build_deleted_memory_guard(tombstones: list[dict[str, Any]]) -> str:
+    if not tombstones:
+        return ""
+
+    blocks = [
+        "以下内容是用户已经明确删除或作废的旧记忆。",
+        "除非用户重新确认，否则不要把它们当成仍然有效的长期设定，也不要在新的长期记忆总结里把它们自动写回来。",
+    ]
+    for index, item in enumerate(tombstones[:PROMPT_VISIBLE_TOMBSTONES], start=1):
+        title = str(item.get("title", "")).strip() or f"已删除记忆 {index}"
+        content = str(item.get("content", "")).strip()
+        lines = [f"{index}. {title}"]
+        if content:
+            lines.append(f"旧内容：{content[:180]}")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def build_messages(
+    user_message: str,
+    retrieved_items: list[dict[str, Any]] | None = None,
+    *,
+    runtime_overrides: dict[str, Any] | None = None,
+    worldbook_matches: list[dict[str, str]] | None = None,
+) -> list[dict[str, str]]:
+    persona = get_persona()
+    history = get_conversation()
+    memories = get_memories()
+    deleted_memories = get_memory_tombstones()
+    llm_config = get_runtime_chat_config(runtime_overrides)
+    messages: list[dict[str, str]] = []
+
+    system_prompt = persona.get("system_prompt", "").strip()
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+
+    memory_recap_prompt = build_memory_recap_prompt(memories)
+    if memory_recap_prompt:
+        messages.append({"role": "system", "content": memory_recap_prompt})
+
+    deleted_memory_guard = build_deleted_memory_guard(deleted_memories)
+    if deleted_memory_guard:
+        messages.append({"role": "system", "content": deleted_memory_guard})
+
+    worldbook_prompt = build_worldbook_prompt(worldbook_matches or [])
+    if worldbook_prompt:
+        messages.append({"role": "system", "content": worldbook_prompt})
+    worldbook_answer_guard = build_worldbook_answer_guard(user_message, worldbook_matches or [])
+    if worldbook_answer_guard:
+        messages.append({"role": "system", "content": worldbook_answer_guard})
+
+    retrieval_prompt = build_retrieval_prompt(retrieved_items or [])
+    if retrieval_prompt:
+        messages.append({"role": "system", "content": retrieval_prompt})
+
+    sprite_prompt = build_sprite_prompt(llm_config)
+    if sprite_prompt:
+        messages.append({"role": "system", "content": sprite_prompt})
+
+    history_limit = max(1, int(llm_config["history_limit"]))
+    for item in history[-history_limit:]:
+        role = item.get("role", "assistant")
+        content = str(item.get("content", ""))
+        if content:
+            messages.append({"role": role, "content": content})
+
+    messages.append({"role": "user", "content": user_message})
+    return messages
+
+
+async def request_model_reply(
+    user_message: str,
+    retrieved_items: list[dict[str, Any]],
+    *,
+    runtime_overrides: dict[str, Any] | None = None,
+    worldbook_matches: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    llm_config = get_runtime_chat_config(runtime_overrides)
+    url = build_api_url(llm_config["base_url"], "chat/completions")
+    payload = {
+        "model": llm_config["model"],
+        "messages": build_messages(
+            user_message,
+            retrieved_items,
+            runtime_overrides=runtime_overrides,
+            worldbook_matches=worldbook_matches,
+        ),
+        "temperature": llm_config["temperature"],
+    }
+    data = await request_json(
+        url=url,
+        api_key=llm_config["api_key"],
+        payload=payload,
+        request_timeout=int(llm_config["request_timeout"]),
+    )
+
+    try:
+        raw_reply = str(data["choices"][0]["message"]["content"]).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(status_code=502, detail="模型返回格式不正确") from exc
+
+    sprite_tag, cleaned_reply = extract_sprite_tag(raw_reply)
+    reply_source = cleaned_reply or raw_reply
+    final_reply = enforce_worldbook_fact_in_reply(
+        user_message,
+        reply_source,
+        worldbook_matches or [],
+    )
+    worldbook_enforced = final_reply != reply_source
+    if not sprite_tag and llm_config.get("sprite_enabled", True):
+        sprite_tag = "平静"
+    return {
+        "reply": final_reply,
+        "sprite_tag": sprite_tag,
+        "worldbook_enforced": worldbook_enforced,
+    }
+
+
+def build_worldbook_debug_payload(
+    user_message: str,
+    worldbook_matches: list[dict[str, str]],
+    *,
+    reply_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "hit_count": len(worldbook_matches),
+        "prompt": build_worldbook_prompt(worldbook_matches),
+        "guard": build_worldbook_answer_guard(user_message, worldbook_matches),
+        "enforced": bool((reply_result or {}).get("worldbook_enforced")),
+        "matched": worldbook_matches,
+    }
+
+
+async def stream_model_reply(
+    user_message: str,
+    retrieved_items: list[dict[str, Any]],
+    *,
+    runtime_overrides: dict[str, Any] | None = None,
+    worldbook_matches: list[dict[str, str]] | None = None,
+):
+    llm_config = get_runtime_chat_config(runtime_overrides)
+    url = build_api_url(llm_config["base_url"], "chat/completions")
+    payload = {
+        "model": llm_config["model"],
+        "messages": build_messages(
+            user_message,
+            retrieved_items,
+            runtime_overrides=runtime_overrides,
+            worldbook_matches=worldbook_matches,
+        ),
+        "temperature": llm_config["temperature"],
+        "stream": True,
+    }
+
+    accumulated_raw = ""
+    accumulated_visible = ""
+    sprite_tag = ""
+
+    async with httpx.AsyncClient(timeout=float(llm_config["request_timeout"])) as client:
+        async with client.stream("POST", url, headers=build_headers(llm_config["api_key"]), json=payload) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line:
+                    continue
+                if not line.startswith("data:"):
+                    continue
+                data_line = line[5:].strip()
+                if not data_line or data_line == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_line)
+                except ValueError:
+                    continue
+
+                choices = data.get("choices") or []
+                if not isinstance(choices, list) or not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                chunk = delta.get("content")
+                if not isinstance(chunk, str) or not chunk:
+                    continue
+
+                accumulated_raw += chunk
+                parsed_tag, visible_text = extract_stream_visible_reply(accumulated_raw)
+                if parsed_tag and not sprite_tag:
+                    sprite_tag = parsed_tag
+                if len(visible_text) > len(accumulated_visible):
+                    delta_text = visible_text[len(accumulated_visible) :]
+                    accumulated_visible = visible_text
+                    if delta_text:
+                        yield {"type": "chunk", "delta": delta_text}
+
+    reply_result: dict[str, Any] = {
+        "reply": enforce_worldbook_fact_in_reply(
+            user_message,
+            accumulated_visible or accumulated_raw,
+            worldbook_matches or [],
+        ),
+        "sprite_tag": sprite_tag or ("骞抽潤" if llm_config.get("sprite_enabled", True) else ""),
+    }
+    reply_result["worldbook_enforced"] = reply_result["reply"] != (accumulated_visible or accumulated_raw)
+    yield {"type": "done", **reply_result}
+
+
+async def generate_reply(
+    user_message: str,
+    runtime_overrides: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, str]]]:
+    llm_config = get_runtime_chat_config(runtime_overrides)
+    retrieved = await retrieve_memories(user_message, runtime_overrides)
+    worldbook_matches = match_worldbook_entries(user_message)
+
+    if not (llm_config["base_url"] and llm_config["model"]):
+        if not llm_config["demo_mode"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Please configure the chat model API URL and model name first, or enable demo mode.",
+            )
+        return {"reply": "", "sprite_tag": ""}, retrieved, worldbook_matches
+
+    reply = await request_model_reply(
+        user_message,
+        retrieved,
+        runtime_overrides=runtime_overrides,
+        worldbook_matches=worldbook_matches,
+    )
+    return reply, retrieved, worldbook_matches
+
+
+def build_conversation_transcript(history: list[dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for item in history:
+        role = item.get("role", "")
+        content = str(item.get("content", "")).strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        speaker = "User" if role == "user" else "AI"
+        lines.append(f"{speaker}: {content}")
+    return "\n".join(lines)
+
+
+def split_history_for_summary(
+    history: list[dict[str, Any]],
+    *,
+    target_chars: int = SUMMARY_CHUNK_TARGET_CHARS,
+    overlap_messages: int = SUMMARY_CHUNK_OVERLAP_MESSAGES,
+) -> list[list[dict[str, Any]]]:
+    filtered = [
+        item
+        for item in history
+        if item.get("role") in {"user", "assistant"} and str(item.get("content", "")).strip()
+    ]
+    if not filtered:
+        return []
+
+    chunks: list[list[dict[str, Any]]] = []
+    start = 0
+    while start < len(filtered):
+        current_chunk: list[dict[str, Any]] = []
+        current_size = 0
+        end = start
+        while end < len(filtered):
+            item = filtered[end]
+            role_name = "User" if item.get("role") == "user" else "AI"
+            item_size = len(role_name) + len(str(item.get("content", ""))) + 4
+            if current_chunk and current_size + item_size > target_chars:
+                break
+            current_chunk.append(item)
+            current_size += item_size
+            end += 1
+
+        if not current_chunk:
+            current_chunk = [filtered[start]]
+            end = start + 1
+
+        chunks.append(current_chunk)
+        if end >= len(filtered):
+            break
+        start = max(start + 1, end - max(0, overlap_messages))
+
+    return chunks
+
+
+async def request_summary_outline_for_chunk(
+    chunk_history: list[dict[str, Any]],
+    *,
+    chunk_index: int,
+    total_chunks: int,
+) -> str:
+    llm_config = get_runtime_chat_config()
+    if not (llm_config["base_url"] and llm_config["model"]):
+        raise ValueError("chat model is not configured")
+
+    transcript = build_conversation_transcript(chunk_history)
+    if not transcript:
+        return ""
+
+    url = build_api_url(llm_config["base_url"], "chat/completions")
+    payload = {
+        "model": llm_config["model"],
+        "temperature": 0.2,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You compress one chunk of dialogue into short Chinese notes. "
+                    "Return plain text only. "
+                    "Write 4 to 8 bullet lines. "
+                    "Keep durable facts, relationship changes, promises, important emotions, key scene turns, and unresolved threads. "
+                    "Do not roleplay. Do not invent details."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"这是整段对话的第 {chunk_index}/{total_chunks} 段压缩任务。\n"
+                    "请按时间顺序输出简短要点，每行一个要点，前面带 `- `。\n"
+                    f"对话内容：\n{transcript}"
+                ),
+            },
+        ],
+    }
+    data = await request_json(
+        url=url,
+        api_key=llm_config["api_key"],
+        payload=payload,
+        request_timeout=int(llm_config["request_timeout"]),
+    )
+    try:
+        return str(data["choices"][0]["message"]["content"]).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError("invalid chunk summary payload") from exc
+
+
+async def build_summary_source_text(history: list[dict[str, Any]]) -> tuple[str, bool]:
+    transcript = build_conversation_transcript(history)
+    if len(transcript) <= SUMMARY_TRANSCRIPT_SOFT_LIMIT_CHARS:
+        return transcript, False
+
+    chunks = split_history_for_summary(history)
+    if len(chunks) <= 1:
+        return transcript, False
+
+    outlines: list[str] = []
+    for index, chunk in enumerate(chunks, start=1):
+        outline = await request_summary_outline_for_chunk(chunk, chunk_index=index, total_chunks=len(chunks))
+        cleaned = outline.strip()
+        if cleaned:
+            outlines.append(f"[第 {index} 段]\n{cleaned}")
+
+    if not outlines:
+        return transcript, False
+
+    return (
+        "下面是按时间顺序整理的整段长对话分段摘要，请把它当作完整对话的压缩稿来理解：\n\n"
+        + "\n\n".join(outlines),
+        True,
+    )
+
+
+def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str, Any]:
+    transcript = build_conversation_transcript(history)
+    first_user = next(
+        (str(item.get("content", "")).strip() for item in history if item.get("role") == "user" and str(item.get("content", "")).strip()),
+        "",
+    )
+    last_user = next(
+        (str(item.get("content", "")).strip() for item in reversed(history) if item.get("role") == "user"),
+        "",
+    )
+    title_source = last_user or transcript or "Conversation Memory"
+    title = title_source[:18] + ("..." if len(title_source) > 18 else "")
+    if first_user and last_user and first_user != last_user:
+        compact = f"这段对话从“{first_user[:40]}”开始，最后停在了“{last_user[:72]}”这样的余韵里。"
+    else:
+        compact = transcript[:120] + ("..." if len(transcript) > 120 else "")
+    return {
+        "title": title or "Conversation Memory",
+        "content": compact or "A short long-term memory summary was created for this conversation.",
+        "tags": ["auto-memory", "summary"],
+        "notes": "",
+    }
+
+
+async def request_conversation_summary_with_model(history: list[dict[str, Any]]) -> dict[str, Any]:
+    llm_config = get_runtime_chat_config()
+    if not (llm_config["base_url"] and llm_config["model"]):
+        raise ValueError("chat model is not configured")
+
+    url = build_api_url(llm_config["base_url"], "chat/completions")
+    summary_source_text, used_chunked_source = await build_summary_source_text(history)
+    deleted_memory_guard = build_deleted_memory_guard(get_memory_tombstones())
+    if deleted_memory_guard:
+        summary_source_text = f"已删除旧记忆：\n{deleted_memory_guard}\n\n{summary_source_text}"
+    if used_chunked_source:
+        summary_source_text = f"输入材料是长对话分段压缩稿。\n\n{summary_source_text}"
+    else:
+        summary_source_text = f"输入材料是完整对话原文。\n\n{summary_source_text}"
+
+    memory_settings = get_settings()
+    memory_length = str(memory_settings.get("memory_summary_length", "medium")).strip()
+    if memory_length == "short":
+        sentence_hint = "content must be 1 to 2 sentences, vivid but concise. "
+    elif memory_length == "long":
+        sentence_hint = "content must be 5 to 10 sentences, vivid and detailed. "
+    elif memory_length == "custom":
+        max_chars_hint = clamp_int(memory_settings.get("memory_summary_max_chars"), 80, 2000, 180)
+        sentence_hint = f"content must be vivid and detailed, covering key events and unresolved threads. Let length match the amount of material; try to approach roughly {max_chars_hint} characters without padding. "
+    else:
+        sentence_hint = "content should be 2 to 5 sentences, vivid but concise. "
+
+    payload = {
+        "model": llm_config["model"],
+        "temperature": 0.35,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a dialogue memory fragment formatter. "
+                    "Return one strict JSON object only. "
+                    "Do not output markdown fences, explanation, roleplay, XML, or any extra text. "
+                    "The JSON object must contain exactly these keys: title, content, tags, notes. "
+                    "title must be short. "
+                    "content must be a compact memory fragment in Chinese, written like a diary fragment or remembered scene excerpt. "
+                    f"{sentence_hint}"
+                    "Do not summarize like meeting minutes. "
+                    "Do not bring back deleted or invalidated old memories. "
+                    "tags must be an array of strings and include 'memory-fragment'. "
+                    "notes may be empty."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "请把这段完整对话整理成一条长期记忆片段。\n"
+                    "要求：\n"
+                    "- 不要写成客观摘要或记录报告\n"
+                    "- 要像对话结束后留下的一小段回忆、日记摘句、心声片段\n"
+                    "- title 保持短小\n"
+                    "- content 必须是记忆片段，不要出现“用户与角色进行了互动”这类说法\n"
+                    "- 如果上方包含“已删除旧记忆”，那些内容不能被重新写回长期记忆\n"
+                    "- tags 里请包含 memory-fragment\n"
+                    "只返回 JSON 对象，不要返回任何解释。\n\n"
+                    f"对话内容：\n{summary_source_text}"
+                ),
+            },
+        ],
+    }
+    data = await request_json(
+        url=url,
+        api_key=llm_config["api_key"],
+        payload=payload,
+        request_timeout=int(llm_config["request_timeout"]),
+    )
+
+    try:
+        text = str(data["choices"][0]["message"]["content"]).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError("invalid summary payload") from exc
+
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            raise ValueError("summary is not json")
+        parsed = json.loads(text[start : end + 1])
+
+    if not isinstance(parsed, dict):
+        raise ValueError("summary json must be an object")
+    return parsed
+
+
+def sanitize_memory_summary(payload: dict[str, Any], *, fallback: dict[str, Any]) -> dict[str, Any]:
+    title = str(payload.get("title", "")).strip() or fallback["title"]
+    content = str(payload.get("content", "")).strip() or fallback["content"]
+    tags = sanitize_tags(payload.get("tags", fallback["tags"])) or ["auto-memory", "memory-fragment"]
+    if "memory-fragment" not in tags:
+        tags.insert(0, "memory-fragment")
+    notes = str(payload.get("notes", "")).strip() or str(fallback.get("notes", "")).strip()
+
+    memory_length = str(get_settings().get("memory_summary_length", "medium")).strip()
+    if memory_length == "short":
+        effective_max_chars = 120
+    elif memory_length == "long":
+        effective_max_chars = 500
+    elif memory_length == "custom":
+        effective_max_chars = clamp_int(get_settings().get("memory_summary_max_chars"), 80, 2000, 180)
+    else:
+        effective_max_chars = 180
+    max_chars = effective_max_chars
+
+    return {
+        "id": f"memory-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        "title": title[:40],
+        "content": content[:max_chars],
+        "tags": tags[:8],
+        "notes": notes[:240],
+    }
+
+
+async def summarize_conversation_to_memory(history: list[dict[str, Any]]) -> dict[str, Any]:
+    fallback = fallback_memory_from_conversation(history)
+    try:
+        summary_payload = await request_conversation_summary_with_model(history)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("自动记忆摘要失败，改用本地摘要：%s", exc)
+        summary_payload = fallback
+
+    return sanitize_memory_summary(summary_payload, fallback=fallback)
+
+
+_ARCHIVE_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _get_archive_lock(slot_id: str) -> asyncio.Lock:
+    if slot_id not in _ARCHIVE_LOCKS:
+        _ARCHIVE_LOCKS[slot_id] = asyncio.Lock()
+    return _ARCHIVE_LOCKS[slot_id]
+
+
+async def archive_current_conversation() -> dict[str, Any]:
+    slot_id = get_active_slot_id()
+    lock = _get_archive_lock(slot_id)
+    async with lock:
+        history = [item for item in get_conversation() if item.get("role") in {"user", "assistant"}]
+        if not history:
+            return {"_skipped": True}
+
+        memory = await summarize_conversation_to_memory(history)
+        memories = get_memories()
+        deleted_memories = get_memory_tombstones()
+        blocked_tombstone = next((item for item in deleted_memories if is_similar_memory(memory, item)), None)
+        if blocked_tombstone:
+            persist_json(
+                conversation_path(),
+                [],
+                detail="结束对话失败：无法清空当前聊天记录。",
+            )
+            return {
+                **memory,
+                "blocked": True,
+                "title": str(blocked_tombstone.get("title", "")).strip() or memory["title"],
+            }
+
+        existing_memory = find_similar_memory(memories, memory)
+        if existing_memory:
+            persist_json(
+                conversation_path(),
+                [],
+                detail="结束对话失败：无法清空当前聊天记录。",
+            )
+            return {**existing_memory, "deduplicated": True}
+
+        memories.append(memory)
+        save_memories(memories)
+        persist_json(
+            conversation_path(),
+            [],
+            detail="结束对话失败：无法清空当前聊天记录。",
+        )
+        return memory
+
+load_env_file()
+ensure_data_files()
+
+bootstrap_runtime_layout()
+
+app = FastAPI(title="Xuqi LLM Chat")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+class ChatRequest(BaseModel):
+    message: str
+    runtime_config: dict[str, Any] | None = None
+
+
+class PersonaPayload(BaseModel):
+    name: str
+    system_prompt: str
+    greeting: str
+
+
+class SettingsPayload(BaseModel):
+    llm_base_url: str = ""
+    llm_api_key: str = ""
+    llm_model: str = ""
+    theme: str = "light"
+    temperature: float = 0.85
+    history_limit: int = 20
+    request_timeout: int = 120
+    demo_mode: bool = False
+    ui_opacity: float = 0.84
+    background_image_url: str = ""
+    background_overlay: float = 0.42
+    sprite_enabled: bool = True
+    sprite_base_path: str = DEFAULT_SPRITE_BASE_PATH
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
+    embedding_model: str = ""
+    embedding_fields: list[str] = Field(default_factory=lambda: list(DEFAULT_SETTINGS["embedding_fields"]))
+    retrieval_top_k: int = 4
+    rerank_enabled: bool = False
+    rerank_base_url: str = ""
+    rerank_api_key: str = ""
+    rerank_model: str = ""
+    rerank_top_n: int = 3
+    memory_summary_length: str = "medium"
+    memory_summary_max_chars: int = 180
+
+
+class MemoryItemPayload(BaseModel):
+    id: str = ""
+    title: str = ""
+    content: str = ""
+    tags: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+
+class MemoryListPayload(BaseModel):
+    items: list[MemoryItemPayload] = Field(default_factory=list)
+
+
+class WorldbookEntryPayload(BaseModel):
+    trigger: str = ""
+    content: str = ""
+
+
+class WorldbookPayload(BaseModel):
+    items: list[WorldbookEntryPayload] = Field(default_factory=list)
+
+
+class SaveSlotSelectPayload(BaseModel):
+    slot_id: str
+
+
+class SaveSlotRenamePayload(BaseModel):
+    slot_id: str
+    name: str = ""
+
+
+class SaveSlotResetPayload(BaseModel):
+    slot_id: str
+
+
+class SpriteDeletePayload(BaseModel):
+    filename: str
+
+
+class RoleCardPayload(BaseModel):
+    raw_json: str
+    filename: str = ""
+    apply_now: bool = True
+
+
+class RoleCardLoadPayload(BaseModel):
+    filename: str
+
+
+def build_chat_template_context() -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    return {
+        "persona": get_persona(active_slot),
+        "history": get_conversation(active_slot),
+        "settings": get_settings(active_slot),
+        "active_slot": active_slot,
+        "slot_registry": get_slot_registry(),
+    }
+
+
+@app.get("/", response_class=HTMLResponse)
+async def welcome_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "welcome.html",
+        {
+            "settings": get_settings(active_slot),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/chat", response_class=HTMLResponse)
+async def index(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        build_chat_template_context(),
+    )
+
+
+@app.get("/config", response_class=HTMLResponse)
+async def config_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "config.html",
+        {
+            "settings": get_settings(active_slot),
+            "memory_count": len(get_memories(active_slot)),
+            "current_card": get_current_card(active_slot),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/config/card", response_class=HTMLResponse)
+async def card_config_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    current_card = get_current_card(active_slot)
+    return templates.TemplateResponse(
+        request,
+        "card_config.html",
+        {
+            "settings": get_settings(active_slot),
+            "cards": list_role_card_files(),
+            "current_card": current_card,
+            "card_template": normalize_role_card(current_card.get("raw", {})),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/config/memory", response_class=HTMLResponse)
+async def memory_config_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "memory_config.html",
+        {
+            "settings": get_settings(active_slot),
+            "memories": get_memories(active_slot),
+            "memory_count": len(get_memories(active_slot)),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/config/sprite", response_class=HTMLResponse)
+async def sprite_config_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "sprite_config.html",
+        {
+            "settings": get_settings(active_slot),
+            "sprites": list_sprite_assets(active_slot),
+            "sprite_count": len(list_sprite_assets(active_slot)),
+            "sprite_base_path": default_sprite_base_path_for_slot(active_slot),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+@app.get("/api/persona")
+async def api_get_persona() -> dict[str, Any]:
+    return get_persona()
+
+
+@app.post("/api/persona")
+async def api_save_persona(payload: PersonaPayload) -> dict[str, Any]:
+    persist_json(
+        persona_path(),
+        {
+            "name": payload.name.strip(),
+            "system_prompt": payload.system_prompt.strip(),
+            "greeting": payload.greeting.strip(),
+        },
+        detail="角色设置保存失败，请检查磁盘空间或文件权限。",
+    )
+    return {"ok": True}
+
+
+@app.get("/api/settings")
+async def api_get_settings() -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    return {
+        "active_slot": active_slot,
+        "slot_name": get_slot_name(active_slot),
+        "settings": get_settings(active_slot),
+    }
+
+
+@app.post("/api/settings")
+async def api_save_settings(payload: SettingsPayload) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    settings = sanitize_settings(payload.model_dump(), strict=True, slot_id=active_slot)
+    persist_json(
+        settings_path(active_slot),
+        settings,
+        detail="设置保存失败，请检查磁盘空间或文件权限。",
+    )
+    return {"ok": True, "settings": settings, "active_slot": active_slot}
+
+
+@app.get("/api/slots")
+async def api_get_slots() -> dict[str, Any]:
+    registry = get_slot_registry()
+    active_slot = registry["active_slot"]
+    slots = [slot_summary(item["id"]) for item in registry["slots"]]
+    return {"active_slot": active_slot, "slots": slots}
+
+
+@app.post("/api/slots/select")
+async def api_select_slot(payload: SaveSlotSelectPayload) -> dict[str, Any]:
+    target = sanitize_slot_id(payload.slot_id, get_active_slot_id())
+    registry = get_slot_registry()
+    registry["active_slot"] = target
+    save_slot_registry(registry)
+    return {"ok": True, "active_slot": target, "slot": slot_summary(target)}
+
+
+@app.post("/api/slots/rename")
+async def api_rename_slot(payload: SaveSlotRenamePayload) -> dict[str, Any]:
+    target = sanitize_slot_id(payload.slot_id, get_active_slot_id())
+    registry = get_slot_registry()
+    for index, item in enumerate(registry["slots"], start=1):
+        if item["id"] == target:
+            item["name"] = str(payload.name or "").strip()[:32] or f"存档 {index}"
+            break
+    save_slot_registry(registry)
+    return {"ok": True, "active_slot": registry["active_slot"], "slots": registry["slots"]}
+
+
+@app.post("/api/slots/reset")
+async def api_reset_slot(payload: SaveSlotResetPayload) -> dict[str, Any]:
+    target = sanitize_slot_id(payload.slot_id, get_active_slot_id())
+    summary = reset_slot_data(target)
+    return {"ok": True, "slot": summary, "active_slot": get_active_slot_id()}
+
+
+@app.get("/api/memories")
+async def api_get_memories() -> list[dict[str, Any]]:
+    return get_memories()
+
+
+@app.get("/api/worldbook")
+async def api_get_worldbook() -> dict[str, Any]:
+    items = [{"trigger": trigger, "content": content} for trigger, content in get_worldbook().items()]
+    return {"items": items}
+
+
+@app.get("/api/sprites")
+async def api_get_sprites() -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    return {
+        "active_slot": active_slot,
+        "base_path": default_sprite_base_path_for_slot(active_slot),
+        "items": list_sprite_assets(active_slot),
+    }
+
+
+@app.get("/api/cards")
+async def api_get_cards() -> dict[str, Any]:
+    return {
+        "items": list_role_card_files(),
+        "current_card": get_current_card(),
+    }
+
+
+@app.post("/api/cards/import")
+async def api_import_card(payload: RoleCardPayload) -> dict[str, Any]:
+    card = parse_role_card_json(payload.raw_json)
+    filename = Path(payload.filename.strip() or f"{card.get('name', 'role_card')}.json").name
+    if not filename.lower().endswith(".json"):
+        filename += ".json"
+
+    persist_json(
+        CARDS_DIR / filename,
+        card,
+        detail="角色卡保存失败：无法写入 cards 目录。",
+    )
+
+    result: dict[str, Any] = {"ok": True, "filename": filename, "card": card}
+    if payload.apply_now:
+        result.update(apply_role_card(card, source_name=filename))
+    return result
+
+
+@app.post("/api/cards/load")
+async def api_load_card(payload: RoleCardLoadPayload) -> dict[str, Any]:
+    filename = Path(payload.filename).name
+    target = CARDS_DIR / filename
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="????????????")
+
+    raw_text = read_role_card_text(target)
+    card = parse_role_card_json(raw_text)
+    result = apply_role_card(card, source_name=filename)
+    result.update({"ok": True, "filename": filename, "card": card})
+    return result
+
+
+@app.get("/api/cards/export/current")
+async def api_export_current_card() -> FileResponse:
+    current_card = get_current_card()
+    card = current_card.get("raw", {})
+    if not isinstance(card, dict) or not any(
+        str(value).strip() for value in card.values() if not isinstance(value, (dict, list))
+    ):
+        raise HTTPException(status_code=404, detail="?????????????")
+
+    source_name = Path(str(current_card.get("source_name", "")).strip() or "role_card_export.json").name
+    if not source_name.lower().endswith(".json"):
+        source_name += ".json"
+    export_path = EXPORT_DIR / source_name
+    persist_json(
+        export_path,
+        normalize_role_card(card),
+        detail="?????????????????????",
+    )
+    return FileResponse(
+        path=export_path,
+        filename=source_name,
+        media_type="application/json",
+    )
+
+@app.post("/api/memories")
+async def api_save_memories(payload: MemoryListPayload) -> dict[str, Any]:
+    memories = save_memories([item.model_dump() for item in payload.items])
+    return {"ok": True, "items": memories}
+
+
+@app.post("/api/worldbook")
+async def api_save_worldbook(payload: WorldbookPayload) -> dict[str, Any]:
+    worldbook = save_worldbook(
+        {
+            item.trigger.strip(): item.content.strip()
+            for item in payload.items
+            if item.trigger.strip() and item.content.strip()
+        }
+    )
+    items = [{"trigger": trigger, "content": content} for trigger, content in worldbook.items()]
+    return {"ok": True, "items": items}
+
+
+@app.post("/api/sprites")
+async def api_upload_sprite(
+    tag: str = Form(""),
+    file: UploadFile = File(...),
+) -> dict[str, Any]:
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in ALLOWED_IMAGE_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Only png / jpg / jpeg / webp / gif sprites are supported.")
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded sprite must be an image file.")
+
+    content = await file.read(MAX_UPLOAD_SIZE_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded sprite cannot be empty.")
+    if len(content) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="Sprite image cannot be larger than 10 MB.")
+
+    active_slot = get_active_slot_id()
+    directory = sprite_dir_path(active_slot)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    normalized_tag = sanitize_sprite_filename_tag(tag) or sanitize_sprite_filename_tag(Path(file.filename or "").stem)
+    if not normalized_tag:
+        raise HTTPException(status_code=400, detail="Please provide a valid sprite tag.")
+
+    for existing in directory.glob(f"{normalized_tag}.*"):
+        if existing.is_file() and existing.suffix.lower() in ALLOWED_IMAGE_SUFFIXES:
+            existing.unlink(missing_ok=True)
+
+    target = directory / f"{normalized_tag}{suffix}"
+    try:
+        target.write_bytes(content)
+    except OSError as exc:
+        logger.exception("Sprite write failed: %s", target)
+        raise HTTPException(status_code=500, detail="Sprite save failed. Please check disk space or file permissions.") from exc
+
+    return {
+        "ok": True,
+        "active_slot": active_slot,
+        "base_path": default_sprite_base_path_for_slot(active_slot),
+        "uploaded": {
+            "filename": target.name,
+            "tag": normalized_tag,
+            "url": f"{default_sprite_base_path_for_slot(active_slot)}/{target.name}",
+        },
+        "items": list_sprite_assets(active_slot),
+    }
+
+
+@app.post("/api/sprites/delete")
+async def api_delete_sprite(payload: SpriteDeletePayload) -> dict[str, Any]:
+    active_slot = get_active_slot_id()
+    filename = Path(str(payload.filename or "")).name
+    if not filename:
+        raise HTTPException(status_code=400, detail="Sprite filename is required.")
+
+    target = sprite_dir_path(active_slot) / filename
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Sprite file not found.")
+    if target.suffix.lower() not in ALLOWED_IMAGE_SUFFIXES:
+        raise HTTPException(status_code=400, detail="Unsupported sprite file type.")
+
+    try:
+        target.unlink()
+    except OSError as exc:
+        logger.exception("Sprite delete failed: %s", target)
+        raise HTTPException(status_code=500, detail="Sprite delete failed. Please check file permissions.") from exc
+
+    return {
+        "ok": True,
+        "active_slot": active_slot,
+        "base_path": default_sprite_base_path_for_slot(active_slot),
+        "items": list_sprite_assets(active_slot),
+    }
+
+
+@app.post("/api/background")
+async def api_upload_background(file: UploadFile = File(...)) -> dict[str, Any]:
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in ALLOWED_IMAGE_SUFFIXES:
+        raise HTTPException(status_code=400, detail="只支持 png / jpg / jpeg / webp / gif 图片。")
+
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="上传文件必须是图片。")
+
+    content = await file.read(MAX_UPLOAD_SIZE_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="上传文件不能为空。")
+    if len(content) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="背景图不能超过 10 MB。")
+
+    filename = f"bg_{datetime.now().strftime('%Y%m%d_%H%M%S')}{suffix}"
+    target = UPLOAD_DIR / filename
+    try:
+        target.write_bytes(content)
+    except OSError as exc:
+        logger.exception("背景图写入失败: %s", target)
+        raise HTTPException(status_code=500, detail="背景图保存失败，请检查磁盘空间或文件权限。") from exc
+
+    return {"ok": True, "url": f"/static/uploads/{filename}"}
+
+
+@app.post("/api/test-connection")
+async def api_test_connection() -> dict[str, Any]:
+    llm_config = get_runtime_chat_config()
+    if not (llm_config["base_url"] and llm_config["model"]):
+        raise HTTPException(status_code=400, detail="请先填写聊天模型的 API URL 和模型名。")
+
+    reply = await request_model_reply("请用一句简短的话回复：聊天模型连接测试成功。", [])
+    return {"ok": True, "reply": reply.get("reply", ""), "sprite_tag": reply.get("sprite_tag", "")}
+
+
+@app.post("/api/test-embedding")
+async def api_test_embedding() -> dict[str, Any]:
+    embedding = get_runtime_embedding_config()
+    if not (embedding["base_url"] and embedding["model"]):
+        raise HTTPException(status_code=400, detail="请先填写嵌入模型的 API URL 和模型名。")
+
+    vectors = await fetch_embeddings(["连接测试", "向量检索"])
+    if not vectors:
+        raise HTTPException(status_code=502, detail="嵌入模型没有返回向量。")
+
+    return {"ok": True, "dimension": len(vectors[0]), "count": len(vectors)}
+
+
+@app.get("/api/history")
+async def api_get_history() -> list[dict[str, Any]]:
+    return get_conversation()
+
+
+@app.post("/api/chat")
+async def api_chat(payload: ChatRequest) -> dict[str, Any]:
+    message = payload.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="???????")
+
+    runtime_overrides = payload.runtime_config or {}
+    reply_result, retrieved_items, worldbook_matches = await generate_reply(message, runtime_overrides)
+    reply = str(reply_result.get("reply", ""))
+    entries = [("user", message)]
+    if reply.strip():
+        entries.append(("assistant", reply))
+    append_messages(entries)
+
+    worldbook_debug = build_worldbook_debug_payload(message, worldbook_matches, reply_result=reply_result)
+
+    return {
+        "reply": reply,
+        "retrieved_items": retrieved_items,
+        "worldbook_hits": worldbook_matches,
+        "worldbook_debug": worldbook_debug,
+        "sprite_tag": reply_result.get("sprite_tag", ""),
+        "memory_item": None,
+    }
+
+
+@app.post("/api/chat/stream")
+async def api_chat_stream(payload: ChatRequest) -> StreamingResponse:
+    message = payload.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+
+    runtime_overrides = payload.runtime_config or {}
+    llm_config = get_runtime_chat_config(runtime_overrides)
+    retrieved_items = await retrieve_memories(message, runtime_overrides)
+    worldbook_matches = match_worldbook_entries(message)
+    worldbook_debug = build_worldbook_debug_payload(message, worldbook_matches)
+
+    if not (llm_config["base_url"] and llm_config["model"]):
+        if not llm_config["demo_mode"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Please configure the chat model API URL and model name first, or enable demo mode.",
+            )
+
+        async def demo_event_stream():
+            append_messages([("user", message)])
+            meta = {
+                "type": "meta",
+                "retrieved_items": retrieved_items,
+                "worldbook_hits": worldbook_matches,
+                "worldbook_debug": worldbook_debug,
+            }
+            yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
+            done = {"type": "done", "reply": "", "sprite_tag": "", "worldbook_enforced": False}
+            yield f"data: {json.dumps(done, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(demo_event_stream(), media_type="text/event-stream")
+
+    async def event_stream():
+        meta = {
+            "type": "meta",
+            "retrieved_items": retrieved_items,
+            "worldbook_hits": worldbook_matches,
+            "worldbook_debug": worldbook_debug,
+        }
+        yield f"data: {json.dumps(meta, ensure_ascii=False)}\n\n"
+
+        final_reply_result: dict[str, Any] | None = None
+        try:
+            async for item in stream_model_reply(
+                message,
+                retrieved_items,
+                runtime_overrides=runtime_overrides,
+                worldbook_matches=worldbook_matches,
+            ):
+                if item.get("type") == "done":
+                    final_reply_result = item
+                yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+        except HTTPException as exc:
+            error_event = {"type": "error", "detail": exc.detail if isinstance(exc.detail, str) else str(exc.detail)}
+            yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
+            return
+        except Exception as exc:
+            logger.exception("Stream reply failed")
+            error_event = {"type": "error", "detail": str(exc)}
+            yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
+            return
+
+        reply_text = str((final_reply_result or {}).get("reply", "")).strip()
+        entries = [("user", message)]
+        if reply_text:
+            entries.append(("assistant", reply_text))
+        append_messages(entries)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/conversation/end")
+async def api_end_conversation() -> dict[str, Any]:
+    memory = await archive_current_conversation()
+    if memory.get("_skipped"):
+        return {"ok": True, "skipped": True}
+    return {
+        "ok": True,
+        "memory_item": memory,
+        "blocked": bool(memory.get("blocked")),
+        "deduplicated": bool(memory.get("deduplicated")),
+    }
+
+@app.post("/api/reset")
+async def api_reset() -> dict[str, Any]:
+    persist_json(
+        conversation_path(),
+        [],
+        detail="聊天记录清空失败，请检查磁盘空间或文件权限。",
+    )
+    return {"ok": True}
+
+
+@app.get("/api/export/history")
+async def api_export_history() -> FileResponse:
+    slot_id = get_active_slot_id()
+    history = get_conversation(slot_id)
+    export_path = EXPORT_DIR / f"{slot_id}_chat_history_export.json"
+    persist_json(
+        export_path,
+        history,
+        detail="导出聊天记录失败，请检查磁盘空间或文件权限。",
+    )
+    return FileResponse(
+        path=export_path,
+        filename=f"{slot_id}_chat_history_export.json",
+        media_type="application/json",
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Card Writer (缃笺) — embedded built-in, not a mod
+# ──────────────────────────────────────────────────────────────────────────────
+
+CARD_WRITER_DATA_DIR = DATA_DIR / "card_writer"
+CARD_WRITER_PROJECTS_DIR = CARD_WRITER_DATA_DIR / "projects"
+CARD_WRITER_EXPORTS_DIR = CARD_WRITER_DATA_DIR / "exports"
+CARD_WRITER_AUTOSAVES_DIR = CARD_WRITER_DATA_DIR / "autosaves"
+CARD_WRITER_SETTINGS_PATH = CARD_WRITER_DATA_DIR / "settings.json"
+CARD_WRITER_WORKSPACE_PATH = CARD_WRITER_DATA_DIR / "workspace.cardwork.json"
+
+FILENAME_RE = re.compile(r'[\\/:*?"<>|]')
+TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+CW_AUTOSAVE_FILENAME = "autosave.cardwork.json"
+PROJECT_TYPE = "fantareal_card_writer_project"
+AUTHOR_PATTERNS = ["这是一个角色卡", "角色介绍", "设定如下", "以下是角色"]
+DEFAULT_LLM_TIMEOUT = 120
+DEFAULT_LLM_TEMPERATURE = 0.8
+
+PERSONA_FIELDS = [
+    "name",
+    "description",
+    "personality",
+    "first_mes",
+    "mes_example",
+    "scenario",
+    "creator_notes",
+]
+
+PLOT_STAGE_DEFAULT = {"description": "", "rules": ""}
+PERSONA_SINGLE_DEFAULT = {
+    "name": "", "description": "", "personality": "", "scenario": "", "creator_notes": "",
+}
+WORKSHOP_ITEM_DEFAULT = {
+    "id": "", "name": "", "enabled": True, "triggerMode": "manual", "triggerStage": "",
+    "triggerTempMin": 0, "triggerTempMax": 1, "actionType": "note", "popupTitle": "",
+    "musicPreset": "", "musicUrl": "", "autoplay": False, "loop": False, "volume": 0.7,
+    "imageUrl": "", "imageAlt": "", "note": "",
+}
+PERSONA_CARD_DEFAULTS = {
+    "name": "", "description": "", "personality": "", "first_mes": "", "mes_example": "",
+    "scenario": "", "creator_notes": "", "tags": [],
+    "creativeWorkshop": {"enabled": True, "items": []},
+    "plotStages": {},
+    "personas": {"1": copy.deepcopy(PERSONA_SINGLE_DEFAULT)},
+}
+WORLDBOOK_SETTINGS_DEFAULTS = {
+    "enabled": True, "debug_enabled": False, "max_hits": 10,
+    "default_case_sensitive": False, "default_whole_word": False,
+    "default_match_mode": "includes", "default_secondary_mode": "includes",
+    "default_entry_type": "lore", "default_group_operator": "and",
+    "default_chance": 100, "default_sticky_turns": 0, "default_cooldown_turns": 0,
+    "default_insertion_position": "after_system", "default_injection_depth": 0,
+    "default_injection_role": "system", "default_injection_order": 100,
+    "default_prompt_layer": "default", "recursive_scan_enabled": False, "recursion_max_depth": 3,
+}
+WORLDBOOK_ENTRY_DEFAULT = {
+    "id": "", "title": "", "trigger": "", "secondary_trigger": "", "entry_type": "lore",
+    "group_operator": "and", "match_mode": "includes", "secondary_mode": "includes",
+    "content": "", "group": "", "chance": 100, "sticky_turns": 0, "cooldown_turns": 0,
+    "order": 0, "priority": 0, "insertion_position": "after_system",
+    "injection_depth": 0, "injection_order": 100, "injection_role": "system",
+    "prompt_layer": "default", "recursive_enabled": False, "prevent_further_recursion": False,
+    "enabled": True, "case_sensitive": False, "whole_word": False, "comment": "",
+}
+MEMORY_ITEM_DEFAULT = {"id": "", "title": "", "content": "", "tags": [], "notes": ""}
+PRESET_MODULE_DEFAULTS = {
+    "no_user_speaking": False, "short_paragraph": False, "long_paragraph": False,
+    "second_person": False, "third_person": False, "anti_repeat": False,
+    "no_closing_feel": False, "emotion_detail": False, "multi_character_boundary": False,
+    "scene_continuation": False, "v4f_output_guard": False,
+}
+EXTRA_PROMPT_DEFAULT = {"id": "", "name": "", "enabled": True, "content": "", "order": 0}
+PRESET_ITEM_DEFAULT = {
+    "id": "", "name": "", "enabled": True, "base_system_prompt": "",
+    "modules": copy.deepcopy(PRESET_MODULE_DEFAULTS), "extra_prompts": [], "prompt_groups": [],
+}
+NEW_PROJECT_DEFAULTS = {
+    "version": 3, "type": PROJECT_TYPE, "title": "",
+    "persona_card": copy.deepcopy(PERSONA_CARD_DEFAULTS),
+    "worldbook": {"settings": copy.deepcopy(WORLDBOOK_SETTINGS_DEFAULTS), "entries": []},
+    "memory": {"items": []},
+    "preset": {"active_preset_id": "", "presets": []},
+    "updated_at": "",
+}
+
+DEFAULT_COPILOT_SETTINGS = {
+    "base_url": "", "api_key": "", "model": "",
+    "request_timeout": DEFAULT_LLM_TIMEOUT, "temperature": DEFAULT_LLM_TEMPERATURE,
+    "base_system_prompt": "你是缃笺 Card Writer 的结构化写作助手。",
+    "persona_prompt": "你要为 Card Writer 生成人设卡草稿，输出内容必须可直接写入编辑器表单。",
+    "worldbook_prompt": "你要为 Card Writer 生成单条世界书词条，输出必须适合直接落入当前 entry。",
+    "preset_prompt": "你要为 Card Writer 生成单个聊天预设，输出必须能直接成为可用 preset。",
+    "memory_prompt": "你要为 Card Writer 生成单条记忆，输出必须适合直接写入 memory item。",
+}
+
+
+class CW_CardWriterProject(BaseModel):
+    version: int = 3
+    type: str = PROJECT_TYPE
+    title: str = ""
+    persona_card: dict[str, Any] = Field(default_factory=dict)
+    worldbook: dict[str, Any] = Field(default_factory=dict)
+    memory: dict[str, Any] = Field(default_factory=dict)
+    preset: dict[str, Any] = Field(default_factory=dict)
+    updated_at: str = ""
+
+
+class CW_ExportPayload(BaseModel):
+    project: CW_CardWriterProject = Field(default_factory=CW_CardWriterProject)
+    filename: str = ""
+    target: str = "persona"
+
+
+class CW_CopilotSettingsPayload(BaseModel):
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+    request_timeout: int = Field(default=DEFAULT_LLM_TIMEOUT)
+    temperature: float = Field(default=DEFAULT_LLM_TEMPERATURE)
+    base_system_prompt: str = ""
+    persona_prompt: str = ""
+    worldbook_prompt: str = ""
+    preset_prompt: str = ""
+    memory_prompt: str = ""
+
+
+class CW_CopilotGeneratePayload(BaseModel):
+    project: CW_CardWriterProject = Field(default_factory=CW_CardWriterProject)
+    module: str = "persona"
+    prompt: str = ""
+    follow_up: str = ""
+    current_view: str = "persona"
+    focus_hint: dict[str, Any] = Field(default_factory=dict)
+    project_revision: str = ""
+
+
+class CW_CopilotGenerateResponse(BaseModel):
+    ok: bool = True
+    review_id: str = ""
+    summary: str = ""
+    prompt_used: str = ""
+    current_view: str = "persona"
+    base_revision: str = ""
+    focus_hint: dict[str, Any] = Field(default_factory=dict)
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
+
+
+CW_CardWriterProject.model_rebuild()
+CW_ExportPayload.model_rebuild()
+CW_CopilotSettingsPayload.model_rebuild()
+CW_CopilotGeneratePayload.model_rebuild()
+CW_CopilotGenerateResponse.model_rebuild()
+
+
+def cw_now_text() -> str:
+    return datetime.now().strftime(TIMESTAMP_FORMAT)
+
+
+def cw_read_json(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def cw_write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def cw_clamp_float(value: Any, minimum: float, maximum: float, default: float) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
+def cw_sanitize_copilot_settings(raw: Any) -> dict[str, Any]:
+    data = copy.deepcopy(DEFAULT_COPILOT_SETTINGS)
+    if not isinstance(raw, dict):
+        return data
+    data["base_url"] = cw_normalize_text(raw.get("base_url"))
+    data["api_key"] = cw_normalize_text(raw.get("api_key"))
+    data["model"] = cw_normalize_text(raw.get("model"))
+    data["request_timeout"] = cw_as_int(raw.get("request_timeout"), DEFAULT_LLM_TIMEOUT)
+    data["request_timeout"] = max(10, min(3600, data["request_timeout"]))
+    data["temperature"] = cw_clamp_float(raw.get("temperature"), 0.0, 2.0, DEFAULT_LLM_TEMPERATURE)
+    data["base_system_prompt"] = cw_normalize_text(raw.get("base_system_prompt")) or DEFAULT_COPILOT_SETTINGS["base_system_prompt"]
+    data["persona_prompt"] = cw_normalize_text(raw.get("persona_prompt")) or DEFAULT_COPILOT_SETTINGS["persona_prompt"]
+    data["worldbook_prompt"] = cw_normalize_text(raw.get("worldbook_prompt")) or DEFAULT_COPILOT_SETTINGS["worldbook_prompt"]
+    data["preset_prompt"] = cw_normalize_text(raw.get("preset_prompt")) or DEFAULT_COPILOT_SETTINGS["preset_prompt"]
+    data["memory_prompt"] = cw_normalize_text(raw.get("memory_prompt")) or DEFAULT_COPILOT_SETTINGS["memory_prompt"]
+    return data
+
+
+def cw_get_copilot_settings() -> dict[str, Any]:
+    return cw_sanitize_copilot_settings(cw_read_json(CARD_WRITER_SETTINGS_PATH, DEFAULT_COPILOT_SETTINGS))
+
+
+def cw_save_copilot_settings(payload: Any) -> dict[str, Any]:
+    settings = cw_sanitize_copilot_settings(payload)
+    cw_write_json(CARD_WRITER_SETTINGS_PATH, settings)
+    return settings
+
+
+def cw_sanitize_filename(name: str) -> str:
+    return FILENAME_RE.sub("_", str(name or "")).strip()
+
+
+def cw_ensure_project_filename(name: str) -> str:
+    safe = cw_sanitize_filename(name) or "untitled"
+    return safe if safe.endswith(".cardwork.json") else f"{safe}.cardwork.json"
+
+
+def cw_ensure_export_filename(name: str) -> str:
+    safe = cw_sanitize_filename(name) or "untitled"
+    return safe if safe.endswith(".json") else f"{safe}.json"
+
+
+def cw_make_id(prefix: str) -> str:
+    return f"{prefix}_{uuid4().hex[:8]}"
+
+
+def cw_create_empty_project() -> dict[str, Any]:
+    return copy.deepcopy(NEW_PROJECT_DEFAULTS)
+
+
+def cw_split_tags(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in re.split(r"[，,]", str(value or "")) if item.strip()]
+
+
+def cw_as_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off", ""}:
+        return False
+    return default
+
+
+def cw_as_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def cw_as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def cw_normalize_text(value: Any) -> str:
+    return str(value or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+
+def cw_normalize_stage_item(key: str, stage: Any) -> dict[str, Any]:
+    raw = stage if isinstance(stage, dict) else {}
+    label = cw_normalize_text(raw.get("label", "")) or key
+    return {"label": label, "description": cw_normalize_text(raw.get("description", "")), "rules": cw_normalize_text(raw.get("rules", ""))}
+
+
+def cw_normalize_plot_stage_map(value: Any) -> dict[str, dict[str, Any]]:
+    if isinstance(value, dict):
+        items = value.items()
+    elif isinstance(value, list):
+        items = ((str(item.get("id") or item.get("label") or chr(ord("A") + idx)).strip().upper(), item) for idx, item in enumerate(value) if isinstance(item, dict))
+    else:
+        items = []
+    result: dict[str, dict[str, Any]] = {}
+    for key, item in items:
+        stage_key = str(key or "").strip().upper() or "A"
+        result[stage_key] = cw_normalize_stage_item(stage_key, item)
+    return result
+
+
+def cw_normalize_persona_single(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    result = copy.deepcopy(PERSONA_SINGLE_DEFAULT)
+    for key in result.keys():
+        result[key] = cw_normalize_text(raw.get(key, ""))
+    return result
+
+
+def cw_normalize_personas_map(value: Any) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    if isinstance(value, dict):
+        for key, item in value.items():
+            result[str(key or "1").strip() or "1"] = cw_normalize_persona_single(item)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get("id") or index + 1).strip() or str(index + 1)
+            result[key] = cw_normalize_persona_single(item)
+    if not result:
+        result["1"] = copy.deepcopy(PERSONA_SINGLE_DEFAULT)
+    return result
+
+
+def cw_normalize_workshop_item(item: Any, index: int) -> dict[str, Any]:
+    raw = item if isinstance(item, dict) else {}
+    data = copy.deepcopy(WORKSHOP_ITEM_DEFAULT)
+    data["id"] = cw_normalize_text(raw.get("id")) or cw_make_id("workshop")
+    data["name"] = cw_normalize_text(raw.get("name"))
+    data["enabled"] = cw_as_bool(raw.get("enabled"), True)
+    data["triggerMode"] = cw_normalize_text(raw.get("triggerMode")) or WORKSHOP_ITEM_DEFAULT["triggerMode"]
+    data["triggerStage"] = cw_normalize_text(raw.get("triggerStage"))
+    data["triggerTempMin"] = cw_as_int(raw.get("triggerTempMin"), WORKSHOP_ITEM_DEFAULT["triggerTempMin"])
+    data["triggerTempMax"] = cw_as_int(raw.get("triggerTempMax"), WORKSHOP_ITEM_DEFAULT["triggerTempMax"])
+    data["actionType"] = cw_normalize_text(raw.get("actionType")) or WORKSHOP_ITEM_DEFAULT["actionType"]
+    data["popupTitle"] = cw_normalize_text(raw.get("popupTitle"))
+    data["musicPreset"] = cw_normalize_text(raw.get("musicPreset"))
+    data["musicUrl"] = cw_normalize_text(raw.get("musicUrl"))
+    data["autoplay"] = cw_as_bool(raw.get("autoplay"), False)
+    data["loop"] = cw_as_bool(raw.get("loop"), False)
+    data["volume"] = cw_as_float(raw.get("volume"), WORKSHOP_ITEM_DEFAULT["volume"])
+    data["imageUrl"] = cw_normalize_text(raw.get("imageUrl"))
+    data["imageAlt"] = cw_normalize_text(raw.get("imageAlt"))
+    data["note"] = cw_normalize_text(raw.get("note"))
+    return data
+
+
+def cw_normalize_creative_workshop(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    items = raw.get("items") if isinstance(raw.get("items"), list) else []
+    return {"enabled": cw_as_bool(raw.get("enabled"), True), "items": [cw_normalize_workshop_item(item, index) for index, item in enumerate(items)]}
+
+
+def cw_normalize_persona_card(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    data = copy.deepcopy(PERSONA_CARD_DEFAULTS)
+    for key in PERSONA_FIELDS:
+        data[key] = cw_normalize_text(raw.get(key, data[key]))
+    data["tags"] = cw_split_tags(raw.get("tags", []))
+    data["creativeWorkshop"] = cw_normalize_creative_workshop(raw.get("creativeWorkshop"))
+    data["plotStages"] = cw_normalize_plot_stage_map(raw.get("plotStages"))
+    data["personas"] = cw_normalize_personas_map(raw.get("personas"))
+    return data
+
+
+def cw_normalize_worldbook_entry(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    data = copy.deepcopy(WORLDBOOK_ENTRY_DEFAULT)
+    data["id"] = cw_normalize_text(raw.get("id")) or cw_make_id("wb")
+    text_fields = ["title", "trigger", "secondary_trigger", "entry_type", "group_operator",
+                   "match_mode", "secondary_mode", "content", "group", "insertion_position",
+                   "injection_role", "prompt_layer", "comment"]
+    for key in text_fields:
+        data[key] = cw_normalize_text(raw.get(key, data[key])) or data[key]
+    for key in ["chance", "sticky_turns", "cooldown_turns", "order", "priority", "injection_depth", "injection_order"]:
+        data[key] = cw_as_int(raw.get(key), data[key])
+    for key in ["recursive_enabled", "prevent_further_recursion", "enabled", "case_sensitive", "whole_word"]:
+        data[key] = cw_as_bool(raw.get(key), data[key])
+    if not cw_normalize_text(raw.get("title")):
+        data["title"] = data["title"] or f"词条 {index + 1}"
+    for field, default_val in [
+        ("entry_type", WORLDBOOK_ENTRY_DEFAULT["entry_type"]),
+        ("group_operator", WORLDBOOK_ENTRY_DEFAULT["group_operator"]),
+        ("match_mode", WORLDBOOK_ENTRY_DEFAULT["match_mode"]),
+        ("secondary_mode", WORLDBOOK_ENTRY_DEFAULT["secondary_mode"]),
+        ("insertion_position", WORLDBOOK_ENTRY_DEFAULT["insertion_position"]),
+        ("injection_role", WORLDBOOK_ENTRY_DEFAULT["injection_role"]),
+        ("prompt_layer", WORLDBOOK_ENTRY_DEFAULT["prompt_layer"]),
+    ]:
+        if not cw_normalize_text(raw.get(field)):
+            data[field] = default_val
+    data["order"] = cw_as_int(raw.get("order"), index)
+    return data
+
+
+def cw_normalize_worldbook(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    settings_raw = raw.get("settings") if isinstance(raw.get("settings"), dict) else {}
+    settings = copy.deepcopy(WORLDBOOK_SETTINGS_DEFAULTS)
+    for key, default in WORLDBOOK_SETTINGS_DEFAULTS.items():
+        if isinstance(default, bool):
+            settings[key] = cw_as_bool(settings_raw.get(key), default)
+        elif isinstance(default, int):
+            settings[key] = cw_as_int(settings_raw.get(key), default)
+        else:
+            settings[key] = cw_normalize_text(settings_raw.get(key, default)) or default
+    entries_raw = raw.get("entries") if isinstance(raw.get("entries"), list) else []
+    return {"settings": settings, "entries": [cw_normalize_worldbook_entry(item, index) for index, item in enumerate(entries_raw)]}
+
+
+def cw_normalize_memory_item(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "id": cw_normalize_text(raw.get("id")) or f"memory_{index + 1:03d}",
+        "title": cw_normalize_text(raw.get("title")),
+        "content": cw_normalize_text(raw.get("content")),
+        "tags": cw_split_tags(raw.get("tags", [])),
+        "notes": cw_normalize_text(raw.get("notes")),
+    }
+
+
+def cw_normalize_memory(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    items_raw = raw.get("items") if isinstance(raw.get("items"), list) else []
+    return {"items": [cw_normalize_memory_item(item, index) for index, item in enumerate(items_raw)]}
+
+
+def cw_normalize_extra_prompt(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    return {
+        "id": cw_normalize_text(raw.get("id")) or cw_make_id("extra"),
+        "name": cw_normalize_text(raw.get("name")),
+        "enabled": cw_as_bool(raw.get("enabled"), True),
+        "content": cw_normalize_text(raw.get("content")),
+        "order": cw_as_int(raw.get("order"), index),
+    }
+
+
+def cw_normalize_modules(value: Any) -> dict[str, bool]:
+    raw = value if isinstance(value, dict) else {}
+    result = copy.deepcopy(PRESET_MODULE_DEFAULTS)
+    for key in list(raw.keys()):
+        result[str(key)] = cw_as_bool(raw.get(key), False)
+    for key in list(result.keys()):
+        result[key] = cw_as_bool(result.get(key), False)
+    return result
+
+
+def cw_normalize_preset_item(value: Any, index: int) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    extra_prompts = raw.get("extra_prompts") if isinstance(raw.get("extra_prompts"), list) else []
+    prompt_groups = raw.get("prompt_groups") if isinstance(raw.get("prompt_groups"), list) else []
+    return {
+        "id": cw_normalize_text(raw.get("id")) or cw_make_id("preset"),
+        "name": cw_normalize_text(raw.get("name")),
+        "enabled": cw_as_bool(raw.get("enabled"), True),
+        "base_system_prompt": cw_normalize_text(raw.get("base_system_prompt")),
+        "modules": cw_normalize_modules(raw.get("modules")),
+        "extra_prompts": [cw_normalize_extra_prompt(item, ei) for ei, item in enumerate(extra_prompts)],
+        "prompt_groups": copy.deepcopy(prompt_groups),
+    }
+
+
+def cw_normalize_preset(value: Any) -> dict[str, Any]:
+    raw = value if isinstance(value, dict) else {}
+    presets_raw = raw.get("presets") if isinstance(raw.get("presets"), list) else []
+    presets = [cw_normalize_preset_item(item, index) for index, item in enumerate(presets_raw)]
+    active_id = cw_normalize_text(raw.get("active_preset_id"))
+    if not active_id and presets:
+        active_id = presets[0]["id"]
+    return {"active_preset_id": active_id, "presets": presets}
+
+
+def cw_normalize_project(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return cw_create_empty_project()
+    if payload.get("type") == PROJECT_TYPE and any(key in payload for key in ["persona_card", "worldbook", "memory", "preset"]):
+        project = cw_create_empty_project()
+        project["version"] = cw_as_int(payload.get("version"), 3)
+        project["type"] = PROJECT_TYPE
+        project["title"] = cw_normalize_text(payload.get("title"))
+        project["updated_at"] = cw_normalize_text(payload.get("updated_at"))
+        project["persona_card"] = cw_normalize_persona_card(payload.get("persona_card"))
+        project["worldbook"] = cw_normalize_worldbook(payload.get("worldbook"))
+        project["memory"] = cw_normalize_memory(payload.get("memory"))
+        project["preset"] = cw_normalize_preset(payload.get("preset"))
+        if not project["title"]:
+            project["title"] = project["persona_card"].get("name", "")
+        return project
+    if cw_looks_like_persona_card(payload):
+        project = cw_create_empty_project()
+        project["persona_card"] = cw_normalize_persona_card(payload)
+        project["title"] = project["persona_card"].get("name", "") or "导入的人设卡"
+        return project
+    if cw_looks_like_worldbook(payload):
+        project = cw_create_empty_project()
+        project["worldbook"] = cw_normalize_worldbook(payload)
+        project["title"] = "导入的世界书"
+        return project
+    if cw_looks_like_memory(payload):
+        project = cw_create_empty_project()
+        project["memory"] = cw_normalize_memory(payload)
+        project["title"] = "导入的记忆"
+        return project
+    if cw_looks_like_preset(payload):
+        project = cw_create_empty_project()
+        project["preset"] = cw_normalize_preset(payload)
+        project["title"] = "导入的预设"
+        return project
+    return cw_create_empty_project()
+
+
+def cw_looks_like_persona_card(payload: dict[str, Any]) -> bool:
+    return "personas" in payload or "creativeWorkshop" in payload or all(key in payload for key in ["name", "description", "first_mes"])
+
+
+def cw_looks_like_worldbook(payload: dict[str, Any]) -> bool:
+    return "settings" in payload and "entries" in payload
+
+
+def cw_looks_like_memory(payload: dict[str, Any]) -> bool:
+    return list(payload.keys()) == ["items"] or "items" in payload
+
+
+def cw_looks_like_preset(payload: dict[str, Any]) -> bool:
+    return "active_preset_id" in payload or "presets" in payload
+
+
+def cw_normalized_has_content(project: dict[str, Any]) -> bool:
+    normalized = cw_normalize_project(project)
+    persona = normalized["persona_card"]
+    if any(str(persona.get(key, "")).strip() for key in PERSONA_FIELDS):
+        return True
+    if persona.get("tags"):
+        return True
+    if normalized["worldbook"].get("entries"):
+        return True
+    if normalized["memory"].get("items"):
+        return True
+    if normalized["preset"].get("presets"):
+        return True
+    return False
+
+
+def cw_build_project_revision(project: dict[str, Any]) -> str:
+    serialized = json.dumps(cw_normalize_project(project), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
+
+
+class CW_ProjectStore:
+    def __init__(self, projects_dir: Path, autosaves_dir: Path, exports_dir: Path, workspace_path: Path) -> None:
+        self.projects_dir = projects_dir
+        self.autosaves_dir = autosaves_dir
+        self.exports_dir = exports_dir
+        self.workspace_path = workspace_path
+
+    def ensure_dirs(self) -> None:
+        for d in [self.projects_dir, self.autosaves_dir, self.exports_dir, self.workspace_path.parent]:
+            d.mkdir(parents=True, exist_ok=True)
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        projects: list[dict[str, Any]] = []
+        if not self.projects_dir.exists():
+            return projects
+        for path in sorted(self.projects_dir.glob("*.cardwork.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+            data = cw_read_json(path, {})
+            normalized = cw_normalize_project(data)
+            projects.append({"filename": path.name, "title": normalized.get("title") or path.stem.replace(".cardwork", ""), "updated_at": normalized.get("updated_at", "")})
+        return projects
+
+    def load_project(self, filename: str) -> dict[str, Any]:
+        path = self.projects_dir / cw_sanitize_filename(filename)
+        if not path.exists():
+            raise HTTPException(status_code=404, detail="工程文件不存在。")
+        data = cw_read_json(path, None)
+        if data is None:
+            raise HTTPException(status_code=400, detail="无法解析工程文件。")
+        return cw_normalize_project(data)
+
+    def save_project(self, filename: str, project: dict[str, Any]) -> dict[str, Any]:
+        safe = cw_ensure_project_filename(filename)
+        normalized = cw_normalize_project(project)
+        normalized["updated_at"] = cw_now_text()
+        cw_write_json(self.projects_dir / safe, normalized)
+        return {"ok": True, "filename": safe, "updated_at": normalized["updated_at"]}
+
+    def delete_project(self, filename: str) -> None:
+        path = self.projects_dir / cw_sanitize_filename(filename)
+        if path.exists():
+            path.unlink()
+
+    def load_workspace(self) -> dict[str, Any]:
+        data = cw_read_json(self.workspace_path, None)
+        if data is None:
+            return cw_create_empty_project()
+        return cw_normalize_project(data)
+
+    def save_workspace(self, project: dict[str, Any]) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        normalized["updated_at"] = cw_now_text()
+        cw_write_json(self.workspace_path, normalized)
+        return {"ok": True, "updated_at": normalized["updated_at"]}
+
+    def clear_workspace(self) -> dict[str, Any]:
+        cw_write_json(self.workspace_path, cw_create_empty_project())
+        return {"ok": True}
+
+    def save_autosave(self, project: dict[str, Any]) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        normalized["updated_at"] = cw_now_text()
+        cw_write_json(self.autosaves_dir / CW_AUTOSAVE_FILENAME, normalized)
+        cw_write_json(self.workspace_path, normalized)
+        return {"ok": True, "updated_at": normalized["updated_at"]}
+
+
+class CW_CardCompiler:
+    def compile(self, project: dict[str, Any]) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        card = copy.deepcopy(normalized["persona_card"])
+        card["tags"] = cw_split_tags(card.get("tags", []))
+        card["creativeWorkshop"] = cw_normalize_creative_workshop(card.get("creativeWorkshop"))
+        card["plotStages"] = cw_normalize_plot_stage_map(card.get("plotStages"))
+        card["personas"] = cw_normalize_personas_map(card.get("personas"))
+        return card
+
+    def export_payload(self, project: dict[str, Any], target: str) -> dict[str, Any]:
+        normalized = cw_normalize_project(project)
+        export_target = str(target or "persona").strip().lower()
+        if export_target == "persona":
+            return self.compile(normalized)
+        if export_target == "worldbook":
+            return copy.deepcopy(normalized["worldbook"])
+        if export_target == "preset":
+            return copy.deepcopy(normalized["preset"])
+        if export_target == "memory":
+            return copy.deepcopy(normalized["memory"])
+        raise HTTPException(status_code=400, detail="不支持的导出类型。")
+
+    def validate(self, project: dict[str, Any], card: dict[str, Any]) -> list[dict[str, Any]]:
+        warnings: list[dict[str, Any]] = []
+        if not str(card.get("name", "")).strip():
+            warnings.append({"level": "error", "field": "name", "message": "角色名不能为空。"})
+        if not str(card.get("first_mes", "")).strip():
+            warnings.append({"level": "error", "field": "first_mes", "message": "开场白不能为空。"})
+        if not isinstance(card.get("tags"), list):
+            warnings.append({"level": "error", "field": "tags", "message": "标签必须是数组。"})
+        if len(str(card.get("personality", ""))) < 10:
+            warnings.append({"level": "warning", "field": "personality", "message": "性格口吻较短，角色表现可能不稳定。"})
+        if not str(card.get("mes_example", "")).strip():
+            warnings.append({"level": "warning", "field": "mes_example", "message": "示例对话为空。"})
+        if not str(card.get("creator_notes", "")).strip():
+            warnings.append({"level": "warning", "field": "creator_notes", "message": "隐藏规则为空。"})
+        first_mes = str(card.get("first_mes", ""))
+        for pattern in AUTHOR_PATTERNS:
+            if pattern in first_mes:
+                warnings.append({"level": "warning", "field": "first_mes", "message": f"开场白可能像作者说明（检测到「{pattern}」）。"})
+                break
+        if not cw_normalized_has_content(project):
+            warnings.append({"level": "warning", "field": "project", "message": "当前工程内容几乎为空。"})
+        return warnings
+
+    def import_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return cw_normalize_project(payload)
+
+    def generate_copilot_draft(self, payload: CW_CopilotGeneratePayload) -> CW_CopilotGenerateResponse:
+        prompt_text = cw_build_copilot_prompt_text(payload.prompt, payload.follow_up)
+        if not prompt_text:
+            raise HTTPException(status_code=400, detail="请输入想让 AI 处理的内容。")
+        project = cw_normalize_project(payload.project.model_dump())
+        current_view = cw_normalize_copilot_view(payload.current_view)
+        focus_hint = cw_normalize_copilot_focus_hint(payload.focus_hint, project, current_view)
+        base_revision = cw_build_project_revision(project)
+        review = cw_request_copilot_review(
+            prompt_text=prompt_text, current_view=current_view,
+            focus_hint=focus_hint, project=project, project_revision=base_revision,
+        )
+        candidates = cw_normalize_copilot_candidates(review.get("candidates"), project)
+        summary = cw_normalize_text(review.get("summary")) or cw_build_copilot_review_summary(candidates, current_view)
+        return CW_CopilotGenerateResponse(
+            ok=True, review_id=cw_make_id("review"), summary=summary,
+            prompt_used=prompt_text, current_view=current_view,
+            base_revision=base_revision, focus_hint=focus_hint, candidates=candidates,
+        )
+
+
+def cw_normalize_copilot_view(value: Any) -> str:
+    view_name = str(value or "persona").strip().lower()
+    if view_name not in {"persona", "worldbook", "preset", "memory", "preview"}:
+        return "persona"
+    return view_name
+
+
+def cw_normalize_copilot_focus_hint(raw: Any, project: dict[str, Any], current_view: str) -> dict[str, Any]:
+    hint = raw if isinstance(raw, dict) else {}
+    normalized: dict[str, Any] = {
+        "view": current_view, "title": "", "subtitle": "",
+        "module": current_view if current_view in {"persona", "worldbook", "preset", "memory"} else "persona",
+        "persona_key": "", "worldbook_id": "", "preset_id": "", "memory_id": "",
+    }
+    for key in ["title", "subtitle", "module", "persona_key", "worldbook_id", "preset_id", "memory_id"]:
+        if key in hint:
+            normalized[key] = cw_normalize_text(hint.get(key))
+    if current_view == "persona":
+        persona_key = normalized["persona_key"]
+        personas = (project.get("persona_card") or {}).get("personas", {})
+        if persona_key and persona_key in personas:
+            persona = personas[persona_key]
+            normalized["title"] = normalized["title"] or f"当前浏览：分身 · {persona.get('name') or persona_key}"
+            normalized["subtitle"] = normalized["subtitle"] or f"焦点提示：personas.{persona_key}"
+        else:
+            normalized["persona_key"] = ""
+            normalized["title"] = normalized["title"] or "当前浏览：角色主体"
+            normalized["subtitle"] = normalized["subtitle"] or "焦点提示：persona_card 主字段"
+    elif current_view == "worldbook":
+        normalized["title"] = normalized["title"] or "当前浏览：世界书"
+    elif current_view == "preset":
+        normalized["title"] = normalized["title"] or "当前浏览：预设"
+    elif current_view == "memory":
+        normalized["title"] = normalized["title"] or "当前浏览：记忆"
+    else:
+        normalized["title"] = normalized["title"] or "当前浏览：预览"
+    return normalized
+
+
+def cw_build_copilot_prompt_text(prompt: Any, follow_up: Any) -> str:
+    base = cw_normalize_text(prompt)
+    extra = cw_normalize_text(follow_up)
+    if base and extra:
+        return f"{base}\n\n补充要求：{extra}"
+    return base or extra
+
+
+def cw_get_runtime_llm_config() -> dict[str, Any]:
+    settings = cw_get_copilot_settings()
+    env_base_url = cw_normalize_text(os.getenv("LLM_BASE_URL", ""))
+    env_api_key = cw_normalize_text(os.getenv("LLM_API_KEY", ""))
+    env_model = cw_normalize_text(os.getenv("LLM_MODEL", ""))
+    return {
+        "base_url": cw_normalize_text(settings.get("base_url")) or env_base_url.rstrip("/"),
+        "api_key": cw_normalize_text(settings.get("api_key")) or env_api_key,
+        "model": cw_normalize_text(settings.get("model")) or env_model,
+        "request_timeout": max(cw_as_int(settings.get("request_timeout"), DEFAULT_LLM_TIMEOUT), 1),
+        "temperature": cw_clamp_float(settings.get("temperature"), 0.0, 2.0, DEFAULT_LLM_TEMPERATURE),
+    }
+
+
+def cw_request_copilot_review(*, prompt_text: str, current_view: str, focus_hint: dict[str, Any], project: dict[str, Any], project_revision: str) -> dict[str, Any]:
+    config = cw_get_runtime_llm_config()
+    if config["base_url"] and config["model"]:
+        return cw_call_copilot_llm(prompt_text=prompt_text, current_view=current_view, focus_hint=focus_hint, project=project, project_revision=project_revision, config=config)
+    return cw_generate_copilot_fallback(prompt_text, current_view, focus_hint, project)
+
+
+def cw_build_copilot_candidate(*, module: str, action: str, label: str, reason: str, target: dict[str, Any], before: Any, after: Any) -> dict[str, Any]:
+    fingerprint = cw_build_copilot_fingerprint(module, action, target, copy.deepcopy(before))
+    return {
+        "id": cw_make_id("candidate"), "module": module, "action": action,
+        "label": cw_normalize_text(label) or "未命名修改", "reason": cw_normalize_text(reason),
+        "target": cw_normalize_copilot_target_ref(module, action, target),
+        "before": copy.deepcopy(before), "after": copy.deepcopy(after), "fingerprint": fingerprint,
+    }
+
+
+def cw_build_copilot_fingerprint(module: str, action: str, target: dict[str, Any], before: Any) -> str:
+    payload = {"module": module, "action": action, "target": cw_normalize_copilot_target_ref(module, action, target), "before": before}
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(serialized.encode("utf-8")).hexdigest()
+
+
+def cw_normalize_copilot_target_ref(module: str, action: str, raw: Any) -> dict[str, Any]:
+    target = raw if isinstance(raw, dict) else {}
+    normalized: dict[str, Any] = {"module": module, "action": action}
+    for key in ["path", "persona_key", "id", "field", "operation"]:
+        value = cw_normalize_text(target.get(key))
+        if value:
+            normalized[key] = value
+    if "index" in target:
+        normalized["index"] = cw_as_int(target.get("index"), 0)
+    return normalized
+
+
+def cw_normalize_copilot_candidates(raw_candidates: Any, project: dict[str, Any]) -> list[dict[str, Any]]:
+    if not isinstance(raw_candidates, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for item in raw_candidates:
+        normalized_items = cw_normalize_single_copilot_candidate(item, project)
+        if isinstance(normalized_items, list):
+            result.extend([c for c in normalized_items if c])
+        elif normalized_items:
+            result.append(normalized_items)
+    return result
+
+
+def cw_get_project_path_value(project: dict[str, Any], path: str) -> Any:
+    if not path:
+        return None
+    ref: Any = project
+    for part in path.split("."):
+        if isinstance(ref, dict):
+            if part not in ref:
+                return None
+            ref = ref.get(part)
+        elif isinstance(ref, list) and part.isdigit():
+            index = int(part)
+            if index < 0 or index >= len(ref):
+                return None
+            ref = ref[index]
+        else:
+            return None
+    return copy.deepcopy(ref)
+
+
+def cw_is_allowed_json_patch_path(path: str) -> bool:
+    if not path or ".." in path:
+        return False
+    parts = path.split(".")
+    if not parts or parts[0] not in {"persona_card", "worldbook", "preset", "memory"}:
+        return False
+    blocked = {"version", "type", "updated_at"}
+    return not any(part in blocked for part in parts)
+
+
+def cw_should_keep_patch_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, list):
+        return bool(value)
+    if isinstance(value, dict):
+        return any(cw_should_keep_patch_value(item) for item in value.values())
+    return True
+
+
+def cw_build_json_patch_candidate(module_name: str, path: str, operation: str, before: Any, after: Any, label: str, reason: str) -> dict[str, Any] | None:
+    if operation != "delete" and not cw_should_keep_patch_value(after):
+        return None
+    return cw_build_copilot_candidate(
+        module=module_name, action="json_patch", label=label,
+        reason=reason or "根据 JSON 路径精确修改对应键。",
+        target={"path": path, "operation": operation},
+        before=before, after=None if operation == "delete" else copy.deepcopy(after),
+    )
+
+
+def cw_normalize_json_patch_candidate(raw: dict[str, Any], project: dict[str, Any], module_name: str, label: str, reason: str) -> dict[str, Any] | None:
+    target = raw.get("target") if isinstance(raw.get("target"), dict) else {}
+    path = cw_normalize_text(target.get("path") or raw.get("path"))
+    if not cw_is_allowed_json_patch_path(path):
+        return None
+    operation = cw_normalize_text(target.get("operation") or raw.get("operation") or "set").lower()
+    if operation not in {"set", "delete", "append"}:
+        operation = "set"
+    before_value = cw_get_project_path_value(project, path)
+    after_value = copy.deepcopy(raw.get("after"))
+    if operation == "delete":
+        after_value = None
+    return cw_build_json_patch_candidate(
+        module_name, path, operation,
+        raw.get("before") if "before" in raw else before_value,
+        after_value, label or f"{operation} · {path}", reason,
+    )
+
+
+def cw_persona_replace_to_json_patch_candidates(raw: dict[str, Any], project: dict[str, Any], label: str, reason: str) -> list[dict[str, Any]]:
+    after_raw = raw.get("after") if isinstance(raw.get("after"), dict) else {}
+    before_raw = raw.get("before") if isinstance(raw.get("before"), dict) else {}
+    normalized_after = cw_normalize_persona_card({**copy.deepcopy(project.get("persona_card") or {}), **after_raw})
+    result: list[dict[str, Any]] = []
+    for key in PERSONA_FIELDS + ["tags"]:
+        if key not in after_raw:
+            continue
+        after_value = copy.deepcopy(normalized_after.get(key))
+        before_value = before_raw.get(key) if key in before_raw else cw_get_project_path_value(project, f"persona_card.{key}")
+        candidate = cw_build_json_patch_candidate(
+            "persona", f"persona_card.{key}", "set", before_value, after_value,
+            label or f"填充 persona_card.{key}", reason or "按人设卡 JSON 键填充对应字段。",
+        )
+        if candidate:
+            result.append(candidate)
+    return result
+
+
+def cw_normalize_single_copilot_candidate(raw: Any, project: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]] | None:
+    if not isinstance(raw, dict):
+        return None
+    module_name = str(raw.get("module") or "").strip().lower()
+    if module_name not in {"persona", "worldbook", "preset", "memory"}:
+        return None
+    action = str(raw.get("action") or "").strip().lower()
+    if action not in {"replace_field", "update_array_item", "append_array_item", "json_patch"}:
+        action = "replace_field" if module_name == "persona" else "update_array_item"
+    target = raw.get("target") if isinstance(raw.get("target"), dict) else {}
+    label = cw_normalize_text(raw.get("label"))
+    reason = cw_normalize_text(raw.get("reason"))
+    if action == "json_patch":
+        return cw_normalize_json_patch_candidate(raw, project, module_name, label, reason)
+    if module_name == "persona":
+        persona_key = cw_normalize_text(target.get("persona_key"))
+        if not persona_key:
+            patch_candidates = cw_persona_replace_to_json_patch_candidates(raw, project, label, reason)
+            if patch_candidates:
+                return patch_candidates
+        if persona_key:
+            personas = (project.get("persona_card") or {}).get("personas", {})
+            current_item = personas.get(persona_key)
+            if current_item is None:
+                return None
+            return cw_build_copilot_candidate(
+                module="persona", action=action,
+                label=label or f"更新分身 · {persona_key}", reason=reason or "根据你的要求调整分身设定。",
+                target={"persona_key": persona_key},
+                before=cw_normalize_persona_single(raw.get("before") or current_item),
+                after=cw_normalize_persona_single(raw.get("after")),
+            )
+        after_value = cw_normalize_persona_card({**copy.deepcopy(project.get("persona_card") or {}), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})})
+        after_main = {key: copy.deepcopy(after_value.get(key)) for key in PERSONA_FIELDS + ["tags"]}
+        return cw_build_copilot_candidate(
+            module="persona", action=action,
+            label=label or f"更新角色主体", reason=reason or "根据你的要求调整主卡字段。",
+            target={"path": "persona_card"},
+            before=raw.get("before") if isinstance(raw.get("before"), dict) else {k: copy.deepcopy((project.get("persona_card") or {}).get(k)) for k in PERSONA_FIELDS + ["tags"]},
+            after=after_main,
+        )
+    if module_name == "worldbook":
+        if action == "append_array_item":
+            index = len((project.get("worldbook") or {}).get("entries", []))
+            after_value = cw_normalize_worldbook_entry(raw.get("after"), index)
+            return cw_build_copilot_candidate(
+                module="worldbook", action=action,
+                label=label or f"新增世界书", reason=reason or "根据你的要求补充新的世界书词条。",
+                target={"id": cw_normalize_text(after_value.get("id")), "index": index},
+                before=None, after=after_value,
+            )
+        entry_id = cw_normalize_text(target.get("id"))
+        entries = (project.get("worldbook") or {}).get("entries", [])
+        current_item = next((item for item in entries if cw_normalize_text(item.get("id")) == entry_id), None)
+        if not current_item:
+            return None
+        idx = entries.index(current_item)
+        return cw_build_copilot_candidate(
+            module="worldbook", action="update_array_item",
+            label=label or f"更新世界书", reason=reason or "根据你的要求改写世界书词条。",
+            target={"id": entry_id, "index": idx},
+            before=cw_normalize_worldbook_entry(raw.get("before") or current_item, idx),
+            after=cw_normalize_worldbook_entry({**copy.deepcopy(current_item), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})}, idx),
+        )
+    if module_name == "preset":
+        if action == "append_array_item":
+            index = len((project.get("preset") or {}).get("presets", []))
+            after_value = cw_normalize_preset_item(raw.get("after"), index)
+            return cw_build_copilot_candidate(
+                module="preset", action=action,
+                label=label or f"新增预设", reason=reason or "根据你的要求补充新的预设。",
+                target={"id": cw_normalize_text(after_value.get("id")), "index": index},
+                before=None, after=after_value,
+            )
+        item_id = cw_normalize_text(target.get("id"))
+        items = (project.get("preset") or {}).get("presets", [])
+        current_item = next((item for item in items if cw_normalize_text(item.get("id")) == item_id), None)
+        if not current_item:
+            return None
+        idx = items.index(current_item)
+        return cw_build_copilot_candidate(
+            module="preset", action="update_array_item",
+            label=label or f"更新预设", reason=reason or "根据你的要求改写预设。",
+            target={"id": item_id, "index": idx},
+            before=cw_normalize_preset_item(raw.get("before") or current_item, idx),
+            after=cw_normalize_preset_item({**copy.deepcopy(current_item), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})}, idx),
+        )
+    if action == "append_array_item":
+        index = len((project.get("memory") or {}).get("items", []))
+        after_value = cw_normalize_memory_item(raw.get("after"), index)
+        return cw_build_copilot_candidate(
+            module="memory", action=action,
+            label=label or f"新增记忆", reason=reason or "根据你的要求补充新的记忆。",
+            target={"id": cw_normalize_text(after_value.get("id")), "index": index},
+            before=None, after=after_value,
+        )
+    item_id = cw_normalize_text(target.get("id"))
+    items = (project.get("memory") or {}).get("items", [])
+    current_item = next((item for item in items if cw_normalize_text(item.get("id")) == item_id), None)
+    if not current_item:
+        return None
+    idx = items.index(current_item)
+    return cw_build_copilot_candidate(
+        module="memory", action="update_array_item",
+        label=label or f"更新记忆", reason=reason or "根据你的要求改写记忆。",
+        target={"id": item_id, "index": idx},
+        before=cw_normalize_memory_item(raw.get("before") or current_item, idx),
+        after=cw_normalize_memory_item({**copy.deepcopy(current_item), **(raw.get("after") if isinstance(raw.get("after"), dict) else {})}, idx),
+    )
+
+
+def cw_build_copilot_review_summary(candidates: list[dict[str, Any]], current_view: str) -> str:
+    if not candidates:
+        return "这次没有整理出可安全应用的候选修改。"
+    module_labels = {"persona": "人设", "worldbook": "世界书", "preset": "预设", "memory": "记忆"}
+    touched = []
+    for c in candidates:
+        name = module_labels.get(c.get("module"))
+        if name and name not in touched:
+            touched.append(name)
+    return f"已基于整张卡内容整理出 {len(candidates)} 条候选修改，涉及 {'、'.join(touched) or module_labels.get(current_view, '当前卡')}。"
+
+
+def cw_generate_copilot_fallback(prompt_text: str, current_view: str, focus_hint: dict[str, Any], project: dict[str, Any]) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    persona_after = {
+        "name": "新角色", "description": f"围绕“{cw_normalize_text(prompt_text)[:60]}”生成的原创角色。",
+        "personality": "语气鲜明、反应具体，保持角色身份稳定。",
+        "first_mes": "{{user}}，你终于来了。新角色轻轻靠近，像是已经等了很久。",
+        "mes_example": "{{char}}: 我是新角色。\n{{user}}: 你好。\n{{char}}: 很高兴见到你。",
+        "scenario": "{{user}}与新角色刚开始近距离相处。",
+        "creator_notes": "必须直接扮演角色，不输出字段说明；保持人设一致。",
+        "tags": ["新角色", "AI草稿"],
+    }
+    persona_before = {k: copy.deepcopy((project.get("persona_card") or {}).get(k)) for k in PERSONA_FIELDS + ["tags"]}
+    for key, value in persona_after.items():
+        candidates.append({
+            "module": "persona", "action": "json_patch",
+            "label": f"填充 persona_card.{key}", "reason": "根据你的要求生成人设卡字段。",
+            "target": {"path": f"persona_card.{key}", "operation": "set"},
+            "before": persona_before.get(key), "after": value, "fingerprint": "",
+        })
+    for c in candidates:
+        c["fingerprint"] = hashlib.sha1(json.dumps({k: v for k, v in c.items() if k != "fingerprint"}, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
+    return {"summary": f"已根据整张卡整理出 {len(candidates)} 条候选修改，请选择 YES 填充或 NO 取消。", "candidates": candidates}
+
+
+def cw_build_copilot_system_prompt(current_view: str, focus_hint: dict[str, Any], settings: dict[str, Any]) -> str:
+    shared = cw_normalize_text(settings.get("base_system_prompt")) or "你是缃笺 Card Writer 的结构化写作助手。"
+    focus_title = cw_normalize_text(focus_hint.get("title")) or "当前卡"
+    return "\n\n".join([
+        shared,
+        "你现在负责分析整张 Card Writer 工程，而不是只重写当前条目。",
+        f"当前视图是 {current_view}，当前焦点提示是：{focus_title}。",
+        "必须只返回一个 JSON 对象，不要输出 markdown、解释、代码块或额外文字。",
+        '{"summary":"string","candidates":[{"module":"persona|worldbook|preset|memory","action":"json_patch","label":"string","reason":"string","target":{"path":"persona_card.name","operation":"set"},"before":"current","after":"new value"}]}',
+    ])
+
+
+def cw_build_copilot_user_payload(prompt_text: str, focus_hint: dict[str, Any], project: dict[str, Any], project_revision: str, current_view: str) -> str:
+    return json.dumps({"prompt": prompt_text, "current_view": current_view, "focus_hint": focus_hint, "project_revision": project_revision, "project": project}, ensure_ascii=False)
+
+
+def cw_call_copilot_llm(*, prompt_text: str, current_view: str, focus_hint: dict[str, Any], project: dict[str, Any], project_revision: str, config: dict[str, Any]) -> dict[str, Any]:
+    url = cw_build_copilot_api_url(config["base_url"], "chat/completions")
+    settings = cw_get_copilot_settings()
+    payload = {
+        "model": config["model"],
+        "messages": [
+            {"role": "system", "content": cw_build_copilot_system_prompt(current_view, focus_hint, settings)},
+            {"role": "user", "content": cw_build_copilot_user_payload(prompt_text, focus_hint, project, project_revision, current_view)},
+        ],
+        "temperature": cw_clamp_float(config.get("temperature"), 0.0, 2.0, DEFAULT_LLM_TEMPERATURE),
+        "response_format": {"type": "json_object"},
+    }
+    data = cw_request_json_sync(url=url, api_key=config["api_key"], payload=payload, request_timeout=int(config["request_timeout"]))
+    try:
+        raw_reply = str(data["choices"][0]["message"]["content"])
+    except (KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(status_code=502, detail="AI 返回格式无效。") from exc
+    text = raw_reply.strip()
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, re.IGNORECASE)
+    if fenced:
+        text = fenced.group(1).strip()
+    try:
+        parsed = json.loads(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="AI 返回的不是合法 JSON。") from exc
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=502, detail="AI 返回的 JSON 根节点必须是对象。")
+    return parsed
+
+
+def cw_build_copilot_api_url(base_url: str, endpoint: str) -> str:
+    clean_base = base_url.strip().rstrip("/")
+    clean_endpoint = endpoint.strip("/")
+    if not clean_base:
+        raise HTTPException(status_code=400, detail="未配置 LLM_BASE_URL。")
+    if clean_base.endswith(f"/{clean_endpoint}") or clean_base.endswith(clean_endpoint):
+        return clean_base
+    return f"{clean_base}/{clean_endpoint}"
+
+
+def cw_request_json_sync(*, url: str, api_key: str, payload: dict[str, Any], request_timeout: int) -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    key = api_key.strip()
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    try:
+        with httpx.Client(timeout=float(request_timeout)) as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        response_text = exc.response.text.strip() if exc.response is not None else ""
+        raise HTTPException(status_code=502, detail=f"AI 请求失败：{response_text[:500] or str(exc)}") from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"AI 请求失败：{exc}") from exc
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="AI 返回的不是合法 JSON。") from exc
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="AI 返回的根结构无效。")
+    return data
+
+
+# ── Card Writer store & compiler instances ──
+
+cw_store = CW_ProjectStore(CARD_WRITER_PROJECTS_DIR, CARD_WRITER_AUTOSAVES_DIR, CARD_WRITER_EXPORTS_DIR, CARD_WRITER_WORKSPACE_PATH)
+cw_compiler = CW_CardCompiler()
+cw_store.ensure_dirs()
+
+
+# ── Card Writer page route ──
+
+@app.get("/card-writer", response_class=HTMLResponse)
+async def card_writer_page(request: Request) -> HTMLResponse:
+    active_slot = get_active_slot_id()
+    return templates.TemplateResponse(
+        request,
+        "card_writer.html",
+        {
+            "project": cw_store.load_workspace(),
+            "api_base_path": "/card-writer",
+            "settings": get_settings(active_slot),
+            "active_slot": active_slot,
+            "slot_registry": get_slot_registry(),
+        },
+    )
+
+
+# ── Card Writer API routes ──
+
+@app.get("/card-writer/api/projects")
+async def cw_list_projects() -> dict[str, Any]:
+    return {"projects": cw_store.list_projects()}
+
+
+@app.get("/card-writer/api/projects/{filename}")
+async def cw_get_project(filename: str) -> dict[str, Any]:
+    return {"project": cw_store.load_project(filename)}
+
+
+@app.post("/card-writer/api/projects/{filename}")
+async def cw_save_project(filename: str, payload: CW_CardWriterProject) -> dict[str, Any]:
+    return cw_store.save_project(filename, payload.model_dump())
+
+
+@app.delete("/card-writer/api/projects/{filename}")
+async def cw_delete_project(filename: str) -> dict[str, Any]:
+    cw_store.delete_project(filename)
+    return {"ok": True}
+
+
+@app.get("/card-writer/api/workspace")
+async def cw_get_workspace() -> dict[str, Any]:
+    return {"project": cw_store.load_workspace()}
+
+
+@app.post("/card-writer/api/workspace")
+async def cw_save_workspace(payload: CW_CardWriterProject) -> dict[str, Any]:
+    return cw_store.save_workspace(payload.model_dump())
+
+
+@app.delete("/card-writer/api/workspace")
+async def cw_clear_workspace() -> dict[str, Any]:
+    return cw_store.clear_workspace()
+
+
+@app.post("/card-writer/api/autosave")
+async def cw_save_autosave(payload: CW_CardWriterProject) -> dict[str, Any]:
+    return cw_store.save_autosave(payload.model_dump())
+
+
+@app.post("/card-writer/api/compile")
+async def cw_compile(payload: CW_CardWriterProject) -> dict[str, Any]:
+    return {"ok": True, "card": cw_compiler.compile(payload.model_dump())}
+
+
+@app.post("/card-writer/api/validate")
+async def cw_validate(payload: CW_CardWriterProject) -> dict[str, Any]:
+    project = payload.model_dump()
+    card = cw_compiler.compile(project)
+    warnings = cw_compiler.validate(project, card)
+    return {"ok": not any(item["level"] == "error" for item in warnings), "warnings": warnings}
+
+
+@app.get("/card-writer/api/settings")
+async def cw_get_settings() -> dict[str, Any]:
+    return {"ok": True, "settings": cw_get_copilot_settings()}
+
+
+@app.post("/card-writer/api/settings")
+async def cw_save_settings(payload: CW_CopilotSettingsPayload) -> dict[str, Any]:
+    return {"ok": True, "settings": cw_save_copilot_settings(payload.model_dump())}
+
+
+@app.post("/card-writer/api/ai/generate")
+async def cw_ai_generate(payload: CW_CopilotGeneratePayload) -> dict[str, Any]:
+    return cw_compiler.generate_copilot_draft(payload).model_dump()
+
+
+@app.post("/card-writer/api/export")
+async def cw_export(payload: CW_ExportPayload) -> Response:
+    export_target = str(payload.target or "persona").strip().lower()
+    content_payload = cw_compiler.export_payload(payload.project.model_dump(), export_target)
+    safe_name = cw_ensure_export_filename(payload.filename) or "untitled.json"
+    content = json.dumps(content_payload, ensure_ascii=False, indent=2)
+    encoded_filename = quote(safe_name)
+    headers = {"Content-Disposition": f"attachment; filename=download.json; filename*=UTF-8''{encoded_filename}"}
+    return Response(content=content, media_type="application/json; charset=utf-8", headers=headers)
+
+
+@app.post("/card-writer/api/import-card")
+async def cw_import_card(payload: dict[str, Any]) -> dict[str, Any]:
+    return {"ok": True, "project": cw_compiler.import_payload(payload)}
