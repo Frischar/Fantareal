@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Memory - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=p6-memory-rp-dossier-20260627" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-toggle-20260701" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
   </head>
   <body class="app-sidebar-shell modern-setting-page memory-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
@@ -327,11 +327,11 @@
       </article>
     </template>
 
-    <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/app-core.js?v=v161-p4-batch-render-atomic-20260701"></script>
     <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script>
-      const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground } = window.Fantareal;
+      const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, batchRenderList } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
       const memoryListEl = document.getElementById("memory-list");
       const mergedListEl = document.getElementById("merged-list");
@@ -404,6 +404,56 @@
         }
       }
 
+      const MEMORY_INPUT_REFRESH_DELAY = 80;
+      const MEMORY_RENDER_BATCH_SIZE = 8;
+      let memorySearchTextCache = new WeakMap();
+      let memoryRefreshTimer = 0;
+      let pendingMemorySearch = false;
+      const pendingMemoryCards = new Set();
+
+      function invalidateMemoryCardCache(card) {
+        if (card) memorySearchTextCache.delete(card);
+      }
+
+      function invalidateMemoryCaches() {
+        memorySearchTextCache = new WeakMap();
+      }
+
+      function clearPendingMemoryRefresh() {
+        pendingMemoryCards.clear();
+        pendingMemorySearch = false;
+      }
+
+      function flushMemoryRefresh() {
+        if (memoryRefreshTimer) {
+          window.clearTimeout(memoryRefreshTimer);
+          memoryRefreshTimer = 0;
+        }
+        const cards = [...pendingMemoryCards];
+        const shouldSearch = pendingMemorySearch;
+        clearPendingMemoryRefresh();
+        cards.forEach(updateMemorySummary);
+        if (shouldSearch) applyMemorySearch();
+      }
+
+      function scheduleMemoryRefresh({ card = null, search = true, delay = MEMORY_INPUT_REFRESH_DELAY } = {}) {
+        if (card) pendingMemoryCards.add(card);
+        pendingMemorySearch ||= Boolean(search);
+        if (memoryRefreshTimer) window.clearTimeout(memoryRefreshTimer);
+        memoryRefreshTimer = window.setTimeout(flushMemoryRefresh, delay);
+      }
+
+      function refreshMemoryNow({ cards = [], search = true, invalidate = false } = {}) {
+        if (memoryRefreshTimer) {
+          window.clearTimeout(memoryRefreshTimer);
+          memoryRefreshTimer = 0;
+        }
+        clearPendingMemoryRefresh();
+        if (invalidate) invalidateMemoryCaches();
+        cards.forEach(updateMemorySummary);
+        if (search) applyMemorySearch();
+      }
+
       function getStatusState(text) {
         const value = String(text || "");
         if (/失败|错误|异常|无法/.test(value)) return "error";
@@ -459,12 +509,16 @@
       }
 
       function getMemorySearchText(card) {
-        return [
+        const cached = memorySearchTextCache.get(card);
+        if (cached !== undefined) return cached;
+        const text = [
           card.querySelector(".memory-title")?.value || "",
           card.querySelector(".memory-content")?.value || "",
           card.querySelector(".memory-tags")?.value || "",
           card.querySelector(".memory-notes")?.value || "",
         ].join("\n").toLowerCase();
+        memorySearchTextCache.set(card, text);
+        return text;
       }
 
       function createMemorySummaryChip(text, className = "") {
@@ -658,7 +712,7 @@
         card.querySelector(".remove-memory").addEventListener("click", () => {
           (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
             updateMemoryCount();
-            applyMemorySearch();
+            refreshMemoryNow({ search: true, invalidate: true });
             setStatus("已删除一条原记忆，记得保存。");
           });
         });
@@ -684,7 +738,8 @@
             setMemoryCardArchiveState(card, "active", "");
             card.style.display = "";
             updateMemoryCount();
-            applyMemorySearch();
+            invalidateMemoryCardCache(card);
+            refreshMemoryNow({ cards: [card], search: true });
             setStatus("已恢复一条归档原记忆，记得保存。");
           });
         }
@@ -717,6 +772,15 @@
         setMemoryCollapsed(card, Boolean(defaultCollapsed));
         updateMemorySummary(card);
         return card;
+      }
+
+      async function renderMemoryCards(items = []) {
+        return batchRenderList(
+          memoryListEl,
+          items,
+          (item) => createMemoryCard(item, true),
+          { batchSize: MEMORY_RENDER_BATCH_SIZE }
+        );
       }
 
       function collectMemories() {
@@ -1308,10 +1372,9 @@
 
       async function loadMemories() {
         const items = await getJson("/api/memories");
-        memoryListEl.innerHTML = "";
-        for (const item of items) {
-          memoryListEl.appendChild(createMemoryCard(item, true));
-        }
+        const renderResult = await renderMemoryCards(items);
+        if (renderResult?.cancelled) return;
+        invalidateMemoryCaches();
         updateMemoryCount();
         applyMemorySearch();
       }
@@ -1334,10 +1397,9 @@
       async function saveMemories() {
         const items = collectMemories();
         const data = await postJson("/api/memories", { items });
-        memoryListEl.innerHTML = "";
-        for (const item of data.items || []) {
-          memoryListEl.appendChild(createMemoryCard(item, true));
-        }
+        const renderResult = await renderMemoryCards(data.items || []);
+        if (renderResult?.cancelled) return;
+        invalidateMemoryCaches();
         updateMemoryCount();
         applyMemorySearch();
         setStatus("原记忆已保存；归档项不会进入聊天 prompt。");
@@ -1347,10 +1409,9 @@
         if (!file) return;
         const rawJson = await file.text();
         const data = await postJson("/api/memories/import", { raw_json: rawJson });
-        memoryListEl.innerHTML = "";
-        for (const item of data.items || []) {
-          memoryListEl.appendChild(createMemoryCard(item, true));
-        }
+        const renderResult = await renderMemoryCards(data.items || []);
+        if (renderResult?.cancelled) return;
+        invalidateMemoryCaches();
         updateMemoryCount();
         applyMemorySearch();
         setStatus(`原记忆导入完成：${data.items?.length || 0} 条。`);
@@ -1398,10 +1459,9 @@
             source_action: sourceAction
           });
 
-          memoryListEl.innerHTML = "";
-          for (const item of data.remaining_items || []) {
-            memoryListEl.appendChild(createMemoryCard(item, true));
-          }
+          const renderResult = await renderMemoryCards(data.remaining_items || []);
+          if (renderResult?.cancelled) return;
+          invalidateMemoryCaches();
 
           renderMergedList(data.merged_items || []);
           renderOutlineTable(data.outline_items || []);
@@ -1535,7 +1595,7 @@
         memoryListEl.prepend(card);
         window.Fantareal?.motion?.pulseItem(card);
         updateMemoryCount();
-        applyMemorySearch();
+        refreshMemoryNow({ cards: [card], search: true, invalidate: true });
         setStatus("已新增一条空白原记忆。");
       });
 
@@ -1673,14 +1733,14 @@
       memoryListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".memory-card");
         if (!card) return;
+        invalidateMemoryCardCache(card);
         card.querySelector(".memory-card-head strong").textContent =
           card.querySelector(".memory-title").value.trim() || "新记忆";
-        updateMemorySummary(card);
-        applyMemorySearch();
+        scheduleMemoryRefresh({ card, search: true });
       });
 
       document.getElementById("memory-search").addEventListener("input", () => {
-        applyMemorySearch();
+        scheduleMemoryRefresh({ search: true });
       });
 
       document.getElementById("collapse-all-memories").addEventListener("click", () => {
@@ -1706,7 +1766,7 @@
 
       document.getElementById("toggle-archived-memories")?.addEventListener("click", () => {
         showArchivedMemories = !showArchivedMemories;
-        applyMemorySearch();
+        refreshMemoryNow({ search: true });
         setStatus(showArchivedMemories ? "已显示归档原记忆。" : "已隐藏归档原记忆。");
       });
 
@@ -1716,6 +1776,7 @@
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
       initExistingMemoryCards();
+      invalidateMemoryCaches();
       updateMemoryCount();
       applyMemorySearch();
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Worldbook Entries - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p9-textarea-scroll-20260701" />
     <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
@@ -660,12 +660,12 @@
       </article>
     </template>
 
-    <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/app-core.js?v=v161-p4-batch-render-atomic-20260701"></script>
     <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
     <script>
-      const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
+      const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, postJson, batchRenderList } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
       const worldbookListEl = document.getElementById("worldbook-entry-list");
       const worldbookCountEl = document.getElementById("worldbook-count");
@@ -802,6 +802,110 @@
         setStatus(message);
       }
 
+      const WORLDBOOK_INPUT_REFRESH_DELAY = 80;
+      const WORLDBOOK_RENDER_BATCH_SIZE = 6;
+      let worldbookSearchTextCache = new WeakMap();
+      let worldbookHealthCache = null;
+      let worldbookRefreshTimer = 0;
+      const pendingWorldbookRefresh = {
+        navigation: false,
+        health: false,
+        healthResults: false,
+        search: false,
+      };
+      const pendingWorldbookHealthCards = new Set();
+
+      function isHealthResultsVisible() {
+        return Boolean(healthResultsEl && !healthResultsEl.classList.contains("is-hidden"));
+      }
+
+      function invalidateWorldbookHealthCache() {
+        worldbookHealthCache = null;
+      }
+
+      function invalidateWorldbookCardCache(card, options = {}) {
+        if (card) worldbookSearchTextCache.delete(card);
+        if (options.health === "full") invalidateWorldbookHealthCache();
+        if (card && options.health === "card" && worldbookHealthCache) {
+          updateWorldbookHealthForCard(card);
+        }
+      }
+
+      function invalidateWorldbookCaches() {
+        worldbookSearchTextCache = new WeakMap();
+        invalidateWorldbookHealthCache();
+      }
+
+      function clearPendingWorldbookRefresh() {
+        pendingWorldbookRefresh.navigation = false;
+        pendingWorldbookRefresh.health = false;
+        pendingWorldbookRefresh.healthResults = false;
+        pendingWorldbookRefresh.search = false;
+        pendingWorldbookHealthCards.clear();
+      }
+
+      function flushWorldbookRefresh() {
+        if (worldbookRefreshTimer) {
+          window.clearTimeout(worldbookRefreshTimer);
+          worldbookRefreshTimer = 0;
+        }
+        const pending = { ...pendingWorldbookRefresh };
+        const healthCards = [...pendingWorldbookHealthCards];
+        clearPendingWorldbookRefresh();
+        if (pending.navigation) refreshWorldbookNavigation();
+        healthCards.forEach((card) => updateWorldbookHealthForCard(card));
+        const shouldRenderHealth = pending.healthResults && isHealthResultsVisible();
+        if (shouldRenderHealth) {
+          renderHealthResults({ applySearch: false, fullScan: pending.health });
+        } else if (pending.health) {
+          analyzeWorldbookHealth({ force: true });
+          updateHealthFilterLabel();
+        } else if (healthCards.length) {
+          updateHealthFilterLabel();
+        }
+        if (pending.search) applyWorldbookSearch();
+      }
+
+      function scheduleWorldbookRefresh(options = {}) {
+        pendingWorldbookRefresh.navigation ||= Boolean(options.navigation);
+        pendingWorldbookRefresh.health ||= Boolean(options.health);
+        pendingWorldbookRefresh.healthResults ||= Boolean(options.healthResults);
+        pendingWorldbookRefresh.search ||= options.search !== false;
+        if (options.healthCard) pendingWorldbookHealthCards.add(options.healthCard);
+        if (worldbookRefreshTimer) window.clearTimeout(worldbookRefreshTimer);
+        worldbookRefreshTimer = window.setTimeout(flushWorldbookRefresh, options.delay ?? WORLDBOOK_INPUT_REFRESH_DELAY);
+      }
+
+      function refreshWorldbookNow(options = {}) {
+        if (worldbookRefreshTimer) {
+          window.clearTimeout(worldbookRefreshTimer);
+          worldbookRefreshTimer = 0;
+        }
+        clearPendingWorldbookRefresh();
+        if (options.navigation) refreshWorldbookNavigation();
+        if (options.healthCard) updateWorldbookHealthForCard(options.healthCard);
+        if (options.healthResults && isHealthResultsVisible()) {
+          renderHealthResults({ applySearch: false, fullScan: Boolean(options.health) });
+        } else if (options.health) {
+          analyzeWorldbookHealth({ force: true });
+          updateHealthFilterLabel();
+        } else if (options.healthCard) {
+          updateHealthFilterLabel();
+        }
+        if (options.search !== false) applyWorldbookSearch();
+      }
+
+      function refreshWorldbookDerivedState(options = {}) {
+        invalidateWorldbookCaches();
+        const shouldRefreshHealth = options.health !== false && (isHealthResultsVisible() || Boolean(activeHealthIssue));
+        refreshWorldbookNow({
+          navigation: options.navigation !== false,
+          health: shouldRefreshHealth,
+          healthResults: options.healthResults ?? isHealthResultsVisible(),
+          search: options.search !== false,
+        });
+      }
+
 
 
 
@@ -857,7 +961,8 @@
         if (stage && card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = stage.stage_key || "";
         updateExternalTagPreview(card);
         updateCardTitle(card);
-        applyWorldbookSearch();
+        invalidateWorldbookCardCache(card);
+        refreshWorldbookNow({ healthCard: card, healthResults: isHealthResultsVisible(), search: true });
       }
 
       function populateExternalStageSelectors(card) {
@@ -875,7 +980,8 @@
         stageSelect.innerHTML = stages.length
           ? optionHtml("", "请选择阶段", !currentStageKey) + stages.map((stage) => optionHtml(stage.stage_key || "", stage.stage_name || stage.stage_key || "未命名阶段", String(stage.stage_key || "") === currentStageKey)).join("")
           : optionHtml("", selectedRole ? "该角色暂无阶段" : "请先选择角色", true);
-        roleSelect.onchange = () => {
+        roleSelect.onchange = (event) => {
+          event?.stopPropagation();
           const role = findStageCatalogRole(roleSelect.value);
           const firstStage = role?.stages?.[0] || null;
           if (card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = role?.role_id || "";
@@ -885,10 +991,12 @@
           populateExternalStageSelectors(card);
           updateExternalTagPreview(card);
           updateCardTitle(card);
-          applyWorldbookSearch();
+          invalidateWorldbookCardCache(card);
+          refreshWorldbookNow({ healthCard: card, healthResults: isHealthResultsVisible(), search: true });
           markWorldbookDirty("已选择数据库角色阶段，记得保存世界书。");
         };
-        stageSelect.onchange = () => {
+        stageSelect.onchange = (event) => {
+          event?.stopPropagation();
           applyExternalStageSelection(card, roleSelect.value, stageSelect.value);
           markWorldbookDirty("已选择数据库阶段，记得保存世界书。");
         };
@@ -1117,7 +1225,9 @@
       }
 
       function getCardSearchText(card) {
-        return [
+        const cached = worldbookSearchTextCache.get(card);
+        if (cached !== undefined) return cached;
+        const text = [
           card.querySelector(".wb-title")?.value || "",
           card.querySelector(".wb-group")?.value || "",
           card.querySelector(".wb-trigger")?.value || "",
@@ -1134,6 +1244,8 @@
           card.querySelector(".wb-content")?.value || "",
           card.querySelector(".wb-comment")?.value || "",
         ].join("\n").toLowerCase();
+        worldbookSearchTextCache.set(card, text);
+        return text;
       }
 
       function setEntryCollapsed(card, collapsed) {
@@ -1429,55 +1541,139 @@
         return getHealthIssueDefinitions().find((item) => item.key === key);
       }
 
-      function analyzeWorldbookHealth() {
-        const cards = getAllEntryCards();
-        const titleMap = new Map();
-        const triggerMap = new Map();
-
-        cards.forEach((card) => {
-          const title = normalizeSearchText(getTrimmedValue(card, ".wb-title"));
-          const trigger = getNormalizedTrigger(card);
-          if (title) titleMap.set(title, (titleMap.get(title) || 0) + 1);
-          if (trigger) triggerMap.set(trigger, (triggerMap.get(trigger) || 0) + 1);
-        });
-
-        const issueMap = new Map();
-        const addIssue = (card, issueKey) => {
-          if (!issueMap.has(issueKey)) issueMap.set(issueKey, []);
-          issueMap.get(issueKey).push(card);
-          const existing = String(card.dataset.healthIssues || "").split(",").filter(Boolean);
-          if (!existing.includes(issueKey)) {
-            existing.push(issueKey);
-            card.dataset.healthIssues = existing.join(",");
-          }
+      function createWorldbookHealthCache(cards = getAllEntryCards()) {
+        return {
+          cards,
+          issueMap: new Map(),
+          titleMap: new Map(),
+          triggerMap: new Map(),
+          facts: new WeakMap(),
         };
+      }
 
+      function getWorldbookHealthFacts(card) {
+        const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
+        return {
+          title: normalizeSearchText(getTrimmedValue(card, ".wb-title")),
+          trigger: getNormalizedTrigger(card),
+          content: getTrimmedValue(card, ".wb-content"),
+          entryType,
+          promptLayer: card.querySelector(".wb-prompt-layer")?.value || "follow_position",
+          groupKey: getCardGroupKey(card),
+          enabled: card.querySelector(".wb-enabled")?.checked !== false,
+          insertionPosition: card.querySelector(".wb-insertion-position")?.value || "after_char_defs",
+          chance: Number(card.querySelector(".wb-chance")?.value || 100),
+        };
+      }
+
+      function addCardToHealthIndex(cache, card, facts = getWorldbookHealthFacts(card)) {
+        cache.facts.set(card, facts);
+        if (facts.title) addCardToHealthBucket(cache.titleMap, facts.title, card);
+        if (facts.trigger) addCardToHealthBucket(cache.triggerMap, facts.trigger, card);
+      }
+
+      function removeCardFromHealthIndex(cache, card, facts = cache.facts.get(card)) {
+        if (!facts) return;
+        if (facts.title) removeCardFromHealthBucket(cache.titleMap, facts.title, card);
+        if (facts.trigger) removeCardFromHealthBucket(cache.triggerMap, facts.trigger, card);
+      }
+
+      function addCardToHealthBucket(map, key, card) {
+        if (!map.has(key)) map.set(key, new Set());
+        map.get(key).add(card);
+      }
+
+      function removeCardFromHealthBucket(map, key, card) {
+        const bucket = map.get(key);
+        if (!bucket) return;
+        bucket.delete(card);
+        if (!bucket.size) map.delete(key);
+      }
+
+      function collectBasicHealthIssues(facts) {
+        const issues = [];
+        if (!facts.content) issues.push("empty_content");
+        if (facts.entryType === "keyword" && !facts.trigger) issues.push("keyword_without_trigger");
+        if (!facts.title) issues.push("untitled");
+        if (facts.groupKey === "__ungrouped__") issues.push("ungrouped");
+        if (!facts.enabled) issues.push("disabled");
+        return issues;
+      }
+
+      function collectRuntimeHealthIssues(facts) {
+        const issues = [];
+        if (facts.entryType === "constant") issues.push("constant");
+        if (facts.promptLayer !== "follow_position") issues.push(facts.promptLayer);
+        if (facts.insertionPosition === "in_chat") issues.push("in_chat");
+        if (facts.entryType !== "external_tag" && facts.chance <= 0) issues.push("chance_zero");
+        return issues;
+      }
+
+      function collectDuplicateHealthIssues(facts, cache) {
+        const issues = [];
+        if (facts.title && (cache.titleMap.get(facts.title)?.size || 0) > 1) issues.push("duplicate_title");
+        if (facts.trigger && (cache.triggerMap.get(facts.trigger)?.size || 0) > 1) issues.push("duplicate_trigger");
+        return issues;
+      }
+
+      function collectWorldbookCardHealthIssues(card, cache, facts = cache.facts.get(card) || getWorldbookHealthFacts(card)) {
+        return [
+          ...collectBasicHealthIssues(facts),
+          ...collectRuntimeHealthIssues(facts),
+          ...collectDuplicateHealthIssues(facts, cache),
+        ];
+      }
+
+      function setWorldbookCardHealthIssues(cache, card, issues) {
+        const previous = String(card.dataset.healthIssues || "").split(",").filter(Boolean);
+        previous.forEach((issueKey) => removeCardFromHealthBucket(cache.issueMap, issueKey, card));
+        const uniqueIssues = [...new Set(issues)];
+        card.dataset.healthIssues = uniqueIssues.join(",");
+        uniqueIssues.forEach((issueKey) => addCardToHealthBucket(cache.issueMap, issueKey, card));
+      }
+
+      function addCardsFromHealthBucket(target, map, key) {
+        if (!key) return;
+        (map.get(key) || []).forEach((card) => target.add(card));
+      }
+
+      function collectAffectedDuplicateCards(cache, previousFacts, nextFacts) {
+        const affected = new Set();
+        addCardsFromHealthBucket(affected, cache.titleMap, previousFacts?.title);
+        addCardsFromHealthBucket(affected, cache.titleMap, nextFacts?.title);
+        addCardsFromHealthBucket(affected, cache.triggerMap, previousFacts?.trigger);
+        addCardsFromHealthBucket(affected, cache.triggerMap, nextFacts?.trigger);
+        return affected;
+      }
+
+      function refreshWorldbookHealthCards(cache, cards) {
         cards.forEach((card) => {
-          card.dataset.healthIssues = "";
-          const title = normalizeSearchText(getTrimmedValue(card, ".wb-title"));
-          const trigger = getNormalizedTrigger(card);
-          const content = getTrimmedValue(card, ".wb-content");
-          const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
-          const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
-          const groupKey = getCardGroupKey(card);
-          const enabled = card.querySelector(".wb-enabled")?.checked !== false;
-          const insertionPosition = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
-          const chance = Number(card.querySelector(".wb-chance")?.value || 100);
-
-          if (!content) addIssue(card, "empty_content");
-          if (entryType === "keyword" && !trigger) addIssue(card, "keyword_without_trigger");
-          if (!title) addIssue(card, "untitled");
-          if (groupKey === "__ungrouped__") addIssue(card, "ungrouped");
-          if (!enabled) addIssue(card, "disabled");
-          if (entryType === "constant") addIssue(card, "constant");
-          if (promptLayer !== "follow_position") addIssue(card, promptLayer);
-          if (insertionPosition === "in_chat") addIssue(card, "in_chat");
-          if (entryType !== "external_tag" && chance <= 0) addIssue(card, "chance_zero");
-          if (title && (titleMap.get(title) || 0) > 1) addIssue(card, "duplicate_title");
-          if (trigger && (triggerMap.get(trigger) || 0) > 1) addIssue(card, "duplicate_trigger");
+          if (!card || !worldbookListEl.contains(card)) return;
+          setWorldbookCardHealthIssues(cache, card, collectWorldbookCardHealthIssues(card, cache));
         });
+      }
 
-        return { cards, issueMap };
+      function analyzeWorldbookHealth(options = {}) {
+        if (!options.force && worldbookHealthCache) return worldbookHealthCache;
+        const cache = createWorldbookHealthCache();
+        cache.cards.forEach((card) => addCardToHealthIndex(cache, card));
+        refreshWorldbookHealthCards(cache, cache.cards);
+        worldbookHealthCache = cache;
+        return worldbookHealthCache;
+      }
+
+      function updateWorldbookHealthForCard(card) {
+        if (!card || !worldbookHealthCache) return null;
+        const cache = worldbookHealthCache;
+        if (!cache.cards.includes(card)) cache.cards.push(card);
+        const previousFacts = cache.facts.get(card);
+        removeCardFromHealthIndex(cache, card, previousFacts);
+        const nextFacts = getWorldbookHealthFacts(card);
+        addCardToHealthIndex(cache, card, nextFacts);
+        const affected = collectAffectedDuplicateCards(cache, previousFacts, nextFacts);
+        affected.add(card);
+        refreshWorldbookHealthCards(cache, affected);
+        return cache;
       }
 
       function updateHealthFilterLabel() {
@@ -1492,13 +1688,14 @@
         activeHealthFilterEl.classList.add("worldbook-health-filter-active");
       }
 
-      function renderHealthResults() {
+      function renderHealthResults(options = {}) {
         if (!healthResultsEl) return;
         healthResultsEl.classList.remove("is-hidden");
-        const { cards, issueMap } = analyzeWorldbookHealth();
+        const { cards, issueMap } = analyzeWorldbookHealth({ force: Boolean(options.fullScan || !worldbookHealthCache) });
         healthResultsEl.innerHTML = "";
         const definitions = getHealthIssueDefinitions();
-        const matchedDefinitions = definitions.filter((item) => (issueMap.get(item.key) || []).length > 0);
+        const getIssueCount = (issueKey) => issueMap.get(issueKey)?.size || 0;
+        const matchedDefinitions = definitions.filter((item) => getIssueCount(item.key) > 0);
 
         if (!matchedDefinitions.length) {
           const empty = document.createElement("p");
@@ -1507,12 +1704,12 @@
           healthResultsEl.appendChild(empty);
           activeHealthIssue = "";
           updateHealthFilterLabel();
-          applyWorldbookSearch();
+          if (options.applySearch !== false) applyWorldbookSearch();
           return;
         }
 
         matchedDefinitions.forEach((item) => {
-          const count = (issueMap.get(item.key) || []).length;
+          const count = getIssueCount(item.key);
           const button = document.createElement("button");
           button.type = "button";
           button.className = `worldbook-health-chip${activeHealthIssue === item.key ? " active" : ""}`;
@@ -1534,8 +1731,7 @@
             (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
               updateCount();
               updateSelectedCount();
-              refreshWorldbookNavigation();
-              applyWorldbookSearch();
+              refreshWorldbookDerivedState();
               markWorldbookDirty("已删除一条世界书词条，记得保存。");
             });
           });
@@ -1722,7 +1918,6 @@
         if (card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = externalRef.stage_name || "";
         if (card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = externalRef.stage_key || "";
         normalizeInitialExternalTagsField(card);
-        card.querySelector(".wb-entry-type")?.addEventListener("change", () => { updateExternalTagPreview(card); updateCardTitle(card); applyWorldbookSearch(); });
         card.querySelectorAll(".wb-external-tag-panel input, .wb-external-tag-panel select, .wb-external-tag-panel textarea").forEach((input) => input.addEventListener("input", () => updateExternalTagPreview(card)));
         populateExternalStageSelectors(card);
         updateExternalTagPreview(card);
@@ -1748,6 +1943,15 @@
         updateCardTitle(card);
         setEntryCollapsed(card, options.collapsed ?? true);
         return card;
+      }
+
+      async function renderWorldbookCards(items = [], options = {}) {
+        return batchRenderList(
+          worldbookListEl,
+          items,
+          (item) => createEntryCard(item, { collapsed: options.collapsed ?? true }),
+          { batchSize: WORLDBOOK_RENDER_BATCH_SIZE, clear: options.clear !== false }
+        );
       }
 
       function collectEntries() {
@@ -1820,33 +2024,23 @@
       async function reloadEntries() {
         await loadStateJournalStageCatalog();
         const data = await fetch("/api/worldbook/entries").then((response) => response.json());
-        worldbookListEl.innerHTML = "";
-        for (const item of data.items || []) {
-          worldbookListEl.appendChild(createEntryCard(item));
-        }
+        const renderResult = await renderWorldbookCards(data.items || []);
+        if (renderResult?.cancelled) return;
         updateCount();
         updateSelectedCount();
         setWorldbookDirty(false);
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState();
         setStatus("世界书词条已重新读取。");
       }
 
       async function saveEntries() {
         const data = await postJson("/api/worldbook/entries", { items: collectEntries() });
-        worldbookListEl.innerHTML = "";
-        for (const item of data.items || []) {
-          worldbookListEl.appendChild(createEntryCard(item));
-        }
+        const renderResult = await renderWorldbookCards(data.items || []);
+        if (renderResult?.cancelled) return;
         updateCount();
         updateSelectedCount();
         setWorldbookDirty(false);
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState();
         setStatus("世界书词条已保存。");
       }
 
@@ -1987,7 +2181,7 @@
         return row;
       }
 
-      function appendImportedWorldbookEntries(rawJson) {
+      async function appendImportedWorldbookEntries(rawJson) {
         const parsed = parseWorldbookJson(rawJson);
         const rawEntries = extractWorldbookImportEntries(parsed);
         if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
@@ -2002,15 +2196,11 @@
         if (!imported.length) {
           throw new Error("导入文件里没有可追加的世界书词条。");
         }
-        imported.forEach((item) => {
-          worldbookListEl.appendChild(createEntryCard(item));
-        });
+        const renderResult = await renderWorldbookCards(imported, { clear: false });
+        if (renderResult?.cancelled) return;
         updateCount();
         updateSelectedCount();
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState();
         markWorldbookDirty(`已增量追加 ${imported.length} 条世界书词条。检查无误后点击“保存全部词条”。`);
       }
 
@@ -2019,7 +2209,7 @@
         const rawJson = await file.text();
         const importMode = importModeEl?.value || "replace";
         if (importMode === "append") {
-          appendImportedWorldbookEntries(rawJson);
+          await appendImportedWorldbookEntries(rawJson);
           return;
         }
 
@@ -2031,52 +2221,33 @@
           force_in_chat_depth: Number(importForceInChatDepthEl?.value || 0),
           force_injection_order: forceOrderRaw ? Number(forceOrderRaw) : null,
         });
-        worldbookListEl.innerHTML = "";
-        for (const item of data.items || []) {
-          worldbookListEl.appendChild(createEntryCard(item));
-        }
+        const renderResult = await renderWorldbookCards(data.items || []);
+        if (renderResult?.cancelled) return;
         updateCount();
         updateSelectedCount();
         setWorldbookDirty(false);
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState();
         setStatus(`世界书导入完成：${data.items?.length || 0} 条。`);
       }
 
       worldbookListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
+        invalidateWorldbookCardCache(card);
         if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
           syncInjectionUi(card);
+        }
+        if (event.target.closest(".wb-external-tag-panel")) {
+          updateExternalTagPreview(card);
         }
         updateCardTitle(card);
-        if (event.target.classList.contains("wb-group")) {
-          refreshWorldbookNavigation();
-        }
-        if (activeHealthIssue) {
-          analyzeWorldbookHealth();
-          updateHealthFilterLabel();
-        }
         markWorldbookDirty("有未保存修改，记得保存。");
-        applyWorldbookSearch();
-      });
-
-      worldbookListEl.addEventListener("change", (event) => {
-        const card = event.target.closest(".worldbook-entry-card");
-        if (!card) return;
-        if (event.target.classList.contains("wb-entry-type") || event.target.closest(".wb-external-tag-panel")) {
-          if (event.target.classList.contains("wb-external-source")) syncExternalSourceUi(card);
-          updateExternalTagPreview(card);
-          updateCardTitle(card);
-          applyWorldbookSearch();
-        }
-        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
-          syncInjectionUi(card);
-          updateCardTitle(card);
-          applyWorldbookSearch();
-        }
+        scheduleWorldbookRefresh({
+          navigation: event.target.classList.contains("wb-group"),
+          healthCard: card,
+          healthResults: isHealthResultsVisible(),
+          search: true,
+        });
       });
 
       loadStateJournalStageCatalog().then(() => {
@@ -2108,10 +2279,7 @@
         window.Fantareal?.motion?.pulseItem(card);
         updateCount();
         updateSelectedCount();
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState();
         markWorldbookDirty("已新增一条空白世界书词条。");
       });
 
@@ -2170,7 +2338,7 @@
       });
 
       document.getElementById("worldbook-search").addEventListener("input", () => {
-        applyWorldbookSearch();
+        scheduleWorldbookRefresh({ search: true });
       });
 
       quickFiltersEl?.addEventListener("click", (event) => {
@@ -2182,13 +2350,12 @@
       });
 
       document.getElementById("check-worldbook-health")?.addEventListener("click", () => {
-        renderHealthResults();
+        renderHealthResults({ fullScan: true });
         setStatus("世界书问题检查已完成。");
       });
 
       document.getElementById("clear-worldbook-health-filter")?.addEventListener("click", () => {
         activeHealthIssue = "";
-        analyzeWorldbookHealth();
         updateHealthFilterLabel();
         if (healthResultsEl) {
           healthResultsEl.classList.add("is-hidden");
@@ -2202,7 +2369,6 @@
         const button = event.target.closest("[data-health-issue]");
         if (!button) return;
         activeHealthIssue = button.dataset.healthIssue || "";
-        analyzeWorldbookHealth();
         updateHealthFilterLabel();
         renderHealthResults();
         applyWorldbookSearch();
@@ -2245,25 +2411,26 @@
         if (quickInput) quickInput.checked = nextEnabled;
         syncQuickEnabledSwitch(card);
 
-        if (activeHealthIssue) {
-          analyzeWorldbookHealth();
-          updateHealthFilterLabel();
-        }
-        applyWorldbookSearch();
+        invalidateWorldbookCardCache(card);
+        refreshWorldbookNow({ healthCard: card, healthResults: isHealthResultsVisible(), search: true });
         markWorldbookDirty(nextEnabled ? "已快捷启用该词条，记得保存。" : "已快捷停用该词条，记得保存。");
       });
 
       worldbookListEl.addEventListener("change", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
-        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
-          syncInjectionUi(card);
-          updateCardTitle(card);
-          applyWorldbookSearch();
-        }
         if (event.target.classList.contains("wb-selected")) {
           updateSelectedCount();
           return;
+        }
+        invalidateWorldbookCardCache(card);
+        let refreshNavigation = false;
+        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
+          syncInjectionUi(card);
+        }
+        if (event.target.classList.contains("wb-entry-type") || event.target.closest(".wb-external-tag-panel")) {
+          if (event.target.classList.contains("wb-external-source")) syncExternalSourceUi(card);
+          updateExternalTagPreview(card);
         }
         if (event.target.classList.contains("wb-quick-enabled")) {
           const enabledEl = card.querySelector(".wb-enabled");
@@ -2271,14 +2438,15 @@
           syncQuickEnabledSwitch(card);
         }
         if (event.target.classList.contains("wb-group")) {
-          refreshWorldbookNavigation();
+          refreshNavigation = true;
         }
         updateCardTitle(card);
-        if (activeHealthIssue) {
-          analyzeWorldbookHealth();
-          updateHealthFilterLabel();
-        }
-        applyWorldbookSearch();
+        refreshWorldbookNow({
+          navigation: refreshNavigation,
+          healthCard: card,
+          healthResults: isHealthResultsVisible(),
+          search: true,
+        });
         markWorldbookDirty("有未保存修改，记得保存。");
       });
 
@@ -2324,10 +2492,7 @@
         Promise.all(cards.map((card) => window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove()))).then(() => {
           updateCount();
           updateSelectedCount();
-          refreshWorldbookNavigation();
-          analyzeWorldbookHealth();
-          updateHealthFilterLabel();
-          applyWorldbookSearch();
+          refreshWorldbookDerivedState();
         });
         markWorldbookDirty(`已从页面移除 ${cards.length} 条词条，确认无误后请保存。`);
       });
@@ -2344,10 +2509,7 @@
           if (groupInput) groupInput.value = group;
           updateCardTitle(card);
         });
-        refreshWorldbookNavigation();
-        analyzeWorldbookHealth();
-        updateHealthFilterLabel();
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState();
         markWorldbookDirty(group ? `已将 ${cards.length} 条词条移动到「${group}」。` : `已清空 ${cards.length} 条词条的组别。`);
       });
 
@@ -2370,11 +2532,7 @@
           syncInjectionUi(card);
           updateCardTitle(card);
         });
-        if (activeHealthIssue) {
-          analyzeWorldbookHealth();
-          updateHealthFilterLabel();
-        }
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState({ navigation: false });
         markWorldbookDirty(`已将 ${cards.length} 条词条的注入设置批量更新。`);
       });
 
@@ -2406,11 +2564,7 @@
           if (enabledEl) enabledEl.checked = true;
           updateCardTitle(card);
         });
-        if (activeHealthIssue) {
-          analyzeWorldbookHealth();
-          updateHealthFilterLabel();
-        }
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState({ navigation: false });
         markWorldbookDirty(`已启用 ${cards.length} 条选中词条。`);
       });
 
@@ -2425,11 +2579,7 @@
           if (enabledEl) enabledEl.checked = false;
           updateCardTitle(card);
         });
-        if (activeHealthIssue) {
-          analyzeWorldbookHealth();
-          updateHealthFilterLabel();
-        }
-        applyWorldbookSearch();
+        refreshWorldbookDerivedState({ navigation: false });
         markWorldbookDirty(`已停用 ${cards.length} 条选中词条。`);
       });
 
@@ -2448,7 +2598,6 @@
       updateSelectedCount();
       refreshWorldbookNavigation();
       renderQuickFilters();
-      analyzeWorldbookHealth();
       updateHealthFilterLabel();
       applyWorldbookSearch();
       syncImportEnhancementUi();

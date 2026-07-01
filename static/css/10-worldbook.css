@@ -3842,3 +3842,45 @@ html[data-performance-mode="on"] body.worldbook-manager-page :is(
 ) {
   box-shadow: none !important;
 }
+
+html[data-performance-mode="on"] body.worldbook-manager-page :is(
+  .worldbook-entry-card[data-collapsed="true"],
+  .worldbook-rule-card[data-collapsed="true"]
+) {
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: auto 104px;
+}
+
+html[data-performance-mode="on"] body.worldbook-manager-page :is(
+  .worldbook-list-pane,
+  .worldbook-rule-body
+) textarea:is(.wb-content, .wb-comment) {
+  box-shadow: none !important;
+  transition: none !important;
+  contain: paint;
+  background-clip: padding-box;
+}
+
+html[data-performance-mode="on"] body.worldbook-manager-page :is(
+  .worldbook-list-pane,
+  .worldbook-rule-body
+) textarea:is(.wb-content, .wb-comment):focus {
+  box-shadow: none !important;
+}
+
+html[data-performance-mode="on"]:not([data-theme="dark"]) body.worldbook-manager-page :is(
+  .worldbook-list-pane,
+  .worldbook-rule-body
+) textarea:is(.wb-content, .wb-comment) {
+  background: rgb(255, 250, 242) !important;
+  background-color: rgb(255, 250, 242) !important;
+}
+
+html[data-performance-mode="on"][data-theme="dark"] body.worldbook-manager-page :is(
+  .worldbook-list-pane,
+  .worldbook-rule-body
+) textarea:is(.wb-content, .wb-comment) {
+  background: rgb(13, 23, 34) !important;
+  background-color: rgb(13, 23, 34) !important;
+}
