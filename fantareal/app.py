@@ -67,6 +67,7 @@ from .worldbook_logic import (
     split_trigger_aliases,
 )
 from .memory_merge_logic import get_memory_outline
+from .version import FA_VERSION
 
 from .prompt_builder import (
     build_conversation_transcript,
@@ -5958,7 +5959,7 @@ ensure_data_files()
 
 bootstrap_runtime_layout()
 
-app = FastAPI(title="Xuqi LLM Chat")
+app = FastAPI(title="Xuqi LLM Chat", version=FA_VERSION)
 
 
 @app.middleware("http")
@@ -5987,6 +5988,7 @@ async def favicon() -> FileResponse:
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates.env.globals["fa_version"] = FA_VERSION
 registered_mods = mount_discovered_mods(app, MODS_DIR)
 templates.env.globals["registered_mods"] = [mod.to_dict() for mod in registered_mods]
 

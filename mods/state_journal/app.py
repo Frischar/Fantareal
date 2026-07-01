@@ -16,8 +16,13 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+try:
+    from fantareal.version import FA_VERSION
+except Exception:  # pragma: no cover - standalone fallback
+    FA_VERSION = "fa_1.0.0"
 
-VERSION = "2.0.9-story-time-fix1"
+
+VERSION = FA_VERSION
 
 
 def get_resource_dir() -> Path:
@@ -291,12 +296,13 @@ STORY_TIME_FIELD_LABELS = {
     "season": "当前季节",
 }
 
-app = FastAPI(title="Fantareal State Journal Mod")
+app = FastAPI(title="Fantareal State Journal Mod", version=FA_VERSION)
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates.env.globals["fa_version"] = FA_VERSION
 
 
 def now_string() -> str:
