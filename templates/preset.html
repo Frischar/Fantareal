@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preset - Fantareal</title>
-    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p9-textarea-scroll-20260701" />
     <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
     {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
 
@@ -197,12 +197,12 @@
       </div>
     </div>
 
-    <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/app-core.js?v=v161-p4-batch-render-atomic-20260701"></script>
     <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
     <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
     <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
     <script>
-      const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml } = window.Fantareal;
+      const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml, batchRenderList } = window.Fantareal;
       const statusEl = document.getElementById("status-text");
       const statusStripEl = document.getElementById("preset-status-strip");
       const presetListEl = document.getElementById("preset-list");
@@ -681,6 +681,67 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         setDirty(true, message);
       }
 
+      const PRESET_INPUT_REFRESH_DELAY = 80;
+      const PRESET_RENDER_BATCH_SIZE = 6;
+      let presetSearchTextCache = new WeakMap();
+      let presetRefreshTimer = 0;
+      let pendingPresetSearch = false;
+      const pendingPresetCards = new Set();
+      const pendingPresetRows = new Set();
+
+      function invalidatePresetCardCache(card) {
+        if (card) presetSearchTextCache.delete(card);
+      }
+
+      function invalidatePresetCaches() {
+        presetSearchTextCache = new WeakMap();
+      }
+
+      function clearPendingPresetRefresh() {
+        pendingPresetCards.clear();
+        pendingPresetRows.clear();
+        pendingPresetSearch = false;
+      }
+
+      function updatePresetCardTitle(card) {
+        const titleEl = card?.querySelector(".preset-card-title-line strong");
+        if (titleEl) titleEl.textContent = getCardTitle(card);
+      }
+
+      function flushPresetRefresh() {
+        if (presetRefreshTimer) {
+          window.clearTimeout(presetRefreshTimer);
+          presetRefreshTimer = 0;
+        }
+        const cards = [...pendingPresetCards];
+        const rows = [...pendingPresetRows];
+        const shouldSearch = pendingPresetSearch;
+        clearPendingPresetRefresh();
+        rows.forEach(updateGroupItemSummary);
+        cards.forEach(updateCardSummary);
+        if (shouldSearch) applySearch();
+      }
+
+      function schedulePresetRefresh({ card = null, row = null, search = true, delay = PRESET_INPUT_REFRESH_DELAY } = {}) {
+        if (card) pendingPresetCards.add(card);
+        if (row) pendingPresetRows.add(row);
+        pendingPresetSearch ||= Boolean(search);
+        if (presetRefreshTimer) window.clearTimeout(presetRefreshTimer);
+        presetRefreshTimer = window.setTimeout(flushPresetRefresh, delay);
+      }
+
+      function refreshPresetNow({ cards = [], rows = [], search = true, invalidate = false } = {}) {
+        if (presetRefreshTimer) {
+          window.clearTimeout(presetRefreshTimer);
+          presetRefreshTimer = 0;
+        }
+        clearPendingPresetRefresh();
+        if (invalidate) invalidatePresetCaches();
+        rows.forEach(updateGroupItemSummary);
+        cards.forEach(updateCardSummary);
+        if (search) applySearch();
+      }
+
       function setPresetMoreOpen(open) {
         if (!presetMoreMenuEl || !presetMoreToggleEl) return;
         presetMoreMenuEl.hidden = !open;
@@ -898,7 +959,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
       function bindCardShellEvents(card) {
         card.querySelector(".preset-card-remove")?.addEventListener("click", () => {
           (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
-            applySearch();
+            refreshPresetNow({ search: true, invalidate: true });
             markDirty("已删除规则块，有未保存修改。");
           });
         });
@@ -985,6 +1046,27 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         }
       }
 
+      function getPresetCardSearchText(card) {
+        const cached = presetSearchTextCache.get(card);
+        if (cached !== undefined) return cached;
+        const parts = [];
+        if (card.dataset.cardType === "group") {
+          parts.push(card.querySelector(".preset-group-name")?.value || "");
+          card.querySelectorAll(".preset-group-item").forEach((row) => {
+            parts.push(row.querySelector(".preset-group-item-name-input")?.value || "");
+            parts.push(row.querySelector(".preset-group-item-content")?.value || "");
+            parts.push(row.querySelector(".preset-segment-activation-tags")?.value || "");
+          });
+        } else {
+          parts.push(card.querySelector(".preset-block-name")?.value || "");
+          parts.push(card.querySelector(".preset-block-content")?.value || "");
+          parts.push(card.querySelector(".preset-segment-activation-tags")?.value || "");
+        }
+        const text = parts.join("\n").toLowerCase();
+        presetSearchTextCache.set(card, text);
+        return text;
+      }
+
       function createBlockCard(item = {}, collapsed = true) {
         const card = createCardShell("block", item.name || "新规则块", item.enabled !== false);
         const body = card.querySelector(".preset-card-body");
@@ -1042,7 +1124,11 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         row.querySelector(".preset-group-item-remove")?.addEventListener("click", () => {
           const card = row.closest(".preset-card");
           row.remove();
-          if (card) enforceGroupSelection(card);
+          if (card) {
+            invalidatePresetCardCache(card);
+            enforceGroupSelection(card);
+            refreshPresetNow({ cards: [card], search: true });
+          }
           markDirty("已删除规则项，有未保存修改。");
         });
         row.querySelector(".preset-group-item-selected")?.addEventListener("change", () => {
@@ -1050,19 +1136,6 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
           if (card) enforceGroupSelection(card, row);
           updateGroupItemSummary(row);
           markDirty("规则组选中项已修改，有未保存修改。");
-        });
-        row.querySelectorAll("input, textarea, select").forEach((el) => {
-          el.addEventListener("input", () => {
-            const card = row.closest(".preset-card");
-            if (card) updateCardSummary(card);
-            updateGroupItemSummary(row);
-            markDirty("规则项内容已修改，有未保存修改。");
-          });
-          el.addEventListener("change", () => {
-            const card = row.closest(".preset-card");
-            if (card) updateCardSummary(card);
-            updateGroupItemSummary(row);
-          });
         });
         initPresetAdvancedDisclosure(row);
         setGroupItemCollapsed(row, collapsed, { immediate: true });
@@ -1109,6 +1182,8 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         body.querySelector(".add-group-item")?.addEventListener("click", () => {
           list.appendChild(createGroupItemElement({ name: "新规则项", content: "" }, false, false));
           enforceGroupSelection(card);
+          invalidatePresetCardCache(card);
+          refreshPresetNow({ cards: [card], search: true });
           markDirty("已新增规则项，有未保存修改。");
         });
         body.querySelector(".preset-group-selection-mode")?.addEventListener("change", () => {
@@ -1172,7 +1247,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
             syncEditorToStore();
             editingPresetId = item.id;
             renderPresetList();
-            applyPreset(getPresetById(editingPresetId));
+            await applyPreset(getPresetById(editingPresetId));
             setPresetPickerOpen(false);
             setStatus(`正在切换编辑预设：${item.name || "未命名预设"}`);
             try {
@@ -1191,20 +1266,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         const keyword = document.getElementById("preset-search").value.trim().toLowerCase();
         let visibleCount = 0;
         presetListEl.querySelectorAll(".preset-card").forEach((card) => {
-          const parts = [];
-          if (card.dataset.cardType === "group") {
-            parts.push(card.querySelector(".preset-group-name")?.value || "");
-            card.querySelectorAll(".preset-group-item").forEach((row) => {
-              parts.push(row.querySelector(".preset-group-item-name-input")?.value || "");
-              parts.push(row.querySelector(".preset-group-item-content")?.value || "");
-              parts.push(row.querySelector(".preset-segment-activation-tags")?.value || "");
-            });
-          } else {
-            parts.push(card.querySelector(".preset-block-name")?.value || "");
-            parts.push(card.querySelector(".preset-block-content")?.value || "");
-            parts.push(card.querySelector(".preset-segment-activation-tags")?.value || "");
-          }
-          const matched = !keyword || parts.join("\n").toLowerCase().includes(keyword);
+          const matched = !keyword || getPresetCardSearchText(card).includes(keyword);
           card.hidden = !matched;
           if (matched) visibleCount += 1;
         });
@@ -1214,7 +1276,23 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         }
       }
 
-      function applyPreset(preset) {
+      function createPresetEmptyState() {
+        const empty = document.createElement("div");
+        empty.className = "preset-empty-state";
+        empty.textContent = "还没有额外规则块。可以新增规则块，或新增一个规则组。";
+        return empty;
+      }
+
+      async function renderPresetCards(cards) {
+        return batchRenderList(
+          presetListEl,
+          cards,
+          (entry) => entry.type === "group" ? createGroupCard(entry.data, true) : createBlockCard(entry.data, true),
+          { batchSize: PRESET_RENDER_BATCH_SIZE, emptyNode: createPresetEmptyState }
+        );
+      }
+
+      async function applyPreset(preset) {
         const target = preset || getPresetById(editingPresetId);
         if (!target) return;
         document.getElementById("preset-name").value = target.name || "默认预设";
@@ -1224,21 +1302,13 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         document.querySelectorAll(".preset-module").forEach((el) => {
           el.checked = Boolean(modules[el.dataset.key]);
         });
-        presetListEl.innerHTML = "";
         const cards = [];
         (target.prompt_groups || []).forEach((group) => cards.push({ type: "group", data: group, order: Number(group.order ?? 100000) }));
         (target.extra_prompts || []).forEach((block) => cards.push({ type: "block", data: block, order: Number(block.order ?? 100000) }));
         cards.sort((a, b) => a.order - b.order);
-        if (!cards.length) {
-          const empty = document.createElement("div");
-          empty.className = "preset-empty-state";
-          empty.textContent = "还没有额外规则块。可以新增规则块，或新增一个规则组。";
-          presetListEl.appendChild(empty);
-        } else {
-          cards.forEach((entry) => {
-            presetListEl.appendChild(entry.type === "group" ? createGroupCard(entry.data, true) : createBlockCard(entry.data, true));
-          });
-        }
+        const renderResult = await renderPresetCards(cards);
+        if (renderResult?.cancelled) return;
+        invalidatePresetCaches();
         applySearch();
         updateOverview();
         setDirty(false);
@@ -1315,7 +1385,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         presetStore = data.preset_store || { active_preset_id: "", presets: [] };
         editingPresetId = presetStore.active_preset_id || presetStore.presets?.[0]?.id || "";
         renderPresetList();
-        applyPreset(getPresetById(editingPresetId));
+        await applyPreset(getPresetById(editingPresetId));
         setStatus("预设已重新读取。");
       }
 
@@ -1332,7 +1402,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
           editingPresetId = presetStore.active_preset_id || editingPresetId;
         }
         renderPresetList();
-        applyPreset(getPresetById(editingPresetId));
+        await applyPreset(getPresetById(editingPresetId));
         setDirty(false, activateEditing ? "预设已保存，并已设为聊天使用。" : "预设已保存。");
       }
 
@@ -1343,7 +1413,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         presetStore = data.preset_store || presetStore;
         editingPresetId = data.created_preset_id || presetStore.active_preset_id;
         renderPresetList();
-        applyPreset(getPresetById(editingPresetId));
+        await applyPreset(getPresetById(editingPresetId));
         setStatus("已新增预设（未自动设为聊天使用）。");
       }
 
@@ -1353,7 +1423,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         presetStore = data.preset_store || presetStore;
         editingPresetId = data.duplicated_preset_id || presetStore.active_preset_id;
         renderPresetList();
-        applyPreset(getPresetById(editingPresetId));
+        await applyPreset(getPresetById(editingPresetId));
         setStatus("已复制当前预设（未自动设为聊天使用）。");
       }
 
@@ -1370,7 +1440,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         editingPresetId = presetStore.active_preset_id || presetStore.presets?.[0]?.id || "";
         hideDeleteConfirm();
         renderPresetList();
-        applyPreset(getPresetById(editingPresetId));
+        await applyPreset(getPresetById(editingPresetId));
         setStatus("有未保存修改");
       }
 
@@ -1382,7 +1452,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         const imported = (presetStore.presets || []).find((item) => !existingIds.has(item.id));
         editingPresetId = imported?.id || editingPresetId || presetStore.active_preset_id || presetStore.presets?.[0]?.id || "";
         renderPresetList();
-        applyPreset(getPresetById(editingPresetId));
+        await applyPreset(getPresetById(editingPresetId));
         setStatus("预设已导入，未自动设为聊天使用。");
       }
 
@@ -1426,15 +1496,27 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
       presetListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".preset-card");
         if (!card) return;
-        if (card.dataset.cardType === "group") enforceGroupSelection(card);
-        updateCardSummary(card);
+        const row = event.target.closest(".preset-group-item");
+        invalidatePresetCardCache(card);
+        if (event.target.classList.contains("preset-block-name") || event.target.classList.contains("preset-group-name")) {
+          updatePresetCardTitle(card);
+        }
+        schedulePresetRefresh({ card, row, search: true });
         markDirty("规则块内容已修改，有未保存修改。");
       });
       presetListEl.addEventListener("change", (event) => {
         const card = event.target.closest(".preset-card");
         if (!card) return;
-        if (card.dataset.cardType === "group") enforceGroupSelection(card, event.target.closest(".preset-group-item"));
-        updateCardSummary(card);
+        if (
+          event.target.classList.contains("preset-card-enabled") ||
+          event.target.classList.contains("preset-group-item-selected") ||
+          event.target.classList.contains("preset-group-selection-mode")
+        ) {
+          return;
+        }
+        const row = event.target.closest(".preset-group-item");
+        invalidatePresetCardCache(card);
+        refreshPresetNow({ cards: [card], rows: row ? [row] : [], search: true });
         markDirty("规则块设置已修改，有未保存修改。");
       });
       document.querySelectorAll(".preset-module").forEach((el) => {
@@ -1464,7 +1546,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         const card = createBlockCard({}, false);
         presetListEl.prepend(card);
         window.Fantareal?.motion?.pulseItem(card);
-        applySearch();
+        refreshPresetNow({ cards: [card], search: true, invalidate: true });
         markDirty("已新增一条空白规则块。");
       });
       document.getElementById("add-preset-group").addEventListener("click", () => {
@@ -1472,7 +1554,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         const card = createGroupCard({ name: "文风", selection_mode: "single" }, false);
         presetListEl.prepend(card);
         window.Fantareal?.motion?.pulseItem(card);
-        applySearch();
+        refreshPresetNow({ cards: [card], search: true, invalidate: true });
         markDirty("已新增一个规则组。");
       });
       document.getElementById("save-preset-top")?.addEventListener("click", async () => { try { await saveStore(); } catch (error) { setStatus(`保存失败：${error.message}`); } });
@@ -1490,7 +1572,9 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
         try { await importPresetFile(file); } catch (error) { setStatus(`导入失败：${error.message}`); } finally { event.target.value = ""; }
       });
       document.getElementById("export-preset").addEventListener("click", async () => { try { await exportCurrentPreset(); setStatus("已导出当前预设。"); } catch (error) { setStatus(`导出失败：${error.message}`); } });
-      document.getElementById("preset-search").addEventListener("input", applySearch);
+      document.getElementById("preset-search").addEventListener("input", () => {
+        schedulePresetRefresh({ search: true });
+      });
       document.getElementById("collapse-all-blocks").addEventListener("click", () => { presetListEl.querySelectorAll(".preset-card").forEach((card) => setCardCollapsed(card, true)); setStatus("已折叠全部规则块。"); });
       document.getElementById("expand-all-blocks").addEventListener("click", () => { presetListEl.querySelectorAll(".preset-card").forEach((card) => setCardCollapsed(card, false)); setStatus("已展开全部规则块。"); });
       window.addEventListener("beforeunload", (event) => {
@@ -1511,7 +1595,7 @@ BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
       renderPresetList();
-      applyPreset(getPresetById(editingPresetId));
+      void applyPreset(getPresetById(editingPresetId));
     </script>
   </body>
 </html>

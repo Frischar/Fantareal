@@ -1902,7 +1902,7 @@ body.modern-setting-page.preset-config-page .preset-card[data-collapsed="true"] 
 
 /* P8-0A: preset page performance relief.
    Large preset libraries can render hundreds of rows; keep hierarchy via borders/backgrounds, not heavy shadows. */
-body.modern-setting-page.preset-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page :is(
   .preset-card,
   .preset-group-item,
   .preset-card-grid .preset-item,
@@ -1917,7 +1917,7 @@ body.modern-setting-page.preset-config-page :is(
   -webkit-backdrop-filter: none !important;
 }
 
-body.modern-setting-page.preset-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page :is(
   .preset-card,
   .preset-group-item,
   .preset-card-grid .preset-item
@@ -1927,7 +1927,7 @@ body.modern-setting-page.preset-config-page :is(
     background var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease) !important;
 }
 
-body.modern-setting-page.preset-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page :is(
   .preset-card,
   .preset-group-item,
   .preset-card-grid .preset-item
@@ -1935,16 +1935,16 @@ body.modern-setting-page.preset-config-page :is(
   transform: none !important;
 }
 
-body.modern-setting-page.preset-config-page .preset-advanced-body {
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page .preset-advanced-body {
   will-change: auto !important;
 }
 
-body.modern-setting-page.preset-config-page .preset-advanced-body.is-disclosure-entering,
-body.modern-setting-page.preset-config-page .preset-advanced-body.is-disclosure-exiting {
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page .preset-advanced-body.is-disclosure-entering,
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page .preset-advanced-body.is-disclosure-exiting {
   will-change: height, opacity, transform, clip-path !important;
 }
 
-body.modern-setting-page.preset-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page :is(
   .preset-list,
   .preset-card-list,
   .preset-card,
@@ -1970,6 +1970,52 @@ body.modern-setting-page.preset-config-page :is(
   .preset-advanced-field
 ) {
   box-shadow: none !important;
+}
+
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page :is(
+  .preset-card[data-collapsed="true"],
+  .preset-group-item[data-collapsed="true"]
+) {
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: auto 96px;
+}
+
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page :is(
+  #base-system-prompt,
+  textarea.preset-block-content,
+  textarea.preset-group-item-content
+) {
+  box-shadow: none !important;
+  transition: none !important;
+  contain: paint;
+  background-clip: padding-box;
+}
+
+html[data-performance-mode="on"] body.modern-setting-page.preset-config-page :is(
+  #base-system-prompt,
+  textarea.preset-block-content,
+  textarea.preset-group-item-content
+):focus {
+  box-shadow: none !important;
+}
+
+html[data-performance-mode="on"]:not([data-theme="dark"]) body.modern-setting-page.preset-config-page :is(
+  #base-system-prompt,
+  textarea.preset-block-content,
+  textarea.preset-group-item-content
+) {
+  background: rgb(255, 250, 242) !important;
+  background-color: rgb(255, 250, 242) !important;
+}
+
+html[data-performance-mode="on"][data-theme="dark"] body.modern-setting-page.preset-config-page :is(
+  #base-system-prompt,
+  textarea.preset-block-content,
+  textarea.preset-group-item-content
+) {
+  background: rgb(13, 23, 34) !important;
+  background-color: rgb(13, 23, 34) !important;
 }
 
 /* P8-0B: preset action dock follows the same narrow-desktop fallback as the
