@@ -91,6 +91,65 @@
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
   };
 
+  F.batchRenderList = async function batchRenderList(container, items, renderItem, options = {}) {
+    if (!container || typeof renderItem !== "function") return { rendered: 0, total: 0, cancelled: true };
+    const list = Array.isArray(items) ? items : Array.from(items || []);
+    const total = list.length;
+    const batchSize = Math.max(1, Math.floor(Number(options.batchSize || 12)));
+    const clear = options.clear !== false;
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const nextFrame = () => new Promise((resolve) => {
+      const raf = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0));
+      raf(() => resolve());
+    });
+
+    container.dataset.frBatchRenderToken = token;
+    const isCurrent = () => container.dataset.frBatchRenderToken === token;
+    const stagedNodes = document.createDocumentFragment();
+    const commitStagedNodes = () => {
+      if (clear) {
+        if (typeof container.replaceChildren === "function") {
+          container.replaceChildren(stagedNodes);
+          return;
+        }
+        container.textContent = "";
+        container.appendChild(stagedNodes);
+        return;
+      }
+      if (stagedNodes.childNodes.length) container.appendChild(stagedNodes);
+    };
+
+    if (!total) {
+      const emptyNode = typeof options.emptyNode === "function" ? options.emptyNode() : options.emptyNode;
+      if (clear && emptyNode) stagedNodes.appendChild(emptyNode);
+      if (!isCurrent()) return { rendered: 0, total: 0, cancelled: true };
+      commitStagedNodes();
+      return { rendered: 0, total: 0, cancelled: !isCurrent() };
+    }
+
+    let rendered = 0;
+    for (let index = 0; index < total; index += batchSize) {
+      if (!isCurrent()) return { rendered, total, cancelled: true };
+      const fragment = document.createDocumentFragment();
+      const end = Math.min(index + batchSize, total);
+      for (let itemIndex = index; itemIndex < end; itemIndex += 1) {
+        const node = renderItem(list[itemIndex], itemIndex);
+        if (node) fragment.appendChild(node);
+      }
+      if (!isCurrent()) return { rendered, total, cancelled: true };
+      stagedNodes.appendChild(fragment);
+      rendered = end;
+      if (typeof options.onBatch === "function") {
+        options.onBatch({ rendered, total, batchSize });
+      }
+      if (rendered < total) await nextFrame();
+    }
+
+    if (!isCurrent()) return { rendered, total, cancelled: true };
+    commitStagedNodes();
+    return { rendered, total, cancelled: false };
+  };
+
   F.showToast = function showToast(host, message, type = "info") {
     if (!host || !message) return;
     const toast = document.createElement("div");

@@ -2717,7 +2717,7 @@ body.modern-setting-page.memory-config-page .memory-card.selectable .remove-memo
 
 /* P8-0A: memory page performance relief.
    Memory rows and outline tables should scroll cheaply; keep semantic borders, drop repeated glass/shadows. */
-body.modern-setting-page.memory-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page :is(
   .memory-card,
   .merged-card,
   .outline-overview-shell,
@@ -2731,7 +2731,7 @@ body.modern-setting-page.memory-config-page :is(
   -webkit-backdrop-filter: none !important;
 }
 
-body.modern-setting-page.memory-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page :is(
   .memory-card,
   .merged-card,
   .memory-icon-button,
@@ -2744,7 +2744,7 @@ body.modern-setting-page.memory-config-page :is(
     color var(--ui-motion-fast, 0.16s) var(--ui-ease-feedback, ease) !important;
 }
 
-body.modern-setting-page.memory-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page :is(
   .memory-card,
   .merged-card,
   .memory-icon-button
@@ -2752,16 +2752,16 @@ body.modern-setting-page.memory-config-page :is(
   transform: none !important;
 }
 
-body.modern-setting-page.memory-config-page .memory-card-body {
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page .memory-card-body {
   will-change: auto !important;
 }
 
-body.modern-setting-page.memory-config-page .memory-card-body.is-disclosure-entering,
-body.modern-setting-page.memory-config-page .memory-card-body.is-disclosure-exiting {
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page .memory-card-body.is-disclosure-entering,
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page .memory-card-body.is-disclosure-exiting {
   will-change: height, opacity, transform, clip-path !important;
 }
 
-body.modern-setting-page.memory-config-page :is(
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page :is(
   .memory-list,
   .memory-card,
   .merged-list-grid,
@@ -2782,6 +2782,15 @@ body.modern-setting-page.memory-config-page :is(
   .selection-chip
 ) {
   box-shadow: none !important;
+}
+
+html[data-performance-mode="on"] body.modern-setting-page.memory-config-page :is(
+  .memory-card[data-collapsed="true"],
+  .merged-card.is-collapsed
+) {
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: auto 96px;
 }
 
 body.modern-setting-page.memory-config-page .config-shell.compact .outline-editor-field .outline-switch-row input.outline-switch-checkbox,
