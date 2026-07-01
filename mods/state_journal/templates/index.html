@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数据库 - Fantareal</title>
+    <script>
+      (() => {
+        const theme = new URLSearchParams(window.location.search).get("host_theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.dataset.theme = theme;
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="./static/state-journal.css?v=state-journal-console-v281-variable-instruction" />
+    <link rel="stylesheet" href="./static/state-journal-stage-table-polish.css?v=state-journal-v211-sync-modal-fit" />
+    <link rel="stylesheet" href="./static/state-journal-theme-pack-contract.css?v=state-journal-v210-zoom150-fit" />
+  </head>
+  <body>
+    <main class="state-journal-shell state-journal-console-v2" data-version="{{ version }}">
+      <header class="state-journal-hero" aria-label="数据库状态概览">
+        <div class="brand-row">
+          <div class="brand-mark">库</div>
+          <div>
+            <h1>数据库</h1>
+            <p class="hero-desc">记录剧情状态、角色变量、阶段规则、剧情账本与状态记录。</p>
+          </div>
+        </div>
+        <div class="top-status">
+          <section class="status-strip" id="statusStrip">正在载入数据库...</section>
+          <section class="update-summary" id="updateSummary">
+            <span class="summary-dot"></span>
+            <strong>最近更新</strong>
+            <span id="updateSummaryText">暂无填表记录。</span>
+          </section>
+        </div>
+      </header>
+
+      <section class="state-journal-workbench">
+        <aside class="panel workspace-nav" aria-label="数据库后台一级导航">
+          <button class="workspace-nav-btn active" type="button" data-workspace="home">
+            <span class="nav-icon">I</span><span><strong>总览</strong><small>运行状态</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="role" data-default-tab="roleState">
+            <span class="nav-icon">II</span><span><strong>状态记录</strong><small>角色与显示</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="data" data-default-tab="data">
+            <span class="nav-icon">III</span><span><strong>剧情账本</strong><small>表格数据</small></span>
+          </button>
+          <button class="workspace-nav-btn" type="button" data-workspace="advanced" data-default-tab="model">
+            <span class="nav-icon">IV</span><span><strong>高级设置</strong><small>模型与调试</small></span>
+          </button>
+        </aside>
+
+        <div class="workspace-main">
+          <section id="homeWorkspace" class="workspace-page active" data-workspace-page="home">
+            <div class="page-head workbench-head" data-workbench-head="home">
+              <div class="workbench-copy">
+                <div class="workbench-titleline">
+                  <p class="eyebrow">Database Workbench</p>
+                  <span class="database-workbench-status ui-status-token is-saved" data-workbench-status="home" aria-live="polite">就绪</span>
+                </div>
+                <h2>数据库总览</h2>
+                <p class="muted">总览只回答数据库是否正常、最近发生了什么、下一步该做什么。表格、字段、规则和调试工具不在这里展开。</p>
+              </div>
+              <div class="workbench-actions ui-action-dock is-wrap">
+                <button id="manualWorkerBtn" class="primary-btn" type="button">根据最近对话更新</button>
+              </div>
+            </div>
+
+            <div class="home-grid">
+              <div class="home-main-stack">
+                <section class="panel runtime-overview" id="runtimeOverview" aria-label="数据库运行状态总览">
+                  <div class="runtime-overview-main">
+                    <div class="runtime-title-row">
+                      <strong>运行总览</strong>
+                      <span id="runtimeModelBadge" class="runtime-badge muted">模型未配置</span>
+                    </div>
+                    <p id="runtimeFlowText" class="runtime-flow-text">聊天回复完成 → Hook 直传 → 记录模型填表 → 写入 SQLite → Chat 显示状态记录。</p>
+                  </div>
+                  <div class="runtime-state-grid">
+                    <label class="runtime-state-cell">
+                      <span>数据库</span>
+                      <strong id="runtimeEnabledBadge">数据库状态</strong>
+                      <input id="dashboardEnabled" type="checkbox" />
+                    </label>
+                    <label class="runtime-state-cell">
+                      <span>填表</span>
+                      <strong id="runtimeAutoBadge">自动填表</strong>
+                      <input id="dashboardAutoUpdate" type="checkbox" />
+                    </label>
+                    <label class="runtime-state-cell">
+                      <span>Chat</span>
+                      <strong id="runtimeTurnNoteBadge">状态记录展示</strong>
+                      <input id="dashboardTurnNote" type="checkbox" />
+                    </label>
+                  </div>
+                  <p class="runtime-last-line">最近运行：<span id="runtimeLastRunText">暂无填表记录。</span></p>
+                </section>
+
+                <section class="panel recent-panel">
+                  <div class="panel-head">
+                    <div>
+                      <h2>最近更新</h2>
+                      <p class="muted">有记录后显示更新时间、写入对象、成功或失败原因；没有记录时不再留一大片空白。</p>
+                    </div>
+                  </div>
+                  <div class="recent-list">
+                    <div class="recent-row">
+                      <span>当前</span>
+                      <strong>暂无填表记录</strong>
+                      <em>等待聊天</em>
+                    </div>
+                    <div class="recent-row">
+                      <span>失败时</span>
+                      <strong>显示具体原因</strong>
+                      <em>可诊断</em>
+                    </div>
+                    <div class="recent-row">
+                      <span>成功时</span>
+                      <strong>显示写入表册和角色</strong>
+                      <em>可追溯</em>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <aside class="home-side-stack">
+                <section class="panel next-step-panel">
+                  <div class="panel-head">
+                    <h2>下一步</h2>
+                  </div>
+                  <div class="next-step-list">
+                    <div class="next-step-item needs-action" id="nextStepModel">
+                      <span>1</span>
+                      <strong id="nextStepModelTitle">配置辅助模型 API</strong>
+                      <button class="ghost-btn small" type="button" data-open-tab="model" id="nextStepModelAction">去配置</button>
+                    </div>
+                    <div class="next-step-item" id="nextStepEnabled">
+                      <span>2</span>
+                      <strong id="nextStepEnabledTitle">数据库运行环境</strong>
+                      <em id="nextStepEnabledStatus">检测中</em>
+                    </div>
+                    <div class="next-step-item" id="nextStepAuto">
+                      <span>3</span>
+                      <strong id="nextStepAutoTitle">自动填表</strong>
+                      <em id="nextStepAutoStatus">检测中</em>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="panel note-preview-panel">
+                  <div class="panel-head">
+                    <h2>状态记录预览</h2>
+                    <button class="ghost-btn small" type="button" data-open-tab="turnNote">调整</button>
+                  </div>
+                  <div class="home-note-preview">
+                    <article>
+                      <strong>本轮标题</strong>
+                      <p>夜色入窗，角色状态已更新。</p>
+                    </article>
+                    <article>
+                      <strong>角色状态</strong>
+                      <p>阶段：春 · 变量：信任 +1 · 快照：气息平稳，位置靠近窗边。</p>
+                    </article>
+                  </div>
+                </section>
+              </aside>
+            </div>
+          </section>
+
+          <section id="roleWorkspace" class="workspace-page config-workspace-panel" data-workspace-page="role" data-active-workspace="role">
+            <div class="page-head workbench-head" data-workbench-head="role">
+              <div class="workbench-copy">
+                <div class="workbench-titleline">
+                  <p class="eyebrow">State Notes</p>
+                  <span class="database-workbench-status ui-status-token is-saved" data-workbench-status="role" aria-live="polite">就绪</span>
+                </div>
+                <h2>角色状态与状态记录</h2>
+                <p class="muted">这里负责角色变量、阶段和聊天页状态记录展示。高风险调试操作集中放在高级设置里。</p>
+              </div>
+              <div class="tabs role-workspace-tabs workbench-tabs">
+                <button class="tab-btn active" data-tab="roleState" type="button">角色状态</button>
+                <button class="tab-btn" data-tab="turnNote" type="button">状态记录显示</button>
+              </div>
+            </div>
+
+            <section class="tab-page active" data-page="roleState">
+              <div class="role-state-workspace">
+                <div class="role-state-toolbar turn-note-config-card standalone">
+                  <div>
+                    <div class="subhead"><strong>角色配置</strong></div>
+                    <p class="microcopy">配置每个角色的专属状态记录、变量和阶段规则。同步角色卡、初始化当前状态和推进阶段已移到高级调试。</p>
+                  </div>
+                  <div class="role-state-actions grouped-actions">
+                    <button id="roleStateReadCardBtn" type="button" class="ghost-btn">读取角色卡</button>
+                    <button id="roleStateSaveBtn" type="button" class="primary-btn">保存本页设置</button>
+                  </div>
+                </div>
+                <section class="role-state-global turn-note-config-card standalone">
+                  <div id="storyTimeGlobalMount"></div>
+                </section>
+                <div class="role-state-layout">
+                  <aside class="role-state-sidebar turn-note-config-card soft-card">
+                    <div class="subhead compact"><strong>角色列表</strong></div>
+                    <div id="roleStateRoleList">
+                      <div class="role-state-role-card active">
+                        <strong>尚未读取角色配置</strong>
+                        <span>变量 0 · 阶段 0</span>
+                        <small>可从当前角色卡读取变量、阶段与状态快照配置。</small>
+                      </div>
+                    </div>
+                  </aside>
+                  <section class="role-state-detail turn-note-config-card standalone">
+                    <div class="subhead compact"><strong>当前角色配置</strong></div>
+                    <div class="role-state-tabs" role="tablist" aria-label="变量与阶段切换">
+                      <button type="button" class="role-state-tab active" data-role-state-tab="variables">变量表</button>
+                      <button type="button" class="role-state-tab" data-role-state-tab="stages">阶段规则</button>
+                      <button type="button" class="role-state-tab" data-role-state-tab="snapshot">状态快照字段</button>
+                    </div>
+                    <div id="roleStateDetail" class="role-state-placeholder">
+                      <strong>尚未选择角色</strong>
+                      <p>可从当前角色卡读取变量、阶段与状态快照配置，或保存数据库内部运行配置。</p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </section>
+
+            <section class="tab-page" data-page="turnNote">
+              <div class="turn-note-config-card standalone">
+                <div class="subhead"><strong>状态记录显示</strong></div>
+                <p class="microcopy">控制 Chat 里是否显示状态记录、使用哪个模板和外观包。</p>
+                <div class="model-toggle-grid">
+                  <label class="check-row"><input id="cfgTurnNoteEnabled" type="checkbox" /> 启用状态记录展示</label>
+                  <label class="check-row"><input id="cfgTurnNoteTitle" type="checkbox" /> 显示本轮标题卡</label>
+                  <label class="check-row"><input id="cfgTurnNoteNote" type="checkbox" /> 每轮回复下方显示状态附笺</label>
+                </div>
+                <div class="grid-two">
+                  <label>当前附笺模板<select id="cfgTurnNoteTemplateSelect"></select></label>
+                  <label>当前美化包<select id="cfgTurnNoteThemeSelect"></select></label>
+                </div>
+                <div class="model-actions inline-actions"><button id="resetDefaultTurnNoteBtn" type="button" class="ghost-btn">恢复默认状态记录</button></div>
+                <p class="microcopy">模板决定角色状态卡生成哪些字段；外观包决定标题卡、角色卡和关系卡的外观。恢复默认会启用 Chat 状态记录，并切回“标准状态模板 + 标准样式”。</p>
+                <label>Chat 状态显示模式<select id="cfgTurnNoteDisplayMode"><option value="collapsed">折叠附笺</option><option value="expanded">默认展开</option><option value="compact">简洁状态条</option><option value="hidden">不显示状态卡</option></select></label>
+                <p class="microcopy">折叠适合沉浸阅读；默认展开适合状态栏玩家；简洁状态条只占一行；不显示仅保留后台记录。</p>
+                <div class="grid-two">
+                  <label>标题生成风格<select id="cfgTurnNoteTitleStyle"><option value="classic">经典标题</option><option value="gufeng">古风标题</option><option value="chapter">章节标题</option></select></label>
+                  <label>附笺生成风格<select id="cfgTurnNoteNoteStyle"><option value="classic">经典状态</option><option value="gufeng">古风旁白</option><option value="sensory">感官标签</option></select></label>
+                </div>
+                <div class="grid-two">
+                  <label>扩写强度<select id="cfgTurnNoteExpand"><option value="conservative">保守</option><option value="standard">标准</option><option value="rich">丰富</option></select></label>
+                  <label>附笺密度<select id="cfgTurnNoteDensity"><option value="compact">简洁</option><option value="standard">标准</option><option value="detailed">详细</option></select></label>
+                </div>
+                <div class="turn-note-style-help" id="turnNoteStyleHelp">
+                  <strong>生成风格影响什么？</strong>
+                  <p id="turnNoteStyleDesc">标题生成风格只控制本轮标题卡；附笺生成风格控制角色状态卡。外观样式仍由卡片模板负责。</p>
+                  <div class="turn-note-style-preview" id="turnNoteStylePreview"></div>
+                </div>
+                <div class="grid-two">
+                  <label>角色显示<select id="cfgTurnNoteCharacterFilter"><option value="turn">本轮生成</option><option value="heroine">双女主</option><option value="protagonist">主角相关</option><option value="custom">自定义名单</option><option value="all">全部角色</option></select></label>
+                </div>
+                <label>自定义角色名单<input id="cfgTurnNoteCharacterNames" placeholder="用逗号分隔，例如：角色甲，角色乙" /></label>
+                <p class="microcopy">附笺会先生成完整数据，再由前端筛选显示。Chat 状态显示模式只影响聊天页展示，不改变 SQLite 后台记录。</p>
+              </div>
+              <div class="model-tools pinned">
+                <button id="saveTurnNoteConfigBtn" type="button" class="primary-btn">保存状态记录显示</button>
+              </div>
+            </section>
+          </section>
+
+          <section id="dataWorkspace" class="workspace-page config-workspace-panel data-workspace" data-workspace-page="data" data-active-workspace="data">
+            <div class="page-head workbench-head" data-workbench-head="data">
+              <div class="workbench-copy">
+                <div class="workbench-titleline">
+                  <p class="eyebrow">Plot Ledger</p>
+                  <span class="database-workbench-status ui-status-token is-saved" data-workbench-status="data" aria-live="polite">就绪</span>
+                </div>
+                <h2>剧情账本与数据表</h2>
+                <p class="muted">这里维护数据库中的角色状态、剧情账本、字段规则和表格内容，供状态记录、世界书和宏系统读取。</p>
+              </div>
+            </div>
+
+            <section id="databaseWorkspace" class="tab-page active" data-page="data">
+              <div class="state-journal-grid">
+                <aside class="panel table-list-panel">
+                  <div class="panel-head">
+                    <div>
+                      <p class="eyebrow">表册</p>
+                      <h2>表册</h2>
+                    </div>
+                    <button id="newTableBtn" class="round-btn" title="新建表">＋</button>
+                  </div>
+                  <div id="tableList" class="table-list"></div>
+                  <div class="panel-actions stacked">
+                    <button id="exportBtn" class="ghost-btn">导出全部</button>
+                    <label class="ghost-btn file-btn">导入 JSON<input id="importInput" type="file" accept="application/json" /></label>
+                  </div>
+                </aside>
+
+                <section class="panel data-panel">
+                  <div class="panel-head split data-panel-head">
+                    <div>
+                      <p class="eyebrow">记录</p>
+                      <h2 id="currentTableTitle">未选择表</h2>
+                      <p id="currentTableDesc" class="muted"></p>
+                    </div>
+                    <div class="panel-actions data-actions">
+                      <div class="view-switch" aria-label="视图切换">
+                        <button id="cardViewBtn" class="view-btn active" type="button">卡片</button>
+                        <button id="tableViewBtn" class="view-btn" type="button">表格</button>
+                      </div>
+                      <button id="refreshBtn" class="ghost-btn">刷新</button>
+                      <button id="saveBtn" class="primary-btn">保存当前表</button>
+                      <button id="openSchemaDrawerBtn" class="ghost-btn">字段</button>
+                      <button id="openRulesDrawerBtn" class="ghost-btn">规则</button>
+                      <button id="addRowBtn" class="ghost-btn">新增行</button>
+                    </div>
+                  </div>
+                  <div id="rowsEditor" class="rows-editor"></div>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-page" data-page="schema">
+              <label>表 ID<input id="schemaId" placeholder="character_status" /></label>
+              <label>表名<input id="schemaName" placeholder="角色状态表" /></label>
+              <label>描述<textarea id="schemaDesc" rows="3"></textarea></label>
+              <label>主键字段<select id="primaryKeySelect"></select></label>
+              <div class="subhead">
+                <strong>字段配置</strong>
+                <button id="addFieldBtn" class="ghost-btn small">新增字段</button>
+              </div>
+              <p class="microcopy">字段默认折叠，点击字段标题展开编辑。设置面板不会再常驻挤占表格。</p>
+              <div id="fieldsEditor" class="fields-editor"></div>
+            </section>
+
+            <section class="tab-page" data-page="rules">
+              <label>Note：这张表记录什么<textarea id="ruleNote" rows="3"></textarea></label>
+              <label>Init：什么时候初始化<textarea id="ruleInit" rows="3"></textarea></label>
+              <label>Insert：什么时候新增<textarea id="ruleInsert" rows="3"></textarea></label>
+              <label>Update：什么时候更新<textarea id="ruleUpdate" rows="3"></textarea></label>
+              <label>Delete：什么时候删除<textarea id="ruleDelete" rows="3"></textarea></label>
+              <label>Ignore：什么时候不要更新<textarea id="ruleIgnore" rows="3"></textarea></label>
+            </section>
+          </section>
+
+          <section id="advancedWorkspace" class="workspace-page config-workspace-panel advanced-workspace" data-workspace-page="advanced" data-active-workspace="advanced">
+            <div class="page-head workbench-head" data-workbench-head="advanced">
+              <div class="workbench-copy">
+                <div class="workbench-titleline">
+                  <p class="eyebrow">Maintenance</p>
+                  <span class="database-workbench-status ui-status-token is-saved" data-workbench-status="advanced" aria-live="polite">就绪</span>
+                </div>
+                <h2>高级维护</h2>
+                <p class="muted">模型联动、模板外观本体和调试迁移放在这里。进入这里代表你正在做维护操作。</p>
+              </div>
+              <div class="page-head-status">
+                <span class="runtime-badge">维护区</span>
+                <span class="runtime-badge muted">API / 模板 / 调试</span>
+              </div>
+            </div>
+
+            <div class="advanced-layout">
+              <aside class="advanced-nav" aria-label="高级维护分类">
+                <button class="tab-btn active" type="button" data-tab="model"><strong>模型与联动</strong><small>API、模型、Hook</small></button>
+                <button class="tab-btn" type="button" data-tab="template"><strong>模板外观</strong><small>模板字段、美化包</small></button>
+                <button class="tab-btn" type="button" data-tab="log"><strong>调试迁移</strong><small>导入导出、高风险操作</small></button>
+              </aside>
+
+              <div class="advanced-main">
+                <section class="tab-page active" data-page="model">
+                  <div class="advanced-subtabs">
+                    <button class="tab-btn active" type="button" data-tab="model">模型</button>
+                    <button class="tab-btn" type="button" data-tab="generate">生成规则</button>
+                    <button class="tab-btn" type="button" data-tab="link">联动</button>
+                  </div>
+                  <p class="microcopy">模型页只保存数据库记录模型 API。生成触发在「生成规则」，展示样式在「状态记录显示」。</p>
+                  <div class="preset-row">
+                    <label>预设服务<select id="servicePresetSelect">
+                      <option value="custom">自定义</option>
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="minimax">MiniMax</option>
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="siliconflow">SiliconFlow</option>
+                    </select></label>
+                    <button id="applyPresetBtn" type="button" class="ghost-btn">一键填入预设</button>
+                  </div>
+                  <label>API URL<input id="cfgBaseUrl" placeholder="https://api.openai.com/v1" /></label>
+                  <label>API Key
+                    <div class="inline-field">
+                      <input id="cfgApiKey" type="password" autocomplete="off" />
+                      <button id="toggleApiKeyBtn" type="button" class="ghost-btn mini">显示</button>
+                    </div>
+                  </label>
+                  <label>模型名
+                    <div class="inline-field model-field">
+                      <input id="cfgModel" list="modelDatalist" placeholder="gpt-4.1-mini / deepseek-chat" />
+                      <button id="fetchModelsBtn" type="button" class="ghost-btn mini">拉取模型</button>
+                    </div>
+                  </label>
+                  <datalist id="modelDatalist"></datalist>
+                  <label>请求超时秒数<input id="cfgTimeout" type="number" min="10" max="600" /></label>
+                  <div class="model-tools pinned">
+                    <button id="fillMainConfigBtn" type="button" class="ghost-btn">从本体配置填入</button>
+                    <button id="testConnectionBtn" type="button" class="ghost-btn">测试连接</button>
+                    <button id="saveConfigBtn" class="primary-btn">保存模型配置</button>
+                  </div>
+                </section>
+
+                <section class="tab-page" data-page="generate">
+                  <div class="advanced-subtabs">
+                    <button class="tab-btn" type="button" data-tab="model">模型</button>
+                    <button class="tab-btn active" type="button" data-tab="generate">生成规则</button>
+                    <button class="tab-btn" type="button" data-tab="link">联动</button>
+                  </div>
+                  <div class="turn-note-config-card standalone">
+                    <div class="subhead"><strong>生成规则</strong><span class="micro-badge">worker</span></div>
+                    <p class="microcopy">这里决定辅助模型怎么读取最近聊天、什么时候写入数据库、是否生成主角状态卡，以及允许用户附加哪些安全提示。</p>
+                    <div class="model-toggle-grid">
+                      <label class="check-row"><input id="cfgAutoUpdate" type="checkbox" /> 聊天后自动填表</label>
+                    </div>
+                    <label>最近输入轮数<input id="cfgTurns" type="number" min="1" max="10" /></label>
+                    <p class="microcopy">轮数越高，worker 读取的最近聊天越多；建议默认 3 轮，剧情复杂时可提高到 5。</p>
+                    <div class="turn-note-config-card soft-card">
+                      <div class="subhead"><strong>主角状态卡</strong><span class="micro-badge">安全生成</span></div>
+                      <label class="check-row"><input id="cfgTurnNoteProtagonistEnabled" type="checkbox" /> 生成主角状态卡</label>
+                      <div class="grid-two">
+                        <label>主角名称<input id="cfgTurnNoteProtagonistName" placeholder="例如：顾知微" /></label>
+                        <label>生成方式<select id="cfgTurnNoteProtagonistMode"><option value="when_relevant">明显涉及时生成</option><option value="always">每轮生成</option></select></label>
+                      </div>
+                      <label>主角别名<input id="cfgTurnNoteProtagonistAliases" placeholder="用逗号分隔，例如：我，先生，顾先生" /></label>
+                      <p class="microcopy">主角状态卡只写可观察状态、身体状态、伤势、气息、位置与互动关系；不会替用户决定行动、台词或内心。</p>
+                    </div>
+                    <div class="turn-note-config-card soft-card worker-prompt-card">
+                      <div class="subhead"><strong>Prompt 编辑</strong><span class="micro-badge">锁定契约</span></div>
+                      <p class="microcopy">为数据库 worker 自定义生成提示词。默认模式使用系统主体；追加模式把你的内容加到默认主体之后；完整编辑模式直接修改 worker 主体。JSON 输出与写库契约会自动锁定追加。</p>
+                      <div class="worker-prompt-toolbar">
+                        <label>编辑范围<select id="cfgTurnNoteWorkerPromptScope"><option value="worker">状态记录 worker</option></select></label>
+                        <label>编辑模式<select id="cfgTurnNoteWorkerPromptMode">
+                          <option value="default">默认：使用系统 Prompt</option>
+                          <option value="additive">追加：补充自然语言要求</option>
+                          <option value="override">编辑完整 Prompt：修改默认主体</option>
+                        </select></label>
+                      </div>
+                      <label><span id="workerPromptEditorLabel">追加自然语言说明 · 状态记录 worker</span><textarea id="cfgTurnNoteWorkerCustomPrompt" rows="12" placeholder="追加模式：写入你希望状态记录遵守的生成偏好。完整编辑模式：可载入默认主体后直接修改。"></textarea></label>
+                      <p class="microcopy">默认模式不使用文本框内容；追加模式会把文本作为高优先级补充说明；完整编辑模式会用文本框内容替换默认主体。锁定的 JSON/updates/SQLite 契约由系统自动追加，不需要重复写。</p>
+                      <div class="model-actions worker-prompt-actions">
+                        <button id="loadDefaultWorkerPromptBtn" type="button" class="ghost-btn">载入默认主体 Prompt</button>
+                        <button id="clearWorkerPromptBtn" type="button" class="ghost-btn">清空当前范围</button>
+                        <button id="resetWorkerPromptBtn" type="button" class="ghost-btn">恢复默认</button>
+                        <button id="refreshWorkerPromptPreviewBtn" type="button" class="ghost-btn">刷新预览</button>
+                      </div>
+                      <details class="worker-prompt-preview-box" open>
+                        <summary>Prompt 预览</summary>
+                        <pre id="workerPromptPreview">保存或刷新后显示当前 worker prompt 预览。</pre>
+                      </details>
+                    </div>
+                    <div class="model-tools pinned">
+                      <button id="saveGenerateConfigBtn" type="button" class="primary-btn">保存生成规则</button>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="tab-page" data-page="link">
+                  <div class="advanced-subtabs">
+                    <button class="tab-btn" type="button" data-tab="model">模型</button>
+                    <button class="tab-btn" type="button" data-tab="generate">生成规则</button>
+                    <button class="tab-btn active" type="button" data-tab="link">联动</button>
+                  </div>
+                  <div class="model-status-card" id="hookStatusCard">
+                    <strong>聊天页 Hook</strong>
+                    <span id="hookStatusText">正在检测……</span>
+                  </div>
+                  <p class="microcopy">这里控制数据库基础启用、聊天页 Hook 和通知。自动填表触发在「生成规则」中设置。</p>
+                  <div class="model-toggle-grid">
+                    <label class="check-row"><input id="cfgEnabled" type="checkbox" /> 启用数据库</label>
+                    <label class="check-row"><input id="cfgNotify" type="checkbox" /> 聊天页显示提示</label>
+                    <label class="check-row"><input id="cfgUiSyncGlobal" type="checkbox" /> 跟随 Fantareal 全局界面主题与透明度</label>
+                  </div>
+                  <p class="microcopy">关闭「跟随全局」后，数据库后台与 Chat 状态记录优先使用自身外观包；开启后，面板颜色、透明度和主题色跟随 Fantareal 主界面。</p>
+                  <div class="model-tools pinned">
+                    <button id="refreshHookBtn" type="button" class="ghost-btn">刷新 Hook 状态</button>
+                    <button id="saveLinkConfigBtn" type="button" class="primary-btn">保存联动设置</button>
+                  </div>
+                </section>
+
+                <section class="tab-page" data-page="template">
+                  <div class="advanced-subtabs">
+                    <button class="tab-btn active" type="button" data-tab="template">模板</button>
+                    <button class="tab-btn" type="button" data-tab="theme">美化包</button>
+                  </div>
+                  <div class="turn-note-config-card standalone">
+                    <div class="subhead"><strong>状态记录模板</strong></div>
+                    <p class="microcopy">模板开放第一版：控制角色附笺“生成哪些字段、每个字段怎么写、最终按什么格式展示”。暂不开放 HTML/CSS/JS 外观。</p>
+                    <div class="preset-row">
+                      <label>当前模板<select id="templateSelect"></select></label>
+                      <button id="newTemplateBtn" type="button" class="ghost-btn">复制为新模板</button>
+                    </div>
+                    <label>模板名称<input id="templateName" placeholder="感官标签" /></label>
+                    <label>模板说明<textarea id="templateDesc" rows="2" placeholder="说明这个模板适合什么场景"></textarea></label>
+                    <label>附笺生成风格<select id="templateNoteStyle"><option value="classic">经典状态</option><option value="gufeng">古风旁白</option><option value="sensory">感官标签</option></select></label>
+                    <div class="subhead"><strong>字段列表</strong><div class="template-field-toolbar"><button id="collapseTemplateFieldsBtn" type="button" class="ghost-btn small">全部折叠</button><button id="addTemplateFieldBtn" type="button" class="ghost-btn small">新增字段</button></div></div>
+                    <p class="microcopy">字段 Key 用英文下划线；显示名和生成说明会进入数据库记录提示词。拖拽暂未开放，可以用上移/下移调整顺序。</p>
+                    <div id="templateFieldsEditor" class="template-fields-editor"></div>
+                    <label>输出格式模板<textarea id="templateOutput" rows="8" placeholder="例如：<情绪({emotion})>&#10;<衣着({clothing})>"></textarea></label>
+                    <div class="template-preview-card">
+                      <strong>预览</strong>
+                      <pre id="templatePreview">选择模板后显示预览。</pre>
+                    </div>
+                    <div class="model-tools pinned">
+                      <button id="exportTemplateBtn" type="button" class="ghost-btn">导出模板 JSON</button>
+                      <label class="ghost-btn file-btn">导入模板 JSON<input id="importTemplateInput" type="file" accept="application/json" /></label>
+                      <button id="saveTemplateConfigBtn" type="button" class="primary-btn">保存模板设置</button>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="tab-page" data-page="theme">
+                  <div class="advanced-subtabs">
+                    <button class="tab-btn" type="button" data-tab="template">模板</button>
+                    <button class="tab-btn active" type="button" data-tab="theme">美化包</button>
+                  </div>
+                  <div class="turn-note-config-card standalone">
+                    <div class="subhead"><strong>状态记录外观模板包</strong></div>
+                    <p class="microcopy">外观包只调整 Chat 状态记录展示样式；不影响生成、变量、阶段或世界书。</p>
+                    <div class="preset-row theme-pack-toolbar-row">
+                      <label>当前外观包<select id="themeSelect"></select></label>
+                      <div class="inline-action-group theme-pack-actions">
+                        <label class="ghost-btn file-btn">导入<input id="importThemeInput" type="file" accept="application/json" /></label>
+                        <button id="exportThemeBtn" type="button" class="ghost-btn" title="导出外观包 JSON">导出</button>
+                        <button id="deleteThemeBtn" type="button" class="ghost-btn danger" disabled title="内置外观包不可删除">删除</button>
+                        <button id="saveThemeConfigBtn" type="button" class="primary-btn" title="保存外观设置">保存</button>
+                      </div>
+                    </div>
+                    <div class="grid-two">
+                      <label>外观包名称<input id="themeName" readonly /></label>
+                      <label>作者<input id="themeAuthor" readonly /></label>
+                    </div>
+                    <label>说明<textarea id="themeDesc" rows="2" readonly></textarea></label>
+                    <div id="themeMeta" class="theme-pack-meta-panel" aria-live="polite"></div>
+                    <div class="theme-preview-wrap">
+                      <div class="theme-preview-head">
+                        <strong>预览</strong>
+                        <label class="theme-preview-mode">预览数据<select id="themePreviewModeSelect"><option value="role">角色变量</option><option value="standard">标准模板</option></select></label>
+                      </div>
+                      <div id="themePreview" class="theme-preview-card">选择外观包后显示预览。</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="tab-page" data-page="log">
+                  <div class="turn-note-config-card standalone log-config-card">
+                    <div class="subhead"><strong>调试与日志</strong><span class="micro-badge">debug</span></div>
+                    <p class="microcopy">这里集中放置数据库运行日志、Hook 排查、导入导出和角色卡同步。下面的操作可能影响运行数据，请确认后再使用。</p>
+                    <div class="risk-actions">
+                      <button id="roleStateSyncCardBtn" type="button" class="ghost-btn">同步至角色卡</button>
+                      <button id="roleStateInitBtn" type="button" class="ghost-btn">从角色卡初始化当前状态</button>
+                      <button id="roleStateDebugNextStageBtn" type="button" class="ghost-btn danger" title="仅调试模式使用：直接把当前选中角色推进到下一阶段，用于测试世界书 external_tag 和状态记录展示。">推进阶段</button>
+                    </div>
+                    <div class="risk-note">同步角色卡、初始化当前状态、推进阶段属于高风险维护操作，已从普通角色配置页迁出。</div>
+                    <div class="panel-actions log-actions">
+                      <button id="loadLogBtn" class="ghost-btn">读取最近日志</button>
+                      <button id="exportDebugLogBtn" class="ghost-btn">导出排查日志</button>
+                    </div>
+                    <pre id="logBox" class="log-box">暂无日志</pre>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <div id="drawerMask" class="drawer-mask" hidden></div>
+
+      <aside id="rowDetailDrawer" class="row-detail-drawer" aria-hidden="true" inert>
+        <div class="drawer-toolbar">
+          <div>
+            <p class="eyebrow">Row Detail</p>
+            <h2 id="rowDetailTitle">行详情</h2>
+          </div>
+          <button id="closeRowDetailBtn" class="ghost-btn small">关闭</button>
+        </div>
+        <div id="rowDetailBody" class="row-detail-body"></div>
+        <div class="drawer-actions pinned">
+          <button id="deleteRowDetailBtn" class="ghost-btn danger">删除此行</button>
+          <button id="saveRowDetailBtn" class="primary-btn">保存行</button>
+        </div>
+      </aside>
+      <div id="rowDetailMask" class="drawer-mask" hidden></div>
+    </main>
+    <script>
+      (() => {
+        const postFrameHeight = () => {
+          if (!window.parent || window.parent === window) return;
+          const candidates = [
+            document.querySelector(".state-journal-hero"),
+            document.querySelector(".state-journal-workbench"),
+            document.querySelector(".row-detail-drawer.open"),
+            document.querySelector(".config-drawer-panel.open"),
+          ].filter(Boolean);
+          const height = candidates.reduce((bottom, node) => {
+            const rect = node.getBoundingClientRect();
+            return Math.max(bottom, rect.bottom);
+          }, 0) + 12;
+          window.parent.postMessage({ type: "fantareal:state-journal:resize", height }, window.location.origin);
+        };
+        const scheduleFrameHeight = () => window.requestAnimationFrame(postFrameHeight);
+        window.addEventListener("load", scheduleFrameHeight);
+        window.addEventListener("resize", scheduleFrameHeight);
+        if ("ResizeObserver" in window) {
+          const observer = new ResizeObserver(scheduleFrameHeight);
+          observer.observe(document.documentElement);
+          if (document.body) observer.observe(document.body);
+        }
+        if ("MutationObserver" in window) {
+          const observer = new MutationObserver(scheduleFrameHeight);
+          observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
+        }
+        scheduleFrameHeight();
+      })();
+    </script>
+    <script src="./static/state-journal.js?v=state-journal-console-v281-variable-instruction"></script>
+  </body>
+</html>

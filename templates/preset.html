@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preset - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p9-textarea-scroll-20260701" />
+    <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
+
+  </head>
+  <body class="app-sidebar-shell modern-setting-page preset-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+      <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Preset</span>
+          <div class="slot-meta">
+            <strong>当前为全局预设库</strong>
+            <p class="slot-hint">这里维护的是全局预设，不再跟存档绑定，可以自由导入和导出。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-shell compact">
+      <section class="panel config-panel full-span preset-workbench-panel ui-readable-canvas">
+        <div class="section-head preset-workbench-head">
+          <div>
+            <div class="ui-workbench-titleline">
+              <p class="eyebrow">Preset Workbench</p>
+              <span id="status-text" class="config-status-pill ui-status-pill status-line is-success" aria-live="polite">就绪</span>
+            </div>
+            <h2>预设工作台</h2>
+            <p class="muted">查看当前编辑与聊天使用状态；新增、导入、导出和保存都在这里完成。</p>
+          </div>
+        </div>
+        <div class="preset-overview-grid">
+          <div class="stat-box"><span class="stat-label">聊天使用中</span><strong id="active-preset-label">{{ active_preset.name }}</strong></div>
+          <div class="stat-box"><span class="stat-label">正在编辑</span><strong id="editing-preset-label">{{ active_preset.name }}</strong></div>
+          <div class="stat-box"><span class="stat-label">预设总数</span><strong id="preset-count">{{ preset_count }}</strong></div>
+          <div class="stat-box"><span class="stat-label">启用状态</span><strong id="preset-enabled-label">{{ '启用' if active_preset.enabled else '停用' }}</strong></div>
+          <div class="stat-box preset-save-state-box"><span class="stat-label">保存状态</span><strong id="dirty-state-label">已保存</strong></div>
+        </div>
+        <div id="preset-status-strip" class="preset-status-strip config-status-strip is-helper-only">
+          <span class="muted helper-text">切换后点击“保存并使用”会同步用于聊天；“设为聊天使用”可在不改内容时快速切换。</span>
+        </div>
+      </section>
+
+        <div class="config-workbench-actions preset-workbench-actions ui-sticky-toolbar ui-action-dock is-wrap">
+          <div class="preset-picker-wrap ui-object-picker">
+            <button id="preset-picker-toggle" type="button" class="preset-picker-toggle ui-object-picker-toggle" aria-haspopup="listbox" aria-expanded="false">
+              <span class="preset-picker-kicker ui-object-picker-kicker">当前预设</span>
+              <strong id="preset-picker-current">{{ active_preset.name }}</strong>
+              <span class="preset-picker-caret ui-object-picker-caret" aria-hidden="true">▾</span>
+            </button>
+            <div id="preset-picker-menu" class="preset-picker-menu ui-object-picker-menu" role="listbox" hidden>
+              <div class="preset-picker-menu-head">
+                <span>选择编辑预设</span>
+                <small>选择后编辑对应预设，点击“保存并使用”同步到聊天。</small>
+              </div>
+              <div id="preset-items" class="preset-card-grid"></div>
+            </div>
+          </div>
+          <div class="preset-actions-primary ui-action-dock-primary">
+            <button id="create-preset" type="button" class="secondary">新增</button>
+            <button id="save-preset-top" type="button">保存并使用</button>
+            <button id="reload-preset" type="button" class="secondary">重新读取</button>
+            <div class="preset-more-wrap ui-action-menu ui-action-more">
+              <button id="preset-more-toggle" type="button" class="secondary" aria-haspopup="menu" aria-expanded="false">更多 ▾</button>
+              <div id="preset-more-menu" class="preset-more-menu ui-menu-popover ui-action-more-menu" role="menu" hidden>
+                <button id="duplicate-preset" type="button" role="menuitem">复制当前预设</button>
+                <button id="activate-preset" type="button" role="menuitem">设为聊天使用</button>
+                <button id="import-preset" type="button" role="menuitem">导入预设</button>
+                <button id="export-preset" type="button" role="menuitem">导出当前编辑</button>
+                <button id="delete-preset" type="button" role="menuitem" class="danger-menu-item is-danger">删除...</button>
+              </div>
+            </div>
+          </div>
+          <span id="header-save-state" class="preset-header-save-state ui-status-token is-saved" aria-live="polite">已保存</span>
+          <input id="import-preset-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
+        </div>
+        <div id="preset-delete-confirm" class="preset-delete-confirm ui-danger-confirm" hidden>
+          <div>
+            <strong id="preset-delete-title">确认删除这个预设？</strong>
+            <p class="muted helper-text">此操作无法恢复。当前聊天正在使用的预设需要先切换到其他预设。</p>
+          </div>
+          <div class="preset-delete-actions ui-danger-actions">
+            <button id="cancel-delete-preset" type="button" class="secondary">取消</button>
+            <button id="confirm-delete-preset" type="button" class="danger-button">确认删除</button>
+          </div>
+        </div>
+
+
+      <div class="preset-workbench-shell full-span">
+        <div class="preset-editor-column">
+          <div class="preset-editor-grid">
+        <section class="panel config-panel">
+          <div class="section-head">
+            <p class="eyebrow">Base</p>
+            <h2>BASE｜预设内核</h2>
+            <p class="muted">适合放长期稳定的预设内核：幕后工作人格、可见思考时的本轮提取格式、预设子内容 / 世界书 / 记忆 / 上下文读取方式，以及正文生成前的简要检查清单。</p>
+          </div>
+          <div class="preset-meta-grid">
+            <div>
+              <label for="preset-name">预设名称</label>
+              <input id="preset-name" placeholder="例如：通用陪伴预设" />
+            </div>
+            <label class="preset-base-enabled-switch offset-top">
+              <input id="preset-enabled" type="checkbox" />
+              <span class="preset-quick-enabled-track" aria-hidden="true"></span>
+              <span>启用当前编辑预设</span>
+            </label>
+          </div>
+          <label for="base-system-prompt">BASE｜预设内核内容</label>
+          <div class="preset-base-template-panel" aria-label="BASE 预设内核模板">
+            <div class="preset-base-template-copy">
+              <strong>模板插入</strong>
+              <span>选择模板后确认插入；不会自动保存，详细规则仍建议放在预设子内容或世界书。</span>
+            </div>
+            <div class="preset-base-template-picker">
+              <label for="base-template-select">选择模板</label>
+              <select id="base-template-select"></select>
+            </div>
+          </div>
+          <textarea id="base-system-prompt" rows="12" placeholder="这里放长期稳定的预设内核。详细文风、禁忌和场景规则建议放在预设子内容或世界书中，BASE 只负责定义读取方式、本轮提取格式和正文隔离边界。"></textarea>
+          <div class="preset-base-footer">
+            <span class="muted helper-text">预设内核：<strong id="base-prompt-count">0</strong> 字</span>
+            <div class="preset-editor-actions">
+              <button type="button" class="secondary macro-insert-button" data-macro-insert data-macro-target="#base-system-prompt">{ } 变量</button>
+              <button id="insert-base-template" type="button" class="secondary">插入模板</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel config-panel">
+          <div class="section-head">
+            <p class="eyebrow">Modules</p>
+            <h2>常用模块</h2>
+            <p class="muted">模块规则集中配置，适合跨角色复用；互斥项会自动互斥。</p>
+          </div>
+          <div class="module-grid">
+            {% for item in preset_modules %}
+            <label class="preset-module-chip">
+              <input class="preset-module" data-key="{{ item.key }}" type="checkbox" />
+              <span class="preset-module-switch-track" aria-hidden="true"></span>
+              <span>{{ item.label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div class="preset-assembly-card">
+            <strong>预设拼装顺序</strong>
+            <ol>
+              <li>基础系统规则</li>
+              <li>已启用常用模块</li>
+              <li>规则组中当前采用的规则项</li>
+              <li>已启用额外规则块</li>
+            </ol>
+            <div class="preset-v4f-note">
+              <strong>V4F稳定器</strong>
+              <p class="muted helper-text">适合 DeepSeek V4-Flash RP 使用。开启后，后端会在本轮用户输入前追加一段短规则，用来加强格式稳定、防抢话、情绪细节和弱收尾；普通模型或追求极限缓存时可以关闭。</p>
+            </div>
+          </div>
+        </section>
+          </div>
+
+          <section class="panel config-panel preset-blocks-panel">
+            <div class="section-head">
+          <p class="eyebrow">Blocks</p>
+          <h2>额外规则块</h2>
+          <p class="muted">规则块适合固定补充；规则组适合“文风 / 节奏 / 描写重点”等多选一或多选配置。</p>
+        </div>
+        <div class="preset-block-toolbar">
+          <div class="preset-block-actions">
+            <button id="add-preset-block" type="button">+ 规则块</button>
+            <button id="add-preset-group" type="button" class="secondary">+ 规则组</button>
+            <button id="collapse-all-blocks" type="button" class="secondary">折叠</button>
+            <button id="expand-all-blocks" type="button" class="secondary">展开</button>
+          </div>
+          <div class="preset-block-search">
+            <label for="preset-search">搜索规则块</label>
+            <input id="preset-search" type="text" placeholder="按标题、正文、规则组或规则项搜索；搜索时会暂时禁用拖动排序" />
+          </div>
+        </div>
+        <p id="preset-drag-hint" class="muted helper-text preset-drag-hint">
+          按住规则块左侧 <strong>⋮⋮</strong> 可拖动排序，看到橙色插入线后松手；保存后生效。
+        </p>
+        <div id="preset-list" class="preset-card-list"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/app-core.js?v=v161-p4-batch-render-atomic-20260701"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
+    <script>
+      const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml, batchRenderList } = window.Fantareal;
+      const statusEl = document.getElementById("status-text");
+      const statusStripEl = document.getElementById("preset-status-strip");
+      const presetListEl = document.getElementById("preset-list");
+      const presetItemsEl = document.getElementById("preset-items");
+      const presetCountEl = document.getElementById("preset-count");
+      const activePresetLabelEl = document.getElementById("active-preset-label");
+      const editingPresetLabelEl = document.getElementById("editing-preset-label");
+      const presetEnabledLabelEl = document.getElementById("preset-enabled-label");
+      const dirtyStateLabelEl = document.getElementById("dirty-state-label");
+      const presetSaveStateBoxEl = document.querySelector(".preset-save-state-box");
+      const basePromptCountEl = document.getElementById("base-prompt-count");
+      const savePresetButton = document.getElementById("save-preset-top");
+      const headerSaveStateEl = document.getElementById("header-save-state");
+      const presetMoreToggleEl = document.getElementById("preset-more-toggle");
+      const presetMoreMenuEl = document.getElementById("preset-more-menu");
+      const presetPickerToggleEl = document.getElementById("preset-picker-toggle");
+      const presetPickerMenuEl = document.getElementById("preset-picker-menu");
+      const presetPickerCurrentEl = document.getElementById("preset-picker-current");
+      const presetDeleteConfirmEl = document.getElementById("preset-delete-confirm");
+      const presetDeleteTitleEl = document.getElementById("preset-delete-title");
+      const dragHintEl = document.getElementById("preset-drag-hint");
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+      let presetStore = {{ preset_store | tojson }};
+      let editingPresetId = presetStore.active_preset_id;
+      let presetDirty = false;
+      let draggedCard = null;
+      let dragIntentCard = null;
+      const MODULE_MUTEX = { short_paragraph: ["long_paragraph"], long_paragraph: ["short_paragraph"], second_person: ["third_person"], third_person: ["second_person"] };
+      const BASE_KERNEL_TEMPLATES = {
+        workerPersona: `【幕后工作人格：atone】
+当模型产生可见思考过程时，请让幕后工作人格「atone」负责阅读后续注入内容，并为本轮正文生成做简短工作整理。
+
+atone 的信息来源：
+- 当前预设与预设子内容；
+- 角色卡；
+- 世界书；
+- 长期记忆与本轮召回记忆；
+- 最近上下文；
+- 用户本轮输入；
+- 最终输出格式与禁忌规则。
+
+atone 的工作边界：
+- atone 不负责提供新的详细设定。
+- atone 只从已注入内容中提取本轮最相关的几条提醒。
+- 不长篇复述设定原文。
+- 不替代预设子内容、世界书、角色卡或记忆。
+- 不得把 worldbook 的 Matched、external_tag、activation_tags 当成用户本轮原话。
+- 只有 runtime.user_input / 最后一条 user message 中明确出现的内容，才可视为用户本轮输入。
+- 最终正文不得提及 atone、预设、世界书、记忆、模型、思考过程或规则来源。`,
+        turnExtraction: `【atone 本轮提取格式】
+如果本轮需要整理创作方向，可在可见思考过程中简短使用以下格式：
+
+剧情走向：
+从上下文、世界书、记忆和用户本轮输入中提取本轮应推进 / 应暂缓 / 应避免的剧情方向。
+
+文风与禁忌：
+- 视角：提取当前预设指定的叙事视角和称呼方式。
+- 语言：提取当前预设指定的语言密度、口吻、描写风格。
+- 感官重点：提取本轮最适合强调的气味、声音、触感、温度、光线、身体反应。
+- 禁忌：提取本轮必须避开的词汇、比喻、剧情走向和角色越界。
+- 物理引擎：提取当前场景里应该保持连续的物件、姿势、距离、衣物、动作惯性和环境反馈。
+- 正文检查：确认正文只自然呈现场景，不解释规则。
+
+注意：
+- 这里的具体内容应从预设子内容、世界书、记忆、上下文和用户本轮输入中提取；BASE 不应写死所有场景的详细感官、禁词和文风。
+- 不得为了填充本轮提取格式而虚构用户说过的话、做过的动作、产生的情绪或作出的决定。
+- worldbook 的 Matched、external_tag、activation_tags 只是激活信号，不等于用户本轮原话。`,
+        injectionReading: `【注入内容读取规则】
+生成正文前，atone 应按以下方式阅读后续注入内容：
+
+- 预设子内容：读取当前启用的文风、输出格式、禁忌词、叙事视角和正文结构要求。
+- 角色卡：读取角色身份、关系边界、性格、当前互动限制和不可违背的人设。
+- 世界书：读取本轮命中的设定、阶段、地点、关系状态、物理规则和临时事件。
+- 记忆：读取长期状态、用户偏好、剧情累积和不能遗忘的事实。
+- 上下文：读取最近对话里的动作连续性、情绪承接、位置关系和未完成互动。
+- 用户本轮输入：优先承接用户明确写出的动作、台词、意图和限制，不替用户推进未写出的行为。`,
+        priority: `【冲突优先级】
+当 BASE 的通用要求与更具体内容冲突时，优先级如下：
+
+1. 用户本轮明确要求。
+2. 最终输出格式 / 禁忌规则。
+3. 本轮命中的世界书与当前状态。
+4. 当前启用的预设子内容。
+5. 角色卡核心设定。
+6. 长期记忆与最近上下文。
+7. BASE 中的通用工作方式。
+
+BASE 只负责提供工作方法，不应压过更具体、更靠近本轮的内容。`,
+        bodyIsolation: `【正文隔离规则】
+- atone 是幕后工作人格，不是正文角色。
+- 正文角色不知道 atone 的存在。
+- 正文中不要提及 atone、预设、世界书、记忆、模型、思考过程或规则来源。
+- 可见思考中的提取结果只能服务于正文生成，不应以分析清单形式进入正文。
+- 最终正文必须自然、沉浸、角色内，优先通过动作、对白、停顿、环境和感官细节呈现场景。`,
+        userInputTruth: `【用户输入真实性边界】
+- atone 只能引用用户本轮明确写出的内容。
+- 不得虚构用户说过的话、做过的动作、产生的情绪或作出的决定。
+- 不得把未出现在 runtime.user_input / 最后一条 user message 中的内容当成用户本轮输入。
+- 不得把 worldbook 的 Matched、external_tag、activation_tags 当成用户原话；这些只代表设定或规则被激活。
+- 如果用户本轮输入很短或含糊，应标记为“用户意图待承接”，而不是补写具体台词、动作或情绪。`,
+      };
+      const BASE_KERNEL_TEMPLATE_LABELS = {
+        workerPersona: "幕后工作人格",
+        turnExtraction: "本轮提取格式",
+        injectionReading: "注入内容读取规则",
+        priority: "冲突优先级",
+        bodyIsolation: "正文隔离规则",
+        userInputTruth: "用户输入真实性边界",
+      };
+
+      function generateId(prefix) {
+        return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+      }
+
+      const SEGMENT_PLACEMENT_OPTIONS = [
+        ["", "默认（不指定）"],
+        ["system_core", "系统核心"],
+        ["system_format", "系统格式"],
+        ["before_character", "角色前"],
+        ["character", "角色卡"],
+        ["after_character", "角色后"],
+        ["lore_context", "世界书区"],
+        ["memory_context", "记忆区"],
+        ["before_history", "聊天历史前"],
+        ["at_depth", "聊天深度"],
+        ["near_latest_user", "近本轮输入"],
+        ["output_guard", "输出守卫"],
+      ];
+      const SEGMENT_KIND_OPTIONS = [
+        ["", "默认（不指定）"],
+        ["base", "基础"],
+        ["creator_persona", "幕后人格"],
+        ["thinking_protocol", "思考协议"],
+        ["format", "格式"],
+        ["html_protocol", "HTML 协议"],
+        ["output_rule", "输出规则"],
+        ["output_guard", "输出守卫"],
+        ["style", "文风"],
+        ["tone", "语气"],
+        ["plot", "剧情"],
+        ["dialogue", "对白"],
+        ["scene", "场景"],
+        ["relationship", "关系"],
+        ["character_policy", "角色策略"],
+        ["lore_policy", "设定策略"],
+        ["reference", "参考"],
+        ["memory", "记忆"],
+        ["director_note", "导演注"],
+        ["mod", "插件"],
+      ];
+      const SEGMENT_STRENGTH_OPTIONS = [
+        ["", "默认（不指定）"],
+        ["soft", "软提示"],
+        ["hard", "硬规则"],
+      ];
+      const SEGMENT_ROLE_OPTIONS = [
+        ["", "默认 system"],
+        ["system", "system"],
+        ["user", "user"],
+        ["assistant", "assistant"],
+      ];
+
+      function renderSegmentSelectOptions(options, selectedValue) {
+        const selected = String(selectedValue || "").trim();
+        return options.map(([value, label]) => {
+          const optionValue = String(value || "");
+          return `<option value="${escapeHtml(optionValue)}" ${selected === optionValue ? "selected" : ""}>${escapeHtml(label)}</option>`;
+        }).join("");
+      }
+
+      function formatActivationTags(tags) {
+        if (Array.isArray(tags)) {
+          return tags.map((tag) => String(tag || "").trim()).filter(Boolean).join("\n");
+        }
+        return String(tags || "").trim();
+      }
+
+      function parseActivationTags(value) {
+        const tags = [];
+        String(value || "")
+          .split(/[\n\r,，]+/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .forEach((tag) => {
+            if (!tags.includes(tag)) tags.push(tag);
+          });
+        return tags.slice(0, 32);
+      }
+
+      function hasSegmentAdvancedFields(item = {}) {
+        if (!item || typeof item !== "object") return false;
+        if (String(item.placement || "").trim()) return true;
+        if (String(item.role || "").trim()) return true;
+        if (Number(item.depth || 0) > 0) return true;
+        if (String(item.kind || "").trim()) return true;
+        if (String(item.strength || "").trim()) return true;
+        if (item.required === true) return true;
+        if (Number(item.tokenBudget || 0) > 0) return true;
+        return parseActivationTags(formatActivationTags(item.activation_tags)).length > 0;
+      }
+
+      function renderSegmentAdvancedFields(item = {}, variant = "block") {
+        const detailsClass = variant === "group-item" ? "preset-advanced-fields preset-group-item-advanced" : "preset-advanced-fields";
+        const openAttr = hasSegmentAdvancedFields(item) ? " open" : "";
+        const tokenBudget = Number(item.tokenBudget || 0) > 0 ? Number(item.tokenBudget || 0) : "";
+        const depth = Number(item.depth || 0) > 0 ? Number(item.depth || 0) : "";
+        return `
+          <details class="${detailsClass}"${openAttr}>
+            <summary class="preset-advanced-summary">
+              <span class="preset-advanced-summary-main">高级字段</span>
+              <span class="preset-advanced-summary-note">可选，普通预设可保持默认</span>
+            </summary>
+            <div class="preset-advanced-body">
+              <p class="muted helper-text preset-advanced-note">这些字段会参与真实 Prompt 编排；普通预设可保持默认。</p>
+              <div class="preset-advanced-grid">
+                <label class="preset-advanced-field">
+                  <span>注入层级 placement</span>
+                  <select class="preset-segment-placement">${renderSegmentSelectOptions(SEGMENT_PLACEMENT_OPTIONS, item.placement)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>消息角色 role</span>
+                  <select class="preset-segment-role">${renderSegmentSelectOptions(SEGMENT_ROLE_OPTIONS, item.role)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>聊天深度 depth</span>
+                  <input class="preset-segment-depth" type="number" min="0" max="999" step="1" value="${escapeHtml(depth)}" placeholder="仅 placement=at_depth" />
+                </label>
+                <label class="preset-advanced-field">
+                  <span>片段类型 kind</span>
+                  <select class="preset-segment-kind">${renderSegmentSelectOptions(SEGMENT_KIND_OPTIONS, item.kind)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>强度 strength</span>
+                  <select class="preset-segment-strength">${renderSegmentSelectOptions(SEGMENT_STRENGTH_OPTIONS, item.strength)}</select>
+                </label>
+                <label class="preset-advanced-field">
+                  <span>Token 预算</span>
+                  <input class="preset-segment-token-budget" type="number" min="0" max="999999" step="1" value="${escapeHtml(tokenBudget)}" placeholder="默认不限制" />
+                </label>
+                <label class="preset-advanced-switch preset-required-switch" title="预算不足时优先保留；当前仍为观察字段，不改变真实裁剪逻辑。">
+                  <input class="preset-segment-required" type="checkbox" ${item.required === true ? "checked" : ""} />
+                  <span>必需片段</span>
+                </label>
+                <label class="preset-advanced-field preset-advanced-tags">
+                  <span>激活标签</span>
+                  <textarea class="preset-segment-activation-tags" rows="2" placeholder="一行一个，例如 preset.style.daily-prose；后续可升级为 tag 输入">${escapeHtml(formatActivationTags(item.activation_tags))}</textarea>
+                </label>
+              </div>
+            </div>
+          </details>
+        `;
+      }
+
+      function collectSegmentAdvancedFields(scopeEl) {
+        const result = {};
+        if (!scopeEl) return result;
+        const placement = scopeEl.querySelector(".preset-segment-placement")?.value.trim() || "";
+        const role = scopeEl.querySelector(".preset-segment-role")?.value.trim() || "";
+        const depth = Number(scopeEl.querySelector(".preset-segment-depth")?.value || 0);
+        const kind = scopeEl.querySelector(".preset-segment-kind")?.value.trim() || "";
+        const strength = scopeEl.querySelector(".preset-segment-strength")?.value.trim() || "";
+        const required = scopeEl.querySelector(".preset-segment-required")?.checked === true;
+        const tokenBudget = Number(scopeEl.querySelector(".preset-segment-token-budget")?.value || 0);
+        const activationTags = parseActivationTags(scopeEl.querySelector(".preset-segment-activation-tags")?.value || "");
+        if (placement) result.placement = placement;
+        if (role) result.role = role;
+        if (Number.isFinite(depth) && depth > 0) result.depth = Math.min(Math.floor(depth), 999);
+        if (kind) result.kind = kind;
+        if (strength) result.strength = strength;
+        if (required) result.required = true;
+        if (Number.isFinite(tokenBudget) && tokenBudget > 0) result.tokenBudget = Math.min(Math.floor(tokenBudget), 999999);
+        if (activationTags.length) result.activation_tags = activationTags;
+        return result;
+      }
+
+      function setAdvancedDetailsOpen(details, shouldOpen, options = {}) {
+        const body = details?.querySelector(".preset-advanced-body");
+        const summary = details?.querySelector(".preset-advanced-summary");
+        if (!details || !body) return;
+        const nextOpen = Boolean(shouldOpen);
+        const motion = window.Fantareal?.motion;
+        if (summary) summary.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+        if (nextOpen) {
+          details.open = true;
+          if (motion?.setDisclosureCollapsed) {
+            motion.setDisclosureCollapsed(details, body, false, {
+              hiddenMode: "hidden",
+              dataAttribute: "advancedCollapsed",
+              immediate: options.immediate === true,
+              fallbackMs: 340,
+            });
+          } else {
+            body.hidden = false;
+            body.setAttribute("aria-hidden", "false");
+            details.dataset.advancedCollapsed = "false";
+          }
+          return;
+        }
+
+        if (motion?.setDisclosureCollapsed) {
+          motion.setDisclosureCollapsed(details, body, true, {
+            hiddenMode: "hidden",
+            dataAttribute: "advancedCollapsed",
+            immediate: options.immediate === true,
+            fallbackMs: 320,
+          });
+          const finishClose = () => {
+            if (details.dataset.advancedCollapsed === "true") details.open = false;
+          };
+          motion.afterMotion?.(body, finishClose, 360) || window.setTimeout(finishClose, 360);
+        } else {
+          body.hidden = true;
+          body.setAttribute("aria-hidden", "true");
+          details.dataset.advancedCollapsed = "true";
+          details.open = false;
+        }
+      }
+
+      function initPresetAdvancedDisclosure(scope = document) {
+        scope.querySelectorAll("details.preset-advanced-fields").forEach((details) => {
+          if (details.dataset.motionReady === "true") return;
+          const summary = details.querySelector(".preset-advanced-summary");
+          const body = details.querySelector(".preset-advanced-body");
+          if (!summary || !body) return;
+          details.dataset.motionReady = "true";
+          if (!body.id) body.id = generateId("preset-advanced-body");
+          summary.setAttribute("role", "button");
+          summary.setAttribute("aria-controls", body.id);
+          summary.setAttribute("aria-expanded", details.open ? "true" : "false");
+          if (details.open) {
+            setAdvancedDetailsOpen(details, true, { immediate: true });
+          } else {
+            body.hidden = true;
+            body.setAttribute("aria-hidden", "true");
+            body.dataset.uiMotionReady = "true";
+            details.dataset.advancedCollapsed = "true";
+          }
+          summary.addEventListener("click", (event) => {
+            event.preventDefault();
+            setAdvancedDetailsOpen(details, !details.open || body.hidden);
+          });
+        });
+      }
+
+      function countAdvancedGroupItems(card) {
+        if (!card) return 0;
+        return Array.from(card.querySelectorAll(".preset-group-item"))
+          .filter((row) => Object.keys(collectSegmentAdvancedFields(row)).length > 0)
+          .length;
+      }
+
+      function updateGroupItemSummary(row) {
+        if (!row) return;
+        const summary = row.querySelector(".preset-group-item-summary");
+        if (!summary) return;
+        const selected = row.querySelector(".preset-group-item-selected")?.checked === true;
+        const content = row.querySelector(".preset-group-item-content")?.value || "";
+        const contentLength = String(content).trim().length;
+        const advancedCount = Object.keys(collectSegmentAdvancedFields(row)).length;
+        const collapsed = row.dataset.collapsed === "true";
+        const chips = [
+          `<span class="preset-group-item-mini-chip ${selected ? "is-selected" : "is-muted"}">${selected ? "已采用" : "未采用"}</span>`,
+          `<span class="preset-group-item-mini-chip">${contentLength} 字</span>`,
+        ];
+        if (advancedCount > 0) {
+          chips.push(`<span class="preset-group-item-mini-chip is-advanced">高级字段 ${advancedCount}</span>`);
+        }
+        summary.innerHTML = `
+          <span class="preset-group-item-summary-chips">${chips.join("")}</span>
+        `;
+        const toggle = row.querySelector(".preset-group-item-toggle");
+        if (toggle) {
+          toggle.textContent = collapsed ? "▸" : "▾";
+          toggle.title = collapsed ? "展开规则项" : "收起规则项";
+          toggle.setAttribute("aria-label", collapsed ? "展开规则项" : "收起规则项");
+          toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        }
+      }
+
+      function setGroupItemCollapsed(row, collapsed, options = {}) {
+        const body = row?.querySelector(".preset-group-item-body");
+        if (!row || !body) return;
+        window.Fantareal?.motion?.setDisclosureCollapsed?.(row, body, collapsed, {
+          hiddenMode: "hidden",
+          collapsedClass: "is-group-item-collapsed",
+          immediate: options.immediate === true,
+          fallbackMs: 300,
+        });
+        row.dataset.collapsed = collapsed ? "true" : "false";
+        if (!window.Fantareal?.motion?.setDisclosureCollapsed) {
+          body.hidden = !!collapsed;
+        }
+        updateGroupItemSummary(row);
+      }
+
+      function updateGroupItemSummaries(scope) {
+        if (!scope?.querySelectorAll) return;
+        scope.querySelectorAll(".preset-group-item").forEach(updateGroupItemSummary);
+      }
+
+      function getCompactStatusLabel(text, state) {
+        const value = String(text || "");
+        if (state === "error") return "出错";
+        if (state === "dirty") return "有修改";
+        if (state === "saving") {
+          if (value.includes("保存")) return "保存中";
+          if (value.includes("读取")) return "读取中";
+          if (value.includes("导入")) return "导入中";
+          if (value.includes("导出")) return "导出中";
+          return "处理中";
+        }
+        if (state === "success") {
+          if (value.includes("保存")) return "已保存";
+          if (value.includes("读取")) return "已读取";
+          if (value.includes("导入")) return "已导入";
+          if (value.includes("导出")) return "已导出";
+          if (value.includes("新增")) return "已新增";
+          if (value.includes("删除")) return "已删除";
+          if (value.includes("切换")) return "已切换";
+          return "就绪";
+        }
+        return "就绪";
+      }
+
+      function setStatus(text) {
+        const value = text || "就绪";
+        const state = getStatusState(value);
+        const label = getCompactStatusLabel(value, state);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: value,
+          state,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = value;
+          statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
+          statusEl.classList.add(`is-${state}`);
+        }
+      }
+
+      function getStatusState(text) {
+        const value = String(text || "");
+        if (/失败|错误|异常|无法/.test(value)) return "error";
+        if (/正在|保存中|读取中|导入中|导出中|生成中|请不要重复/.test(value)) return "saving";
+        if (/未保存|修改|记得保存|待保存/.test(value)) return "dirty";
+        if (/就绪|已保存|已加载|已读取|读取完成|已导出|已导入|已新增|已复制|已删除|已切换|重新读取|完成/.test(value)) return "success";
+        return "idle";
+      }
+
+      function setDirty(dirty, message) {
+        presetDirty = Boolean(dirty);
+        const stateLabel = presetDirty ? "有未保存修改" : "已保存";
+        dirtyStateLabelEl.textContent = stateLabel;
+        if (!window.Fantareal?.motion?.setStatusState?.(headerSaveStateEl, {
+          text: stateLabel,
+          title: message || stateLabel,
+          state: presetDirty ? "dirty" : "saved",
+          stateClasses: ["is-dirty", "is-saved", "is-success", "is-error", "is-saving"],
+        })) {
+          headerSaveStateEl.textContent = stateLabel;
+          headerSaveStateEl.title = message || stateLabel;
+          headerSaveStateEl.classList.toggle("is-dirty", presetDirty);
+          headerSaveStateEl.classList.toggle("is-saved", !presetDirty);
+        }
+        statusStripEl.classList.toggle("is-dirty", presetDirty);
+        presetSaveStateBoxEl?.classList.toggle("is-dirty", presetDirty);
+        savePresetButton?.classList.toggle("is-dirty", presetDirty);
+        if (message) setStatus(message);
+      }
+
+      function markDirty(message = "有未保存修改，记得保存当前预设。") {
+        setDirty(true, message);
+      }
+
+      const PRESET_INPUT_REFRESH_DELAY = 80;
+      const PRESET_RENDER_BATCH_SIZE = 6;
+      let presetSearchTextCache = new WeakMap();
+      let presetRefreshTimer = 0;
+      let pendingPresetSearch = false;
+      const pendingPresetCards = new Set();
+      const pendingPresetRows = new Set();
+
+      function invalidatePresetCardCache(card) {
+        if (card) presetSearchTextCache.delete(card);
+      }
+
+      function invalidatePresetCaches() {
+        presetSearchTextCache = new WeakMap();
+      }
+
+      function clearPendingPresetRefresh() {
+        pendingPresetCards.clear();
+        pendingPresetRows.clear();
+        pendingPresetSearch = false;
+      }
+
+      function updatePresetCardTitle(card) {
+        const titleEl = card?.querySelector(".preset-card-title-line strong");
+        if (titleEl) titleEl.textContent = getCardTitle(card);
+      }
+
+      function flushPresetRefresh() {
+        if (presetRefreshTimer) {
+          window.clearTimeout(presetRefreshTimer);
+          presetRefreshTimer = 0;
+        }
+        const cards = [...pendingPresetCards];
+        const rows = [...pendingPresetRows];
+        const shouldSearch = pendingPresetSearch;
+        clearPendingPresetRefresh();
+        rows.forEach(updateGroupItemSummary);
+        cards.forEach(updateCardSummary);
+        if (shouldSearch) applySearch();
+      }
+
+      function schedulePresetRefresh({ card = null, row = null, search = true, delay = PRESET_INPUT_REFRESH_DELAY } = {}) {
+        if (card) pendingPresetCards.add(card);
+        if (row) pendingPresetRows.add(row);
+        pendingPresetSearch ||= Boolean(search);
+        if (presetRefreshTimer) window.clearTimeout(presetRefreshTimer);
+        presetRefreshTimer = window.setTimeout(flushPresetRefresh, delay);
+      }
+
+      function refreshPresetNow({ cards = [], rows = [], search = true, invalidate = false } = {}) {
+        if (presetRefreshTimer) {
+          window.clearTimeout(presetRefreshTimer);
+          presetRefreshTimer = 0;
+        }
+        clearPendingPresetRefresh();
+        if (invalidate) invalidatePresetCaches();
+        rows.forEach(updateGroupItemSummary);
+        cards.forEach(updateCardSummary);
+        if (search) applySearch();
+      }
+
+      function setPresetMoreOpen(open) {
+        if (!presetMoreMenuEl || !presetMoreToggleEl) return;
+        presetMoreMenuEl.hidden = !open;
+        presetMoreToggleEl.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      function setPresetPickerOpen(open) {
+        if (!presetPickerMenuEl || !presetPickerToggleEl) return;
+        presetPickerMenuEl.hidden = !open;
+        presetPickerToggleEl.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open) setPresetMoreOpen(false);
+      }
+
+      function hideDeleteConfirm() {
+        if (presetDeleteConfirmEl) presetDeleteConfirmEl.hidden = true;
+      }
+
+      function showDeleteConfirm() {
+        const current = getPresetById(editingPresetId);
+        if (!current || !presetDeleteConfirmEl) return;
+        if (presetDeleteTitleEl) {
+          presetDeleteTitleEl.textContent = `确认删除「${current.name || "未命名预设"}」？`;
+        }
+        presetDeleteConfirmEl.hidden = false;
+        setPresetMoreOpen(false);
+      }
+
+      function getBaseTemplateSelect() {
+        return document.getElementById("base-template-select");
+      }
+
+      function getSelectedBaseTemplateKey() {
+        return getBaseTemplateSelect()?.value || "";
+      }
+
+      function getBaseTemplateText(key = getSelectedBaseTemplateKey()) {
+        return String(BASE_KERNEL_TEMPLATES[key] || "").trim();
+      }
+
+      function renderBaseTemplateOptions() {
+        const select = getBaseTemplateSelect();
+        if (!select) return;
+        select.innerHTML = "";
+        Object.entries(BASE_KERNEL_TEMPLATE_LABELS).forEach(([key, label]) => {
+          const option = document.createElement("option");
+          option.value = key;
+          option.textContent = label;
+          select.appendChild(option);
+        });
+      }
+
+      function normalizeTemplateText(value) {
+        return String(value || "").replace(/\s+/g, "").trim();
+      }
+
+      function insertBaseKernelTemplate(key) {
+        const textarea = document.getElementById("base-system-prompt");
+        const text = getBaseTemplateText(key);
+        if (!text || !textarea) return;
+
+        const current = textarea.value || "";
+        const normalizedCurrent = normalizeTemplateText(current);
+        const normalizedTemplate = normalizeTemplateText(text);
+        if (normalizedTemplate && normalizedCurrent.includes(normalizedTemplate)) {
+          const shouldInsertDuplicate = window.confirm("检测到这个模板内容已经存在，仍然要重复插入吗？");
+          if (!shouldInsertDuplicate) return;
+        }
+        const shouldInsert = window.confirm("将把所选模板插入到当前光标位置；不会自动保存。是否继续？");
+        if (!shouldInsert) return;
+
+        const start = typeof textarea.selectionStart === "number" ? textarea.selectionStart : current.length;
+        const end = typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : current.length;
+        const before = current.slice(0, start);
+        const after = current.slice(end);
+        const prefix = before && !before.endsWith("\n") ? "\n\n" : "";
+        const suffix = after && !after.startsWith("\n") ? "\n\n" : "";
+
+        textarea.value = `${before}${prefix}${text}${suffix}${after}`;
+        const nextCursor = `${before}${prefix}${text}`.length;
+        textarea.focus();
+        textarea.setSelectionRange(nextCursor, nextCursor);
+        updateOverview();
+        markDirty("已插入 BASE 预设内核模板，有未保存修改。");
+      }
+
+      function getPresetById(id) {
+        return (presetStore.presets || []).find((item) => item.id === id) || presetStore.presets?.[0] || null;
+      }
+
+      function getActivePreset() {
+        return getPresetById(presetStore.active_preset_id);
+      }
+
+      function getEditingPreset() {
+        return getPresetById(editingPresetId);
+      }
+
+      function countEnabled(items) {
+        return (items || []).filter((item) => item && item.enabled !== false).length;
+      }
+
+      function updateOverview() {
+        const activePreset = getActivePreset();
+        const editingPreset = getEditingPreset();
+        presetCountEl.textContent = String((presetStore.presets || []).length);
+        activePresetLabelEl.textContent = activePreset?.name || "未命名预设";
+        editingPresetLabelEl.textContent = editingPreset?.name || "未命名预设";
+        presetEnabledLabelEl.textContent = editingPreset?.enabled === false ? "停用" : "启用";
+        basePromptCountEl.textContent = String(document.getElementById("base-system-prompt")?.value.trim().length || 0);
+      }
+
+      function getCardTitle(card) {
+        if (card.dataset.cardType === "group") {
+          return card.querySelector(".preset-group-name")?.value.trim() || "新规则组";
+        }
+        return card.querySelector(".preset-block-name")?.value.trim() || "新规则块";
+      }
+
+      function setCardCollapsed(card, collapsed) {
+        const body = card.querySelector(".preset-card-body");
+        const toggle = card.querySelector(".toggle-preset-card");
+        window.Fantareal?.motion?.setDisclosureCollapsed(card, body, collapsed, { hiddenMode: "hidden" });
+        if (toggle) {
+          toggle.textContent = collapsed ? "▸" : "▾";
+          toggle.title = collapsed ? "展开" : "折叠";
+          toggle.setAttribute("aria-label", collapsed ? "展开" : "折叠");
+          toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        }
+      }
+
+      function setCardEnabledState(card, enabled) {
+        card.classList.toggle("is-disabled", !enabled);
+        const switchInput = card.querySelector(".preset-card-enabled");
+        if (switchInput) switchInput.checked = enabled;
+      }
+
+      function getGroupSelectedNames(card) {
+        const names = [];
+        card.querySelectorAll(".preset-group-item").forEach((item) => {
+          const selected = item.querySelector(".preset-group-item-selected")?.checked;
+          if (selected) {
+            names.push(item.querySelector(".preset-group-item-name-input")?.value.trim() || "未命名项");
+          }
+        });
+        return names;
+      }
+
+      function updateCardSummary(card) {
+        const title = getCardTitle(card);
+        const titleEl = card.querySelector(".preset-card-title-line strong");
+        if (titleEl) titleEl.textContent = title;
+        const summary = card.querySelector(".preset-card-summary");
+        if (!summary) return;
+        summary.innerHTML = "";
+        const type = card.dataset.cardType || "block";
+        const contentLength = type === "group"
+          ? Array.from(card.querySelectorAll(".preset-group-item-content")).reduce((sum, el) => sum + String(el.value || "").trim().length, 0)
+          : String(card.querySelector(".preset-block-content")?.value || "").trim().length;
+        const chips = [];
+        if (type === "group") {
+          const mode = card.querySelector(".preset-group-selection-mode")?.value || "single";
+          const itemCount = card.querySelectorAll(".preset-group-item").length;
+          const selectedNames = getGroupSelectedNames(card);
+          chips.push({ text: "\u89c4\u5219\u7ec4", cls: "preset-chip-type preset-chip-rule-group" });
+          chips.push({ text: mode === "multiple" ? "\u591a\u9009" : "\u5355\u9009", cls: "preset-chip-mode" });
+          chips.push({ text: selectedNames.length ? `\u5f53\u524d:${selectedNames.slice(0, 2).join("\u3001")}${selectedNames.length > 2 ? "\u7b49" : ""}` : "\u5f53\u524d:\u672a\u9009\u62e9", cls: "preset-chip-current" });
+          chips.push({ text: `${itemCount} \u9879`, cls: "preset-chip-count" });
+          chips.push({ text: `${contentLength} \u5b57`, cls: "preset-chip-words" });
+          const advancedCount = countAdvancedGroupItems(card);
+          if (advancedCount > 0) chips.push({ text: `\u542b\u9ad8\u7ea7\u9879 ${advancedCount}`, cls: "preset-chip-advanced advanced" });
+        } else {
+          chips.push({ text: "规则块", cls: "preset-chip-type preset-chip-rule-block" });
+          chips.push({ text: `${contentLength} \u5b57`, cls: "preset-chip-words" });
+          if (Object.keys(collectSegmentAdvancedFields(card)).length > 0) chips.push({ text: "\u9ad8\u7ea7\u5b57\u6bb5", cls: "preset-chip-advanced advanced" });
+        }
+        chips.forEach((item) => {
+          const chip = document.createElement("span");
+          chip.className = `preset-summary-chip ui-summary-chip ${item.cls || ""}`.trim();
+          chip.textContent = item.text;
+          summary.appendChild(chip);
+        });
+        setCardEnabledState(card, card.querySelector(".preset-card-enabled")?.checked !== false);
+      }
+
+      function createCardShell(type, title, enabled = true) {
+        const card = document.createElement("article");
+        card.className = "preset-card";
+        card.dataset.cardType = type;
+        card.dataset.collapsed = "false";
+        card.draggable = true;
+        card.innerHTML = `
+          <div class="preset-card-head">
+            <button type="button" class="preset-drag-handle" title="拖动排序" aria-label="拖动排序">⋮⋮</button>
+            <div class="preset-card-title-zone">
+              <div class="preset-card-title-line">
+                <strong>${escapeHtml(title || (type === "group" ? "新规则组" : "新规则块"))}</strong>
+                <div class="preset-card-summary"></div>
+            </div>
+            </div>
+            <div class="preset-card-controls">
+              <label class="preset-quick-enabled-switch" title="启用 / 停用">
+                <input class="preset-card-enabled ${type === "group" ? "preset-group-enabled" : "preset-block-enabled"}" type="checkbox" ${enabled !== false ? "checked" : ""} />
+                <span class="preset-quick-enabled-track" aria-hidden="true"></span>
+              </label>
+              <button type="button" class="secondary preset-icon-button toggle-preset-card" title="折叠 / 展开">▾</button>
+              <button type="button" class="secondary preset-icon-button preset-card-remove" title="删除">×</button>
+            </div>
+          </div>
+          <div class="preset-card-body"></div>
+        `;
+        bindCardShellEvents(card);
+        return card;
+      }
+
+      function bindCardShellEvents(card) {
+        card.querySelector(".preset-card-remove")?.addEventListener("click", () => {
+          (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+            refreshPresetNow({ search: true, invalidate: true });
+            markDirty("已删除规则块，有未保存修改。");
+          });
+        });
+        card.querySelector(".toggle-preset-card")?.addEventListener("click", () => {
+          setCardCollapsed(card, card.dataset.collapsed !== "true");
+        });
+        card.querySelector(".preset-card-enabled")?.addEventListener("change", () => {
+          updateCardSummary(card);
+          markDirty("启用状态已修改，有未保存修改。");
+        });
+        const handle = card.querySelector(".preset-drag-handle");
+        handle?.addEventListener("mousedown", () => {
+          dragIntentCard = card;
+        });
+        handle?.addEventListener("mouseup", () => {
+          dragIntentCard = null;
+        });
+        card.addEventListener("dragstart", (event) => {
+          if (isSearchActive() || dragIntentCard !== card) {
+            event.preventDefault();
+            return;
+          }
+          draggedCard = card;
+          card.classList.add("is-dragging");
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", card.dataset.cardType || "card");
+          setStatus(`正在拖动规则块：移动到目标位置，看到橙色插入线后松手。`);
+        });
+        card.addEventListener("dragend", () => {
+          clearDragMarkers();
+          if (draggedCard) {
+            draggedCard.classList.remove("is-dragging");
+          }
+          draggedCard = null;
+          dragIntentCard = null;
+        });
+        card.addEventListener("dragover", (event) => {
+          if (!draggedCard || draggedCard === card || isSearchActive()) return;
+          event.preventDefault();
+          const rect = card.getBoundingClientRect();
+          const isBottom = event.clientY > rect.top + rect.height / 2;
+          clearDragMarkers(card);
+          card.classList.toggle("drag-over-top", !isBottom);
+          card.classList.toggle("drag-over-bottom", isBottom);
+        });
+        card.addEventListener("dragleave", () => {
+          card.classList.remove("drag-over-top", "drag-over-bottom");
+        });
+        card.addEventListener("drop", (event) => {
+          if (!draggedCard || draggedCard === card || isSearchActive()) return;
+          event.preventDefault();
+          const insertAfter = card.classList.contains("drag-over-bottom");
+          if (insertAfter) {
+            card.after(draggedCard);
+          } else {
+            card.before(draggedCard);
+          }
+          clearDragMarkers();
+          updateAllCardSummaries();
+          markDirty("规则块顺序已调整，有未保存修改。");
+        });
+      }
+
+      function clearDragMarkers(exceptCard = null) {
+        presetListEl.querySelectorAll(".preset-card").forEach((card) => {
+          if (card !== exceptCard) card.classList.remove("drag-over-top", "drag-over-bottom");
+        });
+      }
+
+      function isSearchActive() {
+        return Boolean(document.getElementById("preset-search")?.value.trim());
+      }
+
+      function updateDragAvailability() {
+        const disabled = isSearchActive();
+        presetListEl.querySelectorAll(".preset-drag-handle").forEach((handle) => {
+          handle.classList.toggle("is-disabled", disabled);
+          handle.title = disabled ? "清空搜索后可拖动排序" : "拖动排序";
+        });
+        if (dragHintEl) {
+          dragHintEl.innerHTML = disabled
+            ? "搜索状态下暂时不能拖动排序，清空搜索后可拖动。"
+            : "按住规则块左侧 <strong>⋮⋮</strong> 可拖动排序，看到橙色插入线后松手；保存后生效。";
+        }
+      }
+
+      function getPresetCardSearchText(card) {
+        const cached = presetSearchTextCache.get(card);
+        if (cached !== undefined) return cached;
+        const parts = [];
+        if (card.dataset.cardType === "group") {
+          parts.push(card.querySelector(".preset-group-name")?.value || "");
+          card.querySelectorAll(".preset-group-item").forEach((row) => {
+            parts.push(row.querySelector(".preset-group-item-name-input")?.value || "");
+            parts.push(row.querySelector(".preset-group-item-content")?.value || "");
+            parts.push(row.querySelector(".preset-segment-activation-tags")?.value || "");
+          });
+        } else {
+          parts.push(card.querySelector(".preset-block-name")?.value || "");
+          parts.push(card.querySelector(".preset-block-content")?.value || "");
+          parts.push(card.querySelector(".preset-segment-activation-tags")?.value || "");
+        }
+        const text = parts.join("\n").toLowerCase();
+        presetSearchTextCache.set(card, text);
+        return text;
+      }
+
+      function createBlockCard(item = {}, collapsed = true) {
+        const card = createCardShell("block", item.name || "新规则块", item.enabled !== false);
+        const body = card.querySelector(".preset-card-body");
+        body.innerHTML = `
+          <div class="preset-block-body-grid">
+            <div>
+              <label>标题</label>
+              <input class="preset-block-name" placeholder="例如：对白节奏" value="${escapeHtml(item.name || "")}" />
+            </div>
+            <input class="preset-block-id" type="hidden" value="${escapeHtml(item.id || "")}" />
+          </div>
+          <div class="macro-field-head">
+            <label>正文</label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".preset-card" data-macro-target=".preset-block-content">{ } 变量</button>
+          </div>
+          <textarea class="preset-block-content" rows="5" placeholder="这里填写要拼进系统规则的文本。">${escapeHtml(item.content || "")}</textarea>
+          ${renderSegmentAdvancedFields(item, "block")}
+        `;
+        initPresetAdvancedDisclosure(card);
+        setCardCollapsed(card, collapsed);
+        updateCardSummary(card);
+        return card;
+      }
+
+      function createGroupItemElement(item = {}, selected = false, collapsed = true) {
+        const row = document.createElement("div");
+        row.className = "preset-group-item";
+        row.dataset.itemId = item.id || generateId("group-item");
+        row.innerHTML = `
+          <div class="preset-group-item-head">
+            <button type="button" class="secondary preset-icon-button preset-group-item-toggle" title="收起规则项" aria-label="收起规则项" aria-expanded="true">▾</button>
+            <label class="preset-group-item-select" title="是否采用这个规则项">
+              <input class="preset-group-item-selected" type="checkbox" ${selected ? "checked" : ""} />
+              <span class="preset-quick-enabled-track" aria-hidden="true"></span>
+              <span class="preset-group-item-select-label">采用</span>
+            </label>
+            <div class="preset-group-item-title-stack">
+              <input class="preset-group-item-name-input" placeholder="规则项名称，例如：轻古风" value="${escapeHtml(item.name || "")}" />
+              <div class="preset-group-item-summary" aria-live="polite"></div>
+            </div>
+            <button type="button" class="secondary preset-icon-button preset-group-item-remove" title="删除规则项">×</button>
+          </div>
+          <div class="preset-group-item-body">
+            <div class="macro-field-head">
+              <label>规则项正文</label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".preset-group-item" data-macro-target=".preset-group-item-content">{ } 变量</button>
+            </div>
+            <textarea class="preset-group-item-content" rows="4" placeholder="这里填写这个规则项被选中后要拼进 prompt 的文本。">${escapeHtml(item.content || "")}</textarea>
+            ${renderSegmentAdvancedFields(item, "group-item")}
+          </div>
+        `;
+        row.querySelector(".preset-group-item-toggle")?.addEventListener("click", () => {
+          setGroupItemCollapsed(row, row.dataset.collapsed !== "true");
+        });
+        row.querySelector(".preset-group-item-remove")?.addEventListener("click", () => {
+          const card = row.closest(".preset-card");
+          row.remove();
+          if (card) {
+            invalidatePresetCardCache(card);
+            enforceGroupSelection(card);
+            refreshPresetNow({ cards: [card], search: true });
+          }
+          markDirty("已删除规则项，有未保存修改。");
+        });
+        row.querySelector(".preset-group-item-selected")?.addEventListener("change", () => {
+          const card = row.closest(".preset-card");
+          if (card) enforceGroupSelection(card, row);
+          updateGroupItemSummary(row);
+          markDirty("规则组选中项已修改，有未保存修改。");
+        });
+        initPresetAdvancedDisclosure(row);
+        setGroupItemCollapsed(row, collapsed, { immediate: true });
+        return row;
+      }
+
+      function createGroupCard(group = {}, collapsed = true) {
+        const card = createCardShell("group", group.name || "新规则组", group.enabled !== false);
+        const body = card.querySelector(".preset-card-body");
+        const selectedIds = Array.isArray(group.selected_ids) ? group.selected_ids.map(String) : [];
+        const items = Array.isArray(group.items) ? group.items : [];
+        body.innerHTML = `
+          <div class="preset-group-body-grid">
+            <div>
+              <label>规则组名称</label>
+              <input class="preset-group-name" placeholder="例如：文风" value="${escapeHtml(group.name || "")}" />
+            </div>
+            <div>
+              <label>选择模式</label>
+              <select class="preset-group-selection-mode">
+                <option value="single" ${(group.selection_mode || "single") !== "multiple" ? "selected" : ""}>单选</option>
+                <option value="multiple" ${group.selection_mode === "multiple" ? "selected" : ""}>多选</option>
+              </select>
+            </div>
+            <input class="preset-group-id" type="hidden" value="${escapeHtml(group.id || "")}" />
+          </div>
+          <div class="preset-block-actions">
+            <button type="button" class="secondary add-group-item">+ 规则项</button>
+          </div>
+          <div class="preset-group-items"></div>
+        `;
+        const list = body.querySelector(".preset-group-items");
+        if (items.length) {
+          items.forEach((item, index) => {
+            const itemId = String(item.id || "");
+            const selected = selectedIds.length ? selectedIds.includes(itemId) : index === 0 && group.selection_mode !== "multiple";
+            list.appendChild(createGroupItemElement(item, selected, true));
+          });
+        } else {
+          list.appendChild(createGroupItemElement({ name: "轻古风", content: "" }, true, true));
+          list.appendChild(createGroupItemElement({ name: "散文", content: "" }, false, true));
+          list.appendChild(createGroupItemElement({ name: "小说", content: "" }, false, true));
+        }
+        body.querySelector(".add-group-item")?.addEventListener("click", () => {
+          list.appendChild(createGroupItemElement({ name: "新规则项", content: "" }, false, false));
+          enforceGroupSelection(card);
+          invalidatePresetCardCache(card);
+          refreshPresetNow({ cards: [card], search: true });
+          markDirty("已新增规则项，有未保存修改。");
+        });
+        body.querySelector(".preset-group-selection-mode")?.addEventListener("change", () => {
+          enforceGroupSelection(card);
+          markDirty("规则组选择模式已修改，有未保存修改。");
+        });
+        enforceGroupSelection(card);
+        setCardCollapsed(card, collapsed);
+        updateCardSummary(card);
+        return card;
+      }
+
+      function enforceGroupSelection(card, changedRow = null) {
+        if (!card || card.dataset.cardType !== "group") return;
+        const mode = card.querySelector(".preset-group-selection-mode")?.value || "single";
+        const rows = Array.from(card.querySelectorAll(".preset-group-item"));
+        if (mode !== "multiple") {
+          const selectedRows = rows.filter((row) => row.querySelector(".preset-group-item-selected")?.checked);
+          if (changedRow && changedRow.querySelector(".preset-group-item-selected")?.checked) {
+            rows.forEach((row) => {
+              if (row !== changedRow) row.querySelector(".preset-group-item-selected").checked = false;
+            });
+          } else if (selectedRows.length > 1) {
+            selectedRows.slice(1).forEach((row) => {
+              row.querySelector(".preset-group-item-selected").checked = false;
+            });
+          }
+        }
+        updateGroupItemSummaries(card);
+        updateCardSummary(card);
+      }
+
+      function updateAllCardSummaries() {
+        presetListEl.querySelectorAll(".preset-card").forEach(updateCardSummary);
+      }
+
+      function renderPresetList() {
+        presetItemsEl.innerHTML = "";
+        const items = presetStore.presets || [];
+        const activePreset = getActivePreset();
+        const editingPreset = getPresetById(editingPresetId);
+        if (presetPickerCurrentEl) presetPickerCurrentEl.textContent = editingPreset?.name || "未命名预设";
+        for (const item of items) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `preset-item${item.id === editingPresetId ? " active-editor" : ""}${item.id === presetStore.active_preset_id ? " current-runtime" : ""}`;
+          const blockCount = Array.isArray(item.extra_prompts) ? item.extra_prompts.length : 0;
+          const groupCount = Array.isArray(item.prompt_groups) ? item.prompt_groups.length : 0;
+          const pills = [];
+          if (item.id === presetStore.active_preset_id) pills.push(`<span class="preset-pill runtime">聊天使用中</span>`);
+          if (item.id === editingPresetId) pills.push(`<span class="preset-pill editing">正在编辑</span>`);
+          if (!pills.length) pills.push(`<span class="preset-pill">候选</span>`);
+          btn.innerHTML = `
+            <div class="preset-item-head">
+              <strong>${escapeHtml(item.name || "未命名预设")}</strong>
+              <span class="preset-pill-row">${pills.join("")}</span>
+            </div>
+            <small>${item.enabled === false ? "已停用" : "已启用"} · ${blockCount} 个规则块 · ${groupCount} 个规则组</small>
+          `;
+          btn.addEventListener("click", async () => {
+            syncEditorToStore();
+            editingPresetId = item.id;
+            renderPresetList();
+            await applyPreset(getPresetById(editingPresetId));
+            setPresetPickerOpen(false);
+            setStatus(`正在切换编辑预设：${item.name || "未命名预设"}`);
+            try {
+              await saveStore({ activateEditing: false });
+              setStatus(`已切换编辑预设：${item.name || "未命名预设"}。点击“保存并使用”后用于聊天。`);
+            } catch (error) {
+              setStatus(`切换后保存失败：${error.message}`);
+            }
+          });
+          presetItemsEl.appendChild(btn);
+        }
+        updateOverview();
+      }
+
+      function applySearch() {
+        const keyword = document.getElementById("preset-search").value.trim().toLowerCase();
+        let visibleCount = 0;
+        presetListEl.querySelectorAll(".preset-card").forEach((card) => {
+          const matched = !keyword || getPresetCardSearchText(card).includes(keyword);
+          card.hidden = !matched;
+          if (matched) visibleCount += 1;
+        });
+        updateDragAvailability();
+        if (keyword) {
+          setStatus(`搜索完成：找到 ${visibleCount} 个匹配规则块。`);
+        }
+      }
+
+      function createPresetEmptyState() {
+        const empty = document.createElement("div");
+        empty.className = "preset-empty-state";
+        empty.textContent = "还没有额外规则块。可以新增规则块，或新增一个规则组。";
+        return empty;
+      }
+
+      async function renderPresetCards(cards) {
+        return batchRenderList(
+          presetListEl,
+          cards,
+          (entry) => entry.type === "group" ? createGroupCard(entry.data, true) : createBlockCard(entry.data, true),
+          { batchSize: PRESET_RENDER_BATCH_SIZE, emptyNode: createPresetEmptyState }
+        );
+      }
+
+      async function applyPreset(preset) {
+        const target = preset || getPresetById(editingPresetId);
+        if (!target) return;
+        document.getElementById("preset-name").value = target.name || "默认预设";
+        document.getElementById("preset-enabled").checked = target.enabled !== false;
+        document.getElementById("base-system-prompt").value = target.base_system_prompt || "";
+        const modules = target.modules || {};
+        document.querySelectorAll(".preset-module").forEach((el) => {
+          el.checked = Boolean(modules[el.dataset.key]);
+        });
+        const cards = [];
+        (target.prompt_groups || []).forEach((group) => cards.push({ type: "group", data: group, order: Number(group.order ?? 100000) }));
+        (target.extra_prompts || []).forEach((block) => cards.push({ type: "block", data: block, order: Number(block.order ?? 100000) }));
+        cards.sort((a, b) => a.order - b.order);
+        const renderResult = await renderPresetCards(cards);
+        if (renderResult?.cancelled) return;
+        invalidatePresetCaches();
+        applySearch();
+        updateOverview();
+        setDirty(false);
+      }
+
+      function collectCurrentPreset() {
+        const extra_prompts = [];
+        const prompt_groups = [];
+        Array.from(presetListEl.querySelectorAll(".preset-card")).forEach((card, index) => {
+          const order = (index + 1) * 10;
+          if (card.dataset.cardType === "group") {
+            const items = [];
+            const selected_ids = [];
+            card.querySelectorAll(".preset-group-item").forEach((row, itemIndex) => {
+              const id = row.dataset.itemId || generateId("group-item");
+              if (row.querySelector(".preset-group-item-selected")?.checked) selected_ids.push(id);
+              items.push({
+                id,
+                name: row.querySelector(".preset-group-item-name-input")?.value.trim() || `规则项 ${itemIndex + 1}`,
+                enabled: true,
+                content: row.querySelector(".preset-group-item-content")?.value.trim() || "",
+                ...collectSegmentAdvancedFields(row),
+              });
+            });
+            prompt_groups.push({
+              id: card.querySelector(".preset-group-id")?.value.trim() || generateId("preset-group"),
+              name: card.querySelector(".preset-group-name")?.value.trim() || `规则组 ${prompt_groups.length + 1}`,
+              enabled: card.querySelector(".preset-group-enabled")?.checked !== false,
+              selection_mode: card.querySelector(".preset-group-selection-mode")?.value || "single",
+              selected_ids,
+              items,
+              order,
+            });
+          } else {
+            extra_prompts.push({
+              id: card.querySelector(".preset-block-id")?.value.trim() || generateId("preset-block"),
+              name: card.querySelector(".preset-block-name")?.value.trim() || `规则块 ${extra_prompts.length + 1}`,
+              enabled: card.querySelector(".preset-block-enabled")?.checked !== false,
+              content: card.querySelector(".preset-block-content")?.value.trim() || "",
+              order,
+              ...collectSegmentAdvancedFields(card),
+            });
+          }
+        });
+        return {
+          id: editingPresetId,
+          name: document.getElementById("preset-name").value.trim() || "默认预设",
+          enabled: document.getElementById("preset-enabled").checked,
+          base_system_prompt: document.getElementById("base-system-prompt").value.trim(),
+          modules: Object.fromEntries(Array.from(document.querySelectorAll(".preset-module")).map((el) => [el.dataset.key, el.checked])),
+          extra_prompts,
+          prompt_groups,
+        };
+      }
+
+      function syncEditorToStore() {
+        const current = collectCurrentPreset();
+        presetStore.presets = (presetStore.presets || []).map((item) => item.id === current.id ? current : item);
+      }
+
+      function applyMutex(changedKey) {
+        const opposites = MODULE_MUTEX[changedKey] || [];
+        const changedEl = document.querySelector(`.preset-module[data-key="${changedKey}"]`);
+        if (!changedEl?.checked) return;
+        opposites.forEach((key) => {
+          const el = document.querySelector(`.preset-module[data-key="${key}"]`);
+          if (el) el.checked = false;
+        });
+      }
+
+      async function reloadStore() {
+        setStatus("正在读取预设...");
+        const data = await fetch("/api/preset").then((response) => response.json());
+        presetStore = data.preset_store || { active_preset_id: "", presets: [] };
+        editingPresetId = presetStore.active_preset_id || presetStore.presets?.[0]?.id || "";
+        renderPresetList();
+        await applyPreset(getPresetById(editingPresetId));
+        setStatus("预设已重新读取。");
+      }
+
+      async function saveStore({ activateEditing = true } = {}) {
+        setStatus(activateEditing ? "正在保存并设为聊天使用..." : "正在保存预设...");
+        syncEditorToStore();
+        const canActivateEditing = (presetStore.presets || []).some((item) => item.id === editingPresetId);
+        if (activateEditing && canActivateEditing) {
+          presetStore.active_preset_id = editingPresetId;
+        }
+        const data = await postJson("/api/preset", presetStore);
+        presetStore = data.preset_store || presetStore;
+        if (activateEditing) {
+          editingPresetId = presetStore.active_preset_id || editingPresetId;
+        }
+        renderPresetList();
+        await applyPreset(getPresetById(editingPresetId));
+        setDirty(false, activateEditing ? "预设已保存，并已设为聊天使用。" : "预设已保存。");
+      }
+
+      async function createPreset() {
+        syncEditorToStore();
+        const name = window.prompt("新预设名称：", "新预设");
+        const data = await postJson("/api/preset/create", { name: name || "" });
+        presetStore = data.preset_store || presetStore;
+        editingPresetId = data.created_preset_id || presetStore.active_preset_id;
+        renderPresetList();
+        await applyPreset(getPresetById(editingPresetId));
+        setStatus("已新增预设（未自动设为聊天使用）。");
+      }
+
+      async function duplicatePreset() {
+        await saveStore({ activateEditing: false });
+        const data = await postJson("/api/preset/duplicate", { preset_id: editingPresetId });
+        presetStore = data.preset_store || presetStore;
+        editingPresetId = data.duplicated_preset_id || presetStore.active_preset_id;
+        renderPresetList();
+        await applyPreset(getPresetById(editingPresetId));
+        setStatus("已复制当前预设（未自动设为聊天使用）。");
+      }
+
+      async function activatePreset() {
+        await saveStore({ activateEditing: true });
+        setStatus("已切换当前聊天使用预设。");
+      }
+
+      async function confirmDeletePreset() {
+        const current = getPresetById(editingPresetId);
+        if (!current) return;
+        const data = await postJson("/api/preset/delete", { preset_id: editingPresetId });
+        presetStore = data.preset_store || presetStore;
+        editingPresetId = presetStore.active_preset_id || presetStore.presets?.[0]?.id || "";
+        hideDeleteConfirm();
+        renderPresetList();
+        await applyPreset(getPresetById(editingPresetId));
+        setStatus("有未保存修改");
+      }
+
+      async function importPresetFile(file) {
+        const text = await file.text();
+        const existingIds = new Set((presetStore.presets || []).map((item) => item.id));
+        const data = await postJson("/api/preset/import", { raw_json: text, activate_now: false });
+        presetStore = data.preset_store || presetStore;
+        const imported = (presetStore.presets || []).find((item) => !existingIds.has(item.id));
+        editingPresetId = imported?.id || editingPresetId || presetStore.active_preset_id || presetStore.presets?.[0]?.id || "";
+        renderPresetList();
+        await applyPreset(getPresetById(editingPresetId));
+        setStatus("预设已导入，未自动设为聊天使用。");
+      }
+
+      async function exportCurrentPreset() {
+        syncEditorToStore();
+        const current = getPresetById(editingPresetId);
+        if (!current) throw new Error("没有可导出的当前编辑预设");
+        const payload = JSON.stringify(current, null, 2);
+        const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const safeName = String(current.name || "preset").trim().replace(/[\\/:*?"<>|]+/g, "_") || "preset";
+        a.href = url;
+        a.download = `${safeName}.preset.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function removeEmptyState() {
+        presetListEl.querySelector(".preset-empty-state")?.remove();
+      }
+
+      document.getElementById("preset-name").addEventListener("input", () => {
+        updateOverview();
+        markDirty();
+      });
+      document.getElementById("preset-enabled").addEventListener("change", () => {
+        updateOverview();
+        markDirty();
+      });
+      document.getElementById("base-system-prompt").addEventListener("input", () => {
+        updateOverview();
+        markDirty();
+      });
+      renderBaseTemplateOptions();
+      document.getElementById("insert-base-template")?.addEventListener("click", () => {
+        insertBaseKernelTemplate(getSelectedBaseTemplateKey());
+      });
+      presetListEl.addEventListener("input", (event) => {
+        const card = event.target.closest(".preset-card");
+        if (!card) return;
+        const row = event.target.closest(".preset-group-item");
+        invalidatePresetCardCache(card);
+        if (event.target.classList.contains("preset-block-name") || event.target.classList.contains("preset-group-name")) {
+          updatePresetCardTitle(card);
+        }
+        schedulePresetRefresh({ card, row, search: true });
+        markDirty("规则块内容已修改，有未保存修改。");
+      });
+      presetListEl.addEventListener("change", (event) => {
+        const card = event.target.closest(".preset-card");
+        if (!card) return;
+        if (
+          event.target.classList.contains("preset-card-enabled") ||
+          event.target.classList.contains("preset-group-item-selected") ||
+          event.target.classList.contains("preset-group-selection-mode")
+        ) {
+          return;
+        }
+        const row = event.target.closest(".preset-group-item");
+        invalidatePresetCardCache(card);
+        refreshPresetNow({ cards: [card], rows: row ? [row] : [], search: true });
+        markDirty("规则块设置已修改，有未保存修改。");
+      });
+      document.querySelectorAll(".preset-module").forEach((el) => {
+        el.addEventListener("change", () => {
+          applyMutex(el.dataset.key);
+          markDirty("常用模块已修改，有未保存修改。");
+        });
+      });
+      presetMoreToggleEl?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        setPresetPickerOpen(false);
+        setPresetMoreOpen(presetMoreMenuEl?.hidden !== false);
+      });
+      presetMoreMenuEl?.addEventListener("click", (event) => event.stopPropagation());
+      presetPickerToggleEl?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        setPresetPickerOpen(presetPickerMenuEl?.hidden !== false);
+      });
+      presetPickerMenuEl?.addEventListener("click", (event) => event.stopPropagation());
+      document.addEventListener("click", () => {
+        setPresetMoreOpen(false);
+        setPresetPickerOpen(false);
+      });
+
+      document.getElementById("add-preset-block").addEventListener("click", () => {
+        removeEmptyState();
+        const card = createBlockCard({}, false);
+        presetListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
+        refreshPresetNow({ cards: [card], search: true, invalidate: true });
+        markDirty("已新增一条空白规则块。");
+      });
+      document.getElementById("add-preset-group").addEventListener("click", () => {
+        removeEmptyState();
+        const card = createGroupCard({ name: "文风", selection_mode: "single" }, false);
+        presetListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
+        refreshPresetNow({ cards: [card], search: true, invalidate: true });
+        markDirty("已新增一个规则组。");
+      });
+      document.getElementById("save-preset-top")?.addEventListener("click", async () => { try { await saveStore(); } catch (error) { setStatus(`保存失败：${error.message}`); } });
+      document.getElementById("reload-preset").addEventListener("click", async () => { try { await reloadStore(); } catch (error) { setStatus(`读取失败：${error.message}`); } });
+      document.getElementById("create-preset").addEventListener("click", async () => { try { await createPreset(); } catch (error) { setStatus(`新增失败：${error.message}`); } });
+      document.getElementById("duplicate-preset").addEventListener("click", async () => { try { await duplicatePreset(); } catch (error) { setStatus(`复制失败：${error.message}`); } });
+      document.getElementById("activate-preset").addEventListener("click", async () => { try { await activatePreset(); } catch (error) { setStatus(`切换失败：${error.message}`); } });
+      document.getElementById("delete-preset").addEventListener("click", () => showDeleteConfirm());
+      document.getElementById("cancel-delete-preset")?.addEventListener("click", hideDeleteConfirm);
+      document.getElementById("confirm-delete-preset")?.addEventListener("click", async () => { try { await confirmDeletePreset(); } catch (error) { setStatus(`删除失败：${error.message}`); } });
+      document.getElementById("import-preset").addEventListener("click", () => document.getElementById("import-preset-file").click());
+      document.getElementById("import-preset-file").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try { await importPresetFile(file); } catch (error) { setStatus(`导入失败：${error.message}`); } finally { event.target.value = ""; }
+      });
+      document.getElementById("export-preset").addEventListener("click", async () => { try { await exportCurrentPreset(); setStatus("已导出当前预设。"); } catch (error) { setStatus(`导出失败：${error.message}`); } });
+      document.getElementById("preset-search").addEventListener("input", () => {
+        schedulePresetRefresh({ search: true });
+      });
+      document.getElementById("collapse-all-blocks").addEventListener("click", () => { presetListEl.querySelectorAll(".preset-card").forEach((card) => setCardCollapsed(card, true)); setStatus("已折叠全部规则块。"); });
+      document.getElementById("expand-all-blocks").addEventListener("click", () => { presetListEl.querySelectorAll(".preset-card").forEach((card) => setCardCollapsed(card, false)); setStatus("已展开全部规则块。"); });
+      window.addEventListener("beforeunload", (event) => {
+        if (!presetDirty) return;
+        event.preventDefault();
+        event.returnValue = "";
+      });
+
+      document.querySelectorAll(".config-workbench-actions button").forEach((button) => {
+        button.addEventListener("click", () => {
+          button.classList.add("is-feedback");
+          window.setTimeout(() => button.classList.remove("is-feedback"), 900);
+        });
+      });
+
+      applyTheme(currentTheme);
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+      renderPresetList();
+      void applyPreset(getPresetById(editingPresetId));
+    </script>
+  </body>
+</html>

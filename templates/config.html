@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Config - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
+
+</head>
+  <body class="modern-setting-page app-sidebar-shell global-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
+    <div id="config-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+            <div class="slot-toolbar config-hero-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Global</span>
+          <div class="slot-meta">
+            <strong>当前为全局配置</strong>
+            <p class="slot-hint">模型设置、记忆、世界书、预设、聊天记录和环境状态现在都按全局工作区保存；角色卡仍然单独加载。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-sticky-actions" aria-label="设置保存状态">
+        <div class="config-sticky-copy">
+          <span class="config-sticky-kicker">Settings Workbench</span>
+          <strong>设置工作台</strong>
+          <p id="status-text" class="task-status is-idle">已准备 · 修改后会自动保存，也可以手动保存全部配置。</p>
+        </div>
+        <div class="config-sticky-buttons ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
+          <button id="save-all" type="button">保存全部配置</button>
+          <button id="test-connection-sticky" type="button" class="secondary compact">测试聊天模型</button>
+          <button id="reset-chat" type="button" class="secondary compact danger-action" title="清空当前聊天记录"><span class="danger-icon" aria-hidden="true">⚠</span> 清空聊天记录</button>
+        </div>
+      </div>
+
+    <div class="config-shell compact config-workbench-shell">
+      <section class="panel config-panel full-span">
+        <div class="section-head">
+          <p class="eyebrow">Guide</p>
+          <h2>配置总览</h2>
+          <p class="muted">这里保留模型、检索和界面设置。角色卡请去单独的 <code>Card</code> 页面。记忆库在 <code>Memory</code> 页面里维护，会作为固定前情提要持续投喂给模型。</p>
+        </div>
+        <div class="stats-row config-overview-grid">
+          <div class="stat-box">
+            <span class="stat-label">当前角色卡</span>
+            <strong>{{ current_card.source_name or '未命名角色卡' }}</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">聊天模型</span>
+            <strong>{{ settings.llm_model or '未配置' }}</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">记忆条数</span>
+            <strong id="memory-count">{{ memory_count }}</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">界面状态</span>
+            <strong>{{ '暗色' if settings.theme == 'dark' else '浅色' }} · 透明度 {{ settings.ui_opacity }}</strong>
+          </div>
+        </div>
+        <div class="button-row config-overview-actions">
+          <label class="config-performance-switch fr-setting-switch-row" for="performance-mode" title="降低毛玻璃、阴影和部分动效开销，适合低帧率或滚动掉帧时启用。">
+            <span class="config-performance-copy">
+              <strong>性能模式</strong>
+              <small id="performance-mode-label">{{ '已开启' if settings.performance_mode else '已关闭' }}</small>
+            </span>
+            <input id="performance-mode" type="checkbox" {% if settings.performance_mode %}checked{% endif %} />
+          </label>
+          <button id="export-current-bundle" type="button" class="secondary export-action">导出当前人设存档 ZIP</button>
+          <button id="import-bundle" type="button" class="secondary import-action">导入人设存档 ZIP</button>
+          <button id="export-logs" type="button" class="secondary export-action">导出日志</button>
+        </div>
+        <input type="file" id="import-bundle-file" accept=".zip" hidden />
+      </section>
+
+      <section class="panel config-panel config-primary-panel">
+        <div class="section-head">
+          <p class="eyebrow">LLM</p>
+          <h2>聊天模型</h2>
+          <p class="muted">兼容 OpenAI 风格接口，常见写法是 <code>.../v1</code>。</p>
+        </div>
+
+        <div class="grid-two preset-row">
+          <div>
+            <label for="preset-provider">预设服务</label>
+            <select id="preset-provider">
+              <option value="custom">自定义</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+              <option value="minimax">MiniMax</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="siliconflow">SiliconFlow</option>
+            </select>
+          </div>
+          <div class="button-row offset-top">
+            <button id="apply-preset" type="button" class="secondary">一键填入预设</button>
+          </div>
+        </div>
+
+        <label for="llm-base-url">API URL</label>
+        <input id="llm-base-url" value="{{ settings.llm_base_url }}" placeholder="例如 http://127.0.0.1:8000/v1" />
+        <p id="preset-helper" class="muted helper-text">可先选常见厂商预设，再按自己的模型名微调。</p>
+
+        <label for="llm-api-key">API Key</label>
+        <div class="inline-field">
+          <input id="llm-api-key" type="password" value="{{ settings.llm_api_key }}" placeholder="本地服务可留空" />
+          <button type="button" id="toggle-llm-api-key" class="secondary compact">显示</button>
+        </div>
+
+        <label for="llm-model">模型名</label>
+        <div class="inline-field model-combo-row">
+          <div class="model-combo">
+            <input id="llm-model" value="{{ settings.llm_model }}" placeholder="例如 deepseek-chat；也可先点右侧拉取模型" />
+            <button type="button" id="toggle-model-menu" class="secondary compact">▼</button>
+            <div id="llm-model-menu" class="model-menu" hidden></div>
+          </div>
+          <button type="button" id="fetch-models" class="secondary compact">拉取模型</button>
+        </div>
+        <p class="muted helper-text">模型名支持手动输入；如果想从已拉取列表里选，请点右侧箭头展开完整模型列表。</p>
+
+        <div class="grid-two">
+          <div>
+            <label for="temperature">Temperature</label>
+            <input id="temperature" type="number" min="0" max="2" step="0.05" value="{{ settings.temperature }}" />
+          </div>
+          <div>
+            <label for="request-timeout">超时秒数</label>
+            <input id="request-timeout" type="number" min="10" max="600" step="1" value="{{ settings.request_timeout }}" />
+          </div>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="history-limit">上下文历史条数</label>
+            <input id="history-limit" type="number" min="1" max="100" step="1" value="{{ settings.history_limit }}" />
+          </div>
+          <div>
+            <label for="prompt-budget-token-limit">最大上下文预算</label>
+            <input id="prompt-budget-token-limit" type="number" min="1000" max="1000000" step="1000" value="{{ settings.prompt_budget_token_limit }}" />
+            <p class="muted helper-text">单位 tokens，用于 Prompt Debug 估算与超限提醒，不会自动裁剪。</p>
+          </div>
+        </div>
+
+        <label class="fr-setting-switch-row config-demo-mode-row">
+          <span>没有模型时允许演示模式</span>
+          <input id="demo-mode" type="checkbox" {% if settings.demo_mode %}checked{% endif %} />
+        </label>
+
+        <div class="button-row config-model-actions">
+          <button id="save-settings" class="compact">保存聊天模型</button>
+          <button id="test-connection" class="secondary compact">测试连接</button>
+        </div>
+      </section>
+
+
+
+      <section class="panel config-panel config-font-panel">
+        <div class="section-head">
+          <p class="eyebrow">Typography</p>
+          <h2>字体设置</h2>
+          <p class="muted">调整聊天消息的字体大小、粗细和颜色，也可上传自定义字体文件。</p>
+        </div>
+
+        <label for="font-size">聊天字体大小</label>
+        <input id="font-size" type="range" min="10" max="28" step="1" value="{{ settings.font_size }}" />
+        <div class="range-value"><span>当前值</span><strong id="font-size-value">{{ settings.font_size }}px</strong></div>
+
+        <label for="font-weight">字体粗细</label>
+        <input id="font-weight" type="range" min="100" max="900" step="100" value="{{ settings.font_weight }}" />
+        <div class="range-value"><span>当前值</span><strong id="font-weight-value">{{ settings.font_weight }}</strong></div>
+
+        <label for="font-color">字体颜色</label>
+        <div class="inline-field">
+          <input id="font-color" type="color" value="{{ settings.font_color or '#2d1f18' }}" style="width: 48px; height: 36px; padding: 2px;" />
+          <input id="font-color-text" value="{{ settings.font_color }}" placeholder="留空则跟随主题色" />
+          <button type="button" id="reset-font-color" class="secondary compact">重置</button>
+        </div>
+
+        <label for="font-family-url">自定义字体</label>
+        <div class="inline-field">
+          <input id="font-family-url" value="{{ settings.font_family_url }}" placeholder="上传字体文件或填写字体 URL" />
+          <button type="button" id="clear-font" class="secondary compact">清除</button>
+        </div>
+        <label for="font-file">上传字体文件</label>
+        <div class="inline-field">
+          <input id="font-file" type="file" accept=".ttf,.otf,.woff,.woff2" />
+          <button type="button" id="upload-font" class="secondary compact">上传</button>
+        </div>
+        <input type="hidden" id="font-family-name" value="{{ settings.font_family_name }}" />
+        <p class="helper-text" id="font-name-display">
+          {% if settings.font_family_name %}当前字体：{{ settings.font_family_name }}{% else %}未设置自定义字体{% endif %}
+        </p>
+
+        <div class="button-row">
+          <button id="reset-font-defaults" type="button" class="secondary">恢复默认字体/颜色/粗细</button>
+        </div>
+      </section>
+
+      <section class="panel config-panel config-appearance-panel">
+        <div class="section-head">
+          <p class="eyebrow">Appearance</p>
+          <h2>界面与背景</h2>
+          <p class="muted">主题、透明度、背景图和遮罩强度都会实时预览，并自动保存。</p>
+        </div>
+
+        <label for="theme-select">界面主题</label>
+        <select id="theme-select">
+          <option value="light" {% if settings.theme == 'light' %}selected{% endif %}>浅色</option>
+          <option value="dark" {% if settings.theme == 'dark' %}selected{% endif %}>暗色</option>
+        </select>
+
+        <label for="ui-opacity">界面透明度</label>
+        <input id="ui-opacity" type="range" min="0.20" max="1" step="0.01" value="{{ settings.ui_opacity }}" />
+        <div class="range-value"><span>当前值</span><strong id="ui-opacity-value">{{ settings.ui_opacity }}</strong></div>
+
+        <label for="background-url">背景图 URL</label>
+        <input id="background-url" value="{{ settings.background_image_url }}" placeholder="可填写远程地址或上传后生成的本地地址" />
+        <div class="button-row background-preset-row" aria-label="背景预设">
+          <button type="button" id="use-default-background" class="secondary compact">使用默认背景</button>
+        </div>
+
+        <label for="background-overlay">背景遮罩强度</label>
+        <input id="background-overlay" type="range" min="0" max="0.85" step="0.01" value="{{ settings.background_overlay }}" />
+        <div class="range-value"><span>当前值</span><strong id="background-overlay-value">{{ settings.background_overlay }}</strong></div>
+
+        <label for="background-file">上传背景图</label>
+        <div class="inline-field">
+          <input id="background-file" type="file" accept="image/*" />
+          <button type="button" id="upload-background" class="secondary compact">上传</button>
+        </div>
+
+        <div class="preview-card background-preview" id="background-preview">
+          <div class="preview-tag">Preview</div>
+          <div class="preview-user">用户消息示例</div>
+          <div class="preview-ai">AI 回复示例</div>
+        </div>
+      </section>
+
+      <details class="config-advanced-group full-span">
+        <summary class="config-advanced-summary">
+          <span class="config-advanced-title">高级设置</span>
+          <strong>嵌入与重排序</strong>
+          <span class="muted">召回、嵌入字段和重排序模型。新手可以先保持默认。</span>
+        </summary>
+        <section class="panel config-panel config-retrieval-panel">
+          <div class="section-head">
+            <p class="eyebrow">Retrieval</p>
+            <h2>嵌入与重排序</h2>
+            <p class="muted">嵌入模型负责召回，重排序模型可在召回后进一步精选结果。</p>
+          </div>
+
+        <label for="embedding-base-url">嵌入 API URL</label>
+        <input id="embedding-base-url" value="{{ settings.embedding_base_url }}" placeholder="例如 http://127.0.0.1:8000/v1" />
+
+        <label for="embedding-api-key">嵌入 API Key</label>
+        <div class="inline-field">
+          <input id="embedding-api-key" type="password" value="{{ settings.embedding_api_key }}" placeholder="本地服务可留空" />
+          <button type="button" id="toggle-embedding-api-key" class="secondary compact">显示</button>
+        </div>
+
+        <label for="embedding-model">嵌入模型名</label>
+        <input id="embedding-model" value="{{ settings.embedding_model }}" placeholder="例如 text-embedding-3-small" />
+
+        <label>嵌入时读取字段</label>
+        <div class="field-chip-row">
+          <label class="check-chip"><input class="embedding-field" type="checkbox" value="title" {% if 'title' in settings.embedding_fields %}checked{% endif %} /><span>标题</span></label>
+          <label class="check-chip"><input class="embedding-field" type="checkbox" value="content" {% if 'content' in settings.embedding_fields %}checked{% endif %} /><span>正文</span></label>
+          <label class="check-chip"><input class="embedding-field" type="checkbox" value="tags" {% if 'tags' in settings.embedding_fields %}checked{% endif %} /><span>标签</span></label>
+          <label class="check-chip"><input class="embedding-field" type="checkbox" value="notes" {% if 'notes' in settings.embedding_fields %}checked{% endif %} /><span>备注</span></label>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="retrieval-top-k">召回条数</label>
+            <input id="retrieval-top-k" type="number" min="1" max="12" step="1" value="{{ settings.retrieval_top_k }}" />
+          </div>
+          <div>
+            <label class="fr-setting-switch-row offset-top">
+              <span>启用重排序模型</span>
+              <input id="rerank-enabled" type="checkbox" {% if settings.rerank_enabled %}checked{% endif %} />
+            </label>
+          </div>
+        </div>
+
+        <label for="rerank-base-url">重排序 API URL</label>
+        <input id="rerank-base-url" value="{{ settings.rerank_base_url }}" placeholder="例如 http://127.0.0.1:8000/v1" />
+
+        <label for="rerank-api-key">重排序 API Key</label>
+        <div class="inline-field">
+          <input id="rerank-api-key" type="password" value="{{ settings.rerank_api_key }}" placeholder="本地服务可留空" />
+          <button type="button" id="toggle-rerank-api-key" class="secondary compact">显示</button>
+        </div>
+
+        <div class="grid-two">
+          <div>
+            <label for="rerank-model">重排序模型名</label>
+            <input id="rerank-model" value="{{ settings.rerank_model }}" placeholder="例如 jina-reranker-v2-base-multilingual" />
+          </div>
+          <div>
+            <label for="rerank-top-n">保留条数</label>
+            <input id="rerank-top-n" type="number" min="1" max="12" step="1" value="{{ settings.rerank_top_n }}" />
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="save-retrieval" class="secondary">立即保存检索设置</button>
+          <button id="test-embedding" class="secondary">测试嵌入</button>
+        </div>
+        </section>
+      </details>
+
+    </div>
+
+    <div id="bundle-export-modal" class="result-modal" hidden>
+      <div id="bundle-export-modal-backdrop" class="result-modal-backdrop"></div>
+      <div class="result-modal-card panel bundle-export-panel" role="dialog" aria-modal="true" aria-labelledby="bundle-export-title">
+        <div class="memory-card-head bundle-export-head">
+          <div>
+            <p class="eyebrow">Export bundle</p>
+            <strong id="bundle-export-title">组合导出当前人设存档</strong>
+          </div>
+        </div>
+        <div class="bundle-export-body">
+          <div class="bundle-export-grid">
+            <label class="checkbox-row bundle-export-line is-required"><input type="checkbox" checked disabled /><span><strong>人设卡</strong></span></label>
+            <label class="checkbox-row bundle-export-line"><input id="bundle-export-memories" type="checkbox" checked /><span><strong>记忆</strong></span></label>
+            <label class="checkbox-row bundle-export-line"><input id="bundle-export-worldbook" type="checkbox" checked /><span><strong>世界书</strong></span></label>
+            <label class="checkbox-row bundle-export-line"><input id="bundle-export-preset" type="checkbox" checked /><span><strong>预设</strong></span></label>
+            <label class="checkbox-row bundle-export-line bundle-export-line-wide"><input id="bundle-export-media" type="checkbox" checked /><span><strong>本地演出包</strong></span></label>
+          </div>
+          <p class="bundle-export-note">外链、内置 /assets/、data URL 不会被打包；不勾选本地演出包时，目标设备可能无法显示本地封面或播放本地音乐。</p>
+        </div>
+        <div class="bundle-export-actions">
+          <button id="bundle-export-cancel" type="button" class="secondary bundle-export-action">取消</button>
+          <button id="bundle-export-confirm" type="button" class="bundle-export-action">导出</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="import-conflict-modal" class="result-modal" hidden>
+      <div id="import-conflict-modal-backdrop" class="result-modal-backdrop"></div>
+      <div class="result-modal-card panel bundle-export-panel import-conflict-panel" role="dialog" aria-modal="true" aria-labelledby="import-conflict-title">
+        <div class="memory-card-head bundle-export-head">
+          <div>
+            <p class="eyebrow">Import conflict</p>
+            <strong id="import-conflict-title">角色卡已存在</strong>
+          </div>
+        </div>
+        <div class="bundle-export-body">
+          <p class="bundle-export-note" id="import-conflict-detail">角色卡列表中已存在同名文件，是否覆盖？</p>
+        </div>
+        <div class="bundle-export-actions">
+          <button id="import-conflict-cancel" type="button" class="secondary bundle-export-action">取消</button>
+          <button id="import-conflict-confirm" type="button" class="bundle-export-action">覆盖导入</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="result-modal" class="result-modal" hidden>
+      <div id="result-modal-backdrop" class="result-modal-backdrop"></div>
+      <div class="result-modal-card panel">
+        <div class="memory-card-head">
+          <strong id="result-modal-title">测试结果</strong>
+          <button id="result-modal-close" type="button" class="secondary compact">关闭</button>
+        </div>
+        <pre id="result-modal-body" class="result-modal-body"></pre>
+      </div>
+    </div>
+
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script>
+      const rootEl = document.documentElement;
+      const bodyEl = document.body;
+      const statusEl = document.getElementById("status-text");
+      const themeSelectEl = document.getElementById("theme-select");
+      const uiOpacityEl = document.getElementById("ui-opacity");
+      const uiOpacityValueEl = document.getElementById("ui-opacity-value");
+      const backgroundUrlEl = document.getElementById("background-url");
+      const backgroundOverlayEl = document.getElementById("background-overlay");
+      const backgroundOverlayValueEl = document.getElementById("background-overlay-value");
+      const backgroundPreviewEl = document.getElementById("background-preview");
+      const performanceModeEl = document.getElementById("performance-mode");
+      const performanceModeLabelEl = document.getElementById("performance-mode-label");
+      const resultModalEl = document.getElementById("result-modal");
+      const bundleExportModalEl = document.getElementById("bundle-export-modal");
+      const bundleExportMemoriesEl = document.getElementById("bundle-export-memories");
+      const bundleExportWorldbookEl = document.getElementById("bundle-export-worldbook");
+      const bundleExportPresetEl = document.getElementById("bundle-export-preset");
+      const bundleExportMediaEl = document.getElementById("bundle-export-media");
+      const bundleExportConfirmEl = document.getElementById("bundle-export-confirm");
+      const resultModalTitleEl = document.getElementById("result-modal-title");
+      const resultModalBodyEl = document.getElementById("result-modal-body");
+      const presetHelperEl = document.getElementById("preset-helper");
+      const toastHostEl = document.getElementById("config-toast-host");
+      const configAdvancedGroupEl = document.querySelector(".config-advanced-group");
+      const configAdvancedPanelEl = configAdvancedGroupEl?.querySelector(".config-retrieval-panel");
+      const configAdvancedSummaryEl = configAdvancedGroupEl?.querySelector(".config-advanced-summary");
+      const saveTimers = { settings: null };
+      let configAdvancedOpenState = Boolean(configAdvancedGroupEl?.open);
+      const DEFAULT_BACKGROUND_PRESET = {
+        label: "默认背景",
+        url: "/assets/default.jpg",
+        theme: "dark",
+        overlay: 0.42,
+      };
+
+      const LLM_PRESETS = {
+        custom: {
+          label: "自定义",
+          baseUrl: "",
+          model: "",
+          helper: "保留当前填写内容，自行输入 API URL 和模型名。",
+        },
+        deepseek: {
+          label: "DeepSeek",
+          baseUrl: "https://api.deepseek.com/v1",
+          model: "deepseek-chat",
+          helper: "官方接口一般直接填到 /v1，模型名通常可用 deepseek-chat。",
+        },
+        openai: {
+          label: "OpenAI",
+          baseUrl: "https://api.openai.com/v1",
+          model: "",
+          helper: "已填入官方兼容地址，模型名请按你账号可用模型自行填写。",
+        },
+        minimax: {
+          label: "MiniMax",
+          baseUrl: "https://api.minimaxi.com/v1",
+          model: "",
+          helper: "MiniMax 建议确认你自己的可用模型名后再保存。",
+        },
+        openrouter: {
+          label: "OpenRouter",
+          baseUrl: "https://openrouter.ai/api/v1",
+          model: "openrouter/auto",
+          helper: "OpenRouter 可先用 openrouter/auto，后续再切换到指定模型。",
+        },
+        siliconflow: {
+          label: "SiliconFlow",
+          baseUrl: "https://api.siliconflow.cn/v1",
+          model: "",
+          helper: "SiliconFlow 地址已填入，模型名请按你实际使用的供应模型填写。",
+        },
+      };
+
+      function setConfigAdvancedSummaryState(open) {
+        configAdvancedSummaryEl?.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      function setConfigAdvancedOpen(open, immediate = false) {
+        if (!configAdvancedGroupEl || !configAdvancedPanelEl) return;
+        configAdvancedOpenState = Boolean(open);
+        setConfigAdvancedSummaryState(configAdvancedOpenState);
+        const motion = window.Fantareal?.motion;
+        const options = {
+          collapsedClass: "is-collapsed",
+          dataAttribute: "advancedCollapsed",
+          hiddenMode: "display",
+          immediate,
+        };
+
+        if (configAdvancedOpenState) {
+          configAdvancedGroupEl.open = true;
+          if (motion?.setDisclosureCollapsed) {
+            motion.setDisclosureCollapsed(configAdvancedGroupEl, configAdvancedPanelEl, false, options);
+          } else {
+            configAdvancedPanelEl.style.display = "";
+            configAdvancedPanelEl.setAttribute("aria-hidden", "false");
+          }
+          return;
+        }
+
+        if (motion?.setDisclosureCollapsed) {
+          const animated = motion.setDisclosureCollapsed(configAdvancedGroupEl, configAdvancedPanelEl, true, options);
+          const finishClose = () => {
+            if (!configAdvancedOpenState) configAdvancedGroupEl.open = false;
+          };
+          if (animated) {
+            motion.afterMotion?.(configAdvancedPanelEl, finishClose, 340) ?? window.setTimeout(finishClose, 340);
+          } else {
+            finishClose();
+          }
+        } else {
+          configAdvancedPanelEl.style.display = "none";
+          configAdvancedPanelEl.setAttribute("aria-hidden", "true");
+          configAdvancedGroupEl.open = false;
+        }
+      }
+
+      function initConfigAdvancedDisclosure() {
+        if (!configAdvancedGroupEl || !configAdvancedPanelEl) return;
+        const initiallyOpen = configAdvancedGroupEl.open;
+        configAdvancedOpenState = initiallyOpen;
+        if (!initiallyOpen) configAdvancedGroupEl.open = true;
+        window.Fantareal?.motion?.setDisclosureCollapsed(configAdvancedGroupEl, configAdvancedPanelEl, !initiallyOpen, {
+          collapsedClass: "is-collapsed",
+          dataAttribute: "advancedCollapsed",
+          hiddenMode: "display",
+          immediate: true,
+        });
+        if (!initiallyOpen) configAdvancedGroupEl.open = false;
+        setConfigAdvancedSummaryState(initiallyOpen);
+        configAdvancedSummaryEl?.addEventListener("click", (event) => {
+          event.preventDefault();
+          setConfigAdvancedOpen(!configAdvancedOpenState);
+        });
+      }
+
+      function showBundleExportModal() {
+        bundleExportModalEl.hidden = false;
+        bundleExportConfirmEl?.focus();
+      }
+
+      function hideBundleExportModal() {
+        bundleExportModalEl.hidden = true;
+      }
+
+      function buildBundleExportUrl() {
+        const params = new URLSearchParams({
+          memories: bundleExportMemoriesEl?.checked ? "1" : "0",
+          worldbook: bundleExportWorldbookEl?.checked ? "1" : "0",
+          preset: bundleExportPresetEl?.checked ? "1" : "0",
+          media: bundleExportMediaEl?.checked ? "1" : "0",
+        });
+        return `/api/export/current-bundle?${params.toString()}`;
+      }
+
+      function startCurrentBundleExport() {
+        const button = document.getElementById("export-current-bundle");
+        setButtonState(button, "loading", "打包中…");
+        setStatus("正在按所选内容打包当前人设存档…", "busy");
+        showToast("正在导出当前人设存档", "info");
+        window.setTimeout(() => {
+          setButtonState(button, "success", "已开始下载 ✓");
+          setStatus("已完成：人设存档下载已开始", "success");
+        }, 700);
+        window.location.href = buildBundleExportUrl();
+      }
+
+      function inferStatusKind(text) {
+        const value = String(text || "");
+        if (/失败|错误|异常|不能为空|不可用/.test(value)) return "error";
+        if (/正在|保存中|测试中|打包|上传|拉取|变更|切换|调整/.test(value)) return "busy";
+        if (/已|成功|完成|清空/.test(value)) return "success";
+        return "idle";
+      }
+
+      function setStatus(text, kind = null) {
+        if (!statusEl) return;
+        const statusKind = kind || inferStatusKind(text);
+        const label = text || "已准备";
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: label,
+          state: statusKind,
+          stateClasses: ["is-idle", "is-busy", "is-success", "is-error"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = label;
+          statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
+          statusEl.classList.add("task-status", `is-${statusKind}`);
+        }
+      }
+
+      function showToast(message, type = "info") {
+        if (!toastHostEl || !message) return;
+        const toast = document.createElement("div");
+        toast.className = `app-toast ${type}`;
+        toast.textContent = message;
+        toastHostEl.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add("show"));
+        window.setTimeout(() => {
+          toast.classList.remove("show");
+          window.setTimeout(() => toast.remove(), 220);
+        }, 2200);
+      }
+
+      function rememberButtonLabel(button) {
+        if (!button) return "";
+        if (!button.dataset.defaultLabel) {
+          button.dataset.defaultLabel = button.textContent.trim();
+        }
+        return button.dataset.defaultLabel;
+      }
+
+      function setButtonState(button, state = "idle", label = "") {
+        if (!button) return;
+        const defaultLabel = rememberButtonLabel(button);
+        button.classList.remove("is-loading", "is-success", "is-error");
+        button.disabled = state === "loading";
+        if (state === "loading") {
+          button.classList.add("is-loading");
+          window.Fantareal?.motion?.pulseStatus?.(button);
+          button.textContent = label || "处理中…";
+          return;
+        }
+        if (state === "success") {
+          button.classList.add("is-success");
+          window.Fantareal?.motion?.pulseStatus?.(button);
+          button.textContent = label || "已完成 ✓";
+          window.setTimeout(() => setButtonState(button, "idle"), 1200);
+          return;
+        }
+        if (state === "error") {
+          button.classList.add("is-error");
+          window.Fantareal?.motion?.pulseStatus?.(button);
+          button.textContent = label || "操作失败";
+          window.setTimeout(() => setButtonState(button, "idle"), 1500);
+          return;
+        }
+        button.textContent = defaultLabel;
+      }
+
+      function showResultModal(title, body) {
+        resultModalTitleEl.textContent = title || "测试结果";
+        resultModalBodyEl.textContent = body || "";
+        resultModalEl.hidden = false;
+        resultModalEl.style.display = "block";
+      }
+
+      function hideResultModal() {
+        resultModalEl.hidden = true;
+        resultModalEl.style.display = "none";
+        resultModalTitleEl.textContent = "测试结果";
+        resultModalBodyEl.textContent = "";
+      }
+
+      function scheduleSave(handler, text, delay = 600) {
+        if (saveTimers.settings) {
+          clearTimeout(saveTimers.settings);
+        }
+        setStatus(text);
+        saveTimers.settings = setTimeout(async () => {
+          try {
+            await handler();
+          } catch (error) {
+            setStatus(`自动保存失败：${error.message}`, "error");
+            showToast(`自动保存失败：${error.message}`, "error");
+          } finally {
+            saveTimers.settings = null;
+          }
+        }, delay);
+      }
+
+      function getAppliedTheme() {
+        return rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      }
+
+      function applyTheme(theme) {
+        const normalizedTheme = theme === "dark" ? "dark" : "light";
+        rootEl.setAttribute("data-theme", normalizedTheme);
+        if (themeSelectEl && themeSelectEl.value !== normalizedTheme) {
+          themeSelectEl.value = normalizedTheme;
+        }
+        window.FantarealThemeToggle = {
+          ...(window.FantarealThemeToggle || {}),
+          theme: normalizedTheme,
+        };
+        applyUiOpacity(uiOpacityEl.value);
+      }
+
+      function applyUiOpacity(value) {
+        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+        uiOpacityValueEl.textContent = opacity.toFixed(2);
+        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const palette = theme === "dark"
+          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
+          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
+
+        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${opacity.toFixed(2)})`);
+        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${Math.max(opacity - 0.1, 0.16).toFixed(2)})`);
+        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${Math.min(opacity + 0.1, 0.98).toFixed(2)})`);
+        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${Math.min(opacity + 0.12, 0.99).toFixed(2)})`);
+      }
+
+      function applyPerformanceMode(enabled) {
+        const active = Boolean(enabled);
+        rootEl.setAttribute("data-performance-mode", active ? "on" : "off");
+        if (performanceModeEl && performanceModeEl.checked !== active) {
+          performanceModeEl.checked = active;
+        }
+        if (performanceModeLabelEl) {
+          performanceModeLabelEl.textContent = active ? "已开启" : "已关闭";
+        }
+      }
+
+      function applyBackground(url, overlay) {
+        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
+        backgroundOverlayValueEl.textContent = normalizedOverlay.toFixed(2);
+        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
+
+        const bgValue = url ? `url("${url}")` : "none";
+        bodyEl.style.setProperty("--background-image", bgValue);
+        backgroundPreviewEl.style.setProperty("--preview-background-image", bgValue);
+        backgroundPreviewEl.style.setProperty("--preview-overlay-opacity", String(normalizedOverlay));
+      }
+
+      function applyFontSettings(settings) {
+        const root = document.documentElement;
+        if (settings.font_family_url) {
+          const fontName = settings.font_family_name || "CustomFont";
+          const formatMap = { '.ttf': 'truetype', '.otf': 'opentype', '.woff': 'woff', '.woff2': 'woff2' };
+          const ext = (settings.font_family_url.match(/\.\w+$/)?.[0] || '').toLowerCase();
+          const formatHint = formatMap[ext] ? ` format('${formatMap[ext]}')` : '';
+          if (!document.getElementById("custom-font-face")) {
+            const style = document.createElement("style");
+            style.id = "custom-font-face";
+            document.head.appendChild(style);
+          }
+          document.getElementById("custom-font-face").textContent =
+            `@font-face { font-family: '${fontName}'; src: url('${settings.font_family_url}')${formatHint}; }`;
+          root.style.setProperty("--chat-font-family", `'${fontName}', "Microsoft YaHei", "PingFang SC", sans-serif`);
+        } else {
+          root.style.setProperty("--chat-font-family", '"Microsoft YaHei", "PingFang SC", sans-serif');
+          const el = document.getElementById("custom-font-face");
+          if (el) el.remove();
+        }
+        const fontSize = Math.min(Math.max(Number(settings.font_size || 15), 10), 28);
+        root.style.setProperty("--chat-font-size", fontSize + "px");
+        const fontWeight = Math.min(Math.max(Number(settings.font_weight || 400), 100), 900);
+        root.style.setProperty("--chat-font-weight", String(fontWeight));
+        const fontColor = String(settings.font_color || "").trim();
+        root.style.setProperty("--chat-font-color", fontColor || "inherit");
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "请求失败");
+        }
+
+        return response.json();
+      }
+
+      function toggleSecret(inputId, buttonId) {
+        const input = document.getElementById(inputId);
+        const button = document.getElementById(buttonId);
+        button.addEventListener("click", () => {
+          const showing = input.type === "text";
+          input.type = showing ? "password" : "text";
+          button.textContent = showing ? "显示" : "隐藏";
+        });
+      }
+
+      function selectedEmbeddingFields() {
+        return [...document.querySelectorAll(".embedding-field:checked")].map((el) => el.value);
+      }
+
+      let fetchedModels = [];
+
+      function renderModelMenu() {
+        const menuEl = document.getElementById("llm-model-menu");
+        const currentValue = document.getElementById("llm-model").value.trim();
+        menuEl.innerHTML = "";
+
+        const models = Array.from(new Set((fetchedModels || []).filter(Boolean)));
+        if (!models.length) {
+          const empty = document.createElement("div");
+          empty.className = "model-menu-empty";
+          empty.textContent = "还没有模型列表，先点右侧“拉取模型”。";
+          menuEl.appendChild(empty);
+          return;
+        }
+
+        const ordered = currentValue && !models.includes(currentValue) ? [currentValue, ...models] : models;
+        for (const modelName of ordered) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "model-menu-item";
+          btn.textContent = modelName;
+          btn.addEventListener("click", () => {
+            document.getElementById("llm-model").value = modelName;
+            hideModelMenu();
+            scheduleSave(saveSettings, "模型名切换中...", 250);
+          });
+          menuEl.appendChild(btn);
+        }
+      }
+
+      function fillModelOptions(items = [], selectedValue = "") {
+        fetchedModels = Array.from(new Set((items || []).filter(Boolean)));
+        if (selectedValue) {
+          document.getElementById("llm-model").value = selectedValue;
+        }
+        renderModelMenu();
+      }
+
+      function showModelMenu() {
+        renderModelMenu();
+        document.getElementById("llm-model-menu").hidden = false;
+      }
+
+      function hideModelMenu() {
+        document.getElementById("llm-model-menu").hidden = true;
+      }
+
+      async function fetchModels() {
+        await saveSettings("正在拉取模型列表...");
+        const data = await postJson("/api/models", {});
+        fillModelOptions(data.items || [], data.current_model || "");
+        setStatus(data.items?.length ? `已拉取 ${data.items.length} 个模型，点右侧箭头可查看完整列表。` : "模型列表为空，可继续手动输入。");
+      }
+
+      const PROMPT_BUDGET_MIN = 1000;
+      const PROMPT_BUDGET_MAX = 1000000;
+      const PROMPT_BUDGET_DEFAULT = 200000;
+
+      function normalizePromptBudgetInput(input, notify = false) {
+        const raw = Number(input?.value || PROMPT_BUDGET_DEFAULT);
+        const normalized = Number.isFinite(raw)
+          ? Math.max(PROMPT_BUDGET_MIN, Math.min(PROMPT_BUDGET_MAX, Math.round(raw)))
+          : PROMPT_BUDGET_DEFAULT;
+        if (input && String(input.value) !== String(normalized)) {
+          input.value = String(normalized);
+          if (notify) {
+            const message = normalized === PROMPT_BUDGET_MAX
+              ? "\u6700\u5927\u4e0a\u4e0b\u6587\u9884\u7b97\u5df2\u81ea\u52a8\u8c03\u6574\u5230\u4e0a\u9650 1000000 tokens"
+              : normalized === PROMPT_BUDGET_MIN
+                ? "\u6700\u5927\u4e0a\u4e0b\u6587\u9884\u7b97\u5df2\u81ea\u52a8\u8c03\u6574\u5230\u4e0b\u9650 1000 tokens"
+                : "\u6700\u5927\u4e0a\u4e0b\u6587\u9884\u7b97\u5df2\u81ea\u52a8\u8c03\u6574\u4e3a 200000 tokens";
+            setStatus(message, "busy");
+            showToast(message, "info");
+          }
+        }
+        return normalized;
+      }
+
+      function settingsPayload() {
+        return {
+          llm_base_url: document.getElementById("llm-base-url").value.trim(),
+          llm_api_key: document.getElementById("llm-api-key").value.trim(),
+          llm_model: document.getElementById("llm-model").value.trim(),
+          theme: getAppliedTheme(),
+          temperature: Number(document.getElementById("temperature").value || 0.85),
+          history_limit: Number(document.getElementById("history-limit").value || 20),
+          prompt_budget_token_limit: normalizePromptBudgetInput(document.getElementById("prompt-budget-token-limit"), true),
+          request_timeout: Number(document.getElementById("request-timeout").value || 120),
+          demo_mode: document.getElementById("demo-mode").checked,
+          ui_opacity: Number(uiOpacityEl.value || 0.84),
+          performance_mode: Boolean(performanceModeEl?.checked),
+          background_image_url: backgroundUrlEl.value.trim(),
+          background_overlay: Number(backgroundOverlayEl.value || 0.42),
+          font_family_url: document.getElementById("font-family-url").value.trim(),
+          font_family_name: document.getElementById("font-family-name").value.trim(),
+          font_size: Number(document.getElementById("font-size").value || 15),
+          font_weight: Number(document.getElementById("font-weight").value || 400),
+          font_color: document.getElementById("font-color-text").value.trim(),
+          embedding_base_url: document.getElementById("embedding-base-url").value.trim(),
+          embedding_api_key: document.getElementById("embedding-api-key").value.trim(),
+          embedding_model: document.getElementById("embedding-model").value.trim(),
+          embedding_fields: selectedEmbeddingFields(),
+          retrieval_top_k: Number(document.getElementById("retrieval-top-k").value || 4),
+          rerank_enabled: document.getElementById("rerank-enabled").checked,
+          rerank_base_url: document.getElementById("rerank-base-url").value.trim(),
+          rerank_api_key: document.getElementById("rerank-api-key").value.trim(),
+          rerank_model: document.getElementById("rerank-model").value.trim(),
+          rerank_top_n: Number(document.getElementById("rerank-top-n").value || 3),
+        };
+      }
+
+      function applyPresetSelection(presetKey) {
+        const preset = LLM_PRESETS[presetKey] || LLM_PRESETS.custom;
+        if (preset.baseUrl) {
+          document.getElementById("llm-base-url").value = preset.baseUrl;
+        }
+        if (preset.model) {
+          document.getElementById("llm-model").value = preset.model;
+        }
+        presetHelperEl.textContent = preset.helper;
+      }
+
+      async function saveSettings(statusText = "设置已自动保存") {
+        const data = await postJson("/api/settings", settingsPayload());
+        applyTheme(data.settings.theme);
+        applyUiOpacity(data.settings.ui_opacity);
+        applyBackground(data.settings.background_image_url, data.settings.background_overlay);
+        applyPerformanceMode(data.settings.performance_mode);
+        applyFontSettings(data.settings);
+        document.getElementById("font-family-name").value = data.settings.font_family_name || "";
+        document.getElementById("font-name-display").textContent =
+          data.settings.font_family_name ? "当前字体：" + data.settings.font_family_name : "未设置自定义字体";
+        setStatus(statusText);
+        return data;
+      }
+
+      async function uploadBackground() {
+        const fileInput = document.getElementById("background-file");
+        const file = fileInput.files[0];
+        if (!file) {
+          throw new Error("请先选择一张图片");
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/background", { method: "POST", body: formData });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "上传失败");
+        }
+
+        const data = await response.json();
+        backgroundUrlEl.value = data.url || "";
+        applyBackground(backgroundUrlEl.value, backgroundOverlayEl.value);
+        await saveSettings("背景图已上传并自动保存");
+      }
+
+      async function useDefaultBackgroundPreset() {
+        themeSelectEl.value = DEFAULT_BACKGROUND_PRESET.theme;
+        backgroundUrlEl.value = DEFAULT_BACKGROUND_PRESET.url;
+        backgroundOverlayEl.value = DEFAULT_BACKGROUND_PRESET.overlay;
+        backgroundOverlayValueEl.textContent = Number(DEFAULT_BACKGROUND_PRESET.overlay).toFixed(2);
+        applyTheme(DEFAULT_BACKGROUND_PRESET.theme);
+        applyBackground(DEFAULT_BACKGROUND_PRESET.url, DEFAULT_BACKGROUND_PRESET.overlay);
+        await saveSettings("默认背景预设已应用并自动保存");
+      }
+
+      document.getElementById("prompt-budget-token-limit")?.addEventListener("change", (event) => {
+        normalizePromptBudgetInput(event.currentTarget, true);
+      });
+
+      performanceModeEl?.addEventListener("change", () => {
+        applyPerformanceMode(performanceModeEl.checked);
+        scheduleSave(
+          saveSettings,
+          performanceModeEl.checked ? "性能模式已开启，正在保存..." : "性能模式已关闭，正在保存...",
+          180
+        );
+      });
+
+      document.getElementById("save-settings").addEventListener("click", async () => {
+        try {
+          await saveSettings("聊天模型配置已保存，正在测试连接...");
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+          showResultModal("聊天模型保存失败", String(error.message || error));
+          return;
+        }
+
+        try {
+          const data = await postJson("/api/test-connection", {});
+          setStatus(`聊天模型连接成功：${data.reply}`);
+          showResultModal("聊天模型保存并测试成功", `模型响应：\n${data.reply}`);
+        } catch (error) {
+          setStatus(`连接失败：${error.message}`);
+          showResultModal("聊天模型连接失败", String(error.message || error));
+        }
+      });
+
+      document.getElementById("save-retrieval").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "保存中…");
+        setStatus("正在保存检索配置…", "busy");
+        try {
+          await saveSettings("已完成：检索配置已保存");
+          setButtonState(button, "success", "已保存 ✓");
+          showToast("检索配置已保存", "success");
+        } catch (error) {
+          setButtonState(button, "error", "保存失败");
+          setStatus(`保存失败：${error.message}`, "error");
+          showToast(`保存失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("save-all").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "保存中…");
+        setStatus("正在保存全部配置…", "busy");
+        try {
+          await saveSettings("已完成：全部配置已保存");
+          setButtonState(button, "success", "已保存 ✓");
+          showToast("全部配置已保存", "success");
+        } catch (error) {
+          setButtonState(button, "error", "保存失败");
+          setStatus(`保存失败：${error.message}`, "error");
+          showToast(`保存失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("test-connection").addEventListener("click", async () => {
+        try {
+          await saveSettings("正在测试聊天模型...");
+          const data = await postJson("/api/test-connection", {});
+          setStatus(`聊天模型连接成功：${data.reply}`);
+          showResultModal("聊天模型测试成功", `模型响应：\n${data.reply}`);
+        } catch (error) {
+          setStatus(`连接失败：${error.message}`);
+          showResultModal("聊天模型测试失败", String(error.message || error));
+        }
+      });
+
+      document.getElementById("test-connection-sticky")?.addEventListener("click", () => {
+        document.getElementById("test-connection")?.click();
+      });
+
+      document.getElementById("test-embedding").addEventListener("click", async () => {
+        try {
+          await saveSettings("正在测试嵌入模型...");
+          const data = await postJson("/api/test-embedding", {});
+          setStatus(`嵌入连接成功：共返回 ${data.count} 个向量，维度 ${data.dimension}`);
+          showResultModal("嵌入模型测试成功", `返回向量数：${data.count}\n向量维度：${data.dimension}`);
+        } catch (error) {
+          setStatus(`连接失败：${error.message}`);
+          showResultModal("嵌入模型测试失败", String(error.message || error));
+        }
+      });
+
+      document.getElementById("fetch-models").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "拉取中…");
+        try {
+          await fetchModels();
+          setButtonState(button, "success", "已拉取 ✓");
+          showToast("模型列表已拉取", "success");
+        } catch (error) {
+          setButtonState(button, "error", "拉取失败");
+          setStatus(`拉取模型失败：${error.message}`, "error");
+          showToast(`拉取模型失败：${error.message}`, "error");
+          showResultModal("拉取模型失败", String(error.message || error));
+        }
+      });
+
+      document.getElementById("toggle-model-menu").addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const menuEl = document.getElementById("llm-model-menu");
+        if (menuEl.hidden) {
+          showModelMenu();
+        } else {
+          hideModelMenu();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const combo = document.querySelector(".model-combo");
+        if (!combo) return;
+        if (!combo.contains(event.target)) {
+          hideModelMenu();
+        }
+      });
+
+      document.getElementById("reset-chat").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "清空中…");
+        setStatus("正在清空聊天记录…", "busy");
+        try {
+          await postJson("/api/reset", {});
+          setStatus("已完成：聊天记录已清空", "success");
+          setButtonState(button, "success", "已清空 ✓");
+          showToast("聊天记录已清空", "success");
+        } catch (error) {
+          setButtonState(button, "error", "清空失败");
+          setStatus(`清空失败：${error.message}`, "error");
+          showToast(`清空失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("upload-background").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "上传中…");
+        setStatus("正在上传背景图…", "busy");
+        try {
+          await uploadBackground();
+          setButtonState(button, "success", "已上传 ✓");
+          showToast("背景图已上传", "success");
+        } catch (error) {
+          setButtonState(button, "error", "上传失败");
+          setStatus(`上传失败：${error.message}`, "error");
+          showToast(`上传失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("use-default-background")?.addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        setButtonState(button, "loading", "应用中…");
+        setStatus("正在应用默认背景预设…", "busy");
+        try {
+          await useDefaultBackgroundPreset();
+          setButtonState(button, "success", "已应用 ✓");
+          showToast("默认背景预设已应用", "success");
+        } catch (error) {
+          setButtonState(button, "error", "应用失败");
+          setStatus(`应用失败：${error.message}`, "error");
+          showToast(`应用失败：${error.message}`, "error");
+        }
+      });
+
+      [
+        "llm-base-url",
+        "llm-api-key",
+        "llm-model",
+        "temperature",
+        "request-timeout",
+        "history-limit",
+        "embedding-base-url",
+        "embedding-api-key",
+        "embedding-model",
+        "retrieval-top-k",
+        "rerank-base-url",
+        "rerank-api-key",
+        "rerank-model",
+        "rerank-top-n",
+        "background-url",
+      ].forEach((id) => {
+        document.getElementById(id).addEventListener("input", () => {
+          scheduleSave(saveSettings, "设置变更中...");
+        });
+      });
+
+      ["demo-mode", "rerank-enabled"].forEach((id) => {
+        document.getElementById(id).addEventListener("change", () => {
+          scheduleSave(saveSettings, "设置变更中...", 300);
+        });
+      });
+
+      document.querySelectorAll(".embedding-field").forEach((el) => {
+        el.addEventListener("change", () => {
+          scheduleSave(saveSettings, "检索字段变更中...", 300);
+        });
+      });
+
+      themeSelectEl.addEventListener("change", () => {
+        applyTheme(themeSelectEl.value);
+        scheduleSave(saveSettings, "主题切换中...", 250);
+      });
+
+      uiOpacityEl.addEventListener("input", () => {
+        applyUiOpacity(uiOpacityEl.value);
+        scheduleSave(saveSettings, "透明度调整中...", 250);
+      });
+
+      backgroundOverlayEl.addEventListener("input", () => {
+        applyBackground(backgroundUrlEl.value, backgroundOverlayEl.value);
+        scheduleSave(saveSettings, "背景遮罩调整中...", 250);
+      });
+
+      // Font settings event listeners
+      document.getElementById("font-size").addEventListener("input", (e) => {
+        document.getElementById("font-size-value").textContent = e.target.value + "px";
+        applyFontSettings({ ...settingsPayload(), font_size: Number(e.target.value) });
+        scheduleSave(saveSettings, "字体大小调整中...", 250);
+      });
+
+      document.getElementById("font-weight").addEventListener("input", (e) => {
+        document.getElementById("font-weight-value").textContent = e.target.value;
+        applyFontSettings({ ...settingsPayload(), font_weight: Number(e.target.value) });
+        scheduleSave(saveSettings, "字体粗细调整中...", 250);
+      });
+
+      document.getElementById("font-color").addEventListener("input", (e) => {
+        document.getElementById("font-color-text").value = e.target.value;
+        applyFontSettings({ ...settingsPayload(), font_color: e.target.value });
+        scheduleSave(saveSettings, "字体颜色调整中...", 250);
+      });
+
+      document.getElementById("font-color-text").addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        if (/^#[0-9a-fA-F]{3,4}$/.test(val) || /^#([0-9a-fA-F]{6,8})$/.test(val)) {
+          document.getElementById("font-color").value = val;
+        }
+        applyFontSettings({ ...settingsPayload(), font_color: val });
+        scheduleSave(saveSettings, "字体颜色调整中...", 250);
+      });
+
+      document.getElementById("reset-font-color").addEventListener("click", () => {
+        document.getElementById("font-color-text").value = "";
+        document.getElementById("font-color").value = "#2d1f18";
+        applyFontSettings({ ...settingsPayload(), font_color: "" });
+        scheduleSave(saveSettings, "字体颜色已重置", 250);
+      });
+
+      document.getElementById("clear-font").addEventListener("click", () => {
+        document.getElementById("font-family-url").value = "";
+        document.getElementById("font-family-name").value = "";
+        document.getElementById("font-name-display").textContent = "未设置自定义字体";
+        applyFontSettings({ ...settingsPayload(), font_family_url: "", font_family_name: "" });
+        scheduleSave(saveSettings, "自定义字体已清除", 250);
+      });
+
+      document.getElementById("upload-font").addEventListener("click", async () => {
+        const fileInput = document.getElementById("font-file");
+        const file = fileInput.files[0];
+        if (!file) { setStatus("请先选择一个字体文件"); return; }
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch("/api/font", { method: "POST", body: formData });
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "上传失败");
+          }
+          const data = await response.json();
+          document.getElementById("font-family-url").value = data.url || "";
+          document.getElementById("font-family-name").value = data.font_name || "";
+          document.getElementById("font-name-display").textContent = "当前字体：" + (data.font_name || file.name);
+          applyFontSettings({ ...settingsPayload(), font_family_url: data.url, font_family_name: data.font_name });
+          await saveSettings("字体文件已上传并保存");
+        } catch (error) {
+          setStatus(`字体上传失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("font-family-url").addEventListener("input", () => {
+        applyFontSettings(settingsPayload());
+        scheduleSave(saveSettings, "字体地址变更中...", 250);
+      });
+
+      document.getElementById("reset-font-defaults").addEventListener("click", () => {
+        document.getElementById("font-size").value = 15;
+        document.getElementById("font-size-value").textContent = "15px";
+        document.getElementById("font-weight").value = 400;
+        document.getElementById("font-weight-value").textContent = "400";
+        document.getElementById("font-color-text").value = "";
+        document.getElementById("font-color").value = "#2d1f18";
+        applyFontSettings({ ...settingsPayload(), font_size: 15, font_weight: 400, font_color: "" });
+        scheduleSave(saveSettings, "字体已恢复默认", 250);
+        showToast("字体大小、粗细、颜色已恢复默认", "success");
+      });
+
+      backgroundUrlEl.addEventListener("input", () => {
+        applyBackground(backgroundUrlEl.value, backgroundOverlayEl.value);
+      });
+
+      document.getElementById("apply-preset").addEventListener("click", () => {
+        applyPresetSelection(document.getElementById("preset-provider").value);
+        scheduleSave(saveSettings, "已填入预设，正在保存...", 250);
+      });
+
+      document.getElementById("export-current-bundle").addEventListener("click", () => {
+        showBundleExportModal();
+      });
+
+      document.getElementById("import-bundle").addEventListener("click", () => {
+        document.getElementById("import-bundle-file").click();
+      });
+
+      const importConflictModalEl = document.getElementById("import-conflict-modal");
+      const importConflictDetailEl = document.getElementById("import-conflict-detail");
+      let pendingImportFile = null;
+
+      function showImportConflictModal(detail) {
+        if (importConflictDetailEl && detail) {
+          importConflictDetailEl.textContent = detail;
+        }
+        importConflictModalEl.hidden = false;
+        document.getElementById("import-conflict-confirm")?.focus();
+      }
+
+      function hideImportConflictModal() {
+        importConflictModalEl.hidden = true;
+      }
+
+      async function runBundleImport(file, overwrite) {
+        const button = document.getElementById("import-bundle");
+        try {
+          setButtonState(button, "loading", "导入中…");
+          setStatus("正在导入人设存档…", "busy");
+          showToast("正在导入人设存档", "info");
+
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const url = overwrite ? "/api/import/bundle?overwrite=1" : "/api/import/bundle";
+          const response = await fetch(url, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "导入失败");
+          }
+
+          const data = await response.json();
+          if (data && data.conflict) {
+            pendingImportFile = file;
+            setButtonState(button, "idle", "导入人设存档 ZIP");
+            setStatus("检测到同名角色卡，等待确认…", "busy");
+            showImportConflictModal(data.detail);
+            return;
+          }
+
+          const filesInfo = data.imported_files || {};
+          let msg = "人设存档导入成功。";
+          if (filesInfo.role_card) msg += ` 已加载：${filesInfo.role_card}`;
+          if (filesInfo.memories) msg += " 记忆已导入";
+          if (filesInfo.worldbook) msg += " 世界书已导入";
+          if (filesInfo.preset) msg += " 预设已导入";
+          if (filesInfo.media?.available) {
+            msg += ` 本地演出资源已恢复 ${filesInfo.media.restored || 0} 个`;
+            if (filesInfo.media.skipped) msg += `，跳过 ${filesInfo.media.skipped} 个`;
+          }
+
+          setButtonState(button, "success", "导入成功 ✓");
+          setStatus(msg, "success");
+          showToast(msg, "success");
+          window.setTimeout(() => window.location.reload(), 900);
+        } catch (error) {
+          setButtonState(button, "idle", "导入人设存档 ZIP");
+          setStatus(`导入失败：${error.message}`, "error");
+          showToast(`导入失败：${error.message}`, "error");
+        }
+      }
+
+      document.getElementById("import-bundle-file").addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          await runBundleImport(file, false);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("export-logs").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        try {
+          setButtonState(button, "loading", "导出中…");
+          setStatus("正在导出日志文件…", "busy");
+          showToast("正在导出日志", "info");
+          const response = await fetch("/api/logs/export");
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.detail || "日志导出失败");
+          }
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `fantareal_logs_${new Date().toISOString().replace(/[:.]/g, "-")}.txt`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          setButtonState(button, "success", "已开始下载 ✓");
+          setStatus("已完成：日志下载已开始", "success");
+        } catch (error) {
+          setButtonState(button, "idle", "导出日志");
+          setStatus(`日志导出失败：${error.message}`, "error");
+          showToast(`日志导出失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("preset-provider").addEventListener("change", () => {
+        const preset = LLM_PRESETS[document.getElementById("preset-provider").value] || LLM_PRESETS.custom;
+        presetHelperEl.textContent = preset.helper;
+      });
+
+      document.getElementById("result-modal-close").addEventListener("click", hideResultModal);
+      document.getElementById("result-modal-backdrop").addEventListener("click", hideResultModal);
+      document.getElementById("bundle-export-modal-backdrop").addEventListener("click", hideBundleExportModal);
+      document.getElementById("bundle-export-cancel").addEventListener("click", hideBundleExportModal);
+      document.getElementById("bundle-export-confirm").addEventListener("click", () => {
+        hideBundleExportModal();
+        startCurrentBundleExport();
+      });
+
+      document.getElementById("import-conflict-modal-backdrop").addEventListener("click", () => {
+        hideImportConflictModal();
+        pendingImportFile = null;
+        setStatus("已取消导入", "idle");
+        showToast("已取消导入", "info");
+      });
+      document.getElementById("import-conflict-cancel").addEventListener("click", () => {
+        hideImportConflictModal();
+        pendingImportFile = null;
+        setStatus("已取消导入", "idle");
+        showToast("已取消导入", "info");
+      });
+      document.getElementById("import-conflict-confirm").addEventListener("click", async () => {
+        const file = pendingImportFile;
+        pendingImportFile = null;
+        hideImportConflictModal();
+        if (file) {
+          await runBundleImport(file, true);
+        }
+      });
+
+
+      toggleSecret("llm-api-key", "toggle-llm-api-key");
+      toggleSecret("embedding-api-key", "toggle-embedding-api-key");
+      toggleSecret("rerank-api-key", "toggle-rerank-api-key");
+      hideResultModal();
+      setStatus("已准备 · 修改后会自动保存，也可以手动保存全部配置。", "idle");
+      fillModelOptions([], document.getElementById("llm-model").value.trim());
+      hideModelMenu();
+      applyPresetSelection("custom");
+      applyTheme({{ settings.theme | tojson }});
+      applyUiOpacity({{ settings.ui_opacity | tojson }});
+      applyPerformanceMode({{ settings.performance_mode | tojson }});
+      applyBackground({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});
+      window.FantarealThemeToggle = { uiOpacity: {{ settings.ui_opacity | tojson }} };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground, applyPerformanceMode, postJson };
+      initConfigAdvancedDisclosure();
+      applyFontSettings({
+        font_family_url: {{ settings.font_family_url | tojson }},
+        font_family_name: {{ settings.font_family_name | tojson }},
+        font_size: {{ settings.font_size | tojson }},
+        font_weight: {{ settings.font_weight | tojson }},
+        font_color: {{ settings.font_color | tojson }}
+      });
+    </script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+  </body>
+</html>

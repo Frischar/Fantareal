@@ -1,0 +1,24 @@
+/* Fantareal main stylesheet · split entry v161
+   原始大文件已拆到 static/css/*.css。
+   v161: 配置页界面与背景面板加宽，兼容消息编辑与重 roll；styles.css 仍只做入口。 */
+@import url("./css/00-base.css?v=v161");
+@import url("./css/01-chat.css?v=ui-p7-chat-motion-final-20260622");
+@import url("./css/02-sidebar.css?v=ui-sidebar-drawer-v1");
+@import url("./css/16-pe-shell.css?v=ui-v170-pe-shell");
+@import url("./css/03-config-global.css?v=ui-p8-performance-mode-20260623");
+@import url("./css/04-user-workshop.css?v=ui-p6-final-20260621");
+@import url("./css/05-config-helpers.css?v=ui-p7-3d-fixes-20260621");
+@import url("./css/06-workshop-controls.css?v=ui-debug-workshop-2");
+@import url("./css/07-card-editor.css?v=ui-p6-variable-instruction-20260628");
+@import url("./css/08-config-fields.css?v=v161");
+@import url("./css/09-preset-memory.css?v=ui-p8-performance-mode-toggle-20260701");
+@import url("./css/10-worldbook.css?v=ui-p9-textarea-scroll-20260701");
+@import url("./css/11-workshop-opening.css?v=v161");
+@import url("./css/12-workshop-performance.css?v=ui-debug-workshop-2");
+@import url("./css/13-route-forwarding.css?v=v161");
+@import url("./css/14-game.css?v=v161");
+@import url("./css/15-ui-system.css?v=p6-memory-rp-dossier-20260627");
+@import url("./css/17-preset-page.css?v=ui-p9-textarea-scroll-20260701");
+@import url("./css/99-mobile-responsive.css?v=ui-v174-mobile-responsive");
+
+/* v161: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */

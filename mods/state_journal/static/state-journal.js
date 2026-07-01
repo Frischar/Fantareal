@@ -1,0 +1,3293 @@
+(() => {
+  const $ = (selector) => document.querySelector(selector);
+  const HOST_THEME_MESSAGE = "fantareal:state-journal:host-theme";
+  function applyHostTheme(theme) {
+    if (theme !== "light" && theme !== "dark") return;
+    document.documentElement.dataset.theme = theme;
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.location.origin) return;
+    const data = event.data;
+    if (!data || typeof data !== "object" || data.type !== HOST_THEME_MESSAGE) return;
+    applyHostTheme(data.theme);
+  });
+
+  const state = {
+    config: {},
+    tables: [],
+    currentId: "",
+    viewMode: localStorage.getItem("state_journal:viewMode") || "card",
+    detailIndex: -1,
+    currentTemplateId: "",
+    currentThemeId: "",
+    expandedTemplateFieldIndex: null,
+    metricCharacterFilter: localStorage.getItem("state_journal:metricCharacterFilter") || "all",
+    metricLabelFilter: localStorage.getItem("state_journal:metricLabelFilter") || "all",
+    metricSort: localStorage.getItem("state_journal:metricSort") || "newest",
+    roleStateConfig: { version: 1, enabled: true, roles: [] },
+    activeStageRows: [],
+    currentRoleStateId: "",
+    roleStateTab: "variables",
+    storyTime: {},
+    storyTimeHistory: [],
+    storyTimeExpanded: localStorage.getItem("state_journal:storyTimeExpanded") === "1",
+    themePreviewMode: localStorage.getItem("state_journal:themePreviewMode") || "role",
+    workerPromptPreview: null,
+  };
+
+  const SERVICE_PRESETS = {
+    custom: { label: "自定义", base_url: "", model: "" },
+    deepseek: { label: "DeepSeek", base_url: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+    openai: { label: "OpenAI", base_url: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
+    minimax: { label: "MiniMax", base_url: "https://api.minimax.chat/v1", model: "MiniMax-Text-01" },
+    openrouter: { label: "OpenRouter", base_url: "https://openrouter.ai/api/v1", model: "" },
+    siliconflow: { label: "SiliconFlow", base_url: "https://api.siliconflow.cn/v1", model: "" },
+  };
+
+
+  const BUILTIN_THEME_IDS = new Set([
+    "standard",
+    "gufeng_paper",
+    "time_card",
+    "moon_white_letter",
+    "cinnabar_dossier",
+    "jade_slip",
+    "status_panel_pro",
+  ]);
+
+  const THEME_PACK_KIND = "state_journal_theme_pack";
+  const THEME_PACK_SCHEMA_VERSION = 1;
+  const THEME_PACK_MAX_DATA_URI_BYTES = 2 * 1024 * 1024;
+  const THEME_PACK_DANGEROUS_KEYS = new Set(["script", "scripts", "javascript", "js", "html", "onload", "onclick", "onerror"]);
+
+  const els = {
+    status: $("#statusStrip"),
+    updateSummaryText: $("#updateSummaryText"),
+    runtimeOverview: $("#runtimeOverview"),
+    runtimeEnabledBadge: $("#runtimeEnabledBadge"),
+    runtimeAutoBadge: $("#runtimeAutoBadge"),
+    runtimeTurnNoteBadge: $("#runtimeTurnNoteBadge"),
+    runtimeModelBadge: $("#runtimeModelBadge"),
+    runtimeLastRunText: $("#runtimeLastRunText"),
+    runtimeFlowText: $("#runtimeFlowText"),
+    dashboardEnabled: $("#dashboardEnabled"),
+    dashboardAutoUpdate: $("#dashboardAutoUpdate"),
+    dashboardTurnNote: $("#dashboardTurnNote"),
+    nextStepModel: $("#nextStepModel"),
+    nextStepModelTitle: $("#nextStepModelTitle"),
+    nextStepModelAction: $("#nextStepModelAction"),
+    nextStepEnabled: $("#nextStepEnabled"),
+    nextStepEnabledTitle: $("#nextStepEnabledTitle"),
+    nextStepEnabledStatus: $("#nextStepEnabledStatus"),
+    nextStepAuto: $("#nextStepAuto"),
+    nextStepAutoTitle: $("#nextStepAutoTitle"),
+    nextStepAutoStatus: $("#nextStepAutoStatus"),
+    tableList: $("#tableList"),
+    currentTitle: $("#currentTableTitle"),
+    currentDesc: $("#currentTableDesc"),
+    rowsEditor: $("#rowsEditor"),
+    fieldsEditor: $("#fieldsEditor"),
+    schemaId: $("#schemaId"),
+    schemaName: $("#schemaName"),
+    schemaDesc: $("#schemaDesc"),
+    primaryKey: $("#primaryKeySelect"),
+    ruleNote: $("#ruleNote"),
+    ruleInit: $("#ruleInit"),
+    ruleInsert: $("#ruleInsert"),
+    ruleUpdate: $("#ruleUpdate"),
+    ruleDelete: $("#ruleDelete"),
+    ruleIgnore: $("#ruleIgnore"),
+    cfgEnabled: $("#cfgEnabled"),
+    cfgAutoUpdate: $("#cfgAutoUpdate"),
+    cfgNotify: $("#cfgNotify"),
+    cfgUiSyncGlobal: $("#cfgUiSyncGlobal"),
+    cfgTurnNoteEnabled: $("#cfgTurnNoteEnabled"),
+    cfgTurnNoteTitle: $("#cfgTurnNoteTitle"),
+    cfgTurnNoteNote: $("#cfgTurnNoteNote"),
+    cfgTurnNoteCollapsed: $("#cfgTurnNoteCollapsed"),
+    cfgTurnNoteDisplayMode: $("#cfgTurnNoteDisplayMode"),
+    cfgTurnNoteStyle: $("#cfgTurnNoteStyle"),
+    cfgTurnNoteTitleStyle: $("#cfgTurnNoteTitleStyle"),
+    cfgTurnNoteNoteStyle: $("#cfgTurnNoteNoteStyle"),
+    cfgTurnNoteExpand: $("#cfgTurnNoteExpand"),
+    cfgTurnNoteDensity: $("#cfgTurnNoteDensity"),
+    cfgTurnNoteCharacterFilter: $("#cfgTurnNoteCharacterFilter"),
+    cfgTurnNoteCharacterNames: $("#cfgTurnNoteCharacterNames"),
+    cfgTurnNoteProtagonistEnabled: $("#cfgTurnNoteProtagonistEnabled"),
+    cfgTurnNoteProtagonistMode: $("#cfgTurnNoteProtagonistMode"),
+    cfgTurnNoteProtagonistName: $("#cfgTurnNoteProtagonistName"),
+    cfgTurnNoteProtagonistAliases: $("#cfgTurnNoteProtagonistAliases"),
+    cfgTurnNoteWorkerPromptScope: $("#cfgTurnNoteWorkerPromptScope"),
+    cfgTurnNoteWorkerPromptMode: $("#cfgTurnNoteWorkerPromptMode"),
+    cfgTurnNoteWorkerCustomPrompt: $("#cfgTurnNoteWorkerCustomPrompt"),
+    workerPromptEditorLabel: $("#workerPromptEditorLabel"),
+    loadDefaultWorkerPromptBtn: $("#loadDefaultWorkerPromptBtn"),
+    clearWorkerPromptBtn: $("#clearWorkerPromptBtn"),
+    refreshWorkerPromptPreviewBtn: $("#refreshWorkerPromptPreviewBtn"),
+    workerPromptPreview: $("#workerPromptPreview"),
+    cfgTurnNoteWorkerPromptEnabled: $("#cfgTurnNoteWorkerPromptEnabled"),
+    cfgTurnNoteWorkerStylePrompt: $("#cfgTurnNoteWorkerStylePrompt"),
+    cfgTurnNoteWorkerProtagonistPrompt: $("#cfgTurnNoteWorkerProtagonistPrompt"),
+    resetWorkerPromptBtn: $("#resetWorkerPromptBtn"),
+    cfgBaseUrl: $("#cfgBaseUrl"),
+    cfgApiKey: $("#cfgApiKey"),
+    cfgModel: $("#cfgModel"),
+    cfgTurns: $("#cfgTurns"),
+    cfgTimeout: $("#cfgTimeout"),
+    modelDatalist: $("#modelDatalist"),
+    hookStatusText: $("#hookStatusText"),
+    logBox: $("#logBox"),
+    cardViewBtn: $("#cardViewBtn"),
+    tableViewBtn: $("#tableViewBtn"),
+    configDrawer: $("#configDrawer"),
+    drawerMask: $("#drawerMask"),
+    drawerTitle: $("#drawerTitle"),
+    rowDetailDrawer: $("#rowDetailDrawer"),
+    rowDetailMask: $("#rowDetailMask"),
+    rowDetailTitle: $("#rowDetailTitle"),
+    rowDetailBody: $("#rowDetailBody"),
+    servicePreset: $("#servicePresetSelect"),
+    cfgTurnNoteTemplateSelect: $("#cfgTurnNoteTemplateSelect"),
+    cfgTurnNoteThemeSelect: $("#cfgTurnNoteThemeSelect"),
+    themeSelect: $("#themeSelect"),
+    themeName: $("#themeName"),
+    themeDesc: $("#themeDesc"),
+    themeAuthor: $("#themeAuthor"),
+    themeMeta: $("#themeMeta"),
+    themePreview: $("#themePreview"),
+    themePreviewModeSelect: $("#themePreviewModeSelect"),
+    exportThemeBtn: $("#exportThemeBtn"),
+    deleteThemeBtn: $("#deleteThemeBtn"),
+    importThemeInput: $("#importThemeInput"),
+    templateSelect: $("#templateSelect"),
+    templateName: $("#templateName"),
+    templateDesc: $("#templateDesc"),
+    templateNoteStyle: $("#templateNoteStyle"),
+    templateFieldsEditor: $("#templateFieldsEditor"),
+    templateOutput: $("#templateOutput"),
+    templatePreview: $("#templatePreview"),
+    importTemplateInput: $("#importTemplateInput"),
+  };
+
+  function setStatus(text, type = "") {
+    if (!els.status) return;
+    els.status.textContent = text;
+    els.status.className = `status-strip ${type}`.trim();
+  }
+
+  function activeWorkspaceName() {
+    return document.querySelector("[data-workspace-page].active")?.dataset.workspacePage || "home";
+  }
+
+  function setWorkbenchStatus(text, type = "success", workspace = activeWorkspaceName()) {
+    const token = document.querySelector(`[data-workbench-status="${CSS.escape(workspace)}"]`) || document.querySelector("[data-workbench-status]");
+    if (!token) return;
+    const classByType = {
+      ok: "is-saved",
+      success: "is-saved",
+      saved: "is-saved",
+      dirty: "is-dirty",
+      saving: "is-saving",
+      warn: "is-dirty",
+      warning: "is-dirty",
+      error: "is-error",
+    };
+    token.textContent = text || "就绪";
+    token.className = `database-workbench-status ui-status-token ${classByType[type] || "is-saved"}`;
+    token.classList.remove("is-status-changing");
+    void token.offsetWidth;
+    token.classList.add("is-status-changing");
+    window.setTimeout(() => token.classList.remove("is-status-changing"), 950);
+  }
+
+  function flashActionButton(button, text = "已完成", type = "success") {
+    if (!button) return;
+    const oldText = button.dataset.feedbackOriginalText || button.textContent;
+    button.dataset.feedbackOriginalText = oldText;
+    button.textContent = text;
+    button.classList.remove("is-loading", "is-success", "is-error", "is-status-changing");
+    button.classList.add(type === "error" ? "is-error" : "is-success", "is-status-changing", "is-feedback");
+    window.setTimeout(() => {
+      button.textContent = button.dataset.feedbackOriginalText || oldText;
+      delete button.dataset.feedbackOriginalText;
+      button.classList.remove("is-success", "is-error", "is-status-changing", "is-feedback");
+    }, 950);
+  }
+
+  async function runFeedbackAction(button, action, successText = "已完成") {
+    if (button) {
+      button.classList.add("is-loading");
+      button.disabled = true;
+    }
+    try {
+      const result = await action();
+      flashActionButton(button, successText, "success");
+      return result;
+    } catch (error) {
+      flashActionButton(button, "失败", "error");
+      throw error;
+    } finally {
+      if (button) {
+        button.classList.remove("is-loading");
+        button.disabled = false;
+      }
+    }
+  }
+
+  let toastTimer = null;
+  function pageToast(title, detail = "", type = "ok") {
+    if (!["error", "warn", "warning"].includes(type)) {
+      const oldToast = document.getElementById("state-journal-page-toast");
+      oldToast?.classList.remove("show");
+      setWorkbenchStatus(title, "success");
+      return;
+    }
+    let toast = document.getElementById("state-journal-page-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "state-journal-page-toast";
+      toast.className = "state-journal-page-toast";
+      toast.innerHTML = "<strong></strong><span></span>";
+      document.body.appendChild(toast);
+    }
+    toast.className = `state-journal-page-toast ${type}`;
+    toast.querySelector("strong").textContent = title;
+    toast.querySelector("span").textContent = detail;
+    setWorkbenchStatus(title, type === "error" ? "error" : "warn");
+    requestAnimationFrame(() => toast.classList.add("show"));
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.remove("show"), type === "error" ? 6200 : 3600);
+  }
+
+  function workerErrorTitle(errorType = "") {
+    const titles = {
+      timeout: "数据库记录超时",
+      empty_response: "记录模型返回为空",
+      invalid_json: "数据库解析失败",
+      invalid_provider_response: "服务商返回异常",
+      rate_limit: "服务商限流",
+      auth_error: "鉴权失败",
+      network_error: "连接失败",
+      config_error: "配置不完整",
+      provider_error: "服务商异常",
+    };
+    return titles[errorType] || "数据库记录失败";
+  }
+
+  function setManualWorkerBusy(busy) {
+    const button = document.getElementById("manualWorkerBtn");
+    if (!button) return;
+    button.disabled = Boolean(busy);
+    button.classList.toggle("is-busy", Boolean(busy));
+    button.dataset.originalText = button.dataset.originalText || button.textContent || "根据最近对话更新";
+    button.textContent = busy ? "数据库记录中……" : button.dataset.originalText;
+  }
+
+  async function requestJson(url, options = {}) {
+    const response = await fetch(url, {
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      ...options,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || payload.message || `请求失败：${response.status}`);
+    return payload;
+  }
+
+  function currentTable() { return state.tables.find((item) => item.schema.id === state.currentId) || state.tables[0] || null; }
+  function escapeHtml(text) { return String(text ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[ch])); }
+  function escapeAttr(text) { return escapeHtml(text).replace(/`/g, "&#096;"); }
+  function fieldLabel(field) { return field.label || field.key; }
+  function textValue(value) { return typeof value === "boolean" ? (value ? "是" : "否") : String(value ?? ""); }
+  function compactText(value, limit = 76) {
+    const text = textValue(value).replace(/\s+/g, " ").trim();
+    if (!text) return "—";
+    return text.length > limit ? `${text.slice(0, limit)}…` : text;
+  }
+
+  const ROLE_STATE_MODES = {
+    default: { label: "默认状态记录模板", desc: "使用全局默认状态记录模板，不使用该角色专属变量、阶段或快照字段。" },
+    snapshot_only: { label: "仅专属状态记录", desc: "只使用角色专属状态快照字段，不计算变量，不判断阶段。" },
+    full: { label: "完整数据库：状态记录 + 变量阶段", desc: "启用角色专属状态记录、变量更新与阶段判断，并生成世界书 external_tag。" },
+    disabled: { label: "不记录该角色", desc: "该角色不参与数据库记录与状态记录展示。" },
+  };
+
+
+  const ROLE_SOURCE_MODES = {
+    auto: { label: "自动识别", desc: "自动识别主卡和有内容的多角色；空占位子角色会自动隐藏。" },
+    main_card: { label: "主卡就是角色", desc: "适合普通单角色卡，数据库会把主卡作为唯一角色记录。" },
+    personas_only: { label: "主卡旁白，多角色展开", desc: "适合旁白卡、多角色卡；只显示有内容的多角色，不显示主卡。" },
+  };
+
+  const STORY_TIME_FIELDS = [
+    { key: "elapsed_days", label: "已过天数", type: "number" },
+    { key: "elapsed_hours", label: "已过小时", type: "number" },
+    { key: "current_hour", label: "当前小时", type: "number" },
+    { key: "current_date", label: "当前日期", type: "text" },
+    { key: "time_slot", label: "当前时段", type: "select", options: [["late_night", "深夜"], ["dawn", "清晨"], ["morning", "上午"], ["noon", "正午"], ["afternoon", "下午"], ["dusk", "黄昏"], ["night", "夜晚"], ["day", "白日"]] },
+    { key: "season", label: "当前季节", type: "select", options: [["spring", "春"], ["summer", "夏"], ["autumn", "秋"], ["winter", "冬"]] },
+  ];
+  const STORY_TIME_FIELD_MAP = new Map(STORY_TIME_FIELDS.map((field) => [field.key, field]));
+
+  function normalizeRoleSourceMode(value) {
+    const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+    const aliases = { main: "main_card", single: "main_card", single_role: "main_card", card: "main_card", persona: "personas_only", personas: "personas_only", multi: "personas_only", multi_role: "personas_only", narrator: "personas_only" };
+    const mode = aliases[raw] || raw;
+    return ROLE_SOURCE_MODES[mode] ? mode : "auto";
+  }
+
+  function roleSourceSummary(config = {}) {
+    const summary = config.role_source_summary || {};
+    const mode = normalizeRoleSourceMode(config.role_source_mode || summary.mode);
+    const label = summary.mode_label || ROLE_SOURCE_MODES[mode]?.label || "自动识别";
+    const detected = summary.detected_label || "";
+    const message = summary.message || (mode === "auto" ? "自动识别角色来源。" : ROLE_SOURCE_MODES[mode]?.desc || "");
+    return { mode, label, detected, message, roleCount: Number(summary.role_count ?? (config.roles || []).length) || 0 };
+  }
+
+  function normalizeRoleStateMode(value, role = {}) {
+    const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+    const aliases = { snapshot: "snapshot_only", snapshotfields: "snapshot_only", snapshot_fields: "snapshot_only", note_only: "snapshot_only", off: "disabled", none: "disabled", disable: "disabled" };
+    const mode = aliases[raw] || raw;
+    if (ROLE_STATE_MODES[mode]) return mode;
+    if (role.enabled === false) return "disabled";
+    if ((role.variables || []).length && (role.stages || []).length) return "full";
+    if ((role.snapshotFields || []).length) return "snapshot_only";
+    return "default";
+  }
+
+  function setRoleStateMode(role, mode) {
+    const safeMode = ROLE_STATE_MODES[mode] ? mode : "default";
+    role.mode = safeMode;
+    role.stateJournalMode = safeMode;
+    role.enabled = safeMode !== "disabled";
+  }
+
+  function roleStateModeLabel(role) {
+    const mode = normalizeRoleStateMode(role?.mode || role?.stateJournalMode, role || {});
+    return ROLE_STATE_MODES[mode]?.label || ROLE_STATE_MODES.default.label;
+  }
+
+  function roleStateModeShortLabel(role) {
+    const mode = normalizeRoleStateMode(role?.mode || role?.stateJournalMode, role || {});
+    const labels = {
+      full: "完整数据库",
+      snapshot_only: "专属状态记录",
+      default: "默认状态记录",
+      disabled: "未记录",
+    };
+    return labels[mode] || ROLE_STATE_MODES.default.label;
+  }
+
+  function roleStateConditionText(role, stage) {
+    const variables = new Map((role?.variables || []).map((item) => [item.var_key, item.var_name || item.var_key]));
+    const parts = (stage?.conditions || []).map((condition) => {
+      const key = condition.source === "story_time" ? condition.field : (condition.var || condition.field || "");
+      const label = condition.source === "story_time" ? `剧情时间 · ${(STORY_TIME_FIELD_MAP.get(key)?.label || key || "时间字段")}` : (variables.get(key) || key || "变量");
+      const op = condition.op === ">=" ? "≥" : condition.op === "<=" ? "≤" : condition.op === "!=" ? "≠" : condition.op === "=" ? "=" : condition.op || "≥";
+      return `${label} ${op} ${condition.value ?? 0}`;
+    }).filter(Boolean);
+    if (!parts.length) return "无条件";
+    return parts.join(stage?.condition_mode === "any" ? " 或 " : " 且 ");
+  }
+
+  function roleStateConditionChips(role, stage) {
+    const variables = new Map((role?.variables || []).map((item) => [item.var_key, item.var_name || item.var_key]));
+    const conditions = Array.isArray(stage?.conditions) ? stage.conditions : [];
+    if (!conditions.length) return `<span class="stage-condition-chip muted">无条件</span>`;
+    const visible = conditions.slice(0, 3).map((condition) => {
+      const key = condition.source === "story_time" ? condition.field : (condition.var || condition.field || "");
+      const label = condition.source === "story_time" ? `剧情时间 · ${(STORY_TIME_FIELD_MAP.get(key)?.label || key || "时间字段")}` : (variables.get(key) || key || "变量");
+      const op = condition.op === ">=" ? "≥" : condition.op === "<=" ? "≤" : condition.op === "!=" ? "≠" : condition.op === "=" ? "=" : condition.op || "≥";
+      return `<span class="stage-condition-chip">${escapeHtml(label)} ${escapeHtml(op)} ${escapeHtml(condition.value ?? 0)}</span>`;
+    });
+    if (conditions.length > visible.length) visible.push(`<span class="stage-condition-chip muted">+${conditions.length - visible.length} 条</span>`);
+    const mode = stage?.condition_mode === "any" ? "任一满足" : "全部满足";
+    return `<span class="stage-condition-mode">${mode}</span>${visible.join("")}`;
+  }
+
+  function normalizeStageCondition(condition = {}, role = {}) {
+    const source = condition.source === "story_time" ? "story_time" : "variable";
+    const op = [">=", "<=", ">", "<", "=", "!="].includes(condition.op) ? condition.op : ">=";
+    if (source === "story_time") {
+      const field = STORY_TIME_FIELD_MAP.has(condition.field) ? condition.field : "elapsed_days";
+      const meta = STORY_TIME_FIELD_MAP.get(field);
+      const fallbackValue = meta?.options?.[0]?.[0] || "";
+      return { source, field, op, value: meta?.type === "number" ? Number(condition.value || 0) : String(condition.value ?? fallbackValue) };
+    }
+    const variables = role.variables || [];
+    const varKey = safeTemplateId(condition.var || condition.field || variables[0]?.var_key || "var_1");
+    return { source: "variable", var: varKey, op, value: Number(condition.value || 0) };
+  }
+
+  function updateStageConditionFromInput(condition, input, role = {}) {
+    const field = input.dataset.stageConditionField;
+    if (field === "source") {
+      const next = input.value === "story_time" ? { source: "story_time", field: "elapsed_days", op: ">=", value: 0 } : { source: "variable", var: role.variables?.[0]?.var_key || "var_1", op: ">=", value: 0 };
+      Object.keys(condition).forEach((key) => delete condition[key]);
+      Object.assign(condition, next);
+      return;
+    }
+    if (field === "field") {
+      if (condition.source === "story_time") {
+        const meta = STORY_TIME_FIELD_MAP.get(input.value) || STORY_TIME_FIELDS[0];
+        condition.field = meta.key;
+        condition.value = meta.type === "number" ? Number(condition.value || 0) : String(condition.value || meta.options?.[0]?.[0] || "");
+      } else {
+        condition.var = input.value;
+      }
+      return;
+    }
+    if (field === "value") {
+      const meta = condition.source === "story_time" ? STORY_TIME_FIELD_MAP.get(condition.field) : null;
+      condition.value = meta?.type === "number" || condition.source !== "story_time" ? Number(input.value || 0) : input.value;
+      return;
+    }
+    condition[field] = input.value;
+  }
+
+  function roleStateStageTagState(role, stage, isCurrent) {
+    const active = activeStageForRole(role);
+    const tag = stageActivationTag(role, stage);
+    const activeTag = String(active?.active_tag || active?.tag || "").trim();
+    if (isCurrent && activeTag && tag && activeTag === tag) return { label: "当前命中", cls: "is-active" };
+    if (isCurrent) return { label: "当前阶段", cls: "is-current" };
+    return { label: "世界书", cls: "" };
+  }
+
+  function confirmAction({ title, body, confirmText = "确认", danger = false }) {
+    return new Promise((resolve) => {
+      let modal = document.getElementById("state-journal-confirm-modal");
+      if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "state-journal-confirm-modal";
+        modal.className = "state-journal-confirm-modal";
+        modal.innerHTML = `<div class="state-journal-confirm-card"><h3></h3><div class="state-journal-confirm-body"></div><div class="state-journal-confirm-actions"><button type="button" data-confirm-cancel class="ghost-btn">取消</button><button type="button" data-confirm-ok class="primary-btn">确认</button></div></div>`;
+        document.body.appendChild(modal);
+      }
+      modal.querySelector("h3").textContent = title || "确认操作";
+      modal.querySelector(".state-journal-confirm-body").innerHTML = body || "";
+      const ok = modal.querySelector("[data-confirm-ok]");
+      ok.textContent = confirmText;
+      ok.classList.toggle("danger", Boolean(danger));
+      modal.classList.add("show");
+      const cleanup = (value) => {
+        modal.classList.remove("show");
+        modal.querySelector("[data-confirm-cancel]").onclick = null;
+        ok.onclick = null;
+        resolve(value);
+      };
+      modal.querySelector("[data-confirm-cancel]").onclick = () => cleanup(false);
+      ok.onclick = () => cleanup(true);
+    });
+  }
+
+  async function confirmDangerousRoleCardAction({ title, body, confirmText, finalTitle, finalBody, finalConfirmText }) {
+    const firstOk = await confirmAction({
+      title,
+      body,
+      confirmText,
+      danger: true,
+    });
+    if (!firstOk) return false;
+    return confirmAction({
+      title: finalTitle || `最终确认：${title}`,
+      body: finalBody,
+      confirmText: finalConfirmText || "我已确认，继续执行",
+      danger: true,
+    });
+  }
+
+
+  function safeTemplateId(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || `template_${Date.now()}`;
+  }
+
+  const TEMPLATE_SAMPLE_VALUES = {
+    name: "示例角色",
+    emotion: "克制中带着松动",
+    clothing: "袖口微乱，衣料被动作牵出细褶",
+    posture: "半垂眼睫，指尖轻按掌心",
+    scene: "泠音阁后楼，灯影与炭火之间",
+    sensory_field: "灯影低垂，药气与夜雨潮意交叠",
+    body_temperature: "指尖偏凉，掌心余温未散",
+    body_motion: "重心微微后撤，肩线仍绷着",
+    micro_reaction: "呼吸放缓，眼睫轻颤",
+    visual_focus: "视线落在对方手背，又很快移开",
+    interaction: "以平稳语气掩住关心，信任在沉默里加深",
+    favor_level: "65/100（+2）",
+    trust_level: "72/100（+1）",
+    guard_level: "18/100（-1）",
+    pulse_level: "48/100（-3）",
+    summary: "她把情绪收得很轻，却没有再退开。",
+  };
+
+  function sampleValueForField(field) {
+    const key = safeTemplateId(field?.key || "");
+    if (TEMPLATE_SAMPLE_VALUES[key]) return TEMPLATE_SAMPLE_VALUES[key];
+    const label = (field?.label || key || "字段").trim();
+    const instruction = String(field?.instruction || "").replace(/\s+/g, " ").trim();
+    if (instruction) return `${label}示例：${instruction.slice(0, 34)}${instruction.length > 34 ? "…" : ""}`;
+    return `${label}示例：这里将显示 ${key || label} 的生成内容`;
+  }
+
+  function buildTemplateSample(template) {
+    const sample = { ...TEMPLATE_SAMPLE_VALUES };
+    (Array.isArray(template?.fields) ? template.fields : []).forEach((field) => {
+      const key = safeTemplateId(field?.key || "");
+      if (key && key !== "name" && !sample[key]) sample[key] = sampleValueForField(field);
+    });
+    return sample;
+  }
+
+  function turnNoteTemplates() {
+    return Array.isArray(state.config?.turn_note_templates) ? state.config.turn_note_templates : [];
+  }
+
+  function activeTemplateId() {
+    return state.currentTemplateId || state.config?.turn_note_template_id || turnNoteTemplates()[0]?.id || "classic";
+  }
+
+  function activeTemplate() {
+    const id = activeTemplateId();
+    return turnNoteTemplates().find((item) => item.id === id) || turnNoteTemplates()[0] || { id: "classic", name: "简洁状态", note_style: "classic", fields: [], output_template: "" };
+  }
+
+  function renderTemplateText(template, sample = null) {
+    const data = sample || buildTemplateSample(template);
+    const tpl = String(template?.output_template || "【{name}】\n情绪：{emotion}\n衣着：{clothing}\n神态：{posture}\n互动：{interaction}");
+    return tpl.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key) => textValue(data[key] ?? `（${key} 未生成）`));
+  }
+
+  function fieldOutputLine(field) {
+    const key = safeTemplateId(field?.key || "");
+    const label = String(field?.label || key || "字段").trim();
+    return key ? `<${label}({${key}})>` : "";
+  }
+
+  function ensureTemplateOutputFields(template) {
+    const next = { ...(template || {}) };
+    let text = String(next.output_template || "").trim();
+    (Array.isArray(next.fields) ? next.fields : []).forEach((field) => {
+      const key = safeTemplateId(field?.key || "");
+      if (!key || key === "name") return;
+      const token = `{${key}}`;
+      if (!text.includes(token)) {
+        const line = fieldOutputLine(field);
+        if (line) text = `${text}${text ? "\n" : ""}${line}`;
+      }
+    });
+    next.output_template = text;
+    return next;
+  }
+
+  function renderTemplateSelectors() {
+    const templates = turnNoteTemplates();
+    const active = activeTemplateId();
+    const options = templates.map((item) => {
+      const selected = item.id === active ? "selected" : "";
+      return `<option value="${escapeAttr(item.id)}" ${selected}>${escapeHtml(item.name || item.id)}</option>`;
+    }).join("");
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.innerHTML = options;
+    if (els.templateSelect) els.templateSelect.innerHTML = options;
+  }
+
+
+  function safeThemeId(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "") || `theme_${Date.now()}`;
+  }
+
+  function turnNoteThemePacks() {
+    return Array.isArray(state.config?.turn_note_theme_packs) ? state.config.turn_note_theme_packs : [];
+  }
+
+  function activeThemeId() {
+    return state.currentThemeId || state.config?.turn_note_theme_id || turnNoteThemePacks()[0]?.id || "standard";
+  }
+
+  function activeThemePack() {
+    const id = activeThemeId();
+    return turnNoteThemePacks().find((item) => item.id === id) || turnNoteThemePacks()[0] || {
+      id: "standard",
+      name: "标准样式",
+      description: "默认样式",
+      style: { class_name: "theme-standard", accent: "#c98263" },
+    };
+  }
+
+
+  function isBuiltinThemePack(packOrId) {
+    const id = typeof packOrId === "string" ? safeThemeId(packOrId) : safeThemeId(packOrId?.id || "");
+    return BUILTIN_THEME_IDS.has(id);
+  }
+
+  function themePackSourceLabel(pack) {
+    return isBuiltinThemePack(pack) ? "内置外观包" : "外置美化包";
+  }
+
+  function themePackDisplayName(pack) {
+    return String(pack?.name || pack?.id || "未命名外观包");
+  }
+
+  function fallbackThemeIdAfterDelete(packs) {
+    const list = Array.isArray(packs) ? packs : turnNoteThemePacks();
+    return list.find((item) => item?.id === "standard")?.id
+      || list.find((item) => isBuiltinThemePack(item))?.id
+      || "standard";
+  }
+
+  function validateThemePackSafety(value, path = "美化包") {
+    if (!value || typeof value !== "object") return;
+    Object.entries(value).forEach(([key, item]) => {
+      const lowerKey = String(key || "").toLowerCase();
+      if (THEME_PACK_DANGEROUS_KEYS.has(lowerKey) || lowerKey.startsWith("on")) {
+        throw new Error(`${path} 包含不允许的字段：${key}`);
+      }
+      if (typeof item === "string") {
+        const text = item.trim();
+        if (/^https?:\/\//i.test(text)) {
+          throw new Error(`${path}.${key} 引用了远程资源，外观包只允许内嵌 data URI 或本地样式标记。`);
+        }
+        if (/^data:/i.test(text) && text.length > THEME_PACK_MAX_DATA_URI_BYTES) {
+          throw new Error(`${path}.${key} 的内嵌资源过大，请压缩后再导入。`);
+        }
+      }
+      if (item && typeof item === "object") validateThemePackSafety(item, `${path}.${key}`);
+    });
+  }
+
+  function themePackLayoutType(pack) {
+    const layout = pack?.style?.layout || pack?.layout || {};
+    return String(layout.layout_type || layout.type || layout.character_card || "standard").trim() || "standard";
+  }
+
+  function themePackProgressBars(pack) {
+    const list = pack?.style?.progress_bars || pack?.progress_bars || [];
+    return Array.isArray(list) ? list : [];
+  }
+
+  function themePackWarnings(pack) {
+    const warnings = [];
+    if (!pack?.kind) warnings.push("旧版包：已自动补充 kind。");
+    if (!pack?.schema_version) warnings.push("旧版包：已自动补充 schema_version。");
+    if (!pack?.style?.layout) warnings.push("未声明 layout，将使用默认预览布局。");
+    if (!pack?.style?.class_name) warnings.push("未声明 class_name，将自动生成安全类名。");
+    return warnings;
+  }
+
+  function normalizeThemePack(pack) {
+    if (!pack || typeof pack !== "object") throw new Error("美化包必须是 JSON 对象。");
+    const rawKind = String(pack.kind || pack.type || THEME_PACK_KIND).trim() || THEME_PACK_KIND;
+    if (![THEME_PACK_KIND, "xinjian_theme_pack", "turn_note_theme_pack"].includes(rawKind)) {
+      throw new Error(`这不是状态记录外观模板包：${rawKind}`);
+    }
+    const schemaVersion = Number(pack.schema_version || pack.schemaVersion || THEME_PACK_SCHEMA_VERSION);
+    if (!Number.isFinite(schemaVersion) || schemaVersion < 1) throw new Error("美化包 schema_version 无效。");
+    if (schemaVersion > THEME_PACK_SCHEMA_VERSION) throw new Error(`美化包 schema_version=${schemaVersion} 高于当前支持版本 ${THEME_PACK_SCHEMA_VERSION}。`);
+    validateThemePackSafety(pack);
+    const id = safeThemeId(pack?.id || pack?.name || `theme_${Date.now()}`);
+    const rawStyle = (pack && typeof pack.style === "object" && pack.style)
+      ? pack.style
+      : ((pack && typeof pack.theme === "object" && pack.theme) ? pack.theme : {});
+    const style = rawStyle || {};
+    const className = String(style.class_name || style.class || `theme-${id}`).replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || `theme-${id}`;
+    const safeStyle = {
+      ...style,
+      class_name: className,
+      accent: String(style.accent || style.primary || "").trim(),
+      title_card: (style.title_card && typeof style.title_card === "object") ? style.title_card : {},
+      character_card: (style.character_card && typeof style.character_card === "object") ? style.character_card : {},
+      relationship_card: (style.relationship_card && typeof style.relationship_card === "object") ? style.relationship_card : {},
+      status_bar: (style.status_bar && typeof style.status_bar === "object") ? style.status_bar : {},
+    };
+    ["layout", "blocks", "tokens", "field_style", "media", "labels"].forEach((key) => {
+      if (pack[key] && typeof pack[key] === "object" && !Array.isArray(pack[key])) safeStyle[key] = pack[key];
+      else if (style[key] && typeof style[key] === "object" && !Array.isArray(style[key])) safeStyle[key] = style[key];
+    });
+    ["progress_bars"].forEach((key) => {
+      if (Array.isArray(pack[key])) safeStyle[key] = pack[key];
+      else if (Array.isArray(style[key])) safeStyle[key] = style[key];
+    });
+    const normalized = {
+      kind: THEME_PACK_KIND,
+      schema_version: THEME_PACK_SCHEMA_VERSION,
+      id,
+      name: String(pack?.name || id).trim() || id,
+      version: String(pack?.version || "1.0.0").trim() || "1.0.0",
+      author: String(pack?.author || "").trim(),
+      description: String(pack?.description || "").trim(),
+      style: safeStyle,
+    };
+    if (pack.media && typeof pack.media === "object") normalized.media = pack.media;
+    if (pack.labels && typeof pack.labels === "object") normalized.labels = pack.labels;
+    normalized.__warnings = themePackWarnings(pack);
+    return normalized;
+  }
+
+  function mergeThemePack(pack) {
+    const packs = turnNoteThemePacks().filter((item) => item && item.id !== pack.id);
+    return [...packs, pack];
+  }
+
+  function persistableThemePack(pack) {
+    const { __warnings, ...rest } = pack || {};
+    return rest;
+  }
+
+  async function persistImportedTheme(pack) {
+    const cleanPack = persistableThemePack(pack);
+    state.config = {
+      ...state.config,
+      turn_note_theme_packs: mergeThemePack(cleanPack),
+      turn_note_theme_id: cleanPack.id,
+    };
+    pack = cleanPack;
+    state.currentThemeId = pack.id;
+    renderThemeSelectors();
+    renderThemePreview();
+    const payload = await requestJson("./api/config", {
+      method: "POST",
+      body: JSON.stringify({ config: readConfig() }),
+    });
+    state.config = payload.config || state.config;
+    state.currentThemeId = pack.id;
+    renderThemeSelectors();
+    renderThemePreview();
+    window.stateJournalChatBridge?.reloadConfig?.();
+    return payload;
+  }
+
+
+  async function deleteActiveImportedTheme() {
+    const pack = activeThemePack();
+    if (!pack?.id) return;
+    if (isBuiltinThemePack(pack)) {
+      pageToast("内置外观包不可删除", "可以导出内置包作为模板，再导入为新的自定义外观包。", "error");
+      return;
+    }
+    const nextPacks = turnNoteThemePacks().filter((item) => item && item.id !== pack.id);
+    const nextThemeId = fallbackThemeIdAfterDelete(nextPacks);
+    const ok = await confirmAction({
+      title: "删除外置美化包？",
+      body: `
+        <p>将删除：<strong>${escapeHtml(themePackDisplayName(pack))}</strong></p>
+        <div class="sync-card-scope">
+          <strong>不会影响</strong>
+          <p>数据库数据、状态记录历史、角色变量、阶段规则、世界书标签。</p>
+          <strong>删除后</strong>
+          <p>如果当前正在使用该外观包，将自动切回「${escapeHtml(nextPacks.find((item) => item?.id === nextThemeId)?.name || "标准样式")}」。</p>
+        </div>
+      `,
+      confirmText: "确认删除",
+      danger: true,
+    });
+    if (!ok) return;
+    state.config = {
+      ...state.config,
+      turn_note_theme_packs: nextPacks,
+      turn_note_theme_id: nextThemeId,
+    };
+    state.currentThemeId = nextThemeId;
+    renderThemeSelectors();
+    renderThemePreview();
+    const payload = await requestJson("./api/config", {
+      method: "POST",
+      body: JSON.stringify({ config: readConfig() }),
+    });
+    state.config = payload.config || state.config;
+    state.currentThemeId = state.config.turn_note_theme_id || nextThemeId;
+    renderThemeSelectors();
+    renderThemePreview();
+    window.stateJournalChatBridge?.reloadConfig?.();
+    pageToast("导入外观包已删除", `已切回：${activeThemePack().name || activeThemePack().id}`, "ok");
+    setStatus(`已删除导入外观包：${pack.name || pack.id}`, "ok");
+  }
+
+  function renderThemeSelectors() {
+    const packs = turnNoteThemePacks();
+    const active = activeThemeId();
+    const option = (item) => `<option value="${escapeAttr(item.id)}" ${item.id === active ? "selected" : ""}>${escapeHtml(item.name || item.id)}</option>`;
+    const builtins = packs.filter((item) => item && isBuiltinThemePack(item));
+    const imports = packs.filter((item) => item && !isBuiltinThemePack(item));
+    const options = [
+      builtins.length ? `<optgroup label="内置外观包">${builtins.map(option).join("")}</optgroup>` : "",
+      imports.length ? `<optgroup label="外置美化包">${imports.map(option).join("")}</optgroup>` : "",
+    ].join("") || packs.map(option).join("");
+    if (els.cfgTurnNoteThemeSelect) els.cfgTurnNoteThemeSelect.innerHTML = options;
+    if (els.themeSelect) els.themeSelect.innerHTML = options;
+  }
+
+  function renderThemePackMeta(pack) {
+    if (!els.themeMeta) return;
+    const builtin = isBuiltinThemePack(pack);
+    const progressCount = themePackProgressBars(pack).length;
+    const layoutType = themePackLayoutType(pack);
+    const style = pack.style || {};
+    const chips = [
+      themePackSourceLabel(pack),
+      `schema v${pack.schema_version || THEME_PACK_SCHEMA_VERSION}`,
+      `layout: ${layoutType}`,
+      `class: ${style.class_name || "theme-standard"}`,
+      progressCount ? `数值条 ${progressCount}` : "默认数值显示",
+    ];
+    const warnings = Array.isArray(pack.__warnings) ? pack.__warnings : [];
+    els.themeMeta.innerHTML = `
+      <div class="theme-pack-chip-row">${chips.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+      ${warnings.length ? `<div class="theme-pack-warning">${warnings.map(escapeHtml).join(" · ")}</div>` : ""}
+      <p>外观包只改变状态记录外观与字段呈现；不会修改变量计算、阶段判断、世界书标签或 worker 提示词。</p>
+    `;
+  }
+
+  function renderThemePreview() {
+    const pack = activeThemePack();
+    if (els.cfgTurnNoteThemeSelect) els.cfgTurnNoteThemeSelect.value = pack.id;
+    if (els.themeSelect) els.themeSelect.value = pack.id;
+    if (els.themeName) els.themeName.value = pack.name || "";
+    if (els.themeAuthor) els.themeAuthor.value = pack.author || "";
+    if (els.themeDesc) els.themeDesc.value = pack.description || "";
+    if (els.deleteThemeBtn) {
+      const builtin = isBuiltinThemePack(pack);
+      els.deleteThemeBtn.disabled = builtin;
+      els.deleteThemeBtn.title = builtin ? "内置外观包不可删除" : `删除导入外观包：${pack.name || pack.id}`;
+      els.deleteThemeBtn.textContent = "删除";
+    }
+    if (els.themePreviewModeSelect) els.themePreviewModeSelect.value = state.themePreviewMode || "role";
+    renderThemePackMeta(pack);
+    const style = pack.style || {};
+    const cls = String(style.class_name || "theme-standard");
+    const accent = String(style.accent || "");
+    const tokens = style.tokens || pack.tokens || {};
+    const progressBars = themePackProgressBars(pack);
+    const layoutType = themePackLayoutType(pack);
+    const normalizePreviewLabel = (value) => String(value || "").replace(/\s+/g, "").trim().toLowerCase();
+    const fieldLabel = (key, fallback) => {
+      const mark = String(tokens[key] || tokens[fallback] || "").trim();
+      const label = String(fallback || key || "字段").trim();
+      if (!mark || normalizePreviewLabel(mark) === normalizePreviewLabel(label)) return escapeHtml(label);
+      return `<span class="theme-preview-field-token">${escapeHtml(mark)}</span><span class="theme-preview-field-name">${escapeHtml(label)}</span>`;
+    };
+    const previewMetricSets = {
+      role: [
+        { key: "trust", name: "信任", value: 43, delta: "+3" },
+        { key: "warmth", name: "亲近", value: 31, delta: "+2" },
+        { key: "worry", name: "担忧", value: 34, delta: "+0" },
+        { key: "respect", name: "认可", value: 48, delta: "+1" },
+      ],
+      standard: [
+        { key: "favor_level", name: "好感", value: 43, delta: "+3" },
+        { key: "trust_level", name: "信任", value: 31, delta: "+2" },
+        { key: "guard_level", name: "戒备", value: 64, delta: "-3" },
+        { key: "pulse_level", name: "心绪", value: 48, delta: "+0" },
+      ],
+    };
+    const previewMetrics = previewMetricSets[state.themePreviewMode || "role"] || previewMetricSets.role;
+    const metricLabel = (bar, idx) => escapeHtml(bar.name || bar.display_name || bar.fallback_label || bar.label_cn || bar.cn || bar.title || ["信任", "亲近", "担忧", "认可"][idx] || bar.label || bar.key || "数值");
+    const isHudPreview = ["status_panel", "status_panel_pro", "hud", "hud_rows"].includes(layoutType)
+      || /(?:^|-)theme-status-(?:panel|pro)/.test(cls)
+      || /status-panel|status_pro|status-panel-advanced/i.test(`${pack?.id || ""} ${pack?.name || ""} ${cls}`);
+    const metricChipHtml = (metric, idx) => {
+      const bar = progressBars[idx] || metric;
+      const label = metricLabel({ ...bar, name: metric.name }, idx);
+      return `<span class="theme-preview-metric-chip"><b>${label}</b>${metric.value}/100（${metric.delta}）</span>`;
+    };
+    const metricBarHtml = (metric, idx) => {
+      const bar = progressBars[idx] || metric;
+      const label = metricLabel({ ...bar, name: metric.name }, idx);
+      return `<div class="theme-preview-metric"><span>${label}</span><b>${metric.value}/100（${metric.delta}）</b><i style="--xj-preview-value:${metric.value}%"></i></div>`;
+    };
+    // v1.19.4：进度条只作为 HUD / 状态面板类外观的特色；其他外观包恢复胶囊数值，避免朱砂、古风、月白等被强制进度条化。
+    const progressHtml = isHudPreview
+      ? `<div class="theme-preview-metrics is-meter-preview">${previewMetrics.map(metricBarHtml).join("")}</div>`
+      : `<div class="theme-preview-metrics compact is-chip-preview">${previewMetrics.map(metricChipHtml).join("")}</div>`;
+    if (els.themePreview) {
+      els.themePreview.className = `theme-preview-card ${cls}`;
+      if (accent) els.themePreview.style.setProperty("--xj-beauty-accent", accent);
+      els.themePreview.innerHTML = `
+        <div class="theme-preview-title"><span>${layoutType === "status_panel_pro" ? "STATUS" : layoutType === "storyboard" ? "SCENE" : layoutType === "paper_time" ? "TIME NOTE" : "DATABASE"}</span><strong>第六条 · 《旧雨入帘》</strong><em>入夜 · 霜庭书馆 · 小雨初歇 · ${state.themePreviewMode === "standard" ? "标准模板预览" : "角色变量预览"}</em></div>
+        <div class="theme-preview-role"><h4>沈栖雪 · C阶段</h4><p><b>${fieldLabel("emotion", "情绪")}</b> 温静中带着担忧，主动递灯提醒用户休息。</p><p><b>${fieldLabel("focus", "关注点")}</b> 卷宗风险、用户状态与书馆规矩。</p><p><b>${fieldLabel("summary", "摘要")}</b> 信任稳定上升，照料动作更主动。</p>${progressHtml}</div>
+        <div class="theme-preview-role"><h4>陆青鸢 · B阶段</h4><p><b>${fieldLabel("interaction", "互动")}</b> 仍然嘴硬，但开始承认用户的配合与判断。</p></div>
+        <div class="theme-preview-relation"><b>阶段变化</b> 沈栖雪：B阶段 → C阶段；陆青鸢：维持 B阶段。</div>
+      `;
+    }
+  }
+
+  function setActiveTheme(id) {
+    state.currentThemeId = safeThemeId(id || activeThemeId());
+    state.config = { ...state.config, turn_note_theme_id: state.currentThemeId };
+    renderThemeSelectors();
+    renderThemePreview();
+  }
+
+  function bindTemplateEditor() {
+    renderTemplateSelectors();
+    let template = ensureTemplateOutputFields(activeTemplate());
+    const templates = turnNoteTemplates().slice();
+    const templatePos = templates.findIndex((item) => item.id === template.id);
+    if (templatePos >= 0) { templates[templatePos] = template; state.config = { ...state.config, turn_note_templates: templates }; }
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.value = template.id;
+    if (els.templateSelect) els.templateSelect.value = template.id;
+    if (els.templateName) els.templateName.value = template.name || "";
+    if (els.templateDesc) els.templateDesc.value = template.description || "";
+    if (els.templateNoteStyle) els.templateNoteStyle.value = template.note_style || "classic";
+    if (els.templateOutput) els.templateOutput.value = template.output_template || "";
+    renderTemplateFields(template);
+    updateTemplatePreview();
+  }
+
+  function renderTemplateFields(template) {
+    if (!els.templateFieldsEditor) return;
+    const fields = Array.isArray(template?.fields) ? template.fields : [];
+    if (state.expandedTemplateFieldIndex !== null && state.expandedTemplateFieldIndex >= fields.length) {
+      state.expandedTemplateFieldIndex = null;
+    }
+    els.templateFieldsEditor.innerHTML = fields.map((field, index) => {
+      const expanded = state.expandedTemplateFieldIndex === index;
+      const key = safeTemplateId(field.key || "");
+      const label = field.label || key || "字段";
+      const instruction = String(field.instruction || "根据本轮上下文生成该字段。").replace(/\s+/g, " ").trim();
+      return `
+      <div class="template-field-card ${expanded ? "expanded" : ""}" data-template-field-index="${index}">
+        <div class="template-field-head" data-tpl-toggle="${index}">
+          <button type="button" class="ghost-btn mini template-field-toggle" data-tpl-toggle="${index}">${expanded ? "收起" : "展开"}</button>
+          <span class="template-field-title"><strong>${escapeHtml(label)}</strong><small class="template-field-summary">${escapeHtml(instruction)}</small></span>
+          <span class="template-field-key">${escapeHtml(key)}</span>
+        </div>
+        <div class="template-field-body">
+          <div class="grid-two">
+            <label>字段 Key<input data-tpl-key value="${escapeAttr(field.key || "")}" placeholder="emotion" /></label>
+            <label>显示名<input data-tpl-label value="${escapeAttr(field.label || "")}" placeholder="情绪" /></label>
+          </div>
+          <label>生成说明<textarea data-tpl-instruction rows="2">${escapeHtml(field.instruction || "")}</textarea></label>
+          <div class="template-field-actions">
+            <button type="button" class="ghost-btn mini" data-tpl-up="${index}">上移</button>
+            <button type="button" class="ghost-btn mini" data-tpl-down="${index}">下移</button>
+            <button type="button" class="ghost-btn mini danger" data-tpl-delete="${index}">删除</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("") || `<div class="empty-state"><strong>暂无字段。</strong><span>点击“新增字段”开始配置。</span></div>`;
+  }
+
+  function readTemplateEditor() {
+    const current = activeTemplate();
+    const fields = [...document.querySelectorAll(".template-field-card")].map((card) => ({
+      key: safeTemplateId(card.querySelector("[data-tpl-key]")?.value || ""),
+      label: (card.querySelector("[data-tpl-label]")?.value || "").trim(),
+      instruction: (card.querySelector("[data-tpl-instruction]")?.value || "").trim(),
+    })).filter((field) => field.key && field.key !== "name").map((field) => ({ ...field, label: field.label || field.key, instruction: field.instruction || "根据本轮上下文生成该字段。" }));
+    return ensureTemplateOutputFields({
+      ...current,
+      id: current.id || safeTemplateId(els.templateName?.value || "custom"),
+      name: (els.templateName?.value || current.name || "自定义模板").trim(),
+      description: (els.templateDesc?.value || "").trim(),
+      note_style: els.templateNoteStyle?.value || "classic",
+      fields,
+      output_template: els.templateOutput?.value || "",
+    });
+  }
+
+  function updateTemplatePreview() {
+    if (!els.templatePreview) return;
+    const template = readTemplateEditor();
+    if (els.templateOutput && els.templateOutput.value !== (template.output_template || "")) els.templateOutput.value = template.output_template || "";
+    els.templatePreview.textContent = renderTemplateText(template);
+  }
+
+  function commitTemplateEditorToState(options = {}) {
+    const template = readTemplateEditor();
+    const templates = turnNoteTemplates().slice();
+    const index = templates.findIndex((item) => item.id === template.id);
+    if (index >= 0) templates[index] = template; else templates.push(template);
+    state.config = { ...state.config, turn_note_templates: templates, turn_note_template_id: template.id, turn_note_card_style: template.note_style, turn_note_style: template.note_style };
+    state.currentTemplateId = template.id;
+    if (options.rebind !== false) {
+      bindTemplateEditor();
+      bindConfig();
+    }
+    return template;
+  }
+
+  function applyAdminUiSyncMode(cfg = state.config || {}) {
+    document.documentElement.dataset.stateJournalUiSync = cfg.ui_sync_global ? "global" : "native";
+  }
+
+
+  function statusText(enabled, onText = "开启", offText = "关闭") {
+    return enabled ? onText : offText;
+  }
+
+  function setRuntimeBadge(el, enabled, onText, offText) {
+    if (!el) return;
+    el.textContent = statusText(enabled, onText, offText);
+    el.classList.toggle("is-on", !!enabled);
+    el.classList.toggle("is-off", !enabled);
+  }
+
+  function setNextStepState(item, titleEl, statusEl, ok, title, status) {
+    if (titleEl) titleEl.textContent = title;
+    if (statusEl) statusEl.textContent = status;
+    if (!item) return;
+    item.classList.toggle("needs-action", !ok);
+    item.classList.toggle("is-complete", !!ok);
+    item.classList.toggle("is-pending", !ok);
+  }
+
+  function renderNextStepChecklist() {
+    const cfg = state.config || {};
+    const modelReady = !!String(cfg.api_base_url || "").trim() && !!String(cfg.model || "").trim();
+    const enabled = cfg.enabled !== false;
+    const autoUpdate = !!cfg.auto_update;
+    setNextStepState(
+      els.nextStepModel,
+      els.nextStepModelTitle,
+      null,
+      modelReady,
+      modelReady ? "辅助模型 API 已配置" : "配置辅助模型 API",
+      modelReady ? "完成" : "去配置"
+    );
+    if (els.nextStepModelAction) els.nextStepModelAction.textContent = modelReady ? "查看" : "去配置";
+    setNextStepState(
+      els.nextStepEnabled,
+      els.nextStepEnabledTitle,
+      els.nextStepEnabledStatus,
+      enabled,
+      enabled ? "数据库运行环境已启用" : "数据库运行环境未启用",
+      enabled ? "完成" : "未开启"
+    );
+    setNextStepState(
+      els.nextStepAuto,
+      els.nextStepAutoTitle,
+      els.nextStepAutoStatus,
+      autoUpdate,
+      autoUpdate ? "自动填表已开启" : "自动填表未开启",
+      autoUpdate ? "完成" : "未开启"
+    );
+  }
+
+  function renderRuntimeOverview() {
+    const cfg = state.config || {};
+    const enabled = cfg.enabled !== false;
+    const autoUpdate = !!cfg.auto_update;
+    const turnNoteEnabled = cfg.turn_note_enabled !== false;
+    setRuntimeBadge(els.runtimeEnabledBadge, enabled, "数据库启用", "数据库关闭");
+    setRuntimeBadge(els.runtimeAutoBadge, autoUpdate, "自动填表", "手动填表");
+    setRuntimeBadge(els.runtimeTurnNoteBadge, turnNoteEnabled, "状态记录展示", "状态记录关闭");
+    if (els.runtimeModelBadge) els.runtimeModelBadge.textContent = cfg.model ? `模型 ${cfg.model}` : "模型未配置";
+    if (els.runtimeLastRunText) els.runtimeLastRunText.textContent = els.updateSummaryText?.textContent || "暂无填表记录。";
+    if (els.runtimeFlowText) {
+      if (!enabled) els.runtimeFlowText.textContent = "当前不会在聊天后运行数据库，也不会写入结构化记录。";
+      else if (!autoUpdate) els.runtimeFlowText.textContent = "数据库已启用，但聊天后自动填表关闭；可手动根据最近对话更新。";
+      else if (!turnNoteEnabled) els.runtimeFlowText.textContent = "聊天后会自动填表并写入 SQLite，但 Chat 页面不显示状态记录。";
+      else els.runtimeFlowText.textContent = "聊天回复完成 → Hook 直传 → 记录模型填表 → 写入 SQLite → Chat 显示状态记录。";
+    }
+    if (els.dashboardEnabled) els.dashboardEnabled.checked = enabled;
+    if (els.dashboardAutoUpdate) els.dashboardAutoUpdate.checked = autoUpdate;
+    if (els.dashboardTurnNote) els.dashboardTurnNote.checked = turnNoteEnabled;
+    renderNextStepChecklist();
+  }
+
+  function bindConfig() {
+    const cfg = state.config || {};
+    els.cfgEnabled.checked = !!cfg.enabled;
+    els.cfgAutoUpdate.checked = !!cfg.auto_update;
+    els.cfgNotify.checked = !!cfg.notify_in_chat;
+    if (els.cfgUiSyncGlobal) els.cfgUiSyncGlobal.checked = !!cfg.ui_sync_global;
+    applyAdminUiSyncMode(cfg);
+    if (els.cfgTurnNoteEnabled) els.cfgTurnNoteEnabled.checked = cfg.turn_note_enabled !== false;
+    if (els.cfgTurnNoteTitle) els.cfgTurnNoteTitle.checked = cfg.turn_note_title_card !== false;
+    if (els.cfgTurnNoteNote) els.cfgTurnNoteNote.checked = cfg.turn_note_card !== false;
+    if (els.cfgTurnNoteCollapsed) els.cfgTurnNoteCollapsed.checked = cfg.turn_note_default_collapsed !== false;
+    if (els.cfgTurnNoteDisplayMode) els.cfgTurnNoteDisplayMode.value = cfg.turn_note_chat_display_mode || (cfg.turn_note_default_collapsed === false ? "expanded" : "collapsed");
+    if (els.cfgTurnNoteStyle) els.cfgTurnNoteStyle.value = cfg.turn_note_style || "classic";
+    if (els.cfgTurnNoteTitleStyle) els.cfgTurnNoteTitleStyle.value = cfg.turn_note_title_style || cfg.turn_note_style || "classic";
+    if (els.cfgTurnNoteNoteStyle) els.cfgTurnNoteNoteStyle.value = cfg.turn_note_card_style || cfg.turn_note_style || "classic";
+    if (els.cfgTurnNoteExpand) els.cfgTurnNoteExpand.value = cfg.turn_note_expand_level || "standard";
+    if (els.cfgTurnNoteDensity) els.cfgTurnNoteDensity.value = cfg.turn_note_density || "standard";
+    if (els.cfgTurnNoteCharacterFilter) els.cfgTurnNoteCharacterFilter.value = cfg.turn_note_character_filter || "turn";
+    state.currentTemplateId = cfg.turn_note_template_id || state.currentTemplateId || turnNoteTemplates()[0]?.id || "classic";
+    state.currentThemeId = cfg.turn_note_theme_id || state.currentThemeId || turnNoteThemePacks()[0]?.id || "standard";
+    renderThemeSelectors();
+    renderThemePreview();
+    renderTemplateSelectors();
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.value = state.currentTemplateId;
+    if (els.cfgTurnNoteCharacterNames) els.cfgTurnNoteCharacterNames.value = cfg.turn_note_character_names || "";
+    if (els.cfgTurnNoteProtagonistEnabled) els.cfgTurnNoteProtagonistEnabled.checked = !!cfg.turn_note_protagonist_card_enabled;
+    if (els.cfgTurnNoteProtagonistMode) els.cfgTurnNoteProtagonistMode.value = cfg.turn_note_protagonist_card_mode || "when_relevant";
+    if (els.cfgTurnNoteProtagonistName) els.cfgTurnNoteProtagonistName.value = cfg.turn_note_protagonist_name || "";
+    if (els.cfgTurnNoteProtagonistAliases) els.cfgTurnNoteProtagonistAliases.value = cfg.turn_note_protagonist_aliases || "";
+    const workerCustomPrompt = (cfg.turn_note_worker_custom_prompt || "").trim() || legacyWorkerPromptText(cfg);
+    const workerPromptMode = ["default", "additive", "override"].includes(cfg.turn_note_worker_prompt_mode)
+      ? cfg.turn_note_worker_prompt_mode
+      : (workerCustomPrompt ? "additive" : "default");
+    if (els.cfgTurnNoteWorkerPromptMode) els.cfgTurnNoteWorkerPromptMode.value = workerPromptMode;
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = workerCustomPrompt;
+    if (els.cfgTurnNoteWorkerPromptEnabled) els.cfgTurnNoteWorkerPromptEnabled.checked = workerPromptMode !== "default" && !!workerCustomPrompt;
+    if (els.cfgTurnNoteWorkerStylePrompt) els.cfgTurnNoteWorkerStylePrompt.value = cfg.turn_note_worker_style_prompt || "";
+    if (els.cfgTurnNoteWorkerProtagonistPrompt) els.cfgTurnNoteWorkerProtagonistPrompt.value = cfg.turn_note_worker_protagonist_prompt || "";
+    renderWorkerPromptPreview();
+    bindTemplateEditor();
+    updateTurnNoteStyleHelp();
+    els.cfgBaseUrl.value = cfg.api_base_url || "";
+    els.cfgApiKey.value = cfg.api_key || "";
+    els.cfgModel.value = cfg.model || "";
+    els.cfgTurns.value = cfg.input_turn_count || 3;
+    els.cfgTimeout.value = cfg.request_timeout || 120;
+    syncPresetSelectFromBaseUrl();
+    renderRuntimeOverview();
+  }
+
+  function readConfig() {
+    return {
+      ...state.config,
+      enabled: els.cfgEnabled.checked,
+      auto_update: els.cfgAutoUpdate.checked,
+      notify_in_chat: els.cfgNotify.checked,
+      ui_sync_global: els.cfgUiSyncGlobal ? els.cfgUiSyncGlobal.checked : false,
+      turn_note_enabled: els.cfgTurnNoteEnabled ? els.cfgTurnNoteEnabled.checked : true,
+      turn_note_title_card: els.cfgTurnNoteTitle ? els.cfgTurnNoteTitle.checked : true,
+      turn_note_card: els.cfgTurnNoteNote ? els.cfgTurnNoteNote.checked : true,
+      turn_note_default_collapsed: els.cfgTurnNoteDisplayMode ? els.cfgTurnNoteDisplayMode.value === "collapsed" : (els.cfgTurnNoteCollapsed ? els.cfgTurnNoteCollapsed.checked : true),
+      turn_note_chat_display_mode: els.cfgTurnNoteDisplayMode ? els.cfgTurnNoteDisplayMode.value : (els.cfgTurnNoteCollapsed && !els.cfgTurnNoteCollapsed.checked ? "expanded" : "collapsed"),
+      turn_note_style: els.cfgTurnNoteNoteStyle ? els.cfgTurnNoteNoteStyle.value : (els.cfgTurnNoteStyle ? els.cfgTurnNoteStyle.value : "classic"),
+      turn_note_title_style: els.cfgTurnNoteTitleStyle ? els.cfgTurnNoteTitleStyle.value : "classic",
+      turn_note_card_style: els.cfgTurnNoteNoteStyle ? els.cfgTurnNoteNoteStyle.value : "classic",
+      turn_note_expand_level: els.cfgTurnNoteExpand ? els.cfgTurnNoteExpand.value : "standard",
+      turn_note_density: els.cfgTurnNoteDensity ? els.cfgTurnNoteDensity.value : "standard",
+      turn_note_character_filter: els.cfgTurnNoteCharacterFilter ? els.cfgTurnNoteCharacterFilter.value : "turn",
+      turn_note_character_names: els.cfgTurnNoteCharacterNames ? els.cfgTurnNoteCharacterNames.value.trim() : "",
+      turn_note_protagonist_card_enabled: els.cfgTurnNoteProtagonistEnabled ? els.cfgTurnNoteProtagonistEnabled.checked : false,
+      turn_note_protagonist_card_mode: els.cfgTurnNoteProtagonistMode ? els.cfgTurnNoteProtagonistMode.value : "when_relevant",
+      turn_note_protagonist_name: els.cfgTurnNoteProtagonistName ? els.cfgTurnNoteProtagonistName.value.trim() : "",
+      turn_note_protagonist_aliases: els.cfgTurnNoteProtagonistAliases ? els.cfgTurnNoteProtagonistAliases.value.trim() : "",
+      turn_note_worker_prompt_mode: selectedWorkerPromptMode(),
+      turn_note_worker_custom_prompt: els.cfgTurnNoteWorkerCustomPrompt ? els.cfgTurnNoteWorkerCustomPrompt.value.trim() : "",
+      turn_note_worker_custom_prompt_enabled: selectedWorkerPromptMode() !== "default" && !!(els.cfgTurnNoteWorkerCustomPrompt ? els.cfgTurnNoteWorkerCustomPrompt.value.trim() : ""),
+      turn_note_worker_style_prompt: els.cfgTurnNoteWorkerStylePrompt ? els.cfgTurnNoteWorkerStylePrompt.value.trim() : "",
+      turn_note_worker_protagonist_prompt: els.cfgTurnNoteWorkerProtagonistPrompt ? els.cfgTurnNoteWorkerProtagonistPrompt.value.trim() : "",
+      turn_note_template_id: activeTemplateId(),
+      turn_note_templates: turnNoteTemplates(),
+      turn_note_theme_id: activeThemeId(),
+      turn_note_theme_packs: turnNoteThemePacks(),
+      api_base_url: els.cfgBaseUrl.value.trim(),
+      api_key: els.cfgApiKey.value.trim(),
+      model: els.cfgModel.value.trim(),
+      input_turn_count: Number(els.cfgTurns.value || 3),
+      request_timeout: Number(els.cfgTimeout.value || 120),
+    };
+  }
+
+  function syncPresetSelectFromBaseUrl() {
+    if (!els.servicePreset) return;
+    const base = (els.cfgBaseUrl.value || "").trim().replace(/\/$/, "");
+    const match = Object.entries(SERVICE_PRESETS).find(([key, preset]) => key !== "custom" && preset.base_url.replace(/\/$/, "") === base);
+    els.servicePreset.value = match ? match[0] : "custom";
+  }
+
+  function applyServicePreset() {
+    const preset = SERVICE_PRESETS[els.servicePreset.value] || SERVICE_PRESETS.custom;
+    if (!preset.base_url) {
+      pageToast("预设服务：自定义", "保留当前 API URL 和模型名。", "ok");
+      return;
+    }
+    els.cfgBaseUrl.value = preset.base_url;
+    if (preset.model && !els.cfgModel.value.trim()) els.cfgModel.value = preset.model;
+    pageToast("已填入预设服务", `${preset.label} · ${preset.base_url}`, "ok");
+  }
+
+  const MUJIAN_TITLE_STYLE_PREVIEWS = {
+    classic: {
+      label: "经典标题",
+      desc: "标题短，副标题说明本轮重点，适合稳定清晰的正文外标题卡。",
+      sample: `标题卡：\n《本轮状态》\n地点：当前场景｜人物：本轮角色`,
+    },
+    gufeng: {
+      label: "古风标题",
+      desc: "标题和引语更偏古风意象，适合章节感、诗性和氛围感。",
+      sample: `标题卡：\n《雨阁留灯》\n夜色压檐，灯影半昏。`,
+    },
+    chapter: {
+      label: "章节标题",
+      desc: "更像小说小节或章节标题，强调本轮冲突、转折和主题。",
+      sample: `标题卡：\n第三幕 · 雨阁留灯\n本轮重点：病榻前的照料与试探。`,
+    },
+  };
+
+  const MUJIAN_NOTE_STYLE_PREVIEWS = {
+    classic: {
+      label: "经典状态",
+      desc: "角色附笺以清晰状态说明为主，适合常规角色状态卡。",
+      sample: `角色附笺：\n情绪：克制而担忧\n衣着：衣袖微皱\n互动：语气平稳，仍有保护意味`,
+    },
+    gufeng: {
+      label: "古风旁白",
+      desc: "角色附笺更像小说旁白，字段仍保留，但措辞更含蓄。",
+      sample: `角色附笺：\n情绪：旧事与病气压在眼底，声线仍稳。\n互动：不肯示弱，却也未曾真正退开。`,
+    },
+    sensory: {
+      label: "感官标签",
+      desc: "角色附笺改为标签式细节，重点生成感官场域、躯体温差、肢体动态、微生理反应、视觉焦点等字段。",
+      sample: `<情绪(克制中带松动)>\n<衣着(袖口微乱)>\n<角色神态(视线短暂避开)>\n<感官场域(灯影与药香交叠)>\n<微生理反应(眼睫轻颤，呼吸稍乱)>`,
+    },
+  };
+
+  function updateTurnNoteStyleHelp() {
+    const titleStyle = els.cfgTurnNoteTitleStyle?.value || "classic";
+    const noteStyle = els.cfgTurnNoteNoteStyle?.value || els.cfgTurnNoteStyle?.value || "classic";
+    const titleItem = MUJIAN_TITLE_STYLE_PREVIEWS[titleStyle] || MUJIAN_TITLE_STYLE_PREVIEWS.classic;
+    const noteItem = MUJIAN_NOTE_STYLE_PREVIEWS[noteStyle] || MUJIAN_NOTE_STYLE_PREVIEWS.classic;
+    const descEl = document.getElementById("turnNoteStyleDesc");
+    const previewEl = document.getElementById("turnNoteStylePreview");
+    if (descEl) descEl.textContent = `标题：${titleItem.label}，${titleItem.desc} 附笺：${noteItem.label}，${noteItem.desc}`;
+    if (previewEl) previewEl.textContent = `${titleItem.sample}\n\n${noteItem.sample}`;
+  }
+
+  function legacyWorkerPromptText(cfg = state.config || {}) {
+    const parts = [];
+    const style = (cfg.turn_note_worker_style_prompt || "").trim();
+    const protagonist = (cfg.turn_note_worker_protagonist_prompt || "").trim();
+    if (style) parts.push(`状态记录语言风格补充：\n${style}`);
+    if (protagonist) parts.push(`主角状态卡规则：\n${protagonist}`);
+    return parts.join("\n\n").trim();
+  }
+
+  function selectedWorkerPromptMode() {
+    const value = els.cfgTurnNoteWorkerPromptMode?.value || state.config?.turn_note_worker_prompt_mode || "default";
+    return ["default", "additive", "override"].includes(value) ? value : "default";
+  }
+
+  function updateWorkerPromptEditorLabel() {
+    const mode = selectedWorkerPromptMode();
+    if (els.workerPromptEditorLabel) {
+      els.workerPromptEditorLabel.textContent = `${mode === "override" ? "编辑完整 Prompt" : "追加自然语言说明"} · 状态记录 worker`;
+    }
+    if (els.cfgTurnNoteWorkerCustomPrompt) {
+      els.cfgTurnNoteWorkerCustomPrompt.placeholder = mode === "override"
+        ? "完整编辑模式：可先载入默认主体 Prompt，再直接修改 worker 的主体规则。锁定输出契约会自动追加。"
+        : "追加模式：写入你希望状态记录遵守的生成偏好，例如文风、详略、主角状态卡取材范围。";
+    }
+  }
+
+  function readableWorkerPromptPreview(preview = state.workerPromptPreview) {
+    if (!preview) return "保存或刷新后显示当前 worker prompt 预览。";
+    const modeLabels = { default: "默认：使用系统 Prompt", additive: "追加：补充自然语言要求", override: "编辑完整 Prompt：修改默认主体" };
+    return [
+      `模式：${modeLabels[preview.mode] || preview.mode || "default"}`,
+      `表结构数量：${preview.table_count ?? 0}`,
+      `数值角色数量：${preview.metric_character_count ?? 0}`,
+      `--- 当前自定义内容 ---\n${preview.custom_prompt || "（无）"}`,
+      `--- 锁定输出契约 ---\n${preview.locked_contract_text || "（无）"}`,
+      `--- 最终发送给 worker 的 System Prompt ---\n${preview.assembled_prompt || "（无）"}`,
+    ].join("\n\n");
+  }
+
+  function renderWorkerPromptPreview() {
+    updateWorkerPromptEditorLabel();
+    if (els.workerPromptPreview) {
+      els.workerPromptPreview.textContent = readableWorkerPromptPreview();
+    }
+  }
+
+  async function refreshWorkerPromptPreview({ toast = true } = {}) {
+    const preview = await requestJson("./api/worker/prompt-preview", {
+      method: "POST",
+      body: JSON.stringify({ config: readConfig() }),
+    });
+    state.workerPromptPreview = preview;
+    renderWorkerPromptPreview();
+    if (toast) pageToast("Prompt 预览已刷新", "本次只组装提示词，不调用模型、不写入数据库。", "ok");
+    return preview;
+  }
+
+  async function loadDefaultWorkerPromptIntoEditor() {
+    const preview = state.workerPromptPreview || await refreshWorkerPromptPreview({ toast: false });
+    if (els.cfgTurnNoteWorkerPromptMode) els.cfgTurnNoteWorkerPromptMode.value = "override";
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = preview.editable_default_prompt || preview.default_prompt || "";
+    updateWorkerPromptEditorLabel();
+    await refreshWorkerPromptPreview({ toast: false });
+    pageToast("已载入默认主体 Prompt", "可直接修改，保存生成规则后生效。", "ok");
+  }
+
+  function bindSchema(table) {
+    if (!table) return;
+    const schema = table.schema;
+    els.schemaId.value = schema.id || "";
+    els.schemaName.value = schema.name || "";
+    els.schemaDesc.value = schema.description || "";
+    const rules = schema.rules || {};
+    els.ruleNote.value = rules.note || "";
+    els.ruleInit.value = rules.init || "";
+    els.ruleInsert.value = rules.insert || "";
+    els.ruleUpdate.value = rules.update || "";
+    els.ruleDelete.value = rules.delete || "";
+    els.ruleIgnore.value = rules.ignore || "";
+    refreshPrimaryOptions(schema.primary_key);
+  }
+
+  function readSchema() {
+    const table = currentTable();
+    const oldSchema = table?.schema || { fields: [] };
+    const fields = [...(els.fieldsEditor?.querySelectorAll(".field-card") || [])].map((card) => ({
+      key: card.querySelector("[data-field-key]").value.trim(),
+      label: card.querySelector("[data-field-label]").value.trim(),
+      type: card.querySelector("[data-field-type]").value,
+      required: card.querySelector("[data-field-required]").checked,
+      options: card.querySelector("[data-field-options]").value.split(/[，,、\n]/).map((item) => item.trim()).filter(Boolean),
+      note: card.querySelector("[data-field-note]").value.trim(),
+    })).filter((field) => field.key);
+    return {
+      ...oldSchema,
+      id: els.schemaId.value.trim(),
+      name: els.schemaName.value.trim(),
+      description: els.schemaDesc.value.trim(),
+      primary_key: els.primaryKey.value || fields[0]?.key || "",
+      fields,
+      rules: {
+        note: els.ruleNote.value.trim(),
+        init: els.ruleInit.value.trim(),
+        insert: els.ruleInsert.value.trim(),
+        update: els.ruleUpdate.value.trim(),
+        delete: els.ruleDelete.value.trim(),
+        ignore: els.ruleIgnore.value.trim(),
+      },
+    };
+  }
+
+  function readRows() {
+    return (currentTable()?.rows || []).map((row) => ({ ...row }));
+  }
+
+  function renderTableList() {
+    els.tableList.innerHTML = "";
+    state.tables.forEach((table) => {
+      const button = document.createElement("button");
+      button.className = `table-item ${table.schema.id === state.currentId ? "active" : ""}`;
+      button.title = table.schema.id ? `机器 ID：${table.schema.id}` : "";
+      button.innerHTML = `<strong>${escapeHtml(table.schema.name || table.schema.id)}</strong><span>${table.rows.length} 行记录</span>`;
+      button.addEventListener("click", () => { closeRowDetail(); state.currentId = table.schema.id; renderAll(); });
+      els.tableList.appendChild(button);
+    });
+  }
+
+  function renderFields(table) {
+    els.fieldsEditor.innerHTML = "";
+    (table.schema.fields || []).forEach((field) => {
+      const card = document.createElement("div");
+      card.className = "field-card";
+      card.innerHTML = `
+        <div class="field-card-head">
+          <button class="expand-btn" type="button">展开</button>
+          <span class="field-title"><strong>${escapeHtml(field.label || field.key)}</strong><small>${escapeHtml(field.key)} · ${escapeHtml(field.type || "text")}${field.required ? " · 必填" : ""}</small></span>
+          <button class="delete-btn" type="button">删除</button>
+        </div>
+        <div class="field-card-body">
+          <div class="field-grid">
+            <label>字段 Key<input data-field-key value="${escapeAttr(field.key || "")}" /></label>
+            <label>显示名<input data-field-label value="${escapeAttr(field.label || "")}" /></label>
+            <label>类型<select data-field-type>${["text", "textarea", "number", "enum", "boolean"].map((type) => `<option value="${type}" ${field.type === type ? "selected" : ""}>${type}</option>`).join("")}</select></label>
+            <label class="check-row"><input data-field-required type="checkbox" ${field.required ? "checked" : ""}/> 必填</label>
+            <label>枚举项<input data-field-options value="${escapeAttr((field.options || []).join(", "))}" /></label>
+            <label>字段说明<input data-field-note value="${escapeAttr(field.note || "")}" /></label>
+          </div>
+        </div>`;
+      card.querySelector(".expand-btn").addEventListener("click", () => {
+        card.classList.toggle("expanded");
+        card.querySelector(".expand-btn").textContent = card.classList.contains("expanded") ? "收起" : "展开";
+      });
+      card.querySelector(".delete-btn").addEventListener("click", () => { card.remove(); refreshPrimaryOptions(); });
+      card.querySelectorAll("[data-field-key], [data-field-label]").forEach((input) => input.addEventListener("input", refreshPrimaryOptions));
+      els.fieldsEditor.appendChild(card);
+    });
+  }
+
+  function makeRowInput(field, value) {
+    let input;
+    if (field.type === "textarea") {
+      input = document.createElement("textarea"); input.rows = 4; input.value = value || "";
+    } else if (field.type === "enum") {
+      input = document.createElement("select");
+      input.innerHTML = `<option value=""></option>${(field.options || []).map((item) => `<option value="${escapeAttr(item)}" ${value === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}`;
+    } else if (field.type === "boolean") {
+      input = document.createElement("input"); input.type = "checkbox"; input.checked = !!value;
+    } else {
+      input = document.createElement("input"); input.type = field.type === "number" ? "number" : "text"; input.value = value ?? "";
+    }
+    input.dataset.rowKey = field.key;
+    return input;
+  }
+
+  function getDisplayFields(table) {
+    const fields = table.schema.fields || [];
+    const hiddenKeys = new Set(["updated_at"]);
+    if (table.schema?.id === "plot_ledger") {
+      ["entry_id", "entry_type", "status"].forEach((key) => hiddenKeys.add(key));
+    }
+    const preferredByTable = {
+      character_status: [table.schema.primary_key, "location", "mood", "metrics_summary", "condition", "summary"],
+      relationship: [table.schema.primary_key, "from", "to", "relation", "metrics_summary", "summary"],
+      plot_ledger: ["title", "condition", "summary", "evidence", "locked"],
+      metric_history: ["character_name", "metric_label", "old_value", "new_value", "delta_display", "raw_value"],
+    };
+    const preferred = (preferredByTable[table.schema.id] || [table.schema.primary_key, "location", "mood", "condition", "metrics_summary", "summary"]).filter(Boolean);
+    const selected = [];
+    preferred.forEach((key) => {
+      const field = fields.find((item) => item.key === key && !hiddenKeys.has(item.key));
+      if (field && !selected.some((item) => item.key === field.key)) selected.push(field);
+    });
+    fields.forEach((field) => {
+      if (selected.length < 6 && !hiddenKeys.has(field.key) && !selected.some((item) => item.key === field.key)) selected.push(field);
+    });
+    return selected;
+  }
+
+  function pickField(fields, keys) {
+    return keys.map((key) => fields.find((field) => field.key === key)).find(Boolean) || null;
+  }
+
+  function rowValue(row, key) {
+    return key ? row?.[key] : "";
+  }
+
+  function cardSummaryForRow(table, row, fields, displayFields) {
+    const summaryField = pickField(fields, ["summary", "status_summary", "description", "note"]);
+    if (summaryField && textValue(rowValue(row, summaryField.key)).trim()) return summaryField;
+    return displayFields.find((field) => field.type === "textarea") || displayFields[0] || null;
+  }
+
+  function relationTitle(row, primaryFallback) {
+    const from = textValue(row.from || row.role_a || row.source || "").trim();
+    const to = textValue(row.to || row.role_b || row.target || "").trim();
+    if (from || to) return `${from || "未知角色"} → ${to || "未知角色"}`;
+    return primaryFallback;
+  }
+
+  const LEDGER_TYPE_LABELS = {
+    event: "事件",
+    task: "任务",
+    clue: "线索",
+    item: "物品",
+    external_tag: "外部标记",
+  };
+
+  const LEDGER_STATUS_LABELS = {
+    hidden: "隐藏",
+    active: "进行中",
+    done: "已完成",
+    failed: "失败",
+    inactive: "已停用",
+  };
+
+  function ledgerTypeLabel(value) {
+    const key = String(value ?? "").trim();
+    return LEDGER_TYPE_LABELS[key] || key || "未分类";
+  }
+
+  function ledgerStatusLabel(value) {
+    const key = String(value ?? "").trim();
+    return LEDGER_STATUS_LABELS[key] || key || "未标记";
+  }
+
+  function ledgerTitle(row, fallback) {
+    return textValue(row.title).trim() || textValue(row.summary).trim() || fallback || "未命名剧情事项";
+  }
+
+  function ledgerMetaText(row) {
+    const parts = [ledgerTypeLabel(row.entry_type), ledgerStatusLabel(row.status)];
+    if (row.locked) parts.push("已锁定");
+    return parts.filter(Boolean).join(" · ");
+  }
+
+  function renderLedgerStatusBadge(row) {
+    const raw = String(row.status ?? "").trim() || "unknown";
+    return `<span class="row-status-badge ledger-status-badge status-${escapeAttr(raw)}">${escapeHtml(ledgerStatusLabel(raw))}</span>`;
+  }
+
+  function renderLedgerTable(table) {
+    const wrap = document.createElement("div");
+    wrap.className = "rows-table-wrap ledger-table-wrap";
+    const tableEl = document.createElement("table");
+    tableEl.className = "rows-table ledger-table";
+    tableEl.innerHTML = `
+      <thead>
+        <tr>
+          <th>剧情事项</th>
+          <th>类型</th>
+          <th>状态</th>
+          <th>推进条件</th>
+          <th>当前摘要</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>`;
+    const tbody = tableEl.querySelector("tbody");
+    (table.rows || []).forEach((row, index) => {
+      const tr = document.createElement("tr");
+      tr.tabIndex = 0;
+      tr.title = "点击查看/编辑详情";
+      const title = ledgerTitle(row, `第 ${index + 1} 行`);
+      tr.innerHTML = `
+        <td>
+          <span class="rows-table-cell ledger-title-cell">
+            <strong>${escapeHtml(compactText(title, 46))}</strong>
+            <small>${escapeHtml(ledgerMetaText(row))}</small>
+          </span>
+        </td>
+        <td><span class="ledger-type-pill">${escapeHtml(ledgerTypeLabel(row.entry_type))}</span></td>
+        <td>${renderLedgerStatusBadge(row)}</td>
+        <td><span class="rows-table-cell long">${escapeHtml(compactText(row.condition, 88))}</span></td>
+        <td><span class="rows-table-cell long">${escapeHtml(compactText(row.summary, 88))}</span></td>
+        <td><button class="ghost-btn small" type="button" data-edit-row="${index}">详情</button> <button class="delete-btn" type="button" data-delete-row="${index}">删除</button></td>`;
+      tr.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        openRowDetail(index);
+      });
+      tbody.appendChild(tr);
+    });
+    wrap.appendChild(tableEl);
+    els.rowsEditor.appendChild(wrap);
+  }
+
+  function renderRowsAsCards(table) {
+    const fields = table.schema.fields || [];
+    const primary = table.schema.primary_key || fields[0]?.key;
+    const displayFields = getDisplayFields(table).filter((field) => field.key !== primary);
+    const list = document.createElement("div");
+    list.className = `row-card-list ${table.schema?.id === "relationship" ? "relationship-list" : ""}`;
+    (table.rows || []).forEach((row, index) => {
+      const card = document.createElement("article");
+      card.className = `row-card readable-row-card ${table.schema?.id === "character_status" ? "character-row-card" : ""} ${table.schema?.id === "relationship" ? "relationship-row-card" : ""} ${table.schema?.id === "plot_ledger" ? "ledger-row-card" : ""}`;
+      const primaryTitle = primary ? (row[primary] || `第 ${index + 1} 行`) : `第 ${index + 1} 行`;
+      const title = table.schema?.id === "relationship" ? relationTitle(row, primaryTitle) : table.schema?.id === "plot_ledger" ? ledgerTitle(row, primaryTitle) : primaryTitle;
+      const summaryField = cardSummaryForRow(table, row, fields, displayFields);
+      const summary = summaryField ? compactText(row[summaryField.key], 150) : "暂无摘要。";
+      const chipFields = displayFields
+        .filter((field) => field.key !== summaryField?.key)
+        .filter((field) => !["from", "to", "role_a", "role_b", "source", "target"].includes(field.key))
+        .slice(0, 5);
+      const badgeField = pickField(fields, ["relation", "mood", "condition", "status", "state"]);
+      const badgeText = badgeField ? compactText(row[badgeField.key], 18) : (table.schema?.name || "记录");
+      const metaText = table.schema?.id === "plot_ledger" ? ledgerMetaText(row) : (table.schema?.name || table.schema?.id || "记录");
+      card.innerHTML = `
+        <div class="row-card-head readable-row-head">
+          <span class="row-card-title"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(metaText)}</small></span>
+          <div class="row-card-head-actions">
+            ${table.schema?.id === "plot_ledger" ? renderLedgerStatusBadge(row) : `<span class="row-status-badge">${escapeHtml(badgeText)}</span>`}
+            <button class="ghost-btn small" type="button" data-edit-row="${index}">详情</button>
+          </div>
+        </div>
+        <div class="row-summary-block">
+          <span>${escapeHtml(summaryField ? fieldLabel(summaryField) : "状态摘要")}</span>
+          <p>${escapeHtml(summary)}</p>
+        </div>
+        <div class="row-chip-grid readable-chip-grid">
+          ${chipFields.map((field) => `<div class="row-chip"><span>${escapeHtml(fieldLabel(field))}</span><strong>${escapeHtml(compactText(row[field.key], field.type === "textarea" ? 92 : 48))}</strong></div>`).join("")}
+        </div>
+        <div class="row-card-actions">
+          <button class="delete-btn" type="button" data-delete-row="${index}">删除</button>
+        </div>`;
+      list.appendChild(card);
+    });
+    els.rowsEditor.appendChild(list);
+  }
+
+  function metricDeltaKind(value) {
+    const text = String(value ?? "").trim();
+    if (/^-/.test(text)) return "negative";
+    if (/^\+/.test(text) && !/^\+?0(?:\.0+)?$/.test(text.replace(/[^+\-0-9.]/g, ""))) return "positive";
+    const num = Number(text.replace(/[^\-0-9.]/g, ""));
+    if (Number.isFinite(num) && num > 0) return "positive";
+    if (Number.isFinite(num) && num < 0) return "negative";
+    return "neutral";
+  }
+
+  function uniqueSorted(values) {
+    return [...new Set(values.map((item) => String(item ?? "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  }
+
+  function renderMetricSelect(label, className, value, options) {
+    return `<label class="metric-filter-label"><span>${escapeHtml(label)}</span><select class="${className}"><option value="all">全部</option>${options.map((item) => `<option value="${escapeAttr(item)}" ${value === item ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select></label>`;
+  }
+
+  function metricRecordDate(row) {
+    const value = row.created_at || row.updated_at || "";
+    if (!value) return "未记录时间";
+    return String(value).replace("T", " ").replace(/\.\d+.*$/, "");
+  }
+
+  function metricDisplayValue(value) {
+    const text = String(value ?? "").trim();
+    return text || "—";
+  }
+
+  function renderMetricHistory(table) {
+    const rows = (table.rows || []).map((row, index) => ({ ...row, __index: index }));
+    if (!rows.length) {
+      els.rowsEditor.innerHTML = `<div class="empty-state"><strong>当前暂无数值变化记录。</strong><span>当 worker 识别到好感、信任、戒备、伤势、疲惫等数值变化后，会在这里按时间线显示。</span></div>`;
+      return;
+    }
+    const characters = uniqueSorted(rows.map((row) => row.character_name));
+    const metrics = uniqueSorted(rows.map((row) => row.metric_label));
+    if (state.metricCharacterFilter !== "all" && !characters.includes(state.metricCharacterFilter)) state.metricCharacterFilter = "all";
+    if (state.metricLabelFilter !== "all" && !metrics.includes(state.metricLabelFilter)) state.metricLabelFilter = "all";
+    let filtered = rows.filter((row) => (state.metricCharacterFilter === "all" || row.character_name === state.metricCharacterFilter) && (state.metricLabelFilter === "all" || row.metric_label === state.metricLabelFilter));
+    filtered.sort((a, b) => state.metricSort === "oldest" ? a.__index - b.__index : b.__index - a.__index);
+    const latestByCharacter = new Map();
+    rows.forEach((row) => {
+      const name = row.character_name || "未命名角色";
+      const current = latestByCharacter.get(name) || { count: 0, deltas: [] };
+      current.count += 1;
+      if (row.metric_label) current.deltas.push(`${row.metric_label} ${row.delta_display || ""}`.trim());
+      latestByCharacter.set(name, current);
+    });
+    const summary = [...latestByCharacter.entries()].slice(0, 4).map(([name, data]) => `<span class="metric-summary-chip"><strong>${escapeHtml(name)}</strong><small>${data.count} 条 · ${escapeHtml(data.deltas.slice(-2).join(" / ") || "暂无变化值")}</small></span>`).join("");
+    const cards = filtered.map((row) => {
+      const delta = row.delta_display || "±0";
+      const kind = metricDeltaKind(delta);
+      const character = row.character_name || "未命名角色";
+      const metric = row.metric_label || "未命名数值";
+      const oldValue = metricDisplayValue(row.old_value);
+      const newValue = metricDisplayValue(row.new_value);
+      const rawValue = metricDisplayValue(row.raw_value) !== "—" ? metricDisplayValue(row.raw_value) : `${newValue} (${delta})`;
+      const turn = row.turn_id || row.record_id || "未记录来源";
+      return `
+        <article class="metric-event-card ${kind}">
+          <div class="metric-event-main">
+            <div class="metric-event-title">
+              <strong>${escapeHtml(character)}</strong>
+              <span>${escapeHtml(metric)}</span>
+            </div>
+            <div class="metric-event-values">
+              <span>${escapeHtml(oldValue)}</span>
+              <b>→</b>
+              <span>${escapeHtml(newValue)}</span>
+              <em>${escapeHtml(rawValue)}</em>
+            </div>
+            <div class="metric-event-meta">
+              <span>来源：${escapeHtml(turn)}</span>
+              <span>${escapeHtml(metricRecordDate(row))}</span>
+            </div>
+          </div>
+          <span class="metric-delta-badge">${escapeHtml(delta)}</span>
+          <div class="metric-event-actions">
+            <button class="ghost-btn small" type="button" data-edit-row="${row.__index}">详情</button>
+            <button class="delete-btn" type="button" data-delete-row="${row.__index}">删除</button>
+          </div>
+        </article>`;
+    }).join("");
+    els.rowsEditor.innerHTML = `
+      <section class="metric-history-view">
+        <div class="metric-history-toolbar">
+          <div>
+            <strong>数值变化时间线</strong>
+            <p>把系统记录从普通表格改成事件流，按角色、数值项和时间筛选。</p>
+          </div>
+          <div class="metric-filter-grid">
+            ${renderMetricSelect("角色", "metric-character-filter", state.metricCharacterFilter, characters)}
+            ${renderMetricSelect("数值项", "metric-label-filter", state.metricLabelFilter, metrics)}
+            <label class="metric-filter-label"><span>排序</span><select class="metric-sort-filter"><option value="newest" ${state.metricSort === "newest" ? "selected" : ""}>最新优先</option><option value="oldest" ${state.metricSort === "oldest" ? "selected" : ""}>最早优先</option></select></label>
+          </div>
+        </div>
+        ${summary ? `<div class="metric-summary-row">${summary}</div>` : ""}
+        <div class="metric-event-list">${cards || `<div class="empty-state"><strong>当前筛选无记录。</strong><span>请调整角色或数值项筛选。</span></div>`}</div>
+      </section>`;
+    els.rowsEditor.querySelector(".metric-character-filter")?.addEventListener("change", (event) => {
+      state.metricCharacterFilter = event.target.value;
+      localStorage.setItem("state_journal:metricCharacterFilter", state.metricCharacterFilter);
+      renderRows(table);
+    });
+    els.rowsEditor.querySelector(".metric-label-filter")?.addEventListener("change", (event) => {
+      state.metricLabelFilter = event.target.value;
+      localStorage.setItem("state_journal:metricLabelFilter", state.metricLabelFilter);
+      renderRows(table);
+    });
+    els.rowsEditor.querySelector(".metric-sort-filter")?.addEventListener("change", (event) => {
+      state.metricSort = event.target.value;
+      localStorage.setItem("state_journal:metricSort", state.metricSort);
+      renderRows(table);
+    });
+  }
+
+  function renderRowsAsTable(table) {
+    if (table.schema?.id === "plot_ledger") {
+      renderLedgerTable(table);
+      return;
+    }
+    const fields = table.schema.fields || [];
+    const displayFields = getDisplayFields(table);
+    const primary = table.schema.primary_key || displayFields[0]?.key;
+    const wrap = document.createElement("div");
+    wrap.className = "rows-table-wrap";
+    const tableEl = document.createElement("table");
+    tableEl.className = "rows-table";
+    tableEl.innerHTML = `<thead><tr>${displayFields.map((field) => `<th>${escapeHtml(fieldLabel(field))}</th>`).join("")}<th>操作</th></tr></thead><tbody></tbody>`;
+    const tbody = tableEl.querySelector("tbody");
+    (table.rows || []).forEach((row, index) => {
+      const tr = document.createElement("tr");
+      tr.tabIndex = 0;
+      tr.title = "点击查看/编辑详情";
+      displayFields.forEach((field) => {
+        const td = document.createElement("td");
+        const isLong = field.type === "textarea" || ["summary", "condition", "appearance", "attitude"].includes(field.key);
+        td.innerHTML = `<span class="rows-table-cell ${isLong ? "long" : ""}">${escapeHtml(compactText(row[field.key], isLong ? 96 : 52))}</span>`;
+        tr.appendChild(td);
+      });
+      const op = document.createElement("td");
+      op.innerHTML = `<button class="ghost-btn small" type="button" data-edit-row="${index}">详情</button> <button class="delete-btn" type="button" data-delete-row="${index}">删除</button>`;
+      tr.appendChild(op);
+      tr.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        openRowDetail(index);
+      });
+      tbody.appendChild(tr);
+    });
+    wrap.appendChild(tableEl);
+    els.rowsEditor.appendChild(wrap);
+  }
+
+  function renderRows(table) {
+    els.rowsEditor.innerHTML = "";
+    const fields = table.schema.fields || [];
+    if (!fields.length) {
+      els.rowsEditor.innerHTML = `<div class="empty-state"><strong>这张表还没有字段。</strong><span>请打开“字段”设置，至少添加一个主键字段。</span></div>`;
+      return;
+    }
+    if (table.schema?.id === "metric_history") {
+      renderMetricHistory(table);
+      return;
+    }
+    if (!table.rows?.length) {
+      els.rowsEditor.innerHTML = `<div class="empty-state"><strong>当前表暂无数据。</strong><span>数据库不会在加载角色卡时自动写入状态。你可以先聊天一轮，再点击“根据最近对话更新”；也可以开启“聊天后自动填表”。</span><span>后续版本会加入“从角色卡 / 记忆初始化”。</span></div>`;
+      return;
+    }
+    if (state.viewMode === "table") renderRowsAsTable(table); else renderRowsAsCards(table);
+  }
+
+  function refreshPrimaryOptions(preferred) {
+    const oldValue = preferred || els.primaryKey.value;
+    const fieldCards = [...(els.fieldsEditor?.querySelectorAll(".field-card") || [])];
+    const source = fieldCards.length
+      ? fieldCards.map((card) => ({ key: card.querySelector("[data-field-key]").value.trim(), label: card.querySelector("[data-field-label]").value.trim() })).filter((field) => field.key)
+      : (currentTable()?.schema.fields || []).map((field) => ({ key: field.key, label: field.label }));
+    els.primaryKey.innerHTML = "";
+    source.forEach((field, index) => {
+      const option = document.createElement("option"); option.value = field.key; option.textContent = `${field.label || field.key} (${field.key})`; option.selected = field.key === oldValue || (!oldValue && index === 0); els.primaryKey.appendChild(option);
+    });
+  }
+
+  function updateViewButtons() {
+    els.cardViewBtn.classList.toggle("active", state.viewMode === "card");
+    els.tableViewBtn.classList.toggle("active", state.viewMode === "table");
+  }
+
+  function renderAll() {
+    if (!state.currentId && state.tables[0]) state.currentId = state.tables[0].schema.id;
+    const table = currentTable();
+    renderTableList(); bindConfig(); updateViewButtons();
+    const dataPanel = els.rowsEditor?.closest(".data-panel");
+    if (dataPanel) dataPanel.dataset.tableKind = table?.schema?.id || "";
+    if (!table) { els.currentTitle.textContent = "未选择表"; els.currentDesc.textContent = ""; els.rowsEditor.innerHTML = `<div class="empty-state"><strong>暂无表格。</strong><span>点击左侧“＋”新建表，或导入数据库 JSON。</span></div>`; return; }
+    els.currentTitle.textContent = table.schema.name || table.schema.id;
+    els.currentDesc.textContent = table.schema.description || "";
+    bindSchema(table); renderFields(table); refreshPrimaryOptions(table.schema.primary_key); renderRows(table);
+  }
+
+  const WORKSPACE_DEFAULT_TAB = {
+    home: null,
+    journal: null,
+    role: "roleState",
+    roleState: "roleState",
+    turnNote: "turnNote",
+    data: "data",
+    advanced: "model",
+    beauty: "template",
+    settings: "model",
+  };
+
+  const TAB_WORKSPACE = {
+    data: "data",
+    schema: "data",
+    rules: "data",
+    roleState: "role",
+    turnNote: "role",
+    log: "advanced",
+    generate: "advanced",
+    template: "advanced",
+    theme: "advanced",
+    model: "advanced",
+    link: "advanced",
+  };
+
+  const TAB_TITLES = {
+    data: "剧情账本与数据表",
+    schema: "字段设置",
+    rules: "规则设置",
+    roleState: "角色配置",
+    log: "调试与日志",
+    turnNote: "状态记录显示",
+    generate: "生成规则",
+    template: "状态记录模板",
+    theme: "外观模板",
+    model: "模型设置",
+    link: "聊天联动",
+  };
+
+  function normalizeWorkspace(workspace = "home") {
+    const aliases = {
+      journal: "home",
+      roleState: "role",
+      turnNote: "role",
+      beauty: "advanced",
+      settings: "advanced",
+    };
+    return aliases[workspace] || workspace || "home";
+  }
+
+  function setWorkspaceNav(workspace) {
+    const normalized = normalizeWorkspace(workspace);
+    document.querySelectorAll(".workspace-nav-btn").forEach((item) => {
+      item.classList.toggle("active", normalizeWorkspace(item.dataset.workspace) === normalized);
+    });
+  }
+
+  function switchWorkspace(workspace = "home", tab = null) {
+    const normalized = normalizeWorkspace(workspace);
+    setWorkspaceNav(normalized);
+    document.querySelectorAll("[data-workspace-page]").forEach((page) => {
+      page.classList.toggle("active", page.dataset.workspacePage === normalized);
+    });
+    document.querySelectorAll(".config-workspace-panel").forEach((page) => {
+      page.dataset.activeWorkspace = normalized;
+    });
+    if (els.drawerMask) els.drawerMask.hidden = true;
+    const defaultTab = tab || WORKSPACE_DEFAULT_TAB[normalized];
+    if (defaultTab) {
+      switchTab(defaultTab);
+    }
+  }
+
+  function openConfigDrawer(tab = "schema") {
+    const workspace = TAB_WORKSPACE[tab] || "journal";
+    switchWorkspace(workspace, tab);
+    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "数据库设置";
+    if (tab === "link") refreshHookStatus();
+    if (tab === "log") loadLog().catch(() => {});
+  }
+
+  function closeConfigDrawer() {
+    switchWorkspace("home");
+  }
+
+  function switchTab(tab) {
+    const workspace = normalizeWorkspace(TAB_WORKSPACE[tab] || "advanced");
+    document.querySelectorAll(".config-workspace-panel").forEach((page) => {
+      page.dataset.activeWorkspace = workspace;
+    });
+    if (els.drawerTitle) els.drawerTitle.textContent = TAB_TITLES[tab] || "数据库设置";
+    document.querySelectorAll(".tab-btn").forEach((item) => item.classList.toggle("active", item.dataset.tab === tab));
+    const advancedGroup = ({ schema: "data", rules: "data", generate: "model", link: "model", theme: "template" }[tab]) || tab;
+    document.querySelectorAll(".advanced-nav .tab-btn").forEach((item) => {
+      item.classList.toggle("active", item.dataset.tab === advancedGroup);
+    });
+    document.querySelectorAll(".tab-page").forEach((item) => item.classList.toggle("active", item.dataset.page === tab));
+    setWorkspaceNav(workspace);
+    document.querySelectorAll("[data-workspace-page]").forEach((page) => {
+      page.classList.toggle("active", page.dataset.workspacePage === workspace);
+    });
+    if (tab === "roleState") loadRoleStateConfig().catch((error) => pageToast("角色配置载入失败", error.message, "error"));
+    if (tab === "link") refreshHookStatus();
+    if (tab === "log") loadLog().catch(() => {});
+  }
+
+  function openRouteFromHash() {
+    const raw = decodeURIComponent(String(window.location.hash || "").replace(/^#\/?/, "")).trim();
+    if (!raw) return false;
+    const parts = raw.split(/[/:]/).map((part) => part.trim()).filter(Boolean);
+    if (!parts.length) return false;
+    const requested = parts[parts.length - 1];
+    const workspace = normalizeWorkspace(parts[0] || requested);
+    if (requested === "home" || workspace === "home") {
+      switchWorkspace("home");
+      return true;
+    }
+    const tab = TAB_WORKSPACE[requested] ? requested : WORKSPACE_DEFAULT_TAB[workspace];
+    if (tab) {
+      openConfigDrawer(tab);
+      return true;
+    }
+    if (["role", "data", "advanced"].includes(workspace)) {
+      switchWorkspace(workspace);
+      return true;
+    }
+    return false;
+  }
+
+  function roleStateStageKey(index) {
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    const i = Math.max(1, Number(index || 1));
+    return `stage_${letters[(i - 1) % letters.length]}${i > letters.length ? Math.ceil(i / letters.length) : ""}`;
+  }
+
+  function roleStateStageName(index) {
+    const key = roleStateStageKey(index).replace(/^stage_/, "").toUpperCase();
+    return `${key}阶段`;
+  }
+
+  function normalizeRoleStateConfig(config = {}) {
+    const roles = Array.isArray(config.roles) ? config.roles : [];
+    const roleSourceMode = normalizeRoleSourceMode(config.role_source_mode || config.roleSourceMode);
+    return { version: 1, enabled: config.enabled !== false, role_source_mode: roleSourceMode, role_source_summary: config.role_source_summary || {}, roles: roles.map((role, index) => {
+      const variables = Array.isArray(role.variables) ? role.variables.map((variable, varIndex) => ({
+        var_key: safeTemplateId(variable.var_key || variable.key || `var_${varIndex + 1}`),
+        var_name: String(variable.var_name || variable.label || `变量${varIndex + 1}`).trim(),
+        enabled: variable.enabled !== false,
+        default_value: Number(variable.default_value ?? 0) || 0,
+        min_value: Number(variable.min_value ?? 0) || 0,
+        max_value: Number(variable.max_value ?? 100) || 100,
+        delta_min: Number(variable.delta_min ?? -2) || -2,
+        delta_max: Number(variable.delta_max ?? 2) || 2,
+        display: variable.display !== false,
+        stage_relevant: variable.stage_relevant !== false,
+        instruction: String(variable.instruction || ""),
+      })) : [];
+      const stages = Array.isArray(role.stages) ? role.stages.map((stage, stageIndex) => ({
+        stage_key: safeTemplateId(stage.stage_key || stage.key || roleStateStageKey(stageIndex + 1)),
+        stage_name: String(stage.stage_name || stage.name || roleStateStageName(stageIndex + 1)).trim(),
+        enabled: stage.enabled !== false,
+        priority: Number(stage.priority ?? (stageIndex + 1) * 10) || (stageIndex + 1) * 10,
+        condition_mode: stage.condition_mode === "any" ? "any" : "all",
+        conditions: Array.isArray(stage.conditions) ? stage.conditions.map((condition) => normalizeStageCondition(condition, role)) : [],
+        allow_regression: !!stage.allow_regression,
+        confirm_turns: Math.max(1, Number(stage.confirm_turns || 1) || 1),
+        cooldown_turns: Math.max(0, Number(stage.cooldown_turns || 0) || 0),
+      })) : [];
+      const snapshotFields = Array.isArray(role.snapshotFields) ? role.snapshotFields.map((field, fieldIndex) => ({
+        key: safeTemplateId(field.key || field.field_key || `snapshot_${fieldIndex + 1}`),
+        label: String(field.label || field.name || `快照字段${fieldIndex + 1}`).trim(),
+        enabled: field.enabled !== false,
+        display: field.display !== false,
+        instruction: String(field.instruction || field.note || "根据本轮上下文生成该状态快照字段。"),
+      })) : [];
+      const source = String(role.source || role.role_source || "").trim();
+      const sourceType = String(role.source_type || role.sourceType || (source === "persona" ? "multi_role_slot" : source || "manual")).trim();
+      const mode = normalizeRoleStateMode(role.mode || role.stateJournalMode, { ...role, variables, stages, snapshotFields });
+      const hasStateJournalConfig = !!(role.has_state_journal_config || role.hasStateJournalConfig || variables.length || stages.length || snapshotFields.length || ["snapshot_only", "full"].includes(mode));
+      const displayPolicy = String(role.display_policy || role.displayPolicy || "").trim();
+      const explicitShow = displayPolicy === "show";
+      const isEmptySlot = !!(role.is_empty_slot || role.isEmptySlot || (!explicitShow && sourceType === "multi_role_slot" && !hasStateJournalConfig && !variables.length && !stages.length && !snapshotFields.length));
+      return {
+        role_id: safeTemplateId(role.role_id || role.id || `role_${index + 1}`),
+        role_name: String(role.role_name || role.name || `角色${index + 1}`).trim(),
+        aliases: Array.isArray(role.aliases) ? role.aliases : [],
+        enabled: role.enabled !== false,
+        mode,
+        stateJournalMode: mode,
+        use_default_variables: !!role.use_default_variables,
+        source,
+        source_type: sourceType,
+        has_state_journal_config: hasStateJournalConfig,
+        is_empty_slot: isEmptySlot,
+        display_policy: displayPolicy || (isEmptySlot ? "hide_empty" : "show"),
+        initial_stage: safeTemplateId(role.initial_stage || "stage_a"),
+        variables,
+        stages,
+        snapshotFields,
+        settings: role.settings || { allow_regression: false, confirm_turns: 1, cooldown_turns: 1 },
+      };
+    }) };
+  }
+
+  function shouldShowRoleStateRole(role) {
+    if (!role) return false;
+    if (role.display_policy === "hide_empty" || role.is_empty_slot) return false;
+    return true;
+  }
+
+  function currentRoleState() {
+    const roles = state.roleStateConfig.roles || [];
+    const visibleRoles = roles.filter(shouldShowRoleStateRole);
+    return visibleRoles.find((role) => role.role_id === state.currentRoleStateId) || visibleRoles[0] || roles.find((role) => role.role_id === state.currentRoleStateId) || roles[0] || null;
+  }
+
+  function activeStageForRole(role) {
+    if (!role) return null;
+    const names = new Set([String(role.role_id || ""), String(role.role_name || ""), ...(Array.isArray(role.aliases) ? role.aliases.map(String) : [])].map((item) => item.trim()).filter(Boolean));
+    return (state.activeStageRows || []).find((item) => names.has(String(item.role_id || "").trim()) || names.has(String(item.role_name || "").trim())) || null;
+  }
+
+  function roleCurrentStageName(role) {
+    const active = activeStageForRole(role);
+    if (active?.stage_name) return active.stage_name;
+    const key = active?.stage_key || role?.initial_stage || "stage_a";
+    const stage = (role?.stages || []).find((item) => item.stage_key === key);
+    return stage?.stage_name || key || "未进入阶段";
+  }
+
+  function roleCurrentStageKey(role) {
+    const active = activeStageForRole(role);
+    return active?.stage_key || role?.initial_stage || "stage_a";
+  }
+
+  function normalizeStoryTime(raw = {}) {
+    return {
+      enabled: !!raw.enabled,
+      show_in_note: raw.show_in_note !== false,
+      base_time: raw.base_time || "",
+      current_time: raw.current_time || "",
+      display_time: raw.display_time || "",
+      time_slot: raw.time_slot || "",
+      time_slot_label: raw.time_slot_label || "",
+      season: raw.season || "",
+      season_label: raw.season_label || "",
+      elapsed_seconds: Number(raw.elapsed_seconds || 0) || 0,
+      advance_mode: ["explicit", "smart", "manual", "custom"].includes(raw.advance_mode) ? raw.advance_mode : "smart",
+      custom_advance_type: ["fixed", "range"].includes(raw.custom_advance_type) ? raw.custom_advance_type : "range",
+      custom_advance_min_seconds: Number(raw.custom_advance_min_seconds ?? 300) || 0,
+      custom_advance_max_seconds: Number(raw.custom_advance_max_seconds ?? 900) || 0,
+      display_mode: ["datetime_minute", "datetime_second", "day_slot"].includes(raw.display_mode) ? raw.display_mode : "datetime_minute",
+      last_delta_seconds: Number(raw.last_delta_seconds || 0) || 0,
+      last_delta_text: raw.last_delta_text || "",
+      last_confidence: raw.last_confidence || "",
+      initialized: !!raw.initialized || !!raw.current_time,
+    };
+  }
+
+  function parseStoryTimeParts(value) {
+    const text = String(value || "").trim();
+    const match = text.match(/^(\d{1,6})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+    return {
+      year: Number(match?.[1] || new Date().getFullYear()),
+      month: Number(match?.[2] || 1),
+      day: Number(match?.[3] || 1),
+      hour: Number(match?.[4] || 0),
+      minute: Number(match?.[5] || 0),
+      second: Number(match?.[6] || 0),
+    };
+  }
+
+  function secondsToMinutes(value, fallback = 0) {
+    const seconds = Number(value ?? fallback) || 0;
+    return Math.max(0, Math.round(seconds / 60));
+  }
+
+  function minutesToSeconds(value, fallback = 0) {
+    const minutes = Number(value ?? fallback);
+    const safe = Number.isFinite(minutes) ? minutes : fallback;
+    return Math.max(0, Math.round(safe * 60));
+  }
+
+  function readStoryTimeForm() {
+    const form = document.getElementById("storyTimePanel");
+    const read = (key) => form?.querySelector(`[data-story-time-field="${key}"]`);
+    const story = normalizeStoryTime(state.storyTime || {});
+    const baseParts = parseStoryTimeParts(story.base_time);
+    const num = (key, fallback = 0) => Number(read(key)?.value || fallback) || fallback;
+    const customType = read("custom_advance_type")?.value || story.custom_advance_type || "range";
+    const customMinSeconds = minutesToSeconds(read("custom_advance_min_minutes")?.value, secondsToMinutes(story.custom_advance_min_seconds, 5));
+    const customMaxSeconds = customType === "fixed"
+      ? customMinSeconds
+      : minutesToSeconds(read("custom_advance_max_minutes")?.value, secondsToMinutes(story.custom_advance_max_seconds, 15));
+    return {
+      enabled: read("enabled") ? !!read("enabled").checked : !!story.enabled,
+      show_in_note: read("show_in_note") ? !!read("show_in_note").checked : story.show_in_note !== false,
+      base_year: num("base_year", baseParts.year || new Date().getFullYear()),
+      base_month: num("base_month", baseParts.month || 1),
+      base_day: num("base_day", baseParts.day || 1),
+      base_hour: num("base_hour", baseParts.hour || 0),
+      base_minute: num("base_minute", baseParts.minute || 0),
+      base_second: num("base_second", baseParts.second || 0),
+      advance_mode: read("advance_mode")?.value || story.advance_mode || "smart",
+      custom_advance_type: customType,
+      custom_advance_min_seconds: customMinSeconds,
+      custom_advance_max_seconds: customMaxSeconds,
+      display_mode: read("display_mode")?.value || story.display_mode || "datetime_minute",
+    };
+  }
+
+  function storyTimePartsInputs(prefix, timeText) {
+    const parts = parseStoryTimeParts(timeText);
+    const fields = [["year", "年", 1, 999999], ["month", "月", 1, 12], ["day", "日", 1, 31], ["hour", "时", 0, 23], ["minute", "分", 0, 59], ["second", "秒", 0, 59]];
+    return fields.map(([key, label, min, max]) => `<label>${label}<input type="number" min="${min}" max="${max}" data-story-time-field="${prefix}_${key}" value="${escapeAttr(parts[key])}"></label>`).join("");
+  }
+
+  function renderStoryTimePanel() {
+    const mount = document.getElementById("storyTimeGlobalMount") || document.getElementById("roleStateDetail");
+    if (!mount) return;
+    const story = normalizeStoryTime(state.storyTime || {});
+    const elapsedDays = Math.floor((story.elapsed_seconds || 0) / 86400);
+    const expanded = !!state.storyTimeExpanded;
+    const isCustomFixed = story.custom_advance_type === "fixed";
+    const customMinMinutes = secondsToMinutes(story.custom_advance_min_seconds, 5);
+    const customMaxMinutes = isCustomFixed ? customMinMinutes : secondsToMinutes(story.custom_advance_max_seconds, 15);
+    const customSettingsHtml = story.advance_mode === "custom" ? `
+          <div class="story-time-section" data-story-time-custom-settings>
+            <strong>用户自定义推进</strong>
+            <div class="story-time-grid">
+              <label>推进类型<select data-story-time-field="custom_advance_type">
+                <option value="fixed" ${story.custom_advance_type === "fixed" ? "selected" : ""}>固定每轮推进</option>
+                <option value="range" ${story.custom_advance_type === "range" ? "selected" : ""}>范围内浮动</option>
+              </select></label>
+              <label>${isCustomFixed ? "每轮推进" : "最小推进"}（分钟）<input type="number" min="0" max="1440" step="1" data-story-time-field="custom_advance_min_minutes" value="${escapeAttr(customMinMinutes)}"></label>
+              <label class="${isCustomFixed ? "is-disabled-field" : ""}">${isCustomFixed ? "最大推进（固定模式同步）" : "最大推进"}（分钟）<input type="number" min="0" max="1440" step="1" data-story-time-field="custom_advance_max_minutes" value="${escapeAttr(customMaxMinutes)}" ${isCustomFixed ? "disabled title=\"固定每轮推进时会自动同步每轮推进值\"" : ""}></label>
+            </div>
+          </div>` : "";
+    const summaryText = story.current_time
+      ? `${story.display_time || story.current_time}${story.time_slot_label ? ` · ${story.time_slot_label}` : ""}${story.season_label ? ` · ${story.season_label}` : ""}${story.initialized ? ` · 已过 ${elapsedDays} 天` : ""}`
+      : `尚未初始化${story.time_slot_label ? ` · ${story.time_slot_label}` : ""}${story.season_label ? ` · ${story.season_label}` : ""}`;
+    mount.innerHTML = `
+      <section id="storyTimePanel" class="story-time-panel ${expanded ? "is-expanded" : "is-collapsed"}">
+        <div class="story-time-summary">
+          <button type="button" class="story-time-summary-main" data-story-time-action="toggle" aria-expanded="${expanded ? "true" : "false"}">
+            <span class="micro-badge">全局状态</span>
+            <strong>剧情时间</strong>
+            <small>${escapeHtml(summaryText)}</small>
+          </button>
+          <div class="story-time-summary-controls">
+            <label class="story-time-switch"><input type="checkbox" data-story-time-field="enabled" ${story.enabled ? "checked" : ""}>启用</label>
+            <label class="story-time-switch"><input type="checkbox" data-story-time-field="show_in_note" ${story.show_in_note ? "checked" : ""}>状态记录</label>
+            <button type="button" class="ghost-btn compact-btn" data-story-time-action="toggle" aria-expanded="${expanded ? "true" : "false"}"><span class="story-time-toggle-label">${expanded ? "收起" : "展开"}</span></button>
+          </div>
+        </div>
+        <div class="story-time-body">
+          <div class="story-time-current-card">
+            <span>当前时间</span>
+            <strong>${escapeHtml(story.current_time || "尚未初始化")}</strong>
+            <small>${escapeHtml(story.display_time || "")}${story.time_slot_label ? ` · ${escapeHtml(story.time_slot_label)}` : ""}${story.season_label ? ` · ${escapeHtml(story.season_label)}` : ""}${story.initialized ? ` · 已过 ${elapsedDays} 天` : ""}</small>
+          </div>
+          <div class="story-time-section">
+            <strong>初始时间</strong>
+            <div class="story-time-parts">${storyTimePartsInputs("base", story.base_time)}</div>
+          </div>
+          <div class="story-time-grid">
+            <label>推进方式<select data-story-time-field="advance_mode">
+              <option value="explicit" ${story.advance_mode === "explicit" ? "selected" : ""}>只在正文明确出现时间推进时更新</option>
+              <option value="smart" ${story.advance_mode === "smart" ? "selected" : ""}>智能自然推进</option>
+              <option value="custom" ${story.advance_mode === "custom" ? "selected" : ""}>用户自定义推进</option>
+              <option value="manual" ${story.advance_mode === "manual" ? "selected" : ""}>手动推进</option>
+            </select></label>
+            <label>显示方式<select data-story-time-field="display_mode">
+              <option value="datetime_minute" ${story.display_mode === "datetime_minute" ? "selected" : ""}>年月日时分</option>
+              <option value="datetime_second" ${story.display_mode === "datetime_second" ? "selected" : ""}>年月日时分秒</option>
+              <option value="day_slot" ${story.display_mode === "day_slot" ? "selected" : ""}>第 N 日 · 时段</option>
+            </select></label>
+          </div>
+          ${customSettingsHtml}
+          <div class="story-time-actions">
+            <button type="button" class="ghost-btn" data-story-time-action="initialize">初始化剧情时间</button>
+            <button type="button" class="ghost-btn" data-story-time-action="calibrate">校准当前时间</button>
+            <button type="button" class="ghost-btn danger-soft" data-story-time-action="reset">重置为初始时间</button>
+            <button type="button" class="ghost-btn" data-story-time-action="history">查看时间历史</button>
+          </div>
+          <div class="story-time-history" id="storyTimeHistory"></div>
+        </div>
+      </section>`;
+    renderStoryTimeHistory();
+  }
+
+  function setStoryTimeExpanded(expanded) {
+    state.storyTimeExpanded = !!expanded;
+    localStorage.setItem("state_journal:storyTimeExpanded", state.storyTimeExpanded ? "1" : "0");
+    const panel = document.getElementById("storyTimePanel");
+    if (!panel) return;
+    panel.classList.toggle("is-expanded", state.storyTimeExpanded);
+    panel.classList.toggle("is-collapsed", !state.storyTimeExpanded);
+    panel.querySelectorAll("[data-story-time-action='toggle']").forEach((button) => {
+      button.setAttribute("aria-expanded", state.storyTimeExpanded ? "true" : "false");
+      const label = button.querySelector(".story-time-toggle-label");
+      if (label) label.textContent = state.storyTimeExpanded ? "收起" : "展开";
+    });
+  }
+
+  function renderStoryTimeHistory() {
+    const box = document.getElementById("storyTimeHistory");
+    if (!box) return;
+    const rows = state.storyTimeHistory || [];
+    box.innerHTML = rows.length ? `<strong>时间历史</strong>${rows.map((row) => `<div class="story-time-history-row"><span>${escapeHtml(row.created_at || "")}</span><b>${escapeHtml(row.old_time || "—")} → ${escapeHtml(row.new_time || "—")}</b><small>${escapeHtml(row.delta_text || row.reason || row.source || "")}</small></div>`).join("")}` : "";
+  }
+
+
+  function stageActivationTag(role, stage) {
+    const roleId = safeTemplateId(role?.role_id || "");
+    const stageKey = safeTemplateId(stage?.stage_key || "");
+    return stage?.activation_tag || (roleId && stageKey ? `state_journal.stage.${roleId}.${stageKey}` : "");
+  }
+
+  async function createWorldbookEntryForStage(stageIndex) {
+    const role = currentRoleState();
+    const stage = role?.stages?.[Number(stageIndex)];
+    if (!role || !stage) return;
+    const tag = stageActivationTag(role, stage);
+    const ok = await confirmAction({
+      title: "创建世界书阶段条目",
+      body: `<p>将为「${escapeHtml(role.role_name || role.role_id)} · ${escapeHtml(stage.stage_name || stage.stage_key)}」创建一个 external_tag 世界书条目。</p><p><strong>机器标签：</strong><code>${escapeHtml(tag)}</code></p><p>世界书只负责阶段表现，不负责计算变量与条件。</p>`,
+      confirmText: "创建条目",
+    });
+    if (!ok) return;
+    const payload = await requestJson("./api/stage-tags/create-worldbook-entry", {
+      method: "POST",
+      body: JSON.stringify({ role_id: role.role_id, stage_key: stage.stage_key }),
+    });
+    if (payload.duplicate) {
+      pageToast("世界书条目已存在", payload.message || "该阶段已绑定世界书条目，可前往世界书管理页查看。", "warn");
+    } else {
+      pageToast("已创建世界书条目", payload.message || "阶段表现草稿已写入世界书。", "ok");
+    }
+  }
+
+
+  function renderRoleStateWorkspace() {
+    const list = document.getElementById("roleStateRoleList");
+    const detail = document.getElementById("roleStateDetail");
+    if (!list || !detail) return;
+    const allRoles = state.roleStateConfig.roles || [];
+    const roles = allRoles.filter(shouldShowRoleStateRole);
+    if (!state.currentRoleStateId && roles[0]) state.currentRoleStateId = roles[0].role_id;
+    if (state.currentRoleStateId && !roles.some((role) => role.role_id === state.currentRoleStateId) && roles[0]) state.currentRoleStateId = roles[0].role_id;
+    const sourceInfo = roleSourceSummary(state.roleStateConfig);
+    const sourceHintHtml = `<div class="role-state-source-hint"><span class="micro-badge">角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<span>${escapeHtml(sourceInfo.detected)}</span>` : ""}<small>${escapeHtml(sourceInfo.message)}</small></div>`;
+    renderStoryTimePanel();
+    list.innerHTML = sourceHintHtml + (roles.length ? roles.map((role) => {
+      const stageName = roleCurrentStageName(role);
+      const stageKey = roleCurrentStageKey(role);
+      const stageShort = String(stageName || stageKey || "未进入阶段").replace(/^([A-Z])阶段$/i, "$1阶段");
+      const mode = normalizeRoleStateMode(role.mode || role.stateJournalMode, role);
+      return `
+      <button type="button" class="role-state-role-card role-state-role-card-v115 ${role.role_id === state.currentRoleStateId ? "active" : ""}" data-role-id="${escapeAttr(role.role_id)}" title="${escapeAttr(roleStateModeLabel(role))}">
+        <div class="role-state-card-head"><strong>${escapeHtml(role.role_name || role.role_id)}</strong><span class="role-stage-pill ${mode === "full" ? "" : "muted"}">${mode === "full" ? escapeHtml(stageShort) : escapeHtml(roleStateModeShortLabel(role))}</span></div>
+        <div class="role-state-chip-row">
+          <span class="role-state-chip">变量 ${role.variables?.length || 0}</span>
+          <span class="role-state-chip">阶段 ${role.stages?.length || 0}</span>
+          <span class="role-state-chip">快照 ${role.snapshotFields?.length || 0}</span>
+        </div>
+        <div class="role-state-chip-row muted-row">
+          <span class="role-state-mode-badge ${mode === "disabled" ? "is-off" : "is-on"}">${escapeHtml(roleStateModeShortLabel(role))}</span>
+        </div>
+      </button>`;
+    }).join("") : `<div class="role-state-role-card active"><strong>尚未读取角色配置</strong><div class="role-state-chip-row"><span class="role-state-chip">变量 0</span><span class="role-state-chip">阶段 0</span><span class="role-state-chip">快照 0</span></div><small>可从当前角色卡读取变量与阶段配置。</small></div>`);
+    const role = currentRoleState();
+    document.querySelectorAll("[data-role-state-tab]").forEach((btn) => btn.classList.toggle("active", btn.dataset.roleStateTab === state.roleStateTab));
+    if (!role) {
+      detail.innerHTML = `<strong>尚未选择角色</strong><p>可从当前角色卡读取变量与阶段配置。</p>`;
+      return;
+    }
+    const roleMode = normalizeRoleStateMode(role.mode || role.stateJournalMode, role);
+    const roleStats = {
+      variables: role.variables?.length || 0,
+      stages: role.stages?.length || 0,
+      snapshots: role.snapshotFields?.length || 0,
+    };
+    const currentStageName = roleCurrentStageName(role);
+    const currentStageKey = roleCurrentStageKey(role);
+    const roleModeMeta = ROLE_STATE_MODES[roleMode] || ROLE_STATE_MODES.default;
+    const overviewPanel = `<div class="role-state-overview-card compact-overview-card">
+      <div class="role-state-overview-main">
+        <div class="role-state-overview-title">
+          <span class="micro-badge">当前角色</span>
+          <strong>${escapeHtml(role.role_name || role.role_id || "未命名角色")}</strong>
+        </div>
+        <div class="role-state-mode-panel">
+          <strong>使用方式</strong>
+          <select data-role-mode-select>
+            <option value="default" ${roleMode === "default" ? "selected" : ""}>默认状态记录模板</option>
+            <option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属状态记录</option>
+            <option value="full" ${roleMode === "full" ? "selected" : ""}>完整数据库：状态记录 + 变量阶段</option>
+            <option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不记录该角色</option>
+          </select>
+        </div>
+        <p>${escapeHtml(roleModeMeta.desc || ROLE_STATE_MODES.default.desc)}</p>
+      </div>
+    </div>`;
+    const wrapRoleStateEditor = (actionsHtml, tableHtml) => `${overviewPanel}<div class="role-state-editor-card"><div class="role-state-editor-head"><div><strong>${state.roleStateTab === "stages" ? "阶段规则" : state.roleStateTab === "snapshot" ? "状态快照字段" : "变量表"}</strong><small>${state.roleStateTab === "stages" ? "主表只展示摘要，条件编辑收在配置弹窗。" : state.roleStateTab === "snapshot" ? "只用于记录模型与状态记录展示，不参与阶段判断。" : "记录可累计变量、变化范围与阶段用途。"}</small></div>${actionsHtml}</div>${tableHtml}</div>`;
+    if (state.roleStateTab === "snapshot") {
+      detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-snapshot-field>＋ 新增快照字段</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-snapshot-table"><thead><tr><th>启用</th><th>字段名</th><th>显示</th><th>生成说明</th><th>操作</th></tr></thead><tbody>
+        ${(role.snapshotFields || []).map((field, index) => `<tr data-snapshot-index="${index}"><td><input type="checkbox" data-snapshot-field="enabled" ${field.enabled !== false ? "checked" : ""}></td><td><input data-snapshot-field="label" value="${escapeAttr(field.label)}"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-snapshot-field="key" value="${escapeAttr(field.key)}"></label></details></td><td><input type="checkbox" data-snapshot-field="display" ${field.display !== false ? "checked" : ""}></td><td><input data-snapshot-field="instruction" value="${escapeAttr(field.instruction || "")}"></td><td><button type="button" class="ghost-btn" data-delete-snapshot-field>删除</button></td></tr>`).join("") || `<tr><td colspan="5">暂无状态快照字段。未配置时会回落到当前全局状态记录模板。</td></tr>`}
+        </tbody></table></div>`);
+    } else if (state.roleStateTab === "stages") {
+      detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-stage>＋ 新增阶段</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-stage-table stage-table-polish"><thead><tr><th>当前</th><th>启用</th><th>阶段</th><th>条件摘要</th><th>世界书</th><th>操作</th></tr></thead><tbody>
+        ${(role.stages || []).map((stage, index) => {
+          const isCurrent = stage.stage_key === roleCurrentStageKey(role);
+          const tagState = roleStateStageTagState(role, stage, isCurrent);
+          return `<tr data-stage-index="${index}" class="${isCurrent ? "current-stage-row" : ""}">
+            <td><span class="current-stage-dot" title="${isCurrent ? "当前阶段" : ""}">${isCurrent ? "✓" : ""}</span></td>
+            <td><input type="checkbox" data-stage-field="enabled" ${stage.enabled !== false ? "checked" : ""}></td>
+            <td>
+              <div class="stage-name-cell">
+                <input data-stage-field="stage_name" value="${escapeAttr(stage.stage_name)}">
+                <span class="stage-priority-pill">优先级 ${escapeHtml(stage.priority ?? 0)}</span>
+              </div>
+            </td>
+            <td><div class="stage-condition-chip-row" title="${escapeAttr(roleStateConditionText(role, stage))}">${roleStateConditionChips(role, stage)}</div></td>
+            <td><button type="button" class="stage-worldbook-pill ${tagState.cls}" data-create-stage-worldbook>${escapeHtml(tagState.label)}</button></td>
+            <td>
+              <div class="stage-row-actions">
+                <button type="button" class="ghost-btn tiny" data-config-stage>配置</button>
+                <button type="button" class="ghost-btn tiny danger-soft" data-delete-stage title="删除该阶段">删除</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join("") || `<tr><td colspan="6">暂无阶段。建议新增 A阶段。</td></tr>`}
+        </tbody></table></div>`);
+    } else {
+      detail.innerHTML = wrapRoleStateEditor(`<button type="button" class="ghost-btn" data-add-variable>＋ 新增变量</button>`, `<div class="role-state-table-wrap"><table class="role-state-table role-state-variable-table"><thead><tr><th>启用</th><th>变量名</th><th>初始值</th><th>范围</th><th>每轮变化</th><th>显示</th><th>阶段</th><th>操作</th></tr></thead><tbody>
+        ${(role.variables || []).map((variable, index) => `<tr data-variable-index="${index}"><td><input type="checkbox" data-var-field="enabled" ${variable.enabled !== false ? "checked" : ""}></td><td><input data-var-field="var_name" value="${escapeAttr(variable.var_name)}" placeholder="变量名"><details class="role-state-advanced"><summary>高级</summary><label>Key<input data-var-field="var_key" value="${escapeAttr(variable.var_key)}" placeholder="key"></label><label class="role-state-instruction-field">变量判断说明<textarea data-var-field="instruction" rows="3" placeholder="例如：只有出现明确亲近、信任或保护行为时才变化；普通寒暄保持不变。">${escapeHtml(variable.instruction || "")}</textarea></label></details></td><td><input type="number" data-var-field="default_value" value="${escapeAttr(variable.default_value)}"></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="min_value" value="${escapeAttr(variable.min_value)}"><span>~</span><input class="mini" type="number" data-var-field="max_value" value="${escapeAttr(variable.max_value)}"></div></td><td><div class="role-state-range"><input class="mini" type="number" data-var-field="delta_min" value="${escapeAttr(variable.delta_min)}"><span>~</span><input class="mini" type="number" data-var-field="delta_max" value="${escapeAttr(variable.delta_max)}"></div></td><td><input type="checkbox" data-var-field="display" ${variable.display !== false ? "checked" : ""}></td><td><input type="checkbox" data-var-field="stage_relevant" ${variable.stage_relevant !== false ? "checked" : ""}></td><td><button type="button" class="ghost-btn" data-delete-variable>删除</button></td></tr>`).join("") || `<tr><td colspan="8">暂无变量。手动新增默认使用 var_1 / var_2，不自动拼音。</td></tr>`}
+        </tbody></table></div>`);
+    }
+  }
+
+
+  function renderRoleStateStageDialog(stageIndex) {
+    const role = currentRoleState();
+    const stage = role?.stages?.[Number(stageIndex)];
+    if (!role || !stage) return;
+    let modal = document.getElementById("roleStateStageDialog");
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "roleStateStageDialog";
+      modal.className = "role-state-modal";
+      document.body.appendChild(modal);
+    }
+    const variables = role.variables || [];
+    stage.conditions = (stage.conditions || []).map((condition) => normalizeStageCondition(condition, role));
+    const variableOptions = variables.map((v) => `<option value="${escapeAttr(v.var_key)}">${escapeHtml(v.var_name || v.var_key)}</option>`).join("");
+    const storyFieldOptions = STORY_TIME_FIELDS.map((field) => `<option value="${escapeAttr(field.key)}">${escapeHtml(field.label)}</option>`).join("");
+    const conditionValueInput = (condition) => {
+      if (condition.source !== "story_time") return `<input type="number" data-stage-condition-field="value" value="${escapeAttr(condition.value ?? 0)}">`;
+      const meta = STORY_TIME_FIELD_MAP.get(condition.field) || STORY_TIME_FIELDS[0];
+      if (meta.type === "select") {
+        return `<select data-stage-condition-field="value">${(meta.options || []).map(([value, label]) => `<option value="${escapeAttr(value)}" ${String(condition.value || "") === value ? "selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select>`;
+      }
+      return `<input type="${meta.type === "number" ? "number" : "text"}" data-stage-condition-field="value" value="${escapeAttr(condition.value ?? "")}">`;
+    };
+    const conditionRows = (stage.conditions || []).map((condition, index) => `
+      <div class="role-state-condition-line" data-condition-index="${index}">
+        <select data-stage-condition-field="source">
+          <option value="variable" ${condition.source !== "story_time" ? "selected" : ""}>角色变量</option>
+          <option value="story_time" ${condition.source === "story_time" ? "selected" : ""}>剧情时间</option>
+        </select>
+        <select data-stage-condition-field="field">
+          ${condition.source === "story_time"
+            ? storyFieldOptions.replace(`value="${escapeAttr(condition.field)}"`, `value="${escapeAttr(condition.field)}" selected`)
+            : variableOptions.replace(`value="${escapeAttr(condition.var || condition.field || "")}"`, `value="${escapeAttr(condition.var || condition.field || "")}" selected`)}
+        </select>
+        <select data-stage-condition-field="op">
+          <option value=">=" ${condition.op === ">=" ? "selected" : ""}>≥</option>
+          <option value="<=" ${condition.op === "<=" ? "selected" : ""}>≤</option>
+          <option value=">" ${condition.op === ">" ? "selected" : ""}>＞</option>
+          <option value="<" ${condition.op === "<" ? "selected" : ""}>＜</option>
+          <option value="=" ${condition.op === "=" ? "selected" : ""}>＝</option>
+          <option value="!=" ${condition.op === "!=" ? "selected" : ""}>≠</option>
+        </select>
+        ${conditionValueInput(condition)}
+        <button type="button" class="tiny-btn" data-delete-stage-condition>×</button>
+      </div>`).join("");
+    modal.innerHTML = `
+      <div class="role-state-modal-mask" data-close-stage-dialog></div>
+      <section class="role-state-modal-card" role="dialog" aria-modal="true">
+        <header>
+          <div><strong>${escapeHtml(role.role_name || role.role_id)} · 阶段配置</strong><small>主表只显示中文摘要，机器 Key 收在高级信息里。</small></div>
+          <button type="button" class="ghost-btn" data-close-stage-dialog>关闭</button>
+        </header>
+        <div class="role-state-stage-form" data-stage-index="${Number(stageIndex)}">
+          <label>阶段名<input data-stage-basic="stage_name" value="${escapeAttr(stage.stage_name || "")}"></label>
+          <label>优先级<input type="number" data-stage-basic="priority" value="${escapeAttr(stage.priority ?? 10)}"></label>
+          <label>条件关系<select data-stage-basic="condition_mode"><option value="all" ${stage.condition_mode !== "any" ? "selected" : ""}>全部满足</option><option value="any" ${stage.condition_mode === "any" ? "selected" : ""}>任一满足</option></select></label>
+          <div class="role-state-condition-editor">
+            <div class="stage-condition-summary">${escapeHtml(roleStateConditionText(role, stage))}</div>
+            <div class="role-state-condition-list">${conditionRows || `<div class="role-state-empty-line">暂无条件。未设置条件时不会自动命中该阶段。</div>`}</div>
+            <button type="button" class="ghost-btn" data-add-stage-condition>＋ 添加条件</button>
+          </div>
+          <details class="role-state-advanced"><summary>高级 / 调试信息</summary><label>阶段 Key<input data-stage-basic="stage_key" value="${escapeAttr(stage.stage_key || "")}"></label><code>${escapeHtml(`state_journal.stage.${role.role_id}.${stage.stage_key}`)}</code></details>
+        </div>
+      </section>`;
+    const close = () => modal.remove();
+    modal.querySelectorAll("[data-close-stage-dialog]").forEach((btn) => btn.addEventListener("click", close));
+    const form = modal.querySelector("[data-stage-index]");
+    const commitBasic = (input) => {
+      const field = input.dataset.stageBasic;
+      if (!field) return;
+      if (field === "priority") stage.priority = Number(input.value || 0);
+      else if (field === "stage_key") stage.stage_key = safeTemplateId(input.value || stage.stage_key);
+      else if (field === "condition_mode") stage.condition_mode = input.value === "any" ? "any" : "all";
+      else stage[field] = input.value;
+      renderRoleStateWorkspace();
+      renderRoleStateStageDialog(stageIndex);
+    };
+    form?.querySelectorAll("[data-stage-basic]").forEach((input) => input.addEventListener("change", () => commitBasic(input)));
+    form?.addEventListener("change", (event) => {
+      const input = event.target.closest("[data-stage-condition-field]");
+      if (!input) return;
+      const row = input.closest("[data-condition-index]");
+      const condition = stage.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
+      if (!condition) return;
+      updateStageConditionFromInput(condition, input, role);
+      renderRoleStateWorkspace();
+      renderRoleStateStageDialog(stageIndex);
+    });
+    form?.addEventListener("click", (event) => {
+      if (event.target.closest("[data-add-stage-condition]")) {
+        stage.conditions = stage.conditions || [];
+        stage.conditions.push({ source: "variable", var: variables[0]?.var_key || "var_1", op: ">=", value: 0 });
+        renderRoleStateWorkspace();
+        renderRoleStateStageDialog(stageIndex);
+        return;
+      }
+      if (event.target.closest("[data-delete-stage-condition]")) {
+        const row = event.target.closest("[data-condition-index]");
+        const index = Number(row?.dataset.conditionIndex ?? -1);
+        if (index >= 0) stage.conditions.splice(index, 1);
+        renderRoleStateWorkspace();
+        renderRoleStateStageDialog(stageIndex);
+      }
+    });
+  }
+
+  async function loadRoleStateConfig() {
+    const [payload, storyPayload] = await Promise.all([requestJson("./api/role-state/config"), requestJson("./api/story-time")]);
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : [];
+    state.storyTime = normalizeStoryTime(storyPayload.story_time || {});
+    renderRoleStateWorkspace();
+  }
+
+  async function ensureRoleStateConfigLoadedForDanger() {
+    if (Array.isArray(state.roleStateConfig?.roles) && state.roleStateConfig.roles.length) return;
+    await loadRoleStateConfig();
+  }
+
+  async function loadStoryTime() {
+    const payload = await requestJson("./api/story-time");
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+  }
+
+  async function saveStoryTimeConfig() {
+    const payload = await requestJson("./api/story-time/config", { method: "POST", body: JSON.stringify(readStoryTimeForm()) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已保存", payload.message || "", "ok");
+  }
+
+  async function initializeStoryTime() {
+    const ok = await confirmAction({ title: "初始化剧情时间", body: "<p>此操作会把当前剧情时间设为初始时间，并影响后续状态记录显示和阶段判断。</p>", confirmText: "初始化" });
+    if (!ok) return;
+    const payload = await requestJson("./api/story-time/initialize", { method: "POST", body: JSON.stringify(readStoryTimeForm()) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已初始化", payload.message || "", "ok");
+  }
+
+  async function resetStoryTime() {
+    const ok = await confirmAction({ title: "重置为初始时间", body: "<p>此操作会回到 base_time，并影响后续状态记录显示和阶段判断。</p>", confirmText: "重置" });
+    if (!ok) return;
+    const payload = await requestJson("./api/story-time/reset", { method: "POST", body: JSON.stringify({}) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已重置", payload.message || "", "ok");
+  }
+
+  async function calibrateStoryTime() {
+    const ok = await confirmAction({ title: "校准当前时间", body: "<p>此操作会把当前时间改为面板中的初始时间数值，并影响后续状态记录显示和阶段判断。</p>", confirmText: "校准" });
+    if (!ok) return;
+    const form = readStoryTimeForm();
+    const payload = await requestJson("./api/story-time/calibrate", { method: "POST", body: JSON.stringify({ current_year: form.base_year, current_month: form.base_month, current_day: form.base_day, current_hour: form.base_hour, current_minute: form.base_minute, current_second: form.base_second }) });
+    state.storyTime = normalizeStoryTime(payload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("剧情时间已校准", payload.message || "", "ok");
+  }
+
+  async function loadStoryTimeHistory() {
+    const payload = await requestJson("./api/story-time/history");
+    state.storyTimeHistory = Array.isArray(payload.history) ? payload.history : [];
+    renderStoryTimePanel();
+  }
+
+  async function saveRoleStateConfig() {
+    const payload = await requestJson("./api/role-state/config", { method: "POST", body: JSON.stringify({ config: state.roleStateConfig }) });
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
+    renderRoleStateWorkspace();
+    pageToast("数据库配置已保存", "变量与阶段配置已写入运行配置。", "ok");
+  }
+
+  async function saveRoleWorkspaceSettings() {
+    const storyTimeForm = readStoryTimeForm();
+    const [rolePayload, storyPayload] = await Promise.all([
+      requestJson("./api/role-state/config", { method: "POST", body: JSON.stringify({ config: state.roleStateConfig }) }),
+      requestJson("./api/story-time/config", { method: "POST", body: JSON.stringify(storyTimeForm) }),
+    ]);
+    state.roleStateConfig = normalizeRoleStateConfig(rolePayload.config || {});
+    state.activeStageRows = Array.isArray(rolePayload.stages) ? rolePayload.stages : state.activeStageRows;
+    state.storyTime = normalizeStoryTime(storyPayload.story_time || {});
+    renderRoleStateWorkspace();
+    pageToast("本页设置已保存", "角色配置与剧情时间配置已写入。", "ok");
+  }
+
+  async function readRoleStateFromCard() {
+    const payload = await requestJson("./api/role-state/from-card", { method: "POST", body: JSON.stringify({}) });
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || {});
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : [];
+    state.currentRoleStateId = state.roleStateConfig.roles?.filter(shouldShowRoleStateRole)?.[0]?.role_id || state.roleStateConfig.roles?.[0]?.role_id || "";
+    renderRoleStateWorkspace();
+    pageToast("已读取角色卡配置", payload.message || "", "ok");
+  }
+
+  function roleStateTempKeyWarnings(config = {}) {
+    const warnings = [];
+    const roles = Array.isArray(config.roles) ? config.roles : [];
+    roles.forEach((role) => {
+      const roleName = role.role_name || role.role_id || "未命名角色";
+      const tempVars = (role.variables || []).filter((item) => /^var_\d+$/i.test(String(item.var_key || "")));
+      const tempSnapshots = (role.snapshotFields || []).filter((item) => /^snapshot_\d+$/i.test(String(item.key || "")));
+      if (tempVars.length) warnings.push(`${roleName}：临时变量 ${tempVars.map((item) => item.var_name || item.var_key).join("、")}`);
+      if (tempSnapshots.length) warnings.push(`${roleName}：临时快照字段 ${tempSnapshots.map((item) => item.label || item.key).join("、")}`);
+    });
+    return warnings;
+  }
+
+  function buildSyncRoleStateConfirmBody() {
+    const config = normalizeRoleStateConfig(state.roleStateConfig || {});
+    const roles = Array.isArray(config.roles) ? config.roles : [];
+    const sourceInfo = roleSourceSummary(config);
+    const roleRows = roles.length ? roles.map((role) => {
+      const roleName = role.role_name || role.role_id || "未命名角色";
+      const mode = roleStateModeShortLabel(role);
+      return `<li><strong>${escapeHtml(roleName)}</strong><span>${escapeHtml(mode)} · 变量 ${role.variables?.length || 0} · 阶段 ${role.stages?.length || 0} · 快照 ${role.snapshotFields?.length || 0}</span></li>`;
+    }).join("") : `<li><strong>暂无角色</strong><span>当前配置中没有可同步的数据库角色。</span></li>`;
+    const warnings = roleStateTempKeyWarnings(config);
+    const warningHtml = warnings.length ? `<div class="sync-card-warning"><strong>检测到可能的测试字段</strong><ul>${warnings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p>如果这些字段只是测试保存 / 放弃修改，可以先删除或改成正式 key 后再同步。</p></div>` : "";
+    return `
+      <p>即将把当前数据库角色配置写入角色卡 <code>stateJournal</code>。</p>
+      <div class="sync-card-summary">
+        <div><span>角色来源</span><strong>${escapeHtml(sourceInfo.label)}</strong>${sourceInfo.detected ? `<small>${escapeHtml(sourceInfo.detected)}</small>` : ""}</div>
+        <div><span>同步角色</span><strong>${roles.length}</strong><small>只同步配置模板</small></div>
+      </div>
+      <div class="sync-card-role-list"><ul>${roleRows}</ul></div>
+      ${warningHtml}
+      <div class="sync-card-scope">
+        <strong>会同步</strong>
+        <p>角色来源、角色列表、变量配置、阶段规则、状态快照字段、阶段 activation_tag / 世界书标签。</p>
+        <strong>不会同步</strong>
+        <p>当前运行数值、状态记录历史、聊天记录、数据库日志。</p>
+      </div>
+    `;
+  }
+
+  async function syncRoleStateToCard() {
+    await ensureRoleStateConfigLoadedForDanger();
+    const ok = await confirmDangerousRoleCardAction({
+      title: "同步配置至角色卡",
+      body: buildSyncRoleStateConfirmBody(),
+      confirmText: "确认写入角色卡",
+      finalTitle: "最终确认：写入角色卡",
+      finalBody: "<p>这是第二次确认。继续后会把当前数据库角色配置写入角色卡 <code>stateJournal</code>，可能覆盖角色卡里已有的数据库配置模板。</p><p class=\"danger-text\">如果你只是想保存后台设置，请取消，并使用「保存角色配置」。</p>",
+      finalConfirmText: "我确认写入角色卡",
+    });
+    if (!ok) return;
+    await requestJson("./api/role-state/sync-to-card", { method: "POST", body: JSON.stringify({ config: state.roleStateConfig }) });
+    pageToast("已同步至角色卡", "只同步变量、阶段、快照与角色来源配置，不同步运行值和历史。", "ok");
+  }
+
+  async function resetDefaultTurnNote() {
+    state.config = {
+      ...state.config,
+      turn_note_enabled: true,
+      notify_in_chat: true,
+      turn_note_template_id: "standard_metrics",
+      turn_note_theme_id: "standard",
+      turn_note_chat_display_mode: state.config.turn_note_chat_display_mode || "collapsed",
+    };
+    await saveConfig("turnNote");
+    bindConfig();
+    pageToast("已恢复默认状态记录", "已启用 Chat 状态记录，并切回标准状态模板与标准样式。", "ok");
+  }
+
+  async function initCurrentRoleState() {
+    await ensureRoleStateConfigLoadedForDanger();
+    const roles = (state.roleStateConfig.roles || []).filter((role) => role.enabled !== false && normalizeRoleStateMode(role.mode || role.stateJournalMode, role) === "full");
+    const ok = await confirmDangerousRoleCardAction({
+      title: "从角色卡初始化当前状态",
+      body: `<p>此操作会先读取当前角色卡里的 <code>stateJournal</code> 配置，再重建数据库当前变量与阶段。它可能覆盖当前运行中的变量值和当前阶段，但不会删除历史记录。</p><p><strong>当前已加载的完整数据库角色：</strong>${escapeHtml(roles.map((role) => role.role_name || role.role_id).join("、") || "暂无完整数据库角色")}</p><p>适合首轮开局前使用；游玩中请谨慎操作。</p>`,
+      confirmText: "确认从角色卡初始化",
+      finalTitle: "最终确认：初始化当前状态",
+      finalBody: "<p>这是第二次确认。继续后会按角色卡里的 <code>stateJournal</code> 重建当前运行状态，当前变量值和当前阶段可能被覆盖。</p><p class=\"danger-text\">正式游玩中不建议执行；更适合开局前或排查配置时使用。</p>",
+      finalConfirmText: "我确认初始化当前状态",
+    });
+    if (!ok) return;
+    const payload = await requestJson("./api/role-state/init-current", { method: "POST", body: JSON.stringify({ source: "role_card", from_card: true }) });
+    state.roleStateConfig = normalizeRoleStateConfig(payload.config || state.roleStateConfig || {});
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
+    renderRoleStateWorkspace();
+    pageToast("当前状态已初始化", payload.message || "", "ok");
+  }
+
+  async function debugAdvanceCurrentStage() {
+    const role = currentRoleState();
+    if (!role) {
+      pageToast("未选择角色", "请先选择一个角色。", "warn");
+      return;
+    }
+    const stages = (role.stages || []).filter((stage) => stage.enabled !== false).sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0));
+    const currentKey = roleCurrentStageKey(role);
+    const idx = stages.findIndex((stage) => stage.stage_key === currentKey);
+    const next = stages[Math.min(idx + 1, stages.length - 1)] || stages[0];
+    const ok = await confirmAction({
+      title: "调试推进阶段",
+      body: `<p>这是测试功能，会强制把当前选中角色推进到下一阶段，用于测试世界书 external_tag 与状态记录显示。</p><p><strong>当前角色：</strong>${escapeHtml(role.role_name || role.role_id)}</p><p><strong>当前阶段：</strong>${escapeHtml(roleCurrentStageName(role))} · ${escapeHtml(currentKey)}</p><p><strong>目标阶段：</strong>${escapeHtml(next?.stage_name || "无")} · ${escapeHtml(next?.stage_key || "")}</p><p class="danger-text">不建议正式游玩时使用。</p>`,
+      confirmText: "确认推进",
+      danger: true,
+    });
+    if (!ok) return;
+    const payload = await requestJson("./api/role-state/debug-advance-stage", { method: "POST", body: JSON.stringify({ role_id: role.role_id }) });
+    state.activeStageRows = Array.isArray(payload.stages) ? payload.stages : state.activeStageRows;
+    renderRoleStateWorkspace();
+    pageToast("已推进调试阶段", payload.message || "", "ok");
+  }
+
+  function openRowDetail(index) {
+    const table = currentTable();
+    if (!table || !table.rows[index]) return;
+    state.detailIndex = index;
+    const fields = table.schema.fields || [];
+    const row = table.rows[index] || {};
+    const primary = table.schema.primary_key || fields[0]?.key;
+    els.rowDetailTitle.textContent = row[primary] || `第 ${index + 1} 行`;
+    els.rowDetailBody.innerHTML = "";
+    fields.forEach((field) => {
+      const wrap = document.createElement("label");
+      wrap.className = "row-detail-field";
+      const input = makeRowInput(field, row[field.key]);
+      wrap.appendChild(document.createTextNode(fieldLabel(field)));
+      const note = document.createElement("small");
+      note.textContent = `${field.key} · ${field.type || "text"}${field.note ? `｜${field.note}` : ""}`;
+      wrap.appendChild(note);
+      wrap.appendChild(input);
+      els.rowDetailBody.appendChild(wrap);
+    });
+    els.rowDetailDrawer.classList.add("open");
+    els.rowDetailDrawer.setAttribute("aria-hidden", "false");
+    els.rowDetailDrawer.removeAttribute("inert");
+    els.rowDetailMask.hidden = false;
+  }
+
+  function closeRowDetail() {
+    state.detailIndex = -1;
+    els.rowDetailDrawer.classList.remove("open");
+    els.rowDetailDrawer.setAttribute("aria-hidden", "true");
+    els.rowDetailDrawer.setAttribute("inert", "");
+    els.rowDetailMask.hidden = true;
+  }
+
+  function commitRowDetailToState() {
+    const table = currentTable();
+    if (!table || state.detailIndex < 0) return false;
+    const row = {};
+    (table.schema.fields || []).forEach((field) => {
+      const input = els.rowDetailBody.querySelector(`[data-row-key="${CSS.escape(field.key)}"]`);
+      row[field.key] = field.type === "boolean" ? !!input?.checked : (input?.value ?? "");
+    });
+    table.rows[state.detailIndex] = row;
+    return true;
+  }
+
+  function saveRowDetail() {
+    if (!commitRowDetailToState()) return;
+    const table = currentTable();
+    renderRows(table);
+    pageToast("行已暂存", "点击“保存当前表”后写入 SQLite。", "ok");
+    closeRowDetail();
+  }
+
+  function deleteRow(index) {
+    const table = currentTable();
+    if (!table || !table.rows[index]) return;
+    table.rows.splice(index, 1);
+    renderRows(table);
+  }
+
+  async function refreshHookStatus() {
+    try {
+      const payload = await requestJson("./api/hook/status");
+      const hook = payload.hook || {};
+      if (hook.loaded) {
+        const base = `已加载 · ${hook.updated_at || "未知时间"} · ${hook.event || "ping"}`;
+        els.hookStatusText.textContent = hook.message ? `${base}\n${hook.message}` : base;
+      } else {
+        els.hookStatusText.textContent = "未检测到聊天页脚本。打开 Chat 页后会自动上报。";
+      }
+    } catch (error) { els.hookStatusText.textContent = `检测失败：${error.message}`; }
+  }
+
+  async function loadState() {
+    setStatus("正在载入数据库...");
+    const payload = await requestJson("./api/state");
+    state.config = payload.config || {}; state.tables = payload.tables || [];
+    if (!state.tables.some((table) => table.schema.id === state.currentId)) state.currentId = state.tables[0]?.schema.id || "";
+    renderAll(); await refreshHookStatus(); setStatus("数据库已就绪。", "ok");
+  }
+
+  async function saveCurrentTable() {
+    commitRowDetailToState();
+    const schema = readSchema(); const rows = readRows();
+    const payload = await requestJson(`./api/table/${encodeURIComponent(state.currentId || schema.id)}`, { method: "POST", body: JSON.stringify({ schema, rows }) });
+    const existing = state.tables.findIndex((item) => item.schema.id === payload.schema.id);
+    if (existing >= 0) state.tables[existing] = { schema: payload.schema, rows: payload.rows }; else state.tables.push({ schema: payload.schema, rows: payload.rows });
+    state.currentId = payload.schema.id; renderAll(); setStatus("当前表已保存。", "ok"); pageToast("当前表已保存", `${payload.schema.name || payload.schema.id} · ${payload.rows.length} 行`, "ok");
+  }
+
+  async function saveConfig(kind = "model") {
+    if (kind === "template") commitTemplateEditorToState();
+    const payload = await requestJson("./api/config", { method: "POST", body: JSON.stringify({ config: readConfig() }) });
+    state.config = payload.config || {};
+    bindConfig();
+    const titles = {
+      model: "模型配置已保存",
+      link: "聊天联动设置已保存",
+      turnNote: "状态记录设置已保存",
+      generate: "生成规则已保存",
+      template: "状态记录模板已保存",
+      theme: "状态记录外观已保存",
+      all: "数据库配置已保存",
+    };
+    const details = {
+      model: `${state.config.model || "未填写模型"} · ${state.config.api_base_url || "未填写 API URL"}`,
+      link: `数据库${state.config.enabled === false ? "关闭" : "开启"}｜自动填表${state.config.auto_update ? "开启" : "关闭"}｜聊天提示${state.config.notify_in_chat ? "开启" : "关闭"}｜跟随全局UI${state.config.ui_sync_global ? "开启" : "关闭"}`,
+      turnNote: `状态记录${state.config.turn_note_enabled === false ? "关闭" : "开启"}｜显示：${({ collapsed: "折叠", expanded: "展开", compact: "状态条", hidden: "不显示" }[state.config.turn_note_chat_display_mode || "collapsed"] || "折叠")}｜标题：${state.config.turn_note_title_style || "classic"}｜附笺：${state.config.turn_note_card_style || state.config.turn_note_style || "classic"}｜密度：${state.config.turn_note_density || "standard"}`,
+      generate: `自动填表${state.config.auto_update ? "开启" : "关闭"}｜读取最近 ${state.config.input_turn_count || 3} 轮｜主角状态卡${state.config.turn_note_protagonist_card_enabled ? "开启" : "关闭"}`,
+      template: `${activeTemplate().name || activeTemplate().id}｜字段 ${activeTemplate().fields?.length || 0} 个`,
+      theme: `${activeThemePack().name || activeThemePack().id}｜${activeThemePack().description || "美化包已启用"}`,
+      all: `${state.config.model || "未填写模型"} · 状态记录${state.config.turn_note_enabled === false ? "关闭" : "开启"}`,
+    };
+    const title = titles[kind] || titles.all;
+    setStatus(`${title}。`, "ok");
+    pageToast(title, details[kind] || details.all, "ok");
+    window.stateJournalChatBridge?.reloadConfig?.();
+  }
+
+  async function fillFromMainConfig() {
+    const payload = await requestJson("./api/main-config");
+    const cfg = payload.config || {};
+    els.cfgBaseUrl.value = cfg.api_base_url || "";
+    els.cfgApiKey.value = cfg.api_key || "";
+    els.cfgModel.value = cfg.model || "";
+    if (cfg.request_timeout) els.cfgTimeout.value = cfg.request_timeout;
+    syncPresetSelectFromBaseUrl();
+    pageToast("已从本体配置填入", cfg.model ? `${cfg.model} · ${cfg.api_base_url || "未填写 API URL"}` : (payload.message || "未读到模型名。"), cfg.model || cfg.api_base_url ? "ok" : "error");
+  }
+
+  async function fetchModels() {
+    setStatus("正在拉取模型列表...");
+    const payload = await requestJson("./api/models", { method: "POST", body: JSON.stringify({ config: readConfig() }) });
+    const models = payload.models || [];
+    els.modelDatalist.innerHTML = models.map((id) => `<option value="${escapeAttr(id)}"></option>`).join("");
+    const message = payload.message || (models.length ? `已拉取 ${models.length} 个模型，请直接在模型名输入框中选择。` : "接口返回为空。");
+    setStatus(message, "ok");
+    pageToast("模型列表已更新", message, "ok");
+  }
+
+  async function testConnection() {
+    setStatus("正在测试连接...");
+    const payload = await requestJson("./api/test-connection", { method: "POST", body: JSON.stringify({ config: readConfig() }) });
+    setStatus(payload.message || "连接成功。", "ok"); pageToast("数据库连接测试成功", payload.message || "连接成功。", "ok");
+  }
+
+  async function manualWorkerUpdate() {
+    setManualWorkerBusy(true);
+    try {
+      setStatus("正在保存当前表，准备请求记录模型...");
+      await saveCurrentTable();
+      setStatus("正在读取最近聊天记录...");
+      const history = await fetch("/api/history").then((res) => res.json()).catch(() => []);
+      const timeoutSeconds = Number(els.cfgTimeout?.value || state.config?.request_timeout || 120);
+      setStatus(`正在请求辅助模型，最多等待 ${timeoutSeconds} 秒...`);
+      const result = await requestJson("./api/worker/update", { method: "POST", body: JSON.stringify({ manual: true, history }) });
+      setStatus("数据库已收到响应，正在刷新状态表...");
+      await loadState();
+      const count = result.summary?.total ?? result.result?.applied?.length ?? 0;
+      const errors = result.result?.errors || [];
+      const displayTitle = result.display?.title ? `｜状态记录：《${result.display.title}》` : "";
+      const msg = (result.message || (count ? `数据库已应用 ${count} 条更新。` : "数据库判断本次无变化。")) + displayTitle;
+      els.updateSummaryText.textContent = msg;
+      if (errors.length || result.ok === false) {
+        const title = workerErrorTitle(result.error_type);
+        setStatus(msg, "error");
+        pageToast(title, msg, "error");
+      } else {
+        setStatus(msg, "ok");
+        pageToast(count ? "数据库已更新" : "数据库无变化", msg, "ok");
+      }
+    } catch (error) {
+      const msg = error.message || "数据库请求异常。";
+      els.updateSummaryText.textContent = msg;
+      setStatus(msg, "error");
+      pageToast("数据库填表失败", msg, "error");
+    } finally {
+      setManualWorkerBusy(false);
+    }
+  }
+
+  async function loadLog() { const payload = await requestJson("./api/logs/latest"); els.logBox.textContent = JSON.stringify(payload.log || {}, null, 2); }
+  async function exportDebugLog() {
+    const payload = await requestJson("./api/logs/export?limit=120");
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `state-journal-debug-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    pageToast("排查日志已导出", "已脱敏 API Key，可用于定位重 roll、编辑与状态记录恢复问题。", "ok");
+  }
+  function addField() { const table = currentTable(); if (!table) return; table.schema.fields.push({ key: `field_${table.schema.fields.length + 1}`, label: "新字段", type: "text", required: false, options: [], note: "" }); renderFields(table); refreshPrimaryOptions(); openConfigDrawer("schema"); }
+  function addRow() { const table = currentTable(); if (!table) return; const row = {}; (table.schema.fields || []).forEach((field) => { row[field.key] = field.type === "boolean" ? false : ""; }); table.rows.push(row); renderRows(table); openRowDetail(table.rows.length - 1); }
+  function newTable() { const id = `custom_table_${Date.now()}`; state.tables.push({ schema: { id, name: "新表", description: "", primary_key: "id", fields: [{ key: "id", label: "ID", type: "text", required: true, options: [], note: "主键字段" }], rules: { note: "", init: "", insert: "", update: "", delete: "", ignore: "" } }, rows: [] }); state.currentId = id; renderAll(); openConfigDrawer("schema"); }
+  async function exportAll() { const payload = await requestJson("./api/export"); const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `state-journal-export-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url); pageToast("导出完成", "默认不包含 API Key，可放心分享表结构与数据。", "ok"); }
+  async function importFile(file) { if (!file) return; const payload = JSON.parse(await file.text()); await requestJson("./api/import", { method: "POST", body: JSON.stringify(payload) }); await loadState(); setStatus("导入完成。", "ok"); pageToast("导入完成", "JSON 数据已写入数据库 SQLite。", "ok"); }
+
+  document.querySelectorAll(".workspace-nav-btn").forEach((button) => button.addEventListener("click", () => {
+    const workspace = normalizeWorkspace(button.dataset.workspace || "home");
+    const defaultTab = button.dataset.defaultTab || WORKSPACE_DEFAULT_TAB[workspace];
+    if (defaultTab) openConfigDrawer(defaultTab);
+    else switchWorkspace(workspace);
+  }));
+  document.querySelectorAll(".tab-btn").forEach((button) => button.addEventListener("click", () => {
+    if (button.dataset.tab) openConfigDrawer(button.dataset.tab);
+  }));
+  document.querySelectorAll("[data-open-tab]").forEach((button) => button.addEventListener("click", () => openConfigDrawer(button.dataset.openTab)));
+  els.cardViewBtn.addEventListener("click", () => { state.viewMode = "card"; localStorage.setItem("state_journal:viewMode", state.viewMode); renderAll(); });
+  els.tableViewBtn.addEventListener("click", () => { state.viewMode = "table"; localStorage.setItem("state_journal:viewMode", state.viewMode); renderAll(); });
+  $("#openSchemaDrawerBtn")?.addEventListener("click", () => openConfigDrawer("schema"));
+  $("#openRulesDrawerBtn")?.addEventListener("click", () => openConfigDrawer("rules"));
+  $("#openModelDrawerBtn")?.addEventListener("click", () => openConfigDrawer("model"));
+  $("#openLinkDrawerBtn")?.addEventListener("click", () => openConfigDrawer("link"));
+  $("#openTurnNoteDrawerBtn")?.addEventListener("click", () => openConfigDrawer("turnNote"));
+  $("#openTemplateDrawerBtn")?.addEventListener("click", () => openConfigDrawer("template"));
+  $("#openLogDrawerBtn")?.addEventListener("click", () => { openConfigDrawer("log"); });
+  $("#closeConfigDrawerBtn")?.addEventListener("click", closeConfigDrawer);
+  els.drawerMask?.addEventListener("click", closeConfigDrawer);
+  $("#closeRowDetailBtn").addEventListener("click", closeRowDetail);
+  els.rowDetailMask.addEventListener("click", closeRowDetail);
+  $("#saveRowDetailBtn").addEventListener("click", (event) => {
+    saveRowDetail();
+    flashActionButton(event.currentTarget, "已暂存");
+  });
+  $("#deleteRowDetailBtn").addEventListener("click", () => { if (state.detailIndex >= 0) { deleteRow(state.detailIndex); closeRowDetail(); } });
+  els.rowsEditor.addEventListener("click", (event) => {
+    const edit = event.target.closest("[data-edit-row]");
+    const del = event.target.closest("[data-delete-row]");
+    if (edit) openRowDetail(Number(edit.dataset.editRow));
+    if (del) deleteRow(Number(del.dataset.deleteRow));
+  });
+  $("#refreshBtn").addEventListener("click", () => loadState().catch((error) => setStatus(error.message, "error")));
+  $("#saveBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, saveCurrentTable, "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存失败", error.message, "error"); }));
+  $("#saveConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("model"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存模型配置失败", error.message, "error"); }));
+  $("#saveLinkConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("link"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存联动设置失败", error.message, "error"); }));
+  $("#saveTurnNoteConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("turnNote"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存状态记录设置失败", error.message, "error"); }));
+  $("#saveGenerateConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("generate"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存生成规则失败", error.message, "error"); }));
+  function bindRuntimeToggle(input, target, kind) {
+    input?.addEventListener("change", () => {
+      if (target) target.checked = input.checked;
+      saveConfig(kind).catch((error) => pageToast("运行状态保存失败", error.message, "error"));
+    });
+  }
+  bindRuntimeToggle(els.dashboardEnabled, els.cfgEnabled, "link");
+  bindRuntimeToggle(els.dashboardAutoUpdate, els.cfgAutoUpdate, "generate");
+  bindRuntimeToggle(els.dashboardTurnNote, els.cfgTurnNoteEnabled, "turnNote");
+  els.cfgTurnNoteWorkerPromptMode?.addEventListener("change", () => {
+    updateWorkerPromptEditorLabel();
+    renderWorkerPromptPreview();
+  });
+  els.loadDefaultWorkerPromptBtn?.addEventListener("click", () => {
+    loadDefaultWorkerPromptIntoEditor().catch((error) => pageToast("载入默认主体失败", error.message, "error"));
+  });
+  els.clearWorkerPromptBtn?.addEventListener("click", () => {
+    if (!window.confirm("确定清空当前范围的自定义 Prompt？")) return;
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = "";
+    renderWorkerPromptPreview();
+    pageToast("已清空当前范围", "保存生成规则后生效。", "ok");
+  });
+  els.resetWorkerPromptBtn?.addEventListener("click", () => {
+    if (els.cfgTurnNoteWorkerPromptMode) els.cfgTurnNoteWorkerPromptMode.value = "default";
+    if (els.cfgTurnNoteWorkerCustomPrompt) els.cfgTurnNoteWorkerCustomPrompt.value = "";
+    if (els.cfgTurnNoteWorkerPromptEnabled) els.cfgTurnNoteWorkerPromptEnabled.checked = false;
+    if (els.cfgTurnNoteWorkerStylePrompt) els.cfgTurnNoteWorkerStylePrompt.value = "";
+    if (els.cfgTurnNoteWorkerProtagonistPrompt) els.cfgTurnNoteWorkerProtagonistPrompt.value = "";
+    renderWorkerPromptPreview();
+    pageToast("已恢复默认 Prompt", "保存生成规则后生效。", "ok");
+  });
+  els.refreshWorkerPromptPreviewBtn?.addEventListener("click", () => {
+    refreshWorkerPromptPreview().catch((error) => pageToast("刷新 Prompt 预览失败", error.message, "error"));
+  });
+  $("#saveTemplateConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("template"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存模板设置失败", error.message, "error"); }));
+  $("#saveThemeConfigBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, () => saveConfig("theme"), "已保存").catch((error) => { setStatus(error.message, "error"); pageToast("保存美化设置失败", error.message, "error"); }));
+  $("#refreshHookBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, refreshHookStatus, "已刷新").catch((error) => pageToast("刷新 Hook 状态失败", error.message, "error")));
+  $("#fillMainConfigBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, fillFromMainConfig, "已填入").catch((error) => pageToast("读取本体配置失败", error.message, "error")));
+  $("#fetchModelsBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, fetchModels, "已更新").catch((error) => { setStatus(error.message, "error"); pageToast("拉取模型列表失败", error.message, "error"); }));
+  $("#testConnectionBtn").addEventListener("click", (event) => runFeedbackAction(event.currentTarget, testConnection, "连接正常").catch((error) => { setStatus(error.message, "error"); pageToast("测试连接失败", error.message, "error"); }));
+  $("#applyPresetBtn").addEventListener("click", applyServicePreset);
+  els.cfgTurnNoteStyle?.addEventListener("change", updateTurnNoteStyleHelp);
+  els.cfgTurnNoteTitleStyle?.addEventListener("change", updateTurnNoteStyleHelp);
+  els.cfgTurnNoteNoteStyle?.addEventListener("change", updateTurnNoteStyleHelp);
+  els.cfgTurnNoteTemplateSelect?.addEventListener("change", () => { state.currentTemplateId = els.cfgTurnNoteTemplateSelect.value; state.expandedTemplateFieldIndex = null; if (els.templateSelect) els.templateSelect.value = state.currentTemplateId; const tmpl = activeTemplate(); if (els.cfgTurnNoteNoteStyle) els.cfgTurnNoteNoteStyle.value = tmpl.note_style || "classic"; bindTemplateEditor(); updateTurnNoteStyleHelp(); });
+
+  els.cfgTurnNoteThemeSelect?.addEventListener("change", () => setActiveTheme(els.cfgTurnNoteThemeSelect.value));
+  els.themeSelect?.addEventListener("change", () => setActiveTheme(els.themeSelect.value));
+  els.themePreviewModeSelect?.addEventListener("change", () => {
+    state.themePreviewMode = els.themePreviewModeSelect.value || "role";
+    localStorage.setItem("state_journal:themePreviewMode", state.themePreviewMode);
+    renderThemePreview();
+  });
+  els.exportThemeBtn?.addEventListener("click", () => {
+    const pack = activeThemePack();
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = `state-journal-beauty-${pack.id || Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    pageToast("美化包已导出", pack.name || pack.id, "ok");
+  });
+  els.deleteThemeBtn?.addEventListener("click", () => deleteActiveImportedTheme().catch((error) => {
+    setStatus(`删除外观包失败：${error.message}`, "error");
+    pageToast("删除外观包失败", error.message, "error");
+  }));
+  els.importThemeInput?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0]; if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const pack = normalizeThemePack(payload);
+      const warnings = Array.isArray(pack.__warnings) ? pack.__warnings : [];
+      const warningText = warnings.length ? `；兼容处理：${warnings.join(" · ")}` : "";
+      await persistImportedTheme(pack);
+      const detail = `${themePackSourceLabel(pack)} · schema v${pack.schema_version || THEME_PACK_SCHEMA_VERSION} · layout: ${themePackLayoutType(pack)} · class: ${pack.style?.class_name || "theme-standard"}${themePackProgressBars(pack).length ? ` · 数值条 ${themePackProgressBars(pack).length}` : ""}`;
+      pageToast("美化包已导入并启用", `${pack.name || pack.id}｜${detail}${warningText}`, "ok");
+      setStatus(`美化包已导入并启用：${pack.name || pack.id}｜${detail}${warningText}`, "ok");
+    } catch (error) {
+      pageToast("导入美化包失败", error.message, "error");
+      setStatus(`导入美化包失败：${error.message}`, "error");
+    }
+    event.target.value = "";
+  });
+
+  els.templateSelect?.addEventListener("change", () => {
+    const nextId = els.templateSelect.value;
+    commitTemplateEditorToState({ rebind: false });
+    state.currentTemplateId = nextId;
+    state.expandedTemplateFieldIndex = null;
+    state.config = { ...state.config, turn_note_template_id: nextId };
+    bindTemplateEditor();
+    if (els.cfgTurnNoteTemplateSelect) els.cfgTurnNoteTemplateSelect.value = nextId;
+  });
+  els.templateFieldsEditor?.addEventListener("input", (event) => {
+    const card = event.target.closest(".template-field-card");
+    if (card) {
+      const title = card.querySelector(".template-field-title strong");
+      const keyText = card.querySelector(".template-field-key");
+      const summary = card.querySelector(".template-field-summary");
+      const key = safeTemplateId(card.querySelector("[data-tpl-key]")?.value || "");
+      const label = (card.querySelector("[data-tpl-label]")?.value || key || "字段").trim();
+      const instruction = (card.querySelector("[data-tpl-instruction]")?.value || "根据本轮上下文生成该字段。").replace(/\s+/g, " ").trim();
+      if (title) title.textContent = label;
+      if (keyText) keyText.textContent = key;
+      if (summary) summary.textContent = instruction;
+    }
+    updateTemplatePreview();
+  });
+  els.templateOutput?.addEventListener("input", updateTemplatePreview);
+  els.templateName?.addEventListener("input", updateTemplatePreview);
+  els.templateDesc?.addEventListener("input", updateTemplatePreview);
+  els.templateNoteStyle?.addEventListener("change", updateTemplatePreview);
+  els.templateFieldsEditor?.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-tpl-toggle]");
+    const up = event.target.closest("[data-tpl-up]");
+    const down = event.target.closest("[data-tpl-down]");
+    const del = event.target.closest("[data-tpl-delete]");
+    if (!toggle && !up && !down && !del) return;
+    const template = readTemplateEditor();
+    if (toggle && !up && !down && !del) {
+      const index = Number(toggle.dataset.tplToggle);
+      state.expandedTemplateFieldIndex = state.expandedTemplateFieldIndex === index ? null : index;
+      renderTemplateFields(template);
+      updateTemplatePreview();
+      return;
+    }
+    let index = Number((up || down || del).dataset.tplUp ?? (up || down || del).dataset.tplDown ?? (up || down || del).dataset.tplDelete);
+    if (del) {
+      template.fields.splice(index, 1);
+      state.expandedTemplateFieldIndex = null;
+    }
+    if (up && index > 0) {
+      [template.fields[index - 1], template.fields[index]] = [template.fields[index], template.fields[index - 1]];
+      state.expandedTemplateFieldIndex = index - 1;
+    }
+    if (down && index < template.fields.length - 1) {
+      [template.fields[index + 1], template.fields[index]] = [template.fields[index], template.fields[index + 1]];
+      state.expandedTemplateFieldIndex = index + 1;
+    }
+    const templates = turnNoteTemplates().slice();
+    const pos = templates.findIndex((item) => item.id === template.id);
+    if (pos >= 0) templates[pos] = template;
+    state.config = { ...state.config, turn_note_templates: templates };
+    renderTemplateFields(template);
+    updateTemplatePreview();
+  });
+  $("#collapseTemplateFieldsBtn")?.addEventListener("click", () => {
+    state.expandedTemplateFieldIndex = null;
+    renderTemplateFields(readTemplateEditor());
+    updateTemplatePreview();
+  });
+  $("#addTemplateFieldBtn")?.addEventListener("click", () => {
+    const template = readTemplateEditor();
+    const used = new Set(template.fields.map((field) => safeTemplateId(field.key)));
+    let n = template.fields.length + 1;
+    while (used.has(`field_${n}`)) n += 1;
+    const field = { key: `field_${n}`, label: "新字段", instruction: "根据本轮上下文生成该字段。" };
+    template.fields.push(field);
+    state.expandedTemplateFieldIndex = template.fields.length - 1;
+    const token = `{${field.key}}`;
+    if (!String(template.output_template || "").includes(token)) {
+      const line = `<${field.label}(${token})>`;
+      template.output_template = `${String(template.output_template || "").trimEnd()}${template.output_template ? "\n" : ""}${line}`;
+      if (els.templateOutput) els.templateOutput.value = template.output_template;
+    }
+    const templates = turnNoteTemplates().slice();
+    const pos = templates.findIndex((item) => item.id === template.id);
+    if (pos >= 0) templates[pos] = template;
+    state.config = { ...state.config, turn_note_templates: templates };
+    renderTemplateFields(template); updateTemplatePreview();
+  });
+  $("#newTemplateBtn")?.addEventListener("click", () => {
+    const source = readTemplateEditor();
+    const copy = { ...source, id: `custom_${Date.now()}`, name: `${source.name || "模板"} 副本` };
+    state.config = { ...state.config, turn_note_templates: [...turnNoteTemplates(), copy], turn_note_template_id: copy.id };
+    state.currentTemplateId = copy.id; state.expandedTemplateFieldIndex = null; bindTemplateEditor(); pageToast("已复制模板", "修改后点击保存模板设置。", "ok");
+  });
+  $("#exportTemplateBtn")?.addEventListener("click", () => {
+    const template = readTemplateEditor();
+    const blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = `state-journal-template-${template.id || Date.now()}.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    pageToast("模板已导出", template.name || template.id, "ok");
+  });
+  els.importTemplateInput?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0]; if (!file) return;
+    try {
+      const template = JSON.parse(await file.text());
+      const id = safeTemplateId(template.id || template.name || `custom_${Date.now()}`);
+      const normalized = { ...template, id, fields: Array.isArray(template.fields) ? template.fields : [] };
+      state.config = { ...state.config, turn_note_templates: [...turnNoteTemplates().filter((item) => item.id !== id), normalized], turn_note_template_id: id };
+      state.currentTemplateId = id; state.expandedTemplateFieldIndex = null; bindTemplateEditor(); pageToast("模板已导入", normalized.name || id, "ok");
+    } catch (error) { pageToast("导入模板失败", error.message, "error"); }
+    event.target.value = "";
+  });
+  $("#toggleApiKeyBtn").addEventListener("click", () => { const hidden = els.cfgApiKey.type === "password"; els.cfgApiKey.type = hidden ? "text" : "password"; $("#toggleApiKeyBtn").textContent = hidden ? "隐藏" : "显示"; });
+
+  document.getElementById("roleStateReadCardBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, readRoleStateFromCard, "已读取").catch((error) => pageToast("读取角色卡失败", error.message, "error")));
+  document.getElementById("roleStateSaveBtn")?.addEventListener("click", (event) => runFeedbackAction(event.currentTarget, saveRoleWorkspaceSettings, "已保存").catch((error) => pageToast("保存本页设置失败", error.message, "error")));
+  document.getElementById("roleStateSyncCardBtn")?.addEventListener("click", () => syncRoleStateToCard().catch((error) => pageToast("同步角色卡失败", error.message, "error")));
+  document.getElementById("roleStateInitBtn")?.addEventListener("click", () => initCurrentRoleState().catch((error) => pageToast("初始化失败", error.message, "error")));
+  document.getElementById("roleStateDebugNextStageBtn")?.addEventListener("click", () => debugAdvanceCurrentStage().catch((error) => pageToast("调试推进失败", error.message, "error")));
+  document.getElementById("roleStateRoleList")?.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-role-id]");
+    if (!card) return;
+    state.currentRoleStateId = card.dataset.roleId;
+    renderRoleStateWorkspace();
+  });
+  document.querySelectorAll("[data-role-state-tab]").forEach((btn) => btn.addEventListener("click", () => {
+    state.roleStateTab = btn.dataset.roleStateTab || "variables";
+    renderRoleStateWorkspace();
+  }));
+  document.getElementById("resetDefaultTurnNoteBtn")?.addEventListener("click", () => resetDefaultTurnNote().catch((error) => pageToast("恢复默认状态记录失败", error.message, "error")));
+
+  function handleStoryTimeFieldChange(event) {
+    const storyField = event.target.closest("[data-story-time-field]");
+    if (storyField && ["advance_mode", "custom_advance_type"].includes(storyField.dataset.storyTimeField)) {
+      state.storyTime = normalizeStoryTime({ ...state.storyTime, ...readStoryTimeForm() });
+      renderStoryTimePanel();
+      return true;
+    }
+    return false;
+  }
+
+  function handleStoryTimeFieldInput(event) {
+    const storyField = event.target.closest("[data-story-time-field='custom_advance_min_minutes']");
+    if (!storyField) return false;
+    const panel = document.getElementById("storyTimePanel");
+    const type = panel?.querySelector("[data-story-time-field='custom_advance_type']")?.value;
+    const maxInput = panel?.querySelector("[data-story-time-field='custom_advance_max_minutes']");
+    if (type === "fixed" && maxInput) maxInput.value = storyField.value;
+    return type === "fixed";
+  }
+
+  document.getElementById("storyTimeGlobalMount")?.addEventListener("change", (event) => {
+    handleStoryTimeFieldChange(event);
+  });
+  document.getElementById("storyTimeGlobalMount")?.addEventListener("input", (event) => {
+    handleStoryTimeFieldInput(event);
+  });
+
+  document.getElementById("roleStateDetail")?.addEventListener("change", (event) => {
+    if (handleStoryTimeFieldChange(event)) return;
+    const role = currentRoleState();
+    const modeSelect = event.target.closest("[data-role-mode-select]");
+    if (role && modeSelect) {
+      setRoleStateMode(role, modeSelect.value);
+      renderRoleStateWorkspace();
+      return;
+    }
+    const conditionInput = event.target.closest("[data-stage-condition-field]");
+    if (role && conditionInput) {
+      const tr = conditionInput.closest("[data-stage-index]");
+      const row = conditionInput.closest("[data-condition-index]");
+      const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
+      const condition = stage?.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
+      if (!condition) return;
+      updateStageConditionFromInput(condition, conditionInput, role);
+      renderRoleStateWorkspace();
+    }
+  });
+
+  document.querySelector(".role-state-workspace")?.addEventListener("click", (event) => {
+    const storyAction = event.target.closest("[data-story-time-action]");
+    if (storyAction) {
+      event.preventDefault();
+      const action = storyAction.dataset.storyTimeAction;
+      if (action === "toggle") {
+        setStoryTimeExpanded(!state.storyTimeExpanded);
+        return;
+      }
+      const tasks = {
+        save: saveStoryTimeConfig,
+        initialize: initializeStoryTime,
+        calibrate: calibrateStoryTime,
+        reset: resetStoryTime,
+        history: loadStoryTimeHistory,
+      };
+      tasks[action]?.().catch((error) => pageToast("剧情时间操作失败", error.message, "error"));
+      return;
+    }
+    const role = currentRoleState();
+    if (!role) return;
+    const hit = (selector) => event.target.closest(selector);
+    if (hit("[data-add-variable]")) {
+      event.preventDefault();
+      const next = (role.variables || []).length + 1;
+      role.variables = role.variables || [];
+      role.variables.push({ var_key: `var_${next}`, var_name: `变量${next}`, enabled: true, default_value: 0, min_value: 0, max_value: 100, delta_min: -2, delta_max: 2, display: true, stage_relevant: true, instruction: "" });
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-delete-variable]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-variable-index]");
+      const index = Number(tr?.dataset.variableIndex ?? -1);
+      if (index >= 0) role.variables.splice(index, 1);
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-add-snapshot-field]")) {
+      event.preventDefault();
+      const next = (role.snapshotFields || []).length + 1;
+      role.snapshotFields = role.snapshotFields || [];
+      role.snapshotFields.push({ key: `snapshot_${next}`, label: `快照字段${next}`, enabled: true, display: true, instruction: "根据本轮上下文生成该状态快照字段。" });
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-delete-snapshot-field]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-snapshot-index]");
+      const index = Number(tr?.dataset.snapshotIndex ?? -1);
+      if (index >= 0) role.snapshotFields.splice(index, 1);
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-add-stage]")) {
+      event.preventDefault();
+      const next = (role.stages || []).length + 1;
+      role.stages = role.stages || [];
+      role.stages.push({ stage_key: roleStateStageKey(next), stage_name: roleStateStageName(next), enabled: true, priority: next * 10, condition_mode: "all", conditions: [], allow_regression: false, confirm_turns: 1, cooldown_turns: 1 });
+      renderRoleStateWorkspace();
+      return;
+    }
+    if (hit("[data-config-stage]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-stage-index]");
+      renderRoleStateStageDialog(Number(tr?.dataset.stageIndex ?? -1));
+      return;
+    }
+    if (hit("[data-create-stage-worldbook]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-stage-index]");
+      createWorldbookEntryForStage(Number(tr?.dataset.stageIndex ?? -1));
+      return;
+    }
+    if (hit("[data-delete-stage]")) {
+      event.preventDefault();
+      const tr = event.target.closest("[data-stage-index]");
+      const index = Number(tr?.dataset.stageIndex ?? -1);
+      if (index >= 0) role.stages.splice(index, 1);
+      renderRoleStateWorkspace();
+      return;
+    }
+  });
+  document.getElementById("roleStateDetail")?.addEventListener("input", (event) => {
+    if (handleStoryTimeFieldInput(event)) return;
+    const role = currentRoleState();
+    if (!role) return;
+    const varInput = event.target.closest("[data-var-field]");
+    if (varInput) {
+      const tr = varInput.closest("[data-variable-index]");
+      const variable = role.variables?.[Number(tr?.dataset.variableIndex ?? -1)];
+      if (!variable) return;
+      const field = varInput.dataset.varField;
+      if (["enabled", "display", "stage_relevant"].includes(field)) variable[field] = !!varInput.checked;
+      else if (["default_value", "min_value", "max_value", "delta_min", "delta_max"].includes(field)) variable[field] = Number(varInput.value || 0);
+      else if (field === "var_key") variable[field] = safeTemplateId(varInput.value || variable.var_key);
+      else variable[field] = varInput.value;
+    }
+    const snapshotInput = event.target.closest("[data-snapshot-field]");
+    if (snapshotInput) {
+      const tr = snapshotInput.closest("[data-snapshot-index]");
+      const fieldItem = role.snapshotFields?.[Number(tr?.dataset.snapshotIndex ?? -1)];
+      if (!fieldItem) return;
+      const field = snapshotInput.dataset.snapshotField;
+      if (["enabled", "display"].includes(field)) fieldItem[field] = !!snapshotInput.checked;
+      else if (field === "key") fieldItem[field] = safeTemplateId(snapshotInput.value || fieldItem.key);
+      else fieldItem[field] = snapshotInput.value;
+    }
+    const conditionInput = event.target.closest("[data-stage-condition-field]");
+    if (conditionInput) {
+      const tr = conditionInput.closest("[data-stage-index]");
+      const row = conditionInput.closest("[data-condition-index]");
+      const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
+      const condition = stage?.conditions?.[Number(row?.dataset.conditionIndex ?? -1)];
+      if (!condition) return;
+      updateStageConditionFromInput(condition, conditionInput, role);
+    }
+    const stageInput = event.target.closest("[data-stage-field]");
+    if (stageInput) {
+      const tr = stageInput.closest("[data-stage-index]");
+      const stage = role.stages?.[Number(tr?.dataset.stageIndex ?? -1)];
+      if (!stage) return;
+      const field = stageInput.dataset.stageField;
+      if (field === "enabled") stage.enabled = !!stageInput.checked;
+      else if (field === "priority") stage.priority = Number(stageInput.value || 0);
+      else if (field === "stage_key") stage.stage_key = safeTemplateId(stageInput.value || stage.stage_key);
+      else if (field === "conditions_text") {
+        stage.conditions = String(stageInput.value || "").split(";").map((part) => {
+          const match = part.trim().match(/^([a-zA-Z0-9_\-]+)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?)$/);
+          return match ? { var: match[1], op: match[2], value: Number(match[3]) } : null;
+        }).filter(Boolean);
+      } else stage[field] = stageInput.value;
+    }
+  });
+
+  $("#manualWorkerBtn").addEventListener("click", () => manualWorkerUpdate());
+  $("#loadLogBtn").addEventListener("click", () => loadLog().catch((error) => { els.logBox.textContent = error.message; }));
+  $("#exportDebugLogBtn")?.addEventListener("click", () => exportDebugLog().catch((error) => pageToast("导出排查日志失败", error.message, "error")));
+  $("#addFieldBtn").addEventListener("click", addField); $("#addRowBtn").addEventListener("click", addRow); $("#newTableBtn").addEventListener("click", newTable);
+  $("#exportBtn").addEventListener("click", () => exportAll().catch((error) => setStatus(error.message, "error")));
+  $("#importInput").addEventListener("change", (event) => importFile(event.target.files?.[0]).catch((error) => { setStatus(error.message, "error"); pageToast("导入失败", error.message, "error"); }));
+  window.addEventListener("state_journal:updated", (event) => { els.updateSummaryText.textContent = event.detail?.message || "聊天页自动填表已完成。"; loadState().catch(() => {}); });
+  window.addEventListener("hashchange", () => { openRouteFromHash(); });
+
+  loadState()
+    .then(() => { openRouteFromHash(); })
+    .catch((error) => { setStatus(error.message, "error"); pageToast("数据库载入失败", error.message, "error"); });
+})();

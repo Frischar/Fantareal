@@ -1,0 +1,34 @@
+{
+  "id": "gufeng_paper",
+  "name": "古风笺纸",
+  "version": "1.1.0",
+  "author": "Fantareal",
+  "description": "宣纸底、淡墨边、朱砂点题，适合古风、武侠、仙侠和明末叙事。",
+  "style": {
+    "class_name": "theme-gufeng-paper",
+    "accent": "#9f5f41",
+    "layout": {
+      "title_card": "gufeng_chapter",
+      "scene_card": "paper_chips",
+      "character_card": "paper_fields",
+      "relationship_card": "side_note",
+      "status_bar": "seal"
+    },
+    "tokens": {
+      "emotion": "情",
+      "clothing": "衣",
+      "posture": "形",
+      "scene": "景",
+      "sensory_field": "境",
+      "body_temperature": "温",
+      "body_motion": "动",
+      "micro_reaction": "息",
+      "visual_focus": "眸",
+      "interaction": "合",
+      "summary": "记"
+    },
+    "title_card": {"background": "paper", "border": "ink", "radius": "soft", "shadow": "paper"},
+    "character_card": {"background": "soft_paper", "field_style": "paper_tag", "spacing": "comfortable"},
+    "relationship_card": {"style": "side_note"}
+  }
+}

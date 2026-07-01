@@ -1,0 +1,2 @@
+"""Fantareal application package."""
+

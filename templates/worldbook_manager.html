@@ -1,0 +1,2611 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Worldbook Entries - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p9-textarea-scroll-20260701" />
+    <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
+
+  </head>
+  <body class="app-sidebar-shell worldbook-manager-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+      <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Worldbook</span>
+          <div class="slot-meta">
+            <strong>当前为全局世界书</strong>
+            <p class="slot-hint">这里维护全局世界书词条。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-shell compact">
+      <section class="panel config-panel full-span">
+        <div class="section-head">
+          <div class="ui-workbench-titleline worldbook-manager-titleline">
+            <p class="eyebrow">Worldbook Entries</p>
+            <span id="worldbook-status-box" class="worldbook-status-box worldbook-status-pill config-status-pill ui-status-pill is-success" aria-live="polite">
+              <strong id="status-text" class="status-line strong">就绪</strong>
+            </span>
+          </div>
+          <h2>世界书词条管理</h2>
+          <p class="muted">支持标题、主关键词、副关键词、常驻/关键词触发、主副组关系、组别、概率、黏性、冷却、顺序，以及角色定义前/后与聊天内注入等字段。</p>
+        </div>
+        <div class="worldbook-overview-strip">
+          <div class="worldbook-overview-pills">
+            <span class="worldbook-overview-pill">当前条数 <strong id="worldbook-count">{{ worldbook_count }}</strong></span>
+            <span class="worldbook-overview-pill">快速入口 <a class="ghost-link" href="/config/worldbook">打开触发设置</a></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span">
+        <div class="worldbook-workspace">
+        <div class="memory-actions worldbook-action-bar ui-sticky-toolbar ui-action-dock is-wrap full-span">
+          <div class="button-row worldbook-actions-primary ui-action-dock-primary">
+            <button id="add-worldbook-entry" type="button">新增</button>
+            <button id="save-worldbook-entries" type="button" class="secondary">保存</button>
+            <button id="reload-worldbook-entries" type="button" class="secondary">重新读取</button>
+          </div>
+          <details class="worldbook-more-actions ui-action-more">
+            <summary class="secondary compact" role="button">更多</summary>
+            <div class="worldbook-more-menu ui-action-more-menu">
+              <button id="import-worldbook" type="button" class="secondary compact">导入世界书</button>
+              <button id="export-worldbook" type="button" class="secondary compact">导出世界书</button>
+            </div>
+          </details>
+          <input id="import-worldbook-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
+        </div>
+
+          <aside class="panel config-panel worldbook-group-panel">
+            <div class="section-head">
+              <p class="eyebrow">Groups</p>
+              <h2>组别导航</h2>
+              <p class="muted">点击左侧组别，只显示该组词条。</p>
+            </div>
+            <div id="worldbook-group-sidebar" class="worldbook-group-list"></div>
+          </aside>
+
+          <div class="worldbook-list-pane worldbook-stage5-rule-editor">
+            <div class="worldbook-list-toolbar">
+              <div>
+                <label for="worldbook-search">搜索词条</label>
+                <input id="worldbook-search" type="text" placeholder="按标题、组别、关键词、内容、备注搜索" />
+                <p id="active-worldbook-filter" class="muted helper-text worldbook-filter-summary">当前筛选：全部词条</p>
+              </div>
+              <div class="button-row offset-top worldbook-toolbar-actions">
+                <button id="check-worldbook-health" type="button" class="secondary">检查问题</button>
+                <button id="clear-worldbook-health-filter" type="button" class="secondary">清除问题</button>
+                <span id="active-health-filter" class="muted helper-text">问题筛选：未启用</span>
+                <button id="collapse-all-worldbook" type="button" class="secondary">全部折叠</button>
+                <button id="expand-all-worldbook" type="button" class="secondary">全部展开</button>
+                <button id="select-all-visible-worldbook-toolbar" type="button" class="secondary">选择当前</button>
+              </div>
+            </div>
+
+            <div class="worldbook-filter-strip">
+              <div class="worldbook-quick-filter-panel">
+                <div class="worldbook-quick-filter-heading">
+                  <span class="worldbook-filter-label">快速筛选</span>
+                  <p id="active-quick-filter" class="muted helper-text">全部</p>
+                </div>
+                <div id="worldbook-quick-filters" class="worldbook-quick-filter-row" aria-label="世界书快速筛选"></div>
+              </div>
+              <div id="worldbook-health-results" class="worldbook-health-results is-hidden">
+                <p class="worldbook-health-empty">点击“检查问题”，可以查看空内容、重复关键词、未分组、禁用词条等问题。</p>
+              </div>
+            </div>
+
+            <p class="muted helper-text">
+              说明：顺序数值越小越先处理。“常驻”表示该条不依赖关键词；
+              “关键词触发”表示仍依赖主关键词命中。主副组关系中的“与所有/与任意”是主组与副组之间的关系，不是组内别名关系。
+            </p>
+
+            <div id="worldbook-entry-list" class="memory-list">
+          {% for item in worldbook_entries %}
+          <article class="memory-card worldbook-entry-card worldbook-rule-card" data-collapsed="false">
+            <div class="memory-card-head">
+              <label class="checkbox-row wb-select-control" title="选择此词条">
+                <input class="wb-selected" type="checkbox" aria-label="选择此词条" />
+              </label>
+              <strong>{{ item.title or ("词条 " ~ loop.index) }}</strong>
+              <div class="button-row">
+                <button type="button" class="secondary compact toggle-worldbook-entry">折叠</button>
+                <button type="button" class="secondary compact remove-worldbook-entry">删除</button>
+              </div>
+            </div>
+
+            <div class="worldbook-entry-body worldbook-rule-body">
+              <div class="grid-two wb-wide-grid">
+                <div>
+                  <label>标题</label>
+                  <input class="wb-title" value="{{ item.title }}" placeholder="例如：身份·我是妻子" />
+                </div>
+                <div>
+                  <label>组别</label>
+                  <input class="wb-group" value="{{ item.group or '' }}" placeholder="例如：身份关系 / 地点 / 规则" />
+                </div>
+              </div>
+
+              <div class="grid-two wb-keyword-grid">
+                <div>
+                  <div class="macro-field-head">
+                    <label>主关键词</label>
+                    <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-trigger">{ } 变量</button>
+                  </div>
+                  <input class="wb-trigger" value="{{ item.trigger }}" placeholder="多个别名可用逗号分隔" />
+                </div>
+                <div>
+                  <div class="macro-field-head">
+                    <label>副关键词</label>
+                    <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-secondary-trigger">{ } 变量</button>
+                  </div>
+                  <input class="wb-secondary-trigger" value="{{ item.secondary_trigger }}" placeholder="可留空；例如：婚后, 成亲" />
+                </div>
+              </div>
+              <div class="wb-external-tag-panel" hidden>
+                <div class="grid-two wb-wide-grid">
+                  <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal" {% if (item.external_source or 'state_journal') == 'state_journal' %}selected{% endif %}>数据库 · 状态阶段</option><option value="preset" {% if item.external_source == 'preset' %}selected{% endif %}>预设标签</option><option value="manual" {% if item.external_source == 'manual' %}selected{% endif %}>手动标签</option></select></div>
+                  <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+                </div>
+                <div class="wb-external-tags-row">
+                  <label class="wb-external-tags-label">自定义触发标签（可选）</label>
+                  <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用数据库角色 / 阶段生成标签">{{ (item.activation_tags or []) | join('&#10;') }}</textarea>
+                  <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成状态阶段标签。</p>
+                </div>
+                <div class="wb-stage-select-row">
+                  <div><label>角色</label><select class="wb-external-role-select"><option value="">读取数据库阶段中…</option></select></div>
+                  <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
+                </div>
+                <p class="muted helper-text wb-external-stage-hint">选择数据库角色与阶段；上方标签留空时会自动生成机器标签。</p>
+                <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
+                  <div class="grid-two wb-wide-grid">
+                    <div><label>角色名</label><input class="wb-external-role-name" value="{{ (item.external_ref or {}).get('role_name', '') }}" placeholder="例如：苏怜烟" /></div>
+                    <div><label>角色 ID</label><input class="wb-external-role-id" value="{{ (item.external_ref or {}).get('role_id', '') }}" placeholder="su_lianyan" /></div>
+                  </div>
+                  <div class="grid-two wb-wide-grid">
+                    <div><label>阶段名</label><input class="wb-external-stage-name" value="{{ (item.external_ref or {}).get('stage_name', '') }}" placeholder="例如：情愫初生" /></div>
+                    <div><label>阶段 Key</label><input class="wb-external-stage-key" value="{{ (item.external_ref or {}).get('stage_key', '') }}" placeholder="qingsu_chusheng" /></div>
+                  </div>
+                </details>
+                <p class="muted wb-external-preview">选择外部标签触发后，本词条会在对应 active_tag 生效时注入。</p>
+              </div>
+
+              <div class="grid-two wb-compact-grid wb-trigger-rule-grid" data-section-title="触发规则">
+                <div>
+                  <label>触发</label>
+                  <select class="wb-entry-type">
+                    <option value="keyword" {% if (item.entry_type or 'keyword') == 'keyword' %}selected{% endif %}>关键词触发</option>
+                    <option value="constant" {% if item.entry_type == 'constant' %}selected{% endif %}>常驻</option>
+                    <option value="external_tag" {% if item.entry_type == 'external_tag' %}selected{% endif %}>外部标签触发</option>
+                  </select>
+                </div>
+                <div>
+                  <label>提示层级</label>
+                  <select class="wb-prompt-layer">
+                    <option value="follow_position" {% if (item.prompt_layer or 'follow_position') == 'follow_position' %}selected{% endif %}>跟随注入位置</option>
+                    <option value="stable" {% if item.prompt_layer == 'stable' %}selected{% endif %}>稳定区</option>
+                    <option value="current_state" {% if item.prompt_layer == 'current_state' %}selected{% endif %}>当前状态区</option>
+                    <option value="dynamic" {% if item.prompt_layer == 'dynamic' %}selected{% endif %}>动态区</option>
+                    <option value="output_guard" {% if item.prompt_layer == 'output_guard' %}selected{% endif %}>输出协议区</option>
+                  </select>
+                </div>
+                <div>
+                  <label>主副关系</label>
+                  <select class="wb-group-operator">
+                    <option value="and" {% if (item.group_operator or 'and') == 'and' %}selected{% endif %}>与所有</option>
+                    <option value="or" {% if item.group_operator == 'or' %}selected{% endif %}>与任意</option>
+                  </select>
+                </div>
+                <div>
+                  <label>主词</label>
+                  <select class="wb-match-mode">
+                    <option value="any" {% if (item.match_mode or 'any') == 'any' %}selected{% endif %}>任意命中</option>
+                    <option value="all" {% if item.match_mode == 'all' %}selected{% endif %}>全部命中</option>
+                  </select>
+                </div>
+                <div>
+                  <label>副词</label>
+                  <select class="wb-secondary-mode">
+                    <option value="any" {% if item.secondary_mode == 'any' %}selected{% endif %}>任意命中</option>
+                    <option value="all" {% if (item.secondary_mode or 'all') == 'all' %}selected{% endif %}>全部命中</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid-two wb-compact-grid wb-number-grid" data-section-title="数值设置">
+                <div>
+                  <label>概率</label>
+                  <input class="wb-chance" type="number" min="0" max="100" step="1" value="{{ item.chance if item.chance is not none else 100 }}" />
+                </div>
+                <div>
+                  <label>顺序</label>
+                  <input class="wb-order" type="number" min="0" max="999999" step="1" value="{{ item.order if item.order is not none else item.priority if item.priority is not none else 100 }}" />
+                </div>
+                <div>
+                  <label>黏性</label>
+                  <input class="wb-sticky-turns" type="number" min="0" max="999" step="1" value="{{ item.sticky_turns if item.sticky_turns is not none else 0 }}" />
+                </div>
+                <div>
+                  <label>冷却</label>
+                  <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="{{ item.cooldown_turns if item.cooldown_turns is not none else 0 }}" />
+                </div>
+              </div>
+              <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当数据库阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
+
+              <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
+                <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
+                <div>
+                  <label>插入位置</label>
+                  <select class="wb-insertion-position">
+                    <option value="before_char_defs" {% if item.insertion_position == 'before_char_defs' %}selected{% endif %}>角色定义前</option>
+                    <option value="after_char_defs" {% if (item.insertion_position or 'after_char_defs') == 'after_char_defs' %}selected{% endif %}>角色定义后</option>
+                    <option value="in_chat" {% if item.insertion_position == 'in_chat' %}selected{% endif %}>@D 自定义角色在深度</option>
+                    <option value="at_depth_system" {% if item.insertion_position == 'at_depth_system' %}selected{% endif %}>@D system 在深度</option>
+                    <option value="at_depth_user" {% if item.insertion_position == 'at_depth_user' %}selected{% endif %}>@D user 在深度</option>
+                    <option value="at_depth_assistant" {% if item.insertion_position == 'at_depth_assistant' %}selected{% endif %}>@D assistant 在深度</option>
+                  </select>
+                </div>
+                <div>
+                  <label>注入顺序</label>
+                  <input class="wb-injection-order" type="number" min="0" max="999999" step="1" value="{{ item.injection_order if item.injection_order is not none else item.order if item.order is not none else item.priority if item.priority is not none else 100 }}" />
+                </div>
+                <div>
+                  <label>聊天深度</label>
+                  <input class="wb-injection-depth" type="number" min="0" max="999" step="1" value="{{ item.injection_depth if item.injection_depth is not none else 0 }}" />
+                </div>
+                <div>
+                  <label>注入角色</label>
+                  <select class="wb-injection-role">
+                    <option value="system" {% if (item.injection_role or 'system') == 'system' %}selected{% endif %}>system</option>
+                    <option value="user" {% if item.injection_role == 'user' %}selected{% endif %}>user</option>
+                    <option value="assistant" {% if item.injection_role == 'assistant' %}selected{% endif %}>assistant</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="wb-options-grid ui-options-grid" data-section-title="选项">
+                <label class="checkbox-row">
+                  <input class="wb-enabled" type="checkbox" {% if item.enabled %}checked{% endif %} />
+                  <span>启用</span>
+                </label>
+                <label class="checkbox-row">
+                  <input class="wb-recursive-enabled" type="checkbox" {% if item.recursive_enabled is not defined or item.recursive_enabled %}checked{% endif %} />
+                  <span>允许递归</span>
+                </label>
+                <label class="checkbox-row">
+                  <input class="wb-prevent-further-recursion" type="checkbox" {% if item.prevent_further_recursion %}checked{% endif %} />
+                  <span>阻止继续递归</span>
+                </label>
+                <label class="checkbox-row">
+                  <input class="wb-case-sensitive" type="checkbox" {% if item.case_sensitive %}checked{% endif %} />
+                  <span>区分大小写</span>
+                </label>
+                <label class="checkbox-row">
+                  <input class="wb-whole-word" type="checkbox" {% if item.whole_word %}checked{% endif %} />
+                  <span>完整词匹配</span>
+                </label>
+              </div>
+              <div class="macro-field-head">
+                <label>内容</label>
+                <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-content">{ } 变量</button>
+              </div>
+              <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。">{{ item.content }}</textarea>
+
+              <label>备注</label>
+              <textarea class="wb-comment" rows="2" placeholder="可写用途说明。">{{ item.comment }}</textarea>
+
+              <input class="wb-id" type="hidden" value="{{ item.id }}" />
+            </div>
+          </article>
+          {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+
+
+    <aside id="worldbook-selection-panel" class="worldbook-selection-panel" aria-hidden="true">
+      <div class="worldbook-selection-card">
+        <div class="worldbook-selection-head">
+          <div>
+            <p class="eyebrow">Selected Tools</p>
+            <h3>已选中 <strong id="selected-worldbook-count" class="worldbook-selection-count">0</strong> 条</h3>
+            <p class="muted helper-text worldbook-inline-hint">针对当前勾选词条进行批量操作。</p>
+          </div>
+          <button id="close-worldbook-selection-panel" type="button" class="secondary worldbook-close-button" aria-label="清空选择并关闭">×</button>
+        </div>
+        <div class="worldbook-selection-content">
+          <div class="worldbook-selection-actions">
+            <button id="toggle-bulk-editor" type="button" class="secondary full-row" aria-expanded="false">批量编辑</button>
+            <button id="bulk-enable-selected" type="button" class="secondary">启用</button>
+            <button id="bulk-disable-selected" type="button" class="secondary">禁用</button>
+            <button id="delete-selected-worldbook" type="button" class="secondary danger-button">删除选中</button>
+            <button id="clear-selected-worldbook" type="button" class="secondary">清空选择</button>
+            <button id="select-all-visible-worldbook" type="button" class="secondary full-row">全选当前筛选结果</button>
+          </div>
+
+          <div id="worldbook-bulk-editor" class="worldbook-bulk-editor is-collapsed" aria-hidden="true">
+            <div class="worldbook-bulk-section">
+              <div class="worldbook-bulk-row">
+                <div>
+                  <label for="bulk-insertion-position">插入位置</label>
+                  <select id="bulk-insertion-position">
+                    <option value="before_char_defs">角色定义前</option>
+                    <option value="after_char_defs" selected>角色定义后</option>
+                    <option value="in_chat">@D 自定义角色在深度</option>
+                    <option value="at_depth_system">@D system 在深度</option>
+                    <option value="at_depth_user">@D user 在深度</option>
+                    <option value="at_depth_assistant">@D assistant 在深度</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="bulk-injection-depth">聊天深度</label>
+                  <input id="bulk-injection-depth" type="number" min="0" max="999" step="1" value="0" />
+                </div>
+              </div>
+              <div>
+                <label for="bulk-injection-order">注入顺序</label>
+                <input id="bulk-injection-order" type="number" min="0" max="999999" step="1" value="100" />
+              </div>
+              <button id="apply-bulk-injection" type="button" class="secondary">应用注入设置</button>
+            </div>
+
+            <div class="worldbook-bulk-section">
+              <div>
+                <label for="bulk-group-target">移动到组别</label>
+                <input id="bulk-group-target" list="worldbook-group-options" placeholder="输入新组别，或选择已有组别" />
+                <datalist id="worldbook-group-options"></datalist>
+              </div>
+              <button id="apply-bulk-group" type="button" class="secondary">应用组别</button>
+            </div>
+
+            <div class="worldbook-bulk-section">
+              <label class="checkbox-row">
+                <input id="bulk-recursive-enabled" type="checkbox" checked />
+                <span>允许递归参与</span>
+              </label>
+              <label class="checkbox-row">
+                <input id="bulk-prevent-further-recursion" type="checkbox" />
+                <span>阻止继续递归</span>
+              </label>
+              <button id="apply-bulk-recursion" type="button" class="secondary">应用递归设置</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div id="worldbook-import-modal" class="worldbook-import-backdrop is-hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="worldbook-import-title">
+      <section class="worldbook-import-modal">
+        <div class="worldbook-import-head">
+          <div>
+            <p class="eyebrow">Import Wizard</p>
+            <h2 id="worldbook-import-title">导入世界书</h2>
+            <p class="muted helper-text worldbook-inline-hint">选择文件前，先确认导入方式和旧字段兼容策略。</p>
+          </div>
+          <button id="close-worldbook-import-modal" type="button" class="secondary worldbook-close-button" aria-label="关闭导入世界书">×</button>
+        </div>
+        <div class="worldbook-import-body">
+          <div class="worldbook-import-step">
+            <div class="worldbook-import-step-title">
+              <strong>1. 导入方式</strong>
+              <span class="muted helper-text">替换或增量</span>
+            </div>
+            <div class="grid-two">
+              <div>
+                <label for="import-mode">导入模式</label>
+                <select id="import-mode">
+                  <option value="replace" selected>替换当前世界书</option>
+                  <option value="append">增量追加到当前世界书</option>
+                </select>
+                <p id="import-mode-hint" class="muted helper-text">替换模式会使用导入文件覆盖当前世界书。</p>
+              </div>
+              <label class="checkbox-row">
+                <input id="import-apply-settings" type="checkbox" checked />
+                <span>导入时同时应用包内 settings</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="worldbook-import-step">
+            <div class="worldbook-import-step-title">
+              <strong>2. 旧字段兼容</strong>
+              <span class="muted helper-text">缺失注入字段时生效</span>
+            </div>
+            <div class="grid-two">
+              <div>
+                <label for="import-missing-injection-policy">缺失注入字段时</label>
+                <select id="import-missing-injection-policy">
+                  <option value="follow_defaults" selected>跟随当前默认设置</option>
+                  <option value="force_before_char_defs">统一补到角色定义前</option>
+                  <option value="force_after_char_defs">统一补到角色定义后</option>
+                  <option value="force_in_chat">统一补到聊天内注入</option>
+                </select>
+              </div>
+              <div>
+                <label for="import-force-in-chat-depth">强制聊天深度</label>
+                <input id="import-force-in-chat-depth" type="number" min="0" max="999" step="1" value="0" />
+                <p class="muted helper-text">仅在“统一补到聊天内注入”时生效。</p>
+              </div>
+            </div>
+            <div>
+              <label for="import-force-injection-order">缺失注入顺序时补为</label>
+              <input id="import-force-injection-order" type="number" min="0" max="999999" step="1" placeholder="留空则不强制" />
+            </div>
+          </div>
+
+          <div class="worldbook-import-step">
+            <div class="worldbook-import-step-title">
+              <strong>3. 选择文件并导入</strong>
+              <span class="muted helper-text">JSON / JSONC</span>
+            </div>
+            <p class="muted helper-text worldbook-inline-hint">选择文件后会立即按以上策略导入。替换模式会覆盖当前页面词条；增量模式只追加到当前列表，检查无误后再保存。</p>
+          </div>
+        </div>
+        <div class="worldbook-import-footer">
+          <button id="cancel-worldbook-import" type="button" class="secondary">取消</button>
+          <button id="confirm-worldbook-import" type="button">选择文件并导入</button>
+        </div>
+      </section>
+    </div>
+
+    <template id="worldbook-entry-template">
+      <article class="memory-card worldbook-entry-card worldbook-rule-card" data-collapsed="false">
+        <div class="memory-card-head">
+          <label class="checkbox-row wb-select-control" title="选择此词条">
+            <input class="wb-selected" type="checkbox" aria-label="选择此词条" />
+          </label>
+          <strong>新词条</strong>
+          <div class="button-row">
+            <button type="button" class="secondary compact toggle-worldbook-entry">折叠</button>
+            <button type="button" class="secondary compact remove-worldbook-entry">删除</button>
+          </div>
+        </div>
+
+        <div class="worldbook-entry-body worldbook-rule-body">
+          <div class="grid-two wb-wide-grid">
+            <div>
+              <label>标题</label>
+              <input class="wb-title" placeholder="例如：身份·我是妻子" />
+            </div>
+            <div>
+              <label>组别</label>
+              <input class="wb-group" placeholder="例如：身份关系 / 地点 / 规则" />
+            </div>
+          </div>
+
+          <div class="grid-two wb-keyword-grid">
+            <div>
+              <div class="macro-field-head">
+                <label>主关键词</label>
+                <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-trigger">{ } 变量</button>
+              </div>
+              <input class="wb-trigger" placeholder="多个别名可用逗号分隔" />
+            </div>
+            <div>
+              <div class="macro-field-head">
+                <label>副关键词</label>
+                <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-secondary-trigger">{ } 变量</button>
+              </div>
+              <input class="wb-secondary-trigger" placeholder="可留空；例如：婚后, 成亲" />
+            </div>
+          </div>
+          <div class="wb-external-tag-panel" hidden>
+            <div class="grid-two wb-wide-grid">
+              <div><label>外部来源</label><select class="wb-external-source"><option value="state_journal">数据库 · 状态阶段</option><option value="preset">预设标签</option><option value="manual">手动标签</option></select></div>
+              <div><label>绑定状态</label><span class="wb-external-status-chip wb-external-status">阶段列表未接入</span></div>
+            </div>
+            <div class="wb-external-tags-row">
+              <label class="wb-external-tags-label">自定义触发标签（可选）</label>
+              <textarea class="wb-external-tags" rows="2" placeholder="留空时自动使用数据库角色 / 阶段生成标签"></textarea>
+              <p class="muted helper-text wb-external-tags-helper">留空时自动使用下方角色 / 阶段生成状态阶段标签。</p>
+            </div>
+            <div class="wb-stage-select-row">
+              <div><label>角色</label><select class="wb-external-role-select"><option value="">读取数据库阶段中…</option></select></div>
+              <div><label>阶段</label><select class="wb-external-stage-select"><option value="">请选择角色</option></select></div>
+            </div>
+            <p class="muted helper-text wb-external-stage-hint">选择数据库角色与阶段；上方标签留空时会自动生成机器标签。</p>
+            <details class="role-state-advanced wb-external-advanced"><summary>高级 / 调试信息</summary>
+              <div class="grid-two wb-wide-grid">
+                <div><label>角色名</label><input class="wb-external-role-name" placeholder="例如：苏怜烟" /></div>
+                <div><label>角色 ID</label><input class="wb-external-role-id" placeholder="su_lianyan" /></div>
+              </div>
+              <div class="grid-two wb-wide-grid">
+                <div><label>阶段名</label><input class="wb-external-stage-name" placeholder="例如：情愫初生" /></div>
+                <div><label>阶段 Key</label><input class="wb-external-stage-key" placeholder="qingsu_chusheng" /></div>
+              </div>
+            </details>
+            <p class="muted wb-external-preview">选择外部标签触发后，本词条会在对应 active_tag 生效时注入。</p>
+          </div>
+
+          <div class="grid-two wb-compact-grid wb-trigger-rule-grid" data-section-title="触发规则">
+            <div>
+              <label>触发</label>
+              <select class="wb-entry-type">
+                <option value="keyword" selected>关键词触发</option>
+                <option value="constant">常驻</option>
+                <option value="external_tag">外部标签触发</option>
+              </select>
+            </div>
+            <div>
+              <label>提示层级</label>
+              <select class="wb-prompt-layer">
+                <option value="follow_position" selected>跟随注入位置</option>
+                <option value="stable">稳定区</option>
+                <option value="current_state">当前状态区</option>
+                <option value="dynamic">动态区</option>
+                <option value="output_guard">输出协议区</option>
+              </select>
+            </div>
+            <div>
+              <label>主副关系</label>
+              <select class="wb-group-operator">
+                <option value="and" selected>与所有</option>
+                <option value="or">与任意</option>
+              </select>
+            </div>
+            <div>
+              <label>主词</label>
+              <select class="wb-match-mode">
+                <option value="any" selected>任意命中</option>
+                <option value="all">全部命中</option>
+              </select>
+            </div>
+            <div>
+              <label>副词</label>
+              <select class="wb-secondary-mode">
+                <option value="any">任意命中</option>
+                <option value="all" selected>全部命中</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-two wb-compact-grid wb-number-grid" data-section-title="数值设置">
+            <div>
+              <label>概率</label>
+              <input class="wb-chance" type="number" min="0" max="100" step="1" value="100" />
+            </div>
+            <div>
+              <label>顺序</label>
+              <input class="wb-order" type="number" min="0" max="999999" step="1" value="100" />
+            </div>
+            <div>
+              <label>黏性</label>
+              <input class="wb-sticky-turns" type="number" min="0" max="999" step="1" value="0" />
+            </div>
+            <div>
+              <label>冷却</label>
+              <input class="wb-cooldown-turns" type="number" min="0" max="999" step="1" value="0" />
+            </div>
+          </div>
+          <p class="muted helper-text wb-external-runtime-note" hidden>外部标签词条按当前 active tag 实时注入；当数据库阶段或预设标签不再 active 时会自动停止注入，不使用概率、黏性和冷却。</p>
+
+          <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
+            <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
+            <div>
+              <label>插入位置</label>
+              <select class="wb-insertion-position">
+                <option value="before_char_defs">角色定义前</option>
+                <option value="after_char_defs" selected>角色定义后</option>
+                <option value="in_chat">@D 自定义角色在深度</option>
+                <option value="at_depth_system">@D system 在深度</option>
+                <option value="at_depth_user">@D user 在深度</option>
+                <option value="at_depth_assistant">@D assistant 在深度</option>
+              </select>
+            </div>
+            <div>
+              <label>注入顺序</label>
+              <input class="wb-injection-order" type="number" min="0" max="999999" step="1" value="100" />
+            </div>
+            <div>
+              <label>聊天深度</label>
+              <input class="wb-injection-depth" type="number" min="0" max="999" step="1" value="0" />
+            </div>
+            <div>
+              <label>注入角色</label>
+              <select class="wb-injection-role">
+                <option value="system" selected>system</option>
+                <option value="user">user</option>
+                <option value="assistant">assistant</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="wb-options-grid ui-options-grid" data-section-title="选项">
+            <label class="checkbox-row">
+              <input class="wb-enabled" type="checkbox" checked />
+              <span>启用</span>
+            </label>
+            <label class="checkbox-row">
+              <input class="wb-recursive-enabled" type="checkbox" checked />
+              <span>允许递归</span>
+            </label>
+            <label class="checkbox-row">
+              <input class="wb-prevent-further-recursion" type="checkbox" />
+              <span>阻止继续递归</span>
+            </label>
+            <label class="checkbox-row">
+              <input class="wb-case-sensitive" type="checkbox" />
+              <span>区分大小写</span>
+            </label>
+            <label class="checkbox-row">
+              <input class="wb-whole-word" type="checkbox" />
+              <span>完整词匹配</span>
+            </label>
+          </div>
+          <div class="macro-field-head">
+            <label>内容</label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".worldbook-entry-card" data-macro-target=".wb-content">{ } 变量</button>
+          </div>
+          <textarea class="wb-content" rows="6" placeholder="命中后会临时注入给模型的设定文本。"></textarea>
+
+          <label>备注</label>
+          <textarea class="wb-comment" rows="2" placeholder="可写用途说明。"></textarea>
+
+          <input class="wb-id" type="hidden" />
+        </div>
+      </article>
+    </template>
+
+    <script src="/static/js/app-core.js?v=v161-p4-batch-render-atomic-20260701"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
+    <script>
+      const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, postJson, batchRenderList } = window.Fantareal;
+      const statusEl = document.getElementById("status-text");
+      const worldbookListEl = document.getElementById("worldbook-entry-list");
+      const worldbookCountEl = document.getElementById("worldbook-count");
+      const templateEl = document.getElementById("worldbook-entry-template");
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      const selectedWorldbookCountEl = document.getElementById("selected-worldbook-count");
+      const importModeEl = document.getElementById("import-mode");
+      const importModeHintEl = document.getElementById("import-mode-hint");
+      const importApplySettingsEl = document.getElementById("import-apply-settings");
+      const importMissingInjectionPolicyEl = document.getElementById("import-missing-injection-policy");
+      const importForceInChatDepthEl = document.getElementById("import-force-in-chat-depth");
+      const importForceInjectionOrderEl = document.getElementById("import-force-injection-order");
+      const bulkInsertionPositionEl = document.getElementById("bulk-insertion-position");
+      const bulkInjectionDepthEl = document.getElementById("bulk-injection-depth");
+      const bulkGroupTargetEl = document.getElementById("bulk-group-target");
+      const groupOptionsEl = document.getElementById("worldbook-group-options");
+      const groupSidebarEl = document.getElementById("worldbook-group-sidebar");
+      const activeWorldbookFilterEl = document.getElementById("active-worldbook-filter");
+      const quickFiltersEl = document.getElementById("worldbook-quick-filters");
+      const activeQuickFilterEl = document.getElementById("active-quick-filter");
+      const healthResultsEl = document.getElementById("worldbook-health-results");
+      const activeHealthFilterEl = document.getElementById("active-health-filter");
+      const saveWorldbookEntriesEl = document.getElementById("save-worldbook-entries");
+      const QUICK_FILTERS = [
+        { key: "__all__", label: "全部" },
+        { key: "enabled", label: "启用" },
+        { key: "disabled", label: "禁用" },
+        { key: "constant", label: "常驻" },
+        { key: "keyword", label: "关键词" },
+        { key: "stable", label: "稳定区" },
+        { key: "current_state", label: "当前状态" },
+        { key: "dynamic", label: "动态区" },
+        { key: "output_guard", label: "输出协议" },
+        { key: "in_chat", label: "聊天注入" },
+        { key: "before_char_defs", label: "角色前" },
+        { key: "after_char_defs", label: "角色后" },
+        { key: "ungrouped", label: "未分组" },
+      ];
+      let activeWorldbookGroup = "__all__";
+      let activeQuickFilter = "__all__";
+      let activeHealthIssue = "";
+      let worldbookDirty = false;
+
+      const PROMPT_LAYER_LABELS = {
+        follow_position: "跟随位置",
+        stable: "稳定区",
+        current_state: "当前状态",
+        dynamic: "动态区",
+        output_guard: "输出协议",
+      };
+
+      const PROMPT_LAYER_HINTS = {
+        stable: "提示层级已接管：进入稳定区，原注入位置仅保留。",
+        current_state: "提示层级已接管：进入当前状态区，原注入位置仅保留。",
+        dynamic: "提示层级已接管：进入动态区，原注入位置仅保留。",
+        output_guard: "提示层级已接管：进入输出协议区，原注入位置仅保留。",
+      };
+
+      function getPromptLayerLabel(value) {
+        return PROMPT_LAYER_LABELS[value] || PROMPT_LAYER_LABELS.follow_position;
+      }
+
+      function getPromptLayerHint(value) {
+        return PROMPT_LAYER_HINTS[value] || "跟随注入位置：继续按角色前/角色后/聊天注入生效。";
+      }
+
+      function getWorldbookStatusKind(message = "") {
+        const text = String(message || statusEl?.title || statusEl?.textContent || "");
+        if (/失败|错误|异常|未能/.test(text)) return "error";
+        if (/正在|保存中|读取中|导入中|导出中|处理中/.test(text)) return "loading";
+        if (worldbookDirty || /未保存|记得保存|修改|移除|追加|启用|停用/.test(text)) return "dirty";
+        return "success";
+      }
+
+      function getCompactWorldbookStatusLabel(message = "", kind = "success") {
+        const text = String(message || "");
+        if (kind === "error") return "出错";
+        if (kind === "dirty") return "有修改";
+        if (kind === "loading") {
+          if (text.includes("保存")) return "保存中";
+          if (text.includes("读取")) return "读取中";
+          if (text.includes("导入")) return "导入中";
+          if (text.includes("导出")) return "导出中";
+          return "处理中";
+        }
+        if (text.includes("保存")) return "已保存";
+        if (text.includes("读取")) return "已读取";
+        if (text.includes("导入")) return "已导入";
+        if (text.includes("导出")) return "已导出";
+        if (text.includes("检查")) return "已检查";
+        return "就绪";
+      }
+
+      function updateWorldbookStatusClass(message = "") {
+        const box = document.getElementById("worldbook-status-box");
+        if (!box) return;
+        box.classList.remove("is-success", "is-loading", "is-saving", "is-dirty", "is-error", "is-idle");
+        const kind = getWorldbookStatusKind(message);
+        box.classList.add(kind === "loading" ? "is-saving" : `is-${kind}`);
+        return kind;
+      }
+
+      function setStatus(text) {
+        const message = worldbookDirty ? `${text}（有未保存修改）` : text;
+        const kind = getWorldbookStatusKind(message);
+        const label = getCompactWorldbookStatusLabel(message, kind);
+        const statusBox = document.getElementById("worldbook-status-box");
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: message,
+          state: kind === "loading" ? "saving" : kind,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle", "is-loading"],
+          pulseTarget: statusBox || statusEl,
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = message;
+        }
+        statusBox?.setAttribute("title", message);
+        updateWorldbookStatusClass(message);
+      }
+
+      function setWorldbookDirty(dirty) {
+        worldbookDirty = Boolean(dirty);
+        saveWorldbookEntriesEl?.classList.toggle("is-dirty", worldbookDirty);
+        updateWorldbookStatusClass();
+      }
+
+      function markWorldbookDirty(message = "有未保存修改，记得保存。") {
+        setWorldbookDirty(true);
+        setStatus(message);
+      }
+
+      const WORLDBOOK_INPUT_REFRESH_DELAY = 80;
+      const WORLDBOOK_RENDER_BATCH_SIZE = 6;
+      let worldbookSearchTextCache = new WeakMap();
+      let worldbookHealthCache = null;
+      let worldbookRefreshTimer = 0;
+      const pendingWorldbookRefresh = {
+        navigation: false,
+        health: false,
+        healthResults: false,
+        search: false,
+      };
+      const pendingWorldbookHealthCards = new Set();
+
+      function isHealthResultsVisible() {
+        return Boolean(healthResultsEl && !healthResultsEl.classList.contains("is-hidden"));
+      }
+
+      function invalidateWorldbookHealthCache() {
+        worldbookHealthCache = null;
+      }
+
+      function invalidateWorldbookCardCache(card, options = {}) {
+        if (card) worldbookSearchTextCache.delete(card);
+        if (options.health === "full") invalidateWorldbookHealthCache();
+        if (card && options.health === "card" && worldbookHealthCache) {
+          updateWorldbookHealthForCard(card);
+        }
+      }
+
+      function invalidateWorldbookCaches() {
+        worldbookSearchTextCache = new WeakMap();
+        invalidateWorldbookHealthCache();
+      }
+
+      function clearPendingWorldbookRefresh() {
+        pendingWorldbookRefresh.navigation = false;
+        pendingWorldbookRefresh.health = false;
+        pendingWorldbookRefresh.healthResults = false;
+        pendingWorldbookRefresh.search = false;
+        pendingWorldbookHealthCards.clear();
+      }
+
+      function flushWorldbookRefresh() {
+        if (worldbookRefreshTimer) {
+          window.clearTimeout(worldbookRefreshTimer);
+          worldbookRefreshTimer = 0;
+        }
+        const pending = { ...pendingWorldbookRefresh };
+        const healthCards = [...pendingWorldbookHealthCards];
+        clearPendingWorldbookRefresh();
+        if (pending.navigation) refreshWorldbookNavigation();
+        healthCards.forEach((card) => updateWorldbookHealthForCard(card));
+        const shouldRenderHealth = pending.healthResults && isHealthResultsVisible();
+        if (shouldRenderHealth) {
+          renderHealthResults({ applySearch: false, fullScan: pending.health });
+        } else if (pending.health) {
+          analyzeWorldbookHealth({ force: true });
+          updateHealthFilterLabel();
+        } else if (healthCards.length) {
+          updateHealthFilterLabel();
+        }
+        if (pending.search) applyWorldbookSearch();
+      }
+
+      function scheduleWorldbookRefresh(options = {}) {
+        pendingWorldbookRefresh.navigation ||= Boolean(options.navigation);
+        pendingWorldbookRefresh.health ||= Boolean(options.health);
+        pendingWorldbookRefresh.healthResults ||= Boolean(options.healthResults);
+        pendingWorldbookRefresh.search ||= options.search !== false;
+        if (options.healthCard) pendingWorldbookHealthCards.add(options.healthCard);
+        if (worldbookRefreshTimer) window.clearTimeout(worldbookRefreshTimer);
+        worldbookRefreshTimer = window.setTimeout(flushWorldbookRefresh, options.delay ?? WORLDBOOK_INPUT_REFRESH_DELAY);
+      }
+
+      function refreshWorldbookNow(options = {}) {
+        if (worldbookRefreshTimer) {
+          window.clearTimeout(worldbookRefreshTimer);
+          worldbookRefreshTimer = 0;
+        }
+        clearPendingWorldbookRefresh();
+        if (options.navigation) refreshWorldbookNavigation();
+        if (options.healthCard) updateWorldbookHealthForCard(options.healthCard);
+        if (options.healthResults && isHealthResultsVisible()) {
+          renderHealthResults({ applySearch: false, fullScan: Boolean(options.health) });
+        } else if (options.health) {
+          analyzeWorldbookHealth({ force: true });
+          updateHealthFilterLabel();
+        } else if (options.healthCard) {
+          updateHealthFilterLabel();
+        }
+        if (options.search !== false) applyWorldbookSearch();
+      }
+
+      function refreshWorldbookDerivedState(options = {}) {
+        invalidateWorldbookCaches();
+        const shouldRefreshHealth = options.health !== false && (isHealthResultsVisible() || Boolean(activeHealthIssue));
+        refreshWorldbookNow({
+          navigation: options.navigation !== false,
+          health: shouldRefreshHealth,
+          healthResults: options.healthResults ?? isHealthResultsVisible(),
+          search: options.search !== false,
+        });
+      }
+
+
+
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      let stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [], active_tags: [], active_plot_ledger_tags: [] };
+
+      function optionHtml(value, label, selected = false) {
+        return `<option value="${escapeHtml(value)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+      }
+
+      function findStageCatalogRole(roleId) {
+        const safeRole = String(roleId || "").trim();
+        return (stateJournalStageCatalog.roles || []).find((role) => String(role.role_id || "") === safeRole) || null;
+      }
+
+      function findStageCatalogItem(roleId, stageKey) {
+        const role = findStageCatalogRole(roleId);
+        if (!role) return null;
+        return (role.stages || []).find((stage) => String(stage.stage_key || "") === String(stageKey || "")) || null;
+      }
+
+      async function loadStateJournalStageCatalog() {
+        try {
+          const response = await fetch("/mods/state-journal/app/api/stage-tags/catalog");
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          stateJournalStageCatalog = {
+            roles: Array.isArray(payload.roles) ? payload.roles : [],
+            tags: Array.isArray(payload.tags) ? payload.tags : [],
+            active_stage_tags: Array.isArray(payload.active_stage_tags) ? payload.active_stage_tags : [],
+            active_plot_ledger_tags: Array.isArray(payload.active_plot_ledger_tags) ? payload.active_plot_ledger_tags : [],
+            active_tags: Array.isArray(payload.active_tags) ? payload.active_tags : (Array.isArray(payload.active_stage_tags) ? payload.active_stage_tags : []),
+          };
+        } catch (error) {
+          stateJournalStageCatalog = { roles: [], tags: [], active_stage_tags: [], active_tags: [], active_plot_ledger_tags: [] };
+        }
+      }
+
+      function applyExternalStageSelection(card, roleId, stageKey) {
+        const role = findStageCatalogRole(roleId);
+        const stage = findStageCatalogItem(roleId, stageKey);
+        if (role && card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = role.role_name || role.role_id || "";
+        if (role && card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = role.role_id || "";
+        if (stage && card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = stage.stage_name || stage.stage_key || "";
+        if (stage && card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = stage.stage_key || "";
+        updateExternalTagPreview(card);
+        updateCardTitle(card);
+        invalidateWorldbookCardCache(card);
+        refreshWorldbookNow({ healthCard: card, healthResults: isHealthResultsVisible(), search: true });
+      }
+
+      function populateExternalStageSelectors(card) {
+        const roleSelect = card.querySelector(".wb-external-role-select");
+        const stageSelect = card.querySelector(".wb-external-stage-select");
+        if (!roleSelect || !stageSelect) return;
+        const currentRoleId = card.querySelector(".wb-external-role-id")?.value.trim() || "";
+        const currentStageKey = card.querySelector(".wb-external-stage-key")?.value.trim() || "";
+        const roles = stateJournalStageCatalog.roles || [];
+        roleSelect.innerHTML = roles.length
+          ? optionHtml("", "请选择数据库角色", !currentRoleId) + roles.map((role) => optionHtml(role.role_id || "", role.role_name || role.role_id || "未命名角色", String(role.role_id || "") === currentRoleId)).join("")
+          : optionHtml("", "未读取到数据库阶段", true);
+        const selectedRole = findStageCatalogRole(currentRoleId) || null;
+        const stages = selectedRole?.stages || [];
+        stageSelect.innerHTML = stages.length
+          ? optionHtml("", "请选择阶段", !currentStageKey) + stages.map((stage) => optionHtml(stage.stage_key || "", stage.stage_name || stage.stage_key || "未命名阶段", String(stage.stage_key || "") === currentStageKey)).join("")
+          : optionHtml("", selectedRole ? "该角色暂无阶段" : "请先选择角色", true);
+        roleSelect.onchange = (event) => {
+          event?.stopPropagation();
+          const role = findStageCatalogRole(roleSelect.value);
+          const firstStage = role?.stages?.[0] || null;
+          if (card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = role?.role_id || "";
+          if (card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = firstStage?.stage_key || "";
+          if (role && card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = role.role_name || role.role_id || "";
+          if (firstStage && card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = firstStage.stage_name || firstStage.stage_key || "";
+          populateExternalStageSelectors(card);
+          updateExternalTagPreview(card);
+          updateCardTitle(card);
+          invalidateWorldbookCardCache(card);
+          refreshWorldbookNow({ healthCard: card, healthResults: isHealthResultsVisible(), search: true });
+          markWorldbookDirty("已选择数据库角色阶段，记得保存世界书。");
+        };
+        stageSelect.onchange = (event) => {
+          event?.stopPropagation();
+          applyExternalStageSelection(card, roleSelect.value, stageSelect.value);
+          markWorldbookDirty("已选择数据库阶段，记得保存世界书。");
+        };
+        updateExternalTagPreview(card);
+      }
+
+      function getCardGroupKey(card) {
+        const group = String(card.querySelector(".wb-group")?.value || "").trim();
+        return group || "__ungrouped__";
+      }
+
+      function getGroupLabel(groupKey) {
+        if (groupKey === "__all__") return "全部词条";
+        if (groupKey === "__ungrouped__") return "未分组";
+        return groupKey;
+      }
+
+      function quickFilterLabel(filterKey) {
+        return QUICK_FILTERS.find((item) => item.key === filterKey)?.label || "全部";
+      }
+
+      function getEntryTypeLabel(value) {
+        if (value === "constant") return "常驻";
+        if (value === "external_tag") return "外部标签";
+        return "关键词";
+      }
+
+      function getInsertionPositionLabel(value) {
+        const mapping = {
+          before_char_defs: "角色前",
+          after_char_defs: "角色后",
+          in_chat: "@D自定义",
+          at_depth_system: "@D system",
+          at_depth_user: "@D user",
+          at_depth_assistant: "@D assistant",
+        };
+        return mapping[value] || value || "角色定义后";
+      }
+
+      function isDepthInsertionPosition(value) {
+        return ["in_chat", "at_depth_system", "at_depth_user", "at_depth_assistant"].includes(String(value || ""));
+      }
+
+      function fixedRoleForInsertionPosition(value) {
+        if (value === "at_depth_system") return "system";
+        if (value === "at_depth_user") return "user";
+        if (value === "at_depth_assistant") return "assistant";
+        return "";
+      }
+
+      function normalizeImportedWorldbookPositionValue(value) {
+        const key = String(value ?? "").trim().toLowerCase();
+        const mapping = {
+          "0": "before_char_defs",
+          "1": "after_char_defs",
+          "4": "in_chat",
+          before_character: "before_char_defs",
+          before_char: "before_char_defs",
+          after_character: "after_char_defs",
+          after_char: "after_char_defs",
+          depth: "in_chat",
+          at_depth: "in_chat",
+          "in-chat": "in_chat",
+          inchat: "in_chat",
+          d_system: "at_depth_system",
+          depth_system: "at_depth_system",
+          at_depth_sys: "at_depth_system",
+          d_user: "at_depth_user",
+          depth_user: "at_depth_user",
+          d_ai: "at_depth_assistant",
+          d_assistant: "at_depth_assistant",
+          depth_ai: "at_depth_assistant",
+          depth_assistant: "at_depth_assistant",
+          assistant: "at_depth_assistant",
+          ai: "at_depth_assistant",
+        };
+        const normalized = mapping[key] || key;
+        return [
+          "before_char_defs",
+          "after_char_defs",
+          "in_chat",
+          "at_depth_system",
+          "at_depth_user",
+          "at_depth_assistant",
+        ].includes(normalized) ? normalized : "";
+      }
+
+      function normalizeImportedWorldbookRoleValue(value) {
+        const key = String(value ?? "").trim().toLowerCase();
+        const mapping = { "0": "system", "1": "user", "2": "assistant", ai: "assistant", model: "assistant" };
+        const normalized = mapping[key] || key;
+        return ["system", "user", "assistant"].includes(normalized) ? normalized : "";
+      }
+
+      function getTrimmedValue(card, selector) {
+        return String(card.querySelector(selector)?.value || "").trim();
+      }
+
+      function getNormalizedTrigger(card) {
+        return normalizeSearchText(getTrimmedValue(card, ".wb-trigger").replace(/\s+/g, " "));
+      }
+
+      function matchesActiveGroup(card) {
+        if (activeWorldbookGroup === "__all__") return true;
+        return getCardGroupKey(card) === activeWorldbookGroup;
+      }
+
+      function getAllEntryCards() {
+        return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")];
+      }
+
+      function getVisibleEntryCards() {
+        return getAllEntryCards().filter((card) => card.style.display !== "none");
+      }
+
+      function getExistingGroupKeys() {
+        const groups = new Set();
+        getAllEntryCards().forEach((card) => {
+          const group = String(card.querySelector(".wb-group")?.value || "").trim();
+          if (group) groups.add(group);
+        });
+        return [...groups].sort((left, right) => left.localeCompare(right, "zh-CN", { numeric: true }));
+      }
+
+      function syncGroupOptions() {
+        if (!groupOptionsEl) return;
+        groupOptionsEl.innerHTML = "";
+        getExistingGroupKeys().forEach((group) => {
+          const option = document.createElement("option");
+          option.value = group;
+          groupOptionsEl.appendChild(option);
+        });
+      }
+
+      function renderGroupSidebar() {
+        if (!groupSidebarEl) return;
+        const cards = getAllEntryCards();
+        const stats = new Map();
+        cards.forEach((card) => {
+          const key = getCardGroupKey(card);
+          stats.set(key, (stats.get(key) || 0) + 1);
+        });
+
+        const items = [{ key: "__all__", label: "全部词条", count: cards.length }];
+        if (stats.has("__ungrouped__")) {
+          items.push({ key: "__ungrouped__", label: "未分组", count: stats.get("__ungrouped__") || 0 });
+        }
+        [...stats.entries()]
+          .filter(([key]) => key !== "__ungrouped__")
+          .sort((left, right) => left[0].localeCompare(right[0], "zh-CN", { numeric: true }))
+          .forEach(([key, count]) => {
+            items.push({ key, label: key, count });
+          });
+
+        if (activeWorldbookGroup !== "__all__" && !items.some((item) => item.key === activeWorldbookGroup)) {
+          activeWorldbookGroup = "__all__";
+        }
+
+        groupSidebarEl.innerHTML = "";
+        items.forEach((item) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `worldbook-group-button${item.key === activeWorldbookGroup ? " active" : ""}`;
+          button.dataset.worldbookGroup = item.key;
+          const label = document.createElement("span");
+          label.textContent = item.label;
+          const count = document.createElement("em");
+          count.textContent = String(item.count);
+          button.append(label, count);
+          groupSidebarEl.appendChild(button);
+        });
+
+        if (activeWorldbookFilterEl) {
+          const groupLabel = getGroupLabel(activeWorldbookGroup);
+          activeWorldbookFilterEl.textContent = activeWorldbookGroup === "__all__"
+            ? "当前筛选：全部词条"
+            : `当前选中组别：${groupLabel}`;
+          activeWorldbookFilterEl.classList.toggle("is-active", activeWorldbookGroup !== "__all__");
+        }
+        syncGroupOptions();
+      }
+
+      function refreshWorldbookNavigation() {
+        renderGroupSidebar();
+        syncGroupOptions();
+      }
+
+      function renderQuickFilters() {
+        if (!quickFiltersEl) return;
+        quickFiltersEl.innerHTML = "";
+        QUICK_FILTERS.forEach((item) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `worldbook-quick-filter-button ui-filter-chip${item.key === activeQuickFilter ? " active" : ""}`;
+          button.dataset.quickFilter = item.key;
+          button.textContent = item.label;
+          quickFiltersEl.appendChild(button);
+        });
+        if (activeQuickFilterEl) {
+          activeQuickFilterEl.textContent = quickFilterLabel(activeQuickFilter);
+          activeQuickFilterEl.classList.toggle("worldbook-health-filter-active", activeQuickFilter !== "__all__");
+        }
+      }
+
+      function matchesQuickFilter(card) {
+        if (activeQuickFilter === "__all__") return true;
+        const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
+        const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
+        const insertionPosition = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
+        if (activeQuickFilter === "enabled") return card.querySelector(".wb-enabled")?.checked !== false;
+        if (activeQuickFilter === "disabled") return card.querySelector(".wb-enabled")?.checked === false;
+        if (activeQuickFilter === "constant") return entryType === "constant";
+        if (activeQuickFilter === "keyword") return entryType === "keyword";
+        if (["stable", "current_state", "dynamic", "output_guard"].includes(activeQuickFilter)) return promptLayer === activeQuickFilter;
+        if (activeQuickFilter === "in_chat") return isDepthInsertionPosition(insertionPosition);
+        if (activeQuickFilter === "before_char_defs") return insertionPosition === "before_char_defs";
+        if (activeQuickFilter === "after_char_defs") return insertionPosition === "after_char_defs";
+        if (activeQuickFilter === "ungrouped") return getCardGroupKey(card) === "__ungrouped__";
+        return true;
+      }
+
+      function matchesHealthIssue(card) {
+        if (!activeHealthIssue) return true;
+        const issues = String(card.dataset.healthIssues || "").split(",").filter(Boolean);
+        return issues.includes(activeHealthIssue);
+      }
+
+      function getCardSearchText(card) {
+        const cached = worldbookSearchTextCache.get(card);
+        if (cached !== undefined) return cached;
+        const text = [
+          card.querySelector(".wb-title")?.value || "",
+          card.querySelector(".wb-group")?.value || "",
+          card.querySelector(".wb-trigger")?.value || "",
+          card.querySelector(".wb-secondary-trigger")?.value || "",
+          card.querySelector(".wb-entry-type")?.value || "",
+          card.querySelector(".wb-external-role-name")?.value || "",
+          card.querySelector(".wb-external-stage-name")?.value || "",
+          card.querySelector(".wb-external-role-id")?.value || "",
+          card.querySelector(".wb-external-stage-key")?.value || "",
+          card.querySelector(".wb-prompt-layer")?.value || "",
+          getPromptLayerLabel(card.querySelector(".wb-prompt-layer")?.value || "follow_position"),
+          card.querySelector(".wb-insertion-position")?.value || "",
+          card.querySelector(".wb-injection-role")?.value || "",
+          card.querySelector(".wb-content")?.value || "",
+          card.querySelector(".wb-comment")?.value || "",
+        ].join("\n").toLowerCase();
+        worldbookSearchTextCache.set(card, text);
+        return text;
+      }
+
+      function setEntryCollapsed(card, collapsed) {
+        const body = card.querySelector(".worldbook-entry-body");
+        const toggleBtn = card.querySelector(".toggle-worldbook-entry");
+        window.Fantareal?.motion?.setDisclosureCollapsed(card, body, collapsed, { hiddenMode: "display" });
+        if (toggleBtn) {
+          toggleBtn.textContent = collapsed ? "▸" : "▾";
+          toggleBtn.title = collapsed ? "展开词条" : "折叠词条";
+          toggleBtn.setAttribute("aria-label", collapsed ? "展开词条" : "折叠词条");
+          toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          toggleBtn.classList.add("icon-button");
+        }
+        updateCardSummary(card);
+      }
+
+      function applyWorldbookSearch() {
+        const keyword = normalizeSearchText(document.getElementById("worldbook-search")?.value || "");
+        const cards = getAllEntryCards();
+        let visibleCount = 0;
+        for (const card of cards) {
+          const matchedGroup = matchesActiveGroup(card);
+          const matchedQuickFilter = matchesQuickFilter(card);
+          const matchedHealthIssue = matchesHealthIssue(card);
+          const matchedKeyword = !keyword || getCardSearchText(card).includes(keyword);
+          const matched = matchedGroup && matchedQuickFilter && matchedHealthIssue && matchedKeyword;
+          card.style.display = matched ? "" : "none";
+          if (matched) visibleCount += 1;
+        }
+
+        const groupLabel = getGroupLabel(activeWorldbookGroup);
+        const parts = [groupLabel];
+        if (activeQuickFilter !== "__all__") parts.push(quickFilterLabel(activeQuickFilter));
+        if (activeHealthIssue) parts.push(`问题：${getHealthIssueMeta(activeHealthIssue)?.label || activeHealthIssue}`);
+        if (keyword) parts.push(`搜索：${keyword}`);
+        if (keyword || activeWorldbookGroup !== "__all__" || activeQuickFilter !== "__all__" || activeHealthIssue) {
+          setStatus(`筛选完成：${parts.join(" / ")}，找到 ${visibleCount} 条词条。`);
+        } else {
+          setStatus("已清除搜索筛选。");
+        }
+      }
+
+      function syncInjectionUi(card) {
+        if (!card) return;
+        const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
+        const layerOverridden = promptLayer !== "follow_position";
+        const position = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
+        const injectionGrid = card.querySelector(".wb-injection-grid");
+        const layerNote = card.querySelector(".wb-layer-override-note");
+        injectionGrid?.classList.toggle("is-layer-overridden", layerOverridden);
+        if (layerNote) layerNote.textContent = layerOverridden
+          ? getPromptLayerHint(promptLayer)
+          : "跟随注入位置：继续按角色前/角色后/聊天注入生效。";
+
+        const injectionControls = [
+          card.querySelector(".wb-insertion-position"),
+          card.querySelector(".wb-injection-order"),
+          card.querySelector(".wb-injection-depth"),
+          card.querySelector(".wb-injection-role"),
+        ].filter(Boolean);
+        injectionControls.forEach((control) => {
+          control.disabled = layerOverridden;
+          control.title = layerOverridden ? getPromptLayerHint(promptLayer) : "";
+        });
+
+        const depthInput = card.querySelector(".wb-injection-depth");
+        const roleInput = card.querySelector(".wb-injection-role");
+        const fixedRole = fixedRoleForInsertionPosition(position);
+        if (roleInput && fixedRole) roleInput.value = fixedRole;
+        if (depthInput && !layerOverridden) {
+          const disabled = !isDepthInsertionPosition(position);
+          depthInput.disabled = disabled;
+          depthInput.title = disabled ? "仅在 @D 深度注入时生效" : "";
+        }
+        if (roleInput && !layerOverridden) {
+          const disabled = !isDepthInsertionPosition(position) || Boolean(fixedRole);
+          roleInput.disabled = disabled;
+          roleInput.title = fixedRole ? "该 @D 位置已固定角色" : (disabled ? "仅在 @D 自定义角色在深度时生效" : "");
+        }
+      }
+
+      function syncImportEnhancementUi() {
+        const policy = importMissingInjectionPolicyEl?.value || "follow_defaults";
+        if (importForceInChatDepthEl) {
+          const disabled = policy !== "force_in_chat";
+          importForceInChatDepthEl.disabled = disabled;
+          importForceInChatDepthEl.title = disabled ? "仅在“统一补到聊天内注入”时生效" : "";
+        }
+      }
+
+      function syncImportModeUi() {
+        const mode = importModeEl?.value || "replace";
+        if (importModeHintEl) {
+          importModeHintEl.textContent = mode === "append"
+            ? "增量模式只追加词条，不改当前 settings；检查无误后点击“保存全部词条”落盘。"
+            : "替换模式会使用导入文件覆盖当前世界书。";
+        }
+        if (importApplySettingsEl) {
+          importApplySettingsEl.disabled = mode === "append";
+          importApplySettingsEl.title = mode === "append" ? "增量追加不应用 settings，避免覆盖当前世界书配置。" : "";
+        }
+      }
+
+      function syncBulkInjectionUi() {
+        const policy = bulkInsertionPositionEl?.value || "after_char_defs";
+        if (bulkInjectionDepthEl) {
+          const disabled = !isDepthInsertionPosition(policy);
+          bulkInjectionDepthEl.disabled = disabled;
+          bulkInjectionDepthEl.title = disabled ? "仅在 @D 深度注入时生效" : "";
+        }
+      }
+
+      function getSelectedCards() {
+        return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].filter((card) => {
+          const checkbox = card.querySelector(".wb-selected");
+          return Boolean(checkbox?.checked);
+        });
+      }
+
+      function setBulkEditorOpen(open, immediate = false) {
+        const editor = document.getElementById("worldbook-bulk-editor");
+        const toggle = document.getElementById("toggle-bulk-editor");
+        if (!editor) return;
+        window.Fantareal?.motion?.setDisclosureCollapsed(editor, editor, !open, {
+          collapsedClass: "is-collapsed",
+          dataAttribute: "bulkEditorCollapsed",
+          hiddenMode: "display",
+          immediate,
+        }) ?? editor.classList.toggle("is-collapsed", !open);
+        editor.setAttribute("aria-hidden", open ? "false" : "true");
+        if (toggle) {
+          toggle.textContent = open ? "收起批量编辑" : "批量编辑";
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+      }
+
+      function updateSelectedCount() {
+        const count = getSelectedCards().length;
+        if (selectedWorldbookCountEl) {
+          selectedWorldbookCountEl.textContent = String(count);
+        }
+        const panel = document.getElementById("worldbook-selection-panel");
+        if (panel) {
+          panel.classList.toggle("is-visible", count > 0);
+          panel.setAttribute("aria-hidden", count > 0 ? "false" : "true");
+        }
+        if (count === 0) {
+          setBulkEditorOpen(false);
+        }
+      }
+
+      function updateCount() {
+        worldbookCountEl.textContent = String(getAllEntryCards().length);
+      }
+
+      function createSummaryChip(text, className = "") {
+        const chip = document.createElement("span");
+        chip.className = `worldbook-summary-chip ui-summary-chip${className ? ` ${className}` : ""}`;
+        chip.textContent = text;
+        return chip;
+      }
+
+      function ensureQuickEnabledSwitch(card) {
+        const head = card.querySelector(".memory-card-head");
+        if (!head) return null;
+        let switchEl = head.querySelector(".wb-quick-enabled-switch");
+        if (!switchEl) {
+          switchEl = document.createElement("label");
+          switchEl.className = "wb-quick-enabled-switch fr-compact-switch";
+          switchEl.title = "快速启用 / 停用这条世界书词条";
+          switchEl.innerHTML = `
+            <input class="wb-quick-enabled" type="checkbox" aria-label="快速启用或停用词条" />
+            <span class="wb-quick-enabled-track fr-compact-switch-track" aria-hidden="true"></span>
+            <em class="wb-quick-enabled-label fr-compact-switch-label">启用</em>
+          `;
+        }
+        const actions = head.querySelector(".button-row");
+        if (actions && switchEl.parentElement !== actions) {
+          actions.insertBefore(switchEl, actions.firstElementChild || null);
+        } else if (!actions && switchEl.parentElement !== head) {
+          head.appendChild(switchEl);
+        }
+        return switchEl;
+      }
+
+      function syncQuickEnabledSwitch(card) {
+        const enabled = card.querySelector(".wb-enabled")?.checked !== false;
+        const switchEl = ensureQuickEnabledSwitch(card);
+        const quickInput = switchEl?.querySelector(".wb-quick-enabled");
+        const label = switchEl?.querySelector(".wb-quick-enabled-label");
+        if (quickInput) quickInput.checked = enabled;
+        if (label) label.textContent = enabled ? "启用" : "停用";
+        if (switchEl) switchEl.title = enabled ? "当前启用，点击停用" : "当前停用，点击启用";
+        switchEl?.classList.toggle("is-on", enabled);
+        card.classList.toggle("is-disabled", !enabled);
+      }
+
+      function updateCardSummary(card) {
+        const head = card.querySelector(".memory-card-head");
+        if (!head) return;
+        ensureQuickEnabledSwitch(card);
+
+        let titleline = head.querySelector(".worldbook-entry-titleline");
+        const directTitle = head.querySelector(":scope > strong");
+        if (!titleline) {
+          titleline = document.createElement("div");
+          titleline.className = "worldbook-entry-titleline";
+          if (directTitle) titleline.appendChild(directTitle);
+          const actions = head.querySelector(".button-row");
+          head.insertBefore(titleline, actions || null);
+        }
+
+        let groupLabel = head.querySelector(".worldbook-entry-group-label");
+        if (!groupLabel) {
+          groupLabel = document.createElement("span");
+          groupLabel.className = "worldbook-entry-group-label";
+          titleline.appendChild(groupLabel);
+        }
+
+        const currentTitle = card.querySelector(".wb-title")?.value?.trim() || titleline.querySelector("strong")?.textContent || "???";
+        const currentGroup = card.querySelector(".wb-group")?.value?.trim() || "???";
+        const titleTextEl = titleline.querySelector("strong");
+        if (titleTextEl) titleTextEl.textContent = currentTitle;
+        groupLabel.textContent = currentGroup;
+
+        let summary = titleline.querySelector(".worldbook-card-summary");
+        if (!summary) {
+          summary = document.createElement("div");
+          summary.className = "worldbook-card-summary";
+          titleline.appendChild(summary);
+        }
+        summary.innerHTML = "";
+
+        const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
+        const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
+        const insertionPosition = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
+        const depth = Number(card.querySelector(".wb-injection-depth")?.value || 0);
+        const order = Number(card.querySelector(".wb-order")?.value || 100);
+        const injectionOrder = Number(card.querySelector(".wb-injection-order")?.value || order);
+        const chance = Number(card.querySelector(".wb-chance")?.value || 100);
+        const externalRuntime = entryType === "external_tag";
+        const expanded = card.dataset.collapsed === "false";
+
+        const layerChipLabel = getPromptLayerLabel(promptLayer)
+          .replace("\u5f53\u524d\u72b6\u6001\u533a", "\u5f53\u524d")
+          .replace("\u8f93\u51fa\u534f\u8bae\u533a", "\u534f\u8bae")
+          .replace("\u7a33\u5b9a\u533a", "\u7a33\u5b9a")
+          .replace("\u52a8\u6001\u533a", "\u52a8\u6001");
+
+        summary.appendChild(createSummaryChip(getEntryTypeLabel(entryType), "strong wb-chip-type"));
+        if (promptLayer === "follow_position") {
+          summary.appendChild(createSummaryChip(
+            insertionPosition === "in_chat"
+              ? `\u804a\u5929 ${depth}`
+              : getInsertionPositionLabel(insertionPosition),
+            "strong wb-chip-layer"
+          ));
+        } else {
+          summary.appendChild(createSummaryChip(`${layerChipLabel}\u4f18\u5148`, "strong wb-chip-layer"));
+          if (!expanded) summary.appendChild(createSummaryChip(`\u539f:${getInsertionPositionLabel(insertionPosition)}`, "wb-chip-position"));
+        }
+        summary.appendChild(externalRuntime ? createSummaryChip("\u5b9e\u65f6\u6807\u7b7e", "wb-chip-chance") : createSummaryChip(`\u7387 ${chance}%`, `wb-chip-chance${chance <= 0 ? " warning" : ""}`));
+        syncQuickEnabledSwitch(card);
+      }
+
+      function updateCardTitle(card) {
+        const title = card.querySelector(".wb-title")?.value?.trim() || "新词条";
+        const group = card.querySelector(".wb-group")?.value?.trim();
+        card.querySelector(".memory-card-head strong").textContent = group ? `${title} ｜ ${group}` : title;
+        updateCardSummary(card);
+      }
+
+      function getHealthIssueDefinitions() {
+        return [
+          { key: "empty_content", label: "空内容词条", description: "内容为空，命中后不会给模型有效设定。" },
+          { key: "keyword_without_trigger", label: "关键词触发但主关键词为空", description: "类型是关键词触发，但主关键词为空。" },
+          { key: "untitled", label: "无标题词条", description: "标题为空，不利于维护和搜索。" },
+          { key: "ungrouped", label: "未分组词条", description: "组别为空，长世界书中较难定位。" },
+          { key: "disabled", label: "禁用词条", description: "当前不会参与触发。" },
+          { key: "constant", label: "常驻词条", description: "常驻词条过多可能挤占上下文。" },
+          { key: "stable", label: "稳定区词条", description: "固定设定、常驻世界观或长期人设补充。" },
+          { key: "current_state", label: "当前状态区词条", description: "章节、地点、关系或临时状态提示。" },
+          { key: "dynamic", label: "动态区词条", description: "本轮临时提示或非聊天深度的动态世界书。" },
+          { key: "output_guard", label: "输出协议区词条", description: "状态变量、TTS 或格式约束类规则。" },
+          { key: "in_chat", label: "聊天内注入词条", description: "检查聊天深度和注入顺序是否符合预期。" },
+          { key: "chance_zero", label: "概率为 0 的词条", description: "概率为 0 时基本不会触发。" },
+          { key: "duplicate_title", label: "重复标题", description: "多个词条使用了同一个标题。" },
+          { key: "duplicate_trigger", label: "重复主关键词", description: "多个词条使用了相同主关键词，可能造成重复触发。" },
+        ];
+      }
+
+      function getHealthIssueMeta(key) {
+        return getHealthIssueDefinitions().find((item) => item.key === key);
+      }
+
+      function createWorldbookHealthCache(cards = getAllEntryCards()) {
+        return {
+          cards,
+          issueMap: new Map(),
+          titleMap: new Map(),
+          triggerMap: new Map(),
+          facts: new WeakMap(),
+        };
+      }
+
+      function getWorldbookHealthFacts(card) {
+        const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
+        return {
+          title: normalizeSearchText(getTrimmedValue(card, ".wb-title")),
+          trigger: getNormalizedTrigger(card),
+          content: getTrimmedValue(card, ".wb-content"),
+          entryType,
+          promptLayer: card.querySelector(".wb-prompt-layer")?.value || "follow_position",
+          groupKey: getCardGroupKey(card),
+          enabled: card.querySelector(".wb-enabled")?.checked !== false,
+          insertionPosition: card.querySelector(".wb-insertion-position")?.value || "after_char_defs",
+          chance: Number(card.querySelector(".wb-chance")?.value || 100),
+        };
+      }
+
+      function addCardToHealthIndex(cache, card, facts = getWorldbookHealthFacts(card)) {
+        cache.facts.set(card, facts);
+        if (facts.title) addCardToHealthBucket(cache.titleMap, facts.title, card);
+        if (facts.trigger) addCardToHealthBucket(cache.triggerMap, facts.trigger, card);
+      }
+
+      function removeCardFromHealthIndex(cache, card, facts = cache.facts.get(card)) {
+        if (!facts) return;
+        if (facts.title) removeCardFromHealthBucket(cache.titleMap, facts.title, card);
+        if (facts.trigger) removeCardFromHealthBucket(cache.triggerMap, facts.trigger, card);
+      }
+
+      function addCardToHealthBucket(map, key, card) {
+        if (!map.has(key)) map.set(key, new Set());
+        map.get(key).add(card);
+      }
+
+      function removeCardFromHealthBucket(map, key, card) {
+        const bucket = map.get(key);
+        if (!bucket) return;
+        bucket.delete(card);
+        if (!bucket.size) map.delete(key);
+      }
+
+      function collectBasicHealthIssues(facts) {
+        const issues = [];
+        if (!facts.content) issues.push("empty_content");
+        if (facts.entryType === "keyword" && !facts.trigger) issues.push("keyword_without_trigger");
+        if (!facts.title) issues.push("untitled");
+        if (facts.groupKey === "__ungrouped__") issues.push("ungrouped");
+        if (!facts.enabled) issues.push("disabled");
+        return issues;
+      }
+
+      function collectRuntimeHealthIssues(facts) {
+        const issues = [];
+        if (facts.entryType === "constant") issues.push("constant");
+        if (facts.promptLayer !== "follow_position") issues.push(facts.promptLayer);
+        if (facts.insertionPosition === "in_chat") issues.push("in_chat");
+        if (facts.entryType !== "external_tag" && facts.chance <= 0) issues.push("chance_zero");
+        return issues;
+      }
+
+      function collectDuplicateHealthIssues(facts, cache) {
+        const issues = [];
+        if (facts.title && (cache.titleMap.get(facts.title)?.size || 0) > 1) issues.push("duplicate_title");
+        if (facts.trigger && (cache.triggerMap.get(facts.trigger)?.size || 0) > 1) issues.push("duplicate_trigger");
+        return issues;
+      }
+
+      function collectWorldbookCardHealthIssues(card, cache, facts = cache.facts.get(card) || getWorldbookHealthFacts(card)) {
+        return [
+          ...collectBasicHealthIssues(facts),
+          ...collectRuntimeHealthIssues(facts),
+          ...collectDuplicateHealthIssues(facts, cache),
+        ];
+      }
+
+      function setWorldbookCardHealthIssues(cache, card, issues) {
+        const previous = String(card.dataset.healthIssues || "").split(",").filter(Boolean);
+        previous.forEach((issueKey) => removeCardFromHealthBucket(cache.issueMap, issueKey, card));
+        const uniqueIssues = [...new Set(issues)];
+        card.dataset.healthIssues = uniqueIssues.join(",");
+        uniqueIssues.forEach((issueKey) => addCardToHealthBucket(cache.issueMap, issueKey, card));
+      }
+
+      function addCardsFromHealthBucket(target, map, key) {
+        if (!key) return;
+        (map.get(key) || []).forEach((card) => target.add(card));
+      }
+
+      function collectAffectedDuplicateCards(cache, previousFacts, nextFacts) {
+        const affected = new Set();
+        addCardsFromHealthBucket(affected, cache.titleMap, previousFacts?.title);
+        addCardsFromHealthBucket(affected, cache.titleMap, nextFacts?.title);
+        addCardsFromHealthBucket(affected, cache.triggerMap, previousFacts?.trigger);
+        addCardsFromHealthBucket(affected, cache.triggerMap, nextFacts?.trigger);
+        return affected;
+      }
+
+      function refreshWorldbookHealthCards(cache, cards) {
+        cards.forEach((card) => {
+          if (!card || !worldbookListEl.contains(card)) return;
+          setWorldbookCardHealthIssues(cache, card, collectWorldbookCardHealthIssues(card, cache));
+        });
+      }
+
+      function analyzeWorldbookHealth(options = {}) {
+        if (!options.force && worldbookHealthCache) return worldbookHealthCache;
+        const cache = createWorldbookHealthCache();
+        cache.cards.forEach((card) => addCardToHealthIndex(cache, card));
+        refreshWorldbookHealthCards(cache, cache.cards);
+        worldbookHealthCache = cache;
+        return worldbookHealthCache;
+      }
+
+      function updateWorldbookHealthForCard(card) {
+        if (!card || !worldbookHealthCache) return null;
+        const cache = worldbookHealthCache;
+        if (!cache.cards.includes(card)) cache.cards.push(card);
+        const previousFacts = cache.facts.get(card);
+        removeCardFromHealthIndex(cache, card, previousFacts);
+        const nextFacts = getWorldbookHealthFacts(card);
+        addCardToHealthIndex(cache, card, nextFacts);
+        const affected = collectAffectedDuplicateCards(cache, previousFacts, nextFacts);
+        affected.add(card);
+        refreshWorldbookHealthCards(cache, affected);
+        return cache;
+      }
+
+      function updateHealthFilterLabel() {
+        if (!activeHealthFilterEl) return;
+        if (!activeHealthIssue) {
+          activeHealthFilterEl.textContent = "问题筛选：未启用";
+          activeHealthFilterEl.classList.remove("worldbook-health-filter-active");
+          return;
+        }
+        const meta = getHealthIssueMeta(activeHealthIssue);
+        activeHealthFilterEl.textContent = `问题筛选：${meta?.label || activeHealthIssue}`;
+        activeHealthFilterEl.classList.add("worldbook-health-filter-active");
+      }
+
+      function renderHealthResults(options = {}) {
+        if (!healthResultsEl) return;
+        healthResultsEl.classList.remove("is-hidden");
+        const { cards, issueMap } = analyzeWorldbookHealth({ force: Boolean(options.fullScan || !worldbookHealthCache) });
+        healthResultsEl.innerHTML = "";
+        const definitions = getHealthIssueDefinitions();
+        const getIssueCount = (issueKey) => issueMap.get(issueKey)?.size || 0;
+        const matchedDefinitions = definitions.filter((item) => getIssueCount(item.key) > 0);
+
+        if (!matchedDefinitions.length) {
+          const empty = document.createElement("p");
+          empty.className = "worldbook-health-empty";
+          empty.textContent = `检查完成：共 ${cards.length} 条，暂时没有发现明显问题。`;
+          healthResultsEl.appendChild(empty);
+          activeHealthIssue = "";
+          updateHealthFilterLabel();
+          if (options.applySearch !== false) applyWorldbookSearch();
+          return;
+        }
+
+        matchedDefinitions.forEach((item) => {
+          const count = getIssueCount(item.key);
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `worldbook-health-chip${activeHealthIssue === item.key ? " active" : ""}`;
+          button.dataset.healthIssue = item.key;
+          button.title = item.description;
+          button.textContent = `${item.label} ${count}`;
+          healthResultsEl.appendChild(button);
+        });
+      }
+
+      function attachRemoveHandler(card) {
+        const removeBtn = card.querySelector(".remove-worldbook-entry");
+        if (removeBtn) {
+          removeBtn.textContent = "×";
+          removeBtn.title = "删除词条";
+          removeBtn.setAttribute("aria-label", "删除词条");
+          removeBtn.classList.add("icon-button", "danger-icon-button");
+          removeBtn.addEventListener("click", () => {
+            (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+              updateCount();
+              updateSelectedCount();
+              refreshWorldbookDerivedState();
+              markWorldbookDirty("已删除一条世界书词条，记得保存。");
+            });
+          });
+        }
+
+        const toggleBtn = card.querySelector(".toggle-worldbook-entry");
+        if (toggleBtn) {
+          toggleBtn.classList.add("icon-button");
+          toggleBtn.addEventListener("click", () => {
+            const collapsed = card.dataset.collapsed === "true";
+            setEntryCollapsed(card, !collapsed);
+          });
+        }
+      }
+
+
+      function buildExternalTag(roleId, stageKey) {
+        const safeRole = String(roleId || "").trim();
+        const safeStage = String(stageKey || "").trim();
+        return safeRole && safeStage ? `state_journal.stage.${safeRole}.${safeStage}` : "";
+      }
+
+      function parseExternalTags(value) {
+        const tags = [];
+        String(value || "")
+          .split(/[\n\r,，、\s]+/)
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .forEach((tag) => {
+            if (!tags.includes(tag)) tags.push(tag);
+          });
+        return tags;
+      }
+
+      function formatExternalTags(tags) {
+        return Array.isArray(tags) ? tags.map((tag) => String(tag || "").trim()).filter(Boolean).join("\n") : "";
+      }
+
+      function getManualExternalTags(card) {
+        return parseExternalTags(card.querySelector(".wb-external-tags")?.value || "");
+      }
+
+      function getExternalSource(card) {
+        return card.querySelector(".wb-external-source")?.value || "state_journal";
+      }
+
+      function getExternalActivationTags(card) {
+        const manualTags = getManualExternalTags(card);
+        if (manualTags.length) return manualTags;
+        if (getExternalSource(card) !== "state_journal") return [];
+        return [buildExternalTag(card.querySelector(".wb-external-role-id")?.value.trim(), card.querySelector(".wb-external-stage-key")?.value.trim())].filter(Boolean);
+      }
+
+      function isStateJournalGeneratedTag(tag, roleId, stageKey) {
+        return String(tag || "").trim() === buildExternalTag(roleId, stageKey);
+      }
+
+      function normalizeInitialExternalTagsField(card) {
+        const tagsInput = card.querySelector(".wb-external-tags");
+        if (!tagsInput || getExternalSource(card) !== "state_journal") return;
+        const roleId = card.querySelector(".wb-external-role-id")?.value.trim() || "";
+        const stageKey = card.querySelector(".wb-external-stage-key")?.value.trim() || "";
+        const manualTags = parseExternalTags(tagsInput.value).filter((tag) => !isStateJournalGeneratedTag(tag, roleId, stageKey));
+        tagsInput.value = formatExternalTags(manualTags);
+      }
+
+      function syncExternalSourceUi(card) {
+        const source = getExternalSource(card);
+        const stageRow = card.querySelector(".wb-stage-select-row");
+        const stageHint = card.querySelector(".wb-external-stage-hint");
+        const tagsLabel = card.querySelector(".wb-external-tags-label");
+        const tagsInput = card.querySelector(".wb-external-tags");
+        const tagsHelper = card.querySelector(".wb-external-tags-helper");
+        const stateJournalSource = source === "state_journal";
+        if (stageRow) stageRow.hidden = !stateJournalSource;
+        if (stageHint) stageHint.hidden = !stateJournalSource;
+        if (tagsLabel) {
+          if (source === "preset") tagsLabel.textContent = "监听预设标签";
+          else if (source === "manual") tagsLabel.textContent = "监听外部标签";
+          else tagsLabel.textContent = "自定义触发标签（可选）";
+        }
+        if (tagsInput) {
+          if (source === "preset") tagsInput.placeholder = "一行一个，例如 preset.style.daily-prose";
+          else if (source === "manual") tagsInput.placeholder = "一行一个，例如 runtime.custom.scene-tag";
+          else tagsInput.placeholder = "留空时自动使用数据库角色 / 阶段生成标签";
+        }
+        if (tagsHelper) {
+          if (source === "preset") tagsHelper.textContent = "只使用这里填写的预设标签；留空会保存为空，不自动生成数据库标签。";
+          else if (source === "manual") tagsHelper.textContent = "只使用这里填写的外部标签；留空会保存为空，不自动生成数据库标签。";
+          else tagsHelper.textContent = "留空时自动使用下方角色 / 阶段生成状态阶段标签。";
+        }
+      }
+
+      function syncExternalTagRuntimeUi(card) {
+        const isExternalTag = (card.querySelector(".wb-entry-type")?.value || "keyword") === "external_tag";
+        [".wb-chance", ".wb-sticky-turns", ".wb-cooldown-turns"].forEach((selector) => {
+          const control = card.querySelector(selector);
+          if (!control) return;
+          control.disabled = isExternalTag;
+          control.title = isExternalTag ? "外部标签词条按 active tag 实时注入，不使用概率、黏性和冷却。" : "";
+        });
+        const runtimeNote = card.querySelector(".wb-external-runtime-note");
+        if (runtimeNote) runtimeNote.hidden = !isExternalTag;
+      }
+
+      function updateExternalTagPreview(card) {
+        const type = card.querySelector(".wb-entry-type")?.value || "keyword";
+        const keywordGrid = card.querySelector(".wb-keyword-grid");
+        const externalPanel = card.querySelector(".wb-external-tag-panel");
+        if (keywordGrid) keywordGrid.hidden = type === "external_tag";
+        if (externalPanel) externalPanel.hidden = type !== "external_tag";
+        syncExternalTagRuntimeUi(card);
+        syncExternalSourceUi(card);
+        const source = getExternalSource(card);
+        const roleName = card.querySelector(".wb-external-role-name")?.value.trim() || "未选择角色";
+        const roleId = card.querySelector(".wb-external-role-id")?.value.trim();
+        const stageName = card.querySelector(".wb-external-stage-name")?.value.trim() || "未选择阶段";
+        const stageKey = card.querySelector(".wb-external-stage-key")?.value.trim();
+        const stageTag = buildExternalTag(roleId, stageKey);
+        const tags = getExternalActivationTags(card);
+        const manualTags = getManualExternalTags(card);
+        const preview = card.querySelector(".wb-external-preview");
+        const status = card.querySelector(".wb-external-status");
+        const activeTags = new Set((stateJournalStageCatalog.active_tags || stateJournalStageCatalog.active_stage_tags || []).map((item) => String(item || "").trim()).filter(Boolean));
+        const inCatalog = Boolean(findStageCatalogItem(roleId, stageKey));
+        if (preview) {
+          if (source === "preset") {
+            preview.textContent = manualTags.length
+              ? `监听预设标签：${manualTags.join(" / ")}`
+              : "未填写预设标签；保存后 activation_tags 为空，不会自动生成数据库标签。";
+          } else if (source === "manual") {
+            preview.textContent = manualTags.length
+              ? `监听外部标签：${manualTags.join(" / ")}`
+              : "未填写外部标签；保存后 activation_tags 为空，不会自动生成数据库标签。";
+          } else if (manualTags.length) {
+            preview.textContent = `使用自定义标签触发：${manualTags.join(" / ")}`;
+          } else {
+            preview.textContent = stageTag ? `当「${roleName}」处于「${stageName}」阶段时触发。机器标签：${stageTag}` : "请选择数据库角色与阶段；标签留空时会自动生成状态阶段标签。";
+          }
+        }
+        if (status) {
+          status.classList.remove("is-active", "is-missing");
+          const hasActiveTag = tags.some((tag) => activeTags.has(tag));
+          if (!tags.length) {
+            status.textContent = "未绑定标签";
+            status.classList.add("is-missing");
+          } else if (source === "state_journal" && hasActiveTag) {
+            status.textContent = "当前命中";
+            status.classList.add("is-active");
+          } else if (source === "state_journal" && !manualTags.length && !inCatalog && (stateJournalStageCatalog.roles || []).length) {
+            status.textContent = "当前卡未找到该阶段";
+            status.classList.add("is-missing");
+          } else if (source === "preset") {
+            status.textContent = "等待预设标签";
+          } else if (source === "manual") {
+            status.textContent = "等待外部标签";
+          } else if (manualTags.length) {
+            status.textContent = "等待外部标签";
+          } else {
+            status.textContent = "等待阶段";
+          }
+        }
+      }
+
+      function createEntryCard(item = {}, options = {}) {
+        const fragment = templateEl.content.cloneNode(true);
+        const card = fragment.querySelector(".worldbook-entry-card");
+        card.querySelector(".wb-id").value = item.id || "";
+        card.querySelector(".wb-title").value = item.title || "";
+        card.querySelector(".wb-group").value = item.group || "";
+        card.querySelector(".wb-trigger").value = item.trigger || "";
+        card.querySelector(".wb-secondary-trigger").value = item.secondary_trigger || "";
+        card.querySelector(".wb-content").value = item.content || "";
+        card.querySelector(".wb-comment").value = item.comment || "";
+        card.querySelector(".wb-entry-type").value = item.entry_type || "keyword";
+        const externalRef = item.external_ref || {};
+        if (card.querySelector(".wb-external-source")) card.querySelector(".wb-external-source").value = item.external_source || "state_journal";
+        if (card.querySelector(".wb-external-tags")) {
+          const activationTags = Array.isArray(item.activation_tags) ? item.activation_tags : [];
+          card.querySelector(".wb-external-tags").value = formatExternalTags(activationTags);
+        }
+        if (card.querySelector(".wb-external-role-name")) card.querySelector(".wb-external-role-name").value = externalRef.role_name || "";
+        if (card.querySelector(".wb-external-role-id")) card.querySelector(".wb-external-role-id").value = externalRef.role_id || "";
+        if (card.querySelector(".wb-external-stage-name")) card.querySelector(".wb-external-stage-name").value = externalRef.stage_name || "";
+        if (card.querySelector(".wb-external-stage-key")) card.querySelector(".wb-external-stage-key").value = externalRef.stage_key || "";
+        normalizeInitialExternalTagsField(card);
+        card.querySelectorAll(".wb-external-tag-panel input, .wb-external-tag-panel select, .wb-external-tag-panel textarea").forEach((input) => input.addEventListener("input", () => updateExternalTagPreview(card)));
+        populateExternalStageSelectors(card);
+        updateExternalTagPreview(card);
+        card.querySelector(".wb-prompt-layer").value = item.prompt_layer || "follow_position";
+        card.querySelector(".wb-group-operator").value = item.group_operator || "and";
+        card.querySelector(".wb-match-mode").value = item.match_mode || "any";
+        card.querySelector(".wb-secondary-mode").value = item.secondary_mode || "all";
+        card.querySelector(".wb-chance").value = item.chance ?? 100;
+        card.querySelector(".wb-sticky-turns").value = item.sticky_turns ?? 0;
+        card.querySelector(".wb-cooldown-turns").value = item.cooldown_turns ?? 0;
+        card.querySelector(".wb-order").value = item.order ?? item.priority ?? 100;
+        card.querySelector(".wb-insertion-position").value = item.insertion_position || "after_char_defs";
+        card.querySelector(".wb-injection-depth").value = item.injection_depth ?? 0;
+        card.querySelector(".wb-injection-role").value = item.injection_role || "system";
+        card.querySelector(".wb-injection-order").value = item.injection_order ?? item.order ?? item.priority ?? 100;
+        card.querySelector(".wb-recursive-enabled").checked = item.recursive_enabled !== false;
+        card.querySelector(".wb-prevent-further-recursion").checked = Boolean(item.prevent_further_recursion);
+        card.querySelector(".wb-enabled").checked = item.enabled !== false;
+        card.querySelector(".wb-case-sensitive").checked = Boolean(item.case_sensitive);
+        card.querySelector(".wb-whole-word").checked = Boolean(item.whole_word);
+        attachRemoveHandler(card);
+        syncInjectionUi(card);
+        updateCardTitle(card);
+        setEntryCollapsed(card, options.collapsed ?? true);
+        return card;
+      }
+
+      async function renderWorldbookCards(items = [], options = {}) {
+        return batchRenderList(
+          worldbookListEl,
+          items,
+          (item) => createEntryCard(item, { collapsed: options.collapsed ?? true }),
+          { batchSize: WORLDBOOK_RENDER_BATCH_SIZE, clear: options.clear !== false }
+        );
+      }
+
+      function collectEntries() {
+        return [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].map((card, index) => {
+          const order = Number(card.querySelector(".wb-order").value || 100);
+          return {
+            id: card.querySelector(".wb-id").value.trim() || `worldbook-manual-${Date.now()}-${index}`,
+            title: card.querySelector(".wb-title").value.trim(),
+            group: card.querySelector(".wb-group").value.trim(),
+            trigger: card.querySelector(".wb-trigger").value.trim(),
+            secondary_trigger: card.querySelector(".wb-secondary-trigger").value.trim(),
+            entry_type: card.querySelector(".wb-entry-type").value,
+            prompt_layer: card.querySelector(".wb-prompt-layer").value,
+            group_operator: card.querySelector(".wb-group-operator").value,
+            match_mode: card.querySelector(".wb-match-mode").value,
+            secondary_mode: card.querySelector(".wb-secondary-mode").value,
+            chance: Number(card.querySelector(".wb-chance").value || 100),
+            sticky_turns: Number(card.querySelector(".wb-sticky-turns").value || 0),
+            cooldown_turns: Number(card.querySelector(".wb-cooldown-turns").value || 0),
+            order,
+            priority: order,
+            insertion_position: card.querySelector(".wb-insertion-position").value,
+            injection_depth: Number(card.querySelector(".wb-injection-depth").value || 0),
+            injection_role: card.querySelector(".wb-injection-role").value,
+            injection_order: Number(card.querySelector(".wb-injection-order").value || order),
+            recursive_enabled: card.querySelector(".wb-recursive-enabled").checked,
+            prevent_further_recursion: card.querySelector(".wb-prevent-further-recursion").checked,
+            external_source: card.querySelector(".wb-external-source")?.value || "",
+            external_ref: {
+              type: "stage",
+              role_id: card.querySelector(".wb-external-role-id")?.value.trim() || "",
+              role_name: card.querySelector(".wb-external-role-name")?.value.trim() || "",
+              stage_key: card.querySelector(".wb-external-stage-key")?.value.trim() || "",
+              stage_name: card.querySelector(".wb-external-stage-name")?.value.trim() || "",
+            },
+            activation_tags: getExternalActivationTags(card),
+            content: card.querySelector(".wb-content").value.trim(),
+            comment: card.querySelector(".wb-comment").value.trim(),
+            enabled: card.querySelector(".wb-enabled").checked,
+            case_sensitive: card.querySelector(".wb-case-sensitive").checked,
+            whole_word: card.querySelector(".wb-whole-word").checked,
+          };
+        });
+      }
+
+
+      function openWorldbookImportModal() {
+        const modal = document.getElementById("worldbook-import-modal");
+        if (!modal) return;
+        modal.classList.remove("is-hidden");
+        modal.setAttribute("aria-hidden", "false");
+        syncImportModeUi();
+        syncImportEnhancementUi();
+      }
+
+      function closeWorldbookImportModal() {
+        const modal = document.getElementById("worldbook-import-modal");
+        if (!modal) return;
+        modal.classList.add("is-hidden");
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      function clearSelectedWorldbookEntries() {
+        [...worldbookListEl.querySelectorAll(".wb-selected")].forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+        updateSelectedCount();
+      }
+
+      async function reloadEntries() {
+        await loadStateJournalStageCatalog();
+        const data = await fetch("/api/worldbook/entries").then((response) => response.json());
+        const renderResult = await renderWorldbookCards(data.items || []);
+        if (renderResult?.cancelled) return;
+        updateCount();
+        updateSelectedCount();
+        setWorldbookDirty(false);
+        refreshWorldbookDerivedState();
+        setStatus("世界书词条已重新读取。");
+      }
+
+      async function saveEntries() {
+        const data = await postJson("/api/worldbook/entries", { items: collectEntries() });
+        const renderResult = await renderWorldbookCards(data.items || []);
+        if (renderResult?.cancelled) return;
+        updateCount();
+        updateSelectedCount();
+        setWorldbookDirty(false);
+        refreshWorldbookDerivedState();
+        setStatus("世界书词条已保存。");
+      }
+
+      function stripJsonComments(rawText) {
+        let result = "";
+        let inString = false;
+        let escape = false;
+        let inLineComment = false;
+        let inBlockComment = false;
+        for (let index = 0; index < rawText.length; index += 1) {
+          const char = rawText[index];
+          const nextChar = rawText[index + 1] || "";
+          if (inLineComment) {
+            if (char === "\n") {
+              inLineComment = false;
+              result += char;
+            }
+            continue;
+          }
+          if (inBlockComment) {
+            if (char === "*" && nextChar === "/") {
+              inBlockComment = false;
+              index += 1;
+            }
+            continue;
+          }
+          if (inString) {
+            result += char;
+            if (escape) {
+              escape = false;
+            } else if (char === "\\") {
+              escape = true;
+            } else if (char === '"') {
+              inString = false;
+            }
+            continue;
+          }
+          if (char === '"') {
+            inString = true;
+            result += char;
+            continue;
+          }
+          if (char === "/" && nextChar === "/") {
+            inLineComment = true;
+            index += 1;
+            continue;
+          }
+          if (char === "/" && nextChar === "*") {
+            inBlockComment = true;
+            index += 1;
+            continue;
+          }
+          result += char;
+        }
+        return result;
+      }
+
+      function parseWorldbookJson(rawText) {
+        const text = String(rawText || "").trim();
+        if (!text) throw new Error("导入文件内容为空。");
+        try {
+          return JSON.parse(text);
+        } catch (error) {
+          return JSON.parse(stripJsonComments(text));
+        }
+      }
+
+      function extractWorldbookImportEntries(parsed) {
+        let rawStore = parsed;
+        if (rawStore && typeof rawStore === "object" && !Array.isArray(rawStore) && rawStore.worldbook) {
+          rawStore = rawStore.worldbook;
+        }
+        if (Array.isArray(rawStore)) return rawStore;
+        if (rawStore && typeof rawStore === "object") {
+          if (Array.isArray(rawStore.entries)) return rawStore.entries;
+          if (Array.isArray(rawStore.items)) return rawStore.items;
+        }
+        return [];
+      }
+
+      function worldbookFieldPresent(row, key) {
+        if (!Object.prototype.hasOwnProperty.call(row, key)) return false;
+        const value = row[key];
+        if (value === null || value === undefined) return false;
+        if (typeof value === "string") return value.trim() !== "";
+        return true;
+      }
+
+      function applyImportOptionsToRow(item, index, existingIds) {
+        const row = item && typeof item === "object" && !Array.isArray(item) ? { ...item } : {};
+        const policy = importMissingInjectionPolicyEl?.value || "follow_defaults";
+        const forceDepth = Math.min(Math.max(Number(importForceInChatDepthEl?.value || 0), 0), 999);
+        const forceOrderRaw = importForceInjectionOrderEl?.value?.trim() || "";
+        const forceOrder = forceOrderRaw ? Number(forceOrderRaw) : null;
+
+        const rawPosition = worldbookFieldPresent(row, "insertion_position")
+          ? row.insertion_position
+          : (worldbookFieldPresent(row, "insertionPosition") ? row.insertionPosition : row.position);
+        const importedPosition = normalizeImportedWorldbookPositionValue(rawPosition);
+        if (importedPosition) row.insertion_position = importedPosition;
+
+        if (!worldbookFieldPresent(row, "injection_depth")) {
+          const rawDepth = worldbookFieldPresent(row, "injectionDepth") ? row.injectionDepth : row.depth;
+          const importedDepth = Number(rawDepth);
+          if (Number.isFinite(importedDepth)) {
+            row.injection_depth = Math.min(Math.max(Math.floor(importedDepth), 0), 999);
+          }
+        }
+
+        const rawRole = worldbookFieldPresent(row, "injection_role")
+          ? row.injection_role
+          : (worldbookFieldPresent(row, "injectionRole") ? row.injectionRole : row.role);
+        const importedRole = normalizeImportedWorldbookRoleValue(rawRole);
+        if (importedRole) row.injection_role = importedRole;
+
+        if (policy !== "follow_defaults" && !worldbookFieldPresent(row, "insertion_position")) {
+          if (policy === "force_before_char_defs") row.insertion_position = "before_char_defs";
+          if (policy === "force_after_char_defs") row.insertion_position = "after_char_defs";
+          if (policy === "force_in_chat") row.insertion_position = "in_chat";
+        }
+        if (isDepthInsertionPosition(String(row.insertion_position || "").trim()) && !worldbookFieldPresent(row, "injection_depth")) {
+          row.injection_depth = forceDepth;
+        }
+        if (!worldbookFieldPresent(row, "injection_role")) {
+          row.injection_role = "system";
+        }
+        if (forceOrder !== null && Number.isFinite(forceOrder) && !worldbookFieldPresent(row, "injection_order")) {
+          row.injection_order = forceOrder;
+        }
+
+        const oldId = String(row.id || "").trim();
+        if (!oldId || existingIds.has(oldId)) {
+          row.id = `worldbook-import-${Date.now()}-${index}`;
+        } else {
+          row.id = oldId;
+        }
+        existingIds.add(row.id);
+        return row;
+      }
+
+      async function appendImportedWorldbookEntries(rawJson) {
+        const parsed = parseWorldbookJson(rawJson);
+        const rawEntries = extractWorldbookImportEntries(parsed);
+        if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
+          throw new Error("导入文件里没有找到 entries 或 items 数组。");
+        }
+        const existingIds = new Set(
+          getAllEntryCards().map((card) => String(card.querySelector(".wb-id")?.value || "").trim()).filter(Boolean)
+        );
+        const imported = rawEntries
+          .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+          .map((item, index) => applyImportOptionsToRow(item, index, existingIds));
+        if (!imported.length) {
+          throw new Error("导入文件里没有可追加的世界书词条。");
+        }
+        const renderResult = await renderWorldbookCards(imported, { clear: false });
+        if (renderResult?.cancelled) return;
+        updateCount();
+        updateSelectedCount();
+        refreshWorldbookDerivedState();
+        markWorldbookDirty(`已增量追加 ${imported.length} 条世界书词条。检查无误后点击“保存全部词条”。`);
+      }
+
+      async function importWorldbookFile(file) {
+        if (!file) return;
+        const rawJson = await file.text();
+        const importMode = importModeEl?.value || "replace";
+        if (importMode === "append") {
+          await appendImportedWorldbookEntries(rawJson);
+          return;
+        }
+
+        const forceOrderRaw = importForceInjectionOrderEl?.value?.trim() || "";
+        const data = await postJson("/api/worldbook/import", {
+          raw_json: rawJson,
+          apply_settings: importApplySettingsEl?.checked ?? true,
+          missing_injection_policy: importMissingInjectionPolicyEl?.value || "follow_defaults",
+          force_in_chat_depth: Number(importForceInChatDepthEl?.value || 0),
+          force_injection_order: forceOrderRaw ? Number(forceOrderRaw) : null,
+        });
+        const renderResult = await renderWorldbookCards(data.items || []);
+        if (renderResult?.cancelled) return;
+        updateCount();
+        updateSelectedCount();
+        setWorldbookDirty(false);
+        refreshWorldbookDerivedState();
+        setStatus(`世界书导入完成：${data.items?.length || 0} 条。`);
+      }
+
+      worldbookListEl.addEventListener("input", (event) => {
+        const card = event.target.closest(".worldbook-entry-card");
+        if (!card) return;
+        invalidateWorldbookCardCache(card);
+        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
+          syncInjectionUi(card);
+        }
+        if (event.target.closest(".wb-external-tag-panel")) {
+          updateExternalTagPreview(card);
+        }
+        updateCardTitle(card);
+        markWorldbookDirty("有未保存修改，记得保存。");
+        scheduleWorldbookRefresh({
+          navigation: event.target.classList.contains("wb-group"),
+          healthCard: card,
+          healthResults: isHealthResultsVisible(),
+          search: true,
+        });
+      });
+
+      loadStateJournalStageCatalog().then(() => {
+        document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
+          normalizeInitialExternalTagsField(card);
+          populateExternalStageSelectors(card);
+          updateExternalTagPreview(card);
+        });
+      });
+
+      document.querySelectorAll(".worldbook-entry-card").forEach((card) => {
+        attachRemoveHandler(card);
+        syncInjectionUi(card);
+        normalizeInitialExternalTagsField(card);
+        populateExternalStageSelectors(card);
+        updateExternalTagPreview(card);
+        updateCardTitle(card);
+        setEntryCollapsed(card, true);
+      });
+
+      document.getElementById("add-worldbook-entry").addEventListener("click", () => {
+        const card = createEntryCard({}, { collapsed: false });
+        if (activeWorldbookGroup !== "__all__" && activeWorldbookGroup !== "__ungrouped__") {
+          const groupInput = card.querySelector(".wb-group");
+          if (groupInput) groupInput.value = activeWorldbookGroup;
+          updateCardTitle(card);
+        }
+        worldbookListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
+        updateCount();
+        updateSelectedCount();
+        refreshWorldbookDerivedState();
+        markWorldbookDirty("已新增一条空白世界书词条。");
+      });
+
+      document.getElementById("save-worldbook-entries").addEventListener("click", async () => {
+        try {
+          await saveEntries();
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("reload-worldbook-entries").addEventListener("click", async () => {
+        try {
+          await reloadEntries();
+        } catch (error) {
+          setStatus(`读取失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("import-worldbook").addEventListener("click", () => {
+        openWorldbookImportModal();
+      });
+
+      document.getElementById("confirm-worldbook-import")?.addEventListener("click", () => {
+        document.getElementById("import-worldbook-file")?.click();
+      });
+
+      document.getElementById("close-worldbook-import-modal")?.addEventListener("click", closeWorldbookImportModal);
+      document.getElementById("cancel-worldbook-import")?.addEventListener("click", closeWorldbookImportModal);
+      document.getElementById("worldbook-import-modal")?.addEventListener("click", (event) => {
+        if (event.target.id === "worldbook-import-modal") {
+          closeWorldbookImportModal();
+        }
+      });
+
+      document.getElementById("import-worldbook-file").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          await importWorldbookFile(file);
+          closeWorldbookImportModal();
+        } catch (error) {
+          setStatus(`导入失败：${error.message}`);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("export-worldbook").addEventListener("click", async () => {
+        try {
+          await downloadJson("/api/worldbook/export", "worldbook.json");
+          setStatus("世界书已导出。");
+        } catch (error) {
+          setStatus(`导出失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("worldbook-search").addEventListener("input", () => {
+        scheduleWorldbookRefresh({ search: true });
+      });
+
+      quickFiltersEl?.addEventListener("click", (event) => {
+        const button = event.target.closest(".worldbook-quick-filter-button");
+        if (!button) return;
+        activeQuickFilter = button.dataset.quickFilter || "__all__";
+        renderQuickFilters();
+        applyWorldbookSearch();
+      });
+
+      document.getElementById("check-worldbook-health")?.addEventListener("click", () => {
+        renderHealthResults({ fullScan: true });
+        setStatus("世界书问题检查已完成。");
+      });
+
+      document.getElementById("clear-worldbook-health-filter")?.addEventListener("click", () => {
+        activeHealthIssue = "";
+        updateHealthFilterLabel();
+        if (healthResultsEl) {
+          healthResultsEl.classList.add("is-hidden");
+          healthResultsEl.innerHTML = '<p class="worldbook-health-empty">点击“检查问题”，可以查看空内容、重复关键词、未分组、禁用词条等问题。</p>';
+        }
+        applyWorldbookSearch();
+        setStatus("已清除问题筛选。");
+      });
+
+      healthResultsEl?.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-health-issue]");
+        if (!button) return;
+        activeHealthIssue = button.dataset.healthIssue || "";
+        updateHealthFilterLabel();
+        renderHealthResults();
+        applyWorldbookSearch();
+      });
+
+      groupSidebarEl?.addEventListener("click", (event) => {
+        const button = event.target.closest(".worldbook-group-button");
+        if (!button) return;
+        activeWorldbookGroup = button.dataset.worldbookGroup || "__all__";
+        renderGroupSidebar();
+        applyWorldbookSearch();
+      });
+
+      document.getElementById("collapse-all-worldbook").addEventListener("click", () => {
+        [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => setEntryCollapsed(card, true));
+        setStatus("已折叠当前列表中的全部词条。");
+      });
+
+      document.getElementById("expand-all-worldbook").addEventListener("click", () => {
+        [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => setEntryCollapsed(card, false));
+        setStatus("已展开当前列表中的全部词条。");
+      });
+
+      worldbookListEl.addEventListener("click", (event) => {
+        const switchEl = event.target.closest(".wb-quick-enabled-switch");
+        if (!switchEl || !worldbookListEl.contains(switchEl)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const card = switchEl.closest(".worldbook-entry-card");
+        if (!card) return;
+
+        const enabledEl = card.querySelector(".wb-enabled");
+        const quickInput = switchEl.querySelector(".wb-quick-enabled");
+        const currentEnabled = enabledEl ? enabledEl.checked : quickInput?.checked !== false;
+        const nextEnabled = !currentEnabled;
+
+        if (enabledEl) enabledEl.checked = nextEnabled;
+        if (quickInput) quickInput.checked = nextEnabled;
+        syncQuickEnabledSwitch(card);
+
+        invalidateWorldbookCardCache(card);
+        refreshWorldbookNow({ healthCard: card, healthResults: isHealthResultsVisible(), search: true });
+        markWorldbookDirty(nextEnabled ? "已快捷启用该词条，记得保存。" : "已快捷停用该词条，记得保存。");
+      });
+
+      worldbookListEl.addEventListener("change", (event) => {
+        const card = event.target.closest(".worldbook-entry-card");
+        if (!card) return;
+        if (event.target.classList.contains("wb-selected")) {
+          updateSelectedCount();
+          return;
+        }
+        invalidateWorldbookCardCache(card);
+        let refreshNavigation = false;
+        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
+          syncInjectionUi(card);
+        }
+        if (event.target.classList.contains("wb-entry-type") || event.target.closest(".wb-external-tag-panel")) {
+          if (event.target.classList.contains("wb-external-source")) syncExternalSourceUi(card);
+          updateExternalTagPreview(card);
+        }
+        if (event.target.classList.contains("wb-quick-enabled")) {
+          const enabledEl = card.querySelector(".wb-enabled");
+          if (enabledEl) enabledEl.checked = event.target.checked;
+          syncQuickEnabledSwitch(card);
+        }
+        if (event.target.classList.contains("wb-group")) {
+          refreshNavigation = true;
+        }
+        updateCardTitle(card);
+        refreshWorldbookNow({
+          navigation: refreshNavigation,
+          healthCard: card,
+          healthResults: isHealthResultsVisible(),
+          search: true,
+        });
+        markWorldbookDirty("有未保存修改，记得保存。");
+      });
+
+      document.getElementById("toggle-bulk-editor")?.addEventListener("click", () => {
+        const editor = document.getElementById("worldbook-bulk-editor");
+        setBulkEditorOpen(editor?.classList.contains("is-collapsed") !== false);
+      });
+
+      document.getElementById("close-worldbook-selection-panel")?.addEventListener("click", () => {
+        clearSelectedWorldbookEntries();
+        setStatus("已清空当前选择。");
+      });
+
+      document.getElementById("select-all-visible-worldbook").addEventListener("click", () => {
+        [...worldbookListEl.querySelectorAll(".worldbook-entry-card")].forEach((card) => {
+          if (card.style.display === "none") return;
+          const checkbox = card.querySelector(".wb-selected");
+          if (checkbox) checkbox.checked = true;
+        });
+        updateSelectedCount();
+        setStatus("已选中当前筛选结果中的全部词条。");
+      });
+
+      document.getElementById("select-all-visible-worldbook-toolbar")?.addEventListener("click", () => {
+        document.getElementById("select-all-visible-worldbook")?.click();
+      });
+
+      document.getElementById("clear-selected-worldbook").addEventListener("click", () => {
+        clearSelectedWorldbookEntries();
+        setStatus("已清空当前选择。");
+      });
+
+      document.getElementById("delete-selected-worldbook").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再批量删除。");
+          return;
+        }
+        const confirmed = window.confirm(
+          `确定删除选中的 ${cards.length} 条世界书词条吗？\n\n这一步只会先从页面移除，点击“保存全部词条”后才会写入文件。`
+        );
+        if (!confirmed) return;
+        Promise.all(cards.map((card) => window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove()))).then(() => {
+          updateCount();
+          updateSelectedCount();
+          refreshWorldbookDerivedState();
+        });
+        markWorldbookDirty(`已从页面移除 ${cards.length} 条词条，确认无误后请保存。`);
+      });
+
+      document.getElementById("apply-bulk-group").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再批量移动组别。");
+          return;
+        }
+        const group = String(bulkGroupTargetEl?.value || "").trim();
+        cards.forEach((card) => {
+          const groupInput = card.querySelector(".wb-group");
+          if (groupInput) groupInput.value = group;
+          updateCardTitle(card);
+        });
+        refreshWorldbookDerivedState();
+        markWorldbookDirty(group ? `已将 ${cards.length} 条词条移动到「${group}」。` : `已清空 ${cards.length} 条词条的组别。`);
+      });
+
+      document.getElementById("apply-bulk-injection").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再应用批量注入设置。");
+          return;
+        }
+        const position = bulkInsertionPositionEl?.value || "after_char_defs";
+        const depth = Number(bulkInjectionDepthEl?.value || 0);
+        const injectionOrder = Number(document.getElementById("bulk-injection-order")?.value || 100);
+        cards.forEach((card) => {
+          const positionEl = card.querySelector(".wb-insertion-position");
+          const depthEl = card.querySelector(".wb-injection-depth");
+          const orderEl = card.querySelector(".wb-injection-order");
+          if (positionEl) positionEl.value = position;
+          if (depthEl) depthEl.value = depth;
+          if (orderEl) orderEl.value = injectionOrder;
+          syncInjectionUi(card);
+          updateCardTitle(card);
+        });
+        refreshWorldbookDerivedState({ navigation: false });
+        markWorldbookDirty(`已将 ${cards.length} 条词条的注入设置批量更新。`);
+      });
+
+      document.getElementById("apply-bulk-recursion").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再应用批量递归设置。");
+          return;
+        }
+        const recursiveEnabled = document.getElementById("bulk-recursive-enabled")?.checked ?? true;
+        const preventFurther = document.getElementById("bulk-prevent-further-recursion")?.checked ?? false;
+        cards.forEach((card) => {
+          const recursiveEl = card.querySelector(".wb-recursive-enabled");
+          const preventEl = card.querySelector(".wb-prevent-further-recursion");
+          if (recursiveEl) recursiveEl.checked = recursiveEnabled;
+          if (preventEl) preventEl.checked = preventFurther;
+        });
+        markWorldbookDirty(`已将 ${cards.length} 条词条的递归设置批量更新。`);
+      });
+
+      document.getElementById("bulk-enable-selected").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再批量启用。");
+          return;
+        }
+        cards.forEach((card) => {
+          const enabledEl = card.querySelector(".wb-enabled");
+          if (enabledEl) enabledEl.checked = true;
+          updateCardTitle(card);
+        });
+        refreshWorldbookDerivedState({ navigation: false });
+        markWorldbookDirty(`已启用 ${cards.length} 条选中词条。`);
+      });
+
+      document.getElementById("bulk-disable-selected").addEventListener("click", () => {
+        const cards = getSelectedCards();
+        if (!cards.length) {
+          setStatus("请先勾选至少一条词条，再批量停用。");
+          return;
+        }
+        cards.forEach((card) => {
+          const enabledEl = card.querySelector(".wb-enabled");
+          if (enabledEl) enabledEl.checked = false;
+          updateCardTitle(card);
+        });
+        refreshWorldbookDerivedState({ navigation: false });
+        markWorldbookDirty(`已停用 ${cards.length} 条选中词条。`);
+      });
+
+      importModeEl?.addEventListener("change", syncImportModeUi);
+      importMissingInjectionPolicyEl?.addEventListener("change", syncImportEnhancementUi);
+      bulkInsertionPositionEl?.addEventListener("change", syncBulkInjectionUi);
+
+      window.addEventListener("beforeunload", (event) => {
+        if (!worldbookDirty) return;
+        event.preventDefault();
+        event.returnValue = "";
+      });
+
+      setBulkEditorOpen(false, true);
+      updateCount();
+      updateSelectedCount();
+      refreshWorldbookNavigation();
+      renderQuickFilters();
+      updateHealthFilterLabel();
+      applyWorldbookSearch();
+      syncImportEnhancementUi();
+      syncImportModeUi();
+      syncBulkInjectionUi();
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+    </script>
+  </body>
+</html>

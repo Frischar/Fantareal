@@ -1,0 +1,476 @@
+/* Fantareal 演出工坊 · 前端演出层 v1.0 · 基于 ui-v140
+   入场演出扩展 / 常驻氛围 / 动态演出 */
+
+.workshop-ambience-config-block,
+.workshop-dynamic-config-block {
+  margin-top: 18px;
+}
+
+.workshop-ambience-grid {
+  align-items: stretch;
+  margin-top: 14px;
+}
+
+.workshop-ambience-ambient-card {
+  margin-top: 14px;
+}
+
+.dynamic-state-tip,
+.workshop-state-tip {
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--panel-strong) 86%, transparent);
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+
+.dynamic-state-tip code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--input-bg) 86%, transparent);
+  color: var(--text);
+}
+
+.dynamic-scene-list {
+  margin-top: 14px;
+}
+
+.dynamic-scene-card {
+  display: grid;
+  gap: 12px;
+}
+
+.dynamic-scene-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dynamic-enabled-row {
+  align-self: end;
+  min-height: 40px;
+}
+
+.dynamic-trigger-panel,
+.dynamic-content-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.workshop-empty-note {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px dashed color-mix(in srgb, var(--muted) 26%, transparent);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+
+body.workshop-ambience-active::before {
+  background-image: var(--workshop-ambience-bg, var(--background-image));
+}
+
+body.workshop-ambience-active::after {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(10, 10, 10, calc(var(--workshop-ambience-overlay, var(--background-overlay-opacity)) * 0.74)),
+      rgba(10, 10, 10, var(--workshop-ambience-overlay, var(--background-overlay-opacity)))
+    );
+}
+
+body.workshop-ambience-previewing::before {
+  background-image: var(--workshop-ambience-preview-bg, var(--background-image));
+}
+
+body.workshop-ambience-previewing::after {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(10, 10, 10, calc(var(--workshop-ambience-preview-overlay, var(--background-overlay-opacity)) * 0.74)),
+      rgba(10, 10, 10, var(--workshop-ambience-preview-overlay, var(--background-overlay-opacity)))
+    );
+}
+
+body.workshop-dynamic-background-active::before {
+  background-image: var(--workshop-dynamic-bg, var(--workshop-ambience-bg, var(--background-image)));
+  transition: background-image 260ms ease, filter 260ms ease;
+}
+
+.workshop-dynamic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  animation: workshopDynamicIn 260ms ease both;
+}
+
+.workshop-dynamic-overlay.is-leaving {
+  animation: workshopDynamicOut 320ms ease both;
+}
+
+.workshop-dynamic-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 8, 12, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.workshop-dynamic-card {
+  position: relative;
+  z-index: 1;
+  width: min(880px, 88vw);
+  max-height: min(82vh, 760px);
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--panel-strong) 98%, #10161d 2%);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+  opacity: 1;
+}
+
+.workshop-dynamic-light {
+  align-items: end;
+  justify-items: end;
+  padding: 24px 32px;
+}
+
+.workshop-dynamic-light .workshop-dynamic-backdrop {
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.workshop-dynamic-light .workshop-dynamic-card {
+  width: min(420px, 86vw);
+  border-radius: 22px;
+}
+
+.workshop-dynamic-blocking .workshop-dynamic-backdrop {
+  background: rgba(5, 8, 12, 0.66);
+}
+
+.workshop-dynamic-blocking .workshop-dynamic-close {
+  min-width: 96px;
+}
+
+.workshop-dynamic-immersive .workshop-dynamic-card {
+  width: min(1280px, 92vw);
+  max-height: 86vh;
+}
+
+.workshop-dynamic-close {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  z-index: 2;
+}
+
+.workshop-dynamic-image {
+  display: block;
+  width: 100%;
+  max-height: 58vh;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.workshop-dynamic-copy {
+  padding: 20px 24px 24px;
+}
+
+.workshop-dynamic-copy h2 {
+  margin: 0 0 8px;
+  font-size: clamp(1.25rem, 2.4vw, 2rem);
+}
+
+.workshop-dynamic-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+@keyframes workshopDynamicIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes workshopDynamicOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.99); }
+}
+
+/* Keep the 演出工坊 editor on the same live glass opacity as the main app. */
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .workshop-empty-note,
+body.workshop-config-page .dynamic-scene-card {
+  backdrop-filter: var(--ui-glass-blur-soft);
+}
+
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 10%, transparent), transparent 38%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--panel-strong) 76%, transparent),
+      color-mix(in srgb, var(--panel) 94%, transparent)) !important;
+}
+
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-scene-card,
+body.workshop-config-page .workshop-empty-note {
+  background: color-mix(in srgb, var(--input-bg) 72%, transparent) !important;
+}
+
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip {
+  background: color-mix(in srgb, var(--panel-strong) 72%, transparent) !important;
+}
+
+body.workshop-config-page .panel.config-panel,
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--panel-strong-rgb), var(--panel-strong-alpha)),
+      rgba(var(--panel-rgb), var(--panel-alpha))
+    ) !important;
+}
+
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-scene-card,
+body.workshop-config-page .workshop-summary-item,
+body.workshop-config-page .workshop-runtime-panel-side,
+body.workshop-config-page .workshop-empty-note,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .task-status {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+body.workshop-config-page input,
+body.workshop-config-page select,
+body.workshop-config-page textarea,
+body.workshop-config-page .checkbox-row {
+  background-color: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+/* Final opacity sync: avoid older color-mix rules making the workshop look denser than global UI opacity. */
+body.workshop-config-page .slot-toolbar,
+body.workshop-config-page .panel.config-panel,
+body.workshop-config-page .workshop-main-card,
+body.workshop-config-page .workshop-control-panel,
+body.workshop-config-page .workshop-opening-config-block,
+body.workshop-config-page .workshop-ambience-config-block,
+body.workshop-config-page .workshop-dynamic-config-block {
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+  backdrop-filter: var(--ui-glass-blur);
+  -webkit-backdrop-filter: var(--ui-glass-blur);
+}
+
+body.workshop-config-page .workshop-panel-block,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .workshop-runtime-panel-side,
+body.workshop-config-page .workshop-side-summary,
+body.workshop-config-page .workshop-summary-item,
+body.workshop-config-page .dynamic-trigger-panel,
+body.workshop-config-page .dynamic-content-panel,
+body.workshop-config-page .dynamic-scene-card,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .workshop-empty-note,
+body.workshop-config-page .task-status {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+  backdrop-filter: var(--ui-glass-blur-soft);
+  -webkit-backdrop-filter: var(--ui-glass-blur-soft);
+}
+
+body.workshop-config-page input,
+body.workshop-config-page select,
+body.workshop-config-page textarea,
+body.workshop-config-page .checkbox-row,
+body.workshop-config-page .workshop-panel-actions button.secondary,
+body.workshop-config-page .workshop-panel-actions .button-link {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+/* Ambience editor polish: avoid the blurred page background reading as dirty vertical shadows. */
+body.workshop-config-page .workshop-ambience-config-block {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0 20px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent) !important;
+  border-radius: 24px !important;
+  background: rgba(var(--panel-rgb), clamp(0.34, calc(var(--panel-alpha) + 0.08), 0.88)) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card {
+  border-color: color-mix(in srgb, var(--border) 88%, transparent) !important;
+  background: rgba(var(--input-rgb), clamp(0.36, calc(var(--input-alpha) + 0.14), 0.82)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(255, 255, 255, 0.015) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card input,
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card select {
+  background: rgba(var(--input-rgb), clamp(0.42, calc(var(--input-alpha) + 0.18), 0.86)) !important;
+}
+
+/* 演出工坊 v0.1：角色卡演出绑定提示卡。 */
+body.workshop-config-page .workshop-card-binding-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)) !important;
+}
+body.workshop-config-page .workshop-binding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+body.workshop-config-page .workshop-binding-head strong {
+  color: var(--text);
+  font-size: .96rem;
+}
+body.workshop-config-page .workshop-binding-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+body.workshop-config-page .workshop-binding-pills .micro-badge {
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: rgba(var(--input-rgb), var(--input-alpha));
+  font-size: .76rem;
+  font-weight: 820;
+}
+body.workshop-config-page .workshop-binding-pills .micro-badge.active {
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, rgba(var(--input-rgb), var(--input-alpha)));
+}
+
+/* Workshop UIdebug pass: keep compact switches, soft cards, and live opacity in sync. */
+body.workshop-config-page .workshop-opening-config-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.workshop-config-page .workshop-opening-config-head .muted.compact {
+  max-width: 780px;
+  line-height: 1.58;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+body.workshop-config-page .workshop-opening-config-head > .fr-setting-switch-row {
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: min(100%, 260px) !important;
+  padding-inline: 12px !important;
+}
+
+body.workshop-config-page .workshop-opening-inline-toggle {
+  min-width: 0 !important;
+}
+
+body.workshop-config-page .workshop-control-panel {
+  gap: 14px !important;
+  padding: 20px !important;
+  border-radius: 24px !important;
+  overflow: hidden;
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-control-panel .workshop-panel-block {
+  gap: 11px;
+  padding: 14px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent) !important;
+  border-radius: 18px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+body.workshop-config-page .workshop-control-panel .workshop-side-summary {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.workshop-config-page .workshop-card-binding-panel,
+body.workshop-config-page .workshop-runtime-panel-side,
+body.workshop-config-page .workshop-summary-item {
+  border-radius: 18px !important;
+}
+
+body.workshop-config-page .workshop-summary-item {
+  padding: 14px 16px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-card-binding-panel {
+  padding: 14px !important;
+}
+
+body.workshop-config-page .workshop-binding-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+body.workshop-config-page .workshop-dynamic-config-block {
+  padding: 18px !important;
+  border-radius: 24px !important;
+  overflow: hidden;
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+}
+
+body.workshop-config-page .dynamic-scene-card {
+  padding: 18px !important;
+  border: 1px solid color-mix(in srgb, var(--border) 76%, transparent) !important;
+  border-radius: 22px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+body.workshop-config-page .dynamic-scene-head {
+  min-width: 0;
+}
+
+body.workshop-config-page .dynamic-trigger-panel,
+body.workshop-config-page .dynamic-content-panel,
+body.workshop-config-page .workshop-opening-media-card,
+body.workshop-config-page .dynamic-state-tip,
+body.workshop-config-page .workshop-state-tip,
+body.workshop-config-page .workshop-empty-note {
+  border-radius: 18px !important;
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-ambience-config-block {
+  background: rgba(var(--panel-rgb), var(--panel-alpha)) !important;
+}
+
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card,
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card input,
+body.workshop-config-page .workshop-ambience-config-block .workshop-opening-media-card select {
+  background: rgba(var(--input-rgb), var(--input-alpha)) !important;
+}

@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memory - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-toggle-20260701" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
+  </head>
+  <body class="app-sidebar-shell modern-setting-page memory-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+
+      <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Memory</span>
+          <div class="slot-meta">
+            <strong>当前为角色卡记忆库</strong>
+            <p class="slot-hint">具备合并记忆+大纲表填入功能</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-shell compact memory-wide">
+      <section class="panel config-panel full-span memory-workbench-panel">
+        <div class="section-head memory-workbench-head">
+          <div>
+            <div class="ui-workbench-titleline">
+              <p class="eyebrow">Memory Workbench</p>
+              <strong id="status-text" class="config-status-pill ui-status-pill status-line strong is-success" aria-live="polite">就绪</strong>
+            </div>
+            <h2>记忆工作台</h2>
+            <p class="muted">
+              当前角色卡的原记忆会参与聊天；新增、保存、读取、导入与导出都只作用于当前角色卡。
+            </p>
+          </div>
+        </div>
+        <div class="memory-overview-strip">
+          <div class="memory-overview-metrics">
+            <span class="memory-overview-pill">原记忆 <strong id="memory-count">{{ memory_count }}</strong></span>
+            <span class="memory-overview-pill">合并记忆 <strong id="merged-count">0</strong></span>
+            <span class="memory-overview-pill">大纲表 <strong id="outline-count">0</strong></span>
+            <span class="memory-overview-pill">当前选中 <strong id="selected-count">0</strong></span>
+          </div>
+        </div>
+        <div class="memory-workbench-settings">
+          <div class="memory-workbench-settings-copy">
+            <strong>记忆输出设置</strong>
+            <span>控制“结束当前对话”时自动生成的记忆长度。</span>
+          </div>
+          <div class="memory-action-row memory-settings-actions">
+            <div class="memory-summary-length-field">
+              <label for="memory-summary-length">总结长度</label>
+              <select id="memory-summary-length">
+                <option value="short" {% if settings.memory_summary_length == "short" %}selected{% endif %}>简短 (1-2句)</option>
+                <option value="medium" {% if settings.memory_summary_length == "medium" %}selected{% endif %}>中等 (2-5句, 默认)</option>
+                <option value="long" {% if settings.memory_summary_length == "long" %}selected{% endif %}>详细 (5-10句)</option>
+                <option value="custom" {% if settings.memory_summary_length == "custom" %}selected{% endif %}>自定义</option>
+              </select>
+            </div>
+            <div id="memory-max-chars-block" style="display:{{ 'none' if settings.memory_summary_length != 'custom' else '' }}">
+              <label for="memory-summary-max-chars">自定义最大字符数 (80-2000)</label>
+              <input id="memory-summary-max-chars" type="number" min="80" max="2000" step="1" value="{{ settings.memory_summary_max_chars }}" />
+            </div>
+            <button id="save-memory-length-settings" type="button" class="secondary">保存设置</button>
+            <span id="memory-settings-status" class="status-line"></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="config-workbench-actions memory-workbench-actions ui-sticky-toolbar ui-action-dock is-wrap full-span">
+        <div class="memory-actions-primary ui-action-dock-primary">
+          <button id="add-memory" type="button" class="secondary">新增</button>
+          <button id="save-memories" type="button">保存</button>
+          <button id="reload-all" type="button" class="secondary">读取</button>
+        </div>
+        <details class="memory-transfer-more ui-action-more">
+          <summary class="secondary compact" role="button">更多</summary>
+          <div class="memory-transfer-menu ui-action-more-menu">
+            <label for="memory-import-select">导入记忆</label>
+            <select id="memory-import-select" class="memory-transfer-select" aria-label="导入记忆">
+              <option value="" selected>选择导入类型</option>
+              <option value="original">导入原记忆 JSON</option>
+              <option value="bundle">导入完整记忆包 ZIP</option>
+            </select>
+            <label for="memory-export-select">导出记忆</label>
+            <select id="memory-export-select" class="memory-transfer-select is-primary" aria-label="导出记忆">
+              <option value="" selected>选择导出类型</option>
+              <option value="original">导出原记忆 JSON</option>
+              <option value="bundle">导出完整记忆包 ZIP</option>
+            </select>
+          </div>
+        </details>
+        <input id="import-memories-file" type="file" accept=".json,.jsonc,application/json,text/plain" hidden />
+        <input id="import-memory-bundle-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden />
+      </div>
+
+      <section class="panel config-panel full-span">
+        <div class="memory-tool-stack">
+          <div class="memory-tool-block">
+          <div class="memory-tool-head">
+            <div>
+              <h3>世界书记忆投影</h3>
+              <p class="muted helper-text">把大纲表/合并记忆生成默认常驻的托管世界书词条。已有旧托管词条时会先确认覆盖，不影响手写世界书。</p>
+            </div>
+          </div>
+          <div class="memory-action-row" style="align-items:flex-end">
+            <label class="selection-chip">
+              <input id="memory-worldbook-include-core" type="checkbox" checked />
+              <span>核心状态常驻</span>
+            </label>
+            <label class="selection-chip">
+              <input id="memory-worldbook-include-index" type="checkbox" checked />
+              <span>大纲索引常驻</span>
+            </label>
+            <label class="selection-chip">
+              <input id="memory-worldbook-include-details" type="checkbox" checked />
+              <span>详细记忆词条</span>
+            </label>
+            <div>
+              <label for="memory-worldbook-recent-count">核心摘要条数</label>
+              <input id="memory-worldbook-recent-count" type="number" min="0" max="12" step="1" value="3" />
+            </div>
+            <div>
+              <label for="memory-worldbook-detail-limit">详细条目上限</label>
+              <input id="memory-worldbook-detail-limit" type="number" min="1" max="200" step="1" value="80" />
+            </div>
+            <div>
+              <label for="memory-worldbook-index-limit">索引条目上限</label>
+              <input id="memory-worldbook-index-limit" type="number" min="1" max="200" step="1" value="80" />
+            </div>
+            <button id="preview-memory-worldbook-sync" type="button" class="secondary">预览投影</button>
+            <button id="apply-memory-worldbook-sync" type="button">同步到世界书</button>
+          </div>
+          <pre id="memory-worldbook-sync-preview" class="empty-tip" style="white-space:pre-wrap; max-height:220px; overflow:auto; margin-top:12px">还没有预览。先点击“预览投影”查看会生成哪些世界书词条。</pre>
+        </div>
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span memory-stage5-section memory-stage5-original">
+        <div class="section-head memory-stage5-section-head">
+          <p class="eyebrow">Original Memories</p>
+          <h2>原记忆区</h2>
+          <p class="muted">这里保留原始长期记忆。可多选后进行批量合并。</p>
+        </div>
+        <div class="memory-list-toolbar">
+          <div>
+            <label for="memory-search">搜索原记忆</label>
+            <input id="memory-search" type="text" placeholder="按标题、正文、标签、备注搜索" />
+          </div>
+          <div class="button-row memory-search-actions">
+            <button id="toggle-archived-memories" type="button" class="secondary">显示归档</button>
+            <button id="collapse-all-memories" type="button" class="secondary">全部折叠</button>
+            <button id="expand-all-memories" type="button" class="secondary">全部展开</button>
+          </div>
+        </div>
+        <div id="memory-list" class="memory-list">
+          {% for item in memories %}
+          <article class="memory-card selectable" data-collapsed="false">
+            <div class="memory-card-head">
+              <div class="memory-card-head-main">
+                <input class="memory-select" type="checkbox" />
+                <strong>{{ item.title or ("记忆 " ~ loop.index) }}</strong>
+              </div>
+              <div class="memory-card-summary"></div>
+              <div class="button-row">
+                <button type="button" class="secondary compact restore-memory" title="恢复归档" hidden>恢复</button>
+                <button type="button" class="secondary compact toggle-memory" title="展开">▾</button>
+                <button type="button" class="secondary compact remove-memory" title="删除">×</button>
+              </div>
+            </div>
+
+            <div class="memory-card-body">
+              <label>标题</label>
+              <input class="memory-title" value="{{ item.title }}" placeholder="例如：和用户的关系进展" />
+
+              <label>正文</label>
+              <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要">{{ item.content }}</textarea>
+
+              <label>标签</label>
+              <input class="memory-tags" value="{{ item.tags | join(', ') }}" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
+
+              <label>备注</label>
+              <textarea class="memory-notes" rows="3" placeholder="补充说明，可选">{{ item.notes }}</textarea>
+
+              <input class="memory-id" type="hidden" value="{{ item.id }}" />
+              <input class="memory-status" type="hidden" value="{{ item.memory_status or 'active' }}" />
+              <input class="memory-archived-at" type="hidden" value="{{ item.archived_at or '' }}" />
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span memory-stage5-section memory-stage5-outline">
+        <div class="section-head memory-stage5-section-head">
+          <p class="eyebrow">Outline Overview</p>
+          <h2>大纲表总览</h2>
+          <p class="muted">时间列在最前，精确到分钟。点击任意一行，在下方查看完整详情。</p>
+        </div>
+
+        <div class="outline-overview-shell">
+          <div class="table-toolbar">
+            <p class="muted">当前按生成时间展示。</p>
+          </div>
+
+          <div class="outline-table-wrap">
+            <div class="outline-table-scroll">
+              <table class="outline-table">
+                <thead>
+                  <tr>
+                    <th style="width: 150px;">时间</th>
+                    <th style="width: 260px;">标题 / 档案</th>
+                    <th style="width: 170px;">剧情位置</th>
+                    <th style="width: 180px;">角色</th>
+                    <th style="width: 200px;">关系推进</th>
+                    <th style="width: 150px;">使用方式</th>
+                    <th>关键事件</th>
+                  </tr>
+                </thead>
+                <tbody id="outline-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="outline-detail-panel" class="outline-detail-shell">
+            <div class="outline-detail-empty">先点击上方某一行，这里会显示该大纲项的详细内容。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span memory-stage5-section memory-stage5-merged">
+        <div class="section-head memory-stage5-section-head">
+          <p class="eyebrow">Merged Memories</p>
+          <h2>合并后的记忆</h2>
+          <p class="muted">这里保留每次批量合并产出的长期记忆结果。</p>
+        </div>
+        <div id="merged-list" class="merged-list-grid"></div>
+      </section>
+    </div>
+
+    <aside id="memory-selection-panel" class="memory-selection-panel" aria-hidden="true">
+      <div class="memory-selection-card">
+        <div class="memory-selection-head">
+          <div>
+            <p class="eyebrow">Selected Memories</p>
+            <h3>已选中 <strong id="memory-selection-panel-count" class="memory-selection-count">0</strong> 条</h3>
+            <p class="muted helper-text">针对当前勾选的原记忆进行合并操作。</p>
+          </div>
+          <button id="close-memory-selection-panel" type="button" class="secondary memory-selection-close-button" aria-label="清空选择并关闭">×</button>
+        </div>
+        <div class="memory-selection-content">
+          <div class="memory-selection-merge">
+            <div class="memory-tool-head">
+              <div>
+                <h3>合并到大纲表</h3>
+                <p class="muted helper-text">勾选两条以上原记忆后，生成合并记忆并写入大纲表。</p>
+              </div>
+            </div>
+            <div class="merge-toolbar">
+              <div class="field-block">
+                <label for="merged-title-input">合并记忆标题（可空）</label>
+                <input id="merged-title-input" type="text" placeholder="例如：主角xxx阶段总结" />
+              </div>
+              <div class="field-block">
+                <label for="outline-title-input">大纲表标题（可空）</label>
+                <input id="outline-title-input" type="text" placeholder="例如：主角冒险线阶段大纲" />
+              </div>
+            </div>
+            <div class="field-block">
+              <label for="merge-source-action">合并后处理来源原记忆</label>
+              <select id="merge-source-action">
+                <option value="delete" selected>删除来源原记忆</option>
+                <option value="archive">归档来源原记忆，不进 prompt</option>
+                <option value="keep">保留来源原记忆，继续进 prompt</option>
+              </select>
+            </div>
+            <div class="memory-selection-actions">
+              <button id="merge-selected" type="button" class="full-row">合并选中记忆</button>
+              <button id="select-all-visible" type="button" class="secondary">选中当前可见项</button>
+              <button id="clear-selection" type="button" class="secondary">清空勾选</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <template id="memory-card-template">
+      <article class="memory-card selectable" data-collapsed="false">
+        <div class="memory-card-head">
+          <div class="memory-card-head-main">
+            <input class="memory-select" type="checkbox" />
+            <strong>新记忆</strong>
+          </div>
+          <div class="memory-card-summary"></div>
+          <div class="button-row">
+            <button type="button" class="secondary compact restore-memory" title="恢复归档" hidden>恢复</button>
+            <button type="button" class="secondary compact toggle-memory" title="展开">▾</button>
+            <button type="button" class="secondary compact remove-memory" title="删除">×</button>
+          </div>
+        </div>
+
+        <div class="memory-card-body">
+          <label>标题</label>
+          <input class="memory-title" placeholder="例如：主角色的固定偏好" />
+
+          <label>正文</label>
+          <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要"></textarea>
+
+          <label>标签</label>
+          <input class="memory-tags" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
+
+          <label>备注</label>
+          <textarea class="memory-notes" rows="3" placeholder="补充说明，可选"></textarea>
+
+          <input class="memory-id" type="hidden" />
+          <input class="memory-status" type="hidden" value="active" />
+          <input class="memory-archived-at" type="hidden" />
+        </div>
+      </article>
+    </template>
+
+    <script src="/static/js/app-core.js?v=v161-p4-batch-render-atomic-20260701"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script>
+      const { normalizeSearchText, downloadJson, applyTheme, applyUiOpacity, applyBackground, batchRenderList } = window.Fantareal;
+      const statusEl = document.getElementById("status-text");
+      const memoryListEl = document.getElementById("memory-list");
+      const mergedListEl = document.getElementById("merged-list");
+      const outlineTableBodyEl = document.getElementById("outline-table-body");
+      const outlineDetailPanelEl = document.getElementById("outline-detail-panel");
+      const memoryCountEl = document.getElementById("memory-count");
+      const mergedCountEl = document.getElementById("merged-count");
+      const outlineCountEl = document.getElementById("outline-count");
+      const selectedCountEl = document.getElementById("selected-count");
+      const templateEl = document.getElementById("memory-card-template");
+
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+
+      let currentOutlineItems = [];
+      let currentMergedItems = [];
+      let currentActiveOutlineId = "";
+      let outlineDetailExpanded = false;
+      let outlineDetailEditing = false;
+      let isMerging = false;
+      let lastMemoryWorldbookSyncPreview = null;
+      let showArchivedMemories = false;
+      const SOURCE_ACTION_PREF_KEY = "xuqi_memory_source_action";
+      const DELETE_SOURCES_PREF_KEY = "xuqi_memory_delete_sources_toggle";
+
+      function getCompactStatusLabel(text, state) {
+        const value = String(text || "");
+        if (state === "error") return "出错";
+        if (state === "dirty") return "有修改";
+        if (state === "saving") {
+          if (value.includes("保存")) return "保存中";
+          if (value.includes("读取")) return "读取中";
+          if (value.includes("导入")) return "导入中";
+          if (value.includes("导出")) return "导出中";
+          if (value.includes("生成")) return "生成中";
+          if (value.includes("同步")) return "同步中";
+          return "处理中";
+        }
+        if (state === "success") {
+          if (value.includes("保存")) return "已保存";
+          if (value.includes("读取")) return "已读取";
+          if (value.includes("导入")) return "已导入";
+          if (value.includes("导出")) return "已导出";
+          if (value.includes("新增")) return "已新增";
+          if (value.includes("删除")) return "已删除";
+          if (value.includes("同步")) return "已同步";
+          if (value.includes("生成")) return "已完成";
+          return "就绪";
+        }
+        return "就绪";
+      }
+
+      function setStatus(text) {
+        const value = text || "就绪";
+        const state = getStatusState(value);
+        const label = getCompactStatusLabel(value, state);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: value,
+          state,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = value;
+          statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
+          statusEl.classList.add(`is-${state}`);
+        }
+      }
+
+      const MEMORY_INPUT_REFRESH_DELAY = 80;
+      const MEMORY_RENDER_BATCH_SIZE = 8;
+      let memorySearchTextCache = new WeakMap();
+      let memoryRefreshTimer = 0;
+      let pendingMemorySearch = false;
+      const pendingMemoryCards = new Set();
+
+      function invalidateMemoryCardCache(card) {
+        if (card) memorySearchTextCache.delete(card);
+      }
+
+      function invalidateMemoryCaches() {
+        memorySearchTextCache = new WeakMap();
+      }
+
+      function clearPendingMemoryRefresh() {
+        pendingMemoryCards.clear();
+        pendingMemorySearch = false;
+      }
+
+      function flushMemoryRefresh() {
+        if (memoryRefreshTimer) {
+          window.clearTimeout(memoryRefreshTimer);
+          memoryRefreshTimer = 0;
+        }
+        const cards = [...pendingMemoryCards];
+        const shouldSearch = pendingMemorySearch;
+        clearPendingMemoryRefresh();
+        cards.forEach(updateMemorySummary);
+        if (shouldSearch) applyMemorySearch();
+      }
+
+      function scheduleMemoryRefresh({ card = null, search = true, delay = MEMORY_INPUT_REFRESH_DELAY } = {}) {
+        if (card) pendingMemoryCards.add(card);
+        pendingMemorySearch ||= Boolean(search);
+        if (memoryRefreshTimer) window.clearTimeout(memoryRefreshTimer);
+        memoryRefreshTimer = window.setTimeout(flushMemoryRefresh, delay);
+      }
+
+      function refreshMemoryNow({ cards = [], search = true, invalidate = false } = {}) {
+        if (memoryRefreshTimer) {
+          window.clearTimeout(memoryRefreshTimer);
+          memoryRefreshTimer = 0;
+        }
+        clearPendingMemoryRefresh();
+        if (invalidate) invalidateMemoryCaches();
+        cards.forEach(updateMemorySummary);
+        if (search) applyMemorySearch();
+      }
+
+      function getStatusState(text) {
+        const value = String(text || "");
+        if (/失败|错误|异常|无法/.test(value)) return "error";
+        if (/正在|保存中|读取中|导入中|导出中|生成中|请不要重复|合并中/.test(value)) return "saving";
+        if (/未保存|修改|记得保存|待保存/.test(value)) return "dirty";
+        if (/就绪|已保存|已加载|已读取|读取完成|已导出|已导入|已新增|已删除|已重新读取|重新读取|生成完成|导入完成|保存/.test(value)) return "success";
+        return "idle";
+      }
+
+      function getSourceActionSelect() {
+        return document.getElementById("merge-source-action");
+      }
+
+      function loadDeleteSourcesPreference() {
+        const select = getSourceActionSelect();
+        if (!select) return;
+        const storedAction = window.localStorage.getItem(SOURCE_ACTION_PREF_KEY);
+        if (["delete", "archive", "keep"].includes(storedAction)) {
+          select.value = storedAction;
+          return;
+        }
+        const legacyDeleteToggle = window.localStorage.getItem(DELETE_SOURCES_PREF_KEY);
+        if (legacyDeleteToggle === "true") {
+          select.value = "delete";
+        } else if (legacyDeleteToggle === "false") {
+          select.value = "keep";
+        }
+      }
+
+      function saveDeleteSourcesPreference() {
+        const select = getSourceActionSelect();
+        if (!select) return;
+        window.localStorage.setItem(SOURCE_ACTION_PREF_KEY, select.value || "delete");
+      }
+
+      function setMergeButtonLoading(loading, message = "") {
+        const button = document.getElementById("merge-selected");
+        if (!button) return;
+        button.disabled = !!loading;
+        button.classList.toggle("loading-button", !!loading);
+        button.textContent = loading ? "正在生成中..." : "把选中记忆合并到大纲表";
+        if (message) {
+          setStatus(message);
+        }
+      }
+
+      function focusOutlineRow(outlineId) {
+        if (!outlineId) return;
+        const row = outlineTableBodyEl.querySelector(`tr[data-outline-id="${outlineId}"]`);
+        if (row) {
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+
+      function getMemorySearchText(card) {
+        const cached = memorySearchTextCache.get(card);
+        if (cached !== undefined) return cached;
+        const text = [
+          card.querySelector(".memory-title")?.value || "",
+          card.querySelector(".memory-content")?.value || "",
+          card.querySelector(".memory-tags")?.value || "",
+          card.querySelector(".memory-notes")?.value || "",
+        ].join("\n").toLowerCase();
+        memorySearchTextCache.set(card, text);
+        return text;
+      }
+
+      function createMemorySummaryChip(text, className = "") {
+        const chip = document.createElement("span");
+        chip.className = "memory-summary-chip ui-summary-chip" + (className ? " " + className : "");
+        chip.textContent = text;
+        return chip;
+      }
+
+      function updateMemorySummary(card) {
+        const summary = card.querySelector(".memory-card-summary");
+        if (!summary) return;
+        const content = String(card.querySelector(".memory-content")?.value || "").trim();
+        const tags = String(card.querySelector(".memory-tags")?.value || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+        const notes = String(card.querySelector(".memory-notes")?.value || "").trim();
+        summary.innerHTML = "";
+        if (isMemoryCardArchived(card)) {
+          summary.appendChild(createMemorySummaryChip("已归档，不进 prompt", "archived"));
+        }
+        summary.appendChild(createMemorySummaryChip("正文 " + content.length + " 字", "strong"));
+        summary.appendChild(createMemorySummaryChip(tags.length ? "标签 " + tags.length + " 个" : "无标签"));
+        summary.appendChild(createMemorySummaryChip(notes ? "有备注" : "无备注"));
+      }
+
+      function setMemoryCollapsed(card, collapsed) {
+        const body = card.querySelector(".memory-card-body");
+        const toggleBtn = card.querySelector(".toggle-memory");
+        window.Fantareal?.motion?.setDisclosureCollapsed(card, body, collapsed, { hiddenMode: "display" });
+        if (toggleBtn) {
+          toggleBtn.textContent = collapsed ? "▾" : "▴";
+          toggleBtn.title = collapsed ? "展开" : "收起";
+          toggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        }
+        updateMemorySummary(card);
+      }
+
+      function updateSelectionCount() {
+        const count = [...memoryListEl.querySelectorAll(".memory-select:checked")].length;
+        selectedCountEl.textContent = String(count);
+        const panelCountEl = document.getElementById("memory-selection-panel-count");
+        if (panelCountEl) {
+          panelCountEl.textContent = String(count);
+        }
+        const panel = document.getElementById("memory-selection-panel");
+        if (panel) {
+          panel.classList.toggle("is-visible", count > 0);
+          panel.setAttribute("aria-hidden", count > 0 ? "false" : "true");
+        }
+      }
+
+      function normalizeMemoryStatus(value) {
+        return String(value || "active").trim().toLowerCase() === "archived" ? "archived" : "active";
+      }
+
+      function isMemoryCardArchived(card) {
+        return normalizeMemoryStatus(card?.querySelector(".memory-status")?.value || card?.dataset.memoryStatus) === "archived";
+      }
+
+      function setMemoryCardArchiveState(card, status = "active", archivedAt = "") {
+        const normalized = normalizeMemoryStatus(status);
+        card.dataset.memoryStatus = normalized;
+        card.classList.toggle("is-archived", normalized === "archived");
+        const statusInput = card.querySelector(".memory-status");
+        if (statusInput) statusInput.value = normalized;
+        const archivedAtInput = card.querySelector(".memory-archived-at");
+        if (archivedAtInput) archivedAtInput.value = normalized === "archived" ? archivedAt : "";
+        const restoreButton = card.querySelector(".restore-memory");
+        if (restoreButton) {
+          restoreButton.hidden = normalized !== "archived";
+        }
+        updateMemorySummary(card);
+      }
+
+      function updateArchivedToggleButton() {
+        const button = document.getElementById("toggle-archived-memories");
+        if (!button) return;
+        const archivedCount = [...memoryListEl.querySelectorAll(".memory-card")]
+          .filter((card) => isMemoryCardArchived(card)).length;
+        button.textContent = showArchivedMemories ? `隐藏归档 (${archivedCount})` : `显示归档 (${archivedCount})`;
+      }
+
+      function applyMemorySearch() {
+        const keyword = normalizeSearchText(document.getElementById("memory-search")?.value || "");
+        const cards = [...memoryListEl.querySelectorAll(".memory-card")];
+        let visibleCount = 0;
+        let hiddenArchivedCount = 0;
+        for (const card of cards) {
+          const archived = isMemoryCardArchived(card);
+          const matchedKeyword = !keyword || getMemorySearchText(card).includes(keyword);
+          const hiddenArchived = archived && !showArchivedMemories;
+          const visible = matchedKeyword && !hiddenArchived;
+          card.style.display = visible ? "" : "none";
+          if (!visible) {
+            const checkbox = card.querySelector(".memory-select");
+            if (checkbox) checkbox.checked = false;
+          }
+          if (visible) visibleCount += 1;
+          if (hiddenArchived) hiddenArchivedCount += 1;
+        }
+        updateArchivedToggleButton();
+        updateSelectionCount();
+        const archiveHint = hiddenArchivedCount ? `，已隐藏 ${hiddenArchivedCount} 条归档记忆` : "";
+        setStatus(keyword ? `搜索完成：找到 ${visibleCount} 条匹配原记忆${archiveHint}。` : `已清除搜索筛选${archiveHint}。`);
+      }
+
+      function updateMemoryCount() {
+        const cards = [...memoryListEl.querySelectorAll(".memory-card")];
+        const activeCount = cards.filter((card) => !isMemoryCardArchived(card)).length;
+        memoryCountEl.textContent = String(activeCount);
+        updateArchivedToggleButton();
+        updateSelectionCount();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function formatMinuteTime(value) {
+        const text = String(value || "").trim();
+        if (!text) return "";
+        return text.length >= 16 ? text.slice(0, 16) : text;
+      }
+
+      function compactText(value, maxLength = 110) {
+        const text = String(value || "").replace(/\s+/g, " ").trim();
+        if (!text) return "—";
+        return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+      }
+
+      function currentMinuteText() {
+        const now = new Date();
+        const pad = (value) => String(value).padStart(2, "0");
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      }
+
+      function outlineFlagEnabled(item, key) {
+        return item?.[key] !== false;
+      }
+
+      function outlineFlagLabel(item, key, enabledLabel, disabledLabel) {
+        return outlineFlagEnabled(item, key) ? enabledLabel : disabledLabel;
+      }
+
+      function buildOutlineLocationText(item) {
+        const parts = [
+          item?.chapter ? `章节：${item.chapter}` : "",
+          item?.story_time ? `时间：${item.story_time}` : "",
+          item?.location ? `地点：${item.location}` : "",
+        ].filter(Boolean);
+        return parts.join(" / ") || "—";
+      }
+
+      function buildOutlineArchiveBadges(item) {
+        const badges = [];
+        if (item?.story_time) badges.push(`时间：${compactText(item.story_time, 18)}`);
+        if (item?.chapter) badges.push(`章节：${compactText(item.chapter, 18)}`);
+        if (item?.location) badges.push(`地点：${compactText(item.location, 18)}`);
+        if (item?.important_items) badges.push(`线索：${compactText(item.important_items, 18)}`);
+        return badges;
+      }
+
+      function buildOutlineUsageBadges(item) {
+        return [
+          {
+            text: outlineFlagLabel(item, "project_to_worldbook", "投影世界书", "不投影世界书"),
+            off: !outlineFlagEnabled(item, "project_to_worldbook"),
+          },
+          {
+            text: outlineFlagLabel(item, "participate_recall", "参与召回", "不参与召回"),
+            off: !outlineFlagEnabled(item, "participate_recall"),
+          },
+        ];
+      }
+
+      function outlineItemMatches(row, target) {
+        if (!row || !target) return false;
+        const rowId = String(row.id || "").trim();
+        const targetId = String(target.id || "").trim();
+        return row === target || (rowId && targetId && rowId === targetId);
+      }
+
+      function attachRemoveHandler(card) {
+        card.querySelector(".remove-memory").addEventListener("click", () => {
+          (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+            updateMemoryCount();
+            refreshMemoryNow({ search: true, invalidate: true });
+            setStatus("已删除一条原记忆，记得保存。");
+          });
+        });
+
+        const toggleBtn = card.querySelector(".toggle-memory");
+        if (toggleBtn) {
+          toggleBtn.addEventListener("click", () => {
+            const collapsed = card.dataset.collapsed === "true";
+            setMemoryCollapsed(card, !collapsed);
+          });
+        }
+
+        const checkbox = card.querySelector(".memory-select");
+        if (checkbox) {
+          checkbox.addEventListener("change", () => {
+            updateSelectionCount();
+          });
+        }
+
+        const restoreButton = card.querySelector(".restore-memory");
+        if (restoreButton) {
+          restoreButton.addEventListener("click", () => {
+            setMemoryCardArchiveState(card, "active", "");
+            card.style.display = "";
+            updateMemoryCount();
+            invalidateMemoryCardCache(card);
+            refreshMemoryNow({ cards: [card], search: true });
+            setStatus("已恢复一条归档原记忆，记得保存。");
+          });
+        }
+      }
+
+      function initExistingMemoryCards() {
+        [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => {
+          attachRemoveHandler(card);
+          if (!card.dataset.collapsed || card.dataset.collapsed === "false") {
+            card.dataset.collapsed = "true";
+          }
+          setMemoryCollapsed(card, true);
+          const title = card.querySelector(".memory-title")?.value?.trim() || card.querySelector(".memory-card-head strong")?.textContent || "新记忆";
+          card.querySelector(".memory-card-head strong").textContent = title;
+          setMemoryCardArchiveState(card, card.querySelector(".memory-status")?.value || "active", card.querySelector(".memory-archived-at")?.value || "");
+        });
+      }
+
+      function createMemoryCard(item = {}, defaultCollapsed = false) {
+        const fragment = templateEl.content.cloneNode(true);
+        const card = fragment.querySelector(".memory-card");
+        card.querySelector(".memory-title").value = item.title || "";
+        card.querySelector(".memory-content").value = item.content || "";
+        card.querySelector(".memory-tags").value = Array.isArray(item.tags) ? item.tags.join(", ") : "";
+        card.querySelector(".memory-notes").value = item.notes || "";
+        card.querySelector(".memory-id").value = item.id || "";
+        card.querySelector(".memory-card-head strong").textContent = item.title ? item.title : "新记忆";
+        attachRemoveHandler(card);
+        setMemoryCardArchiveState(card, item.memory_status || item.status || "active", item.archived_at || "");
+        setMemoryCollapsed(card, Boolean(defaultCollapsed));
+        updateMemorySummary(card);
+        return card;
+      }
+
+      async function renderMemoryCards(items = []) {
+        return batchRenderList(
+          memoryListEl,
+          items,
+          (item) => createMemoryCard(item, true),
+          { batchSize: MEMORY_RENDER_BATCH_SIZE }
+        );
+      }
+
+      function collectMemories() {
+        return [...memoryListEl.querySelectorAll(".memory-card")].map((card, index) => {
+          const id = card.querySelector(".memory-id").value.trim() || `memory-manual-${Date.now()}-${index}`;
+          const title = card.querySelector(".memory-title").value.trim();
+          const content = card.querySelector(".memory-content").value.trim();
+          const tags = card.querySelector(".memory-tags").value.split(",").map((item) => item.trim()).filter(Boolean);
+          const notes = card.querySelector(".memory-notes").value.trim();
+          const memory_status = normalizeMemoryStatus(card.querySelector(".memory-status")?.value || "active");
+          const archived_at = memory_status === "archived" ? (card.querySelector(".memory-archived-at")?.value || "") : "";
+          return { id, title, content, tags, notes, memory_status, archived_at };
+        });
+      }
+
+      function getSelectedMemoryIds() {
+        return [...memoryListEl.querySelectorAll(".memory-card")]
+          .filter((card) => card.querySelector(".memory-select")?.checked)
+          .map((card) => card.querySelector(".memory-id")?.value?.trim())
+          .filter(Boolean);
+      }
+
+      async function getJson(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "读取失败");
+        }
+        return response.json();
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "请求失败");
+        }
+        return response.json();
+      }
+
+
+      async function saveMergedMemoryItems(items) {
+        const data = await postJson("/api/memories/merged", { items });
+        const savedItems = data.items || items || [];
+        renderMergedList(savedItems);
+        return savedItems;
+      }
+
+      function renderMergedList(items = []) {
+        currentMergedItems = Array.isArray(items) ? items : [];
+        mergedListEl.innerHTML = "";
+        mergedCountEl.textContent = String(currentMergedItems.length);
+
+        if (!currentMergedItems.length) {
+          mergedListEl.innerHTML = '<div class="empty-tip">还没有合并后的记忆。先在上方原记忆区勾选两条以上，再执行合并。</div>';
+          return;
+        }
+
+        for (const item of currentMergedItems) {
+          const tags = Array.isArray(item.tags) ? item.tags : [];
+          const sourceIds = Array.isArray(item.source_memory_ids) ? item.source_memory_ids : [];
+          const createdAt = formatMinuteTime(item.created_at || "");
+          const article = document.createElement("article");
+          article.className = "merged-card is-collapsed";
+          article.dataset.mergedId = item.id || "";
+          article.innerHTML = `
+            <div class="merged-card-head">
+              <span class="merged-card-time">${escapeHtml(createdAt || "无时间")}</span>
+              <div class="merged-card-title">
+                <h3>${escapeHtml(item.title || "未命名合并记忆")}</h3>
+                <div class="merged-card-subline">来源 ${sourceIds.length} 条</div>
+              </div>
+              <div class="memory-icon-actions">
+                <button type="button" class="secondary compact memory-icon-button toggle-merged-card" title="展开">▾</button>
+                <button type="button" class="secondary compact memory-icon-button memory-danger remove-merged-card" title="删除">×</button>
+              </div>
+            </div>
+            <div class="merged-card-body">
+              <div class="merged-meta">
+                <span class="merged-badge">${escapeHtml(createdAt || "无时间")}</span>
+                <span class="merged-badge">来源 ${sourceIds.length} 条</span>
+                ${tags.map((tag) => `<span class="merged-badge">${escapeHtml(tag)}</span>`).join("")}
+              </div>
+              <div class="merged-content">${escapeHtml(item.content || "")}</div>
+              ${item.notes ? `<div class="merged-notes">${escapeHtml(item.notes)}</div>` : ""}
+            </div>
+          `;
+
+          const toggle = article.querySelector(".toggle-merged-card");
+          toggle?.addEventListener("click", () => {
+            const collapsed = !article.classList.contains("is-collapsed");
+            const body = article.querySelector(".merged-card-body");
+            window.Fantareal?.motion?.setDisclosureCollapsed(article, body, collapsed, { collapsedClass: "is-collapsed", toggleData: false, hiddenMode: "display" });
+            toggle.textContent = collapsed ? "▾" : "▴";
+            toggle.title = collapsed ? "展开" : "收起";
+            toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          });
+
+          article.querySelector(".remove-merged-card")?.addEventListener("click", async () => {
+            const confirmed = window.confirm(`要删除合并记忆「${item.title || "未命名合并记忆"}」吗？`);
+            if (!confirmed) return;
+            try {
+              const nextItems = currentMergedItems.filter((row) => row !== item && String(row.id || "") !== String(item.id || ""));
+              await saveMergedMemoryItems(nextItems);
+              setStatus("已删除一条合并后的记忆。");
+            } catch (error) {
+              setStatus(`删除合并记忆失败：${error.message}`);
+            }
+          });
+
+          mergedListEl.appendChild(article);
+        }
+      }
+
+      async function saveOutlineMemoryItems(items, preferredActiveId = "") {
+        const data = await postJson("/api/memories/outline", { items });
+        const savedItems = data.items || items || [];
+        renderOutlineTable(savedItems, preferredActiveId);
+        return savedItems;
+      }
+
+      function collectOutlineEditorItem(original) {
+        const keyEvents = String(document.getElementById("outline-edit-key-events")?.value || "")
+          .split(/\n+/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+        return {
+          ...original,
+          title: document.getElementById("outline-edit-title")?.value.trim() || "",
+          summary: document.getElementById("outline-edit-summary")?.value.trim() || "",
+          story_time: document.getElementById("outline-edit-story-time")?.value.trim() || "",
+          chapter: document.getElementById("outline-edit-chapter")?.value.trim() || "",
+          location: document.getElementById("outline-edit-location")?.value.trim() || "",
+          characters: document.getElementById("outline-edit-characters")?.value.trim() || "",
+          relationship_progress: document.getElementById("outline-edit-relationship")?.value.trim() || "",
+          emotion_shift: document.getElementById("outline-edit-emotion-shift")?.value.trim() || "",
+          key_events: keyEvents,
+          conflicts: document.getElementById("outline-edit-conflicts")?.value.trim() || "",
+          foreshadowing: document.getElementById("outline-edit-foreshadowing")?.value.trim() || "",
+          unresolved_items: document.getElementById("outline-edit-unresolved-items")?.value.trim() || "",
+          important_items: document.getElementById("outline-edit-important-items")?.value.trim() || "",
+          next_hooks: document.getElementById("outline-edit-next-hooks")?.value.trim() || "",
+          notes: document.getElementById("outline-edit-notes")?.value.trim() || "",
+          participate_recall: document.getElementById("outline-edit-participate-recall")?.checked !== false,
+          project_to_worldbook: document.getElementById("outline-edit-project-worldbook")?.checked !== false,
+          source_memory_ids: Array.isArray(original.source_memory_ids) ? original.source_memory_ids : [],
+          merged_memory_id: original.merged_memory_id || "",
+          updated_at: currentMinuteText(),
+        };
+      }
+
+      async function saveOutlineEditorItem(item) {
+        const updatedItem = collectOutlineEditorItem(item);
+        const nextItems = currentOutlineItems.map((row) => outlineItemMatches(row, item) ? updatedItem : row);
+        outlineDetailEditing = false;
+        outlineDetailExpanded = true;
+        await saveOutlineMemoryItems(nextItems, updatedItem.id || currentActiveOutlineId);
+        setStatus("大纲项已保存。");
+      }
+
+      async function deleteOutlineItem(item) {
+        const confirmed = window.confirm(`确定删除大纲项「${item.title || "未命名大纲"}」吗？\n\n这只会删除大纲表条目，不会删除原记忆或合并记忆。`);
+        if (!confirmed) return;
+        const nextItems = currentOutlineItems.filter((row) => !outlineItemMatches(row, item));
+        outlineDetailEditing = false;
+        outlineDetailExpanded = false;
+        await saveOutlineMemoryItems(nextItems, nextItems[0]?.id || "");
+        setStatus("已删除一条大纲项。");
+      }
+
+      function renderOutlineEditor(item, previousDetailHeight = 0) {
+        const keyEvents = Array.isArray(item.key_events) ? item.key_events : [];
+        const sourceCount = Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0;
+        outlineDetailPanelEl.innerHTML = `
+          <div class="outline-detail-head">
+            <div>
+              <h3>编辑大纲项</h3>
+              <div class="outline-submeta">来源 ${sourceCount} 条原记忆${item.merged_memory_id ? ` · 合并记忆 ${escapeHtml(item.merged_memory_id)}` : ""}</div>
+            </div>
+            <div class="outline-detail-side">
+              <div class="outline-detail-time">${escapeHtml(formatMinuteTime(item.updated_at || "") || "无时间")}</div>
+              <div class="outline-detail-actions">
+                <button type="button" class="secondary compact outline-editor-cancel">取消</button>
+                <button type="button" class="secondary compact outline-editor-delete outline-danger-button">删除</button>
+                <button type="button" class="compact outline-editor-save">保存</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="outline-editor-grid">
+            <div class="outline-editor-field">
+              <label for="outline-edit-title">标题</label>
+              <input id="outline-edit-title" type="text" value="${escapeHtml(item.title || "")}" />
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-characters">涉及角色</label>
+              <input id="outline-edit-characters" type="text" value="${escapeHtml(item.characters || "")}" />
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-story-time">剧情时间</label>
+              <input id="outline-edit-story-time" type="text" placeholder="例如：第七日夜晚 / 冬至后" value="${escapeHtml(item.story_time || "")}" />
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-chapter">章节 / 段落</label>
+              <input id="outline-edit-chapter" type="text" placeholder="例如：银钥匙篇 / 第二幕" value="${escapeHtml(item.chapter || "")}" />
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-location">地点</label>
+              <input id="outline-edit-location" type="text" placeholder="例如：旧图书馆地下门厅" value="${escapeHtml(item.location || "")}" />
+            </div>
+            <div class="outline-editor-field full">
+              <label for="outline-edit-summary">摘要</label>
+              <textarea id="outline-edit-summary" rows="4">${escapeHtml(item.summary || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-relationship">关系推进</label>
+              <textarea id="outline-edit-relationship" rows="3">${escapeHtml(item.relationship_progress || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-emotion-shift">情绪变化</label>
+              <textarea id="outline-edit-emotion-shift" rows="3">${escapeHtml(item.emotion_shift || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-key-events">关键事件（一行一条）</label>
+              <textarea id="outline-edit-key-events" rows="3">${escapeHtml(keyEvents.join("\n"))}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-conflicts">矛盾点</label>
+              <textarea id="outline-edit-conflicts" rows="3">${escapeHtml(item.conflicts || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-foreshadowing">伏笔</label>
+              <textarea id="outline-edit-foreshadowing" rows="3">${escapeHtml(item.foreshadowing || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-unresolved-items">未解决事项</label>
+              <textarea id="outline-edit-unresolved-items" rows="3">${escapeHtml(item.unresolved_items || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-important-items">重要物品 / 线索</label>
+              <textarea id="outline-edit-important-items" rows="3">${escapeHtml(item.important_items || "")}</textarea>
+            </div>
+            <div class="outline-editor-field">
+              <label for="outline-edit-next-hooks">后续钩子</label>
+              <textarea id="outline-edit-next-hooks" rows="3">${escapeHtml(item.next_hooks || "")}</textarea>
+            </div>
+            <div class="outline-editor-field full outline-editor-switches">
+              <label>使用方式</label>
+              <label class="outline-switch-row" for="outline-edit-project-worldbook">
+                <input id="outline-edit-project-worldbook" class="outline-switch-checkbox" type="checkbox" ${outlineFlagEnabled(item, "project_to_worldbook") ? "checked" : ""} />
+                <span><strong>投影到世界书</strong><small>开启后，记忆同步世界书时会使用这条剧情档案。</small></span>
+              </label>
+              <label class="outline-switch-row" for="outline-edit-participate-recall">
+                <input id="outline-edit-participate-recall" class="outline-switch-checkbox" type="checkbox" ${outlineFlagEnabled(item, "participate_recall") ? "checked" : ""} />
+                <span><strong>参与召回</strong><small>开启后，来源原记忆不在活跃记忆区时，会作为剧情档案进入聊天召回候选；如已用世界书管理，可手动关闭。</small></span>
+              </label>
+            </div>
+            <div class="outline-editor-field full">
+              <label for="outline-edit-notes">备注</label>
+              <textarea id="outline-edit-notes" rows="3">${escapeHtml(item.notes || "")}</textarea>
+            </div>
+          </div>
+        `;
+
+        outlineDetailPanelEl.querySelector(".outline-editor-save")?.addEventListener("click", async () => {
+          try {
+            await saveOutlineEditorItem(item);
+          } catch (error) {
+            setStatus(`保存大纲项失败：${error.message}`);
+          }
+        });
+        outlineDetailPanelEl.querySelector(".outline-editor-cancel")?.addEventListener("click", () => {
+          outlineDetailEditing = false;
+          renderOutlineDetail(item);
+        });
+        outlineDetailPanelEl.querySelector(".outline-editor-delete")?.addEventListener("click", async () => {
+          try {
+            await deleteOutlineItem(item);
+          } catch (error) {
+            setStatus(`删除大纲项失败：${error.message}`);
+          }
+        });
+        animateOutlineDetailPanel(previousDetailHeight);
+      }
+
+      function animateOutlineDetailPanel(previousHeight = 0) {
+        const motion = window.Fantareal?.motion;
+        const panel = outlineDetailPanelEl;
+        const durationMs = 560;
+        const collapseDurationMs = 460;
+        const reduceMotion = motion?.prefersReducedMotion?.() === true;
+        let isShrinking = false;
+        panel.classList.remove("outline-detail-motion-in", "outline-detail-resizing");
+        void panel.offsetWidth;
+
+        if (!reduceMotion && Number(previousHeight) > 0) {
+          const nextHeight = panel.scrollHeight || panel.getBoundingClientRect().height;
+          isShrinking = nextHeight > 0 && nextHeight < previousHeight - 2;
+          if (nextHeight > 0 && Math.abs(nextHeight - previousHeight) > 2) {
+            panel.style.setProperty("--outline-detail-resize-duration", isShrinking ? `${collapseDurationMs}ms` : `${durationMs}ms`);
+            panel.style.setProperty(
+              "--outline-detail-resize-ease",
+              isShrinking
+                ? "var(--ui-ease-exit, cubic-bezier(0.4, 0, 1, 1))"
+                : "var(--ui-ease-enter, cubic-bezier(0.2, 0.8, 0.2, 1))"
+            );
+            panel.style.height = `${previousHeight}px`;
+            panel.style.overflow = "hidden";
+            panel.classList.add("outline-detail-resizing");
+            requestAnimationFrame(() => {
+              panel.style.height = `${nextHeight}px`;
+            });
+            window.setTimeout(() => {
+              panel.style.height = "";
+              panel.style.overflow = "";
+              panel.style.removeProperty("--outline-detail-resize-duration");
+              panel.style.removeProperty("--outline-detail-resize-ease");
+              panel.classList.remove("outline-detail-resizing");
+            }, (isShrinking ? collapseDurationMs : durationMs) + 40);
+          }
+        }
+
+        if (isShrinking) {
+          return;
+        }
+
+        if (motion?.pulseItem) {
+          motion.pulseItem(panel, "outline-detail-motion-in", { fallbackMs: durationMs + 80 });
+        } else {
+          panel.classList.add("outline-detail-motion-in");
+          window.setTimeout(() => panel.classList.remove("outline-detail-motion-in"), durationMs + 80);
+        }
+      }
+
+      function renderOutlineDetail(item) {
+        const previousDetailHeight = outlineDetailPanelEl.getBoundingClientRect().height;
+        if (!item) {
+          outlineDetailPanelEl.innerHTML = '<div class="outline-detail-empty">先点击上方某一行，这里会显示该大纲项的简要内容。</div>';
+          animateOutlineDetailPanel(previousDetailHeight);
+          return;
+        }
+
+        if (outlineDetailEditing) {
+          renderOutlineEditor(item, previousDetailHeight);
+          return;
+        }
+
+        const keyEvents = Array.isArray(item.key_events) ? item.key_events : [];
+        const sourceCount = Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0;
+        const currentTime = formatMinuteTime(item.updated_at || "");
+        const locationText = buildOutlineLocationText(item);
+        const usageBadges = buildOutlineUsageBadges(item);
+        const usageBadgeHtml = usageBadges
+          .map((badge) => `<span class="outline-usage-badge${badge.off ? " is-off" : ""}">${escapeHtml(badge.text)}</span>`)
+          .join("");
+
+        if (!outlineDetailExpanded) {
+          outlineDetailPanelEl.innerHTML = `
+            <div class="outline-brief-card">
+              <div class="outline-detail-head">
+                <div>
+                  <h3>${escapeHtml(item.title || "未命名大纲")}</h3>
+                  <div class="outline-submeta">来源 ${sourceCount} 条原记忆</div>
+                </div>
+                <div class="outline-detail-side">
+                  <div class="outline-detail-time">${escapeHtml(currentTime || "无时间")}</div>
+                  <div class="outline-detail-actions">
+                    <button type="button" class="secondary compact outline-detail-edit">编辑</button>
+                    <button type="button" class="secondary compact outline-detail-toggle">展开完整详情</button>
+                    <button type="button" class="secondary compact outline-detail-delete outline-danger-button">删除</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="outline-brief-summary">
+                <div class="outline-brief-line"><strong>摘要：</strong><span>${escapeHtml(compactText(item.summary || "—", 150))}</span></div>
+                <div class="outline-brief-line"><strong>位置：</strong><span>${escapeHtml(compactText(locationText, 120))}</span></div>
+                <div class="outline-brief-line"><strong>角色：</strong><span>${escapeHtml(compactText(item.characters || "—", 90))}</span></div>
+                <div class="outline-brief-line"><strong>关系：</strong><span>${escapeHtml(compactText(item.relationship_progress || "—", 110))}</span></div>
+                <div class="outline-brief-line"><strong>情绪：</strong><span>${escapeHtml(compactText(item.emotion_shift || "—", 110))}</span></div>
+                <div class="outline-brief-line"><strong>线索：</strong><span>${escapeHtml(compactText(item.important_items || item.foreshadowing || "—", 120))}</span></div>
+                <div class="outline-usage-badges">${usageBadgeHtml}</div>
+              </div>
+            </div>
+          `;
+          outlineDetailPanelEl.querySelector(".outline-detail-toggle")?.addEventListener("click", () => {
+            outlineDetailExpanded = true;
+            renderOutlineDetail(item);
+          });
+          outlineDetailPanelEl.querySelector(".outline-detail-edit")?.addEventListener("click", () => {
+            outlineDetailEditing = true;
+            renderOutlineDetail(item);
+          });
+          outlineDetailPanelEl.querySelector(".outline-detail-delete")?.addEventListener("click", async () => {
+            try {
+              await deleteOutlineItem(item);
+            } catch (error) {
+              setStatus(`删除大纲项失败：${error.message}`);
+            }
+          });
+          animateOutlineDetailPanel(previousDetailHeight);
+          return;
+        }
+
+        outlineDetailPanelEl.innerHTML = `
+          <div class="outline-detail-head">
+            <div>
+              <h3>${escapeHtml(item.title || "未命名大纲")}</h3>
+              <div class="outline-submeta">来源 ${sourceCount} 条原记忆</div>
+            </div>
+            <div class="outline-detail-side">
+              <div class="outline-detail-time">${escapeHtml(currentTime || "无时间")}</div>
+              <div class="outline-detail-actions">
+                <button type="button" class="secondary compact outline-detail-edit">编辑</button>
+                <button type="button" class="secondary compact outline-detail-toggle">收起详情</button>
+                <button type="button" class="secondary compact outline-detail-delete outline-danger-button">删除</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="outline-detail-grid">
+            <div class="outline-detail-block full">
+              <strong>使用方式</strong>
+              <div class="outline-usage-badges">${usageBadgeHtml}</div>
+            </div>
+
+            <div class="outline-detail-block full">
+              <strong>摘要</strong>
+              <div class="outline-detail-text">${escapeHtml(item.summary || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>剧情时间</strong>
+              <div class="outline-detail-text">${escapeHtml(item.story_time || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>章节 / 段落</strong>
+              <div class="outline-detail-text">${escapeHtml(item.chapter || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>地点</strong>
+              <div class="outline-detail-text">${escapeHtml(item.location || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>涉及角色</strong>
+              <div class="outline-detail-text">${escapeHtml(item.characters || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>关系推进</strong>
+              <div class="outline-detail-text">${escapeHtml(item.relationship_progress || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>情绪变化</strong>
+              <div class="outline-detail-text">${escapeHtml(item.emotion_shift || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block full">
+              <strong>关键事件</strong>
+              ${
+                keyEvents.length
+                  ? `<ul class="outline-detail-list">${keyEvents.map((event) => `<li>${escapeHtml(event)}</li>`).join("")}</ul>`
+                  : `<div class="outline-detail-text">—</div>`
+              }
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>矛盾点</strong>
+              <div class="outline-detail-text">${escapeHtml(item.conflicts || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>伏笔</strong>
+              <div class="outline-detail-text">${escapeHtml(item.foreshadowing || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>未解决事项</strong>
+              <div class="outline-detail-text">${escapeHtml(item.unresolved_items || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>重要物品 / 线索</strong>
+              <div class="outline-detail-text">${escapeHtml(item.important_items || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block">
+              <strong>后续钩子</strong>
+              <div class="outline-detail-text">${escapeHtml(item.next_hooks || "—")}</div>
+            </div>
+
+            <div class="outline-detail-block full">
+              <strong>备注</strong>
+              <div class="outline-detail-text">${escapeHtml(item.notes || "—")}</div>
+            </div>
+          </div>
+        `;
+        outlineDetailPanelEl.querySelector(".outline-detail-toggle")?.addEventListener("click", () => {
+          outlineDetailExpanded = false;
+          renderOutlineDetail(item);
+        });
+        outlineDetailPanelEl.querySelector(".outline-detail-edit")?.addEventListener("click", () => {
+          outlineDetailEditing = true;
+          renderOutlineDetail(item);
+        });
+        outlineDetailPanelEl.querySelector(".outline-detail-delete")?.addEventListener("click", async () => {
+          try {
+            await deleteOutlineItem(item);
+          } catch (error) {
+            setStatus(`删除大纲项失败：${error.message}`);
+          }
+        });
+        animateOutlineDetailPanel(previousDetailHeight);
+      }
+
+      function setActiveOutline(id) {
+        currentActiveOutlineId = id || "";
+        outlineDetailExpanded = false;
+        outlineDetailEditing = false;
+        [...outlineTableBodyEl.querySelectorAll("tr")].forEach((row) => {
+          row.classList.toggle("active", row.dataset.outlineId === currentActiveOutlineId);
+        });
+        const matched = currentOutlineItems.find((item) => item.id === currentActiveOutlineId);
+        renderOutlineDetail(matched || null);
+      }
+
+      function renderOutlineTable(items = [], preferredActiveId = "") {
+        currentOutlineItems = Array.isArray(items) ? items : [];
+        outlineTableBodyEl.innerHTML = "";
+        outlineCountEl.textContent = String(currentOutlineItems.length);
+
+        if (!currentOutlineItems.length) {
+          outlineTableBodyEl.innerHTML = `
+            <tr>
+              <td colspan="7">
+                <div class="empty-tip">还没有大纲表项。完成一次记忆合并后，这里会出现宽版总览表格。</div>
+              </td>
+            </tr>
+          `;
+          renderOutlineDetail(null);
+          return;
+        }
+
+        for (const item of currentOutlineItems) {
+          const events = Array.isArray(item.key_events) ? item.key_events : [];
+          const archiveBadges = buildOutlineArchiveBadges(item);
+          const usageBadges = buildOutlineUsageBadges(item);
+          const archiveBadgeHtml = archiveBadges.length
+            ? `<div class="outline-archive-badges">${archiveBadges.map((badge) => `<span>${escapeHtml(badge)}</span>`).join("")}</div>`
+            : "";
+          const usageBadgeHtml = usageBadges
+            .map((badge) => `<span class="outline-usage-badge${badge.off ? " is-off" : ""}">${escapeHtml(badge.text)}</span>`)
+            .join("");
+          const row = document.createElement("tr");
+          row.dataset.outlineId = item.id || "";
+          row.innerHTML = `
+            <td class="outline-time">${escapeHtml(formatMinuteTime(item.updated_at || ""))}</td>
+            <td class="outline-title-cell">
+              <div class="outline-title-main">${escapeHtml(item.title || "未命名大纲")}</div>
+              <div class="outline-submeta">来源 ${Array.isArray(item.source_memory_ids) ? item.source_memory_ids.length : 0} 条</div>
+              ${archiveBadgeHtml}
+            </td>
+            <td><div class="outline-cell-clamp">${escapeHtml(buildOutlineLocationText(item))}</div></td>
+            <td><div class="outline-cell-clamp">${escapeHtml(item.characters || "—")}</div></td>
+            <td><div class="outline-cell-clamp">${escapeHtml(item.relationship_progress || "—")}</div></td>
+            <td><div class="outline-usage-badges compact">${usageBadgeHtml}</div></td>
+            <td><div class="outline-events-inline outline-cell-clamp">${escapeHtml(events.join(" / ") || "—")}</div></td>
+          `;
+          row.addEventListener("click", () => {
+            setActiveOutline(item.id || "");
+          });
+          outlineTableBodyEl.appendChild(row);
+        }
+
+        const preferredId = String(preferredActiveId || currentActiveOutlineId || "").trim();
+        const nextActiveId = currentOutlineItems.some((item) => String(item.id || "") === preferredId)
+          ? preferredId
+          : (currentOutlineItems[0]?.id || "");
+        setActiveOutline(nextActiveId);
+      }
+
+      async function loadMemories() {
+        const items = await getJson("/api/memories");
+        const renderResult = await renderMemoryCards(items);
+        if (renderResult?.cancelled) return;
+        invalidateMemoryCaches();
+        updateMemoryCount();
+        applyMemorySearch();
+      }
+
+      async function loadMergedMemories() {
+        const data = await getJson("/api/memories/merged");
+        renderMergedList(data.items || []);
+      }
+
+      async function loadOutlineItems() {
+        const data = await getJson("/api/memories/outline");
+        renderOutlineTable(data.items || []);
+      }
+
+      async function loadAllPanels() {
+        await Promise.all([loadMemories(), loadMergedMemories(), loadOutlineItems()]);
+        setStatus("原记忆、合并记忆和大纲表已重新读取。");
+      }
+
+      async function saveMemories() {
+        const items = collectMemories();
+        const data = await postJson("/api/memories", { items });
+        const renderResult = await renderMemoryCards(data.items || []);
+        if (renderResult?.cancelled) return;
+        invalidateMemoryCaches();
+        updateMemoryCount();
+        applyMemorySearch();
+        setStatus("原记忆已保存；归档项不会进入聊天 prompt。");
+      }
+
+      async function importMemoriesFile(file) {
+        if (!file) return;
+        const rawJson = await file.text();
+        const data = await postJson("/api/memories/import", { raw_json: rawJson });
+        const renderResult = await renderMemoryCards(data.items || []);
+        if (renderResult?.cancelled) return;
+        invalidateMemoryCaches();
+        updateMemoryCount();
+        applyMemorySearch();
+        setStatus(`原记忆导入完成：${data.items?.length || 0} 条。`);
+      }
+
+      async function importMemoryBundleFile(file) {
+        if (!file) return;
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/memories/import-bundle", {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "完整记忆包导入失败");
+        }
+        const data = await response.json();
+        await loadAllPanels();
+        setStatus(
+          `完整记忆包导入完成：原记忆 +${data.imported?.memories || 0}，合并记忆 +${data.imported?.merged_memories || 0}，大纲表 +${data.imported?.memory_outline || 0}。`
+        );
+      }
+
+      async function mergeSelectedMemories() {
+        const memoryIds = getSelectedMemoryIds();
+        if (memoryIds.length < 2) {
+          throw new Error("请至少勾选两条原记忆再执行合并。");
+        }
+
+        const mergedTitle = document.getElementById("merged-title-input").value.trim();
+        const outlineTitle = document.getElementById("outline-title-input").value.trim();
+        const sourceAction = document.getElementById("merge-source-action")?.value || "delete";
+        const deleteSources = sourceAction === "delete";
+
+        isMerging = true;
+        setMergeButtonLoading(true, `正在调用模型生成总结，请稍候… 本次共处理 ${memoryIds.length} 条原记忆。`);
+
+        try {
+          const data = await postJson("/api/memories/merge", {
+            memory_ids: memoryIds,
+            merged_title: mergedTitle,
+            outline_title: outlineTitle,
+            delete_sources: deleteSources,
+            source_action: sourceAction
+          });
+
+          const renderResult = await renderMemoryCards(data.remaining_items || []);
+          if (renderResult?.cancelled) return;
+          invalidateMemoryCaches();
+
+          renderMergedList(data.merged_items || []);
+          renderOutlineTable(data.outline_items || []);
+
+          updateMemoryCount();
+          applyMemorySearch();
+          document.getElementById("merged-title-input").value = "";
+          document.getElementById("outline-title-input").value = "";
+
+          const newOutlineId = data?.outline_item?.id || "";
+          const outlineTitleText = data?.outline_item?.title || "未命名大纲";
+          const outlineTimeText = formatMinuteTime(data?.outline_item?.updated_at || "");
+
+          if (newOutlineId) {
+            setActiveOutline(newOutlineId);
+            focusOutlineRow(newOutlineId);
+          }
+
+          const sourceActionLabel = data.source_action === "archive"
+            ? `已归档 ${data.archived_memory_ids?.length || 0} 条来源原记忆。`
+            : data.source_action === "keep"
+              ? "来源原记忆已保留并继续进 prompt。"
+              : `已删除 ${data.removed_memory_ids?.length || 0} 条来源原记忆。`;
+          setStatus(`生成完成：${outlineTitleText}${outlineTimeText ? `（${outlineTimeText}）` : ""}。${sourceActionLabel}`);
+        } finally {
+          isMerging = false;
+          setMergeButtonLoading(false);
+        }
+      }
+
+      function getWorldbookSyncNumber(id, fallback) {
+        const value = Number(document.getElementById(id)?.value || fallback);
+        return Number.isFinite(value) ? value : fallback;
+      }
+
+      function collectMemoryWorldbookSyncOptions(overrides = {}) {
+        return {
+          include_core: Boolean(document.getElementById("memory-worldbook-include-core")?.checked),
+          include_index: Boolean(document.getElementById("memory-worldbook-include-index")?.checked),
+          include_details: Boolean(document.getElementById("memory-worldbook-include-details")?.checked),
+          recent_constant_count: getWorldbookSyncNumber("memory-worldbook-recent-count", 3),
+          detail_entry_limit: getWorldbookSyncNumber("memory-worldbook-detail-limit", 80),
+          index_entry_limit: getWorldbookSyncNumber("memory-worldbook-index-limit", 80),
+          replace_existing: true,
+          confirm_replace_existing: false,
+          ...overrides,
+        };
+      }
+
+      function renderMemoryWorldbookSyncPreview(data) {
+        const panel = document.getElementById("memory-worldbook-sync-preview");
+        if (!panel) return;
+        const stats = data?.stats || {};
+        const entries = Array.isArray(data?.entries) ? data.entries : [];
+        const sample = entries.slice(0, 6).map((entry) => {
+          const type = [entry.entry_type || "keyword", entry.prompt_layer || "follow_position"].join(" / ");
+          const trigger = entry.trigger ? `触发：${compactText(entry.trigger, 80)}` : "常驻注入";
+          return `- ${entry.title || entry.id || "未命名词条"} [${type}] ${trigger}`;
+        });
+        const lines = [
+          `源大纲表：${stats.source_outline_count || 0} 条；源合并记忆：${stats.source_merged_count || 0} 条；可投影摘要：${stats.source_row_count || 0} 条`,
+          `生成词条：${stats.generated_count || 0} 条（默认常驻 ${stats.constant_count || 0} / 关键词 ${stats.keyword_count || 0}）`,
+          `估算正文字符：${stats.estimated_chars || 0}`,
+          `现有托管词条：${stats.existing_managed_count || 0}；确认覆盖后将替换：${stats.will_replace_count || 0}`,
+          "提示：生成词条默认常驻；如需关键词触发，可在世界书词条管理中手动调整。",
+          "提示：合并时若保留来源原记忆且也同步世界书，可能出现重复注入；默认删除来源原记忆可避免。",
+        ];
+        if (Number(stats.skipped_worldbook_projection_count || 0) > 0) {
+          lines.splice(1, 0, `已按大纲项开关跳过：${stats.skipped_worldbook_projection_count || 0} 条`);
+        }
+        if (!stats.source_row_count) {
+          lines.push("没有可投影的大纲表/合并记忆。先完成一次记忆合并，再生成世界书投影。");
+        }
+        if (sample.length) {
+          lines.push("", "预览前几条：", ...sample);
+        }
+        panel.textContent = lines.join("\n");
+      }
+
+      async function previewMemoryWorldbookSync() {
+        setStatus("正在生成世界书投影预览...");
+        const data = await postJson("/api/memories/worldbook-sync/preview", collectMemoryWorldbookSyncOptions());
+        lastMemoryWorldbookSyncPreview = data;
+        renderMemoryWorldbookSyncPreview(data);
+        setStatus(`世界书投影预览完成：将生成 ${data.stats?.generated_count || 0} 条词条。`);
+        return data;
+      }
+
+      async function applyMemoryWorldbookSync() {
+        const preview = await previewMemoryWorldbookSync();
+        const stats = preview?.stats || {};
+        if (!stats.generated_count) {
+          throw new Error("没有可同步的世界书投影词条。");
+        }
+        const willReplace = Number(stats.will_replace_count || 0);
+        let confirmedReplace = false;
+        if (willReplace > 0) {
+          confirmedReplace = window.confirm(
+            `已有 ${willReplace} 条 Fantareal 托管世界书旧词条。\n\n确认后会覆盖生成 ${stats.generated_count || 0} 条新词条；取消则不改动现有世界书。手写世界书不会被覆盖。`
+          );
+          if (!confirmedReplace) {
+            setStatus("已取消覆盖旧世界书词条，现有世界书未改动。");
+            return;
+          }
+        }
+        setStatus("正在同步记忆投影到世界书...");
+        const data = await postJson(
+          "/api/memories/worldbook-sync/apply",
+          collectMemoryWorldbookSyncOptions({ confirm_replace_existing: confirmedReplace })
+        );
+        if (data?.requires_confirmation) {
+          lastMemoryWorldbookSyncPreview = data;
+          renderMemoryWorldbookSyncPreview(data);
+          setStatus("检测到旧托管词条，但尚未确认覆盖；世界书未改动。");
+          return;
+        }
+        lastMemoryWorldbookSyncPreview = data;
+        renderMemoryWorldbookSyncPreview(data);
+        setStatus(`已同步到世界书：新增 ${data.entries?.length || 0} 条托管词条，世界书当前共 ${data.stats?.saved_worldbook_count || 0} 条。`);
+      }
+
+      function clearSelectedMemories() {
+        [...memoryListEl.querySelectorAll(".memory-select")].forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+        updateSelectionCount();
+      }
+
+      document.getElementById("add-memory").addEventListener("click", () => {
+        const card = createMemoryCard();
+        memoryListEl.prepend(card);
+        window.Fantareal?.motion?.pulseItem(card);
+        updateMemoryCount();
+        refreshMemoryNow({ cards: [card], search: true, invalidate: true });
+        setStatus("已新增一条空白原记忆。");
+      });
+
+      document.querySelectorAll(".config-workbench-actions button").forEach((button) => {
+        button.addEventListener("click", () => {
+          button.classList.add("is-feedback");
+          window.setTimeout(() => button.classList.remove("is-feedback"), 900);
+        });
+      });
+
+
+      document.getElementById("save-memories").addEventListener("click", async () => {
+        setStatus("正在保存到 Memory...");
+        try {
+          await saveMemories();
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("reload-all").addEventListener("click", async () => {
+        setStatus("正在读取 Memory...");
+        try {
+          await loadAllPanels();
+        } catch (error) {
+          setStatus(`读取失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("memory-import-select").addEventListener("change", (event) => {
+        const action = event.target.value;
+        event.target.value = "";
+        if (action === "original") {
+          document.getElementById("import-memories-file").click();
+        } else if (action === "bundle") {
+          const confirmed = window.confirm("完整记忆包会追加导入原记忆、合并记忆和大纲表，不会覆盖当前数据。确定继续？");
+          if (confirmed) {
+            document.getElementById("import-memory-bundle-file").click();
+          }
+        }
+      });
+
+      document.getElementById("memory-export-select").addEventListener("change", async (event) => {
+        const action = event.target.value;
+        event.target.value = "";
+        try {
+          if (action === "original") {
+            await downloadJson("/api/memories/export", "memories.json");
+            setStatus("原记忆已导出。");
+          } else if (action === "bundle") {
+            await downloadJson("/api/memories/export-bundle", "memory_bundle.zip");
+            setStatus("完整记忆包已导出，包含原记忆、合并记忆和大纲表。");
+          }
+        } catch (error) {
+          setStatus(`导出失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("import-memories-file").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          await importMemoriesFile(file);
+        } catch (error) {
+          setStatus(`导入原记忆失败：${error.message}`);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("import-memory-bundle-file").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        try {
+          await importMemoryBundleFile(file);
+        } catch (error) {
+          setStatus(`导入完整记忆包失败：${error.message}`);
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("merge-selected").addEventListener("click", async () => {
+        if (isMerging) {
+          setStatus("正在生成中，请不要重复点击。");
+          return;
+        }
+
+        try {
+          await mergeSelectedMemories();
+        } catch (error) {
+          isMerging = false;
+          setMergeButtonLoading(false);
+          setStatus(`合并失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("preview-memory-worldbook-sync")?.addEventListener("click", async () => {
+        try {
+          await previewMemoryWorldbookSync();
+        } catch (error) {
+          setStatus(`世界书投影预览失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("apply-memory-worldbook-sync")?.addEventListener("click", async () => {
+        try {
+          await applyMemoryWorldbookSync();
+        } catch (error) {
+          setStatus(`同步到世界书失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("close-memory-selection-panel")?.addEventListener("click", () => {
+        clearSelectedMemories();
+        setStatus("已清空当前选择。");
+      });
+
+      document.getElementById("select-all-visible").addEventListener("click", () => {
+        [...memoryListEl.querySelectorAll(".memory-card")]
+          .filter((card) => card.style.display !== "none")
+          .forEach((card) => {
+            const checkbox = card.querySelector(".memory-select");
+            if (checkbox) checkbox.checked = true;
+          });
+        updateSelectionCount();
+        setStatus("已勾选当前可见的原记忆。");
+      });
+
+      document.getElementById("clear-selection").addEventListener("click", () => {
+        clearSelectedMemories();
+        setStatus("已清空勾选。");
+      });
+
+      memoryListEl.addEventListener("input", (event) => {
+        const card = event.target.closest(".memory-card");
+        if (!card) return;
+        invalidateMemoryCardCache(card);
+        card.querySelector(".memory-card-head strong").textContent =
+          card.querySelector(".memory-title").value.trim() || "新记忆";
+        scheduleMemoryRefresh({ card, search: true });
+      });
+
+      document.getElementById("memory-search").addEventListener("input", () => {
+        scheduleMemoryRefresh({ search: true });
+      });
+
+      document.getElementById("collapse-all-memories").addEventListener("click", () => {
+        [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, true));
+        setStatus("已折叠当前列表中的全部原记忆。");
+      });
+
+      document.getElementById("expand-all-memories").addEventListener("click", () => {
+        [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, false));
+        setStatus("已展开当前列表中的全部原记忆。");
+      });
+
+      document.getElementById("merge-source-action")?.addEventListener("change", () => {
+        saveDeleteSourcesPreference();
+        const action = document.getElementById("merge-source-action")?.value || "delete";
+        const label = action === "archive"
+          ? "归档来源原记忆，不进 prompt"
+          : action === "keep"
+            ? "保留来源原记忆，继续进 prompt"
+            : "删除来源原记忆";
+        setStatus(`合并后处理方式已改为：${label}。`);
+      });
+
+      document.getElementById("toggle-archived-memories")?.addEventListener("click", () => {
+        showArchivedMemories = !showArchivedMemories;
+        refreshMemoryNow({ search: true });
+        setStatus(showArchivedMemories ? "已显示归档原记忆。" : "已隐藏归档原记忆。");
+      });
+
+      loadDeleteSourcesPreference();
+
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+      initExistingMemoryCards();
+      invalidateMemoryCaches();
+      updateMemoryCount();
+      applyMemorySearch();
+
+      Promise.allSettled([loadMergedMemories(), loadOutlineItems()]).then(() => {
+        setMergeButtonLoading(false);
+        setStatus("页面已就绪。");
+      });
+
+      // ── 记忆输出长度设置 ──
+      const memoryLengthSelect = document.getElementById("memory-summary-length");
+      const memoryMaxCharsBlock = document.getElementById("memory-max-chars-block");
+      const memoryMaxCharsInput = document.getElementById("memory-summary-max-chars");
+      const memorySettingsStatus = document.getElementById("memory-settings-status");
+
+      function updateMemoryMaxCharsBlock() {
+        if (memoryLengthSelect && memoryMaxCharsBlock) {
+          memoryMaxCharsBlock.style.display = memoryLengthSelect.value === "custom" ? "" : "none";
+        }
+      }
+      if (memoryLengthSelect) {
+        memoryLengthSelect.addEventListener("change", updateMemoryMaxCharsBlock);
+      }
+
+      document.getElementById("save-memory-length-settings").addEventListener("click", async () => {
+        try {
+          memorySettingsStatus.textContent = "正在保存...";
+          const current = await getJson("/api/settings");
+          const length = memoryLengthSelect.value;
+          const patch = { memory_summary_length: length };
+          // 只在 custom 模式保存用户填写的最大字符数，避免 hidden input 的脏值污染其他模式
+          if (length === "custom") {
+            patch.memory_summary_max_chars = Number(memoryMaxCharsInput.value || 520);
+          } else {
+            // 非 custom 时回写对应默认值，清理之前 custom 遗留的脏值
+            if (length === "short") patch.memory_summary_max_chars = 200;
+            else if (length === "long") patch.memory_summary_max_chars = 800;
+            else patch.memory_summary_max_chars = 520;
+          }
+          const merged = Object.assign({}, current.settings || {}, patch);
+          await postJson("/api/settings", merged);
+          memorySettingsStatus.textContent = "记忆输出设置已保存。";
+          setTimeout(() => { memorySettingsStatus.textContent = ""; }, 3000);
+        } catch (error) {
+          memorySettingsStatus.textContent = "保存失败：" + error.message;
+        }
+      });
+    </script>
+  </body>
+</html>

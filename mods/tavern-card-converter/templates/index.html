@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>酒馆卡转换器</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/static/styles.css?v=mod-admin-embed-v0-1" />
+  <link rel="stylesheet" href="./static/tavern-card-converter.css?v=0-3-3" />
+</head>
+<body class="tcc-page mod-admin-embedded-page">
+  <main class="tcc-shell">
+    <div class="tcc-topbar">
+      <a href="/chat" class="tcc-back-btn" target="_top">← 回到聊天</a>
+      <div class="tcc-topbar-actions">
+        <button id="tcc-guide-trigger" class="tcc-link-btn" type="button">获取酒馆卡说明</button>
+        <a class="tcc-link-btn" href="/mods/tavern-card-converter/app/" target="_blank" rel="noopener noreferrer">独立打开</a>
+      </div>
+    </div>
+
+    <header class="tcc-header">
+      <div class="tcc-header-main">
+        <p class="tcc-kicker">Fantareal Official Mod · Tavern Workbench</p>
+        <h1>酒馆卡转换器</h1>
+        <p>将 SillyTavern / 酒馆 的 PNG 角色卡、纯角色卡与世界书 JSON 转换为 Fantareal 可用格式。转换逻辑保持原样，本版只重构前端工作台与结果展示。</p>
+      </div>
+      <div class="tcc-header-stats" aria-hidden="true">
+        <span>PNG</span>
+        <span>JSON</span>
+        <span>Worldbook</span>
+      </div>
+    </header>
+
+    <div class="tcc-mode-bar">
+      <button id="tcc-mode-switch" class="tcc-mode-switch-btn" type="button">模式转换：生成酒馆卡</button>
+      <span id="tcc-mode-label" class="tcc-mode-label">当前：酒馆卡 → Fantareal</span>
+    </div>
+
+    <div id="tcc-forward-workbench">
+    <nav class="tcc-tabs" aria-label="转换类型">
+      <button class="tcc-tab active" type="button" data-tab="general">
+        <span class="tcc-tab-title">角色卡通用转换</span>
+        <span class="tcc-tab-note">自动拆分角色卡 / 世界书 / 扩展配置</span>
+      </button>
+      <button class="tcc-tab" type="button" data-tab="card">
+        <span class="tcc-tab-title">纯角色卡转换</span>
+        <span class="tcc-tab-note">只处理角色设定字段</span>
+      </button>
+      <button class="tcc-tab" type="button" data-tab="worldbook">
+        <span class="tcc-tab-title">世界书转换</span>
+        <span class="tcc-tab-note">转换独立 Lorebook JSON</span>
+      </button>
+    </nav>
+
+    <section id="tab-general" class="tcc-tab-panel active">
+      <p class="tcc-tab-desc">适合大多数酒馆 PNG 角色卡。上传后自动识别角色卡、内嵌世界书、深度提示、话量设定等内容。</p>
+      <div class="tcc-card-grid">
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>上传酒馆 PNG 角色卡</h2>
+            <span class="tcc-panel-tag">综合</span>
+          </div>
+          <label class="tcc-drop-zone" id="general-drop-zone">
+            <input type="file" id="general-file-input" accept="image/png" hidden />
+            <span class="tcc-drop-icon">⌁</span>
+            <span class="tcc-drop-title">拖拽 PNG 到此处</span>
+            <span class="tcc-drop-hint">或点击选择文件，支持 tEXt / iTXt 元数据</span>
+          </label>
+          <div id="general-parsing-hint" class="tcc-parsing-hint" hidden>正在解析酒馆卡，请稍等…</div>
+          <div id="general-error" class="tcc-msg tcc-msg-error" hidden></div>
+          <div id="general-preview" class="tcc-image-preview" hidden>
+            <img id="general-preview-img" src="" alt="角色立绘预览" />
+          </div>
+          <div id="general-file-summary" class="tcc-file-summary" hidden></div>
+          <div class="tcc-sidebar-actions">
+            <button id="general-download-png-btn" class="tcc-btn tcc-btn-soft" type="button" disabled>下载纯图片</button>
+          </div>
+        </aside>
+
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>转换结果</h2>
+              <p>默认显示摘要，详细内容与 JSON 可逐项展开。</p>
+            </div>
+            <div class="tcc-result-tools" id="general-result-tools" hidden>
+              <button class="tcc-btn tcc-btn-sm tcc-collapse-all" type="button" data-target="general">全部折叠</button>
+              <button class="tcc-btn tcc-btn-sm tcc-expand-all" type="button" data-target="general">展开详情</button>
+            </div>
+          </div>
+          <div id="general-result-empty" class="tcc-empty-state">
+            <strong>等待上传</strong>
+            <span>转换完成后会在这里生成结果卡片。</span>
+          </div>
+          <div id="general-result" hidden>
+            <div id="general-pure-hint" class="tcc-pure-hint" hidden>这张卡看起来更接近纯角色卡，也可以切换到「纯角色卡转换」获得更专注的角色字段输出。</div>
+            <div id="general-sections" class="tcc-result-stack"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-card" class="tcc-tab-panel">
+      <p class="tcc-tab-desc">用于只包含角色设定的酒馆 PNG 卡。不处理内嵌世界书，重点检查名称、描述、性格、场景、开场白与示例对话。</p>
+      <div class="tcc-card-grid">
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>上传纯角色 PNG 卡</h2>
+            <span class="tcc-panel-tag">角色</span>
+          </div>
+          <label class="tcc-drop-zone" id="card-drop-zone">
+            <input type="file" id="card-file-input" accept="image/png" hidden />
+            <span class="tcc-drop-icon">⌁</span>
+            <span class="tcc-drop-title">拖拽 PNG 到此处</span>
+            <span class="tcc-drop-hint">适合 SillyTavern V2 纯角色卡</span>
+          </label>
+          <div id="card-parsing-hint" class="tcc-parsing-hint" hidden>正在解析角色卡，请稍等…</div>
+          <div id="card-error" class="tcc-msg tcc-msg-error" hidden></div>
+          <div id="card-preview" class="tcc-image-preview" hidden>
+            <img id="card-preview-img" src="" alt="角色立绘预览" />
+          </div>
+          <div id="card-file-summary" class="tcc-file-summary" hidden></div>
+          <div class="tcc-sidebar-actions">
+            <button id="card-download-png-btn" class="tcc-btn tcc-btn-soft" type="button" disabled>下载纯图片</button>
+          </div>
+        </aside>
+
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>转换结果</h2>
+              <p>先看字段摘要，再展开角色设定和完整 JSON。</p>
+            </div>
+            <div class="tcc-result-tools" id="card-result-tools" hidden>
+              <button class="tcc-btn tcc-btn-sm tcc-collapse-all" type="button" data-target="card">全部折叠</button>
+              <button class="tcc-btn tcc-btn-sm tcc-expand-all" type="button" data-target="card">展开详情</button>
+            </div>
+          </div>
+          <div id="card-result-empty" class="tcc-empty-state">
+            <strong>等待上传</strong>
+            <span>上传后会生成角色卡字段摘要。</span>
+          </div>
+          <div id="card-result" hidden>
+            <div class="tcc-result-meta" hidden>
+              <span id="card-result-name"></span>
+              <span id="card-result-preserved" class="tcc-preserved-badge"></span>
+            </div>
+            <div id="card-result-body" class="tcc-result-stack"></div>
+            <pre id="card-json-output" class="tcc-json-block tcc-hidden-buffer"></pre>
+            <div class="tcc-actions tcc-hidden-buffer">
+              <button id="card-download-btn" class="tcc-btn tcc-btn-primary" type="button" disabled>保存 / 下载角色卡 JSON</button>
+              <button id="card-copy-btn" class="tcc-btn" type="button" disabled>复制 JSON</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-worldbook" class="tcc-tab-panel">
+      <p class="tcc-tab-desc">用于独立世界书 / Lorebook JSON 文件，将酒馆条目映射为 Fantareal 世界书格式。</p>
+      <div class="tcc-card-grid">
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>上传世界书 JSON</h2>
+            <span class="tcc-panel-tag">世界书</span>
+          </div>
+          <label class="tcc-drop-zone" id="wb-drop-zone">
+            <input type="file" id="wb-file-input" accept=".json,.jsonc,application/json" hidden />
+            <span class="tcc-drop-icon">◇</span>
+            <span class="tcc-drop-title">拖拽 JSON 到此处</span>
+            <span class="tcc-drop-hint">支持 SillyTavern Lorebook / World Info</span>
+          </label>
+          <div id="wb-parsing-hint" class="tcc-parsing-hint" hidden>正在转换世界书，请稍等…</div>
+          <div id="wb-error" class="tcc-msg tcc-msg-error" hidden></div>
+          <div id="wb-file-summary" class="tcc-file-summary" hidden></div>
+        </aside>
+
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>转换结果</h2>
+              <p>世界书条目默认二级折叠，避免一次拉出过长内容。</p>
+            </div>
+            <div class="tcc-result-tools" id="wb-result-tools" hidden>
+              <button class="tcc-btn tcc-btn-sm tcc-collapse-all" type="button" data-target="wb">全部折叠</button>
+              <button class="tcc-btn tcc-btn-sm tcc-expand-all" type="button" data-target="wb">展开详情</button>
+            </div>
+          </div>
+          <div id="wb-result-empty" class="tcc-empty-state">
+            <strong>等待上传</strong>
+            <span>上传 JSON 后会生成世界书摘要和条目列表。</span>
+          </div>
+          <div id="wb-result" hidden>
+            <div class="tcc-result-meta" hidden>
+              <span id="wb-result-name"></span>
+              <span id="wb-entry-count"></span>
+            </div>
+            <div id="wb-conversion-info" class="tcc-conversion-info" hidden></div>
+            <div id="wb-result-body" class="tcc-result-stack"></div>
+            <pre id="wb-json-output" class="tcc-json-block tcc-hidden-buffer"></pre>
+            <div class="tcc-actions tcc-hidden-buffer">
+              <button id="wb-download-btn" class="tcc-btn tcc-btn-primary" type="button" disabled>保存 / 下载世界书 JSON</button>
+              <button id="wb-copy-btn" class="tcc-btn" type="button" disabled>复制 JSON</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    </div><!-- /tcc-forward-workbench -->
+
+    <div id="tcc-reverse-workbench" hidden>
+      <nav class="tcc-sub-tabs">
+        <button class="tcc-sub-tab active" type="button" data-rv-tab="card">生成酒馆卡</button>
+        <button class="tcc-sub-tab" type="button" data-rv-tab="worldbook">生成酒馆适配世界书</button>
+      </nav>
+
+      <!-- Sub-tab 1: Generate Tavern Card -->
+      <div id="rv-panel-card" class="tcc-rv-panel active">
+      <p class="tcc-tab-desc">将 Fantareal 角色信息生成为 SillyTavern / 酒馆 可识别的 PNG 角色卡。上传立绘，导入或填写角色信息，生成带 chara 元数据的酒馆卡。</p>
+      <div class="tcc-card-grid">
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>角色立绘</h2>
+            <span class="tcc-panel-tag">必填</span>
+          </div>
+          <div class="tcc-drop-zone" id="reverse-drop-zone">
+            <input type="file" id="reverse-file-input" accept="image/png,image/jpeg,image/webp" hidden />
+            <span class="tcc-drop-icon">绘</span>
+            <span class="tcc-drop-title">拖拽立绘到此处</span>
+            <span class="tcc-drop-hint">或点击选择文件，支持 PNG / JPEG / WebP</span>
+          </div>
+          <div id="reverse-preview" class="tcc-image-preview" hidden>
+            <img id="reverse-preview-img" src="" alt="角色立绘预览" />
+          </div>
+          <div id="reverse-file-summary" class="tcc-file-summary" hidden></div>
+
+          <div class="tcc-import-section tcc-json-drop-area" id="reverse-json-import-area">
+            <h3 class="tcc-import-title">Fantareal JSON 导入</h3>
+            <textarea id="reverse-json-input" class="tcc-textarea" rows="3" placeholder="粘贴 Fantareal 角色卡 JSON 或缃笺项目 JSON，也可以将 JSON 文件拖拽到此区域…"></textarea>
+            <div class="tcc-import-actions">
+              <label class="tcc-btn tcc-btn-soft tcc-file-label" tabindex="0">
+                选择 JSON 文件
+                <input type="file" id="reverse-json-file" accept=".json,application/json" hidden />
+              </label>
+              <button id="reverse-json-import-btn" class="tcc-btn tcc-btn-soft" type="button">导入到表单</button>
+            </div>
+          </div>
+
+          <div class="tcc-import-section">
+            <h3 class="tcc-import-title">缃笺导入</h3>
+            <button id="reverse-cw-load-btn" class="tcc-btn tcc-btn-soft" type="button">从缃笺读取项目</button>
+            <div id="reverse-cw-list" class="tcc-cw-import-list" hidden></div>
+          </div>
+        </aside>
+
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>角色信息表单</h2>
+              <p>填写或导入角色信息后点击生成。红色星号为必填项。</p>
+            </div>
+          </div>
+
+          <div id="reverse-form" class="tcc-form-grid">
+            <div class="tcc-form-group">
+              <label class="tcc-form-label"><span class="tcc-required-mark">*</span> 角色名 name</label>
+              <input id="rv-name" class="tcc-form-input" type="text" placeholder="角色名称" />
+            </div>
+            <div class="tcc-form-group">
+              <label class="tcc-form-label"><span class="tcc-required-mark">*</span> 开场白 first_mes</label>
+              <textarea id="rv-first-mes" class="tcc-textarea" rows="4" placeholder="角色的第一段对话…"></textarea>
+            </div>
+            <div class="tcc-form-group">
+              <label class="tcc-form-label">角色描述 description <span class="tcc-suggested-mark">建议</span></label>
+              <textarea id="rv-description" class="tcc-textarea" rows="4" placeholder="角色的外观、背景等描述…"></textarea>
+            </div>
+            <div class="tcc-form-group">
+              <label class="tcc-form-label">性格 personality <span class="tcc-suggested-mark">建议</span></label>
+              <textarea id="rv-personality" class="tcc-textarea" rows="2" placeholder="角色的性格特征、口吻…"></textarea>
+            </div>
+            <div class="tcc-form-group">
+              <label class="tcc-form-label">场景 scenario <span class="tcc-suggested-mark">建议</span></label>
+              <textarea id="rv-scenario" class="tcc-textarea" rows="2" placeholder="对话发生的场景…"></textarea>
+            </div>
+            <div class="tcc-form-group">
+              <label class="tcc-form-label">示例对话 mes_example <span class="tcc-optional-mark">可选</span></label>
+              <textarea id="rv-mes-example" class="tcc-textarea" rows="3" placeholder="<START>\n{{user}}: ...\n{{char}}: ..."></textarea>
+            </div>
+            <div class="tcc-form-group">
+              <label class="tcc-form-label">作者备注 creator_notes <span class="tcc-optional-mark">可选</span></label>
+              <textarea id="rv-creator-notes" class="tcc-textarea" rows="2" placeholder="使用建议、作者留言…"></textarea>
+            </div>
+            <div class="tcc-form-group">
+              <label class="tcc-form-label">标签 tags <span class="tcc-optional-mark">可选，逗号分隔</span></label>
+              <input id="rv-tags" class="tcc-form-input" type="text" placeholder="标签1, 标签2, …" />
+            </div>
+            <div class="tcc-form-group tcc-form-group-half">
+              <label class="tcc-form-label">作者 creator <span class="tcc-optional-mark">可选</span></label>
+              <input id="rv-creator" class="tcc-form-input" type="text" placeholder="创作者名称" />
+            </div>
+            <div class="tcc-form-group tcc-form-group-half">
+              <label class="tcc-form-label">版本 character_version <span class="tcc-optional-mark">可选</span></label>
+              <input id="rv-char-version" class="tcc-form-input" type="text" placeholder="1.0" />
+            </div>
+          </div>
+
+          <div id="reverse-validation" class="tcc-validation-area" hidden></div>
+
+          <div class="tcc-actions">
+            <button id="reverse-generate-btn" class="tcc-btn tcc-btn-primary" type="button">生成酒馆 PNG</button>
+          </div>
+
+          <div id="reverse-result" hidden>
+            <div id="reverse-result-body" class="tcc-result-stack"></div>
+            <div id="reverse-result-actions" class="tcc-actions" hidden>
+              <button id="reverse-download-btn" class="tcc-btn tcc-btn-primary" type="button">下载酒馆 PNG</button>
+              <button id="reverse-copy-json-btn" class="tcc-btn" type="button">复制 Tavern JSON</button>
+            </div>
+          </div>
+        </section>
+      </div>
+      </div>
+
+      <!-- Sub-tab 2: Generate Tavern Worldbook -->
+      <div id="rv-panel-worldbook" class="tcc-rv-panel">
+      <p class="tcc-tab-desc">将 Fantareal 世界书转换为 SillyTavern / 酒馆 可识别的世界书 JSON 格式。支持直接粘贴 JSON、上传文件或从缃笺导入。</p>
+      <div class="tcc-card-grid">
+        <aside class="tcc-panel tcc-upload-panel">
+          <div class="tcc-panel-title-row">
+            <h2>Fantareal 世界书输入</h2>
+            <span class="tcc-panel-tag">世界书</span>
+          </div>
+          <div class="tcc-import-section tcc-json-drop-area" id="rv-wb-import-area">
+            <h3 class="tcc-import-title">粘贴或拖入世界书 JSON</h3>
+            <textarea id="rv-wb-json-input" class="tcc-textarea" rows="5" placeholder="粘贴 Fantareal 世界书 JSON…&#10;应包含 settings 和 entries 字段"></textarea>
+            <div class="tcc-import-actions">
+              <label class="tcc-btn tcc-btn-soft tcc-file-label" tabindex="0">
+                选择 JSON 文件
+                <input type="file" id="rv-wb-file" accept=".json,application/json" hidden />
+              </label>
+              <button id="rv-wb-generate-btn" class="tcc-btn tcc-btn-primary" type="button">转换为酒馆世界书</button>
+            </div>
+          </div>
+
+          <div class="tcc-import-section">
+            <h3 class="tcc-import-title">缃笺导入</h3>
+            <button id="rv-wb-cw-load-btn" class="tcc-btn tcc-btn-soft" type="button">从缃笺读取项目</button>
+            <div id="rv-wb-cw-list" class="tcc-cw-import-list" hidden></div>
+          </div>
+
+          <div id="rv-wb-error" class="tcc-msg tcc-msg-error" hidden></div>
+        </aside>
+
+        <section class="tcc-panel tcc-result-panel">
+          <div class="tcc-result-head">
+            <div>
+              <h2>转换结果</h2>
+              <p>将输出 SillyTavern 世界书 JSON，可直接导入酒馆。</p>
+            </div>
+          </div>
+          <div id="rv-wb-result-empty" class="tcc-empty-state">
+            <strong>等待输入</strong>
+            <span>输入 Fantareal 世界书 JSON 后点击转换。</span>
+          </div>
+          <div id="rv-wb-result" hidden>
+            <div id="rv-wb-result-body" class="tcc-result-stack"></div>
+            <div class="tcc-actions">
+              <button id="rv-wb-download-btn" class="tcc-btn tcc-btn-primary" type="button">下载酒馆世界书 JSON</button>
+              <button id="rv-wb-copy-btn" class="tcc-btn" type="button">复制 JSON</button>
+            </div>
+          </div>
+        </section>
+      </div>
+      </div>
+
+    </div>
+
+    <div id="card-save-dialog" class="tcc-dialog-overlay" hidden>
+      <div class="tcc-dialog">
+        <h3>保存角色卡 JSON</h3>
+        <p id="card-save-filename" class="tcc-dialog-filename"></p>
+        <div class="tcc-dialog-actions">
+          <button id="card-save-to-assets" class="tcc-btn tcc-btn-primary" type="button">保存到人设卡目录</button>
+          <p class="tcc-dialog-path" id="card-assets-path"></p>
+        </div>
+        <hr class="tcc-dialog-sep" />
+        <div class="tcc-dialog-actions">
+          <button id="card-save-browse" class="tcc-btn" type="button">下载到本地</button>
+          <p class="tcc-dialog-hint">通过浏览器下载到本地磁盘。</p>
+        </div>
+        <div class="tcc-dialog-footer">
+          <button id="card-save-cancel" class="tcc-btn tcc-btn-ghost" type="button">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="wb-save-dialog" class="tcc-dialog-overlay" hidden>
+      <div class="tcc-dialog">
+        <h3>保存世界书 JSON</h3>
+        <p id="wb-save-filename" class="tcc-dialog-filename"></p>
+        <div class="tcc-dialog-actions">
+          <button id="wb-save-to-assets" class="tcc-btn tcc-btn-primary" type="button">保存到世界书目录</button>
+          <p class="tcc-dialog-path" id="wb-assets-path"></p>
+        </div>
+        <hr class="tcc-dialog-sep" />
+        <div class="tcc-dialog-actions">
+          <button id="wb-save-browse" class="tcc-btn" type="button">下载到本地</button>
+          <p class="tcc-dialog-hint">通过浏览器下载到本地磁盘。</p>
+        </div>
+        <div class="tcc-dialog-footer">
+          <button id="wb-save-cancel" class="tcc-btn tcc-btn-ghost" type="button">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tcc-guide-dialog" class="tcc-dialog-overlay" hidden>
+      <div class="tcc-dialog tcc-guide-dialog">
+        <h3>如何获取酒馆卡</h3>
+        <div class="tcc-guide-sources">
+          <div class="tcc-guide-item">
+            <strong>1. Chub.ai</strong>
+            <p>国际上常见的酒馆卡分享站，标签系统比较完整，适合寻找动漫角色或原创 OC。</p>
+            <a href="https://chub.ai/" target="_blank" rel="noopener">https://chub.ai/</a>
+          </div>
+          <div class="tcc-guide-item">
+            <strong>2. Character Tavern</strong>
+            <p>界面友好，适合寻找高质量原创角色卡和常见角色卡。</p>
+            <a href="https://character-tavern.com/" target="_blank" rel="noopener">https://character-tavern.com/</a>
+          </div>
+          <div class="tcc-guide-item">
+            <strong>3. 本地 SillyTavern 导出</strong>
+            <p>在 SillyTavern 的角色卡管理中导出 PNG 角色卡，再拖入本工具转换。</p>
+          </div>
+        </div>
+        <div class="tcc-dialog-footer">
+          <button id="tcc-guide-close" class="tcc-btn tcc-btn-primary" type="button">知道了</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="./static/tavern-card-converter.js?v=0-3-3"></script>
+</body>
+</html>

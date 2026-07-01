@@ -1,0 +1,45 @@
+{
+  "id": "cinnabar_dossier",
+  "name": "朱砂密卷",
+  "version": "1.0.0",
+  "author": "Fantareal",
+  "description": "朱砂、黑墨、卷宗和批注感，适合权谋、杀伐、旧债和档案叙事。",
+  "style": {
+    "class_name": "theme-cinnabar-dossier",
+    "accent": "#b8322a",
+    "layout": {
+      "title_card": "dossier",
+      "scene_card": "paper_chips",
+      "character_card": "field_blocks",
+      "relationship_card": "side_note",
+      "status_bar": "seal"
+    },
+    "tokens": {
+      "emotion": "情录",
+      "clothing": "形录",
+      "posture": "势录",
+      "scene": "地录",
+      "sensory_field": "境录",
+      "body_temperature": "温录",
+      "body_motion": "动录",
+      "micro_reaction": "息录",
+      "visual_focus": "目录",
+      "interaction": "关系",
+      "summary": "案结"
+    },
+    "title_card": {
+      "background": "dossier",
+      "border": "ink",
+      "radius": "small",
+      "shadow": "paper"
+    },
+    "character_card": {
+      "background": "dossier",
+      "field_style": "case_row",
+      "spacing": "standard"
+    },
+    "relationship_card": {
+      "style": "case_note"
+    }
+  }
+}

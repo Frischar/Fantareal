@@ -1,0 +1,10 @@
+{
+  "label": "数据库",
+  "description": "结构化剧情状态、角色变量、阶段规则、剧情账本与状态记录系统。",
+  "hooks": {
+    "chat_scripts": [
+      "/static/state-journal-chat.js?v=state-journal-story-time-v1"
+    ]
+  },
+  "version": "2.0.9-story-time"
+}

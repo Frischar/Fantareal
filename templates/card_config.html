@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Config - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-variable-instruction-20260628" />
+    <link rel="stylesheet" href="/static/css/macro-insert-panel.css?v=p2-macro-panel-v2-fit-viewport" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
+
+
+  </head>
+  <body class="modern-setting-page card-config-page app-sidebar-shell pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+            <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Card</span>
+          <div class="slot-meta">
+            <strong>当前编辑的是角色卡</strong>
+            <p class="slot-hint">切换角色卡会切换到该卡自己的记忆库；世界书、预设和聊天记录仍按当前全局规则保留。</p>
+          </div>
+        </div>
+      </div>
+    <div class="config-shell compact">
+      <section class="panel config-panel full-span">
+        <div class="section-head">
+          <p class="eyebrow">Role Card</p>
+          <h2>角色卡编辑器</h2>
+          <p class="muted">这里把常用的 JSON 键都拆成了固定输入位。大文本字段可插入 Fantareal 只读宏；导出到其他平台时这些宏可能不会被解析。</p>
+        </div>
+
+        <div class="card-workbench ui-readable-canvas">
+          <div class="card-workbench-head">
+            <div class="card-workbench-title">
+              <div class="ui-workbench-titleline card-workbench-titleline">
+                <span class="eyebrow mini">CARD WORKBENCH</span>
+                <span id="status-text" class="config-status-pill ui-status-pill status-line is-success" data-state="success" aria-live="polite">就绪</span>
+              </div>
+              <strong>角色工作台</strong>
+              <span class="muted compact">加载、导入、导出与保存都在这里完成。</span>
+            </div>
+          <div class="grid-two card-top-grid card-workbench-grid">
+            <div>
+              <label for="card-file-select">文件夹里的角色卡</label>
+              <select id="card-file-select">
+                <option value="">选择一个角色卡文件</option>
+                {% for item in cards %}
+                <option value="{{ item.filename }}" {% if current_card.source_name == item.filename %}selected{% endif %}>{{ item.filename }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="card-filename">保存文件名</label>
+              <input id="card-filename" value="{{ current_card.source_name or 'role_card.json' }}" placeholder="例如 yuki.json" />
+            </div>
+          </div>
+
+          </div>
+
+
+        </div>
+      </section>
+
+      <div class="card-workbench-actions ui-sticky-toolbar ui-action-dock is-wrap full-span">
+        <div class="card-actions-primary ui-action-dock-primary">
+          <button id="add-persona" type="button" class="secondary compact card-add-button">＋ 新增角色</button>
+          <button id="save-card" type="button" class="compact">保存并加载</button>
+          <button id="load-card" type="button" class="secondary compact">加载</button>
+          <details class="card-more-actions ui-action-more">
+            <summary class="secondary compact" role="button">更多</summary>
+            <div class="card-more-menu ui-action-more-menu">
+              <button id="refresh-cards" type="button" class="secondary compact">刷新列表</button>
+              <button id="import-local-card" type="button" class="secondary compact">导入本地卡</button>
+              <button id="export-card" type="button" class="secondary compact">导出当前卡</button>
+            </div>
+          </details>
+        </div>
+        <label class="card-canvas-opacity-toggle ui-preference-toggle" for="card-canvas-follow-opacity">
+          <input id="card-canvas-follow-opacity" type="checkbox" {% if settings.card_canvas_follow_opacity %}checked{% endif %} />
+          <span>底色跟随透明度</span>
+        </label>
+        <input
+          id="import-local-card-file"
+          type="file"
+          accept=".json,.txt,application/json,text/plain"
+          style="display: none"
+        />
+      </div>
+
+      <section class="panel config-panel card-builder full-span card-dossier-editor">
+        <div class="card-dossier-grid" aria-label="角色档案正文编辑区">
+          <section class="card-dossier-section card-dossier-identity" aria-labelledby="card-dossier-identity-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">01</span>
+              <div>
+                <h3 id="card-dossier-identity-title">基础身份</h3>
+                <p class="helper-text">角色名称、检索标签，以及用户最先需要理解的核心背景。</p>
+              </div>
+            </div>
+
+            <div class="card-field-row card-field-row-inline">
+              <div class="card-field-unit">
+                <label for="card-name">name <span class="field-note">（角色卡标题 / 主显示名）</span></label>
+                <input id="card-name" value="{{ card_template.name }}" />
+              </div>
+              <div class="card-field-unit">
+                <label for="card-tags">tags <span class="field-note">（标签，方便分类与检索）</span></label>
+                <input id="card-tags" value="{{ card_template.tags | join(', ') }}" placeholder="用英文逗号分隔" />
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-description">description <span class="field-note">（角色背景 / 设定简介）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-description">{ } 变量</button>
+              <textarea id="card-description" rows="7">{{ card_template.description }}</textarea>
+            </div>
+          </section>
+
+          <section class="card-dossier-section card-dossier-narrative" aria-labelledby="card-dossier-narrative-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">02</span>
+              <div>
+                <h3 id="card-dossier-narrative-title">叙事设定</h3>
+                <p class="helper-text">决定角色如何行动、处在什么局势，以及故事运行时的基调。</p>
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-personality">personality <span class="field-note">（性格关键词 / 行为倾向）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-personality">{ } 变量</button>
+              <textarea id="card-personality" rows="7">{{ card_template.personality }}</textarea>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-scenario">scenario <span class="field-note">（当前世界观 / 场景基调）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-scenario">{ } 变量</button>
+              <textarea id="card-scenario" rows="7">{{ card_template.scenario }}</textarea>
+            </div>
+          </section>
+
+          <section class="card-dossier-section card-dossier-dialogue" aria-labelledby="card-dossier-dialogue-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">03</span>
+              <div>
+                <h3 id="card-dossier-dialogue-title">开场与对话</h3>
+                <p class="helper-text">新对话的第一印象，以及模型模仿语气时参考的样例。</p>
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-first-mes">first_mes <span class="field-note">（开场白 / 初见时第一句）</span></label>
+              <p class="field-note card-field-tip">只作为新对话首次展示，不作为常驻提示词反复注入。</p>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-first-mes">{ } 变量</button>
+              <textarea id="card-first-mes" rows="7">{{ card_template.first_mes }}</textarea>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-mes-example">mes_example <span class="field-note">（示例对话 / 说话风格参考）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-mes-example">{ } 变量</button>
+              <textarea id="card-mes-example" rows="8">{{ card_template.mes_example }}</textarea>
+            </div>
+          </section>
+
+          <section class="card-dossier-section card-dossier-rules" aria-labelledby="card-dossier-rules-title">
+            <div class="card-dossier-section-head">
+              <span class="card-dossier-index">04</span>
+              <div>
+                <h3 id="card-dossier-rules-title">创作者规则</h3>
+                <p class="helper-text">隐藏规则和补充说明，主要用于约束模型，而不是展示给玩家。</p>
+              </div>
+            </div>
+
+            <div class="card-field-unit card-field-unit-main">
+              <label for="card-creator-notes">creator_notes <span class="field-note">（隐藏规则 / 对模型的补充说明）</span></label>
+              <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-target="#card-creator-notes">{ } 变量</button>
+              <textarea id="card-creator-notes" rows="12">{{ card_template.creator_notes }}</textarea>
+            </div>
+
+            <div class="card-field-unit card-field-unit-meta">
+              <label for="card-creator-comment">创作者备注 <span class="field-note">（不进入 prompt，仅写入角色卡）</span></label>
+              <p class="field-note card-field-tip">用于记录卡的摘要、版本号、作者、简单介绍、灵感来源或使用说明。</p>
+              <textarea id="card-creator-comment" rows="4">{{ card_template.creator_comment or '' }}</textarea>
+            </div>
+          </section>
+        </div>
+
+        <div class="persona-toolbar">
+          <h3>多角色</h3>
+        </div>
+
+        <div id="persona-grid" class="card-persona-grid">
+          {% for key, persona in persona_items %}
+          <div class="card-block persona-card" data-persona-key="{{ key }}">
+            <div class="memory-card-head persona-card-head card-item-head">
+              <div class="card-item-title">
+                <strong class="persona-display-title">{{ persona.name or ('角色' ~ loop.index) }}</strong>
+                <span class="card-summary-chip ui-summary-chip">多角色</span>
+              </div>
+              <button type="button" class="card-icon-button card-danger-icon remove-persona" title="删除角色" aria-label="删除角色">×</button>
+            </div>
+            <label for="persona-{{ key }}-name">name <span class="field-note">（该角色显示名）</span></label>
+            <input id="persona-{{ key }}-name" value="{{ persona.name }}" />
+
+            <label for="persona-{{ key }}-role-id">role_id <span class="field-note">（用于角色宏的稳定代号，例如 role:su_lianyan）</span></label>
+            <input id="persona-{{ key }}-role-id" value="{{ persona.role_id or persona.id or '' }}" placeholder="su_lianyan" />
+
+            <label for="persona-{{ key }}-aliases">aliases <span class="field-note">（别名 / 小名，可用逗号或换行分隔）</span></label>
+            <textarea id="persona-{{ key }}-aliases" rows="2">{{ (persona.aliases or [])|join('\n') }}</textarea>
+
+            <label for="persona-{{ key }}-description">description <span class="field-note">（身份 / 背景简介）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-description">{ } 变量</button>
+            <textarea id="persona-{{ key }}-description" rows="3">{{ persona.description }}</textarea>
+
+            <label for="persona-{{ key }}-personality">personality <span class="field-note">（个性 / 语气倾向）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-personality">{ } 变量</button>
+            <textarea id="persona-{{ key }}-personality" rows="3">{{ persona.personality }}</textarea>
+
+            <label for="persona-{{ key }}-scenario">scenario <span class="field-note">（该角色所处场景 / 关系定位）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-scenario">{ } 变量</button>
+            <textarea id="persona-{{ key }}-scenario" rows="3">{{ persona.scenario }}</textarea>
+
+            <label for="persona-{{ key }}-creator-notes">creator_notes <span class="field-note">（仅给模型看的补充说明）</span></label>
+            <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-{{ key }}-creator-notes">{ } 变量</button>
+            <textarea id="persona-{{ key }}-creator-notes" rows="3">{{ persona.creator_notes }}</textarea>
+          </div>
+          {% endfor %}
+
+        </div>
+
+        <div id="state-journal-card-panel" class="card-block card-state-journal-panel" hidden>
+          <div class="persona-toolbar">
+            <div>
+              <h3>数据库变量与阶段配置</h3>
+              <p class="helper-text">此配置仅用于数据库初始化与分享，不进入 prompt，也不保存运行时当前值或阶段历史。</p>
+            </div>
+            <div class="button-row">
+              <button id="state-journal-refresh-roles" type="button" class="secondary compact">同步角色列表</button>
+            </div>
+          </div>
+          <div class="card-state-journal-source-card">
+            <label>数据库角色来源
+              <select id="state-journal-role-source-mode">
+                <option value="auto">自动识别</option>
+                <option value="main_card">主卡就是角色</option>
+                <option value="personas_only">主卡旁白，多角色展开</option>
+              </select>
+            </label>
+            <p id="state-journal-role-source-hint" class="card-state-journal-source-hint">没有多角色时读取主卡；有多角色时默认读取多角色。</p>
+          </div>
+          <div class="card-state-journal-table-wrap">
+            <table class="card-state-journal-table">
+              <thead><tr><th>角色</th><th>使用方式</th><th>扫描结果</th><th>操作</th></tr></thead>
+              <tbody id="state-journal-role-table-body"></tbody>
+            </table>
+          </div>
+          <p class="helper-text">数据库关闭时本区块隐藏；导入卡内已有配置会继续保留，并随角色卡保存。</p>
+        </div>
+      </section>
+
+    </div>
+
+
+    <div id="state-journal-role-dialog" class="card-state-journal-dialog" hidden>
+      <div class="card-state-journal-dialog-card" role="dialog" aria-modal="true" aria-labelledby="state-journal-dialog-title">
+        <div class="card-state-journal-dialog-head">
+          <div>
+            <p class="eyebrow">数据库</p>
+            <h3 id="state-journal-dialog-title">数据库变量与阶段</h3>
+            <p id="state-journal-dialog-subtitle" class="helper-text"></p>
+          </div>
+          <button id="state-journal-close-dialog" type="button" class="secondary compact">关闭</button>
+        </div>
+        <div class="card-state-journal-tabs">
+          <button id="state-journal-tab-variables" type="button" class="secondary compact active">变量表</button>
+          <button id="state-journal-tab-stages" type="button" class="secondary compact">阶段规则</button>
+          <button id="state-journal-tab-snapshot" type="button" class="secondary compact">状态快照字段</button>
+        </div>
+        <section id="state-journal-variables-tab" class="card-state-journal-tab">
+          <div class="button-row"><button id="state-journal-add-variable" type="button" class="secondary compact">＋ 新增变量</button></div>
+          <div class="card-state-journal-table-wrap"><table class="card-state-journal-table"><thead><tr><th>启用</th><th>变量名</th><th>初始值</th><th>范围</th><th>每轮变化</th><th>显示</th><th>阶段</th><th>操作</th></tr></thead><tbody id="state-journal-variable-table-body"></tbody></table></div>
+        </section>
+        <section id="state-journal-stages-tab" class="card-state-journal-tab" hidden>
+          <div class="button-row"><button id="state-journal-add-stage" type="button" class="secondary compact">＋ 新增阶段</button></div>
+          <div class="card-state-journal-table-wrap"><table class="card-state-journal-table"><thead><tr><th>启用</th><th>阶段名</th><th>优先级</th><th>条件摘要</th><th>操作</th></tr></thead><tbody id="state-journal-stage-table-body"></tbody></table></div>
+        </section>
+        <section id="state-journal-snapshot-tab" class="card-state-journal-tab" hidden>
+          <div class="button-row"><button id="state-journal-add-snapshot-field" type="button" class="secondary compact">＋ 新增快照字段</button></div>
+          <div class="card-state-journal-table-wrap"><table class="card-state-journal-table"><thead><tr><th>启用</th><th>字段名</th><th>显示</th><th>生成说明</th><th>操作</th></tr></thead><tbody id="state-journal-snapshot-table-body"></tbody></table></div>
+        </section>
+        <div class="helper-text" style="margin-top:12px;">状态快照字段只用于记录模型与状态记录展示，不参与阶段判断、不发给世界书、不进入主 prompt。未点击“保存配置”前，本弹窗内新增或修改不会写入角色卡当前编辑状态。</div>
+        <div class="card-state-journal-dialog-footer">
+          <button id="state-journal-cancel-dialog" type="button" class="secondary compact">放弃修改</button>
+          <button id="state-journal-save-dialog" type="button" class="primary compact">保存配置</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="state-journal-condition-dialog" class="card-state-journal-dialog card-state-journal-condition-dialog" hidden>
+      <div class="card-state-journal-dialog-card card-state-journal-condition-dialog-card" role="dialog" aria-modal="true" aria-labelledby="state-journal-condition-dialog-title">
+        <div class="card-state-journal-dialog-head">
+          <div>
+            <p class="eyebrow">阶段条件</p>
+            <h3 id="state-journal-condition-dialog-title">配置阶段条件</h3>
+            <p id="state-journal-condition-dialog-subtitle" class="helper-text">选择变量、比较符和数值；保存角色配置前仍属于草稿。</p>
+          </div>
+          <button id="state-journal-condition-close" type="button" class="secondary compact">关闭</button>
+        </div>
+        <div id="state-journal-condition-dialog-body" class="card-state-journal-condition-dialog-body"></div>
+        <div class="card-state-journal-dialog-footer">
+          <button id="state-journal-condition-done" type="button" class="primary compact">完成</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script src="/static/js/macro-insert-panel.js?v=p2-macro-panel-v2-fit-viewport"></script>
+    <script>
+      const PERSONA_LABELS = {
+        name: "（该角色显示名）",
+        description: "（身份 / 背景简介）",
+        personality: "（个性 / 语气倾向）",
+        scenario: "（该角色所处场景 / 关系定位）",
+        creator_notes: "（仅给模型看的补充说明）",
+      };
+      const WORKSHOP_STAGE_LIMITS = { aMax: 2, bMax: 5 };
+      const MUSIC_PRESETS = [
+        { id: "off", label: "关闭", url: "" },
+        { id: "coffee", label: "咖啡馆氛围", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
+        { id: "night", label: "夜晚钢琴", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
+        { id: "rain", label: "雨声氛围", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
+      ];
+      const { applyTheme, applyUiOpacity, applyBackground, postJson, escapeHtml, escapeAttr } = window.Fantareal;
+      const statusEl = document.getElementById("status-text");
+      const personaGridEl = document.getElementById("persona-grid");
+      const workshopEnabledEl = document.getElementById("workshop-enabled");
+      const workshopRuleListEl = document.getElementById("workshop-rule-list");
+      const workshopRuntimeInfoEl = document.getElementById("workshop-runtime-info");
+      const workshopSearchEl = document.getElementById("workshop-rule-search");
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+      const initialCardCanvasFollowOpacity = {{ settings.card_canvas_follow_opacity | default(false) | tojson }};
+      const cardCanvasFollowOpacityEl = document.getElementById("card-canvas-follow-opacity");
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      const initialWorkshop = {{ card_template.creativeWorkshop | tojson }};
+      const initialStateJournal = {{ card_template.stateJournal | tojson }};
+      const initialWorkshopTemp = Number({{ workshop_state.temp or 0 }}) || 0;
+      let currentWorkshop = null;
+      let currentStateJournal = null;
+      let stateJournalEnabled = false;
+      let activeStateJournalRoleId = "";
+      let activeStateJournalRoleDraft = null;
+      let activeStateJournalTab = "variables";
+      let activeStateJournalStageIndex = -1;
+
+      function inferStatusState(text, state = "") {
+        if (state) return state;
+        const value = String(text || "");
+        if (/失败|错误|不能|没有选择|内容为空/.test(value)) return "error";
+        if (/正在|上传中|保存中|加载中|读取中|导入中|导出中/.test(value)) return "saving";
+        if (/修改|未保存|尚未保存/.test(value)) return "dirty";
+        return "success";
+      }
+
+      function getCompactStatusLabel(text, state) {
+        const value = String(text || "");
+        if (state === "error") return "出错";
+        if (state === "dirty") return "有修改";
+        if (state === "saving") {
+          if (value.includes("保存")) return "保存中";
+          if (value.includes("加载")) return "加载中";
+          if (value.includes("读取") || value.includes("刷新")) return "读取中";
+          if (value.includes("导入")) return "导入中";
+          if (value.includes("导出")) return "导出中";
+          if (value.includes("上传")) return "上传中";
+          return "处理中";
+        }
+        if (state === "success") {
+          if (value.includes("保存")) return "已保存";
+          if (value.includes("加载")) return "已加载";
+          if (value.includes("刷新")) return "已刷新";
+          if (value.includes("导入")) return "已导入";
+          if (value.includes("导出")) return "已导出";
+          if (value.includes("新增")) return "已新增";
+          if (value.includes("删除")) return "已删除";
+          return "就绪";
+        }
+        return "就绪";
+      }
+
+      function setStatus(text, state = "") {
+        if (!statusEl) return;
+        const resolvedState = inferStatusState(text, state);
+        const label = getCompactStatusLabel(text, resolvedState);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: text || label,
+          state: resolvedState,
+          stateClasses: ["is-saving", "is-success", "is-error", "is-dirty", "is-idle"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = text;
+          statusEl.dataset.state = resolvedState;
+          statusEl.classList.remove("is-saving", "is-success", "is-error", "is-dirty", "is-idle");
+          statusEl.classList.add(`is-${resolvedState}`);
+        }
+      }
+
+      function markCardDirty() {
+        setStatus("已修改，尚未保存。", "dirty");
+      }
+
+      function getCardCanvasTheme() {
+        return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      }
+
+      function normalizeCardCanvasOpacity(value) {
+        return Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+      }
+
+      function applyCardCanvasOpacity(follow = false) {
+        const theme = getCardCanvasTheme();
+        const opacity = normalizeCardCanvasOpacity(currentOpacity);
+        const alpha = follow
+          ? Math.max(theme === "dark" ? 0.46 : 0.50, opacity)
+          : (theme === "dark" ? 0.62 : 0.72);
+        const rgb = theme === "dark" ? "18, 27, 37" : "255, 248, 238";
+        const canvasColor = `rgba(${rgb}, ${alpha.toFixed(2)})`;
+        document.documentElement.style.setProperty("--card-readable-canvas", canvasColor);
+        document.body?.style.setProperty("--card-readable-canvas", canvasColor);
+      }
+
+      async function saveCardCanvasFollowOpacity(follow) {
+        const data = await fetch("/api/settings").then((response) => response.json());
+        const settings = { ...(data.settings || {}), card_canvas_follow_opacity: follow };
+        await postJson("/api/settings", settings);
+      }
+
+      cardCanvasFollowOpacityEl?.addEventListener("change", async () => {
+        const follow = cardCanvasFollowOpacityEl.checked;
+        applyCardCanvasOpacity(follow);
+        try {
+          await saveCardCanvasFollowOpacity(follow);
+          setStatus(follow ? "工作台底色已跟随透明度。" : "工作台底色已固定为可读模式。", "success");
+        } catch (error) {
+          cardCanvasFollowOpacityEl.checked = !follow;
+          applyCardCanvasOpacity(cardCanvasFollowOpacityEl.checked);
+          setStatus(`透明度偏好保存失败：${error.message}`, "error");
+        }
+      });
+
+      new MutationObserver(() => applyCardCanvasOpacity(cardCanvasFollowOpacityEl?.checked ?? initialCardCanvasFollowOpacity))
+        .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+      function value(id) {
+        return document.getElementById(id).value.trim();
+      }
+
+      function normalizeWorkshopStage(value) {
+        const stage = String(value || "A").trim().toUpperCase();
+        return ["A", "B", "C"].includes(stage) ? stage : "A";
+      }
+
+      function normalizeWorkshopTriggerMode(value) {
+        const mode = String(value || "stage").trim().toLowerCase();
+        return mode === "temp" ? "temp" : "stage";
+      }
+
+      function normalizeWorkshopTempValue(value, fallback = 0) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(Math.max(Math.round(parsed), 0), 9999);
+      }
+
+      function normalizeWorkshopActionType(value) {
+        const actionType = String(value || "music").trim().toLowerCase();
+        return actionType === "image" ? "image" : "music";
+      }
+
+      function getWorkshopStageLabel(stage) {
+        const mapping = {
+          A: "A 阶段",
+          B: "B 阶段",
+          C: "C 阶段",
+        };
+        return mapping[stage] || stage || "A 阶段";
+      }
+
+      function getWorkshopActionLabel(actionType) {
+        return actionType === "image" ? "弹出图片" : "播放音乐";
+      }
+
+      function resolveWorkshopMusicUrl(item) {
+        const customUrl = String(item?.musicUrl || "").trim();
+        if (customUrl) return customUrl;
+        const preset = MUSIC_PRESETS.find((entry) => entry.id === item?.musicPreset);
+        return preset?.url || "";
+      }
+
+      function stripFileExtension(filename) {
+        const text = String(filename || "").trim();
+        if (!text) return "";
+        return text.replace(/\.[^.]+$/, "");
+      }
+
+      async function uploadWorkshopAsset(kind, file) {
+        const formData = new FormData();
+        formData.append("kind", kind);
+        formData.append("file", file);
+        const response = await fetch("/api/workshop/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "上传失败");
+        }
+        return response.json();
+      }
+
+      function createDefaultWorkshopItem(stage = "A") {
+        return {
+          id: `workshop_stage_${String(stage).toLowerCase()}`,
+          name: `${stage}阶段动作`,
+          enabled: stage === "A",
+          triggerMode: "stage",
+          triggerStage: stage,
+          triggerTempMin: initialWorkshopTemp,
+          triggerTempMax: initialWorkshopTemp,
+          actionType: "music",
+          popupTitle: "",
+          musicPreset: "off",
+          musicUrl: "",
+          autoplay: true,
+          loop: true,
+          volume: 0.85,
+          imageUrl: "",
+          imageAlt: "",
+          note: "",
+        };
+      }
+
+      function normalizeCreativeWorkshop(workshop) {
+        const base = {
+          enabled: true,
+          items: [createDefaultWorkshopItem("A"), createDefaultWorkshopItem("B"), createDefaultWorkshopItem("C")],
+        };
+        if (!workshop || typeof workshop !== "object") return base;
+        const items = [];
+        const rawItems = Array.isArray(workshop.items) ? workshop.items : [];
+        rawItems.forEach((item, index) => {
+          if (!item || typeof item !== "object") return;
+          items.push({
+            id: String(item.id || "").trim() || `workshop-item-${index + 1}`,
+            name: String(item.name || "").trim() || `触发器 ${index + 1}`,
+            enabled: item.enabled !== false,
+            triggerMode: normalizeWorkshopTriggerMode(item.triggerMode),
+            triggerStage: normalizeWorkshopStage(item.triggerStage),
+            triggerTempMin: normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp),
+            triggerTempMax: normalizeWorkshopTempValue(item.triggerTempMax, normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp)),
+            actionType: normalizeWorkshopActionType(item.actionType),
+            popupTitle: String(item.popupTitle || "").trim(),
+            musicPreset: String(item.musicPreset || "off").trim() || "off",
+            musicUrl: String(item.musicUrl || "").trim(),
+            autoplay: item.autoplay !== false,
+            loop: item.loop !== false,
+            volume: Math.min(Math.max(Number(item.volume ?? 0.85) || 0.85, 0), 1),
+            imageUrl: String(item.imageUrl || "").trim(),
+            imageAlt: String(item.imageAlt || "").trim(),
+            note: String(item.note || "").trim(),
+          });
+        });
+        const stageMap = new Map();
+        const extraItems = [];
+        items.forEach((item) => {
+          if (item.triggerMode === "stage" && ["A", "B", "C"].includes(item.triggerStage) && !stageMap.has(item.triggerStage)) {
+            stageMap.set(item.triggerStage, item);
+          } else {
+            extraItems.push(item);
+          }
+        });
+        base.enabled = workshop.enabled !== false;
+        base.items = ["A", "B", "C"].map((stage) => stageMap.get(stage) || createDefaultWorkshopItem(stage)).concat(extraItems);
+        return base;
+      }
+
+      function getWorkshopSearchText(card) {
+        return [
+          card.querySelector(".workshop-rule-name")?.value || "",
+          card.querySelector(".workshop-rule-popup-title")?.value || "",
+          card.querySelector(".workshop-rule-trigger")?.value || "",
+          card.querySelector(".workshop-rule-action")?.value || "",
+          card.querySelector(".workshop-rule-note")?.value || "",
+          card.querySelector(".workshop-rule-url")?.value || "",
+          card.querySelector(".workshop-rule-image-url")?.value || "",
+        ]
+          .join("\n")
+          .toLowerCase();
+      }
+
+      function setWorkshopRuleCollapsed(shell, collapsed) {
+        if (!shell) return;
+        const body = shell.querySelector(".workshop-rule-body");
+        window.Fantareal?.motion?.setDisclosureCollapsed(shell, body, collapsed, { collapsedClass: "is-collapsed", hiddenMode: "hidden" });
+        const button = shell.querySelector(".toggle-workshop-rule");
+        if (button) {
+          button.textContent = collapsed ? "展开" : "折叠";
+          button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          button.setAttribute("aria-label", collapsed ? "展开这条规则" : "折叠这条规则");
+        }
+      }
+
+      function setWorkshopPanelState(panel, active) {
+        if (!panel) return;
+        panel.hidden = !active;
+        panel.querySelectorAll("input, select, textarea, button").forEach((field) => {
+          field.disabled = !active;
+        });
+      }
+
+      function buildWorkshopMusicActionFields(item, index) {
+        const presetOptions = MUSIC_PRESETS.map((preset) => {
+          const selected = preset.id === (item.musicPreset || "off") ? "selected" : "";
+          return `<option value="${preset.id}" ${selected}>${preset.label}</option>`;
+        }).join("");
+        return `
+          <div class="workshop-action-panel" data-action-type="music">
+            <label>音乐预设</label>
+            <select class="workshop-rule-preset" data-workshop-rule-preset="${index}">
+              ${presetOptions}
+            </select>
+            <label>音乐地址</label>
+            <input class="workshop-rule-url" data-workshop-rule-url="${index}" value="${escapeAttr(item.musicUrl || "")}" placeholder="留空则使用上面的预设" />
+            <div class="grid-two">
+              <label class="fr-setting-switch-row"><span>自动播放</span><input class="workshop-rule-autoplay" data-workshop-rule-autoplay="${index}" type="checkbox" ${item.autoplay !== false ? "checked" : ""} /></label>
+              <label class="fr-setting-switch-row"><span>循环播放</span><input class="workshop-rule-loop" data-workshop-rule-loop="${index}" type="checkbox" ${item.loop !== false ? "checked" : ""} /></label>
+            </div>
+            <label>音量</label>
+            <input class="workshop-rule-volume" data-workshop-rule-volume="${index}" type="range" min="0" max="1" step="0.01" value="${escapeAttr(item.volume ?? 0.85)}" />
+          </div>
+        `;
+      }
+
+      function buildWorkshopImageActionFields(item, index) {
+        return `
+          <div class="workshop-action-panel" data-action-type="image">
+            <label>弹窗标题</label>
+            <input class="workshop-rule-popup-title" data-workshop-rule-popup-title="${index}" value="${escapeAttr(item.popupTitle || "")}" placeholder="留空则用规则标题" />
+            <label>图片地址</label>
+            <input class="workshop-rule-image-url" data-workshop-rule-image-url="${index}" value="${escapeAttr(item.imageUrl || "")}" placeholder="远程图片地址或 data URL" />
+            <label>图片说明</label>
+            <input class="workshop-rule-image-alt" data-workshop-rule-image-alt="${index}" value="${escapeAttr(item.imageAlt || "")}" placeholder="弹窗里的说明文字" />
+            <div class="workshop-image-preview-wrap">
+              <img class="workshop-rule-image-preview" loading="lazy" decoding="async" src="${escapeAttr(item.imageUrl || "")}" alt="${escapeAttr(item.imageAlt || item.name || "演出工坊图片")}" ${item.imageUrl ? "" : "hidden"} />
+            </div>
+          </div>
+        `;
+      }
+
+      function updateWorkshopRuleActionUI(card) {
+        if (!card) return;
+        const actionType = normalizeWorkshopActionType(card.querySelector(".workshop-rule-action")?.value);
+        const musicBlock = card.querySelector(".workshop-action-panel[data-action-type='music']");
+        const imageBlock = card.querySelector(".workshop-action-panel[data-action-type='image']");
+        const summaryAction = card.querySelector(".workshop-rule-action-label");
+        const summarySnippet = card.querySelector(".workshop-rule-summary-text");
+
+        if (summaryAction) {
+          summaryAction.textContent = getWorkshopActionLabel(actionType);
+        }
+        if (summarySnippet) {
+          const snippet = actionType === "image"
+            ? (card.querySelector(".workshop-rule-image-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条演出工坊规则")
+            : (card.querySelector(".workshop-rule-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条演出工坊规则");
+          summarySnippet.textContent = String(snippet).replace(/\s+/g, " ").trim().slice(0, 56) || "点击展开编辑这条演出工坊规则";
+        }
+
+        setWorkshopPanelState(musicBlock, actionType === "music");
+        setWorkshopPanelState(imageBlock, actionType === "image");
+        const preview = card.querySelector(".workshop-rule-image-preview");
+        const imageUrl = card.querySelector(".workshop-rule-image-url")?.value || "";
+        if (preview) {
+          preview.src = imageUrl;
+          preview.alt = card.querySelector(".workshop-rule-image-alt")?.value || card.querySelector(".workshop-rule-name")?.value || "演出工坊图片";
+          preview.hidden = !imageUrl;
+        }
+      }
+
+      function injectWorkshopAssetPickers(card) {
+        if (!card) return;
+        const configs = [
+          {
+            kind: "music",
+            buttonLabel: "选择本地音乐",
+            accept: "audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm",
+            targetSelector: ".workshop-rule-url",
+          },
+          {
+            kind: "image",
+            buttonLabel: "选择本地图片",
+            accept: "image/*,.png,.jpg,.jpeg,.webp,.gif",
+            targetSelector: ".workshop-rule-image-url",
+          },
+        ];
+
+        configs.forEach((config) => {
+          const panel = card.querySelector(`.workshop-action-panel[data-action-type='${config.kind}']`);
+          if (!panel || panel.querySelector(".workshop-asset-row")) return;
+          const targetInput = panel.querySelector(config.targetSelector);
+          if (!targetInput) return;
+          const row = document.createElement("div");
+          row.className = "button-row workshop-asset-row";
+          row.innerHTML = `
+            <button class="secondary compact workshop-asset-pick" data-workshop-pick-kind="${config.kind}" type="button">${config.buttonLabel}</button>
+            <input class="workshop-rule-file" data-workshop-file-kind="${config.kind}" type="file" accept="${config.accept}" hidden />
+            <span class="muted compact">会自动上传并回填地址</span>
+          `;
+          targetInput.insertAdjacentElement("afterend", row);
+        });
+      }
+
+      async function handleWorkshopAssetSelection(card, kind, fileInput) {
+        const file = fileInput?.files?.[0];
+        if (!file || !card) return;
+        try {
+          setStatus(`正在上传${kind === "image" ? "图片" : "音乐"}...`);
+          const result = await uploadWorkshopAsset(kind, file);
+          if (kind === "image") {
+            const urlInput = card.querySelector(".workshop-rule-image-url");
+            if (urlInput) {
+              urlInput.value = result.url || "";
+              urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            const altInput = card.querySelector(".workshop-rule-image-alt");
+            if (altInput && !String(altInput.value || "").trim()) {
+              altInput.value = stripFileExtension(file.name) || "演出工坊图片";
+              altInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          } else {
+            const urlInput = card.querySelector(".workshop-rule-url");
+            if (urlInput) {
+              urlInput.value = result.url || "";
+              urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            const presetInput = card.querySelector(".workshop-rule-preset");
+            if (presetInput) {
+              presetInput.value = "off";
+              presetInput.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+          }
+          setStatus(`${kind === "image" ? "图片" : "音乐"}已上传并回填地址。`);
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`);
+        } finally {
+          fileInput.value = "";
+        }
+      }
+
+      function createWorkshopRuleBlock(item, index) {
+        const node = document.createElement("div");
+        node.className = "card-block workshop-rule-card";
+        node.dataset.workshopIndex = String(index);
+        const summaryTitle = item.name || `规则 ${index + 1}`;
+        const isCoreStage = String(item.id || "").startsWith("workshop_stage_") && ["A", "B", "C"].includes(item.triggerStage);
+        const summarySource = item.actionType === "image"
+          ? (item.imageUrl || item.note || "点击展开编辑这条演出工坊规则")
+          : (item.musicUrl || item.musicPreset || item.note || "点击展开编辑这条演出工坊规则");
+        const summarySnippet = String(summarySource).replace(/\s+/g, " ").trim().slice(0, 56);
+        node.innerHTML = `
+          <div class="workshop-rule-shell" data-collapsed="false">
+            <div class="workshop-rule-summary" role="button" tabindex="0" aria-expanded="true">
+              <div class="workshop-rule-summary-copy">
+                <strong class="workshop-rule-summary-title">${escapeHtml(summaryTitle)}</strong>
+                <span class="workshop-rule-summary-meta">
+                  <span class="workshop-rule-action-label">${escapeHtml(getWorkshopActionLabel(item.actionType))}</span>
+                  ·
+                  <span class="workshop-rule-summary-text">${escapeHtml(summarySnippet || "点击展开编辑这条演出工坊规则")}</span>
+                </span>
+              </div>
+              <div class="button-row">
+                <button class="secondary compact toggle-workshop-rule" data-toggle-workshop-rule="${index}" type="button">折叠</button>
+                ${isCoreStage ? '<span class="preset-pill">固定阶段</span>' : `<button class="secondary compact danger-button" data-remove-workshop-rule="${index}" type="button">删除</button>`}
+              </div>
+            </div>
+            <div class="workshop-rule-body">
+              <input class="workshop-rule-id" data-workshop-rule-id="${index}" type="hidden" value="${escapeAttr(item.id || "")}" />
+              <label>标题</label>
+              <input class="workshop-rule-name" data-workshop-rule-name="${index}" value="${escapeAttr(item.name || "")}" />
+              <label class="fr-setting-switch-row"><span>启用规则</span><input class="workshop-rule-enabled" data-workshop-rule-enabled="${index}" type="checkbox" ${item.enabled !== false ? "checked" : ""} /></label>
+              <div class="grid-two">
+                <div>
+                  <label>触发阶段</label>
+                  <select class="workshop-rule-trigger" data-workshop-rule-trigger="${index}" ${isCoreStage ? "disabled" : ""}>
+                    <option value="A" ${item.triggerStage === "A" ? "selected" : ""}>A 阶段</option>
+                    <option value="B" ${item.triggerStage === "B" ? "selected" : ""}>B 阶段</option>
+                    <option value="C" ${item.triggerStage === "C" ? "selected" : ""}>C 阶段</option>
+                  </select>
+                </div>
+                <div>
+                  <label>动作类型</label>
+                  <select class="workshop-rule-action" data-workshop-rule-action="${index}">
+                    <option value="music" ${normalizeWorkshopActionType(item.actionType) === "music" ? "selected" : ""}>播放音乐</option>
+                    <option value="image" ${normalizeWorkshopActionType(item.actionType) === "image" ? "selected" : ""}>弹出图片</option>
+                  </select>
+                </div>
+              </div>
+              ${buildWorkshopMusicActionFields(item, index)}
+              ${buildWorkshopImageActionFields(item, index)}
+              <label>备注</label>
+              <textarea class="workshop-rule-note" data-workshop-rule-note="${index}" rows="3">${escapeHtml(item.note || "")}</textarea>
+            </div>
+          </div>
+        `;
+        const shell = node.querySelector(".workshop-rule-shell");
+        setWorkshopRuleCollapsed(shell, false);
+        injectWorkshopAssetPickers(node);
+        updateWorkshopRuleActionUI(node);
+        return node;
+      }
+
+      function renderWorkshopRules(workshop = currentWorkshop) {
+        const collapsedStateById = new Map();
+        if (workshopRuleListEl) {
+          workshopRuleListEl.querySelectorAll(".workshop-rule-card").forEach((card) => {
+            const itemId = String(card.querySelector(".workshop-rule-id")?.value || "").trim();
+            const shell = card.querySelector(".workshop-rule-shell");
+            if (itemId && shell) {
+              collapsedStateById.set(itemId, shell.dataset.collapsed === "true");
+            }
+          });
+        }
+        currentWorkshop = normalizeCreativeWorkshop(workshop || initialWorkshop);
+        if (workshopEnabledEl) {
+          workshopEnabledEl.checked = Boolean(currentWorkshop.enabled);
+        }
+        if (!workshopRuleListEl) return;
+        workshopRuleListEl.innerHTML = "";
+        currentWorkshop.items.forEach((item, index) => {
+          const block = createWorkshopRuleBlock(item, index);
+          workshopRuleListEl.appendChild(block);
+          const shell = block.querySelector(".workshop-rule-shell");
+          const collapsed = collapsedStateById.has(item.id) ? collapsedStateById.get(item.id) : false;
+          setWorkshopRuleCollapsed(shell, collapsed);
+        });
+        applyWorkshopRuleSearch();
+      }
+
+      function fillWorkshopForm(workshop) {
+        currentWorkshop = normalizeCreativeWorkshop(workshop || initialWorkshop);
+        renderWorkshopRules(currentWorkshop);
+      }
+
+      function addWorkshopRuleToCurrentCard() {
+        currentWorkshop = normalizeCreativeWorkshop(currentWorkshop || initialWorkshop);
+        currentWorkshop.enabled = true;
+        if (workshopEnabledEl) {
+          workshopEnabledEl.checked = true;
+        }
+        const nextIndex = currentWorkshop.items.filter((item) => !String(item.id || "").startsWith("workshop_stage_")).length + 1;
+        currentWorkshop.items.push({
+          ...createDefaultWorkshopItem("A"),
+          id: `workshop-item-${Date.now().toString(36)}`,
+          name: `触发器 ${nextIndex}`,
+          enabled: true,
+        });
+        const item = currentWorkshop.items[currentWorkshop.items.length - 1];
+        const block = createWorkshopRuleBlock(item, currentWorkshop.items.length - 1);
+        workshopRuleListEl?.appendChild(block);
+        if (workshopSearchEl) {
+          workshopSearchEl.value = "";
+        }
+        applyWorkshopRuleSearch();
+        const lastCard = workshopRuleListEl?.querySelector(".workshop-rule-card:last-of-type");
+        if (lastCard && typeof lastCard.scrollIntoView === "function") {
+          lastCard.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.Fantareal?.motion?.pulseItem(lastCard);
+        }
+        setStatus("已新增演出工坊规则。");
+      }
+
+      function applyWorkshopRuleSearch() {
+        if (!workshopSearchEl || !workshopRuleListEl) return;
+        const keyword = String(workshopSearchEl.value || "").trim().toLowerCase();
+        const cards = [...workshopRuleListEl.querySelectorAll(".workshop-rule-card")];
+        let visibleCount = 0;
+        cards.forEach((card) => {
+          const matched = !keyword || getWorkshopSearchText(card).includes(keyword);
+          card.hidden = !matched;
+          if (matched) visibleCount += 1;
+        });
+        if (keyword) {
+          setStatus(`演出工坊搜索完成：找到 ${visibleCount} 条匹配规则。`);
+        }
+      }
+
+      function setAllWorkshopRulesCollapsed(collapsed) {
+        if (!workshopRuleListEl) return;
+        workshopRuleListEl.querySelectorAll(".workshop-rule-card .workshop-rule-shell").forEach((shell) => {
+          setWorkshopRuleCollapsed(shell, collapsed);
+        });
+      }
+
+      function getNextPersonaKey() {
+        const keys = [...personaGridEl.querySelectorAll(".persona-card")]
+          .map((card) => Number(card.dataset.personaKey || "0"))
+          .filter((value) => Number.isFinite(value) && value > 0);
+        return String((keys.length ? Math.max(...keys) : 0) + 1);
+      }
+
+      function formatPersonaIndex(value) {
+        const number = Number(value);
+        const chinese = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+        if (Number.isFinite(number) && number > 0 && number <= 10) return chinese[number];
+        if (Number.isFinite(number) && number > 10) return String(number);
+        return String(value || "一");
+      }
+
+      function createPersonaBlock(key, persona = {}) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "card-block persona-card";
+        wrapper.dataset.personaKey = key;
+        wrapper.innerHTML = `
+          <div class="memory-card-head persona-card-head card-item-head">
+            <div class="card-item-title">
+              <strong class="persona-display-title">角色${formatPersonaIndex(key)}</strong>
+              <span class="card-summary-chip ui-summary-chip">多角色</span>
+            </div>
+            <button type="button" class="card-icon-button card-danger-icon remove-persona" title="删除角色" aria-label="删除角色">×</button>
+          </div>
+          <label for="persona-${key}-name">name <span class="field-note">${PERSONA_LABELS.name}</span></label>
+          <input id="persona-${key}-name" />
+
+          <label for="persona-${key}-role-id">role_id <span class="field-note">（用于角色宏的稳定代号，例如 role:su_lianyan）</span></label>
+          <input id="persona-${key}-role-id" placeholder="su_lianyan" />
+
+          <label for="persona-${key}-aliases">aliases <span class="field-note">（别名 / 小名，可用逗号或换行分隔）</span></label>
+          <textarea id="persona-${key}-aliases" rows="2"></textarea>
+
+          <label for="persona-${key}-description">description <span class="field-note">${PERSONA_LABELS.description}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-description">{ } 变量</button>
+          <textarea id="persona-${key}-description" rows="3"></textarea>
+
+          <label for="persona-${key}-personality">personality <span class="field-note">${PERSONA_LABELS.personality}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-personality">{ } 变量</button>
+          <textarea id="persona-${key}-personality" rows="3"></textarea>
+
+          <label for="persona-${key}-scenario">scenario <span class="field-note">${PERSONA_LABELS.scenario}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-scenario">{ } 变量</button>
+          <textarea id="persona-${key}-scenario" rows="3"></textarea>
+
+          <label for="persona-${key}-creator-notes">creator_notes <span class="field-note">${PERSONA_LABELS.creator_notes}</span></label>
+          <button type="button" class="secondary compact macro-insert-button" data-macro-insert data-macro-scope=".persona-card" data-macro-target="#persona-${key}-creator-notes">{ } 变量</button>
+          <textarea id="persona-${key}-creator-notes" rows="3"></textarea>
+        `;
+        wrapper.querySelector(`#persona-${key}-name`).value = persona.name || "";
+        const personaTitle = wrapper.querySelector(".persona-display-title");
+        if (personaTitle) {
+          personaTitle.textContent = persona.name || `角色${formatPersonaIndex(key)}`;
+        }
+        wrapper.querySelector(`#persona-${key}-name`).addEventListener("input", (event) => {
+          const target = wrapper.querySelector(".persona-display-title");
+          if (target) target.textContent = event.target.value.trim() || `角色${formatPersonaIndex(key)}`;
+        });
+        wrapper.querySelector(`#persona-${key}-description`).value = persona.description || "";
+        wrapper.querySelector(`#persona-${key}-role-id`).value = persona.role_id || persona.id || "";
+        wrapper.querySelector(`#persona-${key}-aliases`).value = formatPersonaAliases(persona.aliases);
+        wrapper.querySelector(`#persona-${key}-personality`).value = persona.personality || "";
+        wrapper.querySelector(`#persona-${key}-scenario`).value = persona.scenario || "";
+        wrapper.querySelector(`#persona-${key}-creator-notes`).value = persona.creator_notes || "";
+        wrapper.querySelector(".remove-persona").addEventListener("click", () => {
+          wrapper.remove();
+          setStatus(`已删除角色：personas.${key}`);
+        });
+        return wrapper;
+      }
+
+      function slugifyStateJournalKey(value, fallback = "") {
+        const text = String(value || fallback || "").trim().toLowerCase();
+        const normalized = text.replace(/\s+/g, "_").replace(/[^a-z0-9_\-]+/g, "").replace(/[_\-]{2,}/g, "_").replace(/^[_\-]+|[_\-]+$/g, "");
+        return normalized || fallback || `item_${Date.now()}`;
+      }
+
+      function slugifyOptionalStateJournalKey(value) {
+        const text = String(value || "").trim().toLowerCase();
+        if (!text) return "";
+        return text.replace(/\s+/g, "_").replace(/[^a-z0-9_\-]+/g, "").replace(/[_\-]{2,}/g, "_").replace(/^[_\-]+|[_\-]+$/g, "");
+      }
+
+      function parsePersonaAliases(value) {
+        if (Array.isArray(value)) {
+          return [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 24);
+        }
+        return [...new Set(String(value || "").split(/[\n,，、;；|]+/).map((item) => item.trim()).filter(Boolean))].slice(0, 24);
+      }
+
+      function formatPersonaAliases(value) {
+        return parsePersonaAliases(value).join("\n");
+      }
+
+      function createStateJournalTempId(prefix = "tmp") {
+        return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      }
+
+      function cloneStateJournalValue(value) {
+        return value == null ? value : JSON.parse(JSON.stringify(value));
+      }
+
+      function stateJournalItemIdentity(item, keys = []) {
+        const candidates = [item?._tmp_id, ...keys.map((key) => item?.[key])];
+        return String(candidates.find((value) => value !== undefined && value !== null && String(value).trim()) || "").trim();
+      }
+
+      function removeStateJournalItem(list, identity, keys = []) {
+        if (!Array.isArray(list)) return false;
+        const target = String(identity || "");
+        const index = list.findIndex((item) => stateJournalItemIdentity(item, keys) === target);
+        if (index < 0) return false;
+        list.splice(index, 1);
+        return true;
+      }
+
+      function stripStateJournalDraftIds(value) {
+        if (Array.isArray(value)) return value.map(stripStateJournalDraftIds);
+        if (!value || typeof value !== "object") return value;
+        const clean = {};
+        Object.entries(value).forEach(([key, item]) => {
+          if (key === "_tmp_id") return;
+          clean[key] = stripStateJournalDraftIds(item);
+        });
+        return clean;
+      }
+
+      function stateJournalStageLetter(index) {
+        const letters = "abcdefghijklmnopqrstuvwxyz";
+        const safeIndex = Math.max(1, Number(index || 1));
+        return letters[(safeIndex - 1) % letters.length] + (safeIndex > letters.length ? Math.ceil(safeIndex / letters.length) : "");
+      }
+
+      function defaultStateJournalStageKey(index) {
+        return `stage_${stateJournalStageLetter(index)}`;
+      }
+
+      function defaultStateJournalStageName(index) {
+        return `${stateJournalStageLetter(index).toUpperCase()}阶段`;
+      }
+
+      const STATE_JOURNAL_ROLE_MODES = {
+        default: "默认状态记录模板",
+        snapshot_only: "仅专属状态记录（不计算变量/阶段）",
+        full: "完整数据库：状态记录 + 变量阶段",
+        disabled: "不记录该角色",
+      };
+
+
+      const STATE_JOURNAL_ROLE_SOURCE_MODES = {
+        auto: {
+          label: "自动识别",
+          desc: "自动识别主卡和有内容的多角色；空占位子角色会自动隐藏。",
+        },
+        main_card: {
+          label: "主卡就是角色",
+          desc: "适合普通单角色卡，数据库会把主卡作为唯一角色记录。",
+        },
+        personas_only: {
+          label: "主卡旁白，多角色展开",
+          desc: "适合旁白卡、多角色卡；只显示有内容的多角色，不显示主卡。",
+        },
+      };
+
+      function normalizeStateJournalRoleSourceMode(value) {
+        const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+        const aliases = { main: "main_card", single: "main_card", single_role: "main_card", card: "main_card", persona: "personas_only", personas: "personas_only", multi: "personas_only", multi_role: "personas_only", narrator: "personas_only" };
+        const mode = aliases[raw] || raw;
+        return STATE_JOURNAL_ROLE_SOURCE_MODES[mode] ? mode : "auto";
+      }
+
+      function normalizeStateJournalMode(value, role = {}) {
+        const raw = String(value || "").trim().toLowerCase().replace(/-/g, "_");
+        const aliases = { snapshot: "snapshot_only", snapshot_fields: "snapshot_only", note_only: "snapshot_only", off: "disabled", none: "disabled", disable: "disabled" };
+        const mode = aliases[raw] || raw;
+        if (STATE_JOURNAL_ROLE_MODES[mode]) return mode;
+        if (role.enabled === false) return "disabled";
+        if ((role.variables || []).length && (role.stages || []).length) return "full";
+        if ((role.snapshotFields || []).length) return "snapshot_only";
+        return "default";
+      }
+
+      function setStateJournalRoleMode(role, mode) {
+        const safeMode = STATE_JOURNAL_ROLE_MODES[mode] ? mode : "default";
+        role.mode = safeMode;
+        role.stateJournalMode = safeMode;
+        role.enabled = safeMode !== "disabled";
+      }
+
+      function stateJournalRoleTokens(role) {
+        return new Set([role.role_id, role.role_name, ...(role.aliases || [])].map((item) => String(item || "").trim().toLowerCase()).filter(Boolean));
+      }
+
+      function mergeStateJournalRoles(roles) {
+        const merged = [];
+        roles.filter(Boolean).forEach((role) => {
+          const normalized = normalizeStateJournalRole(role, merged.length + 1);
+          const tokens = stateJournalRoleTokens(normalized);
+          const idx = merged.findIndex((existing) => [...tokens].some((token) => stateJournalRoleTokens(existing).has(token)));
+          if (idx >= 0) {
+            const old = merged[idx];
+            const oldScore = (old.variables?.length || 0) * 5 + (old.stages?.length || 0) * 5 + (old.snapshotFields?.length || 0) * 3;
+            const newScore = (normalized.variables?.length || 0) * 5 + (normalized.stages?.length || 0) * 5 + (normalized.snapshotFields?.length || 0) * 3;
+            const primary = newScore > oldScore ? normalized : old;
+            const secondary = newScore > oldScore ? old : normalized;
+            primary.aliases = [...new Set([...(primary.aliases || []), secondary.role_id, secondary.role_name, ...(secondary.aliases || [])].filter(Boolean))];
+            if (!(primary.variables || []).length && (secondary.variables || []).length) primary.variables = secondary.variables;
+            if (!(primary.stages || []).length && (secondary.stages || []).length) primary.stages = secondary.stages;
+            if (!(primary.snapshotFields || []).length && (secondary.snapshotFields || []).length) primary.snapshotFields = secondary.snapshotFields;
+            merged[idx] = normalizeStateJournalRole(primary, idx + 1);
+          } else {
+            merged.push(normalized);
+          }
+        });
+        return merged;
+      }
+
+      function normalizeStateJournalConfig(raw) {
+        const config = raw && typeof raw === "object" ? raw : {};
+        const roles = Array.isArray(config.roles) ? config.roles : [];
+        return {
+          version: Number(config.version || 1) || 1,
+          enabled: config.enabled !== false,
+          role_source_mode: normalizeStateJournalRoleSourceMode(config.role_source_mode || config.roleSourceMode),
+          roles: mergeStateJournalRoles(roles.filter((role) => role && typeof role === "object")),
+        };
+      }
+
+      function ensureStateJournalConfigReady() {
+        if (currentStateJournal && typeof currentStateJournal === "object" && Array.isArray(currentStateJournal.roles)) {
+          return currentStateJournal;
+        }
+        try {
+          currentStateJournal = normalizeStateJournalConfig(initialStateJournal || {});
+        } catch (error) {
+          console.error("[stateJournal] card config init failed", error);
+          currentStateJournal = { version: 1, enabled: true, role_source_mode: "auto", roles: [] };
+        }
+        return currentStateJournal;
+      }
+
+      function safeRenderStateJournalPanel() {
+        try {
+          ensureStateJournalConfigReady();
+          renderStateJournalPanel();
+        } catch (error) {
+          console.error("[stateJournal] render panel failed", error);
+          const panel = document.getElementById("state-journal-card-panel");
+          if (panel) panel.hidden = true;
+        }
+      }
+
+      function normalizeStateJournalRole(role, index = 1) {
+        const roleName = String(role.role_name || role.name || `角色${index}`).trim();
+        const roleId = slugifyStateJournalKey(role.role_id || role.id || roleName, `role_${index}`);
+        return {
+          role_id: roleId,
+          role_name: roleName || roleId,
+          aliases: Array.isArray(role.aliases) ? role.aliases.map((item) => String(item).trim()).filter(Boolean) : [],
+          enabled: role.enabled !== false,
+          mode: normalizeStateJournalMode(role.mode || role.stateJournalMode, role),
+          stateJournalMode: normalizeStateJournalMode(role.mode || role.stateJournalMode, role),
+          use_default_variables: Boolean(role.use_default_variables),
+          source: String(role.source || role.role_source || "").trim(),
+          variables: Array.isArray(role.variables) ? role.variables.map((item, idx) => normalizeStateJournalVariable(item, idx + 1)).filter(Boolean) : [],
+          stages: Array.isArray(role.stages) ? role.stages.map((item, idx) => normalizeStateJournalStage(item, roleId, idx + 1)).filter(Boolean) : [],
+          snapshotFields: Array.isArray(role.snapshotFields) ? role.snapshotFields.map((item, idx) => normalizeStateJournalSnapshotField(item, idx + 1)).filter(Boolean) : [],
+          initial_stage: slugifyStateJournalKey(role.initial_stage || role.settings?.initial_stage, "stage_a"),
+          settings: role.settings && typeof role.settings === "object" ? role.settings : { allow_regression: false, confirm_turns: 1, cooldown_turns: 2 },
+        };
+      }
+
+      function normalizeStateJournalVariable(variable, index = 1) {
+        if (!variable || typeof variable !== "object") return null;
+        const key = slugifyStateJournalKey(variable.var_key || variable.key, `var_${index}`);
+        const min = Number(variable.min_value ?? 0);
+        const max = Number(variable.max_value ?? 100);
+        const safeMin = Number.isFinite(min) ? min : 0;
+        const safeMax = Number.isFinite(max) && max > safeMin ? max : 100;
+        const defaultValue = Number(variable.default_value ?? safeMin);
+        return {
+          var_key: key,
+          var_name: String(variable.var_name || variable.label || key).trim() || key,
+          enabled: variable.enabled !== false,
+          default_value: Math.min(Math.max(Number.isFinite(defaultValue) ? defaultValue : safeMin, safeMin), safeMax),
+          min_value: safeMin,
+          max_value: safeMax,
+          delta_min: Number(variable.delta_min ?? -5),
+          delta_max: Number(variable.delta_max ?? 5),
+          display: variable.display !== false,
+          stage_relevant: variable.stage_relevant !== false,
+          instruction: String(variable.instruction || "").trim(),
+        };
+      }
+
+      function normalizeStateJournalSnapshotField(field, index = 1) {
+        if (!field || typeof field !== "object") return null;
+        const key = slugifyStateJournalKey(field.key || field.field_key, `snapshot_${index}`);
+        return {
+          key,
+          label: String(field.label || field.name || key).trim() || key,
+          enabled: field.enabled !== false,
+          display: field.display !== false,
+          instruction: String(field.instruction || field.note || "根据本轮上下文生成该状态快照字段。").trim(),
+        };
+      }
+
+      function normalizeStateJournalStage(stage, roleId = "", index = 1) {
+        if (!stage || typeof stage !== "object") return null;
+        const key = slugifyStateJournalKey(stage.stage_key || stage.key, defaultStateJournalStageKey(index));
+        const conditions = Array.isArray(stage.conditions) ? stage.conditions.map((condition) => ({
+          var: slugifyStateJournalKey(condition?.var || condition?.field || "", ""),
+          op: [">", ">=", "<", "<=", "=", "!="].includes(String(condition?.op || ">=")) ? String(condition.op || ">=") : ">=",
+          value: Number(condition?.value ?? 0) || 0,
+        })).filter((item) => item.var) : [];
+        return {
+          stage_key: key,
+          stage_name: String(stage.stage_name || stage.name || defaultStateJournalStageName(index)).trim() || defaultStateJournalStageName(index),
+          enabled: stage.enabled !== false,
+          priority: Number(stage.priority ?? index * 10) || index * 10,
+          condition_mode: String(stage.condition_mode || "all") === "any" ? "any" : "all",
+          conditions,
+          allow_regression: Boolean(stage.allow_regression),
+          confirm_turns: Math.max(1, Number(stage.confirm_turns || 1) || 1),
+          cooldown_turns: Math.max(0, Number(stage.cooldown_turns || 0) || 0),
+          activation_tag: `state_journal.stage.${roleId}.${key}`,
+        };
+      }
+
+      function collectPersonaSummaries() {
+        return [...personaGridEl.querySelectorAll(".persona-card")].map((card, index) => {
+          const key = String(card.dataset.personaKey || index + 1).trim();
+          const name = card.querySelector(`#persona-${key}-name`)?.value.trim() || `角色${index + 1}`;
+          const roleIdInput = card.querySelector(`#persona-${key}-role-id`)?.value.trim() || "";
+          const role_id = slugifyStateJournalKey(roleIdInput || `current_card_${key}_${name}`, `current_card_role_${index + 1}`);
+          const aliases = parsePersonaAliases(card.querySelector(`#persona-${key}-aliases`)?.value || "");
+          return { key, name, role_id, aliases, is_empty_slot: isEmptyStateJournalPersonaCard(card, key) };
+        });
+      }
+
+
+      function collectMainCardStateJournalRole() {
+        const name = value("card-name") || "主卡角色";
+        const roleId = slugifyStateJournalKey(name, "main_card");
+        return { role_id: roleId, role_name: name, aliases: [], mode: "default", stateJournalMode: "default", source: "main_card", variables: [], stages: [], snapshotFields: [] };
+      }
+
+      function stateJournalRoleHasConfig(role) {
+        return Boolean((role.variables || []).length || (role.stages || []).length || (role.snapshotFields || []).length);
+      }
+
+      function isPlaceholderStateJournalRoleLabel(value) {
+        const text = String(value || "").trim();
+        return /^\d+$/.test(text) || /^role\s*[a-z0-9]+$/i.test(text) || /^role[_\-\s]*[a-z0-9]+$/i.test(text);
+      }
+
+      function isEmptyStateJournalPersonaCard(card, key = "") {
+        const name = card.querySelector(`#persona-${key}-name`)?.value.trim() || "";
+        if (!isPlaceholderStateJournalRoleLabel(name)) return false;
+        const fields = ["description", "personality", "scenario", "creator-notes"];
+        const hasContent = fields.some((field) => (card.querySelector(`#persona-${key}-${field}`)?.value || "").trim());
+        // Role A/B/C 这类占位多角色不作为数据库角色来源；原始 personas 仍随角色卡保存。
+        return !hasContent || isPlaceholderStateJournalRoleLabel(name);
+      }
+
+      function shouldHideStateJournalEmptyRole(role) {
+        if (!role) return false;
+        if (role.display_policy === "hide_empty" || role.is_empty_slot) return true;
+        const sourceType = String(role.source_type || role.sourceType || "").trim();
+        const source = String(role.source || "").trim();
+        return (sourceType === "multi_role_slot" || source === "persona")
+          && isPlaceholderStateJournalRoleLabel(role.role_name || role.role_id)
+          && !stateJournalRoleHasConfig(role)
+          && !role.has_state_journal_config;
+      }
+
+      function stateJournalDesiredSourceRoleSeeds() {
+        const mode = normalizeStateJournalRoleSourceMode(currentStateJournal?.role_source_mode || "auto");
+        const personas = collectPersonaSummaries();
+        if (mode === "main_card") return { detected: "main_card", roles: [collectMainCardStateJournalRole()], personas };
+        const personaRoles = personas
+          .filter((persona) => !persona.is_empty_slot)
+          .map((persona) => ({ role_id: persona.role_id, role_name: persona.name, aliases: [persona.key, ...(persona.aliases || [])].filter(Boolean), mode: "default", stateJournalMode: "default", source: "persona", source_type: "multi_role_slot", has_state_journal_config: false, is_empty_slot: false, display_policy: "show", variables: [], stages: [], snapshotFields: [] }));
+        const mainRole = collectMainCardStateJournalRole();
+        if (mode === "personas_only") return { detected: "personas_only", roles: personaRoles, personas };
+        return { detected: personaRoles.length ? "auto" : "main_card", roles: [mainRole, ...personaRoles].filter(Boolean), personas };
+      }
+
+      function renderStateJournalRoleSourceHint() {
+        const select = document.getElementById("state-journal-role-source-mode");
+        const hint = document.getElementById("state-journal-role-source-hint");
+        if (!select || !hint) return;
+        const mode = normalizeStateJournalRoleSourceMode(currentStateJournal?.role_source_mode || "auto");
+        const desired = stateJournalDesiredSourceRoleSeeds();
+        select.value = mode;
+        const modeMeta = STATE_JOURNAL_ROLE_SOURCE_MODES[mode] || STATE_JOURNAL_ROLE_SOURCE_MODES.auto;
+        const detectedLabel = STATE_JOURNAL_ROLE_SOURCE_MODES[desired.detected]?.label || modeMeta.label;
+        const roleNames = desired.roles.map((role) => role.role_name).filter(Boolean).join("、") || "暂无角色";
+        hint.innerHTML = `<strong>${escapeHtml(modeMeta.label)}</strong>｜当前将按“${escapeHtml(detectedLabel)}”识别：${escapeHtml(roleNames)}。${escapeHtml(modeMeta.desc)}`;
+      }
+
+      function ensureStateJournalRolesFromPersonas() {
+        ensureStateJournalConfigReady();
+        currentStateJournal.role_source_mode = normalizeStateJournalRoleSourceMode(currentStateJournal.role_source_mode || "auto");
+        const desired = stateJournalDesiredSourceRoleSeeds();
+        const desiredIds = new Set((desired.roles || []).map((role) => String(role.role_id || "").trim()).filter(Boolean));
+        const desiredSources = new Set((desired.roles || []).map((role) => String(role.source || "").trim()).filter(Boolean));
+        const existing = (currentStateJournal.roles || []).filter((role) => {
+          if (shouldHideStateJournalEmptyRole(role)) return false;
+          const source = String(role.source || "").trim();
+          const roleId = String(role.role_id || "").trim();
+          if (desiredIds.has(roleId)) return true;
+          if (source === "main_card" || source === "persona") return false;
+          if (!source && desiredSources.has("")) return true;
+          return stateJournalRoleHasConfig(role);
+        });
+        currentStateJournal.roles = mergeStateJournalRoles([...existing, ...desired.roles]).filter((role) => !shouldHideStateJournalEmptyRole(role));
+      }
+
+      function renderStateJournalPanel() {
+        ensureStateJournalConfigReady();
+        const panel = document.getElementById("state-journal-card-panel");
+        if (!panel) return;
+        const hasStoredStateJournal = Boolean(currentStateJournal?.roles?.length);
+        panel.hidden = !stateJournalEnabled;
+        panel.dataset.hasStateJournalData = hasStoredStateJournal ? "true" : "false";
+        if (!stateJournalEnabled) return;
+        ensureStateJournalRolesFromPersonas();
+        renderStateJournalRoleSourceHint();
+        const tbody = document.getElementById("state-journal-role-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        if (!currentStateJournal.roles.length) {
+          tbody.innerHTML = `<tr><td colspan="4"><div class="card-state-journal-empty">暂无角色配置。点击“同步角色列表”会按当前数据库角色来源生成空配置。</div></td></tr>`;
+          return;
+        }
+        currentStateJournal.roles.forEach((role) => {
+          const tr = document.createElement("tr");
+          const roleMode = normalizeStateJournalMode(role.mode || role.stateJournalMode, role);
+          tr.innerHTML = `
+            <td><strong>${escapeHtml(role.role_name || role.role_id)}</strong></td>
+            <td><select data-sj-role-mode><option value="default" ${roleMode === "default" ? "selected" : ""}>默认状态记录模板</option><option value="snapshot_only" ${roleMode === "snapshot_only" ? "selected" : ""}>仅专属状态记录</option><option value="full" ${roleMode === "full" ? "selected" : ""}>完整数据库：状态记录 + 变量阶段</option><option value="disabled" ${roleMode === "disabled" ? "selected" : ""}>不记录该角色</option></select></td>
+            <td><span class="card-state-journal-badge">变量 ${role.variables?.length || 0}</span> <span class="card-state-journal-badge">阶段 ${role.stages?.length || 0}</span> <span class="card-state-journal-badge">快照 ${role.snapshotFields?.length || 0}</span></td>
+            <td><button type="button" class="secondary compact" data-sj-config-role="${escapeAttr(role.role_id)}">配置</button></td>
+          `;
+          tr.querySelector("[data-sj-role-mode]").addEventListener("change", (event) => { setStateJournalRoleMode(role, event.target.value); markCardDirty(); renderStateJournalPanel(); });
+          tr.querySelector("[data-sj-config-role]").addEventListener("click", () => openStateJournalRoleDialog(role.role_id));
+          tbody.appendChild(tr);
+        });
+      }
+
+      function openStateJournalRoleDialog(roleId) {
+        ensureStateJournalConfigReady();
+        const sourceRole = (currentStateJournal.roles || []).find((role) => role.role_id === roleId);
+        if (!sourceRole) return;
+        activeStateJournalRoleId = roleId;
+        activeStateJournalRoleDraft = normalizeStateJournalRole(cloneStateJournalValue(sourceRole), 1);
+        renderStateJournalDialog();
+        const dialog = document.getElementById("state-journal-role-dialog");
+        if (dialog) dialog.hidden = false;
+      }
+
+      function closeStateJournalRoleDialog() {
+        activeStateJournalRoleDraft = null;
+        const dialog = document.getElementById("state-journal-role-dialog");
+        if (dialog) dialog.hidden = true;
+      }
+
+      function activeStateJournalRole() {
+        return activeStateJournalRoleDraft;
+      }
+
+      function saveStateJournalRoleDialog() {
+        const draft = activeStateJournalRoleDraft ? normalizeStateJournalRole(activeStateJournalRoleDraft, 1) : null;
+        if (!draft) return;
+        ensureStateJournalConfigReady();
+        const index = (currentStateJournal.roles || []).findIndex((role) => role.role_id === activeStateJournalRoleId);
+        if (index >= 0) {
+          currentStateJournal.roles[index] = draft;
+        } else {
+          currentStateJournal.roles.push(draft);
+        }
+        currentStateJournal.roles = mergeStateJournalRoles(currentStateJournal.roles);
+        activeStateJournalRoleId = draft.role_id;
+        markCardDirty();
+        renderStateJournalPanel();
+        closeStateJournalRoleDialog();
+      }
+
+      function setStateJournalDialogTab(tab) {
+        activeStateJournalTab = tab === "stages" ? "stages" : (tab === "snapshot" ? "snapshot" : "variables");
+        document.getElementById("state-journal-tab-variables")?.classList.toggle("active", activeStateJournalTab === "variables");
+        document.getElementById("state-journal-tab-stages")?.classList.toggle("active", activeStateJournalTab === "stages");
+        document.getElementById("state-journal-tab-snapshot")?.classList.toggle("active", activeStateJournalTab === "snapshot");
+        const variablesTab = document.getElementById("state-journal-variables-tab");
+        const stagesTab = document.getElementById("state-journal-stages-tab");
+        const snapshotTab = document.getElementById("state-journal-snapshot-tab");
+        if (variablesTab) variablesTab.hidden = activeStateJournalTab !== "variables";
+        if (stagesTab) stagesTab.hidden = activeStateJournalTab !== "stages";
+        if (snapshotTab) snapshotTab.hidden = activeStateJournalTab !== "snapshot";
+      }
+
+      function summarizeStageConditions(stage) {
+        const role = activeStateJournalRole();
+        const nameMap = new Map((role?.variables || []).map((item) => [item.var_key, item.var_name || item.var_key]));
+        const items = Array.isArray(stage.conditions) ? stage.conditions : [];
+        if (!items.length) return "未设置条件";
+        const opMap = { ">=": "≥", "<=": "≤", ">": "＞", "<": "＜", "=": "＝", "!=": "≠" };
+        const joiner = stage.condition_mode === "any" ? " 或 " : " 且 ";
+        return items.map((item) => `${nameMap.get(item.var) || item.var} ${opMap[item.op] || item.op || "≥"} ${item.value ?? 0}`).join(joiner);
+      }
+
+      function stateJournalConditionVariableOptions(role, selected) {
+        const variables = Array.isArray(role?.variables) ? role.variables : [];
+        if (!variables.length) return `<option value="">请先添加变量</option>`;
+        return variables.map((item) => `<option value="${escapeAttr(item.var_key)}" ${item.var_key === selected ? "selected" : ""}>${escapeHtml(item.var_name || item.var_key)}</option>`).join("");
+      }
+
+      function stateJournalConditionOpOptions(selected) {
+        const ops = [[">=", "≥"], ["<=", "≤"], [">", "＞"], ["<", "＜"], ["=", "＝"], ["!=", "≠"]];
+        return ops.map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`).join("");
+      }
+
+      function openStateJournalStageConditionDialog(stageIndex) {
+        const role = activeStateJournalRole();
+        if (!role || !role.stages?.[stageIndex]) return;
+        activeStateJournalStageIndex = stageIndex;
+        renderStateJournalStageConditionDialog();
+        const dialog = document.getElementById("state-journal-condition-dialog");
+        if (dialog) dialog.hidden = false;
+      }
+
+      function closeStateJournalStageConditionDialog() {
+        activeStateJournalStageIndex = -1;
+        const dialog = document.getElementById("state-journal-condition-dialog");
+        if (dialog) dialog.hidden = true;
+        renderStateJournalDialog();
+      }
+
+      function renderStateJournalStageConditionDialog() {
+        const role = activeStateJournalRole();
+        const stage = role?.stages?.[activeStateJournalStageIndex];
+        const body = document.getElementById("state-journal-condition-dialog-body");
+        if (!body || !role || !stage) return;
+        stage.conditions = Array.isArray(stage.conditions) ? stage.conditions : [];
+        document.getElementById("state-journal-condition-dialog-title").textContent = `${stage.stage_name || stage.stage_key || "阶段"} · 条件配置`;
+        document.getElementById("state-journal-condition-dialog-subtitle").textContent = `当前摘要：${summarizeStageConditions(stage)}`;
+        const rows = stage.conditions.length ? stage.conditions.map((condition, conditionIndex) => `
+          <div class="card-state-journal-condition-row" data-condition-index="${conditionIndex}">
+            <select data-condition-index="${conditionIndex}" data-condition-field="var">${stateJournalConditionVariableOptions(role, condition.var)}</select>
+            <select data-condition-index="${conditionIndex}" data-condition-field="op">${stateJournalConditionOpOptions(condition.op || ">=")}</select>
+            <input type="number" value="${Number(condition.value ?? 0)}" data-condition-index="${conditionIndex}" data-condition-field="value">
+            <button type="button" class="secondary compact" data-remove-condition="${conditionIndex}">删除</button>
+          </div>
+        `).join("") : `<div class="card-state-journal-empty compact">暂无条件。点击“添加条件”后选择变量、比较符和数值。</div>`;
+        body.innerHTML = `
+          <div class="card-state-journal-condition-toolbar">
+            <label>满足方式
+              <select data-stage-condition-mode>
+                <option value="all" ${stage.condition_mode !== "any" ? "selected" : ""}>全部满足</option>
+                <option value="any" ${stage.condition_mode === "any" ? "selected" : ""}>任一满足</option>
+              </select>
+            </label>
+          </div>
+          <div class="card-state-journal-condition-list">${rows}</div>
+          <button type="button" class="secondary compact" data-add-condition="${activeStateJournalStageIndex}">＋ 添加条件</button>
+        `;
+        body.querySelector("[data-stage-condition-mode]")?.addEventListener("change", (event) => {
+          stage.condition_mode = event.target.value === "any" ? "any" : "all";
+          renderStateJournalStageConditionDialog();
+        });
+        body.querySelectorAll("[data-condition-field]").forEach((input) => input.addEventListener("change", () => {
+          const conditionIndex = Number(input.dataset.conditionIndex);
+          const condition = stage.conditions?.[conditionIndex];
+          if (!condition) return;
+          if (input.dataset.conditionField === "var") condition.var = input.value;
+          else if (input.dataset.conditionField === "op") condition.op = input.value;
+          else if (input.dataset.conditionField === "value") condition.value = Number(input.value || 0);
+          renderStateJournalStageConditionDialog();
+        }));
+        body.querySelectorAll("[data-remove-condition]").forEach((button) => button.addEventListener("click", (event) => {
+          event.preventDefault();
+          const conditionIndex = Number(button.dataset.removeCondition);
+          if (Number.isFinite(conditionIndex)) stage.conditions.splice(conditionIndex, 1);
+          renderStateJournalStageConditionDialog();
+        }));
+        body.querySelector("[data-add-condition]")?.addEventListener("click", (event) => {
+          event.preventDefault();
+          const firstVariable = role.variables?.[0]?.var_key || "";
+          stage.conditions.push({ var: firstVariable, op: ">=", value: 0 });
+          renderStateJournalStageConditionDialog();
+        });
+      }
+
+      function renderStateJournalDialog() {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        document.getElementById("state-journal-dialog-title").textContent = `${role.role_name || role.role_id} · 数据库配置`;
+        document.getElementById("state-journal-dialog-subtitle").textContent = `${STATE_JOURNAL_ROLE_MODES[normalizeStateJournalMode(role.mode || role.stateJournalMode, role)] || "默认状态记录模板"}｜变量 ${role.variables?.length || 0} 个｜阶段 ${role.stages?.length || 0} 个｜快照字段 ${role.snapshotFields?.length || 0} 个`;
+        renderStateJournalVariableRows(role);
+        renderStateJournalStageRows(role);
+        renderStateJournalSnapshotRows(role);
+        setStateJournalDialogTab(activeStateJournalTab);
+      }
+
+      function renderStateJournalVariableRows(role) {
+        const tbody = document.getElementById("state-journal-variable-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        if (!role.variables?.length) {
+          tbody.innerHTML = `<tr><td colspan="8"><div class="card-state-journal-empty">暂无变量。可点击新增变量录入初始化配置。</div></td></tr>`;
+          return;
+        }
+        role.variables.forEach((variable, index) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="card-state-journal-check"><input type="checkbox" title="启用变量" ${variable.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
+            <td><input class="card-state-journal-name-input" value="${escapeAttr(variable.var_name || variable.var_key)}" data-field="var_name"><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(variable.var_key)}" data-field="var_key"></label><label class="card-state-journal-instruction-field">变量判断说明<textarea class="card-state-journal-instruction-input" rows="3" data-field="instruction" placeholder="例如：只有出现明确亲近、信任或保护行为时才变化；普通寒暄保持不变。">${escapeHtml(variable.instruction || "")}</textarea></label></details></td>
+            <td><input class="card-state-journal-num-input" type="number" value="${Number(variable.default_value ?? 0)}" data-field="default_value"></td>
+            <td><span class="card-state-journal-range-inputs"><input class="card-state-journal-num-input" type="number" value="${Number(variable.min_value ?? 0)}" data-field="min_value"> <span>~</span> <input class="card-state-journal-num-input" type="number" value="${Number(variable.max_value ?? 100)}" data-field="max_value"></span></td>
+            <td><span class="card-state-journal-range-inputs"><input class="card-state-journal-num-input" type="number" value="${Number(variable.delta_min ?? -5)}" data-field="delta_min"> <span>~</span> <input class="card-state-journal-num-input" type="number" value="${Number(variable.delta_max ?? 5)}" data-field="delta_max"></span></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在状态记录" ${variable.display !== false ? "checked" : ""} data-field="display"></span></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="参与阶段判断" ${variable.stage_relevant !== false ? "checked" : ""} data-field="stage_relevant"></span></td>
+            <td><button type="button" class="secondary compact" data-remove-variable-index="${index}">删除</button></td>
+          `;
+          tr.querySelectorAll("input, textarea").forEach((input) => input.addEventListener("change", () => {
+            const field = input.dataset.field;
+            if (["enabled", "display", "stage_relevant"].includes(field)) variable[field] = input.checked;
+            else if (["default_value", "min_value", "max_value", "delta_min", "delta_max"].includes(field)) variable[field] = Number(input.value || 0);
+            else if (field === "var_key") variable.var_key = slugifyStateJournalKey(input.value, variable.var_key);
+            else variable[field] = input.value.trim();
+            markCardDirty(); renderStateJournalPanel();
+          }));
+          tr.querySelector("[data-remove-variable-index]").addEventListener("click", (event) => {
+            event.preventDefault();
+            const removeIndex = Number(event.currentTarget.dataset.removeVariableIndex);
+            if (Number.isFinite(removeIndex)) role.variables.splice(removeIndex, 1);
+            renderStateJournalDialog();
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderStateJournalStageRows(role) {
+        const tbody = document.getElementById("state-journal-stage-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        if (!role.stages?.length) {
+          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无阶段规则。数据库会使用这里的条件判断阶段标签。</div></td></tr>`;
+          return;
+        }
+        role.stages.forEach((stage, index) => {
+          stage.conditions = Array.isArray(stage.conditions) ? stage.conditions : [];
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="card-state-journal-check"><input type="checkbox" title="启用阶段" ${stage.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
+            <td><input class="card-state-journal-name-input" value="${escapeAttr(stage.stage_name || stage.stage_key)}" data-field="stage_name"></td>
+            <td><input class="card-state-journal-num-input" type="number" value="${Number(stage.priority ?? 10)}" data-field="priority"></td>
+            <td>
+              <div class="card-state-journal-stage-summary">
+                <strong>${escapeHtml(summarizeStageConditions(stage))}</strong>
+                <button type="button" class="secondary compact" data-edit-stage-conditions="${index}">配置条件</button>
+              </div>
+            </td>
+            <td><button type="button" class="secondary compact" data-remove-stage-index="${index}">删除</button><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(stage.stage_key)}" data-field="stage_key"></label><code class="card-state-journal-code" title="${escapeAttr(`state_journal.stage.${role.role_id}.${stage.stage_key}`)}">${escapeHtml(`state_journal.stage.${role.role_id}.${stage.stage_key}`)}</code></details></td>
+          `;
+          tr.querySelectorAll("input,select").forEach((input) => input.addEventListener("change", () => {
+            const field = input.dataset.field;
+            if (field) {
+              if (field === "enabled") stage.enabled = input.checked;
+              else if (field === "priority") stage.priority = Number(input.value || 0);
+              else if (field === "stage_key") stage.stage_key = slugifyStateJournalKey(input.value, stage.stage_key);
+              else stage[field] = input.value.trim();
+              stage.activation_tag = `state_journal.stage.${role.role_id}.${stage.stage_key}`;
+              markCardDirty(); renderStateJournalDialog(); renderStateJournalPanel();
+              return;
+            }
+          }));
+          tr.querySelector("[data-edit-stage-conditions]")?.addEventListener("click", (event) => {
+            event.preventDefault();
+            const stageIndex = Number(event.currentTarget.dataset.editStageConditions);
+            openStateJournalStageConditionDialog(stageIndex);
+          });
+          tr.querySelector("[data-remove-stage-index]").addEventListener("click", (event) => {
+            event.preventDefault();
+            const removeIndex = Number(event.currentTarget.dataset.removeStageIndex);
+            if (Number.isFinite(removeIndex)) role.stages.splice(removeIndex, 1);
+            renderStateJournalDialog();
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderStateJournalSnapshotRows(role) {
+        const tbody = document.getElementById("state-journal-snapshot-table-body");
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        const fields = Array.isArray(role.snapshotFields) ? role.snapshotFields : [];
+        if (!fields.length) {
+          tbody.innerHTML = `<tr><td colspan="5"><div class="card-state-journal-empty">暂无状态快照字段。未配置时会回落到当前全局状态记录模板。</div></td></tr>`;
+          return;
+        }
+        fields.forEach((field, index) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="card-state-journal-check"><input type="checkbox" title="启用字段" ${field.enabled !== false ? "checked" : ""} data-field="enabled"></span></td>
+            <td><input class="card-state-journal-name-input" value="${escapeAttr(field.label || field.key)}" data-field="label"><details class="card-state-journal-advanced"><summary>高级</summary><label>Key<input class="card-state-journal-key-input" value="${escapeAttr(field.key)}" data-field="key"></label></details></td>
+            <td><span class="card-state-journal-check"><input type="checkbox" title="显示在状态记录" ${field.display !== false ? "checked" : ""} data-field="display"></span></td>
+            <td><input class="card-state-journal-wide-input" value="${escapeAttr(field.instruction || "")}" data-field="instruction"></td>
+            <td><button type="button" class="secondary compact" data-remove-snapshot-field-index="${index}">删除</button></td>
+          `;
+          tr.querySelectorAll("input").forEach((input) => input.addEventListener("change", () => {
+            const key = input.dataset.field;
+            if (["enabled", "display"].includes(key)) field[key] = input.checked;
+            else if (key === "key") field.key = slugifyStateJournalKey(input.value, field.key);
+            else field[key] = input.value.trim();
+            markCardDirty(); renderStateJournalDialog(); renderStateJournalPanel();
+          }));
+          tr.querySelector("[data-remove-snapshot-field-index]").addEventListener("click", (event) => {
+            event.preventDefault();
+            const removeIndex = Number(event.currentTarget.dataset.removeSnapshotFieldIndex);
+            if (Number.isFinite(removeIndex)) fields.splice(removeIndex, 1);
+            role.snapshotFields = fields;
+            renderStateJournalDialog();
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      async function detectStateJournalEnabled() {
+        try {
+          const data = await fetch("/mods/state-journal/app/api/config", { cache: "no-store" }).then((response) => response.ok ? response.json() : null);
+          stateJournalEnabled = Boolean(data?.config?.enabled);
+        } catch (_) {
+          stateJournalEnabled = false;
+        }
+        safeRenderStateJournalPanel();
+      }
+
+      function buildCardPayload() {
+        ensureStateJournalConfigReady();
+        const roleSourceSelect = document.getElementById("state-journal-role-source-mode");
+        if (roleSourceSelect) {
+          currentStateJournal.role_source_mode = normalizeStateJournalRoleSourceMode(roleSourceSelect.value);
+        }
+        ensureStateJournalRolesFromPersonas();
+        const personas = {};
+        personaGridEl.querySelectorAll(".persona-card").forEach((card) => {
+          const key = card.dataset.personaKey;
+          if (!key) return;
+          personas[key] = {
+            name: card.querySelector(`#persona-${key}-name`)?.value.trim() || "",
+            role_id: slugifyOptionalStateJournalKey(card.querySelector(`#persona-${key}-role-id`)?.value.trim() || ""),
+            aliases: parsePersonaAliases(card.querySelector(`#persona-${key}-aliases`)?.value || ""),
+            description: card.querySelector(`#persona-${key}-description`)?.value.trim() || "",
+            personality: card.querySelector(`#persona-${key}-personality`)?.value.trim() || "",
+            scenario: card.querySelector(`#persona-${key}-scenario`)?.value.trim() || "",
+            creator_notes: card.querySelector(`#persona-${key}-creator-notes`)?.value.trim() || "",
+          };
+        });
+        const creativeWorkshop = workshopRuleListEl
+          ? {
+              enabled: workshopEnabledEl?.checked !== false,
+              items: [],
+            }
+          : normalizeCreativeWorkshop(currentWorkshop || initialWorkshop);
+        if (workshopRuleListEl) {
+          workshopRuleListEl.querySelectorAll(".workshop-rule-card").forEach((card, index) => {
+            const itemId = String(card.querySelector(".workshop-rule-id")?.value || "").trim() || `workshop-item-${Date.now()}-${index}`;
+            creativeWorkshop.items.push({
+              id: itemId,
+              name: String(card.querySelector(".workshop-rule-name")?.value || "").trim() || `触发器 ${index + 1}`,
+              enabled: card.querySelector(".workshop-rule-enabled")?.checked !== false,
+              triggerMode: normalizeWorkshopTriggerMode(card.querySelector(".workshop-rule-trigger-mode")?.value || "stage"),
+              triggerStage: normalizeWorkshopStage(card.querySelector(".workshop-rule-trigger")?.value || "A"),
+              triggerTempMin: normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-min")?.value || initialWorkshopTemp, initialWorkshopTemp),
+              triggerTempMax: normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-max")?.value || initialWorkshopTemp, initialWorkshopTemp),
+              actionType: normalizeWorkshopActionType(card.querySelector(".workshop-rule-action")?.value),
+              popupTitle: String(card.querySelector(".workshop-rule-popup-title")?.value || "").trim(),
+              musicPreset: String(card.querySelector(".workshop-rule-preset")?.value || "off").trim() || "off",
+              musicUrl: String(card.querySelector(".workshop-rule-url")?.value || "").trim(),
+              autoplay: card.querySelector(".workshop-rule-autoplay")?.checked !== false,
+              loop: card.querySelector(".workshop-rule-loop")?.checked !== false,
+              volume: Math.min(Math.max(Number(card.querySelector(".workshop-rule-volume")?.value ?? 0.85) || 0.85, 0), 1),
+              imageUrl: String(card.querySelector(".workshop-rule-image-url")?.value || "").trim(),
+              imageAlt: String(card.querySelector(".workshop-rule-image-alt")?.value || "").trim(),
+              note: String(card.querySelector(".workshop-rule-note")?.value || "").trim(),
+            });
+          });
+        }
+        return {
+          name: value("card-name"),
+          description: value("card-description"),
+          personality: value("card-personality"),
+          first_mes: value("card-first-mes"),
+          mes_example: value("card-mes-example"),
+          scenario: value("card-scenario"),
+          creator_notes: value("card-creator-notes"),
+          creator_comment: value("card-creator-comment"),
+          tags: value("card-tags").split(",").map((item) => item.trim()).filter(Boolean),
+          personas,
+          stateJournal: stripStateJournalDraftIds(normalizeStateJournalConfig(ensureStateJournalConfigReady())),
+          creativeWorkshop,
+        };
+      }
+
+      function fillCardForm(card) {
+        if (!card) return;
+        document.getElementById("card-name").value = card.name || "";
+        document.getElementById("card-description").value = card.description || "";
+        document.getElementById("card-personality").value = card.personality || "";
+        document.getElementById("card-first-mes").value = card.first_mes || "";
+        document.getElementById("card-mes-example").value = card.mes_example || "";
+        document.getElementById("card-scenario").value = card.scenario || "";
+        document.getElementById("card-creator-notes").value = card.creator_notes || "";
+        document.getElementById("card-creator-comment").value = card.creator_comment || card.creatorComment || card.creator_summary || card.creatorSummary || "";
+        document.getElementById("card-tags").value = Array.isArray(card.tags) ? card.tags.join(", ") : "";
+        currentStateJournal = normalizeStateJournalConfig(card.stateJournal || {});
+
+        personaGridEl.innerHTML = "";
+        const personaEntries = Object.entries(card.personas || {}).sort((left, right) => {
+          const [leftKey] = left;
+          const [rightKey] = right;
+          const leftNumber = Number(leftKey);
+          const rightNumber = Number(rightKey);
+          if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+            return leftNumber - rightNumber;
+          }
+          return String(leftKey).localeCompare(String(rightKey), "zh-CN", { numeric: true });
+        });
+        if (personaEntries.length === 0) {
+          personaGridEl.appendChild(createPersonaBlock("1", {}));
+        } else {
+          personaEntries.forEach(([key, persona]) => {
+            personaGridEl.appendChild(createPersonaBlock(key, persona || {}));
+          });
+        }
+        fillWorkshopForm(card.creativeWorkshop);
+        safeRenderStateJournalPanel();
+      }
+
+      async function refreshCardList(selectedFilename = "") {
+        const data = await fetch("/api/cards").then((response) => response.json());
+        const select = document.getElementById("card-file-select");
+        const current = selectedFilename || select.value || "";
+        select.innerHTML = '<option value="">选择一个角色卡文件</option>';
+        for (const item of data.items || []) {
+          const option = document.createElement("option");
+          option.value = item.filename;
+          option.textContent = item.filename;
+          if (item.filename === current) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        }
+      }
+
+      function notifyWorkshopRoleCardChanged(reason, data = {}) {
+        try {
+          const payload = {
+            type: "role_card_loaded",
+            reason: reason || "card_config",
+            filename: data.filename || "",
+            workshop_preserved: Boolean(data.workshop_preserved),
+            at: Date.now(),
+          };
+          localStorage.setItem("fantareal:role_card_loaded", JSON.stringify(payload));
+        } catch (_) {}
+      }
+
+      async function saveCard() {
+        const filename = value("card-filename") || "role_card.json";
+        const card = buildCardPayload();
+        const data = await postJson("/api/cards/import", {
+          raw_json: JSON.stringify(card, null, 2),
+          filename,
+          apply_now: true,
+        });
+        const savedCard = data.card?.raw || data.card || card;
+        fillCardForm(savedCard);
+        document.getElementById("card-filename").value = data.filename || filename;
+        await refreshCardList(data.filename || filename);
+        applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("save", data);
+        const slotSummary = `当前角色卡记忆库：记忆 ${data.current_memory_count ?? 0} 条；世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
+        setStatus(data.workshop?.triggered
+          ? `角色卡已保存并加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`
+          : `角色卡已保存并加载：${data.filename}。${slotSummary}${preserveNote}`);
+      }
+
+      async function loadCard() {
+        const filename = value("card-file-select");
+        if (!filename) {
+          throw new Error("请先选择一个角色卡文件");
+        }
+        const data = await postJson("/api/cards/load", { filename });
+        const loadedCard = data.card?.raw || data.card || {};
+        document.getElementById("card-filename").value = data.filename || filename;
+        fillCardForm(loadedCard);
+        await refreshCardList(data.filename || filename);
+        applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("load", data);
+        const slotSummary = `当前角色卡记忆库：记忆 ${data.current_memory_count ?? 0} 条；世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        setStatus(data.workshop?.triggered
+          ? `角色卡已加载：${data.filename}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。`
+          : `角色卡已加载：${data.filename}。${slotSummary}`);
+      }
+
+      async function importLocalCardFile(file) {
+        if (!file) {
+          throw new Error("没有选择文件");
+        }
+
+        const rawText = await file.text();
+        if (!rawText || !rawText.trim()) {
+          throw new Error("所选文件内容为空");
+        }
+
+        const data = await postJson("/api/cards/import", {
+          raw_json: rawText,
+          filename: file.name || "imported_role_card.json",
+          apply_now: true,
+        });
+
+        const importedCard = data.card?.raw || data.card || {};
+        fillCardForm(importedCard);
+        document.getElementById("card-filename").value = data.filename || file.name || "imported_role_card.json";
+        await refreshCardList(data.filename || file.name || "");
+        applyBackground(data.current_background_image_url || "", data.current_background_overlay ?? currentOverlay);
+        notifyWorkshopRoleCardChanged("import", data);
+        const slotSummary = `当前角色卡记忆库：记忆 ${data.current_memory_count ?? 0} 条；世界书 ${data.current_worldbook_count ?? 0} 条。`;
+        const preserveNote = data.workshop_preserved ? " 已保留本地角色卡演出绑定。" : "";
+        setStatus(data.workshop?.triggered
+          ? `本地角色卡已导入：${data.filename || file.name}。${slotSummary} 演出工坊已进入 ${data.workshop.stage_label}。${preserveNote}`
+          : `本地角色卡已导入：${data.filename || file.name}。${slotSummary}${preserveNote}`);
+        return data;
+      }
+
+
+      document.getElementById("state-journal-refresh-roles")?.addEventListener("click", () => {
+        ensureStateJournalRolesFromPersonas();
+        safeRenderStateJournalPanel();
+        markCardDirty();
+      });
+      document.getElementById("state-journal-role-source-mode")?.addEventListener("change", (event) => {
+        ensureStateJournalConfigReady();
+        currentStateJournal.role_source_mode = normalizeStateJournalRoleSourceMode(event.target.value);
+        ensureStateJournalRolesFromPersonas();
+        safeRenderStateJournalPanel();
+        markCardDirty();
+      });
+      document.getElementById("state-journal-close-dialog")?.addEventListener("click", closeStateJournalRoleDialog);
+      document.getElementById("state-journal-cancel-dialog")?.addEventListener("click", closeStateJournalRoleDialog);
+      document.getElementById("state-journal-save-dialog")?.addEventListener("click", saveStateJournalRoleDialog);
+      document.getElementById("state-journal-role-dialog")?.addEventListener("click", (event) => {
+        if (event.target?.id === "state-journal-role-dialog") closeStateJournalRoleDialog();
+      });
+      document.getElementById("state-journal-condition-close")?.addEventListener("click", closeStateJournalStageConditionDialog);
+      document.getElementById("state-journal-condition-done")?.addEventListener("click", closeStateJournalStageConditionDialog);
+      document.getElementById("state-journal-condition-dialog")?.addEventListener("click", (event) => {
+        if (event.target?.id === "state-journal-condition-dialog") closeStateJournalStageConditionDialog();
+      });
+      document.getElementById("state-journal-tab-variables")?.addEventListener("click", () => setStateJournalDialogTab("variables"));
+      document.getElementById("state-journal-tab-stages")?.addEventListener("click", () => setStateJournalDialogTab("stages"));
+      document.getElementById("state-journal-tab-snapshot")?.addEventListener("click", () => setStateJournalDialogTab("snapshot"));
+      document.getElementById("state-journal-add-variable")?.addEventListener("click", () => {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        role.variables = role.variables || [];
+        const draftVariable = normalizeStateJournalVariable({ var_key: `var_${role.variables.length + 1}`, var_name: "新变量", default_value: 0, min_value: 0, max_value: 100, delta_min: -2, delta_max: 2 }, role.variables.length + 1);
+        draftVariable._tmp_id = createStateJournalTempId("var");
+        role.variables.push(draftVariable);
+        renderStateJournalDialog();
+      });
+      document.getElementById("state-journal-add-stage")?.addEventListener("click", () => {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        role.stages = role.stages || [];
+        const nextStageIndex = role.stages.length + 1;
+        const draftStage = normalizeStateJournalStage({ stage_key: defaultStateJournalStageKey(nextStageIndex), stage_name: defaultStateJournalStageName(nextStageIndex), priority: nextStageIndex * 10, conditions: [] }, role.role_id, nextStageIndex);
+        draftStage._tmp_id = createStateJournalTempId("stage");
+        role.stages.push(draftStage);
+        renderStateJournalDialog();
+      });
+      document.getElementById("state-journal-add-snapshot-field")?.addEventListener("click", () => {
+        const role = activeStateJournalRole();
+        if (!role) return;
+        role.snapshotFields = role.snapshotFields || [];
+        const next = role.snapshotFields.length + 1;
+        const draftField = normalizeStateJournalSnapshotField({ key: `snapshot_${next}`, label: "新快照字段", instruction: "根据本轮上下文生成该状态快照字段。" }, next);
+        draftField._tmp_id = createStateJournalTempId("snapshot");
+        role.snapshotFields.push(draftField);
+        renderStateJournalDialog();
+      });
+      ensureStateJournalConfigReady();
+      detectStateJournalEnabled();
+
+      document.getElementById("save-card").addEventListener("click", async () => {
+        try {
+          setStatus("正在保存并加载角色卡...", "saving");
+          await saveCard();
+        } catch (error) {
+          setStatus(`保存失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("load-card").addEventListener("click", async () => {
+        try {
+          setStatus("正在加载角色卡...", "saving");
+          await loadCard();
+        } catch (error) {
+          setStatus(`加载失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("refresh-cards").addEventListener("click", async () => {
+        try {
+          setStatus("正在刷新角色卡列表...", "saving");
+          await refreshCardList();
+          setStatus("角色卡列表已刷新。", "success");
+        } catch (error) {
+          setStatus(`刷新失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("import-local-card").addEventListener("click", () => {
+        document.getElementById("import-local-card-file").click();
+      });
+
+      function flashButtonFeedback(button, text = "已新增") {
+        if (!button) return;
+        const originalText = button.textContent;
+        button.classList.add("is-feedback");
+        button.textContent = text;
+        window.setTimeout(() => {
+          button.classList.remove("is-feedback");
+          button.textContent = originalText;
+        }, 950);
+      }
+
+      document.getElementById("add-persona").addEventListener("click", (event) => {
+        const key = getNextPersonaKey();
+        personaGridEl.appendChild(createPersonaBlock(key, {}));
+        setStatus(`已新增角色：personas.${key}`);
+        flashButtonFeedback(event.currentTarget, "已新增");
+      });
+
+      document.getElementById("add-workshop-rule")?.addEventListener("click", () => {
+        addWorkshopRuleToCurrentCard();
+      });
+
+      document.getElementById("collapse-workshop-rules")?.addEventListener("click", () => {
+        setAllWorkshopRulesCollapsed(true);
+        setStatus("已折叠全部演出工坊规则。");
+      });
+
+      document.getElementById("expand-workshop-rules")?.addEventListener("click", () => {
+        setAllWorkshopRulesCollapsed(false);
+        setStatus("已展开全部演出工坊规则。");
+      });
+
+      workshopEnabledEl?.addEventListener("change", () => {
+        if (currentWorkshop) {
+          currentWorkshop.enabled = workshopEnabledEl.checked;
+        }
+      });
+
+      workshopSearchEl?.addEventListener("input", applyWorkshopRuleSearch);
+
+      workshopRuleListEl?.addEventListener("input", (event) => {
+        const card = event.target.closest(".workshop-rule-card");
+        if (!card) return;
+        if (event.target.matches(".workshop-rule-name")) {
+          const title = card.querySelector(".workshop-rule-summary-title");
+          if (title) title.textContent = String(event.target.value || "").trim() || "未命名规则";
+        }
+        updateWorkshopRuleActionUI(card);
+        applyWorkshopRuleSearch();
+      });
+
+      workshopRuleListEl?.addEventListener("change", (event) => {
+        const card = event.target.closest(".workshop-rule-card");
+        if (!card) return;
+        if (event.target.matches(".workshop-rule-action")) {
+          updateWorkshopRuleActionUI(card);
+        }
+        if (event.target.matches(".workshop-rule-image-url")) {
+          updateWorkshopRuleActionUI(card);
+        }
+        if (event.target.matches(".workshop-rule-file")) {
+          handleWorkshopAssetSelection(card, String(event.target.dataset.workshopFileKind || "image"), event.target);
+          return;
+        }
+        applyWorkshopRuleSearch();
+      });
+
+      workshopRuleListEl?.addEventListener("click", (event) => {
+        const pickerButton = event.target.closest(".workshop-asset-pick");
+        if (pickerButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const card = pickerButton.closest(".workshop-rule-card");
+          if (!card) return;
+          const kind = String(pickerButton.dataset.workshopPickKind || "image");
+          const input = card.querySelector(`.workshop-rule-file[data-workshop-file-kind="${kind}"]`);
+          if (input) input.click();
+          return;
+        }
+
+        const removeButton = event.target.closest("[data-remove-workshop-rule]");
+        if (removeButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const card = removeButton.closest(".workshop-rule-card");
+          if (!card) return;
+          const targetIndex = Number(card.dataset.workshopIndex || "0");
+          if (String(card.querySelector(".workshop-rule-id")?.value || "").startsWith("workshop_stage_")) {
+            setStatus("固定阶段规则不能删除。");
+            return;
+          }
+          if (Number.isFinite(targetIndex)) {
+            (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+            setStatus("演出工坊规则已删除。");
+            applyWorkshopRuleSearch();
+            });
+          }
+          return;
+        }
+
+        const toggleButton = event.target.closest("[data-toggle-workshop-rule]");
+        if (toggleButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const card = toggleButton.closest(".workshop-rule-card");
+          const shell = card?.querySelector(".workshop-rule-shell");
+          if (!shell) return;
+          const collapsed = shell.dataset.collapsed === "true";
+          setWorkshopRuleCollapsed(shell, !collapsed);
+          return;
+        }
+
+        const summary = event.target.closest(".workshop-rule-summary");
+        if (summary) {
+          if (event.target.closest("button, input, select, textarea, label")) {
+            return;
+          }
+          const card = summary.closest(".workshop-rule-card");
+          const shell = card?.querySelector(".workshop-rule-shell");
+          if (!shell) return;
+          const collapsed = shell.dataset.collapsed === "true";
+          setWorkshopRuleCollapsed(shell, !collapsed);
+        }
+      });
+
+      document.getElementById("import-local-card-file").addEventListener("change", async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        try {
+          setStatus("正在导入本地角色卡...", "saving");
+          await importLocalCardFile(file);
+        } catch (error) {
+          setStatus(`导入失败：${error.message}`, "error");
+        } finally {
+          event.target.value = "";
+        }
+      });
+
+      document.getElementById("card-file-select").addEventListener("change", async (event) => {
+        if (!event.target.value) {
+          return;
+        }
+        try {
+          setStatus("正在加载角色卡...", "saving");
+          await loadCard();
+        } catch (error) {
+          setStatus(`加载失败：${error.message}`, "error");
+        }
+      });
+
+      document.getElementById("export-card").addEventListener("click", () => {
+        window.location.href = "/api/cards/export/current";
+      });
+
+      window.addEventListener("focus", () => {
+        refreshCardList().catch(() => {});
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          refreshCardList().catch(() => {});
+        }
+      });
+
+      document.querySelector(".card-builder")?.addEventListener("input", (event) => {
+        if (event.target.closest("button")) return;
+        markCardDirty();
+      });
+      document.querySelector(".card-builder")?.addEventListener("change", (event) => {
+        if (event.target.closest("button")) return;
+        markCardDirty();
+      });
+
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+      applyCardCanvasOpacity(cardCanvasFollowOpacityEl?.checked ?? initialCardCanvasFollowOpacity);
+      fillWorkshopForm(initialWorkshop);
+      refreshCardList(document.getElementById("card-filename").value).catch(() => {});
+    </script>
+  </body>
+</html>

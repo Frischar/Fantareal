@@ -1,0 +1,2122 @@
+import hashlib
+import json
+import re
+from io import BytesIO
+from datetime import datetime
+from pathlib import Path, PurePosixPath
+from typing import Any
+from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile
+import shutil
+import tempfile
+
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+
+from .memory_merge_logic import (
+    get_memory_outline,
+    get_merged_memories,
+    merge_memories_to_outline,
+    save_memory_outline,
+    save_merged_memories,
+)
+from .memory_worldbook_sync import (
+    apply_memory_worldbook_sync,
+    preview_memory_worldbook_sync,
+)
+
+from .app_models import (
+    DynamicWorldbookPreviewPayload,
+    JsonImportPayload,
+    MemoryListPayload,
+    MemoryMergePayload,
+    MemoryOutlineListPayload,
+    MemoryWorldbookSyncPayload,
+    MergedMemoryListPayload,
+    PersonaPayload,
+    PresetActionPayload,
+    PresetCreatePayload,
+    PresetImportPayload,
+    PresetStorePayload,
+    RoleCardLoadPayload,
+    RoleCardPayload,
+    SettingsPayload,
+    SpriteDeletePayload,
+    UserProfilePayload,
+    WorkshopEvaluatePayload,
+    WorkshopSavePayload,
+    WorkshopTriggeredScenePayload,
+    WorldbookPayload,
+    WorldbookSettingsPayload,
+)
+
+
+MAX_MEMORY_BUNDLE_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_MEMORY_BUNDLE_ENTRY_BYTES = 5 * 1024 * 1024
+MAX_MEMORY_BUNDLE_TOTAL_BYTES = 12 * 1024 * 1024
+MAX_MEMORY_BUNDLE_FILE_COUNT = 8
+MAX_CAMPAIGN_BUNDLE_UPLOAD_BYTES = 200 * 1024 * 1024
+WORKSHOP_MEDIA_MANIFEST = "media_manifest.json"
+WORKSHOP_MEDIA_PREFIXES = {
+    "/static/uploads/workshop/image/": "image",
+    "/static/uploads/workshop/music/": "music",
+}
+MEMORY_BUNDLE_ALLOWED_FILENAMES = {
+    "memories.json",
+    "merged_memories.json",
+    "memory_outline.json",
+    "README.txt",
+    "导出说明.txt",
+}
+
+
+def strip_json_comments(raw_text: str) -> str:
+    result: list[str] = []
+    in_string = False
+    escape = False
+    in_line_comment = False
+    in_block_comment = False
+    index = 0
+    while index < len(raw_text):
+        char = raw_text[index]
+        next_char = raw_text[index + 1] if index + 1 < len(raw_text) else ""
+        if in_line_comment:
+            if char == "\n":
+                in_line_comment = False
+                result.append(char)
+            index += 1
+            continue
+        if in_block_comment:
+            if char == "*" and next_char == "/":
+                in_block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if in_string:
+            result.append(char)
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            result.append(char)
+            index += 1
+            continue
+        if char == "/" and next_char == "/":
+            in_line_comment = True
+            index += 2
+            continue
+        if char == "/" and next_char == "*":
+            in_block_comment = True
+            index += 2
+            continue
+        result.append(char)
+        index += 1
+    return "".join(result)
+
+
+def parse_json_import_payload(raw_json: str, *, label: str) -> Any:
+    raw_text = str(raw_json or "").strip()
+    if not raw_text:
+        raise HTTPException(status_code=400, detail=f"{label} import content cannot be empty.")
+    try:
+        return json.loads(raw_text)
+    except ValueError as exc:
+        try:
+            return json.loads(strip_json_comments(raw_text))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"{label} JSON parse failed: {exc}") from exc
+
+
+def _normalize_card_runtime_key(value: Any, fallback: str = "global") -> str:
+    text = str(value or "").strip() or fallback
+    text = re.sub(r"\s+", "_", text.lower())
+    text = re.sub(r"[^a-z0-9_\-]+", "", text)
+    text = re.sub(r"[_\-]{2,}", "_", text).strip("_-")
+    return text or fallback
+
+
+def _workspace_card_identity_payload(card: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(card, dict):
+        return {}
+    source_name = Path(str(card.get("source_name", "")).strip()).name
+    raw_value = card.get("raw")
+    raw = raw_value if isinstance(raw_value, dict) else card
+    return {
+        "source_name": source_name,
+        "card_uid": card.get("card_uid", ""),
+        "raw": raw,
+    }
+
+
+def _extract_workspace_card_uid(card: dict[str, Any] | None) -> str:
+    if not isinstance(card, dict):
+        return ""
+    payload = _workspace_card_identity_payload(card)
+    raw = payload.get("raw", {}) if isinstance(payload.get("raw", {}), dict) else {}
+    state_journal = raw.get("stateJournal") if isinstance(raw.get("stateJournal"), dict) else {}
+    for value in (
+        payload.get("card_uid"),
+        state_journal.get("card_uid"),
+        raw.get("card_uid"),
+        raw.get("uid"),
+        raw.get("id"),
+        card.get("uid"),
+        card.get("id"),
+    ):
+        text = str(value or "").strip()
+        if text:
+            return _normalize_card_runtime_key(text, "global")
+    return ""
+
+
+def _legacy_workspace_card_uid(card: dict[str, Any] | None) -> str:
+    payload = _workspace_card_identity_payload(card)
+    raw = payload.get("raw", {}) if isinstance(payload.get("raw", {}), dict) else {}
+    fingerprint_payload = {
+        "source_name": Path(str(payload.get("source_name", "")).strip()).name,
+        "name": raw.get("name") or raw.get("role_name") or "",
+        "personas": raw.get("personas") if isinstance(raw.get("personas"), dict) else {},
+    }
+    digest = hashlib.sha1(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return f"card_{digest}"
+
+
+def _has_workspace_card_identity(card: dict[str, Any] | None) -> bool:
+    payload = _workspace_card_identity_payload(card)
+    raw = payload.get("raw", {}) if isinstance(payload.get("raw", {}), dict) else {}
+    return any(
+        str(value or "").strip()
+        for value in (
+            payload.get("source_name"),
+            raw.get("name"),
+            raw.get("role_name"),
+            raw.get("personas") if isinstance(raw.get("personas"), dict) else "",
+        )
+    )
+
+
+def resolve_workspace_import_card_uid(raw_card: dict[str, Any], existing_card: dict[str, Any] | None = None) -> str:
+    imported_uid = _extract_workspace_card_uid(raw_card)
+    if imported_uid:
+        return imported_uid
+    if _has_workspace_card_identity(raw_card):
+        return _legacy_workspace_card_uid(raw_card)
+    return _extract_workspace_card_uid(existing_card)
+
+
+def _stamp_workspace_card_uid(raw: dict[str, Any], card_uid: str) -> dict[str, Any]:
+    safe_uid = _normalize_card_runtime_key(card_uid, "")
+    if not isinstance(raw, dict) or not safe_uid:
+        return raw
+    raw["card_uid"] = safe_uid
+    state_journal = raw.get("stateJournal")
+    if isinstance(state_journal, dict):
+        state_journal["card_uid"] = safe_uid
+    return raw
+
+
+def _worldbook_field_present(row: dict[str, Any], key: str) -> bool:
+    if key not in row:
+        return False
+    value = row.get(key)
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return True
+
+
+def _normalize_import_worldbook_position(value: Any) -> str:
+    text = str(value if value is not None else "").strip().lower()
+    aliases = {
+        "0": "before_char_defs",
+        "1": "after_char_defs",
+        "4": "in_chat",
+        "before_character": "before_char_defs",
+        "before_char": "before_char_defs",
+        "after_character": "after_char_defs",
+        "after_char": "after_char_defs",
+        "depth": "in_chat",
+        "at_depth": "in_chat",
+        "in-chat": "in_chat",
+        "inchat": "in_chat",
+        "d_system": "at_depth_system",
+        "depth_system": "at_depth_system",
+        "at_depth_sys": "at_depth_system",
+        "d_user": "at_depth_user",
+        "depth_user": "at_depth_user",
+        "d_ai": "at_depth_assistant",
+        "d_assistant": "at_depth_assistant",
+        "depth_ai": "at_depth_assistant",
+        "depth_assistant": "at_depth_assistant",
+        "assistant": "at_depth_assistant",
+        "ai": "at_depth_assistant",
+    }
+    text = aliases.get(text, text)
+    valid = {
+        "before_char_defs",
+        "after_char_defs",
+        "in_chat",
+        "at_depth_system",
+        "at_depth_user",
+        "at_depth_assistant",
+    }
+    return text if text in valid else ""
+
+
+def _normalize_import_worldbook_role(value: Any) -> str:
+    text = str(value if value is not None else "").strip().lower()
+    aliases = {"0": "system", "1": "user", "2": "assistant", "ai": "assistant", "model": "assistant"}
+    text = aliases.get(text, text)
+    return text if text in {"system", "user", "assistant"} else ""
+
+
+def _apply_worldbook_import_options(
+    entries: list[Any],
+    *,
+    missing_injection_policy: str,
+    force_in_chat_depth: int,
+    force_injection_order: int | None,
+) -> list[Any]:
+    policy = str(missing_injection_policy or "follow_defaults").strip().lower()
+    if policy not in {"follow_defaults", "force_before_char_defs", "force_after_char_defs", "force_in_chat"}:
+        policy = "follow_defaults"
+
+    normalized_depth = max(0, min(int(force_in_chat_depth or 0), 999))
+    processed: list[Any] = []
+    for item in entries:
+        if not isinstance(item, dict):
+            processed.append(item)
+            continue
+
+        row = dict(item)
+        if not _worldbook_field_present(row, "insertion_position"):
+            if _worldbook_field_present(row, "insertionPosition"):
+                row["insertion_position"] = row.get("insertionPosition")
+            elif _worldbook_field_present(row, "position"):
+                row["insertion_position"] = row.get("position")
+        normalized_position = _normalize_import_worldbook_position(row.get("insertion_position"))
+        if normalized_position:
+            row["insertion_position"] = normalized_position
+
+        if not _worldbook_field_present(row, "injection_depth"):
+            if _worldbook_field_present(row, "injectionDepth"):
+                row["injection_depth"] = row.get("injectionDepth")
+            elif _worldbook_field_present(row, "depth"):
+                row["injection_depth"] = row.get("depth")
+
+        if not _worldbook_field_present(row, "injection_role"):
+            if _worldbook_field_present(row, "injectionRole"):
+                row["injection_role"] = row.get("injectionRole")
+            elif _worldbook_field_present(row, "role"):
+                row["injection_role"] = row.get("role")
+        normalized_role = _normalize_import_worldbook_role(row.get("injection_role"))
+        if normalized_role:
+            row["injection_role"] = normalized_role
+
+        if policy != "follow_defaults":
+            if not _worldbook_field_present(row, "insertion_position"):
+                if policy == "force_before_char_defs":
+                    row["insertion_position"] = "before_char_defs"
+                elif policy == "force_after_char_defs":
+                    row["insertion_position"] = "after_char_defs"
+                elif policy == "force_in_chat":
+                    row["insertion_position"] = "in_chat"
+
+            effective_position = str(row.get("insertion_position", "") or "").strip().lower()
+            if effective_position in {"in_chat", "at_depth_system", "at_depth_user", "at_depth_assistant"} and not _worldbook_field_present(row, "injection_depth"):
+                row["injection_depth"] = normalized_depth
+
+            if not _worldbook_field_present(row, "injection_role"):
+                row["injection_role"] = "system"
+
+            if force_injection_order is not None and not _worldbook_field_present(row, "injection_order"):
+                row["injection_order"] = force_injection_order
+
+        processed.append(row)
+    return processed
+
+
+def register_config_api_routes(app: FastAPI, *, ctx: Any) -> None:
+    def build_bundle_label() -> tuple[str, dict[str, Any], dict[str, Any]]:
+        current_card = ctx.get_current_card()
+        card = ctx.normalize_role_card(current_card.get("raw", {}))
+        has_card_content = bool(str(current_card.get("source_name", "")).strip()) or any(
+            str(value).strip() for value in card.values() if not isinstance(value, (dict, list))
+        )
+        if not has_card_content:
+            raise HTTPException(status_code=404, detail="当前人设卡尚未加载，无法导出存档包。")
+
+        display_name = (
+            str(card.get("name", "")).strip()
+            or str(ctx.get_persona().get("name", "")).strip()
+            or Path(str(current_card.get("source_name", "")).strip() or "当前角色").stem
+            or "当前角色"
+        )
+        safe_name = re.sub(r'[\\/:*?"<>|]+', "_", display_name).strip(" ._") or "当前角色"
+        return safe_name[:64], current_card, card
+
+    def parse_bundle_option(value: Any, default: bool = True) -> bool:
+        if value is None:
+            return default
+        return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+    def get_nested_value(payload: Any, path: str) -> Any:
+        current = payload
+        for part in path.split("."):
+            if isinstance(current, list):
+                if not part.isdigit():
+                    return None
+                index = int(part)
+                if index < 0 or index >= len(current):
+                    return None
+                current = current[index]
+                continue
+            if not isinstance(current, dict) or part not in current:
+                return None
+            current = current[part]
+        return current
+
+    def set_nested_value(payload: Any, path: str, value: Any) -> bool:
+        parts = path.split(".")
+        current = payload
+        for part in parts[:-1]:
+            if isinstance(current, list):
+                if not part.isdigit():
+                    return False
+                index = int(part)
+                if index < 0 or index >= len(current):
+                    return False
+                current = current[index]
+                continue
+            if not isinstance(current, dict) or part not in current:
+                return False
+            current = current[part]
+        final = parts[-1]
+        if isinstance(current, list):
+            if not final.isdigit():
+                return False
+            index = int(final)
+            if index < 0 or index >= len(current):
+                return False
+            current[index] = value
+            return True
+        if not isinstance(current, dict) or final not in current:
+            return False
+        current[final] = value
+        return True
+
+    def iter_workshop_media_fields(card: dict[str, Any]) -> list[tuple[str, str]]:
+        workshop = card.get("creativeWorkshop", {}) if isinstance(card, dict) else {}
+        if not isinstance(workshop, dict):
+            return []
+
+        fields: list[tuple[str, str]] = []
+        base_paths = [
+            "creativeWorkshop.opening.coverImage",
+            "creativeWorkshop.opening.musicUrl",
+            "creativeWorkshop.ambience.background.imageUrl",
+            "creativeWorkshop.ambience.music.url",
+            "creativeWorkshop.ambience.ambient.url",
+        ]
+        for path in base_paths:
+            value = get_nested_value(card, path)
+            if isinstance(value, str) and value.strip():
+                fields.append((path, value.strip()))
+
+        scenes = workshop.get("dynamicScenes", [])
+        if isinstance(scenes, list):
+            for index, _scene in enumerate(scenes):
+                for suffix in [
+                    "content.imageUrl",
+                    "content.soundUrl",
+                    "content.backgroundUrl",
+                    "audio.url",
+                ]:
+                    path = f"creativeWorkshop.dynamicScenes.{index}.{suffix}"
+                    value = get_nested_value(card, path)
+                    if isinstance(value, str) and value.strip():
+                        fields.append((path, value.strip()))
+        return fields
+
+    def classify_workshop_media_url(url: str) -> tuple[str, str] | None:
+        text = str(url or "").strip()
+        for prefix, kind in WORKSHOP_MEDIA_PREFIXES.items():
+            if text.startswith(prefix):
+                filename = text.removeprefix(prefix).strip()
+                if filename and "/" not in filename and "\\" not in filename:
+                    return kind, filename
+        return None
+
+    def workshop_media_zip_path(kind: str, filename: str) -> str:
+        safe_name = Path(str(filename or "")).name
+        normalized_kind = "image" if kind == "image" else "music"
+        return f"media/workshop/{normalized_kind}/{safe_name}"
+
+    def is_safe_workshop_media_zip_path(name: str, kind: str) -> bool:
+        if not name or "\\" in name or name.startswith("/") or re.match(r"^[A-Za-z]:", name):
+            return False
+        path = PurePosixPath(name)
+        parts = path.parts
+        if ".." in parts or len(parts) != 4:
+            return False
+        return parts[:3] == ("media", "workshop", "image" if kind == "image" else "music") and bool(parts[3])
+
+    def allowed_workshop_media_suffix(kind: str, filename: str) -> bool:
+        suffix = Path(str(filename or "")).suffix.lower()
+        allowed = ctx.ALLOWED_IMAGE_SUFFIXES if kind == "image" else ctx.ALLOWED_AUDIO_SUFFIXES
+        return suffix in allowed
+
+    def collect_workshop_media_for_export(card: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
+        items: list[dict[str, Any]] = []
+        skipped: list[str] = []
+        seen: set[str] = set()
+
+        for field_path, url in iter_workshop_media_fields(card):
+            classified = classify_workshop_media_url(url)
+            if not classified:
+                if url.startswith("/static/") or url.startswith("/assets/") or ":" in url or url.startswith("/"):
+                    skipped.append(f"{field_path}: 非可打包本地演出资源，已跳过（{url}）")
+                continue
+            kind, filename = classified
+            if not allowed_workshop_media_suffix(kind, filename):
+                skipped.append(f"{field_path}: 文件类型不支持，已跳过（{url}）")
+                continue
+            source = ctx.workshop_asset_dir(kind) / filename
+            try:
+                if not source.is_file():
+                    skipped.append(f"{field_path}: 文件不存在，已跳过（{url}）")
+                    continue
+                size = source.stat().st_size
+            except OSError:
+                skipped.append(f"{field_path}: 文件无法读取，已跳过（{url}）")
+                continue
+            if size > ctx.MAX_WORKSHOP_UPLOAD_SIZE_BYTES:
+                skipped.append(f"{field_path}: 文件超过 25 MB，已跳过（{url}）")
+                continue
+
+            zip_path = workshop_media_zip_path(kind, filename)
+            dedupe_key = f"{field_path}\0{zip_path}"
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            items.append(
+                {
+                    "field": field_path,
+                    "url": url,
+                    "kind": kind,
+                    "filename": filename,
+                    "zip_path": zip_path,
+                    "size": size,
+                    "source_path": source,
+                }
+            )
+        return items, skipped
+
+    def make_import_media_filename(original: str, existing_target: Path) -> str:
+        stem = ctx.sanitize_sprite_filename_tag(Path(original).stem) or "workshop_asset"
+        suffix = Path(original).suffix.lower()
+        if not existing_target.exists():
+            return existing_target.name
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        return f"{timestamp}_{uuid4().hex[:8]}_{stem}{suffix}"
+
+    def restore_workshop_media_from_bundle(archive: ZipFile, card: dict[str, Any]) -> dict[str, Any]:
+        summary: dict[str, Any] = {"restored": 0, "skipped": 0, "skipped_items": []}
+        if WORKSHOP_MEDIA_MANIFEST not in archive.namelist():
+            summary["available"] = False
+            return summary
+
+        summary["available"] = True
+        try:
+            manifest = json.loads(archive.read(WORKSHOP_MEDIA_MANIFEST).decode("utf-8"))
+        except Exception:
+            summary["skipped"] += 1
+            summary["skipped_items"].append("media_manifest.json 无法读取，已跳过媒体恢复。")
+            return summary
+
+        items = manifest.get("items", []) if isinstance(manifest, dict) else []
+        if not isinstance(items, list):
+            summary["skipped"] += 1
+            summary["skipped_items"].append("media_manifest.json 格式不正确，已跳过媒体恢复。")
+            return summary
+
+        names = set(archive.namelist())
+        restored_urls: dict[str, str] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                summary["skipped"] += 1
+                summary["skipped_items"].append("媒体清单项目格式不正确，已跳过。")
+                continue
+            field_path = str(item.get("field", "")).strip()
+            kind = str(item.get("kind", "")).strip().lower()
+            zip_path = str(item.get("zip_path", "")).strip()
+            original_name = Path(str(item.get("filename", "") or PurePosixPath(zip_path).name)).name
+            if kind not in {"image", "music"} or not field_path:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体清单项目缺少必要字段，已跳过（{zip_path or original_name}）。")
+                continue
+            if not is_safe_workshop_media_zip_path(zip_path, kind) or zip_path not in names:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体路径不安全或不存在，已跳过（{zip_path}）。")
+                continue
+            if not allowed_workshop_media_suffix(kind, original_name):
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体类型不支持，已跳过（{original_name}）。")
+                continue
+            if zip_path in restored_urls:
+                if set_nested_value(card, field_path, restored_urls[zip_path]):
+                    continue
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体已恢复但角色卡字段未能重写（{field_path}）。")
+                continue
+            info = archive.getinfo(zip_path)
+            if info.is_dir() or info.file_size > ctx.MAX_WORKSHOP_UPLOAD_SIZE_BYTES:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件超过 25 MB 或不是文件，已跳过（{zip_path}）。")
+                continue
+
+            try:
+                content = archive.read(zip_path)
+            except Exception:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件读取失败，已跳过（{zip_path}）。")
+                continue
+            if not content or len(content) > ctx.MAX_WORKSHOP_UPLOAD_SIZE_BYTES:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件为空或超过 25 MB，已跳过（{zip_path}）。")
+                continue
+
+            target_dir = ctx.workshop_asset_dir(kind)
+            target_dir.mkdir(parents=True, exist_ok=True)
+            target = target_dir / original_name
+            target_name = make_import_media_filename(original_name, target)
+            target = target_dir / target_name
+            try:
+                target.write_bytes(content)
+            except OSError:
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体文件写入失败，已跳过（{original_name}）。")
+                continue
+
+            new_url = ctx.workshop_asset_url(kind, target.name)
+            if not set_nested_value(card, field_path, new_url):
+                target.unlink(missing_ok=True)
+                summary["skipped"] += 1
+                summary["skipped_items"].append(f"媒体已恢复但角色卡字段未能重写（{field_path}）。")
+                continue
+            restored_urls[zip_path] = new_url
+            summary["restored"] += 1
+        return summary
+
+    @app.get("/api/user-profile")
+    async def api_get_user_profile() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {"active_slot": active_slot, "profile": ctx.get_user_profile(active_slot)}
+
+    @app.post("/api/user-profile")
+    async def api_save_user_profile(payload: UserProfilePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        profile = ctx.save_user_profile(payload.model_dump(), active_slot)
+        return {"ok": True, "active_slot": active_slot, "profile": profile}
+
+    @app.post("/api/user-avatar")
+    async def api_upload_user_avatar(file: UploadFile = File(...)) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        url = ctx.save_image_upload_for_slot(
+            file=file,
+            prefix="user_avatar",
+            empty_detail="User avatar upload cannot be empty.",
+            too_large_detail="User avatar cannot be larger than 10 MB.",
+            invalid_type_detail="User avatar only supports png / jpg / jpeg / webp / gif.",
+            save_failed_detail="User avatar save failed. Please check disk space or file permissions.",
+        )
+        profile = ctx.save_user_profile({"avatar_url": url}, active_slot)
+        return {"ok": True, "active_slot": active_slot, "profile": profile}
+
+    @app.post("/api/role-avatar")
+    async def api_upload_role_avatar(file: UploadFile = File(...)) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        url = ctx.save_image_upload_for_slot(
+            file=file,
+            prefix="role_avatar",
+            empty_detail="Role avatar upload cannot be empty.",
+            too_large_detail="Role avatar cannot be larger than 10 MB.",
+            invalid_type_detail="Role avatar only supports png / jpg / jpeg / webp / gif.",
+            save_failed_detail="Role avatar save failed. Please check disk space or file permissions.",
+        )
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "role_avatar_url": url,
+            "profile": ctx.get_user_profile(active_slot),
+        }
+
+    @app.get("/api/preset")
+    async def api_get_preset() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        store = ctx.get_preset_store(active_slot)
+        return {
+            "active_slot": active_slot,
+            "preset_store": store,
+            "active_preset": ctx.get_active_preset_from_store(store),
+            "preset_debug": ctx.build_preset_debug_payload(active_slot),
+        }
+
+    @app.get("/api/macro_variables/catalog")
+    async def api_macro_variables_catalog() -> dict[str, Any]:
+        return ctx.get_macro_catalog()
+
+    @app.post("/api/preset")
+    async def api_save_preset(payload: PresetStorePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        store = ctx.save_preset_store(payload.model_dump(exclude_none=True), active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "preset_store": store,
+            "active_preset": ctx.get_active_preset_from_store(store),
+            "preset_debug": ctx.build_preset_debug_payload(active_slot),
+        }
+
+    @app.post("/api/preset/create")
+    async def api_create_preset(payload: PresetCreatePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        store = ctx.create_preset_in_store(ctx.get_preset_store(active_slot), payload.name)
+        created_preset = store.get("presets", [])[-1] if store.get("presets") else {}
+        store = ctx.save_preset_store(store, active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "preset_store": store,
+            "active_preset": ctx.get_active_preset_from_store(store),
+            "created_preset_id": str(created_preset.get("id", "")).strip(),
+            "preset_debug": ctx.build_preset_debug_payload(active_slot),
+        }
+
+    @app.post("/api/preset/activate")
+    async def api_activate_preset(payload: PresetActionPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        store = ctx.activate_preset_in_store(ctx.get_preset_store(active_slot), payload.preset_id)
+        store = ctx.save_preset_store(store, active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "preset_store": store,
+            "active_preset": ctx.get_active_preset_from_store(store),
+            "preset_debug": ctx.build_preset_debug_payload(active_slot),
+        }
+
+    @app.post("/api/preset/duplicate")
+    async def api_duplicate_preset(payload: PresetActionPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        store = ctx.duplicate_preset_in_store(ctx.get_preset_store(active_slot), payload.preset_id)
+        duplicated_preset = store.get("presets", [])[-1] if store.get("presets") else {}
+        store = ctx.save_preset_store(store, active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "preset_store": store,
+            "active_preset": ctx.get_active_preset_from_store(store),
+            "duplicated_preset_id": str(duplicated_preset.get("id", "")).strip(),
+            "preset_debug": ctx.build_preset_debug_payload(active_slot),
+        }
+
+    @app.post("/api/preset/delete")
+    async def api_delete_preset(payload: PresetActionPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        store = ctx.delete_preset_from_store(ctx.get_preset_store(active_slot), payload.preset_id)
+        store = ctx.save_preset_store(store, active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "preset_store": store,
+            "active_preset": ctx.get_active_preset_from_store(store),
+            "preset_debug": ctx.build_preset_debug_payload(active_slot),
+        }
+
+    @app.get("/api/preset/export/current")
+    async def api_export_current_preset() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        preset = ctx.get_active_preset(active_slot)
+        if not isinstance(preset, dict):
+            raise HTTPException(status_code=404, detail="No current preset exists.")
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        safe_name = re.sub(r'[\\/:*?"<>|]+', "_", str(preset.get("name", "preset")).strip() or "preset")
+        filename = f"{safe_name}.preset.json"
+        target = ctx.EXPORT_DIR / filename
+        ctx.persist_json(target, preset, detail="Preset export failed. Please check disk space or file permissions.")
+        return FileResponse(target, media_type="application/json", filename=filename)
+
+    @app.post("/api/preset/import")
+    async def api_import_preset(payload: PresetImportPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        parsed = parse_json_import_payload(payload.raw_json, label="Preset")
+        current_store = ctx.get_preset_store(active_slot)
+        imported_store = ctx.sanitize_preset_store(parsed)
+        if isinstance(parsed, dict) and "presets" in parsed:
+            imported_presets = imported_store.get("presets", [])
+        else:
+            imported_presets = [ctx.get_active_preset_from_store(imported_store)]
+
+        existing_ids = {item.get("id") for item in current_store.get("presets", []) if isinstance(item, dict)}
+        added_ids: list[str] = []
+        for item in imported_presets:
+            if not isinstance(item, dict):
+                continue
+            cloned = json.loads(json.dumps(item, ensure_ascii=False))
+            preset_id = str(cloned.get("id", "")).strip()
+            if not preset_id or preset_id in existing_ids:
+                from .preset_rules import generate_preset_id
+
+                cloned["id"] = generate_preset_id()
+            existing_ids.add(cloned["id"])
+            current_store.setdefault("presets", []).append(cloned)
+            added_ids.append(cloned["id"])
+        if not added_ids:
+            raise HTTPException(status_code=400, detail="No preset content could be imported.")
+        if payload.activate_now:
+            current_store["active_preset_id"] = added_ids[-1]
+        store = ctx.save_preset_store(current_store, active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "preset_store": store,
+            "active_preset": ctx.get_active_preset_from_store(store),
+            "preset_debug": ctx.build_preset_debug_payload(active_slot),
+        }
+
+    @app.get("/api/persona")
+    async def api_get_persona() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return ctx.get_persona(active_slot)
+
+    @app.post("/api/persona")
+    async def api_save_persona(payload: PersonaPayload) -> dict[str, Any]:
+        ctx.persist_json(
+            ctx.global_persona_path(),
+            {
+                "name": payload.name.strip(),
+                "system_prompt": payload.system_prompt.strip(),
+                "greeting": payload.greeting.strip(),
+            },
+            detail="Persona settings save failed. Please check disk space or file permissions.",
+        )
+        return {"ok": True}
+
+    @app.get("/api/settings")
+    async def api_get_settings() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {
+            "active_slot": active_slot,
+            "slot_name": ctx.get_slot_name(active_slot),
+            "settings": ctx.get_settings(active_slot),
+        }
+
+    @app.post("/api/settings")
+    async def api_save_settings(payload: SettingsPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        raw_settings = payload.model_dump()
+        current_settings = ctx.get_settings(active_slot)
+        if "layered_prompt_injection_enabled" not in payload.model_fields_set:
+            raw_settings["layered_prompt_injection_enabled"] = current_settings.get(
+                "layered_prompt_injection_enabled",
+                False,
+            )
+        if "prompt_budget_token_limit" not in payload.model_fields_set:
+            raw_settings["prompt_budget_token_limit"] = current_settings.get(
+                "prompt_budget_token_limit",
+                200000,
+            )
+        if "performance_mode" not in payload.model_fields_set:
+            raw_settings["performance_mode"] = current_settings.get("performance_mode", False)
+        settings = ctx.sanitize_settings(raw_settings, strict=True, slot_id=active_slot)
+        ctx.persist_json(
+            ctx.settings_path(active_slot),
+            settings,
+            detail="Settings save failed. Please check disk space or file permissions.",
+        )
+        return {"ok": True, "settings": ctx.get_settings(active_slot), "active_slot": active_slot}
+
+    @app.get("/api/route-forwarding")
+    async def api_get_route_forwarding() -> dict[str, Any]:
+        return {
+            "ok": True,
+            "config": ctx.get_route_forwarding_config(),
+            "stats": ctx.get_route_forwarding_runtime_stats(),
+        }
+
+    @app.post("/api/route-forwarding")
+    async def api_save_route_forwarding(payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
+        config = ctx.save_route_forwarding_config(payload)
+        return {
+            "ok": True,
+            "config": config,
+            "stats": ctx.get_route_forwarding_runtime_stats(),
+        }
+
+    @app.post("/api/route-forwarding/test-provider")
+    async def api_test_route_forwarding_provider(payload: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
+        provider_id = str(payload.get("provider_id", "") or "").strip()
+        if not provider_id:
+            raise HTTPException(status_code=400, detail="Provider id is required.")
+        result = await ctx.test_route_forwarding_provider(provider_id)
+        return {
+            "ok": bool(result.get("ok")),
+            "result": result,
+            "stats": ctx.get_route_forwarding_runtime_stats(),
+        }
+
+    @app.get("/api/memories")
+    async def api_get_memories() -> list[dict[str, Any]]:
+        active_slot = ctx.get_active_slot_id()
+        return ctx.get_memories(active_slot)
+
+    @app.get("/api/memories/export")
+    async def api_export_memories() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        filename = "memories.json"
+        target = ctx.EXPORT_DIR / filename
+        ctx.persist_json(
+            target,
+            {"items": ctx.get_memories(active_slot)},
+            detail="Memory export failed. Please check disk space or file permissions.",
+        )
+        return FileResponse(path=target, filename=filename, media_type="application/json")
+
+    @app.post("/api/memories/import")
+    async def api_import_memories(payload: JsonImportPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        parsed = parse_json_import_payload(payload.raw_json, label="Memory")
+        raw_items = parsed
+        if isinstance(parsed, dict):
+            if isinstance(parsed.get("memories"), list):
+                raw_items = parsed["memories"]
+            elif isinstance(parsed.get("items"), list):
+                raw_items = parsed["items"]
+        if not isinstance(raw_items, list):
+            raise HTTPException(status_code=400, detail="Memory import JSON must contain an items array.")
+        memories = ctx.save_memories(raw_items, active_slot)
+        return {"ok": True, "items": memories}
+
+    @app.post("/api/memories")
+    async def api_save_memories(payload: MemoryListPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        memories = ctx.save_memories([item.model_dump() for item in payload.items], active_slot)
+        return {"ok": True, "items": memories}
+
+
+    @app.get("/api/memories/merged")
+    async def api_get_merged_memories() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {"ok": True, "items": get_merged_memories(ctx, active_slot), "active_slot": active_slot}
+
+    @app.post("/api/memories/merged")
+    async def api_save_merged_memories(payload: MergedMemoryListPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        items = save_merged_memories(ctx, [item.model_dump() for item in payload.items], active_slot)
+        return {"ok": True, "items": items, "active_slot": active_slot}
+
+    @app.get("/api/memories/merged/export")
+    async def api_export_merged_memories() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        filename = "merged_memories.json"
+        target = ctx.EXPORT_DIR / filename
+        ctx.persist_json(
+            target,
+            {"items": get_merged_memories(ctx, active_slot)},
+            detail="Merged memory export failed. Please check disk space or file permissions.",
+        )
+        return FileResponse(path=target, filename=filename, media_type="application/json")
+
+    @app.get("/api/memories/outline")
+    async def api_get_memory_outline() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {"ok": True, "items": get_memory_outline(ctx, active_slot), "active_slot": active_slot}
+
+    @app.post("/api/memories/outline")
+    async def api_save_memory_outline(payload: MemoryOutlineListPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        items = save_memory_outline(ctx, [item.model_dump() for item in payload.items], active_slot)
+        return {"ok": True, "items": items, "active_slot": active_slot}
+
+    @app.get("/api/memories/outline/export")
+    async def api_export_memory_outline() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        filename = "memory_outline.json"
+        target = ctx.EXPORT_DIR / filename
+        ctx.persist_json(
+            target,
+            {"items": get_memory_outline(ctx, active_slot)},
+            detail="Memory outline export failed. Please check disk space or file permissions.",
+        )
+        return FileResponse(path=target, filename=filename, media_type="application/json")
+
+
+    @app.get("/api/memories/export-bundle")
+    async def api_export_memory_bundle() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"memory_bundle_{timestamp}.zip"
+        target = ctx.EXPORT_DIR / filename
+
+        memories_payload = {"items": ctx.get_memories(active_slot)}
+        merged_payload = {"items": get_merged_memories(ctx, active_slot)}
+        outline_payload = {"items": get_memory_outline(ctx, active_slot)}
+        manifest_lines = [
+            "记忆完整导出包",
+            "",
+            "1. memories.json：原记忆区条目",
+            "2. merged_memories.json：合并后的记忆",
+            "3. memory_outline.json：大纲表",
+            "",
+            f"导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"活动存档：{active_slot}",
+        ]
+
+        try:
+            with ZipFile(target, "w", compression=ZIP_DEFLATED) as archive:
+                archive.writestr("memories.json", json.dumps(memories_payload, ensure_ascii=False, indent=2))
+                archive.writestr("merged_memories.json", json.dumps(merged_payload, ensure_ascii=False, indent=2))
+                archive.writestr("memory_outline.json", json.dumps(outline_payload, ensure_ascii=False, indent=2))
+                archive.writestr("导出说明.txt", "\n".join(manifest_lines))
+        except OSError as exc:
+            ctx.logger.exception("Memory bundle export failed: %s", target)
+            raise HTTPException(
+                status_code=500,
+                detail="Memory bundle export failed. Please check disk space or file permissions.",
+            ) from exc
+
+        return FileResponse(path=target, filename=filename, media_type="application/zip")
+
+    @app.post("/api/memories/import-bundle")
+    async def api_import_memory_bundle(file: UploadFile = File(...)) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        filename = Path(file.filename or "").name.lower()
+        if not filename.endswith(".zip"):
+            raise HTTPException(status_code=400, detail="完整记忆包必须是 .zip 文件。")
+
+        raw_bytes = await file.read(MAX_MEMORY_BUNDLE_UPLOAD_BYTES + 1)
+        if not raw_bytes:
+            raise HTTPException(status_code=400, detail="完整记忆包不能为空。")
+        if len(raw_bytes) > MAX_MEMORY_BUNDLE_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="完整记忆包不能大于 10 MB。")
+
+        def validate_bundle_archive(archive: ZipFile) -> None:
+            file_infos = [info for info in archive.infolist() if not info.is_dir()]
+            if len(file_infos) > MAX_MEMORY_BUNDLE_FILE_COUNT:
+                raise HTTPException(status_code=400, detail="完整记忆包内文件数量过多。")
+
+            total_size = 0
+            seen_entry_names: set[str] = set()
+            for info in file_infos:
+                raw_name = str(info.filename or "")
+                normalized_name = raw_name.replace("\\", "/").strip("/")
+                entry_name = Path(normalized_name).name
+                if normalized_name != entry_name:
+                    raise HTTPException(status_code=400, detail=f"完整记忆包不能包含子目录文件：{raw_name}")
+                if entry_name in seen_entry_names:
+                    raise HTTPException(status_code=400, detail=f"完整记忆包包含重复文件：{entry_name}")
+                seen_entry_names.add(entry_name)
+                if entry_name not in MEMORY_BUNDLE_ALLOWED_FILENAMES:
+                    raise HTTPException(status_code=400, detail=f"完整记忆包包含不支持的文件：{entry_name or info.filename}")
+                if info.file_size > MAX_MEMORY_BUNDLE_ENTRY_BYTES:
+                    raise HTTPException(status_code=413, detail=f"{entry_name} 不能大于 5 MB。")
+                total_size += int(info.file_size)
+
+            if total_size > MAX_MEMORY_BUNDLE_TOTAL_BYTES:
+                raise HTTPException(status_code=413, detail="完整记忆包解压后内容不能大于 12 MB。")
+
+        def payload_items(payload: Any) -> list[Any]:
+            if isinstance(payload, dict):
+                if isinstance(payload.get("items"), list):
+                    return payload["items"]
+                if isinstance(payload.get("memories"), list):
+                    return payload["memories"]
+                if isinstance(payload.get("merged_memories"), list):
+                    return payload["merged_memories"]
+                if isinstance(payload.get("memory_outline"), list):
+                    return payload["memory_outline"]
+            if isinstance(payload, list):
+                return payload
+            return []
+
+        def read_bundle_json(archive: ZipFile, entry_name: str) -> list[Any]:
+            candidates = [name for name in archive.namelist() if Path(name).name == entry_name]
+            if not candidates:
+                return []
+            try:
+                with archive.open(candidates[0]) as handle:
+                    entry_bytes = handle.read(MAX_MEMORY_BUNDLE_ENTRY_BYTES + 1)
+                    if len(entry_bytes) > MAX_MEMORY_BUNDLE_ENTRY_BYTES:
+                        raise HTTPException(status_code=413, detail=f"{entry_name} 不能大于 5 MB。")
+                    payload = json.loads(entry_bytes.decode("utf-8-sig"))
+            except (OSError, UnicodeDecodeError, ValueError) as exc:
+                raise HTTPException(status_code=400, detail=f"完整记忆包中的 {entry_name} 读取失败。") from exc
+            return payload_items(payload)
+
+        def clone_rows(rows: list[Any]) -> list[dict[str, Any]]:
+            cloned: list[dict[str, Any]] = []
+            for row in rows:
+                if isinstance(row, dict):
+                    cloned.append(json.loads(json.dumps(row, ensure_ascii=False)))
+            return cloned
+
+        def ensure_unique_ids(
+            rows: list[dict[str, Any]],
+            existing_ids: set[str],
+            *,
+            prefix: str,
+        ) -> tuple[list[dict[str, Any]], dict[str, str]]:
+            id_map: dict[str, str] = {}
+            normalized: list[dict[str, Any]] = []
+            for row in rows:
+                item = dict(row)
+                old_id = str(item.get("id", "") or "").strip()
+                new_id = old_id
+                if not new_id or new_id in existing_ids:
+                    new_id = f"{prefix}-{uuid4().hex[:10]}"
+                item["id"] = new_id
+                existing_ids.add(new_id)
+                if old_id:
+                    id_map[old_id] = new_id
+                normalized.append(item)
+            return normalized, id_map
+
+        try:
+            with ZipFile(BytesIO(raw_bytes), "r") as archive:
+                validate_bundle_archive(archive)
+                imported_memories_raw = read_bundle_json(archive, "memories.json")
+                imported_merged_raw = read_bundle_json(archive, "merged_memories.json")
+                imported_outline_raw = read_bundle_json(archive, "memory_outline.json")
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="完整记忆包 ZIP 读取失败，请确认文件格式正确。") from exc
+
+        if not any([imported_memories_raw, imported_merged_raw, imported_outline_raw]):
+            raise HTTPException(status_code=400, detail="完整记忆包中没有可导入的记忆数据。")
+
+        current_memories = clone_rows(ctx.get_memories(active_slot))
+        current_merged = clone_rows(get_merged_memories(ctx, active_slot))
+        current_outline = clone_rows(get_memory_outline(ctx, active_slot))
+
+        imported_memories, memory_id_map = ensure_unique_ids(
+            clone_rows(imported_memories_raw),
+            {str(item.get("id", "")) for item in current_memories if isinstance(item, dict)},
+            prefix="memory-import",
+        )
+        imported_merged, _ = ensure_unique_ids(
+            clone_rows(imported_merged_raw),
+            {str(item.get("id", "")) for item in current_merged if isinstance(item, dict)},
+            prefix="merged-import",
+        )
+        imported_outline, _ = ensure_unique_ids(
+            clone_rows(imported_outline_raw),
+            {str(item.get("id", "")) for item in current_outline if isinstance(item, dict)},
+            prefix="outline-import",
+        )
+
+        def remap_source_ids(rows: list[dict[str, Any]]) -> None:
+            for row in rows:
+                source_ids = row.get("source_memory_ids")
+                if isinstance(source_ids, list):
+                    row["source_memory_ids"] = [memory_id_map.get(str(item), str(item)) for item in source_ids]
+
+        remap_source_ids(imported_merged)
+        remap_source_ids(imported_outline)
+
+        memories = ctx.save_memories(current_memories + imported_memories, active_slot)
+        merged_items = save_merged_memories(ctx, current_merged + imported_merged, active_slot)
+        outline_items = save_memory_outline(ctx, current_outline + imported_outline, active_slot)
+
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "imported": {
+                "memories": len(imported_memories),
+                "merged_memories": len(imported_merged),
+                "memory_outline": len(imported_outline),
+            },
+            "items": memories,
+            "merged_items": merged_items,
+            "outline_items": outline_items,
+        }
+
+    @app.post("/api/memories/merge")
+    async def api_merge_memories(payload: MemoryMergePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return await merge_memories_to_outline(
+            ctx,
+            payload.memory_ids,
+            merged_title=payload.merged_title,
+            outline_title=payload.outline_title,
+            delete_sources=payload.delete_sources,
+            source_action=payload.source_action,
+            slot_id=active_slot,
+            runtime_overrides=payload.runtime_config,
+        )
+
+    @app.post("/api/memories/worldbook-sync/preview")
+    async def api_preview_memory_worldbook_sync(payload: MemoryWorldbookSyncPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return preview_memory_worldbook_sync(ctx, payload.model_dump(), active_slot)
+
+    @app.post("/api/memories/worldbook-sync/apply")
+    async def api_apply_memory_worldbook_sync(payload: MemoryWorldbookSyncPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return apply_memory_worldbook_sync(ctx, payload.model_dump(), active_slot)
+
+    @app.get("/api/worldbook")
+    async def api_get_worldbook() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        store = ctx.get_worldbook_store(active_slot)
+        return {"items": store["entries"], "settings": store["settings"]}
+
+    @app.get("/api/worldbook/export")
+    async def api_export_worldbook() -> FileResponse:
+        active_slot = ctx.get_active_slot_id()
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        filename = "worldbook.json"
+        target = ctx.EXPORT_DIR / filename
+        ctx.persist_json(
+            target,
+            ctx.get_worldbook_store(active_slot),
+            detail="Worldbook export failed. Please check disk space or file permissions.",
+        )
+        return FileResponse(path=target, filename=filename, media_type="application/json")
+
+    @app.post("/api/worldbook/import")
+    async def api_import_worldbook(payload: JsonImportPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        parsed = parse_json_import_payload(payload.raw_json, label="Worldbook")
+        raw_store = parsed
+        if isinstance(parsed, dict) and "worldbook" in parsed:
+            raw_store = parsed["worldbook"]
+        if isinstance(raw_store, dict) and "items" in raw_store and "entries" not in raw_store:
+            raw_store = {
+                "settings": raw_store.get("settings", {}),
+                "entries": raw_store.get("items", []),
+            }
+
+        current_store = ctx.get_worldbook_store(active_slot)
+        current_settings = current_store.get("settings", {})
+
+        if isinstance(raw_store, dict):
+            import_settings = raw_store.get("settings", {})
+            import_entries = raw_store.get("entries", [])
+        elif isinstance(raw_store, list):
+            import_settings = {}
+            import_entries = raw_store
+        else:
+            import_settings = {}
+            import_entries = []
+
+        effective_entries = _apply_worldbook_import_options(
+            import_entries if isinstance(import_entries, list) else [],
+            missing_injection_policy=payload.missing_injection_policy,
+            force_in_chat_depth=payload.force_in_chat_depth,
+            force_injection_order=payload.force_injection_order,
+        )
+
+        store_to_save = {
+            "settings": import_settings if payload.apply_settings else current_settings,
+            "entries": effective_entries,
+        }
+        saved_store = ctx.save_worldbook_store(store_to_save, active_slot)
+        return {"ok": True, "items": saved_store["entries"], "settings": saved_store["settings"]}
+
+    @app.post("/api/worldbook")
+    async def api_save_worldbook(payload: WorldbookPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        existing_store = ctx.get_worldbook_store(active_slot)
+        existing_entries = existing_store["entries"]
+        merged_items: list[dict[str, Any]] = []
+        for index, item in enumerate(payload.items, start=1):
+            row = item.model_dump(exclude_unset=True)
+            trigger = str(row.get("trigger", "") or "").strip()
+            content = str(row.get("content", "") or "").strip()
+            entry_type = str(row.get("entry_type", "") or "").strip() or "keyword"
+            row_id = str(row.get("id", "") or "").strip()
+            previous = next((entry for entry in existing_entries if row_id and str(entry.get("id", "")).strip() == row_id), None)
+            if previous is None:
+                previous = next((entry for entry in existing_entries if trigger and str(entry.get("trigger", "")).strip() == trigger), {})
+            effective_trigger = trigger or str(previous.get("trigger", "")).strip()
+            effective_content = content or str(previous.get("content", "")).strip()
+            activation_tags = row.get("activation_tags") if isinstance(row.get("activation_tags"), list) else previous.get("activation_tags", [])
+            if entry_type == "external_tag":
+                has_external_ref = isinstance(row.get("external_ref"), dict) and bool(row.get("external_ref"))
+                if not effective_content or (not activation_tags and not has_external_ref):
+                    continue
+            elif not effective_trigger or not effective_content:
+                continue
+
+            merged = dict(previous)
+            if row.get("id"):
+                merged["id"] = row.get("id")
+            else:
+                merged.setdefault("id", f"worldbook-{index}")
+            merged["title"] = str(row.get("title", "") or merged.get("title", f"词条 {index}")).strip() or f"词条 {index}"
+            merged["trigger"] = effective_trigger
+            merged["secondary_trigger"] = str(
+                row.get("secondary_trigger", merged.get("secondary_trigger", ""))
+            ).strip()
+            merged["content"] = effective_content
+            for key in [
+                "enabled",
+                "priority",
+                "case_sensitive",
+                "whole_word",
+                "match_mode",
+                "secondary_mode",
+                "comment",
+                "group",
+                "entry_type",
+                "group_operator",
+                "chance",
+                "sticky_turns",
+                "cooldown_turns",
+                "order",
+                "insertion_position",
+                "injection_depth",
+                "injection_role",
+                "injection_order",
+                "prompt_layer",
+                "recursive_enabled",
+                "prevent_further_recursion",
+                "external_source",
+                "external_ref",
+                "activation_tags",
+                "metadata",
+            ]:
+                if key in row:
+                    merged[key] = row[key]
+            merged_items.append(merged)
+
+        store_to_save = {
+            "settings": payload.settings.model_dump() if payload.settings is not None else existing_store["settings"],
+            "entries": merged_items,
+        }
+        saved_store = ctx.save_worldbook_store(store_to_save, active_slot)
+        return {"ok": True, "items": saved_store["entries"], "settings": saved_store["settings"]}
+
+    @app.get("/api/worldbook/settings")
+    async def api_get_worldbook_settings() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {"settings": ctx.get_worldbook_settings(active_slot)}
+
+    @app.post("/api/worldbook/settings")
+    async def api_save_worldbook_settings(payload: WorldbookSettingsPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        settings = ctx.save_worldbook_settings(payload.model_dump(), active_slot)
+        return {"ok": True, "settings": settings}
+
+    @app.get("/api/worldbook/entries")
+    async def api_get_worldbook_entries() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {
+            "items": ctx.get_worldbook_entries(active_slot),
+            "settings": ctx.get_worldbook_settings(active_slot),
+        }
+
+    @app.post("/api/worldbook/entries")
+    async def api_save_worldbook_entries(payload: WorldbookPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        items = ctx.save_worldbook_entries([item.model_dump() for item in payload.items], active_slot)
+        return {"ok": True, "items": items, "settings": ctx.get_worldbook_settings(active_slot)}
+
+    @app.post("/api/worldbook/dynamic-preview")
+    async def api_preview_dynamic_worldbook(payload: DynamicWorldbookPreviewPayload) -> dict[str, Any]:
+        effective_payload = payload.model_copy(
+            update={"slot_id": payload.slot_id or ctx.get_active_slot_id()}
+        )
+        preview = ctx.slot_runtime_service.build_slot_injection_payload(effective_payload)
+        return {"ok": True, **preview}
+
+    @app.get("/api/sprites")
+    async def api_get_sprites() -> dict[str, Any]:
+        return {
+            "active_slot": ctx.get_active_slot_id(),
+            "base_path": ctx.default_sprite_base_path_for_slot(),
+            "items": ctx.list_sprite_assets(),
+        }
+
+    @app.post("/api/sprites")
+    async def api_upload_sprite(
+        tag: str = Form(""),
+        file: UploadFile = File(...),
+    ) -> dict[str, Any]:
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix not in ctx.ALLOWED_IMAGE_SUFFIXES:
+            raise HTTPException(status_code=400, detail="Only png / jpg / jpeg / webp / gif sprites are supported.")
+        if file.content_type and not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Uploaded sprite must be an image file.")
+
+        content = await file.read(ctx.MAX_BACKGROUND_UPLOAD_SIZE_BYTES + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded sprite cannot be empty.")
+        if len(content) > ctx.MAX_BACKGROUND_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Sprite image cannot be larger than 30 MB.")
+
+        active_slot = ctx.get_active_slot_id()
+        directory = ctx.sprite_dir_path()
+        directory.mkdir(parents=True, exist_ok=True)
+
+        normalized_tag = ctx.sanitize_sprite_filename_tag(tag) or ctx.sanitize_sprite_filename_tag(Path(file.filename or "").stem)
+        if not normalized_tag:
+            raise HTTPException(status_code=400, detail="Please provide a valid sprite tag.")
+
+        for existing in directory.glob(f"{normalized_tag}.*"):
+            if existing.is_file() and existing.suffix.lower() in ctx.ALLOWED_IMAGE_SUFFIXES:
+                existing.unlink(missing_ok=True)
+
+        target = directory / f"{normalized_tag}{suffix}"
+        try:
+            target.write_bytes(content)
+        except OSError as exc:
+            ctx.logger.exception("Sprite write failed: %s", target)
+            raise HTTPException(
+                status_code=500,
+                detail="Sprite save failed. Please check disk space or file permissions.",
+            ) from exc
+
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "base_path": ctx.default_sprite_base_path_for_slot(),
+            "uploaded": {
+                "filename": target.name,
+                "tag": normalized_tag,
+                "url": f"{ctx.default_sprite_base_path_for_slot()}/{target.name}",
+            },
+            "items": ctx.list_sprite_assets(),
+        }
+
+    @app.post("/api/sprites/delete")
+    async def api_delete_sprite(payload: SpriteDeletePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        filename = Path(str(payload.filename or "")).name
+        if not filename:
+            raise HTTPException(status_code=400, detail="Sprite filename is required.")
+
+        target = ctx.sprite_dir_path() / filename
+        if not target.exists() or not target.is_file():
+            raise HTTPException(status_code=404, detail="Sprite file not found.")
+        if target.suffix.lower() not in ctx.ALLOWED_IMAGE_SUFFIXES:
+            raise HTTPException(status_code=400, detail="Unsupported sprite file type.")
+
+        try:
+            target.unlink()
+        except OSError as exc:
+            ctx.logger.exception("Sprite delete failed: %s", target)
+            raise HTTPException(status_code=500, detail="Sprite delete failed. Please check file permissions.") from exc
+
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "base_path": ctx.default_sprite_base_path_for_slot(),
+            "items": ctx.list_sprite_assets(),
+        }
+
+    @app.get("/api/cards")
+    async def api_get_cards() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        return {
+            "items": ctx.list_role_card_files(),
+            "current_card": ctx.get_current_card(active_slot),
+            "workshop_state": ctx.get_workshop_state(active_slot),
+        }
+
+    def workshop_has_effective_binding(raw: Any) -> bool:
+        workshop = ctx.sanitize_creative_workshop(raw)
+        opening = workshop.get("opening", {}) if isinstance(workshop, dict) else {}
+        ambience = workshop.get("ambience", {}) if isinstance(workshop, dict) else {}
+        scenes = workshop.get("dynamicScenes", []) if isinstance(workshop, dict) else []
+
+        opening_bound = bool(
+            isinstance(opening, dict)
+            and opening.get("enabled") is True
+            and any(str(opening.get(key, "")).strip() for key in ["title", "subtitle", "coverImage", "musicUrl"])
+        )
+        ambience_background = ambience.get("background", {}) if isinstance(ambience, dict) else {}
+        ambience_music = ambience.get("music", {}) if isinstance(ambience, dict) else {}
+        ambience_ambient = ambience.get("ambient", {}) if isinstance(ambience, dict) else {}
+        ambience_bound = bool(
+            isinstance(ambience, dict)
+            and ambience.get("enabled") is True
+            and (
+                (isinstance(ambience_background, dict) and ambience_background.get("enabled") is True and str(ambience_background.get("imageUrl", "")).strip())
+                or (isinstance(ambience_music, dict) and ambience_music.get("enabled") is True and (str(ambience_music.get("url", "")).strip() or str(ambience_music.get("preset", "off")).strip().lower() not in {"", "off"}))
+                or (isinstance(ambience_ambient, dict) and ambience_ambient.get("enabled") is True and (str(ambience_ambient.get("url", "")).strip() or str(ambience_ambient.get("preset", "off")).strip().lower() not in {"", "off"}))
+            )
+        )
+        return bool(opening_bound or ambience_bound or (isinstance(scenes, list) and len(scenes) > 0))
+
+    def normalize_card_filename(filename: str, fallback_name: str = "role_card") -> str:
+        name = Path(str(filename or "").strip() or f"{fallback_name}.json").name
+        if not name.lower().endswith(tuple(ctx.ROLE_CARD_EXTENSIONS)):
+            name += ".json"
+        return name
+
+    def read_existing_role_card_for_workshop(filename: str) -> dict[str, Any] | None:
+        target = ctx.CARDS_DIR / Path(filename).name
+        if not target.exists() or target.suffix.lower() not in ctx.ROLE_CARD_EXTENSIONS:
+            return None
+        try:
+            return ctx.parse_role_card_json(ctx.read_role_card_text(target))
+        except Exception:
+            return None
+
+    def preserve_existing_workshop_when_importing(card: dict[str, Any], filename: str) -> tuple[dict[str, Any], bool]:
+        if workshop_has_effective_binding(card.get("creativeWorkshop", {})):
+            return card, False
+
+        existing = read_existing_role_card_for_workshop(filename)
+        if isinstance(existing, dict) and workshop_has_effective_binding(existing.get("creativeWorkshop", {})):
+            merged = dict(card)
+            merged["creativeWorkshop"] = existing.get("creativeWorkshop", {})
+            return merged, True
+
+        current_card = ctx.get_current_card(ctx.get_active_slot_id())
+        current_raw = current_card.get("raw", {}) if isinstance(current_card, dict) else {}
+        current_source = Path(str(current_card.get("source_name", "")).strip()).name if isinstance(current_card, dict) else ""
+        if (
+            isinstance(current_raw, dict)
+            and current_source
+            and current_source == Path(filename).name
+            and workshop_has_effective_binding(current_raw.get("creativeWorkshop", {}))
+        ):
+            merged = dict(card)
+            merged["creativeWorkshop"] = current_raw.get("creativeWorkshop", {})
+            return merged, True
+
+        return card, False
+
+    @app.post("/api/cards/import")
+    async def api_import_card(payload: RoleCardPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        card = ctx.parse_role_card_json(payload.raw_json)
+        filename = normalize_card_filename(payload.filename.strip() or f"{card.get('name', 'role_card')}.json")
+        card, workshop_preserved = preserve_existing_workshop_when_importing(card, filename)
+
+        ctx.persist_json(
+            ctx.CARDS_DIR / filename,
+            card,
+            detail="Card save failed: could not write to the cards directory.",
+        )
+
+        result: dict[str, Any] = {"ok": True, "filename": filename, "workshop_preserved": workshop_preserved}
+        if payload.apply_now:
+            result.update(ctx.apply_role_card(card, source_name=filename, slot_id=active_slot))
+            result["workshop"] = ctx.evaluate_creative_workshop(slot_id=active_slot, reason="load")
+        result["card"] = card
+        return result
+
+    @app.post("/api/cards/load")
+    async def api_load_card(payload: RoleCardLoadPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        filename = Path(payload.filename).name
+        target = ctx.CARDS_DIR / filename
+        if not target.exists():
+            raise HTTPException(status_code=404, detail="The requested card file was not found.")
+        if target.suffix.lower() not in ctx.ROLE_CARD_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="Card files must use the .json or .txt extension.")
+
+        raw_text = ctx.read_role_card_text(target)
+        card = ctx.parse_role_card_json(raw_text)
+        result = ctx.apply_role_card(card, source_name=filename, slot_id=active_slot)
+        result["workshop"] = ctx.evaluate_creative_workshop(slot_id=active_slot, reason="load")
+        result.update({"ok": True, "filename": filename, "card": card})
+        return result
+
+    @app.get("/api/cards/export/current")
+    async def api_export_current_card() -> FileResponse:
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        current_card = ctx.get_current_card()
+        card = current_card.get("raw", {})
+        if not isinstance(card, dict) or not any(
+            str(value).strip() for value in card.values() if not isinstance(value, (dict, list))
+        ):
+            raise HTTPException(status_code=404, detail="The current card is missing or not loaded yet.")
+
+        source_name = Path(str(current_card.get("source_name", "")).strip() or "role_card_export.json").name
+        if not source_name.lower().endswith(".json"):
+            source_name += ".json"
+        export_path = ctx.EXPORT_DIR / source_name
+        ctx.persist_json(
+            export_path,
+            ctx.normalize_role_card(card),
+            detail="Current card export failed. Please check file permissions.",
+        )
+        return FileResponse(
+            path=export_path,
+            filename=source_name,
+            media_type="application/json",
+        )
+
+    @app.get("/api/export/current-bundle")
+    async def api_export_current_bundle(
+        memories: str | None = "1",
+        worldbook: str | None = "1",
+        preset: str | None = "1",
+        media: str | None = "1",
+    ) -> FileResponse:
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        bundle_label, current_card, card = build_bundle_label()
+        export_path = ctx.EXPORT_DIR / f"{bundle_label}存档.zip"
+
+        include_memories = parse_bundle_option(memories, True)
+        include_worldbook = parse_bundle_option(worldbook, True)
+        include_preset = parse_bundle_option(preset, True)
+        include_media = parse_bundle_option(media, True)
+
+        manifest_lines = [
+            f"导出角色：{bundle_label}",
+            "",
+            f"1. {bundle_label}的人设卡.json",
+        ]
+        if include_memories:
+            manifest_lines.append(f"2. {bundle_label}的记忆.json")
+        if include_worldbook:
+            manifest_lines.append(f"3. {bundle_label}的世界书.json")
+        if include_preset:
+            manifest_lines.append(f"4. {bundle_label}的预设.json")
+        manifest_lines.extend(
+            [
+                "",
+                f"原始角色卡文件：{str(current_card.get('source_name', '')).strip() or '未命名角色卡'}",
+                f"导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            ]
+        )
+
+        media_items: list[dict[str, Any]] = []
+        media_skipped: list[str] = []
+        if include_media:
+            media_items, media_skipped = collect_workshop_media_for_export(card)
+            total_media_size = sum(int(item.get("size", 0) or 0) for item in media_items)
+            manifest_lines.extend(
+                [
+                    "",
+                    f"已打包本地演出资源：{len({item['zip_path'] for item in media_items})} 个，共 {total_media_size / 1024 / 1024:.2f} MB",
+                ]
+            )
+            if media_skipped:
+                manifest_lines.append("以下本地演出资源未打包：")
+                manifest_lines.extend(f"- {item}" for item in media_skipped)
+        else:
+            manifest_lines.extend(["", "本次未勾选本地演出资源，封面、背景和音乐文件不会随包迁移。"])
+
+        try:
+            with ZipFile(export_path, "w", compression=ZIP_DEFLATED) as archive:
+                archive.writestr(
+                    f"{bundle_label}的人设卡.json",
+                    json.dumps(card, ensure_ascii=False, indent=2),
+                )
+                if include_memories:
+                    archive.writestr(
+                        f"{bundle_label}的记忆.json",
+                        json.dumps({"items": ctx.get_memories(ctx.get_active_slot_id())}, ensure_ascii=False, indent=2),
+                    )
+                if include_worldbook:
+                    archive.writestr(
+                        f"{bundle_label}的世界书.json",
+                        json.dumps(ctx.get_worldbook_store(), ensure_ascii=False, indent=2),
+                    )
+                if include_preset:
+                    archive.writestr(
+                        f"{bundle_label}的预设.json",
+                        json.dumps(ctx.get_preset_store(), ensure_ascii=False, indent=2),
+                    )
+                if include_media and media_items:
+                    manifest_items = [
+                        {key: value for key, value in item.items() if key != "source_path"}
+                        for item in media_items
+                    ]
+                    archive.writestr(
+                        WORKSHOP_MEDIA_MANIFEST,
+                        json.dumps({"version": 1, "items": manifest_items}, ensure_ascii=False, indent=2),
+                    )
+                    written_paths: set[str] = set()
+                    for item in media_items:
+                        zip_path = str(item.get("zip_path", ""))
+                        if zip_path in written_paths:
+                            continue
+                        written_paths.add(zip_path)
+                        archive.write(item["source_path"], zip_path)
+                archive.writestr(
+                    f"{bundle_label}的导出说明.txt",
+                    "\n".join(manifest_lines),
+                )
+        except OSError as exc:
+            ctx.logger.exception("Bundle export failed: %s", export_path)
+            raise HTTPException(
+                status_code=500,
+                detail="存档压缩包导出失败，请检查磁盘空间或文件权限。",
+            ) from exc
+
+        return FileResponse(
+            path=export_path,
+            filename=export_path.name,
+            media_type="application/zip",
+        )
+
+    @app.post("/api/import/bundle")
+    async def api_import_bundle(
+        file: UploadFile = File(...),
+        overwrite: str | None = None,
+    ) -> dict[str, Any]:
+        """导入四卡完整存档 ZIP 包"""
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix != ".zip":
+            raise HTTPException(status_code=400, detail="请选择 .zip 格式的存档文件。")
+
+        active_slot = ctx.get_active_slot_id()
+
+        tmp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                tmp_path = Path(tmp.name)
+                total = 0
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_CAMPAIGN_BUNDLE_UPLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="文件大小不能超过 200 MB。")
+                    tmp.write(chunk)
+
+            with ZipFile(tmp_path) as archive:
+                namelist = archive.namelist()
+
+                def read_json(name: str) -> dict[str, Any] | None:
+                    try:
+                        return json.loads(archive.read(name).decode("utf-8"))
+                    except Exception:
+                        return None
+
+                role_card = None
+                memories_payload = None
+                worldbook_payload = None
+                preset_payload = None
+
+                for name in namelist:
+                    if "人设卡" in name and name.endswith(".json"):
+                        role_card = read_json(name)
+                    elif "记忆" in name and name.endswith(".json"):
+                        memories_payload = read_json(name)
+                    elif "世界书" in name and name.endswith(".json"):
+                        worldbook_payload = read_json(name)
+                    elif "预设" in name and name.endswith(".json"):
+                        preset_payload = read_json(name)
+
+                if role_card is None:
+                    raise HTTPException(status_code=400, detail="存档包中未找到人设卡文件。")
+
+                source_name = "imported_bundle.json"
+                for name in namelist:
+                    if name.endswith(".json") and "人设卡" in name:
+                        source_name = normalize_card_filename(Path(name).name)
+                        break
+
+                target_card_path = ctx.CARDS_DIR / Path(source_name).name
+                if target_card_path.exists() and overwrite != "1":
+                    return {
+                        "ok": False,
+                        "conflict": True,
+                        "card_name": source_name,
+                        "detail": f"角色卡列表中已存在「{source_name}」，是否覆盖？",
+                    }
+
+                media_summary = restore_workshop_media_from_bundle(archive, role_card)
+
+                if isinstance(worldbook_payload, dict):
+                    ctx.save_worldbook_store(worldbook_payload, active_slot)
+
+                if isinstance(preset_payload, dict):
+                    ctx.save_preset_store(preset_payload, active_slot)
+
+                card_to_apply, workshop_preserved = preserve_existing_workshop_when_importing(role_card, source_name)
+
+                result = ctx.apply_role_card(card_to_apply, source_name=source_name, slot_id=active_slot)
+
+                if isinstance(memories_payload, dict) and "items" in memories_payload:
+                    ctx.save_memories(memories_payload.get("items", []), active_slot)
+                elif isinstance(memories_payload, list):
+                    ctx.save_memories(memories_payload, active_slot)
+                ctx.persist_json(
+                    target_card_path,
+                    result.get("card", {}).get("raw", card_to_apply),
+                    detail="保存导入的角色卡到卡片目录失败。",
+                )
+                result["workshop"] = ctx.evaluate_creative_workshop(slot_id=active_slot, reason="import")
+                result["ok"] = True
+                result["workshop_preserved"] = workshop_preserved
+                result["imported_files"] = {
+                    "role_card": source_name,
+                    "memories": bool(memories_payload),
+                    "worldbook": bool(worldbook_payload),
+                    "preset": bool(preset_payload),
+                    "media": media_summary,
+                }
+                return result
+
+        except HTTPException:
+            raise
+        except Exception as exc:
+            ctx.logger.exception("Bundle import failed")
+            raise HTTPException(status_code=500, detail=f"导入存档失败：{exc}") from exc
+        finally:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+
+    @app.get("/api/logs/export")
+    async def api_export_logs() -> FileResponse:
+        ctx.EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+        ctx.flush_log_handlers()
+        source_path = Path(ctx.log_file_path)
+        if not source_path.exists() or source_path.stat().st_size <= 0:
+            raise HTTPException(status_code=404, detail="当前还没有可导出的日志。")
+
+        filename = f"fantareal_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        export_path = ctx.EXPORT_DIR / filename
+        try:
+            shutil.copyfile(source_path, export_path)
+        except OSError as exc:
+            ctx.logger.exception("Log export failed: %s", export_path)
+            raise HTTPException(
+                status_code=500,
+                detail="日志导出失败，请检查磁盘空间或文件权限。",
+            ) from exc
+
+        return FileResponse(path=export_path, filename=filename, media_type="text/plain")
+
+    def workshop_card_binding_summary(workshop: dict[str, Any], current_card: dict[str, Any] | None = None) -> dict[str, Any]:
+        opening = workshop.get("opening", {}) if isinstance(workshop, dict) else {}
+        ambience = workshop.get("ambience", {}) if isinstance(workshop, dict) else {}
+        scenes = workshop.get("dynamicScenes", []) if isinstance(workshop, dict) else []
+        opening_bound = bool(isinstance(opening, dict) and opening.get("enabled"))
+        ambience_bound = bool(isinstance(ambience, dict) and ambience.get("enabled"))
+        dynamic_count = len(scenes) if isinstance(scenes, list) else 0
+        card_name = ""
+        if isinstance(current_card, dict):
+            card_name = str(current_card.get("source_name") or current_card.get("name") or "").strip()
+        return {
+            "source": "current_card",
+            "card_name": card_name,
+            "has_binding": bool(opening_bound or ambience_bound or dynamic_count > 0),
+            "bound_parts": {
+                "opening": opening_bound,
+                "ambience": ambience_bound,
+                "dynamic": dynamic_count > 0,
+            },
+            "dynamic_count": dynamic_count,
+            "scope": ["opening", "ambience", "dynamicScenes"],
+            "resource_mode": "reference_only",
+        }
+
+    def workshop_status_payload(active_slot: str | None = None) -> dict[str, Any]:
+        if active_slot is None:
+            active_slot = ctx.get_active_slot_id()
+        current_card = ctx.get_current_card(active_slot)
+        workshop = ctx.sanitize_creative_workshop(current_card.get("raw", {}).get("creativeWorkshop", {}))
+        state = ctx.get_workshop_state(active_slot)
+        stage = ctx.get_workshop_stage(state.get("temp", 0))
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "current_card": current_card,
+            "workshop": workshop,
+            "state": state,
+            "stage": stage,
+            "stage_label": ctx.get_workshop_stage_label(stage),
+            "signature": ctx.workshop_signature(current_card, workshop, stage),
+            "binding": workshop_card_binding_summary(workshop, current_card),
+        }
+
+    @app.get("/api/workshop/status")
+    async def api_get_workshop_status() -> dict[str, Any]:
+        return workshop_status_payload()
+
+    @app.post("/api/workshop/save")
+    async def api_save_workshop(payload: WorkshopSavePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        result = ctx.save_workshop_card(payload.creativeWorkshop, slot_id=active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "current_card": result["current_card"],
+            "card": result["card"],
+            "workshop": result["workshop"],
+            "state": result["workshop_state"],
+            "binding": workshop_card_binding_summary(result["workshop"], result["current_card"]),
+        }
+
+    @app.post("/api/workshop/triggered-scene")
+    async def api_mark_workshop_triggered_scene(payload: WorkshopTriggeredScenePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        token = str(payload.token or "").strip()[:240]
+        if not token:
+            raise HTTPException(status_code=400, detail="Missing triggered scene token.")
+        state = ctx.get_workshop_state(active_slot)
+        triggered = state.get("triggered_scenes", [])
+        if not isinstance(triggered, list):
+            triggered = []
+        normalized = []
+        for item in triggered:
+            value = str(item or "").strip()
+            if value and value not in normalized:
+                normalized.append(value)
+        if token not in normalized:
+            normalized.append(token)
+        state["triggered_scenes"] = normalized[-256:]
+        saved_state = ctx.save_workshop_state(state, active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "token": token,
+            "scene_id": str(payload.scene_id or "").strip()[:80],
+            "reason": str(payload.reason or "dynamic_scene").strip()[:80],
+            "state": saved_state,
+        }
+
+    @app.post("/api/workshop/clear-card-binding")
+    async def api_clear_workshop_card_binding() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        result = ctx.save_workshop_card(ctx.sanitize_creative_workshop({}), slot_id=active_slot)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "current_card": result["current_card"],
+            "card": result["card"],
+            "workshop": result["workshop"],
+            "state": result["workshop_state"],
+            "binding": workshop_card_binding_summary(result["workshop"], result["current_card"]),
+        }
+
+    @app.post("/api/workshop/evaluate")
+    async def api_evaluate_workshop(payload: WorkshopEvaluatePayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        if payload.advance_temp:
+            state = ctx.get_workshop_state(active_slot)
+            state["temp"] = max(0, int(state.get("temp", 0) or 0) + 1)
+            state["pending_temp"] = state["temp"]
+            ctx.save_workshop_state(state, active_slot)
+        workshop = ctx.evaluate_creative_workshop(slot_id=active_slot, reason=payload.reason)
+        return {
+            "ok": True,
+            "active_slot": active_slot,
+            "workshop": workshop,
+            "state": ctx.get_workshop_state(active_slot),
+        }
+
+    @app.post("/api/background")
+    async def api_upload_background(file: UploadFile = File(...)) -> dict[str, Any]:
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix not in ctx.ALLOWED_IMAGE_SUFFIXES:
+            raise HTTPException(status_code=400, detail="Only png / jpg / jpeg / webp / gif images are supported.")
+        if file.content_type and not file.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="The uploaded file must be an image.")
+
+        content = await file.read(ctx.MAX_BACKGROUND_UPLOAD_SIZE_BYTES + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file cannot be empty.")
+        if len(content) > ctx.MAX_BACKGROUND_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Background image cannot be larger than 30 MB.")
+
+        ctx.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        filename = f"bg_{datetime.now().strftime('%Y%m%d_%H%M%S')}{suffix}"
+        target = ctx.UPLOAD_DIR / filename
+        try:
+            target.write_bytes(content)
+        except OSError as exc:
+            ctx.logger.exception("Background image write failed: %s", target)
+            raise HTTPException(
+                status_code=500,
+                detail="Background image save failed. Please check disk space or file permissions.",
+            ) from exc
+
+        return {"ok": True, "url": f"/static/uploads/{filename}"}
+
+    @app.post("/api/font")
+    async def api_upload_font(file: UploadFile = File(...)) -> dict[str, Any]:
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix not in ctx.ALLOWED_FONT_SUFFIXES:
+            raise HTTPException(status_code=400, detail="Only .ttf, .otf, .woff, .woff2 fonts are supported.")
+
+        content = await file.read(ctx.MAX_FONT_UPLOAD_SIZE_BYTES + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file cannot be empty.")
+        if len(content) > ctx.MAX_FONT_UPLOAD_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Font file cannot be larger than 5 MB.")
+
+        ctx.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        filename = f"font_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}{suffix}"
+        target = ctx.UPLOAD_DIR / filename
+        try:
+            target.write_bytes(content)
+        except OSError as exc:
+            ctx.logger.exception("Font file write failed: %s", target)
+            raise HTTPException(
+                status_code=500,
+                detail="Font file save failed. Please check disk space or file permissions.",
+            ) from exc
+
+        font_name = Path(file.filename or "CustomFont").stem
+        return {"ok": True, "url": f"/static/uploads/{filename}", "font_name": font_name}
+
+    @app.post("/api/workshop/upload")
+    async def api_upload_workshop_asset(
+        kind: str = Form("image"),
+        file: UploadFile = File(...),
+    ) -> dict[str, Any]:
+        return await ctx.save_workshop_asset_upload(kind=kind, file=file)
+
+    @app.get("/api/workspace/export")
+    async def api_export_workspace_bundle() -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        current_card = ctx.get_current_card(active_slot)
+        card = ctx.normalize_role_card(current_card.get("raw", {}))
+        settings = ctx.get_settings(active_slot)
+        safe_settings = {k: v for k, v in settings.items() if "api_key" not in k and "base_url" not in k}
+
+        return {
+            "version": 1,
+            "exported_at": datetime.now().isoformat(timespec="seconds"),
+            "source": "pc",
+            "persona": ctx.get_persona(active_slot),
+            "current_card": current_card,
+            "memories": ctx.get_memories(active_slot),
+            "worldbook": ctx.get_worldbook_store(active_slot),
+            "preset_store": ctx.get_preset_store(active_slot),
+            "workshop_state": ctx.get_workshop_state(active_slot),
+            "user_profile": ctx.get_user_profile(active_slot),
+            "messages": ctx.get_conversation(active_slot),
+            "settings": safe_settings,
+        }
+
+    @app.post("/api/workspace/import")
+    async def api_import_workspace_bundle(payload: JsonImportPayload) -> dict[str, Any]:
+        active_slot = ctx.get_active_slot_id()
+        parsed = parse_json_import_payload(payload.raw_json, label="Workspace")
+
+        if not isinstance(parsed, dict):
+            raise HTTPException(status_code=400, detail="Workspace bundle must be a JSON object.")
+
+        raw_persona = parsed.get("persona")
+        if isinstance(raw_persona, dict):
+            persona_payload = {
+                "name": str(raw_persona.get("name", "")).strip(),
+                "system_prompt": str(raw_persona.get("system_prompt", "")).strip(),
+                "greeting": str(raw_persona.get("greeting", "")).strip(),
+            }
+            ctx.persist_json(
+                ctx.global_persona_path(),
+                persona_payload,
+                detail="Workspace import failed: could not save persona.",
+            )
+
+        raw_card = parsed.get("current_card")
+        if isinstance(raw_card, dict):
+            existing_card = ctx.read_json(ctx.current_card_path(), {})
+            merged_card = {**existing_card, **raw_card} if isinstance(existing_card, dict) else dict(raw_card)
+            merged_raw = merged_card.get("raw", {}) if isinstance(merged_card.get("raw", {}), dict) else {}
+            card_uid = resolve_workspace_import_card_uid(
+                raw_card,
+                existing_card if isinstance(existing_card, dict) else None,
+            )
+            merged_card["card_uid"] = card_uid
+            if isinstance(merged_raw, dict) and card_uid:
+                merged_card["raw"] = _stamp_workspace_card_uid(dict(merged_raw), card_uid)
+            ctx.persist_json(
+                ctx.current_card_path(),
+                merged_card,
+                detail="Workspace import failed: could not save current card.",
+            )
+
+        memories = parsed.get("memories")
+        if isinstance(memories, list):
+            ctx.save_memories(memories, active_slot)
+
+        worldbook = parsed.get("worldbook")
+        if isinstance(worldbook, dict):
+            ctx.save_worldbook_store(worldbook, active_slot)
+
+        preset_store = parsed.get("preset_store")
+        if isinstance(preset_store, dict):
+            ctx.save_preset_store(preset_store, active_slot)
+
+        workshop_state = parsed.get("workshop_state")
+        if isinstance(workshop_state, dict):
+            ctx.save_workshop_state(workshop_state, active_slot)
+
+        user_profile = parsed.get("user_profile")
+        if isinstance(user_profile, dict):
+            ctx.save_user_profile(user_profile, active_slot)
+
+        messages = parsed.get("messages")
+        if isinstance(messages, list):
+            ctx.persist_json(
+                ctx.conversation_path(active_slot),
+                messages,
+                detail="Workspace import failed: could not save conversation.",
+            )
+
+        settings = parsed.get("settings")
+        if isinstance(settings, dict):
+            ctx.persist_json(
+                ctx.settings_path(active_slot),
+                ctx.sanitize_settings(settings, slot_id=active_slot),
+                detail="Workspace import failed: could not save settings.",
+            )
+
+        return {"ok": True, "active_slot": active_slot}
+
+    @app.post("/api/models")
+    async def api_get_models() -> dict[str, Any]:
+        llm_config = ctx.get_runtime_chat_config()
+        models = await ctx.fetch_available_models(
+            base_url=str(llm_config["base_url"] or "").strip(),
+            api_key=str(llm_config["api_key"] or "").strip(),
+            request_timeout=int(llm_config["request_timeout"]),
+        )
+        current_model = str(llm_config.get("model", "")).strip()
+        preferred = current_model if current_model in models else (models[0] if models else "")
+        return {
+            "ok": True,
+            "items": models,
+            "current_model": current_model,
+            "preferred_model": preferred,
+        }
+
+    @app.post("/api/test-connection")
+    async def api_test_connection() -> dict[str, Any]:
+        llm_config = ctx.get_runtime_chat_config()
+        if not (llm_config["base_url"] and llm_config["model"]):
+            raise HTTPException(status_code=400, detail="Please enter both the chat API URL and model name first.")
+
+        reply = await ctx.request_minimal_model_reply()
+        return {"ok": True, "reply": reply.get("reply", ""), "sprite_tag": reply.get("sprite_tag", "")}
+
+    @app.post("/api/test-embedding")
+    async def api_test_embedding() -> dict[str, Any]:
+        embedding = ctx.get_runtime_embedding_config()
+        if not (embedding["base_url"] and embedding["model"]):
+            raise HTTPException(status_code=400, detail="Please enter both the embedding API URL and model name first.")
+
+        vectors = await ctx.fetch_embeddings(["connection test", "vector search"])
+        if not vectors:
+            raise HTTPException(status_code=502, detail="The embedding model did not return any vectors.")
+
+        return {"ok": True, "dimension": len(vectors[0]), "count": len(vectors)}

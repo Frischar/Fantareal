@@ -1,0 +1,400 @@
+/* Force PE/mobile shell when pages are opened from /mobile with ?mobile=1. */
+html:has(body.force-mobile-shell) {
+  min-height: 100%;
+  overflow-x: hidden;
+  background: var(--bg, #0f1419);
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) {
+  width: 100% !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-bottom: var(--pe-bottom-nav-total, 96px) !important;
+  overflow-x: hidden !important;
+  box-shadow: none !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack {
+  position: static !important;
+  width: 100% !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar {
+  position: static !important;
+  inset: auto !important;
+  top: auto !important;
+  width: 100% !important;
+  height: 0 !important;
+  min-height: auto !important;
+  padding: 0 !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topbar-left,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topbar-left {
+  display: none !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand {
+  width: auto !important;
+  min-height: 56px !important;
+  padding: 8px 10px !important;
+  border-radius: 15px !important;
+  font-size: 22px !important;
+  white-space: nowrap !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .brand::before {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  flex-basis: 38px !important;
+  border-radius: 11px !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topnav,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .topnav-grouped,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .topbar-stack > .topbar .standalone-about {
+  display: none !important;
+}
+
+body.force-mobile-shell .pe-bottom-nav {
+  position: fixed !important;
+  left: 12px !important;
+  right: 12px !important;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  z-index: 260 !important;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  grid-auto-columns: minmax(0, 1fr) !important;
+  gap: 6px !important;
+  align-items: stretch !important;
+  padding: 8px !important;
+  border: 1px solid var(--pe-border, rgba(148, 163, 184, 0.26)) !important;
+  border-radius: 28px !important;
+  background: color-mix(in srgb, var(--pe-surface, var(--panel-strong, #17202a)) 92%, transparent 8%) !important;
+  box-shadow: var(--pe-shadow, 0 18px 44px rgba(0, 0, 0, 0.22)) !important;
+  backdrop-filter: blur(22px) saturate(1.08);
+  -webkit-backdrop-filter: blur(22px) saturate(1.08);
+}
+
+body.force-mobile-shell .pe-bottom-link {
+  width: auto !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
+  min-height: 60px !important;
+  display: grid !important;
+  place-items: center !important;
+  gap: 4px !important;
+  padding: 6px 4px !important;
+  border-radius: 22px !important;
+  color: var(--muted) !important;
+  text-decoration: none !important;
+  background: transparent !important;
+  transition: background 0.16s ease, color 0.16s ease !important;
+}
+
+body.force-mobile-shell .pe-bottom-link.active {
+  color: var(--text) !important;
+  background: color-mix(in srgb, var(--accent) 14%, var(--input-bg) 86%) !important;
+}
+
+body.force-mobile-shell .pe-bottom-icon {
+  width: 26px !important;
+  height: 26px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent 84%) !important;
+}
+
+body.force-mobile-shell .pe-bottom-label {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+  white-space: nowrap !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-shell,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-shell.wide,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .welcome-shell {
+  width: calc(100% - 16px) !important;
+  max-width: 1480px !important;
+  margin: 0 auto !important;
+  padding: 12px 0 calc(var(--pe-bottom-nav-total, 96px) + 14px) !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  overflow: visible !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .slot-toolbar {
+  margin: 12px 8px 0 !important;
+  padding: 14px 16px !important;
+  border-radius: var(--pe-card-radius, 22px) !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-actions {
+  position: static !important;
+  margin: 12px 8px 0 !important;
+  padding: 14px 16px !important;
+  min-height: 0 !important;
+  border-radius: var(--pe-card-radius, 22px) !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-actions,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-buttons,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-actions,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .card-workbench-actions,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .button-row {
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-sticky-buttons button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-actions button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-actions select,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .card-workbench-actions button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .button-row button,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .button-row a {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-workbench-shell,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .user-workbench-shell.user-layout-a,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .user-workbench-shell.user-layout-b,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .card-editor-layout,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-two,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-three,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-four,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .grid-two-uneven {
+  grid-template-columns: 1fr !important;
+  gap: 14px !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(
+  main,
+  section,
+  form,
+  .panel,
+  .config-panel,
+  .config-shell,
+  .card-builder,
+  .card-workbench,
+  .card-grid,
+  .card-column,
+  .card-block,
+  .sub-block,
+  .persona-card,
+  .stage-grid,
+  .stats-row,
+  .stat-box,
+  .config-workbench-shell,
+  .config-overview-grid,
+  .config-advanced-summary,
+  .config-sticky-actions,
+  .preset-workbench-shell,
+  .preset-editor-shell,
+  .preset-library-grid,
+  .preset-card-grid,
+  .memory-wide,
+  .memory-card,
+  .worldbook-config-shell,
+  .worldbook-workbench-shell,
+  .worldbook-rule-shell,
+  .worldbook-entry-shell,
+  .worldbook-entry-grid,
+  .user-workbench-shell,
+  .workshop-workbench-shell,
+  .workshop-rule-shell,
+  .workshop-rule-body,
+  .route-forwarding-shell
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(
+  .card-grid,
+  .card-persona-grid,
+  .stage-grid,
+  .stats-row,
+  .grid-two,
+  .grid-three,
+  .grid-four,
+  .config-workbench-shell,
+  .config-overview-grid,
+  .preset-detail-grid,
+  .preset-card-grid,
+  .preset-meta-grid,
+  .memory-editor-grid,
+  .memory-card-grid,
+  .worldbook-workbench-shell,
+  .worldbook-entry-grid,
+  .worldbook-rule-grid,
+  .worldbook-config-grid,
+  .user-workbench-shell,
+  .workshop-workbench-shell,
+  .workshop-rule-body,
+  .route-forwarding-grid
+) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(
+  .slot-toolbar,
+  .slot-toolbar-left,
+  .slot-toolbar-right,
+  .section-head,
+  .card-workbench-head,
+  .card-workbench-title,
+  .card-workbench-actions,
+  .card-source-actions,
+  .card-main-actions,
+  .persona-toolbar,
+  .button-row,
+  .action-group,
+  .inline-field,
+  .model-combo-row,
+  .config-sticky-actions,
+  .config-sticky-buttons,
+  .config-workbench-actions,
+  .workshop-toolbar,
+  .workshop-modal-actions
+) {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea,
+  button,
+  .button-link,
+  .ghost-link,
+  .secondary,
+  .compact,
+  .card-workbench-status,
+  .status-line,
+  .task-status,
+  .slot-select
+) {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(input[type="checkbox"], input[type="radio"]) {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(
+  .worldbook-selection-panel,
+  .worldbook-selection-card,
+  .worldbook-overview-strip,
+  .worldbook-overview-pills,
+  .route-switch-app,
+  .route-switch-topbar,
+  .route-switch-actions
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .worldbook-selection-panel:not(.is-open):not(.active) {
+  display: none !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .worldbook-overview-strip,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .worldbook-overview-pills,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .route-switch-topbar,
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .route-switch-actions {
+  grid-template-columns: minmax(0, 1fr) !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(.worldbook-overview-pill, .route-switch-actions label, .route-switch-actions button) {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(.panel.config-panel, .card-builder) {
+  padding: 14px !important;
+  border-radius: 22px !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(.card-block, .sub-block, .stat-box, .memory-card, .worldbook-card) {
+  padding: 12px !important;
+  border-radius: 18px !important;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) :where(.card-state-journal-table-wrap, .memory-table-wrap, .worldbook-table-wrap) {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .pe-bottom-nav {
+  max-width: calc(100vw - 18px) !important;
+  transform: translateZ(0);
+}
+
+@media (max-width: 760px) {
+  body.force-mobile-shell.app-sidebar-shell:not(.chat-page) {
+    padding-bottom: var(--pe-bottom-nav-total, 96px) !important;
+  }
+
+  body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-shell,
+  body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .config-shell.wide,
+  body.force-mobile-shell.app-sidebar-shell:not(.chat-page) .welcome-shell {
+    width: calc(100% - 12px) !important;
+    max-width: calc(100% - 12px) !important;
+    padding-top: 8px !important;
+  }
+
+  body.force-mobile-shell .pe-bottom-nav {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    gap: 4px !important;
+    padding: 7px !important;
+    border-radius: 24px !important;
+  }
+
+  body.force-mobile-shell .pe-bottom-link {
+    min-height: 56px !important;
+    border-radius: 18px !important;
+  }
+
+  body.force-mobile-shell .pe-bottom-label {
+    font-size: 10px !important;
+  }
+}

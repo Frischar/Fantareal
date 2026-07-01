@@ -1,3 +1,4 @@
+# ===== Android =====
 .gradle/
 local.properties
 build/
@@ -15,7 +16,34 @@ keystore/
 keystore.properties
 Keys/
 
-# Keep copied web source clean as well
+# ===== Python / Web(根目录) =====
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+exports/
+browser_profile/
+static/uploads/
+dist/
+*.spec
+tmp_index_script*.js
+data/**/*.json
+data/**/*.jsonc
+data/.slot_migration_done
+data/.global_runtime_migration_done
+cards/*.json
+cards/*.txt
+!cards/template_multi_role_card.json
+!cards/template_role_card.json
+!cards/template_single_role_card.json
+mods/*/data/*.json
+data/logs/
+# Runtime data, saves, logs, local databases
+/data/
+CLAUDE.md
+
+# ===== web_source 子目录 =====
 web_source/.venv/
 web_source/__pycache__/
 web_source/dist/

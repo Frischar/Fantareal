@@ -1,0 +1,2102 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>演出工坊 - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
+</head>
+  <body class="modern-setting-page app-sidebar-shell workshop-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
+    <div id="workshop-toast-host" class="toast-host config-toast-host" aria-live="polite"></div>
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+      <div class="slot-toolbar config-hero-toolbar workshop-hero-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Workshop</span>
+          <div class="slot-meta">
+            <strong>演出工坊</strong>
+            <p class="slot-hint">编辑当前角色卡的工坊规则；运行进度跟随全局记忆。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-shell compact config-workbench-shell workshop-workbench-shell workshop-layout-b">
+      <section class="panel config-panel workshop-main-card">
+        <div class="section-head workshop-section-head">
+          <p class="eyebrow">Performance Layer</p>
+          <h2>入场演出、常驻氛围与动态演出</h2>
+          <p class="muted">演出工坊作为角色卡的前端演出层；封面、背景、音乐、环境音和动态演出不会写进提示词。</p>
+        </div>
+
+
+        <div id="workshop-opening-config" class="workshop-opening-config-block workshop-panel-block">
+          <div class="workshop-opening-config-head">
+            <div>
+              <p class="eyebrow">Opening</p>
+              <h3>开场演出</h3>
+              <p class="muted compact">新对话第一次进入 Chat 时显示封面；点击按钮后播放音乐并进入 first_mes。</p>
+            </div>
+            <label class="fr-setting-switch-row workshop-opening-enabled-row"><input id="workshop-opening-enabled" type="checkbox" /> 启用开场演出</label>
+          </div>
+
+          <div class="grid-two workshop-opening-fields">
+            <div>
+              <label for="workshop-opening-title">开场标题</label>
+              <input id="workshop-opening-title" type="text" placeholder="留空则使用角色名" />
+            </div>
+            <div>
+              <label for="workshop-opening-button-text">进入按钮文字</label>
+              <input id="workshop-opening-button-text" type="text" maxlength="24" placeholder="进入故事 / 入梦 / 启程" />
+            </div>
+          </div>
+
+          <label for="workshop-opening-subtitle">开场副标题</label>
+          <textarea id="workshop-opening-subtitle" rows="2" placeholder="例如：重逢与试探，自此始。"></textarea>
+
+          <div class="grid-two workshop-opening-fields workshop-opening-typewriter-row">
+            <label class="fr-setting-switch-row workshop-opening-inline-toggle"><input id="workshop-opening-typewriter-enabled" type="checkbox" /> 开场白打字机效果</label>
+            <div>
+              <label for="workshop-opening-typewriter-speed">打字速度</label>
+              <select id="workshop-opening-typewriter-speed">
+                <option value="slow">慢</option>
+                <option value="normal">标准</option>
+                <option value="fast">快</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-two workshop-opening-fields">
+            <div>
+              <label for="workshop-opening-animation">动画模板</label>
+              <select id="workshop-opening-animation">
+                <option value="fade">默认淡入</option>
+                <option value="push">镜头推进</option>
+                <option value="black">黑场显现</option>
+                <option value="dream">旧梦浮现</option>
+                <option value="curtain">幕布展开</option>
+                <option value="still">静止封面</option>
+              </select>
+            </div>
+            <p class="muted compact workshop-opening-animation-hint">只影响封面入场和退场效果，不影响提示词、聊天内容或角色卡阶段。</p>
+          </div>
+
+          <div class="grid-two workshop-opening-media-grid">
+            <div class="workshop-opening-media-card">
+              <label for="workshop-opening-cover-image">封面图地址</label>
+              <input id="workshop-opening-cover-image" type="text" placeholder="上传后自动回填，或粘贴图片地址" />
+              <div class="button-row workshop-asset-row">
+                <button id="workshop-opening-cover-pick" class="secondary compact" type="button">选择本地封面图</button>
+                <button id="workshop-opening-cover-clear" class="secondary compact ghost" type="button">清除封面</button>
+                <input id="workshop-opening-cover-file" type="file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif" hidden />
+                <span class="muted compact">上传或清除后需保存演出工坊</span>
+              </div>
+              <div class="workshop-opening-preview-wrap">
+                <img id="workshop-opening-cover-preview" class="workshop-opening-cover-preview" loading="lazy" decoding="async" alt="开场封面预览" hidden />
+              </div>
+              <p class="workshop-opening-cover-tip">推荐 16:9 横图；主体尽量放在中间偏右，左下留给标题和按钮。</p>
+            </div>
+
+            <div class="workshop-opening-media-card">
+              <label for="workshop-opening-music-url">开场音乐地址</label>
+              <input id="workshop-opening-music-url" type="text" placeholder="上传后自动回填，或粘贴音乐地址" />
+              <div class="button-row workshop-asset-row">
+                <button id="workshop-opening-music-pick" class="secondary compact" type="button">选择本地音乐</button>
+                <button id="workshop-opening-music-clear" class="secondary compact ghost" type="button">清除音乐</button>
+                <input id="workshop-opening-music-file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm" hidden />
+                <span class="muted compact">点击进入故事后播放</span>
+              </div>
+              <label for="workshop-opening-volume">开场音乐音量</label>
+              <input id="workshop-opening-volume" type="range" min="0" max="1" step="0.01" />
+              <label class="fr-setting-switch-row workshop-opening-inline-toggle"><input id="workshop-opening-autoplay-music" type="checkbox" /> 封面出现时尝试自动播放开场音乐</label>
+              <p class="muted compact">浏览器可能限制自动播放；如果失败，点击进入按钮后仍会正常播放。</p>
+              <div class="grid-two workshop-opening-timing-grid">
+                <div>
+                  <label for="workshop-opening-hold-seconds">点击后封面停留</label>
+                  <input id="workshop-opening-hold-seconds" type="number" min="0" max="20" step="0.5" placeholder="默认 3 秒" />
+                </div>
+                <div>
+                  <label for="workshop-opening-fade-in-seconds">开场音乐淡入</label>
+                  <input id="workshop-opening-fade-in-seconds" type="number" min="0" max="8" step="0.5" placeholder="默认 2 秒" />
+                </div>
+                <div>
+                  <label for="workshop-opening-fade-out-seconds">开场音乐淡出</label>
+                  <input id="workshop-opening-fade-out-seconds" type="number" min="0" max="8" step="0.5" placeholder="默认 2 秒" />
+                </div>
+                <div>
+                  <label for="workshop-opening-transition-seconds">接入常驻过渡</label>
+                  <input id="workshop-opening-transition-seconds" type="number" min="0" max="8" step="0.5" placeholder="默认 2 秒" />
+                </div>
+              </div>
+              <label for="workshop-opening-after-mode">开场结束后</label>
+              <select id="workshop-opening-after-mode">
+                <option value="connect_ambience">接入常驻氛围</option>
+                <option value="continue_opening">继续播放开场音乐</option>
+                <option value="fade_stop">淡出停止</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="workshop-opening-preview-actions">
+            <button id="preview-workshop-opening" class="secondary compact" type="button">测试开场</button>
+            <span class="muted compact">只预览封面、标题、按钮和音乐；不会触发 first_mes，也不会改变聊天记录。</span>
+          </div>
+        </div>
+
+
+
+        <div id="workshop-ambience-config" class="workshop-ambience-config-block workshop-panel-block">
+          <div class="workshop-opening-config-head">
+            <div>
+              <p class="eyebrow">Ambience</p>
+              <h3>常驻氛围</h3>
+              <p class="muted compact">正式聊天时持续存在的背景、主音乐和环境音；不判断剧情，不进入提示词。</p>
+            </div>
+            <label class="fr-setting-switch-row"><input id="workshop-ambience-enabled" type="checkbox" /> 启用常驻氛围</label>
+          </div>
+
+          <div class="grid-two workshop-opening-fields">
+            <div>
+              <label for="workshop-ambience-name">氛围名称</label>
+              <input id="workshop-ambience-name" type="text" maxlength="40" placeholder="夜聊 / 雨天 / 咖啡馆" />
+            </div>
+            <div>
+              <label for="workshop-ambience-start-mode">播放方式</label>
+              <select id="workshop-ambience-start-mode">
+                <option value="after_opening">开场结束后接入</option>
+                <option value="manual">进入 Chat 后手动播放</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-two workshop-ambience-grid">
+            <div class="workshop-opening-media-card">
+              <label class="fr-setting-switch-row"><input id="workshop-ambience-bg-enabled" type="checkbox" /> 启用聊天背景</label>
+              <label for="workshop-ambience-bg-url">背景图地址</label>
+              <input id="workshop-ambience-bg-url" type="text" placeholder="上传后自动回填，或粘贴图片地址" />
+              <div class="button-row workshop-asset-row">
+                <button id="workshop-ambience-bg-pick" class="secondary compact" type="button">选择本地背景图</button>
+                <button id="workshop-ambience-bg-clear" class="secondary compact ghost" type="button">清除背景</button>
+                <input id="workshop-ambience-bg-file" type="file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif" hidden />
+              </div>
+              <label for="workshop-ambience-bg-overlay">背景遮罩强度</label>
+              <input id="workshop-ambience-bg-overlay" type="range" min="0" max="0.85" step="0.01" />
+            </div>
+
+            <div class="workshop-opening-media-card">
+              <label class="fr-setting-switch-row"><input id="workshop-ambience-music-enabled" type="checkbox" /> 启用主音乐</label>
+              <label for="workshop-ambience-music-preset">主音乐预设</label>
+              <select id="workshop-ambience-music-preset"></select>
+              <label for="workshop-ambience-music-url">主音乐地址</label>
+              <input id="workshop-ambience-music-url" type="text" placeholder="上传后自动回填，或粘贴音乐地址" />
+              <div class="button-row workshop-asset-row">
+                <button id="workshop-ambience-music-pick" class="secondary compact" type="button">选择本地音乐</button>
+                <button id="workshop-ambience-music-clear" class="secondary compact ghost" type="button">清除主音乐</button>
+                <input id="workshop-ambience-music-file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm" hidden />
+              </div>
+              <label for="workshop-ambience-music-volume">主音乐音量</label>
+              <input id="workshop-ambience-music-volume" type="range" min="0" max="1" step="0.01" />
+            </div>
+          </div>
+
+          <div class="workshop-opening-media-card workshop-ambience-ambient-card">
+            <label class="fr-setting-switch-row"><input id="workshop-ambience-ambient-enabled" type="checkbox" /> 启用环境音</label>
+            <div class="grid-two workshop-opening-fields">
+              <div>
+                <label for="workshop-ambience-ambient-preset">环境音预设</label>
+                <select id="workshop-ambience-ambient-preset"></select>
+              </div>
+              <div>
+                <label for="workshop-ambience-ambient-volume">环境音音量</label>
+                <input id="workshop-ambience-ambient-volume" type="range" min="0" max="1" step="0.01" />
+              </div>
+            </div>
+            <label for="workshop-ambience-ambient-url">环境音地址</label>
+            <input id="workshop-ambience-ambient-url" type="text" placeholder="上传后自动回填，或粘贴音乐地址" />
+            <div class="button-row workshop-asset-row">
+              <button id="workshop-ambience-ambient-pick" class="secondary compact" type="button">选择本地环境音</button>
+              <button id="workshop-ambience-ambient-clear" class="secondary compact ghost" type="button">清除环境音</button>
+              <input id="workshop-ambience-ambient-file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm" hidden />
+              <span class="muted compact">主音乐负责情绪，环境音负责场景底噪。</span>
+            </div>
+          </div>
+
+          <div class="workshop-opening-preview-actions">
+            <button id="preview-workshop-ambience" class="secondary compact" type="button">测试氛围</button>
+            <span class="muted compact">测试会播放主音乐和环境音，并临时预览背景；再次测试前会自动停止上一段预览。</span>
+          </div>
+        </div>
+
+        <div id="workshop-dynamic-config" class="workshop-dynamic-config-block workshop-panel-block">
+          <div class="workshop-opening-config-head">
+            <div>
+              <p class="eyebrow">Dynamic Performance</p>
+              <h3>动态演出</h3>
+          <p class="muted compact">聊天过程中由系统计数、模型状态块或数据库 tag 触发的图片、音效和背景切换。它不是关键词触发，也不会进入提示词。</p>
+            </div>
+            <button id="add-dynamic-scene" type="button" class="secondary compact">+ 新增演出</button>
+          </div>
+          <div class="workshop-state-tip dynamic-state-tip">
+            <strong>状态块触发 Tips：</strong>
+            <span>演出工坊不会因为正文出现“雨夜”“回忆”等词而触发。模型状态块仍可用 <code>[FT_EVENT: rain_memory]</code>；状态触发则只认数据库 active tag，例如 <code>state_journal.task.find_silver_key.done</code>。</span>
+          </div>
+          <div id="dynamic-scene-list" class="stack-list dynamic-scene-list"></div>
+        </div>
+      </section>
+
+      <aside class="panel config-panel workshop-control-panel">
+        <div class="section-head workshop-section-head compact-head">
+          <p class="eyebrow">Workshop Panel</p>
+          <h2>演出工坊面板</h2>
+        </div>
+
+
+
+        <div class="workshop-panel-block workshop-side-actions-panel">
+          <p id="status-text" class="task-status is-idle">已准备 · 修改演出设置后点击保存到当前角色卡。</p>
+
+          <div class="workshop-panel-actions workshop-panel-actions-top ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
+          <button id="save-workshop" type="button">保存到当前角色卡</button>
+          <a class="secondary compact button-link workshop-return-link" href="/config/card">返回角色卡</a>
+          <button id="reload-workshop-status" type="button" class="secondary compact">重新读取角色卡</button>
+          <button id="clear-workshop-binding" type="button" class="secondary compact ghost danger stage4-danger-action">清除本卡演出</button>
+        </div>
+        </div>
+
+        <div class="workshop-panel-block workshop-card-binding-panel">
+          <div class="workshop-binding-head">
+            <span class="eyebrow">Card Binding</span>
+            <strong>角色卡演出绑定</strong>
+          </div>
+          <p id="workshop-binding-source" class="muted compact">当前演出设置写入当前角色卡。</p>
+          <div class="workshop-binding-pills" aria-label="角色卡演出绑定范围">
+            <span id="workshop-binding-opening" class="micro-badge muted">开场演出</span>
+            <span id="workshop-binding-ambience" class="micro-badge muted">常驻氛围</span>
+            <span id="workshop-binding-dynamic" class="micro-badge muted">动态演出</span>
+          </div>
+          <p class="muted compact">只保存资源引用，不打包图片、音乐或音效；不绑定主程序 UI、模型、数据库或状态栏设置。</p>
+        </div>
+
+        <div class="workshop-panel-block workshop-runtime-panel-side">
+          <label class="fr-setting-switch-row"><input id="workshop-enabled" type="checkbox" /> 启用演出工坊</label>
+          <p class="muted compact" id="workshop-runtime-info">当前 temp = {{ workshop_state.temp or 0 }}，阶段 = {{ workshop_stage }}阶段。</p>
+        </div>
+
+        <div class="workshop-panel-block workshop-side-summary">
+          <div class="workshop-summary-item ui-summary-card">
+            <span>当前角色卡</span>
+            <strong id="workshop-current-card-name">{{ current_card.source_name or "未命名角色卡" }}</strong>
+          </div>
+          <div class="workshop-summary-grid" aria-label="演出工坊状态总览">
+            <div class="workshop-summary-item ui-summary-card">
+              <span>演出工坊开关</span>
+              <strong id="workshop-enabled-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>开场演出</span>
+              <strong id="workshop-opening-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>常驻氛围</span>
+              <strong id="workshop-ambience-state">未启用</strong>
+            </div>
+            <div class="workshop-summary-item ui-summary-card">
+              <span>动态演出</span>
+              <strong id="workshop-dynamic-state">0 项</strong>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script>
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+      const initialWorkshop = {{ card_template.creativeWorkshop | tojson }};
+      const initialWorkshopTemp = Number({{ workshop_state.temp or 0 }}) || 0;
+      const currentCardName = {{ current_card.source_name | tojson }};
+      const rootEl = document.documentElement;
+      const bodyEl = document.body;
+      const statusEl = document.getElementById("status-text");
+      const workshopEnabledEl = document.getElementById("workshop-enabled");
+      const workshopRuntimeInfoEl = document.getElementById("workshop-runtime-info");
+      const toastHostEl = document.getElementById("workshop-toast-host");
+      const workshopEnabledStateEl = document.getElementById("workshop-enabled-state");
+      const workshopOpeningStateEl = document.getElementById("workshop-opening-state");
+      const workshopAmbienceStateEl = document.getElementById("workshop-ambience-state");
+      const workshopDynamicStateEl = document.getElementById("workshop-dynamic-state");
+      const workshopBindingSourceEl = document.getElementById("workshop-binding-source");
+      const workshopBindingOpeningEl = document.getElementById("workshop-binding-opening");
+      const workshopBindingAmbienceEl = document.getElementById("workshop-binding-ambience");
+      const workshopBindingDynamicEl = document.getElementById("workshop-binding-dynamic");
+      const clearWorkshopBindingBtn = document.getElementById("clear-workshop-binding");
+      const workshopOpeningEnabledEl = document.getElementById("workshop-opening-enabled");
+      const workshopOpeningTitleEl = document.getElementById("workshop-opening-title");
+      const workshopOpeningSubtitleEl = document.getElementById("workshop-opening-subtitle");
+      const workshopOpeningButtonTextEl = document.getElementById("workshop-opening-button-text");
+      const workshopOpeningAnimationEl = document.getElementById("workshop-opening-animation");
+      const workshopOpeningCoverImageEl = document.getElementById("workshop-opening-cover-image");
+      const workshopOpeningMusicUrlEl = document.getElementById("workshop-opening-music-url");
+      const workshopOpeningVolumeEl = document.getElementById("workshop-opening-volume");
+      const workshopOpeningCoverPreviewEl = document.getElementById("workshop-opening-cover-preview");
+      const previewWorkshopOpeningBtn = document.getElementById("preview-workshop-opening");
+      let workshopOpeningPreviewAudio = null;
+      let currentWorkshop = null;
+
+      const MUSIC_PRESETS = [
+        { id: "off", label: "关闭", url: "" },
+        { id: "coffee", label: "咖啡馆氛围", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
+        { id: "night", label: "夜晚钢琴", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
+        { id: "rain", label: "雨声音氛围", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
+      ];
+
+      function inferStatusKind(text) {
+        const value = String(text || "");
+        if (/失败|错误|异常|不能|不可用|请先/.test(value)) return "error";
+        if (/已|成功|完成/.test(value)) return "success";
+        if (/正在|保存中|读取中|搜索中|处理/.test(value)) return "busy";
+        return "idle";
+      }
+
+      function setStatus(text, kind = null) {
+        if (!statusEl) return;
+        const statusKind = kind || inferStatusKind(text);
+        const label = text || "已准备";
+        if (!window.Fantareal?.motion?.setStatusState?.(statusEl, {
+          text: label,
+          title: label,
+          state: statusKind,
+          stateClasses: ["is-idle", "is-busy", "is-success", "is-error"],
+        })) {
+          statusEl.textContent = label;
+          statusEl.title = label;
+          statusEl.classList.remove("is-idle", "is-busy", "is-success", "is-error");
+          statusEl.classList.add("task-status", `is-${statusKind}`);
+        }
+      }
+
+      function showToast(message, type = "info") {
+        if (!toastHostEl || !message) return;
+        const toast = document.createElement("div");
+        toast.className = `app-toast ${type}`;
+        toast.textContent = message;
+        toastHostEl.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add("show"));
+        window.setTimeout(() => {
+          toast.classList.remove("show");
+          window.setTimeout(() => toast.remove(), 220);
+        }, 2200);
+      }
+
+      function rememberButtonLabel(button) {
+        if (!button) return "";
+        if (!button.dataset.defaultLabel) {
+          button.dataset.defaultLabel = button.textContent.trim();
+        }
+        return button.dataset.defaultLabel;
+      }
+
+      function setButtonState(button, state = "idle", label = "") {
+        if (!button) return;
+        const defaultLabel = rememberButtonLabel(button);
+        if (button.dataset.stateTimer) {
+          window.clearTimeout(Number(button.dataset.stateTimer));
+          delete button.dataset.stateTimer;
+        }
+        button.dataset.buttonState = state;
+        button.classList.remove("is-loading", "is-success", "is-error");
+        button.disabled = state === "loading";
+        if (state === "loading") {
+          button.classList.add("is-loading");
+          window.Fantareal?.motion?.pulseStatus?.(button);
+          button.textContent = label || "处理中…";
+          return;
+        }
+        if (state === "success") {
+          button.disabled = false;
+          button.classList.add("is-success");
+          window.Fantareal?.motion?.pulseStatus?.(button);
+          button.textContent = label || "已完成 ✓";
+          button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1200));
+          return;
+        }
+        if (state === "error") {
+          button.disabled = false;
+          button.classList.add("is-error");
+          window.Fantareal?.motion?.pulseStatus?.(button);
+          button.textContent = label || "操作失败";
+          button.dataset.stateTimer = String(window.setTimeout(() => setButtonState(button, "idle"), 1500));
+          return;
+        }
+        button.disabled = false;
+        delete button.dataset.buttonState;
+        button.textContent = defaultLabel;
+      }
+
+      function ensureButtonReleased(button, fallbackLabel = "") {
+        if (!button) return;
+        const text = String(button.textContent || "");
+        const isLocked = button.disabled
+          || button.classList.contains("is-loading")
+          || button.dataset.buttonState === "loading"
+          || text.includes("保存中")
+          || text.includes("读取中");
+        if (!isLocked) return;
+        if (button.dataset.stateTimer) {
+          window.clearTimeout(Number(button.dataset.stateTimer));
+          delete button.dataset.stateTimer;
+        }
+        button.classList.remove("is-loading", "is-error");
+        button.disabled = false;
+        button.textContent = button.dataset.defaultLabel || fallbackLabel || "操作";
+        delete button.dataset.buttonState;
+      }
+
+      function updateWorkshopPanelStats() {
+        const enabled = workshopEnabledEl?.checked !== false;
+        const ambienceEnabled = ambienceEnabledEl?.checked === true || currentWorkshop?.ambience?.enabled === true;
+        const dynamicCount = dynamicSceneListEl?.querySelectorAll(".dynamic-scene-card").length
+          || (Array.isArray(currentWorkshop?.dynamicScenes) ? currentWorkshop.dynamicScenes.length : 0);
+        if (workshopEnabledStateEl) workshopEnabledStateEl.textContent = enabled ? "已启用" : "未启用";
+        if (workshopOpeningStateEl) workshopOpeningStateEl.textContent = workshopOpeningEnabledEl?.checked ? "已启用" : "未启用";
+        if (workshopAmbienceStateEl) workshopAmbienceStateEl.textContent = ambienceEnabled ? "已启用" : "未启用";
+        if (workshopDynamicStateEl) workshopDynamicStateEl.textContent = `${dynamicCount} 项`;
+        updateWorkshopBindingPanel();
+      }
+
+      function setBindingPill(element, active, label) {
+        if (!element) return;
+        element.textContent = `${label}${active ? " · 已绑定" : " · 未绑定"}`;
+        element.classList.toggle("muted", !active);
+        element.classList.toggle("active", !!active);
+      }
+
+      function workshopBindingFromData(workshop = currentWorkshop || {}) {
+        const opening = workshop?.opening && typeof workshop.opening === "object" ? workshop.opening : {};
+        const ambience = workshop?.ambience && typeof workshop.ambience === "object" ? workshop.ambience : {};
+        const dynamicScenes = Array.isArray(workshop?.dynamicScenes) ? workshop.dynamicScenes : [];
+        return {
+          has_binding: Boolean(opening.enabled || ambience.enabled || dynamicScenes.length),
+          bound_parts: {
+            opening: Boolean(opening.enabled),
+            ambience: Boolean(ambience.enabled),
+            dynamic: dynamicScenes.length > 0,
+          },
+          dynamic_count: dynamicScenes.length,
+        };
+      }
+
+      function updateWorkshopBindingPanel(binding = null) {
+        const data = binding || workshopBindingFromData();
+        const parts = data.bound_parts || {};
+        setBindingPill(workshopBindingOpeningEl, parts.opening, "开场演出");
+        setBindingPill(workshopBindingAmbienceEl, parts.ambience, "常驻氛围");
+        setBindingPill(workshopBindingDynamicEl, parts.dynamic, `动态演出${Number(data.dynamic_count || 0) > 0 ? ` ${data.dynamic_count} 项` : ""}`);
+        if (workshopBindingSourceEl) {
+          workshopBindingSourceEl.textContent = data.has_binding
+            ? "当前角色卡已绑定演出配置，Chat 会优先读取本卡的开场、氛围与动态演出。"
+            : "当前角色卡未绑定演出配置；保存后会把本页三类演出写入角色卡。";
+        }
+      }
+
+      function applyTheme(theme) {
+        rootEl.setAttribute("data-theme", theme === "dark" ? "dark" : "light");
+      }
+
+      function applyUiOpacity(value) {
+        const opacity = Math.min(Math.max(Number(value || 0.84), 0.2), 1);
+        const theme = rootEl.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const palette = theme === "dark"
+          ? { panel: "18, 27, 37", strong: "20, 30, 41", input: "11, 18, 26", user: "34, 52, 70", assistant: "23, 33, 46" }
+          : { panel: "255, 250, 244", strong: "255, 250, 244", input: "255, 255, 255", user: "239, 220, 206", assistant: "255, 248, 242" };
+        const panelAlpha = opacity.toFixed(2);
+        const strongAlpha = Math.min(opacity + 0.1, 0.98).toFixed(2);
+        const inputAlpha = Math.max(opacity - 0.1, 0.16).toFixed(2);
+        const userAlpha = Math.min(opacity + 0.1, 0.98).toFixed(2);
+        const assistantAlpha = Math.min(opacity + 0.12, 0.99).toFixed(2);
+        rootEl.style.setProperty("--panel-rgb", palette.panel);
+        rootEl.style.setProperty("--panel-strong-rgb", palette.strong);
+        rootEl.style.setProperty("--input-rgb", palette.input);
+        rootEl.style.setProperty("--user-rgb", palette.user);
+        rootEl.style.setProperty("--assistant-rgb", palette.assistant);
+        rootEl.style.setProperty("--panel-alpha", panelAlpha);
+        rootEl.style.setProperty("--panel-strong-alpha", strongAlpha);
+        rootEl.style.setProperty("--input-alpha", inputAlpha);
+        rootEl.style.setProperty("--user-alpha", userAlpha);
+        rootEl.style.setProperty("--assistant-alpha", assistantAlpha);
+        rootEl.style.setProperty("--panel", `rgba(${palette.panel}, ${panelAlpha})`);
+        rootEl.style.setProperty("--panel-strong", `rgba(${palette.strong}, ${strongAlpha})`);
+        rootEl.style.setProperty("--input-bg", `rgba(${palette.input}, ${inputAlpha})`);
+        rootEl.style.setProperty("--user", `rgba(${palette.user}, ${userAlpha})`);
+        rootEl.style.setProperty("--assistant", `rgba(${palette.assistant}, ${assistantAlpha})`);
+      }
+
+      function applyBackground(url, overlay) {
+        const normalizedOverlay = Math.min(Math.max(Number(overlay || 0), 0), 0.85);
+        bodyEl.style.setProperty("--background-overlay-opacity", String(normalizedOverlay));
+        bodyEl.style.setProperty("--background-image", url ? `url("${url}")` : "none");
+      }
+
+      async function postJson(url, payload) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "请求失败");
+        }
+        return response.json();
+      }
+
+      function withTimeout(promise, ms = 8000, message = "请求超时") {
+        let timer = null;
+        const timeout = new Promise((_, reject) => {
+          timer = window.setTimeout(() => reject(new Error(message)), ms);
+        });
+        return Promise.race([promise, timeout]).finally(() => {
+          if (timer) window.clearTimeout(timer);
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function escapeAttr(value) {
+        return escapeHtml(value).replace(/`/g, "&#96;");
+      }
+
+      function normalizeWorkshopStage(value) {
+        const stage = String(value || "A").trim().toUpperCase();
+        return ["A", "B", "C"].includes(stage) ? stage : "A";
+      }
+
+      function normalizeWorkshopTriggerMode(value) {
+        const mode = String(value || "stage").trim().toLowerCase();
+        return mode === "temp" ? "temp" : "stage";
+      }
+
+      function normalizeWorkshopTempValue(value, fallback = 0) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(Math.max(Math.round(parsed), 0), 9999);
+      }
+
+      function normalizeWorkshopActionType(value) {
+        const actionType = String(value || "music").trim().toLowerCase();
+        return actionType === "image" ? "image" : "music";
+      }
+
+      function getWorkshopStageLabel(stage) {
+        const mapping = { A: "A 阶段", B: "B 阶段", C: "C 阶段" };
+        return mapping[normalizeWorkshopStage(stage)] || "A 阶段";
+      }
+
+      function getWorkshopActionLabel(actionType) {
+        return normalizeWorkshopActionType(actionType) === "image" ? "弹出图片" : "播放音乐";
+      }
+
+      function getWorkshopTriggerLabel(item) {
+        const triggerMode = normalizeWorkshopTriggerMode(item?.triggerMode);
+        if (triggerMode === "temp") {
+          let min = normalizeWorkshopTempValue(item?.triggerTempMin, initialWorkshopTemp);
+          let max = normalizeWorkshopTempValue(item?.triggerTempMax, min);
+          if (max < min) [min, max] = [max, min];
+          return min === max ? `Temp ${min}` : `Temp ${min}-${max}`;
+        }
+        return getWorkshopStageLabel(item?.triggerStage);
+      }
+
+      function stripFileExtension(filename) {
+        const text = String(filename || "").trim();
+        if (!text) return "";
+        return text.replace(/\.[^.]+$/, "");
+      }
+
+      async function uploadWorkshopAsset(kind, file) {
+        const formData = new FormData();
+        formData.append("kind", kind);
+        formData.append("file", file);
+        const response = await fetch("/api/workshop/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "上传失败");
+        }
+        return response.json();
+      }
+
+      const WORKSHOP_OPENING_ANIMATIONS = new Set(["fade", "push", "black", "dream", "curtain", "still"]);
+
+      function normalizeWorkshopOpeningAnimation(value) {
+        const animation = String(value || "fade").trim().toLowerCase();
+        return WORKSHOP_OPENING_ANIMATIONS.has(animation) ? animation : "fade";
+      }
+
+      function createDefaultWorkshopOpening() {
+        return {
+          enabled: false,
+          title: "",
+          subtitle: "",
+          coverImage: "",
+          musicUrl: "",
+          buttonText: "进入故事",
+          volume: 0.65,
+          animation: "fade",
+        };
+      }
+
+      function normalizeWorkshopOpening(opening) {
+        const base = createDefaultWorkshopOpening();
+        if (!opening || typeof opening !== "object") return base;
+        const buttonText = String(opening.buttonText || "").trim().slice(0, 24);
+        return {
+          enabled: opening.enabled === true,
+          title: String(opening.title || "").trim().slice(0, 80),
+          subtitle: String(opening.subtitle || "").trim().slice(0, 160),
+          coverImage: String(opening.coverImage || opening.coverUrl || "").trim(),
+          musicUrl: String(opening.musicUrl || "").trim(),
+          buttonText: buttonText || "进入故事",
+          volume: Math.min(Math.max(Number(opening.volume ?? 0.65) || 0.65, 0), 1),
+          animation: normalizeWorkshopOpeningAnimation(opening.animation),
+        };
+      }
+
+      function renderWorkshopOpening(opening = currentWorkshop?.opening) {
+        const data = normalizeWorkshopOpening(opening);
+        if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = Boolean(data.enabled);
+        if (workshopOpeningTitleEl) workshopOpeningTitleEl.value = data.title;
+        if (workshopOpeningSubtitleEl) workshopOpeningSubtitleEl.value = data.subtitle;
+        if (workshopOpeningButtonTextEl) workshopOpeningButtonTextEl.value = data.buttonText || "进入故事";
+        if (workshopOpeningAnimationEl) workshopOpeningAnimationEl.value = data.animation || "fade";
+        if (workshopOpeningCoverImageEl) workshopOpeningCoverImageEl.value = data.coverImage;
+        if (workshopOpeningMusicUrlEl) workshopOpeningMusicUrlEl.value = data.musicUrl;
+        if (workshopOpeningVolumeEl) workshopOpeningVolumeEl.value = String(data.volume);
+        updateWorkshopOpeningPreview();
+        updateWorkshopPanelStats();
+      }
+
+      function updateWorkshopOpeningPreview() {
+        if (!workshopOpeningCoverPreviewEl) return;
+        const imageUrl = String(workshopOpeningCoverImageEl?.value || "").trim();
+        workshopOpeningCoverPreviewEl.src = imageUrl;
+        workshopOpeningCoverPreviewEl.hidden = !imageUrl;
+      }
+
+      function collectWorkshopOpeningPayload() {
+        const buttonText = String(workshopOpeningButtonTextEl?.value || "").trim().slice(0, 24);
+        return {
+          enabled: workshopOpeningEnabledEl?.checked === true,
+          title: String(workshopOpeningTitleEl?.value || "").trim().slice(0, 80),
+          subtitle: String(workshopOpeningSubtitleEl?.value || "").trim().slice(0, 160),
+          coverImage: String(workshopOpeningCoverImageEl?.value || "").trim(),
+          musicUrl: String(workshopOpeningMusicUrlEl?.value || "").trim(),
+          buttonText: buttonText || "进入故事",
+          volume: Math.min(Math.max(Number(workshopOpeningVolumeEl?.value ?? 0.65) || 0.65, 0), 1),
+          animation: normalizeWorkshopOpeningAnimation(workshopOpeningAnimationEl?.value),
+        };
+      }
+
+      function clampOpeningVolume(value, fallback = 0.65) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return fallback;
+        return Math.min(Math.max(numeric, 0), 1);
+      }
+
+      function stopWorkshopOpeningPreviewAudio() {
+        if (!workshopOpeningPreviewAudio) return;
+        workshopOpeningPreviewAudio.pause();
+        workshopOpeningPreviewAudio.removeAttribute("src");
+        workshopOpeningPreviewAudio.load();
+        workshopOpeningPreviewAudio = null;
+      }
+
+      function closeWorkshopOpeningPreview(overlay, returnFocus = true) {
+        if (!overlay) return;
+        overlay.classList.add("is-leaving");
+        window.setTimeout(() => {
+          overlay.remove();
+          bodyEl.classList.remove("workshop-opening-active");
+          stopWorkshopOpeningPreviewAudio();
+          if (returnFocus) previewWorkshopOpeningBtn?.focus();
+        }, 760);
+      }
+
+      function showWorkshopOpeningPreview() {
+        const data = normalizeWorkshopOpening(collectWorkshopOpeningPayload());
+        document.querySelectorAll(".workshop-opening-overlay[data-preview='true']").forEach((node) => node.remove());
+        stopWorkshopOpeningPreviewAudio();
+
+        const overlay = document.createElement("div");
+        overlay.className = `workshop-opening-overlay workshop-opening-animation-${data.animation || "fade"}`;
+        overlay.dataset.preview = "true";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-label", "开场演出预览");
+
+        const backdrop = document.createElement("div");
+        backdrop.className = "workshop-opening-backdrop";
+
+        const card = document.createElement("section");
+        card.className = "workshop-opening-card";
+        if (data.coverImage) {
+          const safeCover = data.coverImage.replace(/["\\\n\r]/g, "");
+          card.style.setProperty("--workshop-opening-cover", `url("${safeCover}")`);
+        }
+        const cover = document.createElement("div");
+        cover.className = "workshop-opening-cover";
+        cover.setAttribute("aria-hidden", "true");
+        const shade = document.createElement("div");
+        shade.className = "workshop-opening-shade";
+        shade.setAttribute("aria-hidden", "true");
+
+        const content = document.createElement("div");
+        content.className = "workshop-opening-content";
+        const eyebrow = document.createElement("p");
+        eyebrow.className = "eyebrow";
+        eyebrow.textContent = "演出工坊 · 开场演出预览";
+        const title = document.createElement("h1");
+        title.textContent = data.title || currentCardName || "Fantareal";
+        content.append(eyebrow, title);
+        if (data.subtitle) {
+          const subtitle = document.createElement("p");
+          subtitle.className = "workshop-opening-subtitle";
+          subtitle.textContent = data.subtitle;
+          content.appendChild(subtitle);
+        }
+        const button = document.createElement("button");
+        button.className = "workshop-opening-start";
+        button.type = "button";
+        button.textContent = data.buttonText || "进入故事";
+        content.appendChild(button);
+
+        card.append(cover, shade, content);
+        overlay.append(backdrop, card);
+        document.body.appendChild(overlay);
+        bodyEl.classList.add("workshop-opening-active");
+        window.setTimeout(() => button.focus(), 80);
+
+        let closing = false;
+        const enterPreview = async () => {
+          if (closing) return;
+          closing = true;
+          button.disabled = true;
+          if (data.musicUrl) {
+            try {
+              workshopOpeningPreviewAudio = new Audio(data.musicUrl);
+              workshopOpeningPreviewAudio.loop = true;
+              workshopOpeningPreviewAudio.volume = clampOpeningVolume(data.volume, 0.65);
+              await workshopOpeningPreviewAudio.play();
+            } catch (error) {
+              showToast("开场音乐播放失败，请检查音频文件或浏览器权限。", "error");
+            }
+          }
+          closeWorkshopOpeningPreview(overlay);
+        };
+        button.addEventListener("click", enterPreview, { once: true });
+        overlay.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closeWorkshopOpeningPreview(overlay);
+        });
+        setStatus("正在预览开场演出。点击按钮测试音乐与退场动画。", "idle");
+      }
+
+      function createDefaultWorkshopItem(stage = "A") {
+        return {
+          id: `workshop_stage_${String(stage).toLowerCase()}`,
+          name: `${stage}阶段规则`,
+          enabled: stage === "A",
+          triggerMode: "stage",
+          triggerStage: normalizeWorkshopStage(stage),
+          triggerTempMin: initialWorkshopTemp,
+          triggerTempMax: initialWorkshopTemp,
+          actionType: "music",
+          popupTitle: "",
+          musicPreset: "off",
+          musicUrl: "",
+          autoplay: true,
+          loop: true,
+          volume: 0.85,
+          imageUrl: "",
+          imageAlt: "",
+          note: "",
+        };
+      }
+
+      function normalizeCreativeWorkshop(workshop) {
+        const base = {
+          enabled: true,
+          opening: createDefaultWorkshopOpening(),
+          items: [createDefaultWorkshopItem("A"), createDefaultWorkshopItem("B"), createDefaultWorkshopItem("C")],
+        };
+        if (!workshop || typeof workshop !== "object") return base;
+
+        const items = [];
+        const rawItems = Array.isArray(workshop.items) ? workshop.items : [];
+        rawItems.forEach((item, index) => {
+          if (!item || typeof item !== "object") return;
+          const triggerMode = normalizeWorkshopTriggerMode(item.triggerMode);
+          let triggerTempMin = normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp);
+          let triggerTempMax = normalizeWorkshopTempValue(item.triggerTempMax, triggerTempMin);
+          if (triggerTempMax < triggerTempMin) [triggerTempMin, triggerTempMax] = [triggerTempMax, triggerTempMin];
+          items.push({
+            id: String(item.id || "").trim() || `workshop-item-${index + 1}`,
+            name: String(item.name || "").trim() || `规则 ${index + 1}`,
+            enabled: item.enabled !== false,
+            triggerMode,
+            triggerStage: normalizeWorkshopStage(item.triggerStage),
+            triggerTempMin,
+            triggerTempMax,
+            actionType: normalizeWorkshopActionType(item.actionType),
+            popupTitle: String(item.popupTitle || "").trim(),
+            musicPreset: String(item.musicPreset || "off").trim() || "off",
+            musicUrl: String(item.musicUrl || "").trim(),
+            autoplay: item.autoplay !== false,
+            loop: item.loop !== false,
+            volume: Math.min(Math.max(Number(item.volume ?? 0.85) || 0.85, 0), 1),
+            imageUrl: String(item.imageUrl || "").trim(),
+            imageAlt: String(item.imageAlt || "").trim(),
+            note: String(item.note || "").trim(),
+          });
+        });
+
+        const stageMap = new Map();
+        const extraItems = [];
+        items.forEach((item) => {
+          if (item.triggerMode === "stage" && ["A", "B", "C"].includes(item.triggerStage) && !stageMap.has(item.triggerStage)) {
+            stageMap.set(item.triggerStage, item);
+          } else {
+            extraItems.push(item);
+          }
+        });
+
+        base.enabled = workshop.enabled !== false;
+        base.opening = normalizeWorkshopOpening(workshop.opening);
+        base.items = ["A", "B", "C"].map((stage) => stageMap.get(stage) || createDefaultWorkshopItem(stage)).concat(extraItems);
+        return base;
+      }
+
+      function getWorkshopSearchText(card) {
+        return [
+          card.querySelector(".workshop-rule-name")?.value || "",
+          card.querySelector(".workshop-rule-trigger-mode")?.value || "",
+          card.querySelector(".workshop-rule-trigger")?.value || "",
+          card.querySelector(".workshop-rule-trigger-temp-min")?.value || "",
+          card.querySelector(".workshop-rule-trigger-temp-max")?.value || "",
+          card.querySelector(".workshop-rule-action")?.value || "",
+          card.querySelector(".workshop-rule-popup-title")?.value || "",
+          card.querySelector(".workshop-rule-note")?.value || "",
+          card.querySelector(".workshop-rule-url")?.value || "",
+          card.querySelector(".workshop-rule-image-url")?.value || "",
+        ].join("\n").toLowerCase();
+      }
+
+      function setWorkshopRuleCollapsed(shell, collapsed) {
+        if (!shell) return;
+        const body = shell.querySelector(".workshop-rule-body");
+        if (body) body.setAttribute("aria-hidden", collapsed ? "true" : "false");
+        window.Fantareal?.motion?.setDisclosureCollapsed(shell, body, collapsed, { collapsedClass: "is-collapsed", hiddenMode: "display" });
+        const button = shell.querySelector(".toggle-workshop-rule");
+        if (button) {
+          button.textContent = collapsed ? "▸" : "▾";
+          button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+          button.setAttribute("aria-label", collapsed ? "展开这条规则" : "折叠这条规则");
+        }
+        const summary = shell.querySelector(".workshop-rule-summary");
+        if (summary) summary.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      }
+
+      function setWorkshopPanelState(panel, active) {
+        if (!panel) return;
+        panel.hidden = !active;
+        panel.querySelectorAll("input, select, textarea, button").forEach((field) => {
+          field.disabled = !active;
+        });
+      }
+
+      function setWorkshopTriggerPanelState(panel, active) {
+        if (!panel) return;
+        panel.hidden = !active;
+        panel.querySelectorAll("input, select").forEach((field) => {
+          field.disabled = !active;
+        });
+      }
+
+      function buildMusicFields(item, index) {
+        const presetOptions = MUSIC_PRESETS.map((preset) => {
+          const selected = preset.id === (item.musicPreset || "off") ? "selected" : "";
+          return `<option value="${preset.id}" ${selected}>${escapeHtml(preset.label)}</option>`;
+        }).join("");
+        return `
+          <div class="workshop-action-panel" data-action-type="music">
+            <label>音乐预设</label>
+            <select class="workshop-rule-preset" data-workshop-rule-preset="${index}">
+              ${presetOptions}
+            </select>
+            <label>音乐地址</label>
+            <input class="workshop-rule-url" data-workshop-rule-url="${index}" value="${escapeAttr(item.musicUrl || "")}" placeholder="留空则使用上面的预设" />
+            <div class="grid-two">
+              <label class="fr-setting-switch-row"><input class="workshop-rule-autoplay" data-workshop-rule-autoplay="${index}" type="checkbox" ${item.autoplay !== false ? "checked" : ""} /> 自动播放</label>
+              <label class="fr-setting-switch-row"><input class="workshop-rule-loop" data-workshop-rule-loop="${index}" type="checkbox" ${item.loop !== false ? "checked" : ""} /> 循环播放</label>
+            </div>
+            <label>音量</label>
+            <input class="workshop-rule-volume" data-workshop-rule-volume="${index}" type="range" min="0" max="1" step="0.01" value="${escapeAttr(item.volume ?? 0.85)}" />
+          </div>
+        `;
+      }
+
+      function buildImageFields(item, index) {
+        return `
+          <div class="workshop-action-panel" data-action-type="image">
+            <label>弹窗标题</label>
+            <input class="workshop-rule-popup-title" data-workshop-rule-popup-title="${index}" value="${escapeAttr(item.popupTitle || "")}" placeholder="留空则使用规则标题" />
+            <label>图片地址</label>
+            <input class="workshop-rule-image-url" data-workshop-rule-image-url="${index}" value="${escapeAttr(item.imageUrl || "")}" placeholder="远程图片地址或 data URL" />
+            <label>图片说明</label>
+            <input class="workshop-rule-image-alt" data-workshop-rule-image-alt="${index}" value="${escapeAttr(item.imageAlt || "")}" placeholder="弹窗里的说明文字" />
+            <div class="workshop-image-preview-wrap">
+              <img class="workshop-rule-image-preview" loading="lazy" decoding="async" src="${escapeAttr(item.imageUrl || "")}" alt="${escapeAttr(item.imageAlt || item.name || "演出工坊图片")}" ${item.imageUrl ? "" : "hidden"} />
+            </div>
+          </div>
+        `;
+      }
+
+      function buildTriggerFields(item, index, isCoreStage) {
+        const triggerMode = normalizeWorkshopTriggerMode(item.triggerMode);
+        const tempMin = normalizeWorkshopTempValue(item.triggerTempMin, initialWorkshopTemp);
+        const tempMax = normalizeWorkshopTempValue(item.triggerTempMax, tempMin);
+        return `
+          <div class="grid-two">
+            <div>
+              <label>触发方式</label>
+              <select class="workshop-rule-trigger-mode" data-workshop-rule-trigger-mode="${index}" ${isCoreStage ? "disabled" : ""}>
+                <option value="stage" ${triggerMode === "stage" ? "selected" : ""}>阶段触发</option>
+                <option value="temp" ${triggerMode === "temp" ? "selected" : ""}>自定义 Temp</option>
+              </select>
+            </div>
+            <div class="workshop-trigger-panel" data-trigger-mode="stage">
+              <label>触发阶段</label>
+              <select class="workshop-rule-trigger" data-workshop-rule-trigger="${index}" ${isCoreStage ? "disabled" : ""}>
+                <option value="A" ${item.triggerStage === "A" ? "selected" : ""}>A 阶段</option>
+                <option value="B" ${item.triggerStage === "B" ? "selected" : ""}>B 阶段</option>
+                <option value="C" ${item.triggerStage === "C" ? "selected" : ""}>C 阶段</option>
+              </select>
+            </div>
+          </div>
+          <div class="workshop-trigger-panel" data-trigger-mode="temp">
+            <div class="grid-two">
+              <div>
+                <label>Temp 起点</label>
+                <input class="workshop-rule-trigger-temp-min" data-workshop-rule-trigger-temp-min="${index}" type="number" min="0" max="9999" step="1" value="${escapeAttr(tempMin)}" />
+              </div>
+              <div>
+                <label>Temp 终点</label>
+                <input class="workshop-rule-trigger-temp-max" data-workshop-rule-trigger-temp-max="${index}" type="number" min="0" max="9999" step="1" value="${escapeAttr(tempMax)}" />
+              </div>
+            </div>
+            <p class="muted compact">起点和终点相同表示只在单个 temp 触发。</p>
+          </div>
+        `;
+      }
+
+      function updateWorkshopRuleTriggerUI(card) {
+        if (!card) return;
+        const triggerMode = normalizeWorkshopTriggerMode(card.querySelector(".workshop-rule-trigger-mode")?.value);
+        const stagePanel = card.querySelector(".workshop-trigger-panel[data-trigger-mode='stage']");
+        const tempPanel = card.querySelector(".workshop-trigger-panel[data-trigger-mode='temp']");
+        const summaryTrigger = card.querySelector(".workshop-rule-trigger-label");
+
+        setWorkshopTriggerPanelState(stagePanel, triggerMode === "stage");
+        setWorkshopTriggerPanelState(tempPanel, triggerMode === "temp");
+
+        if (summaryTrigger) {
+          if (triggerMode === "temp") {
+            let min = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-min")?.value, initialWorkshopTemp);
+            let max = normalizeWorkshopTempValue(card.querySelector(".workshop-rule-trigger-temp-max")?.value, min);
+            if (max < min) [min, max] = [max, min];
+            summaryTrigger.textContent = min === max ? `Temp ${min}` : `Temp ${min}-${max}`;
+          } else {
+            summaryTrigger.textContent = getWorkshopStageLabel(card.querySelector(".workshop-rule-trigger")?.value);
+          }
+        }
+      }
+
+      function updateWorkshopRuleActionUI(card) {
+        if (!card) return;
+        const actionType = normalizeWorkshopActionType(card.querySelector(".workshop-rule-action")?.value);
+        const musicBlock = card.querySelector(".workshop-action-panel[data-action-type='music']");
+        const imageBlock = card.querySelector(".workshop-action-panel[data-action-type='image']");
+        const summaryAction = card.querySelector(".workshop-rule-action-label");
+        const summarySnippet = card.querySelector(".workshop-rule-summary-text");
+
+        if (summaryAction) {
+          summaryAction.textContent = getWorkshopActionLabel(actionType);
+        }
+        if (summarySnippet) {
+          const snippet = actionType === "image"
+            ? (card.querySelector(".workshop-rule-image-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条演出工坊规则")
+            : (card.querySelector(".workshop-rule-url")?.value || card.querySelector(".workshop-rule-note")?.value || "点击展开编辑这条演出工坊规则");
+          summarySnippet.textContent = String(snippet).replace(/\s+/g, " ").trim().slice(0, 56) || "点击展开编辑这条演出工坊规则";
+        }
+
+        setWorkshopPanelState(musicBlock, actionType === "music");
+        setWorkshopPanelState(imageBlock, actionType === "image");
+
+        const preview = card.querySelector(".workshop-rule-image-preview");
+        const imageUrl = card.querySelector(".workshop-rule-image-url")?.value || "";
+        if (preview) {
+          preview.src = imageUrl;
+          preview.alt = card.querySelector(".workshop-rule-image-alt")?.value || card.querySelector(".workshop-rule-name")?.value || "演出工坊图片";
+          preview.hidden = !imageUrl;
+        }
+      }
+
+      function injectWorkshopAssetPickers(card) {
+        if (!card) return;
+        const configs = [
+          {
+            kind: "music",
+            buttonLabel: "选择本地音乐",
+            accept: "audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm",
+            targetSelector: ".workshop-rule-url",
+          },
+          {
+            kind: "image",
+            buttonLabel: "选择本地图片",
+            accept: "image/*,.png,.jpg,.jpeg,.webp,.gif",
+            targetSelector: ".workshop-rule-image-url",
+          },
+        ];
+
+        configs.forEach((config) => {
+          const panel = card.querySelector(`.workshop-action-panel[data-action-type='${config.kind}']`);
+          if (!panel || panel.querySelector(".workshop-asset-row")) return;
+          const targetInput = panel.querySelector(config.targetSelector);
+          if (!targetInput) return;
+
+          const row = document.createElement("div");
+          row.className = "button-row workshop-asset-row";
+          row.innerHTML = `
+            <button class="secondary compact workshop-asset-pick" data-workshop-pick-kind="${config.kind}" type="button">${config.buttonLabel}</button>
+            <input class="workshop-rule-file" data-workshop-file-kind="${config.kind}" type="file" accept="${config.accept}" hidden />
+            <span class="muted compact">上传后会自动回填地址</span>
+          `;
+          targetInput.insertAdjacentElement("afterend", row);
+        });
+      }
+
+      async function handleWorkshopAssetSelection(card, kind, fileInput) {
+        const file = fileInput?.files?.[0];
+        if (!file || !card) return;
+
+        try {
+          setStatus(`正在上传${kind === "image" ? "图片" : "音乐"}...`);
+          const result = await uploadWorkshopAsset(kind, file);
+
+          if (kind === "image") {
+            const urlInput = card.querySelector(".workshop-rule-image-url");
+            if (urlInput) {
+              urlInput.value = result.url || "";
+              urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            const altInput = card.querySelector(".workshop-rule-image-alt");
+            if (altInput && !String(altInput.value || "").trim()) {
+              altInput.value = stripFileExtension(file.name) || "演出工坊图片";
+              altInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          } else {
+            const urlInput = card.querySelector(".workshop-rule-url");
+            if (urlInput) {
+              urlInput.value = result.url || "";
+              urlInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+            const presetInput = card.querySelector(".workshop-rule-preset");
+            if (presetInput) {
+              presetInput.value = "off";
+              presetInput.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+          }
+
+          setStatus(`${kind === "image" ? "图片" : "音乐"}已上传并回填地址，请点击“保存演出工坊”后生效。`);
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`);
+        } finally {
+          fileInput.value = "";
+        }
+      }
+
+      async function handleWorkshopOpeningAssetSelection(kind, fileInput) {
+        const file = fileInput?.files?.[0];
+        if (!file) return;
+        try {
+          setStatus(`正在上传开场${kind === "image" ? "封面图" : "音乐"}...`, "busy");
+          const result = await uploadWorkshopAsset(kind, file);
+          if (kind === "image") {
+            if (workshopOpeningCoverImageEl) {
+              workshopOpeningCoverImageEl.value = result.url || "";
+              updateWorkshopOpeningPreview();
+            }
+          } else if (workshopOpeningMusicUrlEl) {
+            workshopOpeningMusicUrlEl.value = result.url || "";
+          }
+          if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = true;
+          updateWorkshopPanelStats();
+          setStatus(`开场${kind === "image" ? "封面图" : "音乐"}已上传并回填地址，请点击“保存演出工坊”后生效。`, "success");
+          showToast(`开场${kind === "image" ? "封面图" : "音乐"}已上传`, "success");
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`, "error");
+          showToast(`上传失败：${error.message}`, "error");
+        } finally {
+          fileInput.value = "";
+        }
+      }
+
+      function createWorkshopRuleBlock(item, index) {
+        const node = document.createElement("div");
+        node.className = "card-block workshop-rule-card";
+        node.dataset.workshopIndex = String(index);
+        const summaryTitle = item.name || `规则 ${index + 1}`;
+        const isCoreStage = String(item.id || "").startsWith("workshop_stage_") && item.triggerMode === "stage" && ["A", "B", "C"].includes(item.triggerStage);
+        const summarySource = item.actionType === "image"
+          ? (item.imageUrl || item.note || "点击展开编辑这条演出工坊规则")
+          : (item.musicUrl || item.musicPreset || item.note || "点击展开编辑这条演出工坊规则");
+        const summarySnippet = String(summarySource).replace(/\s+/g, " ").trim().slice(0, 56);
+
+        node.innerHTML = `
+          <div class="workshop-rule-shell" data-collapsed="false">
+            <div class="workshop-rule-summary" role="button" tabindex="0" aria-expanded="true">
+              <div class="workshop-rule-summary-copy">
+                <strong class="workshop-rule-summary-title">${escapeHtml(summaryTitle)}</strong>
+                <span class="workshop-rule-summary-meta">
+                  <span class="workshop-rule-trigger-label">${escapeHtml(getWorkshopTriggerLabel(item))}</span>
+                  <span class="workshop-rule-action-label">${escapeHtml(getWorkshopActionLabel(item.actionType))}</span>
+                  <span class="workshop-rule-summary-text">${escapeHtml(summarySnippet || "点击展开编辑这条演出工坊规则")}</span>
+                </span>
+              </div>
+              <div class="button-row workshop-rule-actions">
+                <button class="secondary compact toggle-workshop-rule fr-collapse-button" data-toggle-workshop-rule="${index}" type="button" aria-expanded="true" aria-label="折叠这条规则">▾</button>
+                ${isCoreStage ? '<span class="preset-pill fr-static-pill">固定阶段</span>' : `<button class="secondary compact danger-button fr-danger-button" data-remove-workshop-rule="${index}" type="button" aria-label="删除这条规则">×</button>`}
+              </div>
+            </div>
+            <div class="workshop-rule-body">
+              <input class="workshop-rule-id" data-workshop-rule-id="${index}" type="hidden" value="${escapeAttr(item.id || "")}" />
+              <label>标题</label>
+              <input class="workshop-rule-name" data-workshop-rule-name="${index}" value="${escapeAttr(item.name || "")}" />
+              <label class="fr-setting-switch-row"><input class="workshop-rule-enabled" data-workshop-rule-enabled="${index}" type="checkbox" ${item.enabled !== false ? "checked" : ""} /> 启用规则</label>
+              ${buildTriggerFields(item, index, isCoreStage)}
+              <div>
+                <label>动作类型</label>
+                <select class="workshop-rule-action" data-workshop-rule-action="${index}">
+                  <option value="music" ${normalizeWorkshopActionType(item.actionType) === "music" ? "selected" : ""}>播放音乐</option>
+                  <option value="image" ${normalizeWorkshopActionType(item.actionType) === "image" ? "selected" : ""}>弹出图片</option>
+                </select>
+              </div>
+              ${buildMusicFields(item, index)}
+              ${buildImageFields(item, index)}
+              <label>备注</label>
+              <textarea class="workshop-rule-note" data-workshop-rule-note="${index}" rows="3">${escapeHtml(item.note || "")}</textarea>
+            </div>
+          </div>
+        `;
+
+        const shell = node.querySelector(".workshop-rule-shell");
+        setWorkshopRuleCollapsed(shell, false);
+        injectWorkshopAssetPickers(node);
+        updateWorkshopRuleTriggerUI(node);
+        updateWorkshopRuleActionUI(node);
+        return node;
+      }
+
+      function renderWorkshopRules(workshop = currentWorkshop) {
+        const collapsedStateById = new Map();
+        workshopRuleListEl?.querySelectorAll(".workshop-rule-card").forEach((card) => {
+          const itemId = String(card.querySelector(".workshop-rule-id")?.value || "").trim();
+          const shell = card.querySelector(".workshop-rule-shell");
+          if (itemId && shell) {
+            collapsedStateById.set(itemId, shell.dataset.collapsed === "true");
+          }
+        });
+
+        currentWorkshop = normalizeCreativeWorkshop(workshop || initialWorkshop);
+        if (workshopEnabledEl) workshopEnabledEl.checked = Boolean(currentWorkshop.enabled);
+        renderWorkshopOpening(currentWorkshop.opening);
+        if (!workshopRuleListEl) return;
+
+        workshopRuleListEl.innerHTML = "";
+        currentWorkshop.items.forEach((item, index) => {
+          const block = createWorkshopRuleBlock(item, index);
+          workshopRuleListEl.appendChild(block);
+          const shell = block.querySelector(".workshop-rule-shell");
+          const collapsed = collapsedStateById.has(item.id) ? collapsedStateById.get(item.id) : false;
+          setWorkshopRuleCollapsed(shell, collapsed);
+        });
+        updateWorkshopPanelStats();
+        applyWorkshopRuleSearch();
+      }
+
+      function addWorkshopRuleToCurrentCard() {
+        currentWorkshop = normalizeCreativeWorkshop(currentWorkshop || initialWorkshop);
+        currentWorkshop.enabled = true;
+        if (workshopEnabledEl) workshopEnabledEl.checked = true;
+
+        const nextIndex = currentWorkshop.items.filter((item) => !String(item.id || "").startsWith("workshop_stage_")).length + 1;
+        currentWorkshop.items.push({
+          ...createDefaultWorkshopItem("A"),
+          id: `workshop-item-${Date.now().toString(36)}`,
+          name: `规则 ${nextIndex}`,
+          enabled: true,
+          triggerMode: "temp",
+          triggerTempMin: initialWorkshopTemp,
+          triggerTempMax: initialWorkshopTemp,
+        });
+
+        const item = currentWorkshop.items[currentWorkshop.items.length - 1];
+        const block = createWorkshopRuleBlock(item, currentWorkshop.items.length - 1);
+        workshopRuleListEl?.appendChild(block);
+        if (workshopSearchEl) workshopSearchEl.value = "";
+        updateWorkshopPanelStats();
+        applyWorkshopRuleSearch();
+        const lastCard = workshopRuleListEl?.querySelector(".workshop-rule-card:last-of-type");
+        if (lastCard && typeof lastCard.scrollIntoView === "function") {
+          lastCard.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.Fantareal?.motion?.pulseItem(lastCard);
+        }
+        setStatus("已新增演出工坊规则。");
+      }
+
+      function applyWorkshopRuleSearch() {
+        if (!workshopSearchEl || !workshopRuleListEl) return;
+        const keyword = String(workshopSearchEl.value || "").trim().toLowerCase();
+        let visibleCount = 0;
+        [...workshopRuleListEl.querySelectorAll(".workshop-rule-card")].forEach((card) => {
+          const matched = !keyword || getWorkshopSearchText(card).includes(keyword);
+          card.hidden = !matched;
+          if (matched) visibleCount += 1;
+        });
+        if (keyword) {
+          setStatus(`演出工坊搜索完成：找到 ${visibleCount} 条匹配规则。`);
+        }
+      }
+
+      function setAllWorkshopRulesCollapsed(collapsed) {
+        workshopRuleListEl?.querySelectorAll(".workshop-rule-shell").forEach((shell) => {
+          setWorkshopRuleCollapsed(shell, collapsed);
+        });
+      }
+
+      function collectWorkshopPayload() {
+        const creativeWorkshop = {
+          enabled: workshopEnabledEl?.checked !== false,
+          opening: collectWorkshopOpeningPayload(),
+          // 旧版 items 不再在前端展示和编辑，但保存时必须原样保留，避免旧卡数据被清空。
+          items: Array.isArray(currentWorkshop?.items) ? currentWorkshop.items : [],
+        };
+
+        return { creativeWorkshop };
+      }
+
+      function notifyWorkshopRuntimeRefresh(reason = "save") {
+        const payload = {
+          type: "workshop_config_saved",
+          reason,
+          at: Date.now(),
+        };
+        try {
+          localStorage.setItem("fantareal:workshop_config_saved", JSON.stringify(payload));
+        } catch (_) {}
+      }
+
+      async function refreshWorkshopStatus() {
+        const response = await fetch("/api/workshop/status");
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "状态读取失败");
+        }
+        const data = await response.json();
+        if (workshopRuntimeInfoEl) {
+          workshopRuntimeInfoEl.textContent = `当前 temp = ${data.state?.temp ?? 0}，阶段 = ${data.stage_label || getWorkshopStageLabel(data.stage)}。temp 只会在一次聊天结束后增加。`;
+        }
+        if (typeof data.workshop === "object") {
+          currentWorkshop = normalizeCreativeWorkshop(data.workshop);
+          renderWorkshopRules(currentWorkshop);
+        }
+        updateWorkshopBindingPanel(data.binding || null);
+        updateWorkshopPanelStats();
+      }
+
+      async function saveWorkshop() {
+        const payload = collectWorkshopPayload();
+        const data = await postJson("/api/workshop/save", payload);
+        currentWorkshop = normalizeCreativeWorkshop(data.workshop || payload.creativeWorkshop);
+        renderWorkshopRules(currentWorkshop);
+        updateWorkshopBindingPanel(data.binding || null);
+        notifyWorkshopRuntimeRefresh("save");
+        setStatus(`已完成：演出工坊已保存到当前角色卡。`, "success");
+        // 保存是否成功只以 /api/workshop/save 为准。
+        // 状态刷新放到后台，避免 /api/workshop/status 慢或卡住时把保存按钮锁在“保存中…”。
+        void refreshWorkshopStatus().catch((error) => {
+          console.warn("演出工坊状态刷新失败，保存本身已完成：", error);
+        });
+      }
+
+      previewWorkshopOpeningBtn?.addEventListener("click", (event) => {
+        setButtonState(event.currentTarget, "success", "预览中 ✓");
+        showWorkshopOpeningPreview();
+      });
+
+      workshopOpeningEnabledEl?.addEventListener("change", () => {
+        updateWorkshopPanelStats();
+        setStatus(workshopOpeningEnabledEl.checked ? "已启用开场演出，记得保存到当前角色卡。" : "已关闭开场演出，记得保存到当前角色卡。", "idle");
+      });
+
+      [workshopOpeningTitleEl, workshopOpeningSubtitleEl, workshopOpeningButtonTextEl, workshopOpeningAnimationEl, workshopOpeningMusicUrlEl, workshopOpeningVolumeEl].forEach((element) => {
+        element?.addEventListener("input", updateWorkshopPanelStats);
+      });
+
+      workshopOpeningCoverImageEl?.addEventListener("input", updateWorkshopOpeningPreview);
+      document.getElementById("workshop-opening-cover-pick")?.addEventListener("click", () => {
+        document.getElementById("workshop-opening-cover-file")?.click();
+      });
+      document.getElementById("workshop-opening-music-pick")?.addEventListener("click", () => {
+        document.getElementById("workshop-opening-music-file")?.click();
+      });
+      document.getElementById("workshop-opening-cover-clear")?.addEventListener("click", () => {
+        if (workshopOpeningCoverImageEl) workshopOpeningCoverImageEl.value = "";
+        updateWorkshopOpeningPreview();
+        if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = true;
+        updateWorkshopPanelStats();
+        setStatus("已清除开场封面，请点击“保存演出工坊”后生效。", "idle");
+        showToast("已清除开场封面", "success");
+      });
+      document.getElementById("workshop-opening-music-clear")?.addEventListener("click", () => {
+        if (workshopOpeningMusicUrlEl) workshopOpeningMusicUrlEl.value = "";
+        if (workshopOpeningEnabledEl) workshopOpeningEnabledEl.checked = true;
+        updateWorkshopPanelStats();
+        setStatus("已清除开场音乐，请点击“保存演出工坊”后生效。", "idle");
+        showToast("已清除开场音乐", "success");
+      });
+      document.getElementById("workshop-opening-cover-file")?.addEventListener("change", (event) => {
+        handleWorkshopOpeningAssetSelection("image", event.currentTarget);
+      });
+      document.getElementById("workshop-opening-music-file")?.addEventListener("change", (event) => {
+        handleWorkshopOpeningAssetSelection("music", event.currentTarget);
+      });
+
+      workshopEnabledEl?.addEventListener("change", () => {
+        if (currentWorkshop) currentWorkshop.enabled = workshopEnabledEl.checked;
+        updateWorkshopPanelStats();
+        setStatus(workshopEnabledEl.checked ? "已启用演出工坊，记得保存到当前角色卡。" : "已关闭演出工坊，记得保存到当前角色卡。", "idle");
+      });
+
+      async function clearWorkshopBinding() {
+        const response = await fetch("/api/workshop/clear-card-binding", { method: "POST" });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || "清除本卡演出失败");
+        }
+        const data = await response.json();
+        currentWorkshop = normalizeCreativeWorkshop(data.workshop || {});
+        renderWorkshopRules(currentWorkshop);
+        updateWorkshopBindingPanel(data.binding || null);
+        updateWorkshopPanelStats();
+        notifyWorkshopRuntimeRefresh("clear");
+        return data;
+      }
+
+      document.getElementById("reload-workshop-status")?.addEventListener("click", async (event) => {
+        const btn = event.currentTarget;
+        rememberButtonLabel(btn);
+        setButtonState(btn, "loading", "读取中…");
+        setStatus("正在重新读取当前角色卡演出配置…", "busy");
+        try {
+          await refreshWorkshopStatus();
+          setButtonState(btn, "success", "已读取 ✓");
+          setStatus("已重新读取当前角色卡演出配置。", "success");
+        } catch (error) {
+          setButtonState(btn, "error", "读取失败");
+          setStatus(error.message || "演出工坊状态读取失败。", "error");
+          showToast(error.message || "演出工坊状态读取失败。", "error");
+        }
+      });
+
+      clearWorkshopBindingBtn?.addEventListener("click", async (event) => {
+        const ok = window.confirm("确认清除当前角色卡的演出绑定？\n\n只会清空开场演出、常驻氛围和动态演出配置，不会删除图片、音乐、聊天记录或其他角色卡内容。");
+        if (!ok) return;
+        const btn = event.currentTarget;
+        rememberButtonLabel(btn);
+        setButtonState(btn, "loading", "清除中…");
+        setStatus("正在清除当前角色卡演出绑定…", "busy");
+        try {
+          await clearWorkshopBinding();
+          setButtonState(btn, "success", "已清除 ✓");
+          setStatus("已清除当前角色卡演出绑定。", "success");
+          showToast("已清除本卡演出", "已恢复为空配置，资源文件不会被删除。", "ok");
+        } catch (error) {
+          setButtonState(btn, "error", "清除失败");
+          setStatus(error.message || "清除本卡演出失败。", "error");
+          showToast(error.message || "清除本卡演出失败。", "error");
+        }
+      });
+
+      document.getElementById("save-workshop")?.addEventListener("click", async (event) => {
+        const saveButton = event.currentTarget;
+        if (saveButton?.dataset.saving === "true") return;
+        saveButton.dataset.saving = "true";
+        setButtonState(saveButton, "loading", "保存中…");
+        setStatus("正在保存演出工坊规则…", "busy");
+        const saveWatchdog = window.setTimeout(() => {
+          ensureButtonReleased(saveButton, "保存演出工坊");
+        }, 6000);
+        try {
+          await saveWorkshop();
+          window.clearTimeout(saveWatchdog);
+          setButtonState(saveButton, "success", "已保存 ✓");
+          showToast("演出工坊已保存", "success");
+          window.setTimeout(() => ensureButtonReleased(saveButton, "保存演出工坊"), 1600);
+        } catch (error) {
+          window.clearTimeout(saveWatchdog);
+          setButtonState(saveButton, "error", "保存失败");
+          setStatus(`保存失败：${error.message}`, "error");
+          showToast(`保存失败：${error.message}`, "error");
+        } finally {
+          saveButton.dataset.saving = "false";
+          window.setTimeout(() => ensureButtonReleased(saveButton, "保存演出工坊"), 7000);
+        }
+      });
+
+
+
+      // ===== Workshop Performance Layer v1.0: opening extension / ambience / dynamic scenes =====
+      const workshopOpeningHoldSecondsEl = document.getElementById("workshop-opening-hold-seconds");
+      const workshopOpeningAfterModeEl = document.getElementById("workshop-opening-after-mode");
+      const workshopOpeningAutoPlayMusicEl = document.getElementById("workshop-opening-autoplay-music");
+      const workshopOpeningFadeInSecondsEl = document.getElementById("workshop-opening-fade-in-seconds");
+      const workshopOpeningFadeOutSecondsEl = document.getElementById("workshop-opening-fade-out-seconds");
+      const workshopOpeningTransitionSecondsEl = document.getElementById("workshop-opening-transition-seconds");
+      const workshopOpeningTypewriterEnabledEl = document.getElementById("workshop-opening-typewriter-enabled");
+      const workshopOpeningTypewriterSpeedEl = document.getElementById("workshop-opening-typewriter-speed");
+      const ambienceEnabledEl = document.getElementById("workshop-ambience-enabled");
+      const ambienceNameEl = document.getElementById("workshop-ambience-name");
+      const ambienceStartModeEl = document.getElementById("workshop-ambience-start-mode");
+      const ambienceBgEnabledEl = document.getElementById("workshop-ambience-bg-enabled");
+      const ambienceBgUrlEl = document.getElementById("workshop-ambience-bg-url");
+      const ambienceBgOverlayEl = document.getElementById("workshop-ambience-bg-overlay");
+      const ambienceMusicEnabledEl = document.getElementById("workshop-ambience-music-enabled");
+      const ambienceMusicPresetEl = document.getElementById("workshop-ambience-music-preset");
+      const ambienceMusicUrlEl = document.getElementById("workshop-ambience-music-url");
+      const ambienceMusicVolumeEl = document.getElementById("workshop-ambience-music-volume");
+      const ambienceAmbientEnabledEl = document.getElementById("workshop-ambience-ambient-enabled");
+      const ambienceAmbientPresetEl = document.getElementById("workshop-ambience-ambient-preset");
+      const ambienceAmbientUrlEl = document.getElementById("workshop-ambience-ambient-url");
+      const ambienceAmbientVolumeEl = document.getElementById("workshop-ambience-ambient-volume");
+      const previewWorkshopAmbienceBtn = document.getElementById("preview-workshop-ambience");
+      const dynamicSceneListEl = document.getElementById("dynamic-scene-list");
+      let workshopAmbiencePreviewAudio = [];
+
+      function clampWorkshopFloat(value, min, max, fallback) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return fallback;
+        return Math.min(Math.max(number, min), max);
+      }
+
+      function populatePresetSelect(selectEl, presets, labelPrefix = "") {
+        if (!selectEl) return;
+        const current = selectEl.value || "off";
+        selectEl.innerHTML = presets.map((preset) => `<option value="${escapeAttr(preset.id)}">${escapeHtml(labelPrefix ? `${labelPrefix}${preset.label}` : preset.label)}</option>`).join("");
+        selectEl.value = presets.some((preset) => preset.id === current) ? current : "off";
+      }
+
+      const AMBIENCE_PRESETS = MUSIC_PRESETS;
+      const AMBIENT_PRESETS = [
+        { id: "off", label: "关闭", url: "" },
+        { id: "rain", label: "雨声", url: "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3f39d79a8.mp3?filename=rain-110495.mp3" },
+        { id: "coffee", label: "咖啡馆人声", url: "https://cdn.pixabay.com/download/audio/2022/10/25/audio_9d60d4f2e7.mp3?filename=coffee-shop-ambience-124008.mp3" },
+        { id: "night", label: "夜晚底噪", url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8a0e95371.mp3?filename=soft-piano-ambient-11157.mp3" },
+      ];
+      populatePresetSelect(ambienceMusicPresetEl, AMBIENCE_PRESETS);
+      populatePresetSelect(ambienceAmbientPresetEl, AMBIENT_PRESETS);
+
+      function normalizeOpeningAfterMode(value) {
+        const mode = String(value || "connect_ambience").trim();
+        return ["connect_ambience", "continue_opening", "fade_stop"].includes(mode) ? mode : "connect_ambience";
+      }
+
+      function normalizeOpeningTypewriterSpeed(value) {
+        const speed = String(value || "normal").trim();
+        return ["slow", "normal", "fast"].includes(speed) ? speed : "normal";
+      }
+
+      const previousNormalizeWorkshopOpening = normalizeWorkshopOpening;
+      normalizeWorkshopOpening = function(opening) {
+        const data = previousNormalizeWorkshopOpening(opening);
+        return {
+          ...data,
+          holdSeconds: clampWorkshopFloat(opening?.holdSeconds ?? 3, 0, 20, 3),
+          afterMode: normalizeOpeningAfterMode(opening?.afterMode),
+          autoPlayMusic: opening?.autoPlayMusic === true,
+          fadeInSeconds: clampWorkshopFloat(opening?.fadeInSeconds ?? 2, 0, 8, 2),
+          fadeOutSeconds: clampWorkshopFloat(opening?.fadeOutSeconds ?? 2, 0, 8, 2),
+          transitionSeconds: clampWorkshopFloat(opening?.transitionSeconds ?? 2, 0, 8, 2),
+          typewriterEnabled: opening?.typewriterEnabled === true,
+          typewriterSpeed: normalizeOpeningTypewriterSpeed(opening?.typewriterSpeed),
+        };
+      };
+
+      const previousRenderWorkshopOpening = renderWorkshopOpening;
+      renderWorkshopOpening = function(opening = currentWorkshop?.opening) {
+        previousRenderWorkshopOpening(opening);
+        const data = normalizeWorkshopOpening(opening);
+        if (workshopOpeningHoldSecondsEl) workshopOpeningHoldSecondsEl.value = String(data.holdSeconds ?? 3);
+        if (workshopOpeningAfterModeEl) workshopOpeningAfterModeEl.value = data.afterMode || "connect_ambience";
+        if (workshopOpeningAutoPlayMusicEl) workshopOpeningAutoPlayMusicEl.checked = data.autoPlayMusic === true;
+        if (workshopOpeningFadeInSecondsEl) workshopOpeningFadeInSecondsEl.value = String(data.fadeInSeconds ?? 2);
+        if (workshopOpeningFadeOutSecondsEl) workshopOpeningFadeOutSecondsEl.value = String(data.fadeOutSeconds ?? 2);
+        if (workshopOpeningTransitionSecondsEl) workshopOpeningTransitionSecondsEl.value = String(data.transitionSeconds ?? 2);
+        if (workshopOpeningTypewriterEnabledEl) workshopOpeningTypewriterEnabledEl.checked = data.typewriterEnabled === true;
+        if (workshopOpeningTypewriterSpeedEl) workshopOpeningTypewriterSpeedEl.value = data.typewriterSpeed || "normal";
+      };
+
+      const previousCollectWorkshopOpeningPayload = collectWorkshopOpeningPayload;
+      collectWorkshopOpeningPayload = function() {
+        const payload = previousCollectWorkshopOpeningPayload();
+        return {
+          ...payload,
+          holdSeconds: clampWorkshopFloat(workshopOpeningHoldSecondsEl?.value ?? 3, 0, 20, 3),
+          afterMode: normalizeOpeningAfterMode(workshopOpeningAfterModeEl?.value),
+          autoPlayMusic: workshopOpeningAutoPlayMusicEl?.checked === true,
+          fadeInSeconds: clampWorkshopFloat(workshopOpeningFadeInSecondsEl?.value ?? 2, 0, 8, 2),
+          fadeOutSeconds: clampWorkshopFloat(workshopOpeningFadeOutSecondsEl?.value ?? 2, 0, 8, 2),
+          transitionSeconds: clampWorkshopFloat(workshopOpeningTransitionSecondsEl?.value ?? 2, 0, 8, 2),
+          typewriterEnabled: workshopOpeningTypewriterEnabledEl?.checked === true,
+          typewriterSpeed: normalizeOpeningTypewriterSpeed(workshopOpeningTypewriterSpeedEl?.value),
+        };
+      };
+
+
+      [
+        workshopOpeningHoldSecondsEl, workshopOpeningAfterModeEl, workshopOpeningAutoPlayMusicEl,
+        workshopOpeningFadeInSecondsEl, workshopOpeningFadeOutSecondsEl, workshopOpeningTransitionSecondsEl,
+        workshopOpeningTypewriterEnabledEl, workshopOpeningTypewriterSpeedEl,
+      ].forEach((element) => {
+        element?.addEventListener("input", updateWorkshopPanelStats);
+        element?.addEventListener("change", updateWorkshopPanelStats);
+      });
+
+      function clampGlobalBackgroundOverlay() {
+        return clampWorkshopFloat(currentOverlay ?? 0.42, 0, 0.85, 0.42);
+      }
+
+      function createDefaultAmbience(inheritGlobal = true) {
+        const inheritedBackground = inheritGlobal ? String(currentBackground || "").trim() : "";
+        const inheritedOverlay = inheritGlobal ? clampGlobalBackgroundOverlay() : 0.35;
+        return {
+          enabled: false,
+          name: "默认氛围",
+          startMode: "after_opening",
+          background: { enabled: Boolean(inheritedBackground), imageUrl: inheritedBackground, overlay: inheritedOverlay },
+          music: { enabled: false, preset: "off", url: "", volume: 0.6, loop: true },
+          ambient: { enabled: false, preset: "off", url: "", volume: 0.35, loop: true },
+        };
+      }
+
+      function normalizeAmbience(raw, inheritGlobal = true) {
+        const base = createDefaultAmbience(inheritGlobal);
+        const source = raw && typeof raw === "object" ? raw : {};
+        const bg = source.background && typeof source.background === "object" ? source.background : {};
+        const music = source.music && typeof source.music === "object" ? source.music : {};
+        const ambient = source.ambient && typeof source.ambient === "object" ? source.ambient : {};
+        const rawBgUrl = String(bg.imageUrl || "").trim();
+        const rawBgOverlay = bg.overlay;
+        const looksLikeLegacyEmptyBackground = inheritGlobal
+          && !rawBgUrl
+          && bg.enabled !== true
+          && (rawBgOverlay === undefined || Number(rawBgOverlay) === 0.35);
+        const fallbackBg = looksLikeLegacyEmptyBackground ? base.background : null;
+        return {
+          enabled: source.enabled === true,
+          name: String(source.name || "默认氛围").trim().slice(0, 40) || "默认氛围",
+          startMode: source.startMode === "manual" ? "manual" : "after_opening",
+          background: {
+            enabled: fallbackBg ? fallbackBg.enabled : bg.enabled === true,
+            imageUrl: fallbackBg ? fallbackBg.imageUrl : rawBgUrl,
+            overlay: fallbackBg ? fallbackBg.overlay : clampWorkshopFloat(bg.overlay ?? 0.35, 0, 0.85, 0.35),
+          },
+          music: {
+            enabled: music.enabled === true,
+            preset: String(music.preset || "off").trim() || "off",
+            url: String(music.url || "").trim(),
+            volume: clampWorkshopFloat(music.volume ?? 0.6, 0, 1, 0.6),
+            loop: music.loop !== false,
+          },
+          ambient: {
+            enabled: ambient.enabled === true,
+            preset: String(ambient.preset || "off").trim() || "off",
+            url: String(ambient.url || "").trim(),
+            volume: clampWorkshopFloat(ambient.volume ?? 0.35, 0, 1, 0.35),
+            loop: ambient.loop !== false,
+          },
+        };
+      }
+
+      function renderAmbience(raw = currentWorkshop?.ambience) {
+        const data = normalizeAmbience(raw);
+        if (ambienceEnabledEl) ambienceEnabledEl.checked = data.enabled;
+        if (ambienceNameEl) ambienceNameEl.value = data.name;
+        if (ambienceStartModeEl) ambienceStartModeEl.value = data.startMode;
+        if (ambienceBgEnabledEl) ambienceBgEnabledEl.checked = data.background.enabled;
+        if (ambienceBgUrlEl) ambienceBgUrlEl.value = data.background.imageUrl;
+        if (ambienceBgOverlayEl) ambienceBgOverlayEl.value = String(data.background.overlay);
+        if (ambienceMusicEnabledEl) ambienceMusicEnabledEl.checked = data.music.enabled;
+        if (ambienceMusicPresetEl) ambienceMusicPresetEl.value = data.music.preset;
+        if (ambienceMusicUrlEl) ambienceMusicUrlEl.value = data.music.url;
+        if (ambienceMusicVolumeEl) ambienceMusicVolumeEl.value = String(data.music.volume);
+        if (ambienceAmbientEnabledEl) ambienceAmbientEnabledEl.checked = data.ambient.enabled;
+        if (ambienceAmbientPresetEl) ambienceAmbientPresetEl.value = data.ambient.preset;
+        if (ambienceAmbientUrlEl) ambienceAmbientUrlEl.value = data.ambient.url;
+        if (ambienceAmbientVolumeEl) ambienceAmbientVolumeEl.value = String(data.ambient.volume);
+      }
+
+      function collectAmbiencePayload() {
+        return normalizeAmbience({
+          enabled: ambienceEnabledEl?.checked === true,
+          name: ambienceNameEl?.value || "默认氛围",
+          startMode: ambienceStartModeEl?.value || "after_opening",
+          background: {
+            enabled: ambienceBgEnabledEl?.checked === true,
+            imageUrl: ambienceBgUrlEl?.value || "",
+            overlay: ambienceBgOverlayEl?.value ?? 0.35,
+          },
+          music: {
+            enabled: ambienceMusicEnabledEl?.checked === true,
+            preset: ambienceMusicPresetEl?.value || "off",
+            url: ambienceMusicUrlEl?.value || "",
+            volume: ambienceMusicVolumeEl?.value ?? 0.6,
+            loop: true,
+          },
+          ambient: {
+            enabled: ambienceAmbientEnabledEl?.checked === true,
+            preset: ambienceAmbientPresetEl?.value || "off",
+            url: ambienceAmbientUrlEl?.value || "",
+            volume: ambienceAmbientVolumeEl?.value ?? 0.35,
+            loop: true,
+          },
+        }, false);
+      }
+
+      const DYNAMIC_TRIGGER_TYPES = new Set(["round", "model", "manual", "state_journal_tag", "plot_ledger_tag"]);
+      const DEPRECATED_DYNAMIC_TRIGGER_TYPES = new Set(["progress"]);
+      const DYNAMIC_REPEAT_MODES = new Set(["once", "session", "always"]);
+      const DYNAMIC_CONTENT_TYPES = new Set(["image", "sound", "background"]);
+      const DYNAMIC_PRESENTATION_MODES = new Set(["light", "standard", "immersive"]);
+
+      function createDefaultDynamicScene(index = 1) {
+        return {
+          id: `dynamic_scene_${Date.now().toString(36)}_${index}`,
+          name: `动态演出 ${index}`,
+          enabled: true,
+          trigger: { type: "model", round: 1, progress: 0, event: `scene_${index}`, tag: "", repeat: "once" },
+          content: { type: "image", title: "", imageUrl: "", caption: "", soundUrl: "", backgroundUrl: "" },
+          presentation: { mode: "standard", duration: 6, autoClose: true, buttonText: "继续", blocking: true },
+          audio: { enabled: false, url: "", volume: 0.5, duckAmbience: true },
+          note: "",
+        };
+      }
+
+      function normalizeDynamicScene(raw, index = 1) {
+        const base = createDefaultDynamicScene(index);
+        const source = raw && typeof raw === "object" ? raw : {};
+        const trigger = source.trigger && typeof source.trigger === "object" ? source.trigger : {};
+        const content = source.content && typeof source.content === "object" ? source.content : {};
+        const presentation = source.presentation && typeof source.presentation === "object" ? source.presentation : {};
+        const audio = source.audio && typeof source.audio === "object" ? source.audio : {};
+        const rawTriggerType = String(trigger.type || "model");
+        const triggerType = DYNAMIC_TRIGGER_TYPES.has(rawTriggerType)
+          ? rawTriggerType
+          : (DEPRECATED_DYNAMIC_TRIGGER_TYPES.has(rawTriggerType) ? "manual" : "model");
+        const repeat = DYNAMIC_REPEAT_MODES.has(String(trigger.repeat || "once")) ? String(trigger.repeat || "once") : "once";
+        const contentType = DYNAMIC_CONTENT_TYPES.has(String(content.type || "image")) ? String(content.type || "image") : "image";
+        const mode = DYNAMIC_PRESENTATION_MODES.has(String(presentation.mode || "standard")) ? String(presentation.mode || "standard") : "standard";
+        return {
+          id: String(source.id || base.id).trim().slice(0, 64) || base.id,
+          name: String(source.name || base.name).trim().slice(0, 64) || base.name,
+          enabled: source.enabled !== false,
+          trigger: {
+            type: triggerType,
+            round: Math.max(1, Math.min(Number(trigger.round || 1) || 1, 9999)),
+            progress: Math.max(0, Math.min(Number(trigger.progress || 0) || 0, 9999)),
+            event: String(trigger.event || "").trim().slice(0, 64),
+            tag: String(trigger.tag || "").trim().slice(0, 160),
+            repeat,
+          },
+          content: {
+            type: contentType,
+            title: String(content.title || "").trim().slice(0, 80),
+            imageUrl: String(content.imageUrl || "").trim(),
+            caption: String(content.caption || "").trim().slice(0, 240),
+            soundUrl: String(content.soundUrl || "").trim(),
+            backgroundUrl: String(content.backgroundUrl || "").trim(),
+          },
+          presentation: {
+            mode,
+            duration: clampWorkshopFloat(presentation.duration ?? 6, 0, 60, 6),
+            autoClose: presentation.autoClose !== false,
+            buttonText: String(presentation.buttonText || "继续").trim().slice(0, 24) || "继续",
+            blocking: presentation.blocking !== false,
+          },
+          audio: {
+            enabled: audio.enabled === true,
+            url: String(audio.url || "").trim(),
+            volume: clampWorkshopFloat(audio.volume ?? 0.5, 0, 1, 0.5),
+            duckAmbience: audio.duckAmbience !== false,
+          },
+          note: String(source.note || "").trim().slice(0, 800),
+        };
+      }
+
+      function renderDynamicScenes(scenes = currentWorkshop?.dynamicScenes || []) {
+        if (!dynamicSceneListEl) return;
+        const normalizedScenes = Array.isArray(scenes) ? scenes.map((scene, index) => normalizeDynamicScene(scene, index + 1)) : [];
+        if (!normalizedScenes.length) {
+          dynamicSceneListEl.innerHTML = `<p class="muted compact workshop-empty-note">还没有动态演出。可以先新增一条，选择“模型状态块触发”，并填入触发标记。</p>`;
+          return;
+        }
+        dynamicSceneListEl.innerHTML = normalizedScenes.map((scene, index) => buildDynamicSceneCard(scene, index)).join("");
+        dynamicSceneListEl.querySelectorAll(".dynamic-scene-card").forEach(updateDynamicSceneCardVisibility);
+      }
+
+      function buildDynamicSceneCard(scene, index) {
+        return `
+          <div class="card-block dynamic-scene-card" data-dynamic-scene-index="${index}">
+            <div class="dynamic-scene-head">
+              <strong>动态演出 ${index + 1}</strong>
+              <div class="button-row">
+                <button type="button" class="secondary compact test-dynamic-scene">测试</button>
+                <button type="button" class="secondary compact danger-button remove-dynamic-scene">删除</button>
+              </div>
+            </div>
+            <input class="dynamic-scene-id" type="hidden" value="${escapeAttr(scene.id)}" />
+            <div class="grid-two">
+              <div><label>演出名称</label><input class="dynamic-scene-name" value="${escapeAttr(scene.name)}" /></div>
+              <label class="fr-setting-switch-row dynamic-enabled-row"><input class="dynamic-scene-enabled" type="checkbox" ${scene.enabled ? "checked" : ""} /> 启用演出</label>
+            </div>
+            <div class="grid-two">
+              <div>
+                <label>触发来源</label>
+                <select class="dynamic-trigger-type">
+                  <option value="round" ${scene.trigger.type === "round" ? "selected" : ""}>系统计数：对话回合</option>
+                  <option value="model" ${scene.trigger.type === "model" ? "selected" : ""}>模型状态块</option>
+                  <option value="state_journal_tag" ${scene.trigger.type === "state_journal_tag" ? "selected" : ""}>状态阶段 tag</option>
+                  <option value="plot_ledger_tag" ${scene.trigger.type === "plot_ledger_tag" ? "selected" : ""}>剧情账本 tag</option>
+                  <option value="manual" ${scene.trigger.type === "manual" ? "selected" : ""}>仅手动 / 测试</option>
+                </select>
+              </div>
+              <div>
+                <label>重复方式</label>
+                <select class="dynamic-repeat-mode">
+                  <option value="once" ${scene.trigger.repeat === "once" ? "selected" : ""}>只触发一次</option>
+                  <option value="session" ${scene.trigger.repeat === "session" ? "selected" : ""}>每次会话一次</option>
+                  <option value="always" ${scene.trigger.repeat === "always" ? "selected" : ""}>每次满足都触发</option>
+                </select>
+              </div>
+            </div>
+            <div class="dynamic-trigger-panel" data-panel="round"><label>第几次角色回复后触发</label><input class="dynamic-trigger-round" type="number" min="1" max="9999" step="1" value="${escapeAttr(scene.trigger.round)}" /></div>
+            <div class="dynamic-trigger-panel" data-panel="model"><label>触发标记</label><input class="dynamic-trigger-event" value="${escapeAttr(scene.trigger.event)}" placeholder="rain_memory" /><p class="muted compact">模型输出 <code>[FT_EVENT: ${escapeHtml(scene.trigger.event || "rain_memory")}]</code> 或 <code>fantareal_workshop</code> 状态块中的 <code>event</code> 值与这里一致时触发。</p></div>
+            <div class="dynamic-trigger-panel" data-panel="state_journal_tag"><label>状态阶段 tag</label><input class="dynamic-trigger-tag dynamic-trigger-state-tag" value="${escapeAttr(scene.trigger.tag)}" placeholder="state_journal.role.hero.stage.trust" /><p class="muted compact">只匹配数据库当前激活的阶段 tag。演出工坊不读取正文，也不自己判断阶段。</p></div>
+            <div class="dynamic-trigger-panel" data-panel="plot_ledger_tag"><label>剧情账本 tag</label><input class="dynamic-trigger-tag dynamic-trigger-plot-tag" value="${escapeAttr(scene.trigger.tag)}" placeholder="state_journal.task.find_silver_key.done" /><p class="muted compact">只匹配剧情账本当前激活的事件 / 任务 / 线索 tag，例如 active、done 或 failed 状态。</p></div>
+            <div class="grid-two">
+              <div>
+                <label>演出内容</label>
+                <select class="dynamic-content-type">
+                  <option value="image" ${scene.content.type === "image" ? "selected" : ""}>图片演出</option>
+                  <option value="sound" ${scene.content.type === "sound" ? "selected" : ""}>音效演出</option>
+                  <option value="background" ${scene.content.type === "background" ? "selected" : ""}>背景切换</option>
+                </select>
+              </div>
+              <div>
+                <label>展示方式</label>
+                <select class="dynamic-presentation-mode">
+                  <option value="light" ${scene.presentation.mode === "light" ? "selected" : ""}>轻量浮层</option>
+                  <option value="standard" ${scene.presentation.mode === "standard" ? "selected" : ""}>标准卡片</option>
+                  <option value="immersive" ${scene.presentation.mode === "immersive" ? "selected" : ""}>沉浸全屏</option>
+                </select>
+              </div>
+            </div>
+            <div class="dynamic-content-panel" data-content="image">
+              <label>图片地址</label><input class="dynamic-image-url" value="${escapeAttr(scene.content.imageUrl)}" placeholder="上传后自动回填，或粘贴图片地址" />
+              <div class="button-row workshop-asset-row"><button type="button" class="secondary compact dynamic-image-pick">选择本地图片</button><input type="file" class="dynamic-image-file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif" hidden /></div>
+              <label>标题</label><input class="dynamic-title" value="${escapeAttr(scene.content.title)}" />
+              <label>说明文字</label><textarea class="dynamic-caption" rows="2">${escapeHtml(scene.content.caption)}</textarea>
+            </div>
+            <div class="dynamic-content-panel" data-content="sound">
+              <label>音效地址</label><input class="dynamic-sound-url" value="${escapeAttr(scene.content.soundUrl || scene.audio.url)}" placeholder="上传后自动回填，或粘贴音频地址" />
+              <div class="button-row workshop-asset-row"><button type="button" class="secondary compact dynamic-sound-pick">选择本地音效</button><input type="file" class="dynamic-sound-file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm" hidden /></div>
+              <label>音效音量</label><input class="dynamic-sound-volume" type="range" min="0" max="1" step="0.01" value="${escapeAttr(scene.audio.volume)}" />
+            </div>
+            <div class="dynamic-content-panel" data-content="background">
+              <label>背景图地址</label><input class="dynamic-background-url" value="${escapeAttr(scene.content.backgroundUrl)}" placeholder="上传后自动回填，或粘贴图片地址" />
+              <div class="button-row workshop-asset-row"><button type="button" class="secondary compact dynamic-background-pick">选择本地背景图</button><input type="file" class="dynamic-background-file" accept="image/*,.png,.jpg,.jpeg,.webp,.gif" hidden /></div>
+              <p class="muted compact">第一版按临时背景处理，演出结束后会恢复常驻背景。</p>
+            </div>
+            <div class="grid-two">
+              <div><label>显示时长（秒）</label><input class="dynamic-duration" type="number" min="0" max="60" step="0.5" value="${escapeAttr(scene.presentation.duration)}" /></div>
+              <label class="fr-setting-switch-row"><input class="dynamic-autoclose" type="checkbox" ${scene.presentation.autoClose ? "checked" : ""} /> 到时自动关闭</label>
+            </div>
+            <div class="grid-two">
+              <div><label>确认按钮文字</label><input class="dynamic-button-text" maxlength="24" value="${escapeAttr(scene.presentation.buttonText)}" placeholder="继续" /></div>
+              <label class="fr-setting-switch-row"><input class="dynamic-blocking" type="checkbox" ${scene.presentation.blocking ? "checked" : ""} /> 需要点击确认后关闭</label>
+            </div>
+            <label>备注</label><textarea class="dynamic-note" rows="2">${escapeHtml(scene.note)}</textarea>
+          </div>
+        `;
+      }
+
+      function updateDynamicSceneCardVisibility(card) {
+        if (!card) return;
+        const triggerType = String(card.querySelector(".dynamic-trigger-type")?.value || "model");
+        card.querySelectorAll(".dynamic-trigger-panel").forEach((panel) => {
+          panel.hidden = panel.dataset.panel !== triggerType;
+        });
+        const contentType = String(card.querySelector(".dynamic-content-type")?.value || "image");
+        card.querySelectorAll(".dynamic-content-panel").forEach((panel) => {
+          panel.hidden = panel.dataset.content !== contentType;
+        });
+      }
+
+      function cssEscapeWorkshopValue(value) {
+        if (window.CSS?.escape) return CSS.escape(String(value || ""));
+        return String(value || "").replace(/["\\]/g, "\\$&");
+      }
+
+      function collectDynamicScenesPayload() {
+        if (!dynamicSceneListEl) return [];
+        return [...dynamicSceneListEl.querySelectorAll(".dynamic-scene-card")].map((card, index) => {
+          const triggerType = card.querySelector(".dynamic-trigger-type")?.value || "model";
+          const activeTagInput = card.querySelector(`.dynamic-trigger-panel[data-panel="${cssEscapeWorkshopValue(triggerType)}"] .dynamic-trigger-tag`);
+          return normalizeDynamicScene({
+          id: card.querySelector(".dynamic-scene-id")?.value || `dynamic_scene_${index + 1}`,
+          name: card.querySelector(".dynamic-scene-name")?.value || `动态演出 ${index + 1}`,
+          enabled: card.querySelector(".dynamic-scene-enabled")?.checked !== false,
+          trigger: {
+            type: triggerType,
+            round: card.querySelector(".dynamic-trigger-round")?.value || 1,
+            progress: 0,
+            event: card.querySelector(".dynamic-trigger-event")?.value || "",
+            tag: activeTagInput?.value || "",
+            repeat: card.querySelector(".dynamic-repeat-mode")?.value || "once",
+          },
+          content: {
+            type: card.querySelector(".dynamic-content-type")?.value || "image",
+            title: card.querySelector(".dynamic-title")?.value || "",
+            imageUrl: card.querySelector(".dynamic-image-url")?.value || "",
+            caption: card.querySelector(".dynamic-caption")?.value || "",
+            soundUrl: card.querySelector(".dynamic-sound-url")?.value || "",
+            backgroundUrl: card.querySelector(".dynamic-background-url")?.value || "",
+          },
+          presentation: {
+            mode: card.querySelector(".dynamic-presentation-mode")?.value || "standard",
+            duration: card.querySelector(".dynamic-duration")?.value || 6,
+            autoClose: card.querySelector(".dynamic-autoclose")?.checked !== false,
+            buttonText: card.querySelector(".dynamic-button-text")?.value || "继续",
+            blocking: card.querySelector(".dynamic-blocking")?.checked !== false,
+          },
+          audio: {
+            enabled: Boolean(card.querySelector(".dynamic-sound-url")?.value || ""),
+            url: card.querySelector(".dynamic-sound-url")?.value || "",
+            volume: card.querySelector(".dynamic-sound-volume")?.value || 0.5,
+            duckAmbience: true,
+          },
+          note: card.querySelector(".dynamic-note")?.value || "",
+        }, index + 1);
+        });
+      }
+
+      const previousNormalizeCreativeWorkshop = normalizeCreativeWorkshop;
+      normalizeCreativeWorkshop = function(workshop) {
+        const data = previousNormalizeCreativeWorkshop(workshop);
+        data.version = Number(workshop?.version || 2) || 2;
+        data.ambience = normalizeAmbience(workshop?.ambience);
+        data.dynamicScenes = Array.isArray(workshop?.dynamicScenes) ? workshop.dynamicScenes.map((scene, index) => normalizeDynamicScene(scene, index + 1)) : [];
+        return data;
+      };
+
+      renderWorkshopRules = function(workshop = currentWorkshop) {
+        currentWorkshop = normalizeCreativeWorkshop(workshop || initialWorkshop);
+        if (workshopEnabledEl) workshopEnabledEl.checked = Boolean(currentWorkshop.enabled);
+        renderWorkshopOpening(currentWorkshop.opening);
+        renderAmbience(currentWorkshop?.ambience);
+        renderDynamicScenes(currentWorkshop?.dynamicScenes || []);
+        updateWorkshopPanelStats();
+      };
+
+      const previousCollectWorkshopPayload = collectWorkshopPayload;
+      collectWorkshopPayload = function() {
+        const payload = previousCollectWorkshopPayload();
+        payload.creativeWorkshop.version = 2;
+        payload.creativeWorkshop.ambience = collectAmbiencePayload();
+        payload.creativeWorkshop.dynamicScenes = collectDynamicScenesPayload();
+        return payload;
+      };
+
+      function stopAmbiencePreview() {
+        workshopAmbiencePreviewAudio.forEach((audio) => {
+          try { audio.pause(); audio.removeAttribute("src"); audio.load(); } catch (_) {}
+        });
+        workshopAmbiencePreviewAudio = [];
+        bodyEl.classList.remove("workshop-ambience-previewing");
+        bodyEl.style.removeProperty("--workshop-ambience-preview-bg");
+        bodyEl.style.removeProperty("--workshop-ambience-preview-overlay");
+      }
+
+      function resolvePresetUrl(presets, presetId) {
+        return presets.find((preset) => preset.id === presetId)?.url || "";
+      }
+
+      function previewAmbience() {
+        stopAmbiencePreview();
+        const data = collectAmbiencePayload();
+        if (data.background.enabled && data.background.imageUrl) {
+          bodyEl.classList.add("workshop-ambience-previewing");
+          bodyEl.style.setProperty("--workshop-ambience-preview-bg", `url("${data.background.imageUrl.replace(/["\\\n\r]/g, "")}")`);
+          bodyEl.style.setProperty("--workshop-ambience-preview-overlay", String(data.background.overlay));
+        }
+        const musicUrl = data.music.url || resolvePresetUrl(AMBIENCE_PRESETS, data.music.preset);
+        const ambientUrl = data.ambient.url || resolvePresetUrl(AMBIENT_PRESETS, data.ambient.preset);
+        [
+          data.music.enabled && musicUrl ? { url: musicUrl, volume: data.music.volume } : null,
+          data.ambient.enabled && ambientUrl ? { url: ambientUrl, volume: data.ambient.volume } : null,
+        ].filter(Boolean).forEach((item) => {
+          const audio = new Audio(item.url);
+          audio.loop = true;
+          audio.volume = clampWorkshopFloat(item.volume, 0, 1, 0.5);
+          workshopAmbiencePreviewAudio.push(audio);
+          audio.play().catch(() => showToast("氛围音频播放失败，请检查文件或浏览器权限。", "error"));
+        });
+        setStatus("正在测试常驻氛围。再次点击测试会重置预览；保存后才会写入角色卡。", "idle");
+      }
+
+      async function handleAmbienceAssetSelection(kind, fileInput) {
+        const file = fileInput?.files?.[0];
+        if (!file) return;
+        try {
+          setStatus("正在上传常驻氛围资源…", "busy");
+          const uploadKind = ["background", "image"].includes(kind) ? "image" : "music";
+          const result = await uploadWorkshopAsset(uploadKind, file);
+          const url = result.url || "";
+          if (kind === "background" && ambienceBgUrlEl) ambienceBgUrlEl.value = url;
+          if (kind === "music" && ambienceMusicUrlEl) ambienceMusicUrlEl.value = url;
+          if (kind === "ambient" && ambienceAmbientUrlEl) ambienceAmbientUrlEl.value = url;
+          if (ambienceEnabledEl) ambienceEnabledEl.checked = true;
+          setStatus("资源已上传并回填地址，请点击“保存演出工坊”后生效。", "success");
+          showToast("资源已上传", "success");
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`, "error");
+          showToast(`上传失败：${error.message}`, "error");
+        } finally {
+          fileInput.value = "";
+        }
+      }
+
+      async function handleDynamicAssetSelection(card, target, kind, fileInput) {
+        const file = fileInput?.files?.[0];
+        if (!file || !card) return;
+        try {
+          setStatus("正在上传动态演出资源…", "busy");
+          const result = await uploadWorkshopAsset(kind, file);
+          const input = card.querySelector(target);
+          if (input) input.value = result.url || "";
+          setStatus("动态演出资源已上传并回填地址，请点击“保存演出工坊”后生效。", "success");
+          showToast("动态演出资源已上传", "success");
+        } catch (error) {
+          setStatus(`上传失败：${error.message}`, "error");
+          showToast(`上传失败：${error.message}`, "error");
+        } finally {
+          fileInput.value = "";
+        }
+      }
+
+      previewWorkshopAmbienceBtn?.addEventListener("click", (event) => {
+        setButtonState(event.currentTarget, "success", "预览中 ✓");
+        previewAmbience();
+      });
+      document.getElementById("workshop-ambience-bg-pick")?.addEventListener("click", () => document.getElementById("workshop-ambience-bg-file")?.click());
+      document.getElementById("workshop-ambience-music-pick")?.addEventListener("click", () => document.getElementById("workshop-ambience-music-file")?.click());
+      document.getElementById("workshop-ambience-ambient-pick")?.addEventListener("click", () => document.getElementById("workshop-ambience-ambient-file")?.click());
+      document.getElementById("workshop-ambience-bg-file")?.addEventListener("change", (event) => handleAmbienceAssetSelection("background", event.currentTarget));
+      document.getElementById("workshop-ambience-music-file")?.addEventListener("change", (event) => handleAmbienceAssetSelection("music", event.currentTarget));
+      document.getElementById("workshop-ambience-ambient-file")?.addEventListener("change", (event) => handleAmbienceAssetSelection("ambient", event.currentTarget));
+      document.getElementById("workshop-ambience-bg-clear")?.addEventListener("click", () => { if (ambienceBgUrlEl) ambienceBgUrlEl.value = ""; setStatus("已清除常驻背景，请保存后生效。", "idle"); });
+      document.getElementById("workshop-ambience-music-clear")?.addEventListener("click", () => { if (ambienceMusicUrlEl) ambienceMusicUrlEl.value = ""; if (ambienceMusicPresetEl) ambienceMusicPresetEl.value = "off"; setStatus("已清除主音乐，请保存后生效。", "idle"); });
+      document.getElementById("workshop-ambience-ambient-clear")?.addEventListener("click", () => { if (ambienceAmbientUrlEl) ambienceAmbientUrlEl.value = ""; if (ambienceAmbientPresetEl) ambienceAmbientPresetEl.value = "off"; setStatus("已清除环境音，请保存后生效。", "idle"); });
+      [ambienceEnabledEl, ambienceNameEl, ambienceStartModeEl, ambienceBgEnabledEl, ambienceBgUrlEl, ambienceBgOverlayEl, ambienceMusicEnabledEl, ambienceMusicPresetEl, ambienceMusicUrlEl, ambienceMusicVolumeEl, ambienceAmbientEnabledEl, ambienceAmbientPresetEl, ambienceAmbientUrlEl, ambienceAmbientVolumeEl, workshopOpeningHoldSecondsEl, workshopOpeningAfterModeEl].forEach((element) => {
+        element?.addEventListener("input", updateWorkshopPanelStats);
+        element?.addEventListener("change", updateWorkshopPanelStats);
+      });
+
+      document.getElementById("add-dynamic-scene")?.addEventListener("click", () => {
+        const scenes = collectDynamicScenesPayload();
+        scenes.push(createDefaultDynamicScene(scenes.length + 1));
+        currentWorkshop = normalizeCreativeWorkshop({ ...(currentWorkshop || {}), dynamicScenes: scenes });
+        renderDynamicScenes(currentWorkshop.dynamicScenes);
+        setStatus("已新增动态演出，记得保存到当前角色卡。", "success");
+      });
+
+      dynamicSceneListEl?.addEventListener("input", (event) => {
+        const card = event.target.closest(".dynamic-scene-card");
+        if (card) updateDynamicSceneCardVisibility(card);
+      });
+      dynamicSceneListEl?.addEventListener("change", (event) => {
+        const card = event.target.closest(".dynamic-scene-card");
+        if (card) updateDynamicSceneCardVisibility(card);
+        if (event.target.matches(".dynamic-image-file")) handleDynamicAssetSelection(card, ".dynamic-image-url", "image", event.target);
+        if (event.target.matches(".dynamic-sound-file")) handleDynamicAssetSelection(card, ".dynamic-sound-url", "music", event.target);
+        if (event.target.matches(".dynamic-background-file")) handleDynamicAssetSelection(card, ".dynamic-background-url", "image", event.target);
+      });
+      dynamicSceneListEl?.addEventListener("click", (event) => {
+        const card = event.target.closest(".dynamic-scene-card");
+        if (!card) return;
+        if (event.target.closest(".remove-dynamic-scene")) {
+          (window.Fantareal?.motion?.removeWithMotion?.(card) || Promise.resolve(false).then(() => card.remove())).then(() => {
+          setStatus("已删除动态演出，记得保存到当前角色卡。", "success");
+          });
+          return;
+        }
+        if (event.target.closest(".dynamic-image-pick")) card.querySelector(".dynamic-image-file")?.click();
+        if (event.target.closest(".dynamic-sound-pick")) card.querySelector(".dynamic-sound-file")?.click();
+        if (event.target.closest(".dynamic-background-pick")) card.querySelector(".dynamic-background-file")?.click();
+        if (event.target.closest(".test-dynamic-scene")) {
+          setStatus("已测试动态演出配置。请到 Chat 页面体验真实触发效果。", "success");
+          showToast("动态演出配置已通过本地收集测试", "success");
+        }
+      });
+
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      window.Fantareal = { ...(window.Fantareal || {}), applyTheme, applyUiOpacity, applyBackground };
+      currentWorkshop = normalizeCreativeWorkshop(initialWorkshop);
+      renderWorkshopRules(currentWorkshop);
+      updateWorkshopPanelStats();
+      refreshWorkshopStatus().catch(() => {});
+    </script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+  </body>
+</html>

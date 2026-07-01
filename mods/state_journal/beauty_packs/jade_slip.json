@@ -1,0 +1,50 @@
+{
+  "id": "jade_slip",
+  "name": "玉简灵纹",
+  "version": "1.0.0",
+  "author": "Fantareal",
+  "description": "玉色、灵纹、玄门与炁息光边，适合仙侠、修真、功法与世界观设定展示。",
+  "style": {
+    "class_name": "theme-jade-slip",
+    "accent": "#47a985",
+    "layout": {
+      "title_card": "gufeng_chapter",
+      "scene_card": "chips",
+      "character_card": "field_blocks",
+      "relationship_card": "side_note",
+      "status_bar": "pill"
+    },
+    "tokens": {
+      "time": "时",
+      "location": "界",
+      "weather": "象",
+      "atmosphere": "炁",
+      "characters": "众",
+      "emotion": "心息",
+      "clothing": "形衣",
+      "posture": "身法",
+      "scene": "场域",
+      "sensory_field": "灵场",
+      "body_temperature": "温炁",
+      "body_motion": "动势",
+      "micro_reaction": "微息",
+      "visual_focus": "灵眸",
+      "interaction": "缘法",
+      "summary": "简记"
+    },
+    "title_card": {
+      "background": "jade",
+      "border": "glow",
+      "radius": "large",
+      "shadow": "glow"
+    },
+    "character_card": {
+      "background": "jade",
+      "field_style": "glyph_block",
+      "spacing": "comfortable"
+    },
+    "relationship_card": {
+      "style": "aura_note"
+    }
+  }
+}

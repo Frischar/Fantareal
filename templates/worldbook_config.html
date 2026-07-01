@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ settings.theme }}" data-performance-mode="{{ 'on' if settings.performance_mode else 'off' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Worldbook Config - Fantareal</title>
+    <link rel="stylesheet" href="/static/styles.css?v=ui-p8-performance-mode-20260623" />
+    {% if force_mobile_shell %}<link rel="stylesheet" href="/static/css/18-force-mobile-shell.css?v=ui-v177-force-mobile-no-overflow" />{% endif %}
+  </head>
+  <body class="modern-setting-page app-sidebar-shell worldbook-config-page pe-shell{{ ' force-mobile-shell' if force_mobile_shell else '' }}">
+    {% include "_theme_toggle.html" %}
+    <div class="topbar-stack">
+      <div class="topbar">
+        <div class="topbar-left">
+          <a class="brand chat-brand" href="/chat">Fantareal</a>
+        </div>
+        {% include "_grouped_nav.html" %}
+      </div>
+      <div class="slot-toolbar">
+        <div class="slot-toolbar-left">
+          <span class="slot-badge">Worldbook</span>
+          <div class="slot-meta">
+            <strong>当前为全局世界书设置</strong>
+            <p class="slot-hint">这些设置会影响新世界书词条与导入旧世界书时的默认行为。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-shell compact worldbook-config-shell">
+      <section class="panel config-panel full-span worldbook-workbench-panel">
+        <div class="worldbook-workbench-lite">
+          <div class="worldbook-workbench-headline">
+            <div class="worldbook-workbench-summary">
+              <div class="worldbook-workbench-titleline ui-workbench-titleline">
+                <p class="eyebrow">WORLDBOOK WORKBENCH</p>
+                <span id="wb-status-pill" class="config-status-pill ui-status-pill is-success">就绪</span>
+              </div>
+              <div class="worldbook-workbench-statusline">
+                <span class="worldbook-workbench-mini">当前状态 <strong id="enabled-label">{% if worldbook_settings.enabled %}启用{% else %}停用{% endif %}</strong></span>
+                <span class="worldbook-workbench-mini">命中上限 <strong id="max-hits-label">{{ worldbook_settings.max_hits }}</strong></span>
+              </div>
+              <h2>世界书工作台</h2>
+              <p class="muted helper-text">保存、读取、词条管理与核心运行项集中在这里；下方只保留触发规则、新词条默认值和默认导入行为。</p>
+            </div>
+
+            <div class="worldbook-workbench-actions ui-sticky-toolbar ui-action-dock is-wrap stage4-action-row">
+              <a class="button-link secondary" href="/config/worldbook/entries">词条管理</a>
+              <button id="reload-worldbook-settings" type="button" class="secondary">重新读取</button>
+              <button id="save-worldbook-settings" type="button">保存设置</button>
+            </div>
+          </div>
+
+          <div class="worldbook-runline" aria-label="世界书运行开关">
+            <label class="worldbook-run-switch">
+              <span class="worldbook-run-switch-text">启用世界书</span>
+              <input id="wb-enabled" type="checkbox" {% if worldbook_settings.enabled %}checked{% endif %} />
+              <span class="worldbook-run-switch-track" aria-hidden="true"><span class="worldbook-run-switch-thumb"></span></span>
+            </label>
+            <label class="worldbook-run-switch">
+              <span class="worldbook-run-switch-text">Chat 页面显示 Worldbook Debug 侧边按钮</span>
+              <input id="wb-debug-enabled" type="checkbox" {% if worldbook_settings.debug_enabled %}checked{% endif %} />
+              <span class="worldbook-run-switch-track" aria-hidden="true"><span class="worldbook-run-switch-thumb"></span></span>
+            </label>
+            <label class="worldbook-inline-number" for="wb-max-hits">
+              <span>每轮最多命中条数</span>
+              <input id="wb-max-hits" type="number" min="1" max="20" step="1" value="{{ worldbook_settings.max_hits }}" />
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel config-panel full-span worldbook-settings-panel">
+        <div class="worldbook-settings-sections">
+          <section class="worldbook-setting-section" aria-labelledby="worldbook-trigger-section-title">
+            <div class="worldbook-setting-section-head">
+              <span class="worldbook-section-index">01</span>
+              <div>
+                <h3 id="worldbook-trigger-section-title">触发规则</h3>
+                <p class="muted helper-text">控制关键词组、主副关键词关系、匹配细节与递归扫描行为。</p>
+              </div>
+            </div>
+            <div class="worldbook-section-grid">
+              <div class="worldbook-setting-card">
+                <h4>关键词逻辑</h4>
+                <div class="field-row">
+                  <label for="wb-default-match-mode">主关键词组默认逻辑</label>
+                  <select id="wb-default-match-mode">
+                    <option value="any" {% if worldbook_settings.default_match_mode == 'any' %}selected{% endif %}>任意命中</option>
+                    <option value="all" {% if worldbook_settings.default_match_mode == 'all' %}selected{% endif %}>全部命中</option>
+                  </select>
+                  <p class="muted helper-text">“任意命中”表示多个别名里命中一个就算；“全部命中”表示填写的词都要同时出现。</p>
+                </div>
+
+                <div class="field-row">
+                  <label for="wb-default-secondary-mode">副关键词组默认逻辑</label>
+                  <select id="wb-default-secondary-mode">
+                    <option value="any" {% if worldbook_settings.default_secondary_mode == 'any' %}selected{% endif %}>任意命中</option>
+                    <option value="all" {% if worldbook_settings.default_secondary_mode == 'all' %}selected{% endif %}>全部命中</option>
+                  </select>
+                  <p class="muted helper-text">这是副关键词组内部多个别名之间的默认关系。</p>
+                </div>
+
+                <div class="field-row">
+                  <label for="wb-default-group-operator">主副组默认关系</label>
+                  <select id="wb-default-group-operator">
+                    <option value="and" {% if (worldbook_settings.default_group_operator or 'and') == 'and' %}selected{% endif %}>与所有（主副都要触发）</option>
+                    <option value="or" {% if worldbook_settings.default_group_operator == 'or' %}selected{% endif %}>与任意（主副任意一个即可）</option>
+                  </select>
+                  <p class="muted helper-text">这是主关键词组与副关键词组之间的默认关系，不是组内别名关系。</p>
+                </div>
+              </div>
+
+              <div class="worldbook-setting-card">
+                <h4>匹配与递归</h4>
+                <div class="worldbook-compact-checks">
+                  <label class="fr-setting-switch-row">
+                    <input id="wb-default-case-sensitive" type="checkbox" {% if worldbook_settings.default_case_sensitive %}checked{% endif %} />
+                    <span>默认区分大小写</span>
+                  </label>
+                  <label class="fr-setting-switch-row">
+                    <input id="wb-default-whole-word" type="checkbox" {% if worldbook_settings.default_whole_word %}checked{% endif %} />
+                    <span>默认完整词匹配</span>
+                  </label>
+                  <label class="fr-setting-switch-row">
+                    <input id="wb-recursive-scan-enabled" type="checkbox" {% if worldbook_settings.recursive_scan_enabled %}checked{% endif %} />
+                    <span>启用递归扫描（V1）</span>
+                  </label>
+                </div>
+                <div class="field-row" style="margin-top: 10px;">
+                  <label for="wb-recursion-max-depth">递归最大层级</label>
+                  <input id="wb-recursion-max-depth" type="number" min="0" max="5" step="1" value="{{ worldbook_settings.recursion_max_depth if worldbook_settings.recursion_max_depth is not none else 2 }}" />
+                  <p class="muted helper-text">0 表示关闭递归扩展；层级越高，可能命中更多关联词条。</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="worldbook-setting-section" aria-labelledby="worldbook-default-section-title">
+            <div class="worldbook-setting-section-head">
+              <span class="worldbook-section-index">02</span>
+              <div>
+                <h3 id="worldbook-default-section-title">新词条默认值</h3>
+                <p class="muted helper-text">新建词条时采用的默认配置，也会作为旧版 worldbook 缺字段时的补齐参考。</p>
+              </div>
+            </div>
+            <div class="worldbook-section-grid">
+              <div class="worldbook-setting-card">
+                <h4>触发与数值</h4>
+                <div class="field-row">
+                  <label for="wb-default-entry-type">新词条默认触发类型</label>
+                  <select id="wb-default-entry-type">
+                    <option value="keyword" {% if (worldbook_settings.default_entry_type or 'keyword') == 'keyword' %}selected{% endif %}>关键词触发</option>
+                    <option value="constant" {% if worldbook_settings.default_entry_type == 'constant' %}selected{% endif %}>常驻</option>
+                    <option value="external_tag" {% if worldbook_settings.default_entry_type == 'external_tag' %}selected{% endif %}>外部标签触发</option>
+                  </select>
+                  <p class="muted helper-text">常驻词条默认不依赖关键词；关键词触发词条仍依赖主关键词；外部标签触发用于接收数据库状态阶段等外部 active_tag。</p>
+                </div>
+
+                <div class="field-row">
+                  <label for="wb-default-chance">默认触发概率（0-100）</label>
+                  <input id="wb-default-chance" type="number" min="0" max="100" step="1" value="{{ worldbook_settings.default_chance if worldbook_settings.default_chance is not none else 100 }}" />
+                  <p class="muted helper-text">只影响新建词条的默认值，不会强行覆盖已有词条。</p>
+                </div>
+
+                <div class="grid-two">
+                  <div>
+                    <label for="wb-default-sticky-turns">默认黏性</label>
+                    <input id="wb-default-sticky-turns" type="number" min="0" max="999" step="1" value="{{ worldbook_settings.default_sticky_turns if worldbook_settings.default_sticky_turns is not none else 0 }}" />
+                  </div>
+                  <div>
+                    <label for="wb-default-cooldown-turns">默认冷却</label>
+                    <input id="wb-default-cooldown-turns" type="number" min="0" max="999" step="1" value="{{ worldbook_settings.default_cooldown_turns if worldbook_settings.default_cooldown_turns is not none else 0 }}" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="worldbook-setting-card">
+                <h4>注入与递归</h4>
+                <div class="field-row">
+                  <label for="wb-default-prompt-layer">默认提示层级</label>
+                  <select id="wb-default-prompt-layer">
+                    <option value="follow_position" {% if (worldbook_settings.default_prompt_layer or 'follow_position') == 'follow_position' %}selected{% endif %}>跟随注入位置</option>
+                    <option value="stable" {% if worldbook_settings.default_prompt_layer == 'stable' %}selected{% endif %}>稳定区</option>
+                    <option value="current_state" {% if worldbook_settings.default_prompt_layer == 'current_state' %}selected{% endif %}>当前状态区</option>
+                    <option value="dynamic" {% if worldbook_settings.default_prompt_layer == 'dynamic' %}selected{% endif %}>动态区</option>
+                    <option value="output_guard" {% if worldbook_settings.default_prompt_layer == 'output_guard' %}selected{% endif %}>输出协议区</option>
+                  </select>
+                  <p class="muted helper-text">选择“跟随注入位置”时继续使用下方位置。</p>
+                </div>
+
+                <div class="field-row">
+                  <label for="wb-default-insertion-position">默认插入位置</label>
+                  <select id="wb-default-insertion-position">
+                    <option value="before_char_defs" {% if worldbook_settings.default_insertion_position == 'before_char_defs' %}selected{% endif %}>角色定义前</option>
+                    <option value="after_char_defs" {% if (worldbook_settings.default_insertion_position or 'after_char_defs') == 'after_char_defs' %}selected{% endif %}>角色定义后</option>
+                    <option value="in_chat" {% if worldbook_settings.default_insertion_position == 'in_chat' %}selected{% endif %}>@D 自定义角色在深度</option>
+                    <option value="at_depth_system" {% if worldbook_settings.default_insertion_position == 'at_depth_system' %}selected{% endif %}>@D system 在深度</option>
+                    <option value="at_depth_user" {% if worldbook_settings.default_insertion_position == 'at_depth_user' %}selected{% endif %}>@D user 在深度</option>
+                    <option value="at_depth_assistant" {% if worldbook_settings.default_insertion_position == 'at_depth_assistant' %}selected{% endif %}>@D assistant 在深度</option>
+                  </select>
+                </div>
+
+                <div class="grid-two">
+                  <div>
+                    <label for="wb-default-injection-order">默认注入顺序</label>
+                    <input id="wb-default-injection-order" type="number" min="0" max="999999" step="1" value="{{ worldbook_settings.default_injection_order if worldbook_settings.default_injection_order is not none else 100 }}" />
+                  </div>
+                  <div>
+                    <label for="wb-default-injection-depth">默认聊天深度</label>
+                    <input id="wb-default-injection-depth" type="number" min="0" max="999" step="1" value="{{ worldbook_settings.default_injection_depth if worldbook_settings.default_injection_depth is not none else 0 }}" />
+                  </div>
+                </div>
+
+                <div class="grid-two">
+                  <div>
+                    <label for="wb-default-injection-role">默认注入角色</label>
+                    <select id="wb-default-injection-role">
+                      <option value="system" {% if (worldbook_settings.default_injection_role or 'system') == 'system' %}selected{% endif %}>system</option>
+                      <option value="user" {% if worldbook_settings.default_injection_role == 'user' %}selected{% endif %}>user</option>
+                      <option value="assistant" {% if worldbook_settings.default_injection_role == 'assistant' %}selected{% endif %}>assistant</option>
+                    </select>
+                  </div>
+                  <div class="worldbook-compact-checks">
+                    <label class="fr-setting-switch-row">
+                      <input id="wb-default-recursive-enabled" type="checkbox" {% if worldbook_settings.default_recursive_enabled is not defined or worldbook_settings.default_recursive_enabled %}checked{% endif %} />
+                      <span>默认允许递归参与</span>
+                    </label>
+                    <label class="fr-setting-switch-row">
+                      <input id="wb-default-prevent-further-recursion" type="checkbox" {% if worldbook_settings.default_prevent_further_recursion %}checked{% endif %} />
+                      <span>默认阻止继续递归</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="worldbook-setting-section" aria-labelledby="worldbook-import-section-title">
+            <div class="worldbook-setting-section-head">
+              <span class="worldbook-section-index">03</span>
+              <div>
+                <h3 id="worldbook-import-section-title">默认导入行为</h3>
+                <p class="muted helper-text">只影响导入旧版 worldbook 时，导入向导默认如何处理缺失字段与 settings。</p>
+              </div>
+            </div>
+            <div class="worldbook-section-grid">
+              <div class="worldbook-setting-card">
+                <h4>旧包缺字段处理</h4>
+                <div class="field-row">
+                  <label for="wb-import-missing-injection-policy">缺失注入字段时</label>
+                  <select id="wb-import-missing-injection-policy">
+                    <option value="ask" {% if (worldbook_settings.import_missing_injection_policy or 'ask') == 'ask' %}selected{% endif %}>导入时询问</option>
+                    <option value="follow_defaults" {% if worldbook_settings.import_missing_injection_policy == 'follow_defaults' %}selected{% endif %}>跟随新词条默认值</option>
+                    <option value="keep_source" {% if worldbook_settings.import_missing_injection_policy == 'keep_source' %}selected{% endif %}>尽量保留导入文件原样</option>
+                  </select>
+                  <p class="muted helper-text">旧版世界书缺少插入位置、聊天深度、注入顺序等字段时，导入向导会默认采用这里的策略。</p>
+                </div>
+              </div>
+
+              <div class="worldbook-setting-card">
+                <h4>settings 处理</h4>
+                <div class="field-row">
+                  <label for="wb-import-settings-policy">导入包内 settings</label>
+                  <select id="wb-import-settings-policy">
+                    <option value="ask" {% if (worldbook_settings.import_settings_policy or 'ask') == 'ask' %}selected{% endif %}>导入时询问</option>
+                    <option value="apply" {% if worldbook_settings.import_settings_policy == 'apply' %}selected{% endif %}>默认应用</option>
+                    <option value="skip" {% if worldbook_settings.import_settings_policy == 'skip' %}selected{% endif %}>默认不应用</option>
+                  </select>
+                  <p class="muted helper-text">这只是导入向导的默认选择；导入时仍可临时覆盖。</p>
+                </div>
+              </div>
+
+              <div class="worldbook-info-note wide">
+                <span aria-hidden="true">ⓘ</span>
+                <p><strong>说明：</strong>默认导入行为不会主动改动当前世界书；只有在词条管理页执行导入时才会生效。</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    <script src="/static/js/app-core.js?v=v161"></script>
+    <script src="/static/js/theme-toggle.js?v=ui-theme-toggle-sync-20260621"></script>
+    <script src="/static/js/ui-motion.js?v=ui-p7-3c-select-20260621"></script>
+    <script>
+      const { applyTheme, applyUiOpacity, applyBackground, postJson } = window.Fantareal;
+      const statusPill = document.getElementById("wb-status-pill");
+      const currentTheme = {{ settings.theme | tojson }};
+      const currentOpacity = {{ settings.ui_opacity | tojson }};
+      const currentBackground = {{ settings.background_image_url | tojson }};
+      const currentOverlay = {{ settings.background_overlay | tojson }};
+      window.FantarealThemeToggle = { uiOpacity: currentOpacity };
+      let dirty = false;
+
+      function getCompactStatusLabel(text, type) {
+        const value = String(text || "");
+        if (type === "error") return "出错";
+        if (type === "dirty") return "有修改";
+        if (type === "saving") {
+          if (value.includes("保存")) return "保存中";
+          if (value.includes("读取")) return "读取中";
+          return "处理中";
+        }
+        if (type === "success") {
+          if (value.includes("保存")) return "已保存";
+          if (value.includes("读取")) return "已读取";
+          return "就绪";
+        }
+        return "就绪";
+      }
+
+      function setStatus(text, type = "success") {
+        const label = getCompactStatusLabel(text, type);
+        if (!window.Fantareal?.motion?.setStatusState?.(statusPill, {
+          text: label,
+          title: text,
+          state: type === "saving" ? "saving" : type === "dirty" ? "dirty" : type === "error" ? "error" : "success",
+          stateClasses: ["is-idle", "is-saving", "is-success", "is-dirty", "is-error"],
+        })) {
+          statusPill.textContent = label;
+          statusPill.title = text;
+          statusPill.classList.remove("is-idle", "is-saving", "is-success", "is-dirty", "is-error");
+          const className = type === "saving" ? "is-saving"
+            : type === "dirty" ? "is-dirty"
+            : type === "error" ? "is-error"
+            : "is-success";
+          statusPill.classList.add(className);
+        }
+      }
+
+      function markDirty() {
+        if (dirty) return;
+        dirty = true;
+        setStatus("有未保存修改", "dirty");
+      }
+
+      function flashButton(button, text = "已完成") {
+        if (!button) return;
+        const oldText = button.textContent;
+        button.classList.add("is-feedback");
+        button.textContent = text;
+        window.setTimeout(() => {
+          button.classList.remove("is-feedback");
+          button.textContent = oldText;
+        }, 950);
+      }
+
+      function setControlValue(id, value) {
+        const control = document.getElementById(id);
+        if (control) control.value = value;
+      }
+
+      function setControlChecked(id, checked) {
+        const control = document.getElementById(id);
+        if (control) control.checked = Boolean(checked);
+      }
+
+      function readSettingsForm() {
+        return {
+          enabled: document.getElementById("wb-enabled").checked,
+          debug_enabled: document.getElementById("wb-debug-enabled").checked,
+          max_hits: Number(document.getElementById("wb-max-hits").value || 3),
+          default_case_sensitive: document.getElementById("wb-default-case-sensitive").checked,
+          default_whole_word: document.getElementById("wb-default-whole-word").checked,
+          default_match_mode: document.getElementById("wb-default-match-mode").value,
+          default_secondary_mode: document.getElementById("wb-default-secondary-mode").value,
+          default_entry_type: document.getElementById("wb-default-entry-type").value,
+          default_group_operator: document.getElementById("wb-default-group-operator").value,
+          default_chance: Number(document.getElementById("wb-default-chance").value || 100),
+          default_sticky_turns: Number(document.getElementById("wb-default-sticky-turns").value || 0),
+          default_cooldown_turns: Number(document.getElementById("wb-default-cooldown-turns").value || 0),
+          default_prompt_layer: document.getElementById("wb-default-prompt-layer").value,
+          default_insertion_position: document.getElementById("wb-default-insertion-position").value,
+          default_injection_depth: Number(document.getElementById("wb-default-injection-depth").value || 0),
+          default_injection_role: document.getElementById("wb-default-injection-role").value,
+          default_injection_order: Number(document.getElementById("wb-default-injection-order").value || 100),
+          default_recursive_enabled: document.getElementById("wb-default-recursive-enabled").checked,
+          default_prevent_further_recursion: document.getElementById("wb-default-prevent-further-recursion").checked,
+          import_missing_injection_policy: document.getElementById("wb-import-missing-injection-policy").value,
+          import_settings_policy: document.getElementById("wb-import-settings-policy").value,
+          recursive_scan_enabled: document.getElementById("wb-recursive-scan-enabled").checked,
+          recursion_max_depth: Number(document.getElementById("wb-recursion-max-depth").value || 2),
+        };
+      }
+
+      function fillSettingsForm(settings) {
+        setControlChecked("wb-enabled", settings.enabled);
+        setControlChecked("wb-debug-enabled", settings.debug_enabled);
+        setControlValue("wb-max-hits", settings.max_hits ?? 3);
+        setControlChecked("wb-default-case-sensitive", settings.default_case_sensitive);
+        setControlChecked("wb-default-whole-word", settings.default_whole_word);
+        setControlValue("wb-default-match-mode", settings.default_match_mode || "any");
+        setControlValue("wb-default-secondary-mode", settings.default_secondary_mode || "all");
+        setControlValue("wb-default-entry-type", settings.default_entry_type || "keyword");
+        setControlValue("wb-default-group-operator", settings.default_group_operator || "and");
+        setControlValue("wb-default-chance", settings.default_chance ?? 100);
+        setControlValue("wb-default-sticky-turns", settings.default_sticky_turns ?? 0);
+        setControlValue("wb-default-cooldown-turns", settings.default_cooldown_turns ?? 0);
+        setControlValue("wb-default-prompt-layer", settings.default_prompt_layer || "follow_position");
+        setControlValue("wb-default-insertion-position", settings.default_insertion_position || "after_char_defs");
+        setControlValue("wb-default-injection-depth", settings.default_injection_depth ?? 0);
+        setControlValue("wb-default-injection-role", settings.default_injection_role || "system");
+        setControlValue("wb-default-injection-order", settings.default_injection_order ?? 100);
+        setControlChecked("wb-default-recursive-enabled", settings.default_recursive_enabled !== false);
+        setControlChecked("wb-default-prevent-further-recursion", settings.default_prevent_further_recursion);
+        setControlValue("wb-import-missing-injection-policy", settings.import_missing_injection_policy || "ask");
+        setControlValue("wb-import-settings-policy", settings.import_settings_policy || "ask");
+        setControlChecked("wb-recursive-scan-enabled", settings.recursive_scan_enabled);
+        setControlValue("wb-recursion-max-depth", settings.recursion_max_depth ?? 2);
+        document.getElementById("enabled-label").textContent = settings.enabled ? "启用" : "停用";
+        document.getElementById("max-hits-label").textContent = String(settings.max_hits ?? 3);
+        dirty = false;
+        syncDefaultInjectionUi();
+      }
+
+      function syncDefaultInjectionUi() {
+        const position = document.getElementById("wb-default-insertion-position")?.value || "after_char_defs";
+        const depthInput = document.getElementById("wb-default-injection-depth");
+        if (!depthInput) return;
+        const disabled = position !== "in_chat";
+        depthInput.disabled = disabled;
+        depthInput.title = disabled ? "仅在默认插入位置为“聊天内注入”时生效" : "";
+      }
+
+      async function reloadSettings(triggerButton) {
+        setStatus("正在读取世界书设置...", "saving");
+        const data = await fetch("/api/worldbook/settings").then((response) => response.json());
+        fillSettingsForm(data.settings || {});
+        setStatus("已重新读取", "success");
+        flashButton(triggerButton, "已读取");
+      }
+
+      async function saveSettings(triggerButton) {
+        setStatus("正在保存世界书设置...", "saving");
+        const data = await postJson("/api/worldbook/settings", readSettingsForm());
+        fillSettingsForm(data.settings || {});
+        setStatus("已保存", "success");
+        flashButton(triggerButton, "已保存");
+      }
+
+      document.querySelectorAll("#save-worldbook-settings").forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            await saveSettings(button);
+          } catch (error) {
+            setStatus(`保存失败：${error.message}`, "error");
+          }
+        });
+      });
+
+      document.querySelectorAll("#reload-worldbook-settings").forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            await reloadSettings(button);
+          } catch (error) {
+            setStatus(`读取失败：${error.message}`, "error");
+          }
+        });
+      });
+
+      document.querySelectorAll("input, select, textarea").forEach((control) => {
+        control.addEventListener("input", markDirty);
+        control.addEventListener("change", markDirty);
+      });
+
+      document.getElementById("wb-default-insertion-position")?.addEventListener("change", syncDefaultInjectionUi);
+
+
+      document.getElementById("wb-enabled")?.addEventListener("change", () => {
+        const label = document.getElementById("enabled-label");
+        if (label) label.textContent = document.getElementById("wb-enabled").checked ? "启用" : "停用";
+      });
+
+      document.getElementById("wb-max-hits")?.addEventListener("input", () => {
+        const label = document.getElementById("max-hits-label");
+        if (label) label.textContent = String(document.getElementById("wb-max-hits").value || 3);
+      });
+
+      applyTheme(currentTheme);
+      applyUiOpacity(currentOpacity);
+      applyBackground(currentBackground, currentOverlay);
+      syncDefaultInjectionUi();
+    </script>
+  </body>
+</html>
