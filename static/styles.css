@@ -19,6 +19,6 @@
 @import url("./css/14-game.css?v=v161");
 @import url("./css/15-ui-system.css?v=p6-memory-rp-dossier-20260627");
 @import url("./css/17-preset-page.css?v=ui-p9-textarea-scroll-20260701");
-@import url("./css/99-mobile-responsive.css?v=ui-v174-mobile-responsive");
+@import url("./css/99-mobile-responsive.css?v=ui-drawer-handle-hover-stable-20260702");
 
 /* v161: split entry only; preset/memory/worldbook_config field rules moved to 08-config-fields.css. */

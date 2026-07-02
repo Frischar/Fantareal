@@ -107,3 +107,23 @@
     font-size: 16px !important;
   }
 }
+
+/* Chat drawer handle positioning guard: keep desktop pull tabs vertically centered on hover. */
+@media (min-width: 821px) {
+  body.chat-page #toggle-left-sidebar.left-sidebar-handle,
+  body.chat-page #toggle-left-sidebar.left-sidebar-handle:hover,
+  body.chat-page #toggle-left-sidebar.left-sidebar-handle:focus-visible,
+  body.chat-page.left-sidebar-collapsed #toggle-left-sidebar.left-sidebar-handle,
+  body.chat-page.left-sidebar-collapsed #toggle-left-sidebar.left-sidebar-handle:hover,
+  body.chat-page.left-sidebar-collapsed #toggle-left-sidebar.left-sidebar-handle:focus-visible {
+    transform: translateY(-50%) !important;
+  }
+}
+
+@media (min-width: 1081px) {
+  body.chat-page #toggle-runtime-panel.runtime-panel-handle,
+  body.chat-page #toggle-runtime-panel.runtime-panel-handle:hover,
+  body.chat-page #toggle-runtime-panel.runtime-panel-handle:focus-visible {
+    transform: translateY(-50%) !important;
+  }
+}
