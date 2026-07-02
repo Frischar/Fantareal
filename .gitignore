@@ -1,0 +1,43 @@
+# ===== Build artifacts =====
+.gradle/
+build/
+app/build/
+captures/
+*.apk
+*.aab
+*.ap_
+
+# ===== IDE =====
+.idea/
+*.iml
+.vscode/
+
+# ===== Local SDK (machine-specific, NEVER commit) =====
+local.properties
+
+# ===== Secrets & signing (NEVER commit) =====
+# 屏蔽树中任意位置的密钥库
+*.jks
+*.keystore
+keystore/
+# 真实签名配置
+signing/keystore.properties
+# 但保留占位与示例模板
+!signing/.gitkeep
+!signing/keystore.properties.example
+
+# ===== 仅内部使用的文档 / 截图 / 调试 dump =====
+docs/
+screen*.png
+window_dump.xml
+
+# ===== PC Web 版（位于 main 分支，不进 android 分支）=====
+web_source/
+
+# ===== Agent / 工具临时目录 =====
+.kagent/
+
+# ===== 其他 =====
+*.log
+.DS_Store
+Thumbs.db
