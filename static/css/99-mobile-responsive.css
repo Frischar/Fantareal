@@ -120,7 +120,7 @@
   }
 }
 
-@media (min-width: 1081px) {
+@media (min-width: 1181px) {
   body.chat-page #toggle-runtime-panel.runtime-panel-handle,
   body.chat-page #toggle-runtime-panel.runtime-panel-handle:hover,
   body.chat-page #toggle-runtime-panel.runtime-panel-handle:focus-visible {

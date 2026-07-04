@@ -3,12 +3,17 @@
 
   const API_BASE = (window.CARD_WRITER_API_BASE || "").replace(/\/$/, "");
   const PROJECT_TYPE = "fantareal_card_writer_project";
+  const COPILOT_THINKING_MODES = {
+    fast: "快速模式",
+    deep: "深度思考",
+  };
 
   const VIEW_META = {
     persona: { title: "人设" },
     worldbook: { title: "世界书" },
     preset: { title: "预设" },
     memory: { title: "记忆" },
+    database: { title: "数据库" },
     preview: { title: "预览" },
   };
 
@@ -95,6 +100,40 @@
     { key: "base_system_prompt", label: "基础系统提示词", type: "textarea", rows: 10, spanTwo: true },
   ];
 
+  const DATABASE_VARIABLE_FIELDS = [
+    { key: "id", label: "变量 ID", type: "text" },
+    { key: "key", label: "变量 key", type: "text", hint: "例如 trust / guard / intimacy" },
+    { key: "label", label: "显示名", type: "text" },
+    { key: "value_type", label: "值类型", type: "text" },
+    { key: "initial_value", label: "初始值", type: "text" },
+    { key: "scope", label: "作用域", type: "text" },
+    { key: "description", label: "变量含义", type: "textarea", rows: 5, spanTwo: true },
+    { key: "write_policy", label: "写入纪律", type: "textarea", rows: 5, spanTwo: true },
+    { key: "notes", label: "备注", type: "textarea", rows: 4, spanTwo: true },
+  ];
+
+  const DATABASE_STAGE_FIELDS = [
+    { key: "id", label: "阶段 ID", type: "text" },
+    { key: "role_id", label: "角色 ID", type: "text" },
+    { key: "stage_key", label: "阶段 key", type: "text" },
+    { key: "title", label: "阶段名", type: "text" },
+    { key: "condition", label: "判定条件", type: "textarea", rows: 5, spanTwo: true },
+    { key: "active_tag", label: "主 tag", type: "text", spanTwo: true },
+    { key: "emits_tags", label: "发出 tags", type: "tags", spanTwo: true },
+    { key: "description", label: "阶段表现", type: "textarea", rows: 5, spanTwo: true },
+    { key: "notes", label: "备注", type: "textarea", rows: 4, spanTwo: true },
+  ];
+
+  const DATABASE_TAG_FIELDS = [
+    { key: "id", label: "Tag ID", type: "text" },
+    { key: "tag", label: "Tag", type: "text", spanTwo: true },
+    { key: "title", label: "显示名", type: "text" },
+    { key: "target", label: "目标", type: "text" },
+    { key: "trigger", label: "触发说明", type: "textarea", rows: 4, spanTwo: true },
+    { key: "description", label: "连接意图", type: "textarea", rows: 5, spanTwo: true },
+    { key: "notes", label: "备注", type: "textarea", rows: 4, spanTwo: true },
+  ];
+
   const WORKSHOP_FIELDS = [
     { key: "id", label: "事件 ID", type: "text" },
     { key: "name", label: "事件名", type: "text" },
@@ -144,10 +183,11 @@
     request_timeout: 120,
     temperature: 0.8,
     base_system_prompt: "你是缃笺 Card Writer 的结构化写作助手。",
-    persona_prompt: "你要为 Card Writer 生成人设卡草稿，输出内容必须可直接写入编辑器表单。\n重点要求：\n1. 角色身份、关系、行为习惯要清楚，避免空泛形容词堆砌。\n2. personality 要稳定可执行，能直接指导后续对话语气与反应方式。\n3. first_mes 必须像真实开场白，能直接发给用户，不要写说明文字。\n4. mes_example 只写示例对话，不要代替 {{user}} 做过多决定。\n5. creator_notes 只写隐藏约束、禁忌和稳定角色表现的规则，不写解释。\n6. 如果是分身 persona，只生成当前分身所需字段，不扩写整张主卡。",
-    worldbook_prompt: "你要为 Card Writer 生成单条世界书词条，输出必须适合直接落入当前 entry。\n重点要求：\n1. 一次只写一个词条，不要把多个设定混成一个 entry。\n2. trigger 要便于触发，尽量是角色、地点、组织、事件等关键词。\n3. content 要写成可注入上下文的设定正文，避免闲聊口吻。\n4. 注入位置、提示层、触发方式要和词条用途一致。\n5. comment 只写维护备注，不重复正文。",
-    preset_prompt: "你要为 Card Writer 生成单个聊天预设，输出必须能直接成为可用 preset。\n重点要求：\n1. base_system_prompt 要具体、可执行，能直接约束模型说话方式。\n2. modules 只开启真正需要的开关，避免互相冲突。\n3. extra_prompts 要补充 base_system_prompt，而不是重复口号。\n4. prompt_groups 若无明确需求可保持精简，不要虚构复杂结构。\n5. 整体目标是让语气、边界、叙事方式稳定一致。",
-    memory_prompt: "你要为 Card Writer 生成单条记忆，输出必须适合直接写入 memory item。\n重点要求：\n1. content 聚焦单个事实、事件、关系或长期偏好，不写散乱总结。\n2. title 要短而明确，能快速说明这条记忆的主题。\n3. tags 保持精简，便于检索，不要堆很多同义词。\n4. notes 只写维护信息、时间线提醒或补充说明，不重复正文。\n5. 每条记忆应当独立成立，便于后续单独删改。",
+    persona_prompt: "你要为 Fa Card Writer 生成人设卡候选，输出内容必须可直接写入编辑器表单。\n重点要求：\n1. description 写身份、处境、关系起点和稳定事实，不要堆抽象形容词。\n2. personality 写可执行反应：欲望、边界、防御、亲近方式、退缩方式、语言纹理。\n3. scenario 写默认局势和关系张力，不要把完整世界观塞进来。\n4. first_mes 必须是角色真实会说/会做的开场，不写作者说明。\n5. mes_example 只写示例对话和动作节奏，不要代替 {{user}} 做过多决定。\n6. creator_notes 写隐藏纪律：不跳关系阶段、不突然坦白、亲密和身体反应必须符合角色边界。\n7. 如果是分身 persona，只生成当前分身所需字段，不扩写整张主卡。",
+    worldbook_prompt: "你要为 Fa Card Writer 生成世界书候选，输出必须适合直接落入当前 entry。\n重点要求：\n1. 一个 entry 只承载一个事实、阶段、地点、组织、秘密或状态表现。\n2. trigger 要便于触发；阶段表现可在 title/comment 中标明未来可由 tag 触发。\n3. content 写成可注入上下文的正文，不写闲聊口吻和作者解释。\n4. 阶段表现应约束“当前会怎样表现”，不要重复整张角色卡。\n5. 优先使用 Fa runtime 可识别的语义：keyword/constant/external_tag、any/all、stable/current_state/dynamic/output_guard。\n6. comment 只写维护备注，不重复正文。",
+    preset_prompt: "你要为 Fa Card Writer 生成轻量预设适配候选，不要尝试从零创作高阶预设或大型叙事引擎。\n重点要求：\n1. preset 只做基础适配纪律：不替用户行动、不跳阶段、不突然亲密、不突然完全信任。\n2. base_system_prompt 只写模型如何读取角色卡、世界书、记忆和状态，不写具体世界观百科。\n3. modules 只开启真正需要的开关，避免互相冲突。\n4. extra_prompts 可补充防总结腔、防替用户、防阶段跳跃等短规则。\n5. prompt_groups 默认保持精简；不要生成复杂风格库或大型高阶预设结构。\n6. 更重要的内容优先落到 persona、worldbook、memory、database。",
+    memory_prompt: "你要为 Fa Card Writer 生成记忆候选，输出必须适合直接写入 memory item。\n重点要求：\n1. content 聚焦单个已发生事实、事件、关系变化或长期偏好，不写散乱总结。\n2. 不要把未发生的剧情冒充记忆；未发生内容应写到 scenario、worldbook 或 preset。\n3. title 要短而明确，能快速说明这条记忆的主题。\n4. tags 保持精简，便于检索，不要堆很多同义词。\n5. notes 写维护信息、时间线提醒或补充说明，可标明这条记忆会影响哪些关系变量。\n6. 每条记忆应当独立成立，便于后续单独删改。",
+    database_prompt: "你要为 Fa Card Writer 生成数据库草稿候选，输出必须只写当前工程里的 database 草稿 JSON，不要尝试写运行时 SQLite 或真实状态库。\n重点要求：\n1. 数据库的意义是记录变量、判断阶段、发出 tag，用来触发世界书或演出工坊。\n2. variables 写可被追踪的状态，例如 trust、guard、intimacy、desire、fatigue、jealousy；必须说明变量含义和写入纪律。\n3. stages 写阶段判断规则和会发出的 tag，例如 state_journal.stage.<role_id>.<stage_key>。\n4. tags 写 tag 与世界书/演出工坊的连接意图，不要写大段剧情正文。\n5. 这是 P1 写卡草稿，只服务于设计和导出；不要伪装成已接入运行时。",
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -161,12 +201,15 @@
   }
 
   const LOCAL_DRAFT_KEY = "cardWriterDraft:v1";
+  const THEME_KEY = "cardWriterTheme:v1";
 
   function createDefaultCollapsedSections() {
     return {
       messages: false,
       review: false,
       input: false,
+      "copilot-plan": false,
+      "copilot-package-audit": false,
     };
   }
 
@@ -183,9 +226,16 @@
     memoryItem: 0,
     presetItem: 0,
     personaItem: 0,
+    databaseVariable: 0,
+    databaseStage: 0,
+    databaseTag: 0,
   };
+  let activeDatabaseKind = "variables";
   let validationCache = [];
   let lastEditingView = "persona";
+  let faBinding = null;
+  let faApplyPreview = null;
+  let faApplySelectedGroupIds = new Set();
   let copilotState = {
     open: false,
     messages: [],
@@ -195,6 +245,7 @@
     collapsedSections: createDefaultCollapsedSections(),
     collapsedCandidateIds: [],
     lastPrompt: "",
+    thinkingMode: "fast",
     lastResolvedContext: null,
   };
 
@@ -251,6 +302,7 @@
       },
       collapsedCandidateIds: includeReview ? [...(copilotState.collapsedCandidateIds || [])] : [],
       lastPrompt: String(copilotState.lastPrompt || ""),
+      thinkingMode: normalizeCopilotThinkingMode(copilotState.thinkingMode),
     };
   }
 
@@ -294,6 +346,7 @@
       copilotSettingsDraft: buildUnsavedCopilotSettingsDraft(),
       currentView,
       currentFilename,
+      activeDatabaseKind,
       selectedIndices: { ...selectedIndices },
       copilotState: buildPersistedCopilotState(includeReview),
     });
@@ -327,6 +380,7 @@
       copilotSettingsDraft: buildUnsavedCopilotSettingsDraft(),
       currentView,
       currentFilename,
+      activeDatabaseKind,
       selectedIndices: { ...selectedIndices },
       copilotState: buildPersistedCopilotState(false),
     });
@@ -382,6 +436,7 @@
         ...selectedIndices,
         ...(draft.selectedIndices || {}),
       };
+      activeDatabaseKind = normalizeDatabaseKind(draft.activeDatabaseKind || activeDatabaseKind);
       copilotState.open = Boolean(storedState.open);
       copilotState.messages = Array.isArray(storedState.messages) ? storedState.messages.map((item) => ({
         role: item?.role === "user" ? "user" : "assistant",
@@ -402,6 +457,7 @@
         ? storedState.collapsedCandidateIds.map((item) => String(item || "")).filter(Boolean)
         : [];
       copilotState.lastPrompt = String(storedState.lastPrompt || "");
+      copilotState.thinkingMode = normalizeCopilotThinkingMode(storedState.thinkingMode);
       const promptInput = $("#copilotPrompt");
       if (promptInput && copilotState.lastPrompt) {
         promptInput.value = copilotState.lastPrompt;
@@ -409,6 +465,50 @@
     } finally {
       suppressLocalDraftWrite = false;
     }
+  }
+
+  function normalizeCopilotThinkingMode(value) {
+    return String(value || "").trim().toLowerCase() === "deep" ? "deep" : "fast";
+  }
+
+  function setCopilotThinkingMode(mode) {
+    copilotState.thinkingMode = normalizeCopilotThinkingMode(mode);
+    persistLocalDraft();
+    renderCopilotWidget();
+  }
+
+  function getStoredTheme() {
+    try {
+      const stored = localStorage.getItem(THEME_KEY);
+      return stored === "dark" ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  }
+
+  function applyTheme(theme) {
+    const normalizedTheme = theme === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = normalizedTheme;
+    const toggle = $("#btnThemeToggle");
+    if (toggle) {
+      toggle.textContent = normalizedTheme === "dark" ? "浅色" : "暗色";
+      toggle.setAttribute("aria-pressed", normalizedTheme === "dark" ? "true" : "false");
+      toggle.title = normalizedTheme === "dark" ? "切换到浅色模式" : "切换到暗色模式";
+    }
+  }
+
+  function setTheme(theme) {
+    const normalizedTheme = theme === "dark" ? "dark" : "light";
+    applyTheme(normalizedTheme);
+    try {
+      localStorage.setItem(THEME_KEY, normalizedTheme);
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function toggleTheme() {
+    setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
   }
 
 
@@ -424,6 +524,7 @@
     merged.worldbook_prompt = String(merged.worldbook_prompt || DEFAULT_COPILOT_SETTINGS.worldbook_prompt).trim() || DEFAULT_COPILOT_SETTINGS.worldbook_prompt;
     merged.preset_prompt = String(merged.preset_prompt || DEFAULT_COPILOT_SETTINGS.preset_prompt).trim() || DEFAULT_COPILOT_SETTINGS.preset_prompt;
     merged.memory_prompt = String(merged.memory_prompt || DEFAULT_COPILOT_SETTINGS.memory_prompt).trim() || DEFAULT_COPILOT_SETTINGS.memory_prompt;
+    merged.database_prompt = String(merged.database_prompt || DEFAULT_COPILOT_SETTINGS.database_prompt).trim() || DEFAULT_COPILOT_SETTINGS.database_prompt;
     return merged;
   }
 
@@ -439,6 +540,7 @@
     $("#copilotWorldbookPrompt").value = copilotSettings.worldbook_prompt || "";
     $("#copilotPresetPrompt").value = copilotSettings.preset_prompt || "";
     $("#copilotMemoryPrompt").value = copilotSettings.memory_prompt || "";
+    $("#copilotDatabasePrompt").value = copilotSettings.database_prompt || "";
     const promptInput = $("#copilotPrompt");
     if (promptInput && copilotState.lastPrompt) {
       promptInput.value = copilotState.lastPrompt;
@@ -457,6 +559,7 @@
       worldbook_prompt: $("#copilotWorldbookPrompt")?.value,
       preset_prompt: $("#copilotPresetPrompt")?.value,
       memory_prompt: $("#copilotMemoryPrompt")?.value,
+      database_prompt: $("#copilotDatabasePrompt")?.value,
     });
   }
 
@@ -473,6 +576,7 @@
       "copilotWorldbookPrompt",
       "copilotPresetPrompt",
       "copilotMemoryPrompt",
+      "copilotDatabasePrompt",
     ].includes(id);
   }
 
@@ -524,7 +628,7 @@
     if (!layer) return;
     const fabSize = 62;
     const gap = 14;
-    const widgetWidth = Math.min(420, Math.max(0, window.innerWidth - 32));
+    const widgetWidth = Math.min(560, Math.max(0, window.innerWidth - 32));
     const rawX = Number(position?.x) || Math.max(12, window.innerWidth - widgetWidth - fabSize - gap - 12);
     const rawY = Number(position?.y) || window.innerHeight - 96;
     const maxX = Math.max(12, window.innerWidth - widgetWidth - fabSize - gap - 12);
@@ -629,6 +733,13 @@
       },
       memory: { items: [] },
       preset: { active_preset_id: "", presets: [] },
+      database: {
+        enabled: true,
+        notes: "",
+        variables: [],
+        stages: [],
+        tags: [],
+      },
       updated_at: "",
     };
   }
@@ -665,8 +776,54 @@
       merged.preset.active_preset_id = merged.preset.presets[0].id;
     }
 
+    merged.database = normalizeDatabase(raw.database || {});
+
     if (!merged.title) merged.title = merged.persona_card.name || "";
     return merged;
+  }
+
+  function hasDatabaseContent(database) {
+    const normalized = normalizeDatabase(database || {});
+    return Boolean(
+      normalized.notes.trim()
+      || normalized.variables.length
+      || normalized.stages.length
+      || normalized.tags.length
+    );
+  }
+
+  function looksLikeDatabasePayload(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const keys = Object.keys(value);
+    const allowedKeys = new Set(["enabled", "notes", "variables", "stages", "tags"]);
+    if (!keys.length || keys.some((key) => !allowedKeys.has(key))) return false;
+    if (Array.isArray(value.variables) || Array.isArray(value.stages)) return true;
+    return Array.isArray(value.tags)
+      && value.tags.some((item) => item && typeof item === "object" && ["tag", "target", "trigger"].some((key) => key in item));
+  }
+
+  function inferImportView(parsed, importedProject, serverTarget = "") {
+    const target = String(serverTarget || "").trim().toLowerCase();
+    if (["persona", "worldbook", "preset", "memory", "database", "preview"].includes(target)) {
+      return target;
+    }
+    const raw = parsed && typeof parsed === "object" ? parsed : {};
+    if (raw.type === PROJECT_TYPE) return "preview";
+    if ("settings" in raw && "entries" in raw) return "worldbook";
+    if ("active_preset_id" in raw || "presets" in raw) return "preset";
+    if (looksLikeDatabasePayload(raw)) return "database";
+    if (Array.isArray(raw.items)) return "memory";
+    if ("personas" in raw || "creativeWorkshop" in raw || ("name" in raw && "first_mes" in raw)) return "persona";
+    const normalizedProject = normalizeProject(importedProject || {});
+    if (hasDatabaseContent(normalizedProject.database) && !normalizedProject.persona_card.name) return "database";
+    return "preview";
+  }
+
+  function selectInitialDatabaseKind() {
+    if (project.database.variables.length) activeDatabaseKind = "variables";
+    else if (project.database.stages.length) activeDatabaseKind = "stages";
+    else if (project.database.tags.length) activeDatabaseKind = "tags";
+    else activeDatabaseKind = "variables";
   }
 
   function structuredCloneCompat(value) {
@@ -774,6 +931,74 @@
     };
   }
 
+  function normalizeDatabaseKind(value) {
+    const kind = String(value || "").trim().toLowerCase();
+    if (["stage", "stages"].includes(kind)) return "stages";
+    if (["tag", "tags"].includes(kind)) return "tags";
+    return "variables";
+  }
+
+  function normalizeDatabaseVariable(item, index = 0) {
+    return {
+      id: item?.id || `db_var_${String(index + 1).padStart(3, "0")}`,
+      key: String(item?.key || ""),
+      label: String(item?.label || ""),
+      value_type: String(item?.value_type || "number"),
+      initial_value: String(item?.initial_value ?? ""),
+      scope: String(item?.scope || "role"),
+      description: String(item?.description || ""),
+      write_policy: String(item?.write_policy || ""),
+      notes: String(item?.notes || ""),
+    };
+  }
+
+  function normalizeDatabaseStage(item, index = 0) {
+    const roleId = String(item?.role_id || "");
+    const stageKey = String(item?.stage_key || "");
+    const activeTag = String(item?.active_tag || (roleId && stageKey ? `state_journal.stage.${roleId}.${stageKey}` : ""));
+    return {
+      id: item?.id || `db_stage_${String(index + 1).padStart(3, "0")}`,
+      role_id: roleId,
+      stage_key: stageKey,
+      title: String(item?.title || ""),
+      condition: String(item?.condition || ""),
+      active_tag: activeTag,
+      emits_tags: splitTags(item?.emits_tags || (activeTag ? [activeTag] : [])),
+      description: String(item?.description || ""),
+      notes: String(item?.notes || ""),
+    };
+  }
+
+  function normalizeDatabaseTag(item, index = 0) {
+    return {
+      id: item?.id || `db_tag_${String(index + 1).padStart(3, "0")}`,
+      tag: String(item?.tag || ""),
+      title: String(item?.title || ""),
+      trigger: String(item?.trigger || ""),
+      target: String(item?.target || "worldbook"),
+      description: String(item?.description || ""),
+      notes: String(item?.notes || ""),
+    };
+  }
+
+  function normalizeDatabaseItem(kind, item, index = 0) {
+    const normalizedKind = normalizeDatabaseKind(kind);
+    if (normalizedKind === "stages") return normalizeDatabaseStage(item, index);
+    if (normalizedKind === "tags") return normalizeDatabaseTag(item, index);
+    return normalizeDatabaseVariable(item, index);
+  }
+
+  function normalizeDatabase(value) {
+    const raw = value && typeof value === "object" ? value : {};
+    return {
+      enabled: Boolean(raw.enabled ?? true),
+      notes: String(raw.notes || ""),
+      variables: Array.isArray(raw.variables) ? raw.variables.map(normalizeDatabaseVariable) : [],
+      stages: Array.isArray(raw.stages) ? raw.stages.map(normalizeDatabaseStage) : [],
+      tags: Array.isArray(raw.tags) ? raw.tags.map(normalizeDatabaseTag) : [],
+    };
+  }
+
   function normalizeExtraPrompt(item, index = 0) {
     return {
       id: item?.id || `extra_${Math.random().toString(36).slice(2, 10)}`,
@@ -811,10 +1036,16 @@
     const memLength = project.memory.items.length;
     const presetLength = project.preset.presets.length;
     const personaLength = Object.keys(project.persona_card.personas || {}).length;
+    const databaseVariableLength = project.database.variables.length;
+    const databaseStageLength = project.database.stages.length;
+    const databaseTagLength = project.database.tags.length;
     selectedIndices.worldbookEntry = clampIndex(selectedIndices.worldbookEntry, wbLength);
     selectedIndices.memoryItem = clampIndex(selectedIndices.memoryItem, memLength);
     selectedIndices.presetItem = clampIndex(selectedIndices.presetItem, presetLength);
     selectedIndices.personaItem = clampIndex(selectedIndices.personaItem, personaLength);
+    selectedIndices.databaseVariable = clampIndex(selectedIndices.databaseVariable, databaseVariableLength);
+    selectedIndices.databaseStage = clampIndex(selectedIndices.databaseStage, databaseStageLength);
+    selectedIndices.databaseTag = clampIndex(selectedIndices.databaseTag, databaseTagLength);
   }
 
   function clampIndex(index, length) {
@@ -857,11 +1088,13 @@
 
     ensureSelections();
     renderSidebarMeta();
+    renderFaBinding();
     renderCurrentView();
     renderPersonaEditor();
     renderWorldbookEditor();
     renderPresetEditor();
     renderMemoryEditor();
+    renderDatabaseEditor();
     renderJsonPreviews();
     renderWarnings(validationCache, !validationCache.some((item) => item.level === "error"));
     if (compileCache) renderCardPreview(compileCache);
@@ -872,8 +1105,118 @@
 
   function renderSidebarMeta() {
     $("#projectTitle").value = project.title || "";
-    const totalBlocks = project.worldbook.entries.length + project.memory.items.length + project.preset.presets.length + project.persona_card.creativeWorkshop.items.length;
+    const totalBlocks = project.worldbook.entries.length
+      + project.memory.items.length
+      + project.preset.presets.length
+      + project.persona_card.creativeWorkshop.items.length
+      + project.database.variables.length
+      + project.database.stages.length
+      + project.database.tags.length;
     $("#editorStats").textContent = `${totalBlocks} 个块`;
+  }
+
+  function clearFaRuntimeState() {
+    faBinding = null;
+    faApplyPreview = null;
+    faApplySelectedGroupIds = new Set();
+  }
+
+  function renderFaBinding() {
+    const summary = $("#faBindingSummary");
+    const meta = $("#faBindingMeta");
+    if (!summary || !meta) return;
+    const binding = faBinding || {};
+    const card = binding.card || {};
+    const preset = binding.preset || {};
+    const worldbook = binding.worldbook || {};
+    const memory = binding.memory || {};
+    if (!card.card_uid && !card.name) {
+      summary.textContent = "尚未读取当前 Fa 内容。";
+      meta.innerHTML = "";
+      return;
+    }
+    summary.textContent = `${card.name || "未命名角色卡"} · ${card.card_uid || "无 card_uid"}`;
+    const roles = Array.isArray(card.roles) ? card.roles : [];
+    meta.innerHTML = `
+      <div class="fa-meta-row"><span>来源</span><strong>${escHtml(card.source_name || "当前角色卡")}</strong></div>
+      <div class="fa-meta-row"><span>角色</span><strong>${roles.length} 个</strong></div>
+      <div class="fa-meta-row"><span>世界书</span><strong>${Number(worldbook.entry_count || 0)} 条</strong></div>
+      <div class="fa-meta-row"><span>预设</span><strong>${escHtml(preset.active_preset_name || preset.active_preset_id || "未启用")}</strong></div>
+      <div class="fa-meta-row"><span>记忆</span><strong>${Number(memory.item_count || 0)} 条</strong></div>
+    `;
+  }
+
+  function resetFaApplySelection(preview) {
+    const groups = Array.isArray(preview?.groups) ? preview.groups : [];
+    faApplySelectedGroupIds = new Set(
+      groups
+        .filter((group) => Number(group.item_count || 0) > 0)
+        .map((group) => String(group.id || ""))
+        .filter(Boolean)
+    );
+  }
+
+  function renderFaApplyPreview() {
+    const root = $("#faApplyPreviewPanel");
+    if (!root) return;
+    const preview = faApplyPreview;
+    if (!preview) {
+      root.innerHTML = '<p class="muted">点击“刷新预览”生成增量应用清单。</p>';
+      return;
+    }
+    const groups = Array.isArray(preview.groups) ? preview.groups : [];
+    const warnings = Array.isArray(preview.warnings) ? preview.warnings : [];
+    const summary = preview.summary || {};
+    const binding = preview.binding || faBinding || {};
+    root.innerHTML = `
+      <div class="fa-preview-summary">
+        <div>
+          <span>变更</span>
+          <strong>${Number(summary.change_count || 0)} 项</strong>
+        </div>
+        <div>
+          <span>提醒</span>
+          <strong>${Number(summary.warning_count || 0)} 条</strong>
+        </div>
+        <div>
+          <span>目标</span>
+          <strong>${escHtml(binding.card?.name || "当前 Fa")}</strong>
+        </div>
+      </div>
+      ${warnings.length ? `<div class="fa-warning-box">${warnings.slice(0, 6).map((item) => `<p>${escHtml(item)}</p>`).join("")}</div>` : ""}
+      <div class="fa-apply-groups">
+        ${groups.length ? groups.map((group) => renderFaApplyGroup(group)).join("") : '<div class="empty-state show">没有可应用的增量变化。</div>'}
+      </div>
+    `;
+  }
+
+  function renderFaApplyGroup(group) {
+    const groupId = String(group.id || "");
+    const itemCount = Number(group.item_count || 0);
+    const checked = faApplySelectedGroupIds.has(groupId);
+    const disabled = itemCount <= 0;
+    const changes = Array.isArray(group.changes) ? group.changes : [];
+    const warnings = Array.isArray(group.warnings) ? group.warnings : [];
+    return `
+      <section class="fa-apply-group${disabled ? " disabled" : ""}">
+        <label class="check-chip fa-apply-check">
+          <input type="checkbox" data-fa-apply-group="${escAttr(groupId)}" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""} />
+          <span>${escHtml(group.title || group.module || groupId)} · ${itemCount} 项</span>
+        </label>
+        <p class="field-tip">${escHtml(group.description || "")}</p>
+        ${warnings.length ? `<div class="fa-group-warnings">${warnings.map((item) => `<p>${escHtml(item)}</p>`).join("")}</div>` : ""}
+        <div class="fa-change-list">
+          ${changes.slice(0, 8).map((change) => `
+            <div class="fa-change-item">
+              <span>${escHtml(change.action || "change")}</span>
+              <strong>${escHtml(change.label || change.path || "")}</strong>
+              <small>${escHtml(change.after_preview || "")}</small>
+            </div>
+          `).join("")}
+          ${changes.length > 8 ? `<div class="fa-change-more">还有 ${changes.length - 8} 项未展开显示。</div>` : ""}
+        </div>
+      </section>
+    `;
   }
 
   function renderCurrentView() {
@@ -1146,6 +1489,127 @@
     `;
   }
 
+  function getDatabaseKindMeta(kind) {
+    const normalizedKind = normalizeDatabaseKind(kind);
+    const map = {
+      variables: {
+        title: "变量",
+        addLabel: "+ 新增变量",
+        action: "add-database-variable",
+        removeAction: "remove-database-variable",
+        moveAction: "move-database-variable",
+        dataType: "database-variable",
+        indexKey: "databaseVariable",
+        emptyText: "还没有变量草稿。",
+        fields: DATABASE_VARIABLE_FIELDS,
+        itemLabel: (item, index) => item.label || item.key || `变量 ${index + 1}`,
+        itemMeta: (item) => truncateText(item.description || item.write_policy || item.key || "未填写", 42),
+      },
+      stages: {
+        title: "阶段",
+        addLabel: "+ 新增阶段",
+        action: "add-database-stage",
+        removeAction: "remove-database-stage",
+        moveAction: "move-database-stage",
+        dataType: "database-stage",
+        indexKey: "databaseStage",
+        emptyText: "还没有阶段草稿。",
+        fields: DATABASE_STAGE_FIELDS,
+        itemLabel: (item, index) => item.title || item.stage_key || `阶段 ${index + 1}`,
+        itemMeta: (item) => truncateText(item.active_tag || item.condition || "未填写", 42),
+      },
+      tags: {
+        title: "Tag",
+        addLabel: "+ 新增 Tag",
+        action: "add-database-tag",
+        removeAction: "remove-database-tag",
+        moveAction: "move-database-tag",
+        dataType: "database-tag",
+        indexKey: "databaseTag",
+        emptyText: "还没有 tag 草稿。",
+        fields: DATABASE_TAG_FIELDS,
+        itemLabel: (item, index) => item.title || item.tag || `Tag ${index + 1}`,
+        itemMeta: (item) => truncateText(item.target || item.trigger || item.description || "未填写", 42),
+      },
+    };
+    return map[normalizedKind] || map.variables;
+  }
+
+  function renderDatabaseEditor() {
+    const root = $("#databaseEditor");
+    if (!root) return;
+    const kind = normalizeDatabaseKind(activeDatabaseKind);
+    const meta = getDatabaseKindMeta(kind);
+    const items = project.database[kind] || [];
+    const selectedIndex = selectedIndices[meta.indexKey] || 0;
+    const current = items[selectedIndex];
+    root.innerHTML = `
+      <div class="editor-card settings-card">
+        <div class="card-header-solo">
+          <div>
+            <h3>数据库设计草稿</h3>
+            <p class="muted">这里只记录变量、阶段和 tag 的设计，不写运行时 SQLite。tag 可用于未来触发世界书或演出工坊。</p>
+          </div>
+          <label class="check-chip">
+            <input type="checkbox" data-path="database.enabled" ${project.database.enabled ? "checked" : ""} />
+            <span>启用数据库设计</span>
+          </label>
+        </div>
+        <div class="detail-fields-grid">
+          ${renderFieldControl({ key: "notes", label: "数据库总备注", type: "textarea", rows: 4, spanTwo: true }, project.database.notes, { path: "database.notes" })}
+        </div>
+      </div>
+      <div class="database-kind-tabs" role="tablist" aria-label="数据库草稿类型">
+        ${[
+          ["variables", `变量 ${project.database.variables.length}`],
+          ["stages", `阶段 ${project.database.stages.length}`],
+          ["tags", `Tag ${project.database.tags.length}`],
+        ].map(([tabKind, label]) => `
+          <button class="database-kind-tab${kind === tabKind ? " active" : ""}" type="button" data-database-kind="${tabKind}" aria-pressed="${kind === tabKind ? "true" : "false"}">${label}</button>
+        `).join("")}
+      </div>
+      <div class="section-browser-layout">
+        ${renderBrowserPanel({
+          title: `${meta.title}列表`,
+          addLabel: meta.addLabel,
+          action: meta.action,
+          items,
+          selectedIndex,
+          itemLabel: meta.itemLabel,
+          itemMeta: meta.itemMeta,
+          dataType: meta.dataType,
+          emptyText: meta.emptyText,
+        })}
+        <div class="item-editor-shell">
+          ${current ? renderDatabaseDetail(kind, current, selectedIndex) : `<div class="empty-state show">左边点一个${meta.title}后开始编辑。</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDatabaseDetail(kind, item, index) {
+    const meta = getDatabaseKindMeta(kind);
+    const pathRoot = `database.${normalizeDatabaseKind(kind)}.${index}`;
+    return `
+      <div class="detail-card active detail-card-large">
+        <div class="detail-head">
+          <div>
+            <p class="eyebrow">Database ${meta.title} ${index + 1}</p>
+            <h3>${escHtml(meta.itemLabel(item, index))}</h3>
+          </div>
+          <div class="item-toolbar">
+            <button class="sort-handle" type="button" data-action="${meta.moveAction}" data-index="${index}" data-delta="-1">上移</button>
+            <button class="sort-handle" type="button" data-action="${meta.moveAction}" data-index="${index}" data-delta="1">下移</button>
+            <button class="item-remove-btn" type="button" data-action="${meta.removeAction}" data-index="${index}">删除</button>
+          </div>
+        </div>
+        <div class="detail-fields-grid">
+          ${meta.fields.map((field) => renderFieldControl(field, item[field.key], { path: `${pathRoot}.${field.key}` })).join("")}
+        </div>
+      </div>
+    `;
+  }
+
   function renderWorkshopCard(item, index) {
     return `
       <section class="sub-card">
@@ -1256,7 +1720,7 @@
             view: "persona",
             module: "persona",
             title: `当前浏览：分身 · ${value.name || key}`,
-            subtitle: `焦点提示：personas.${key}，但 AI 仍会读取 persona_card / worldbook / preset / memory。`,
+            subtitle: `焦点提示：personas.${key}，但 AI 仍会读取 persona_card / worldbook / preset / memory / database。`,
             persona_key: key,
           },
         };
@@ -1269,7 +1733,7 @@
           view: "persona",
           module: "persona",
           title: "当前浏览：角色主体",
-          subtitle: "焦点提示：persona_card 主字段，但 AI 仍会读取 persona_card / worldbook / preset / memory。",
+          subtitle: "焦点提示：persona_card 主字段，但 AI 仍会读取 persona_card / worldbook / preset / memory / database。",
           persona_key: "",
         },
       };
@@ -1307,6 +1771,27 @@
       };
     }
 
+    if (baseView === "database") {
+      const kind = normalizeDatabaseKind(activeDatabaseKind);
+      const meta = getDatabaseKindMeta(kind);
+      const index = selectedIndices[meta.indexKey] || 0;
+      const item = (project.database[kind] || [])[index] || {};
+      const label = meta.itemLabel(item, index);
+      return {
+        module: "database",
+        title: `当前浏览：数据库 · ${label}`,
+        subtitle: "AI 将分析整张卡内容并返回候选修改；数据库这里只写设计草稿。",
+        focusHint: {
+          view: "database",
+          module: "database",
+          title: `当前浏览：数据库 · ${label}`,
+          subtitle: "焦点提示：数据库只写变量、阶段和 tag 设计草稿，不写运行时状态库。",
+          database_kind: kind,
+          database_id: String(item.id || ""),
+        },
+      };
+    }
+
     const memoryItem = project.memory.items[selectedIndices.memoryItem] || {};
     return {
       module: "memory",
@@ -1324,6 +1809,77 @@
 
   function getReviewCandidates() {
     return Array.isArray(copilotState.pendingReview?.candidates) ? copilotState.pendingReview.candidates : [];
+  }
+
+  function getReviewCandidateGroups(candidates = getReviewCandidates()) {
+    const rawGroups = Array.isArray(copilotState.pendingReview?.candidate_groups) ? copilotState.pendingReview.candidate_groups : [];
+    const byId = new Map();
+    rawGroups.forEach((group) => {
+      const groupId = normalizeGroupId(group?.group_id || group?.id);
+      if (!groupId) return;
+      byId.set(groupId, {
+        group_id: groupId,
+        group_title: String(group?.group_title || group?.title || groupId).trim(),
+        reason: String(group?.reason || "").trim(),
+        candidate_ids: Array.isArray(group?.candidate_ids) ? group.candidate_ids.map((id) => String(id || "")).filter(Boolean) : [],
+        depends_on: Array.isArray(group?.depends_on) ? group.depends_on.map((id) => normalizeGroupId(id)).filter(Boolean) : [],
+        draft_only: Boolean(group?.draft_only),
+      });
+    });
+    candidates.forEach((candidate) => {
+      const groupId = normalizeGroupId(candidate?.group_id) || inferCandidateGroupId(candidate);
+      if (!byId.has(groupId)) {
+        byId.set(groupId, {
+          group_id: groupId,
+          group_title: candidate?.group_title || inferCandidateGroupTitle(groupId),
+          reason: "",
+          candidate_ids: [],
+          depends_on: [],
+          draft_only: false,
+        });
+      }
+      const group = byId.get(groupId);
+      const candidateId = String(candidate?.id || "");
+      if (candidateId && !group.candidate_ids.includes(candidateId)) {
+        group.candidate_ids.push(candidateId);
+      }
+      if (!group.group_title && candidate?.group_title) group.group_title = candidate.group_title;
+      if (candidate?.draft_only) group.draft_only = true;
+    });
+    return [...byId.values()].filter((group) => group.candidate_ids.length);
+  }
+
+  function normalizeGroupId(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_.:-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  function inferCandidateGroupId(candidate) {
+    const path = getCandidatePath(candidate);
+    if (path.startsWith("database.")) return "database_mechanism";
+    if (path.startsWith("worldbook.")) return "worldbook_context";
+    if (path.startsWith("preset.")) return "preset_discipline";
+    if (path.startsWith("memory.")) return "memory_continuity";
+    if (path.startsWith("persona_card.")) return "persona_foundation";
+    return normalizeGroupId(candidate?.module) || "ungrouped";
+  }
+
+  function inferCandidateGroupTitle(groupId) {
+    const titles = {
+      persona_foundation: "角色底座",
+      worldbook_context: "世界书承接",
+      preset_discipline: "预设纪律",
+      memory_continuity: "记忆连续性",
+      database_mechanism: "数据库机制",
+      tag_consumer_link: "tag 消费闭环",
+      ungrouped: "候选修改",
+    };
+    return titles[groupId] || groupId.replace(/_/g, " ");
   }
 
   function isSectionCollapsed(sectionKey) {
@@ -1377,6 +1933,37 @@
     renderCopilotWidget();
   }
 
+  function getGroupCandidateIds(group) {
+    return Array.isArray(group?.candidate_ids) ? group.candidate_ids.map((id) => String(id || "")).filter(Boolean) : [];
+  }
+
+  function getGroupSelectionState(group) {
+    const ids = getGroupCandidateIds(group);
+    const selectedCount = ids.filter((id) => isCandidateSelected(id)).length;
+    return {
+      ids,
+      selectedCount,
+      checked: ids.length > 0 && selectedCount === ids.length,
+      mixed: selectedCount > 0 && selectedCount < ids.length,
+    };
+  }
+
+  function toggleCandidateGroupSelection(groupId) {
+    const groups = getReviewCandidateGroups();
+    const group = groups.find((item) => item.group_id === normalizeGroupId(groupId));
+    if (!group) return;
+    const state = getGroupSelectionState(group);
+    const current = new Set(copilotState.selectedCandidateIds || []);
+    if (state.checked) {
+      state.ids.forEach((id) => current.delete(id));
+    } else {
+      state.ids.forEach((id) => current.add(id));
+    }
+    copilotState.selectedCandidateIds = [...current];
+    persistLocalDraft();
+    renderCopilotWidget();
+  }
+
   function summarizeCandidateValue(value, maxLen = 120) {
     if (value == null) return "空";
     if (Array.isArray(value)) return value.length ? truncateText(value.map((item) => typeof item === "string" ? item : JSON.stringify(item)).join("，"), maxLen) : "空数组";
@@ -1394,6 +1981,10 @@
     if (candidate?.module === "worldbook") return target.id ? `worldbook.entries.${target.id}` : "worldbook.entries";
     if (candidate?.module === "preset") return target.id ? `preset.presets.${target.id}` : "preset.presets";
     if (candidate?.module === "memory") return target.id ? `memory.items.${target.id}` : "memory.items";
+    if (candidate?.module === "database") {
+      const kind = normalizeDatabaseKind(target.kind);
+      return target.id ? `database.${kind}.${target.id}` : `database.${kind}`;
+    }
     return "候选修改";
   }
 
@@ -1410,20 +2001,25 @@
     return actionLabels[candidate?.action] || String(candidate?.action || "修改");
   }
 
-  function renderCandidateDiff(candidate) {
-    const beforeValue = summarizeCandidateValue(candidate.before, 180);
-    const afterValue = summarizeCandidateValue(candidate.after, 260);
+  function renderCandidateDiff(candidate, check = analyzeCopilotCandidate(candidate)) {
+    const currentValue = summarizeCandidateValue(check.currentValue, 180);
+    const expectedValue = summarizeCandidateValue(check.expectedValue, 180);
+    const afterValue = summarizeCandidateValue(check.afterValue, 260);
+    const expectedBlock = check.expectedValue != null && stableStringify(check.expectedValue) !== stableStringify(check.currentValue)
+      ? `<div><span>候选基准</span><p>${escHtml(expectedValue)}</p></div>`
+      : "";
     return `
       <div class="copilot-field-map">
         <div class="copilot-path-line">
-          <span>JSON 键</span>
-          <code>${escHtml(getCandidatePath(candidate))}</code>
+          <span>JSON 键 · ${escHtml(check.operation)}</span>
+          <code>${escHtml(check.path || getCandidatePath(candidate))}</code>
         </div>
-        <div class="copilot-field-change">
+        <div class="copilot-field-change${expectedBlock ? " has-expected" : ""}">
           <div>
             <span>当前</span>
-            <p>${escHtml(beforeValue)}</p>
+            <p>${escHtml(currentValue)}</p>
           </div>
+          ${expectedBlock}
           <div>
             <span>将填充</span>
             <p>${escHtml(afterValue)}</p>
@@ -1434,7 +2030,7 @@
   }
 
   function describeCandidateTarget(candidate) {
-    const moduleLabels = { persona: "人设", worldbook: "世界书", preset: "预设", memory: "记忆" };
+    const moduleLabels = { persona: "人设", worldbook: "世界书", preset: "预设", memory: "记忆", database: "数据库" };
     const target = candidate?.target || {};
     if (candidate?.module === "persona") {
       if (target.persona_key) return `分身 ${target.persona_key}`;
@@ -1442,6 +2038,276 @@
     }
     if (target.id) return `${moduleLabels[candidate.module] || candidate.module} · ${target.id}`;
     return moduleLabels[candidate?.module] || "候选修改";
+  }
+
+  function renderCopilotPlan(plan) {
+    if (!plan || typeof plan !== "object" || !Object.keys(plan).length) return "";
+    const containers = Array.isArray(plan.required_containers) ? plan.required_containers.filter(Boolean) : [];
+    const containerPlan = Array.isArray(plan.container_plan) ? plan.container_plan : [];
+    const risks = Array.isArray(plan.risks) ? plan.risks.filter(Boolean) : [];
+    const coverage = plan.coverage && typeof plan.coverage === "object" ? plan.coverage : {};
+    const coverageItems = ["persona", "worldbook", "memory", "database", "preset"]
+      .map((key) => ({ key, value: String(coverage[key] || "").trim() }))
+      .filter((item) => item.value);
+    const content = `
+      <div class="copilot-plan-grid">
+        ${plan.intent_type ? `<div class="copilot-review-row"><span>意图</span><strong>${escHtml(plan.intent_type)}</strong></div>` : ""}
+        ${plan.package_mode ? `<div class="copilot-review-row"><span>模式</span><strong>${escHtml(plan.package_mode)}</strong></div>` : ""}
+        ${plan.quality_goal ? `<div class="copilot-review-row"><span>目标</span><p>${escHtml(plan.quality_goal)}</p></div>` : ""}
+        ${containers.length ? `<div class="copilot-review-row"><span>容器</span><div class="copilot-chip-row">${containers.map((item) => `<span class="pill-note">${escHtml(item)}</span>`).join("")}</div></div>` : ""}
+      </div>
+      ${containerPlan.length ? `
+        <div class="copilot-plan-list">
+          ${containerPlan.map((item) => `
+            <div class="copilot-plan-item">
+              <strong>${escHtml(item.module || "container")}</strong>
+              <p>${escHtml(item.role || "")}</p>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+      ${coverageItems.length ? `
+        <div class="copilot-coverage-grid">
+          ${coverageItems.map((item) => `
+            <div class="copilot-coverage-item">
+              <strong>${escHtml(item.key)}</strong>
+              <p>${escHtml(item.value)}</p>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+      ${risks.length ? `<div class="copilot-warning-list">${risks.map((risk) => `<p>${escHtml(risk)}</p>`).join("")}</div>` : ""}
+    `;
+    return renderCollapsibleSection({
+      key: "copilot-plan",
+      title: "生成计划",
+      badge: containers.length ? `${containers.length} 个容器` : "",
+      collapsed: isSectionCollapsed("copilot-plan"),
+      bodyClass: "copilot-plan-body",
+      content,
+      extraClass: "copilot-plan-section",
+    });
+  }
+
+  function getCandidateEmittedTags(candidate) {
+    if (candidate?.module !== "database") return [];
+    const after = candidate?.after && typeof candidate.after === "object" ? candidate.after : {};
+    const path = getCandidatePath(candidate);
+    const tags = [];
+    ["active_tag", "tag"].forEach((key) => {
+      const value = String(after[key] || "").trim();
+      if (value && !tags.includes(value)) tags.push(value);
+    });
+    if (!tags.length && path.startsWith("database.stages")) {
+      const roleId = String(after.role_id || "").trim();
+      const stageKey = String(after.stage_key || "").trim();
+      if (roleId && stageKey) tags.push(`state_journal.stage.${roleId}.${stageKey}`);
+    }
+    splitTags(after.emits_tags || []).forEach((tag) => {
+      if (tag && !tags.includes(tag)) tags.push(tag);
+    });
+    return tags;
+  }
+
+  function getCandidateConsumedTags(candidate) {
+    if (candidate?.module !== "worldbook") return [];
+    const after = candidate?.after && typeof candidate.after === "object" ? candidate.after : {};
+    if (String(after.entry_type || "").trim().toLowerCase() !== "external_tag") return [];
+    const tags = [];
+    ["trigger", "secondary_trigger"].forEach((key) => {
+      splitTags(after[key] || "").forEach((tag) => {
+        if (tag && !tags.includes(tag)) tags.push(tag);
+      });
+    });
+    return tags;
+  }
+
+  function buildCopilotPackageAudit(candidates, plan = {}) {
+    const modules = [];
+    const emittedTags = [];
+    const consumedTags = [];
+    candidates.forEach((candidate) => {
+      if (candidate?.module && !modules.includes(candidate.module)) modules.push(candidate.module);
+      getCandidateEmittedTags(candidate).forEach((tag) => {
+        if (!emittedTags.includes(tag)) emittedTags.push(tag);
+      });
+      getCandidateConsumedTags(candidate).forEach((tag) => {
+        if (!consumedTags.includes(tag)) consumedTags.push(tag);
+      });
+    });
+    const allowedRequired = new Set(["persona", "worldbook", "memory", "database", "preset"]);
+    let required = Array.isArray(plan?.required_containers)
+      ? plan.required_containers.map((item) => String(item || "").trim()).filter((item) => allowedRequired.has(item))
+      : [];
+    required = [...new Set(required)];
+    if (!required.length && String(plan?.package_mode || "") === "runtime_package") {
+      required = ["persona", "worldbook", "memory", "database"];
+    }
+    const missingContainers = required.filter((module) => !modules.includes(module));
+    const missingTagConsumers = emittedTags.filter((tag) => !consumedTags.includes(tag));
+    const warnings = [];
+    if (missingContainers.length) warnings.push(`缺少容器：${missingContainers.join(", ")}`);
+    if (missingTagConsumers.length) warnings.push(`tag 未闭环：${missingTagConsumers.join(", ")}`);
+    if (!modules.includes("preset")) warnings.push("没有轻量预设适配候选；若已有外部预设可忽略。");
+    return {
+      package_mode: String(plan?.package_mode || (modules.length > 1 ? "runtime_package" : "single_edit")),
+      modules,
+      required_containers: required,
+      missing_containers: missingContainers,
+      emitted_tags: emittedTags,
+      consumed_tags: consumedTags,
+      missing_tag_consumers: missingTagConsumers,
+      has_light_preset: modules.includes("preset"),
+      ready: !missingContainers.length && !missingTagConsumers.length,
+      warnings,
+    };
+  }
+
+  function normalizePackageAudit(raw, candidates, plan) {
+    const fallback = buildCopilotPackageAudit(candidates, plan);
+    if (!raw || typeof raw !== "object") return fallback;
+    return {
+      ...fallback,
+      ...raw,
+      modules: Array.isArray(raw.modules) ? raw.modules.map(String).filter(Boolean) : fallback.modules,
+      missing_containers: Array.isArray(raw.missing_containers) ? raw.missing_containers.map(String).filter(Boolean) : fallback.missing_containers,
+      required_containers: Array.isArray(raw.required_containers) ? raw.required_containers.map(String).filter(Boolean) : fallback.required_containers,
+      emitted_tags: Array.isArray(raw.emitted_tags) ? raw.emitted_tags.map(String).filter(Boolean) : fallback.emitted_tags,
+      consumed_tags: Array.isArray(raw.consumed_tags) ? raw.consumed_tags.map(String).filter(Boolean) : fallback.consumed_tags,
+      missing_tag_consumers: Array.isArray(raw.missing_tag_consumers) ? raw.missing_tag_consumers.map(String).filter(Boolean) : fallback.missing_tag_consumers,
+      warnings: Array.isArray(raw.warnings) ? raw.warnings.map(String).filter(Boolean) : fallback.warnings,
+      has_light_preset: Boolean(raw.has_light_preset ?? fallback.has_light_preset),
+      ready: Boolean(raw.ready ?? fallback.ready),
+    };
+  }
+
+  function renderCopilotPackageAudit(audit) {
+    if (!audit) return "";
+    const modules = Array.isArray(audit.modules) ? audit.modules : [];
+    const missing = Array.isArray(audit.missing_containers) ? audit.missing_containers : [];
+    const emitted = Array.isArray(audit.emitted_tags) ? audit.emitted_tags : [];
+    const consumed = Array.isArray(audit.consumed_tags) ? audit.consumed_tags : [];
+    const missingTags = Array.isArray(audit.missing_tag_consumers) ? audit.missing_tag_consumers : [];
+    const warnings = Array.isArray(audit.warnings) ? audit.warnings : [];
+    const content = `
+      <div class="copilot-audit-grid">
+        <div class="copilot-audit-item">
+          <span>容器覆盖</span>
+          <strong>${escHtml(modules.length ? modules.join(" / ") : "无")}</strong>
+          ${missing.length ? `<p>缺少：${escHtml(missing.join(", "))}</p>` : `<p>关键容器已覆盖。</p>`}
+        </div>
+        <div class="copilot-audit-item">
+          <span>tag 闭环</span>
+          <strong>${escHtml(`${consumed.length}/${emitted.length} 已消费`)}</strong>
+          ${missingTags.length ? `<p>未消费：${escHtml(missingTags.join(", "))}</p>` : `<p>数据库 tag 有世界书消费者。</p>`}
+        </div>
+        <div class="copilot-audit-item">
+          <span>轻量预设</span>
+          <strong>${audit.has_light_preset ? "已覆盖" : "未覆盖"}</strong>
+          <p>${audit.has_light_preset ? "只作为适配纪律。" : "已有外部预设时可忽略。"}</p>
+        </div>
+      </div>
+      ${warnings.length ? `<div class="copilot-warning-list">${warnings.map((item) => `<p>${escHtml(item)}</p>`).join("")}</div>` : ""}
+    `;
+    return renderCollapsibleSection({
+      key: "copilot-package-audit",
+      title: "运行包验收",
+      badge: audit.ready ? "闭环" : "需复查",
+      collapsed: isSectionCollapsed("copilot-package-audit"),
+      bodyClass: "copilot-audit-body",
+      content,
+      extraClass: "copilot-audit-section",
+    });
+  }
+
+  function renderCandidateMeta(candidate) {
+    const chips = [];
+    if (candidate?.container_role) chips.push(`<span class="pill-note">${escHtml(candidate.container_role)}</span>`);
+    if (candidate?.draft_only) chips.push(`<span class="pill-note warning-pill">设计草稿</span>`);
+    if (Array.isArray(candidate?.depends_on) && candidate.depends_on.length) {
+      chips.push(`<span class="pill-note">依赖 ${escHtml(candidate.depends_on.join(", "))}</span>`);
+    }
+    if (Array.isArray(candidate?.emits_tags) && candidate.emits_tags.length) {
+      chips.push(`<span class="pill-note">发出 ${escHtml(candidate.emits_tags.join(", "))}</span>`);
+    }
+    if (Array.isArray(candidate?.consumes_tags) && candidate.consumes_tags.length) {
+      chips.push(`<span class="pill-note">消费 ${escHtml(candidate.consumes_tags.join(", "))}</span>`);
+    }
+    const warnings = Array.isArray(candidate?.tag_warnings) ? candidate.tag_warnings.filter(Boolean) : [];
+    return `
+      ${chips.length ? `<div class="copilot-candidate-meta">${chips.join("")}</div>` : ""}
+      ${warnings.length ? `<div class="copilot-tag-warning">${warnings.map((item) => `<p>${escHtml(item)}</p>`).join("")}</div>` : ""}
+    `;
+  }
+
+  function renderCandidatePreflight(candidate, check = analyzeCopilotCandidate(candidate)) {
+    const warnings = Array.isArray(check.warnings) ? check.warnings.filter(Boolean) : [];
+    return `
+      <div class="copilot-preflight ${escAttr(check.tone)}">
+        <div class="copilot-preflight-main">
+          <span class="preflight-dot"></span>
+          <strong>${escHtml(check.label)}</strong>
+          <p>${escHtml(check.reason)}</p>
+        </div>
+        ${warnings.length ? `<div class="copilot-preflight-warnings">${warnings.map((item) => `<p>${escHtml(item)}</p>`).join("")}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function renderCandidateCard(candidate) {
+    const path = getCandidatePath(candidate);
+    const actionLabel = describeCandidateAction(candidate);
+    const check = analyzeCopilotCandidate(candidate);
+    return `
+      <article class="copilot-candidate-card simple-candidate-card${isCandidateSelected(candidate.id) ? " selected" : ""} ${escAttr(`preflight-${check.status}`)}">
+        <label class="copilot-candidate-toggle-row" data-candidate-toggle="${escAttr(candidate.id || "")}">
+          <input type="checkbox" ${isCandidateSelected(candidate.id) ? "checked" : ""} />
+          <span class="copilot-candidate-main">
+            <strong>${escHtml(path)}</strong>
+            <small>${escHtml(actionLabel)} · ${escHtml(candidate.label || "候选修改")}</small>
+          </span>
+        </label>
+        ${renderCandidatePreflight(candidate, check)}
+        ${renderCandidateMeta(candidate)}
+        ${renderCandidateDiff(candidate, check)}
+      </article>
+    `;
+  }
+
+  function renderCandidateGroup(group, candidatesById) {
+    const state = getGroupSelectionState(group);
+    const candidates = state.ids.map((id) => candidatesById.get(id)).filter(Boolean);
+    const checks = candidates.map((candidate) => analyzeCopilotCandidate(candidate));
+    const moduleNames = [...new Set(candidates.map((candidate) => candidate.module).filter(Boolean))];
+    const readyCount = checks.filter((check) => check.canApply && check.status === "ready").length;
+    const warningCount = checks.filter((check) => check.canApply && check.status === "warning").length;
+    const blockedCount = checks.filter((check) => !check.canApply).length;
+    const badge = `${state.selectedCount}/${state.ids.length}`;
+    return `
+      <section class="copilot-candidate-group${state.checked ? " selected" : ""}${state.mixed ? " mixed" : ""}">
+        <div class="copilot-group-head">
+          <label class="copilot-group-toggle" data-candidate-group-toggle="${escAttr(group.group_id)}">
+            <input type="checkbox" ${state.checked ? "checked" : ""} ${state.mixed ? "data-mixed=\"true\"" : ""} />
+            <span>
+              <strong>${escHtml(group.group_title || group.group_id || "候选组")}</strong>
+              <small>${escHtml(group.reason || "这一组候选共同完成一个容器编排目标。")}</small>
+            </span>
+          </label>
+          <div class="copilot-group-meta">
+            <span class="pill-note">${escHtml(badge)}</span>
+            ${moduleNames.map((item) => `<span class="pill-note">${escHtml(item)}</span>`).join("")}
+            ${readyCount ? `<span class="pill-note success-pill">可应用 ${readyCount}</span>` : ""}
+            ${warningCount ? `<span class="pill-note warning-pill">提醒 ${warningCount}</span>` : ""}
+            ${blockedCount ? `<span class="pill-note danger-pill">拦截 ${blockedCount}</span>` : ""}
+            ${group.draft_only ? `<span class="pill-note warning-pill">设计草稿</span>` : ""}
+          </div>
+        </div>
+        ${group.depends_on?.length ? `<p class="copilot-group-deps">依赖：${escHtml(group.depends_on.join(", "))}</p>` : ""}
+        <div class="copilot-review-grid simple-review-grid">
+          ${candidates.map((candidate) => renderCandidateCard(candidate)).join("")}
+        </div>
+      </section>
+    `;
   }
 
   function renderCollapsibleSection({ key, title, badge = "", bodyClass = "", collapsed = false, content = "", extraClass = "" }) {
@@ -1472,6 +2338,7 @@
     layer.classList.toggle("open", copilotState.open);
     fab.setAttribute("aria-expanded", copilotState.open ? "true" : "false");
     $("#copilotTitle").textContent = "轮椅模式";
+    renderCopilotThinkingModeControl();
     renderCopilotMessages();
     const sendButton = $("#copilotSend");
     if (sendButton) {
@@ -1484,37 +2351,83 @@
     }
   }
 
+  function renderCopilotThinkingModeControl() {
+    const inputArea = $("#copilotInputArea");
+    const promptInput = $("#copilotPrompt");
+    if (!inputArea || !promptInput) return;
+    let control = $("#copilotThinkingMode");
+    if (!control) {
+      control = document.createElement("div");
+      control.id = "copilotThinkingMode";
+      control.className = "copilot-mode-toggle";
+      promptInput.insertAdjacentElement("beforebegin", control);
+    }
+    const activeMode = normalizeCopilotThinkingMode(copilotState.thinkingMode);
+    control.innerHTML = Object.entries(COPILOT_THINKING_MODES).map(([mode, label]) => `
+      <button
+        class="copilot-mode-button${activeMode === mode ? " active" : ""}"
+        type="button"
+        data-copilot-mode="${escAttr(mode)}"
+        aria-pressed="${activeMode === mode ? "true" : "false"}"
+        title="${mode === "deep" ? "读取深度参考，适合从零造角、重构和关系系统" : "读取压缩核心，适合日常补写和小范围修改"}"
+      >${escHtml(label)}</button>
+    `).join("");
+  }
+
   function renderCopilotReviewMessage() {
     const pending = copilotState.pendingReview;
     if (!pending) return "";
     ensureSelectedCandidates();
     const candidates = getReviewCandidates();
+    const selected = candidates.filter((candidate) => isCandidateSelected(candidate.id));
+    const reviewChecks = candidates.map((candidate) => analyzeCopilotCandidate(candidate));
+    const selectedChecks = (selected.length ? selected : candidates).map((candidate) => analyzeCopilotCandidate(candidate));
+    const applyCount = selectedChecks.filter((check) => check.canApply).length;
+    const groups = getReviewCandidateGroups(candidates);
+    const candidatesById = new Map(candidates.map((candidate) => [String(candidate.id || ""), candidate]));
+    const packageAudit = normalizePackageAudit(pending.package_audit, candidates, pending.plan);
     return `
       <div class="copilot-message assistant copilot-message-review">
         <div class="copilot-bubble copilot-review-bubble">
           <div class="copilot-review-actions">
-            <button class="primary-button copilot-apply-button" type="button" data-copilot-action="apply">填充到卡片</button>
+            <button class="primary-button copilot-apply-button" type="button" data-copilot-action="apply">填充 ${applyCount} 条到卡片</button>
             <button class="ghost-button copilot-cancel-button" type="button" data-copilot-action="discard">取消</button>
           </div>
           <p class="muted">${escHtml(pending.summary || "已生成候选修改，点击填充后写入对应 JSON 键。")}</p>
-          <div class="copilot-review-grid simple-review-grid">
-            ${candidates.map((candidate) => {
-              const path = getCandidatePath(candidate);
-              const actionLabel = describeCandidateAction(candidate);
-              return `
-                <article class="copilot-candidate-card simple-candidate-card${isCandidateSelected(candidate.id) ? " selected" : ""}">
-                  <label class="copilot-candidate-toggle-row" data-candidate-toggle="${escAttr(candidate.id || "")}">
-                    <input type="checkbox" ${isCandidateSelected(candidate.id) ? "checked" : ""} />
-                    <span class="copilot-candidate-main">
-                      <strong>${escHtml(path)}</strong>
-                      <small>${escHtml(actionLabel)} · ${escHtml(candidate.label || "候选修改")}</small>
-                    </span>
-                  </label>
-                  ${renderCandidateDiff(candidate)}
-                </article>
-              `;
-            }).join("")}
+          ${renderCopilotPreflightSummary(reviewChecks, selectedChecks)}
+          ${renderCopilotPlan(pending.plan)}
+          ${renderCopilotPackageAudit(packageAudit)}
+          <div class="copilot-group-list">
+            ${groups.length
+              ? groups.map((group) => renderCandidateGroup(group, candidatesById)).join("")
+              : `<div class="copilot-review-grid simple-review-grid">${candidates.map((candidate) => renderCandidateCard(candidate)).join("")}</div>`}
           </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCopilotPreflightSummary(allChecks, selectedChecks) {
+    const total = allChecks.length;
+    const selectedTotal = selectedChecks.length;
+    const ready = selectedChecks.filter((check) => check.canApply && check.status === "ready").length;
+    const warnings = selectedChecks.filter((check) => check.canApply && check.status === "warning").length;
+    const blocked = selectedChecks.filter((check) => !check.canApply).length;
+    const changed = selectedChecks.filter((check) => check.status === "conflict").length;
+    const missing = selectedChecks.filter((check) => check.status === "missing").length;
+    return `
+      <div class="copilot-preflight-summary">
+        <div>
+          <span>应用预检</span>
+          <strong>${escHtml(`${ready + warnings}/${selectedTotal || total} 可写入`)}</strong>
+        </div>
+        <div class="copilot-chip-row">
+          <span class="pill-note success-pill">可应用 ${ready}</span>
+          ${warnings ? `<span class="pill-note warning-pill">提醒 ${warnings}</span>` : ""}
+          ${blocked ? `<span class="pill-note danger-pill">拦截 ${blocked}</span>` : ""}
+          ${changed ? `<span class="pill-note warning-pill">内容变化 ${changed}</span>` : ""}
+          ${missing ? `<span class="pill-note danger-pill">目标缺失 ${missing}</span>` : ""}
+          <span class="pill-note">全部 ${total}</span>
         </div>
       </div>
     `;
@@ -1532,8 +2445,8 @@
     `;
     const history = copilotState.messages.map((item) => {
       const detailBlock = item.detail ? `
-          <details class="copilot-error-detail">
-            <summary>详细报错</summary>
+          <details class="copilot-message-detail${item.error ? " is-error" : ""}">
+            <summary>${item.error ? "详细报错" : "详细记录"}</summary>
             <pre>${escHtml(item.detail)}</pre>
           </details>
         ` : "";
@@ -1557,6 +2470,9 @@
       </div>
     ` : "";
     root.innerHTML = `<div class="copilot-messages-body">${baseMessage + history + review + loading}</div>`;
+    $$('input[data-mixed="true"]', root).forEach((input) => {
+      input.indeterminate = true;
+    });
     const body = root.querySelector(".copilot-messages-body");
     if (body) body.scrollTop = body.scrollHeight;
   }
@@ -1574,18 +2490,18 @@
     }
 
     const applied = [];
-    const conflicts = [];
+    const skipped = [];
     const failed = [];
     candidatesToApply.forEach((candidate) => {
-      const conflict = detectCopilotCandidateConflict(candidate);
-      if (conflict) {
-        conflicts.push({ candidate, reason: conflict });
+      const check = analyzeCopilotCandidate(candidate);
+      if (!check.canApply) {
+        skipped.push({ candidate, check });
         return;
       }
       if (applyCopilotCandidate(candidate)) {
-        applied.push(candidate);
+        applied.push({ candidate, check });
       } else {
-        failed.push(candidate);
+        failed.push({ candidate, check });
       }
     });
 
@@ -1593,8 +2509,8 @@
     if (applied.length) {
       messages.push(`已填充 ${applied.length} 条。`);
     }
-    if (conflicts.length) {
-      messages.push(`${conflicts.length} 条内容已变化，已跳过。`);
+    if (skipped.length) {
+      messages.push(`${skipped.length} 条预检未通过，已跳过。`);
     }
     if (failed.length) {
       messages.push(`${failed.length} 条找不到可写入位置。`);
@@ -1603,11 +2519,12 @@
     copilotState.messages.push({
       role: "assistant",
       text: messages.join(" ") || "这次没有可填充的内容。",
+      detail: buildCopilotApplyReceipt(applied, skipped, failed),
       error: !applied.length,
     });
 
-    if (conflicts.length || failed.length) {
-      const keepIds = new Set([...conflicts, ...failed].map((item) => String((item.candidate || item).id || "")));
+    if (skipped.length || failed.length) {
+      const keepIds = new Set([...skipped, ...failed].map((item) => String(item.candidate?.id || "")));
       copilotState.pendingReview = {
         ...pending,
         candidates: candidates.filter((candidate) => keepIds.has(String(candidate.id || ""))),
@@ -1621,7 +2538,7 @@
     }
 
     if (applied.length) {
-      focusCopilotCandidate(applied[0]);
+      focusCopilotCandidate(applied[0].candidate);
       renderAll();
       persistLocalDraft({ skipSync: true });
       flushDraftForReload({ includeReview: false, sendAutosave: true });
@@ -1635,15 +2552,89 @@
   }
 
   function detectCopilotCandidateConflict(candidate) {
+    const check = analyzeCopilotCandidate(candidate);
+    return check.canApply ? null : check.reason;
+  }
+
+  function analyzeCopilotCandidate(candidate) {
     const resolved = resolveCandidateTarget(candidate);
-    if (!resolved) return "找不到目标位置";
-    if (candidate.action === "append_array_item" || resolved.operation === "append") {
-      return null;
+    const path = resolved?.path || getCandidatePath(candidate);
+    const operation = String(resolved?.operation || candidate?.target?.operation || candidate?.action || "set").toLowerCase();
+    const warnings = Array.isArray(candidate?.tag_warnings) ? candidate.tag_warnings.filter(Boolean).map(String) : [];
+    if (candidate?.draft_only) {
+      warnings.push("这是设计草稿，应用后仍需人工确认运行时是否消费。");
     }
-    const currentValue = resolved.currentValue;
-    const expected = candidate.before;
-    if (expected == null) return null;
-    return stableStringify(currentValue) === stableStringify(expected) ? null : "目标内容已变化";
+    if (!resolved) {
+      return {
+        status: "missing",
+        label: "找不到目标",
+        tone: "danger",
+        canApply: false,
+        path,
+        operation,
+        currentValue: undefined,
+        expectedValue: candidate?.before,
+        afterValue: candidate?.after,
+        reason: "目标位置不存在，可能是条目被删除、移动，或候选路径已经过期。",
+        warnings,
+      };
+    }
+    if (!isCandidateAppendLike(candidate, resolved) && candidate?.before != null && stableStringify(resolved.currentValue) !== stableStringify(candidate.before)) {
+      return {
+        status: "conflict",
+        label: "内容已变化",
+        tone: "warning",
+        canApply: false,
+        path,
+        operation,
+        currentValue: resolved.currentValue,
+        expectedValue: candidate.before,
+        afterValue: candidate.after,
+        reason: "候选生成后目标内容发生变化，为避免覆盖你的新修改已拦截。",
+        warnings,
+      };
+    }
+    const hasWarnings = warnings.length > 0;
+    return {
+      status: hasWarnings ? "warning" : "ready",
+      label: hasWarnings ? "可应用，有提醒" : "可应用",
+      tone: hasWarnings ? "warning" : "success",
+      canApply: true,
+      path,
+      operation,
+      currentValue: resolved.currentValue,
+      expectedValue: candidate?.before,
+      afterValue: candidate?.after,
+      reason: hasWarnings ? "候选可写入，但存在后续承接或草稿提醒。" : "预检通过，目标位置和当前内容匹配。",
+      warnings,
+    };
+  }
+
+  function isCandidateAppendLike(candidate, resolved) {
+    return candidate?.action === "append_array_item" || String(resolved?.operation || candidate?.target?.operation || "").toLowerCase() === "append";
+  }
+
+  function buildCopilotApplyReceipt(applied, skipped, failed) {
+    const lines = [];
+    if (applied.length) {
+      lines.push("已写入：");
+      applied.forEach(({ candidate, check }, index) => {
+        lines.push(`${index + 1}. ${check.path || getCandidatePath(candidate)} · ${candidate.label || describeCandidateAction(candidate)}`);
+      });
+    }
+    if (skipped.length) {
+      lines.push("已跳过：");
+      skipped.forEach(({ candidate, check }, index) => {
+        lines.push(`${index + 1}. ${check.path || getCandidatePath(candidate)} · ${check.label} · ${check.reason}`);
+      });
+    }
+    if (failed.length) {
+      lines.push("写入失败：");
+      failed.forEach(({ candidate, check }, index) => {
+        lines.push(`${index + 1}. ${check.path || getCandidatePath(candidate)} · ${candidate.label || describeCandidateAction(candidate)}`);
+      });
+    }
+    return lines.join("\n");
   }
 
   function resolveCandidateTarget(candidate) {
@@ -1651,7 +2642,9 @@
     if (candidate?.action === "json_patch") {
       const path = String(target.path || "").trim();
       if (!path) return null;
-      return { path, currentValue: getAtPath(project, path), operation: target.operation || "set" };
+      const operation = target.operation || "set";
+      if (String(operation).toLowerCase() !== "append" && !hasProjectPath(project, path)) return null;
+      return { path, currentValue: getAtPath(project, path), operation };
     }
     if (candidate?.module === "persona") {
       if (target.persona_key) {
@@ -1682,6 +2675,16 @@
       }
       if (index < 0) return null;
       return { path: `preset.presets.${index}`, currentValue: project.preset.presets[index], index };
+    }
+    if (candidate?.module === "database") {
+      const kind = normalizeDatabaseKind(target.kind);
+      const list = project.database[kind] || [];
+      const index = list.findIndex((item) => String(item.id || "") === String(target.id || ""));
+      if (candidate.action === "append_array_item") {
+        return { path: `database.${kind}.${list.length}`, currentValue: null, index: list.length, kind };
+      }
+      if (index < 0) return null;
+      return { path: `database.${kind}.${index}`, currentValue: list[index], index, kind };
     }
     const index = project.memory.items.findIndex((item) => String(item.id || "") === String(target.id || ""));
     if (candidate.action === "append_array_item") {
@@ -1746,6 +2749,20 @@
       return true;
     }
 
+    if (candidate.module === "database") {
+      const kind = normalizeDatabaseKind(resolved.kind || candidate.target?.kind);
+      const meta = getDatabaseKindMeta(kind);
+      if (candidate.action === "append_array_item") {
+        project.database[kind].push(normalizeDatabaseItem(kind, candidate.after || {}, project.database[kind].length));
+        selectedIndices[meta.indexKey] = project.database[kind].length - 1;
+      } else if (resolved.index >= 0) {
+        project.database[kind][resolved.index] = normalizeDatabaseItem(kind, candidate.after || {}, resolved.index);
+        selectedIndices[meta.indexKey] = resolved.index;
+      }
+      activeDatabaseKind = kind;
+      return true;
+    }
+
     if (candidate.action === "append_array_item") {
       project.memory.items.push(normalizeMemoryItem(candidate.after || {}, project.memory.items.length));
       selectedIndices.memoryItem = project.memory.items.length - 1;
@@ -1759,7 +2776,7 @@
   function applyJsonPatchCandidate(candidate, resolved) {
     const operation = String(resolved.operation || "set").toLowerCase();
     const path = String(resolved.path || "").trim();
-    if (!path) return false;
+    if (!isSafeProjectPath(path)) return false;
     if (operation === "delete") {
       return deleteByPath(project, path);
     }
@@ -1767,12 +2784,14 @@
       const list = getAtPath(project, path);
       if (Array.isArray(list)) {
         list.push(structuredCloneCompat(candidate.after));
+        normalizeProjectAfterJsonPatch(path);
         selectJsonPatchTarget(path, candidate.after);
         return true;
       }
       const parent = getParentAtPath(project, path);
       if (Array.isArray(parent?.container)) {
         parent.container.push(structuredCloneCompat(candidate.after));
+        normalizeProjectAfterJsonPatch(path);
         selectJsonPatchTarget(path, candidate.after);
         return true;
       }
@@ -1795,7 +2814,34 @@
     return { container: ref, key: parts[parts.length - 1] };
   }
 
+  function isSafeProjectPath(path) {
+    const parts = String(path || "").split(".").filter(Boolean);
+    if (!parts.length) return false;
+    const blocked = new Set(["__proto__", "prototype", "constructor"]);
+    return parts.every((part) => part && !blocked.has(part));
+  }
+
+  function hasProjectPath(target, path) {
+    if (!isSafeProjectPath(path)) return false;
+    const parts = String(path || "").split(".").filter(Boolean);
+    let ref = target;
+    for (const part of parts) {
+      if (Array.isArray(ref)) {
+        if (!/^\d+$/.test(part)) return false;
+        const index = Number(part);
+        if (index < 0 || index >= ref.length) return false;
+        ref = ref[index];
+      } else if (ref && typeof ref === "object" && Object.prototype.hasOwnProperty.call(ref, part)) {
+        ref = ref[part];
+      } else {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function deleteByPath(target, path) {
+    if (!isSafeProjectPath(path)) return false;
     const parent = getParentAtPath(target, path);
     if (!parent?.container) return false;
     if (Array.isArray(parent.container)) {
@@ -1825,6 +2871,9 @@
         project.preset.active_preset_id = project.preset.presets[0].id;
       }
     }
+    if (path.startsWith("database")) {
+      project.database = normalizeDatabase(project.database);
+    }
     if (!project.title && project.persona_card.name) {
       project.title = String(project.persona_card.name || "").trim();
     }
@@ -1843,6 +2892,15 @@
       const id = afterValue?.id;
       const index = id ? project.preset.presets.findIndex((item) => String(item.id || "") === String(id)) : project.preset.presets.length - 1;
       selectedIndices.presetItem = clampIndex(index, project.preset.presets.length);
+    } else if (path.startsWith("database.")) {
+      const parts = path.split(".");
+      const kind = normalizeDatabaseKind(parts[1]);
+      const meta = getDatabaseKindMeta(kind);
+      const list = project.database[kind] || [];
+      const id = afterValue?.id;
+      const index = id ? list.findIndex((item) => String(item.id || "") === String(id)) : list.length - 1;
+      activeDatabaseKind = kind;
+      selectedIndices[meta.indexKey] = clampIndex(index, list.length);
     }
   }
 
@@ -1885,6 +2943,7 @@
       else if (path.startsWith("worldbook")) currentView = "worldbook";
       else if (path.startsWith("preset")) currentView = "preset";
       else if (path.startsWith("memory")) currentView = "memory";
+      else if (path.startsWith("database")) currentView = "database";
       renderAll();
       focusPath(path);
       return;
@@ -1910,6 +2969,18 @@
       selectedIndices.presetItem = clampIndex(index, project.preset.presets.length);
       renderAll();
       focusPath(`preset.presets.${selectedIndices.presetItem}.name`);
+      return;
+    }
+    if (candidate.module === "database") {
+      currentView = "database";
+      const kind = normalizeDatabaseKind(candidate.target?.kind);
+      const meta = getDatabaseKindMeta(kind);
+      const list = project.database[kind] || [];
+      const index = list.findIndex((item) => String(item.id || "") === String(candidate.after?.id || candidate.target?.id || ""));
+      activeDatabaseKind = kind;
+      selectedIndices[meta.indexKey] = clampIndex(index, list.length);
+      renderAll();
+      focusPath(`database.${kind}.${selectedIndices[meta.indexKey]}.id`);
       return;
     }
     currentView = "memory";
@@ -1971,6 +3042,7 @@
           prompt,
           current_view: currentView,
           focus_hint: context.focusHint,
+          thinking_mode: normalizeCopilotThinkingMode(copilotState.thinkingMode),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -2000,20 +3072,105 @@
     }
   }
 
+  async function loadCurrentFaContext() {
+    if (!window.confirm("读取当前 Fa 会用当前运行中的角色卡、世界书、预设和标准记忆替换写卡器工作区。继续吗？")) return;
+    try {
+      setSaveStatus("读取 Fa 中…");
+      const response = await fetch(apiUrl("/api/fa/context"));
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || "读取当前 Fa 失败");
+      project = normalizeProject(data.project || createEmptyProject());
+      faBinding = data.binding || null;
+      faApplyPreview = null;
+      resetFaApplySelection(null);
+      currentFilename = "";
+      copilotState.pendingReview = null;
+      copilotState.selectedCandidateIds = [];
+      copilotState.collapsedCandidateIds = [];
+      selectInitialDatabaseKind();
+      renderAll();
+      persistLocalDraft({ includeReview: false, skipSync: true });
+      await saveWorkspaceNow({ skipSync: true });
+      toast("已读取当前 Fa 内容");
+    } catch (error) {
+      toast(`读取当前 Fa 失败：${error.message || error}`, "error");
+      setSaveStatus("读取失败");
+    }
+  }
+
+  async function refreshFaApplyPreview({ keepSelection = false } = {}) {
+    syncProjectFromRenderedFields();
+    const response = await fetch(apiUrl("/api/fa/apply-preview"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || "生成应用预览失败");
+    faApplyPreview = data;
+    faBinding = data.binding || faBinding;
+    if (!keepSelection) resetFaApplySelection(data);
+    renderFaBinding();
+    renderFaApplyPreview();
+    return data;
+  }
+
+  async function openFaApplyPreview() {
+    $("#faApplyDialog")?.showModal();
+    const root = $("#faApplyPreviewPanel");
+    if (root) root.innerHTML = '<p class="muted">正在生成增量预览……</p>';
+    try {
+      await refreshFaApplyPreview();
+    } catch (error) {
+      if (root) root.innerHTML = `<div class="empty-state show">生成预览失败：${escHtml(error.message || error)}</div>`;
+      toast(`生成应用预览失败：${error.message || error}`, "error");
+    }
+  }
+
+  async function applySelectedFaGroups() {
+    try {
+      if (!faApplyPreview) {
+        await refreshFaApplyPreview();
+      }
+      const selected = Array.from(faApplySelectedGroupIds);
+      if (!selected.length) {
+        toast("没有选中的应用项。", "error");
+        return;
+      }
+      if (!window.confirm(`确认把 ${selected.length} 个模块的增量变化写回当前 Fa？写入前会自动备份。`)) return;
+      const response = await fetch(apiUrl("/api/fa/apply"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project, selected_group_ids: selected }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || "应用到 Fa 失败");
+      faApplyPreview = data.preview || faApplyPreview;
+      faBinding = faApplyPreview?.binding || faBinding;
+      resetFaApplySelection(faApplyPreview);
+      renderFaBinding();
+      renderFaApplyPreview();
+      const applied = Array.isArray(data.applied) ? data.applied : [];
+      const backups = Array.isArray(data.backups) ? data.backups : [];
+      toast(`已应用 ${applied.length} 个模块，备份 ${backups.length} 个文件`);
+    } catch (error) {
+      toast(`应用到 Fa 失败：${error.message || error}`, "error");
+    }
+  }
+
   function bindEvents() {
     $("#btnNew").addEventListener("click", newProject);
     $("#btnOpen").addEventListener("click", openProjectList);
     $("#btnSave").addEventListener("click", () => saveProject());
     $("#btnSaveAs").addEventListener("click", () => saveProject());
     $("#btnImport").addEventListener("click", openImport);
-    const exportPersonaButton = $("#btnExportPersona");
-    const exportWorldbookButton = $("#btnExportWorldbook");
-    const exportPresetButton = $("#btnExportPreset");
-    const exportMemoryButton = $("#btnExportMemory");
-    if (exportPersonaButton) exportPersonaButton.addEventListener("click", () => confirmExport("persona"));
-    if (exportWorldbookButton) exportWorldbookButton.addEventListener("click", () => confirmExport("worldbook"));
-    if (exportPresetButton) exportPresetButton.addEventListener("click", () => confirmExport("preset"));
-    if (exportMemoryButton) exportMemoryButton.addEventListener("click", () => confirmExport("memory"));
+    $("#btnThemeToggle")?.addEventListener("click", toggleTheme);
+    $("#btnLoadFaContext")?.addEventListener("click", loadCurrentFaContext);
+    $("#btnOpenFaApply")?.addEventListener("click", openFaApplyPreview);
+    $("#btnFaApplyRefresh")?.addEventListener("click", () => {
+      refreshFaApplyPreview({ keepSelection: true }).catch((error) => toast(`刷新预览失败：${error.message || error}`, "error"));
+    });
+    $("#btnFaApplyConfirm")?.addEventListener("click", applySelectedFaGroups);
     $("#btnCopilotSettings").addEventListener("click", openCopilotSettings);
     $("#btnCopilotSettingsSave").addEventListener("click", saveCopilotSettings);
     $("#btnImportConfirm").addEventListener("click", confirmImport);
@@ -2067,6 +3224,19 @@
         return;
       }
 
+      const modeButton = target.closest("[data-copilot-mode]");
+      if (modeButton) {
+        setCopilotThinkingMode(modeButton.dataset.copilotMode || "fast");
+        return;
+      }
+
+      const databaseKindButton = target.closest("[data-database-kind]");
+      if (databaseKindButton) {
+        activeDatabaseKind = normalizeDatabaseKind(databaseKindButton.dataset.databaseKind);
+        renderAll({ preserveBrowserScroll: true });
+        return;
+      }
+
       const collapseToggle = target.closest("[data-collapsible-section]");
       if (collapseToggle) {
         toggleSectionCollapsed(collapseToggle.dataset.collapsibleSection || "");
@@ -2076,6 +3246,12 @@
       const candidateCollapse = target.closest("[data-candidate-collapse]");
       if (candidateCollapse) {
         toggleCandidateCollapsed(candidateCollapse.dataset.candidateCollapse || "");
+        return;
+      }
+
+      const groupToggle = target.closest("[data-candidate-group-toggle]");
+      if (groupToggle) {
+        toggleCandidateGroupSelection(groupToggle.dataset.candidateGroupToggle || "");
         return;
       }
 
@@ -2105,6 +3281,18 @@
         if (type === "memory-item") selectedIndices.memoryItem = index;
         if (type === "preset-item") selectedIndices.presetItem = index;
         if (type === "persona-item") selectedIndices.personaItem = index;
+        if (type === "database-variable") {
+          activeDatabaseKind = "variables";
+          selectedIndices.databaseVariable = index;
+        }
+        if (type === "database-stage") {
+          activeDatabaseKind = "stages";
+          selectedIndices.databaseStage = index;
+        }
+        if (type === "database-tag") {
+          activeDatabaseKind = "tags";
+          selectedIndices.databaseTag = index;
+        }
         renderAll({ preserveBrowserScroll: true });
         return;
       }
@@ -2116,6 +3304,14 @@
 
     document.addEventListener("input", (event) => {
       const target = event.target;
+      if (target.matches("[data-fa-apply-group]")) {
+        const groupId = String(target.dataset.faApplyGroup || "");
+        if (groupId) {
+          if (target.checked) faApplySelectedGroupIds.add(groupId);
+          else faApplySelectedGroupIds.delete(groupId);
+        }
+        return;
+      }
       if (isCopilotSettingsField(target)) {
         persistLocalDraft();
       }
@@ -2239,6 +3435,45 @@
       moveItem(project.preset.presets, index, delta);
       selectedIndices.presetItem = clampIndex(index + delta, project.preset.presets.length);
       revealBrowserType = "preset-item";
+    } else if (action === "add-database-variable") {
+      project.database.variables.push(normalizeDatabaseVariable({}, project.database.variables.length));
+      selectedIndices.databaseVariable = project.database.variables.length - 1;
+      activeDatabaseKind = "variables";
+      revealBrowserType = "database-variable";
+    } else if (action === "remove-database-variable") {
+      project.database.variables.splice(index, 1);
+      selectedIndices.databaseVariable = clampIndex(selectedIndices.databaseVariable, project.database.variables.length);
+    } else if (action === "move-database-variable") {
+      moveItem(project.database.variables, index, delta);
+      selectedIndices.databaseVariable = clampIndex(index + delta, project.database.variables.length);
+      activeDatabaseKind = "variables";
+      revealBrowserType = "database-variable";
+    } else if (action === "add-database-stage") {
+      project.database.stages.push(normalizeDatabaseStage({}, project.database.stages.length));
+      selectedIndices.databaseStage = project.database.stages.length - 1;
+      activeDatabaseKind = "stages";
+      revealBrowserType = "database-stage";
+    } else if (action === "remove-database-stage") {
+      project.database.stages.splice(index, 1);
+      selectedIndices.databaseStage = clampIndex(selectedIndices.databaseStage, project.database.stages.length);
+    } else if (action === "move-database-stage") {
+      moveItem(project.database.stages, index, delta);
+      selectedIndices.databaseStage = clampIndex(index + delta, project.database.stages.length);
+      activeDatabaseKind = "stages";
+      revealBrowserType = "database-stage";
+    } else if (action === "add-database-tag") {
+      project.database.tags.push(normalizeDatabaseTag({}, project.database.tags.length));
+      selectedIndices.databaseTag = project.database.tags.length - 1;
+      activeDatabaseKind = "tags";
+      revealBrowserType = "database-tag";
+    } else if (action === "remove-database-tag") {
+      project.database.tags.splice(index, 1);
+      selectedIndices.databaseTag = clampIndex(selectedIndices.databaseTag, project.database.tags.length);
+    } else if (action === "move-database-tag") {
+      moveItem(project.database.tags, index, delta);
+      selectedIndices.databaseTag = clampIndex(index + delta, project.database.tags.length);
+      activeDatabaseKind = "tags";
+      revealBrowserType = "database-tag";
     } else if (action === "add-extra-prompt") {
       project.preset.presets[index].extra_prompts.push(normalizeExtraPrompt({}, project.preset.presets[index].extra_prompts.length));
     } else if (action === "remove-extra-prompt") {
@@ -2324,6 +3559,7 @@
   }
 
   function setByPath(target, path, value) {
+    if (!isSafeProjectPath(path)) return false;
     const parts = String(path || "").split(".").filter(Boolean);
     if (!parts.length) return false;
     let ref = target;
@@ -2340,7 +3576,8 @@
   }
 
   function getAtPath(target, path) {
-    return String(path || "").split(".").reduce((acc, key) => acc?.[key], target);
+    if (!isSafeProjectPath(path)) return undefined;
+    return String(path || "").split(".").filter(Boolean).reduce((acc, key) => acc?.[key], target);
   }
 
   function guessTitle() {
@@ -2433,7 +3670,9 @@
       copilotState.pendingReview = null;
       copilotState.selectedCandidateIds = [];
       copilotState.collapsedCandidateIds = [];
-      selectedIndices = { worldbookEntry: 0, memoryItem: 0, presetItem: 0, personaItem: 0 };
+      selectedIndices = { worldbookEntry: 0, memoryItem: 0, presetItem: 0, personaItem: 0, databaseVariable: 0, databaseStage: 0, databaseTag: 0 };
+      activeDatabaseKind = "variables";
+      clearFaRuntimeState();
       clearLocalReviewDraft({ keepProjectDraft: false });
       persistLocalDraft({ includeReview: false, skipSync: true });
       void saveWorkspaceNow({ skipSync: true });
@@ -2482,7 +3721,9 @@
     copilotState.pendingReview = null;
     copilotState.selectedCandidateIds = [];
     copilotState.collapsedCandidateIds = [];
-    selectedIndices = { worldbookEntry: 0, memoryItem: 0, presetItem: 0, personaItem: 0 };
+    selectedIndices = { worldbookEntry: 0, memoryItem: 0, presetItem: 0, personaItem: 0, databaseVariable: 0, databaseStage: 0, databaseTag: 0 };
+    activeDatabaseKind = "variables";
+    clearFaRuntimeState();
     clearLocalReviewDraft();
     renderAll();
     setSaveStatus("新建工程");
@@ -2523,12 +3764,14 @@
       selectedProjectFilename = "";
       compileCache = null;
       validationCache = [];
-      currentView = "preview";
-      lastEditingView = "persona";
+      currentView = inferImportView(parsed, data.project, data.import_target);
+      lastEditingView = currentView === "preview" ? "persona" : currentView;
       copilotState.pendingReview = null;
       copilotState.selectedCandidateIds = [];
       copilotState.collapsedCandidateIds = [];
-      selectedIndices = { worldbookEntry: 0, memoryItem: 0, presetItem: 0, personaItem: 0 };
+      selectedIndices = { worldbookEntry: 0, memoryItem: 0, presetItem: 0, personaItem: 0, databaseVariable: 0, databaseStage: 0, databaseTag: 0 };
+      selectInitialDatabaseKind();
+      clearFaRuntimeState();
       clearLocalReviewDraft();
       renderAll();
       renderWarnings([], false);
@@ -2548,6 +3791,7 @@
       worldbook: { filename: `${base}的世界书.json`, label: "世界书", title: "世界书", accept: ".json" },
       preset: { filename: `${base}的预设.json`, label: "预设", title: "预设", accept: ".json" },
       memory: { filename: `${base}的记忆.json`, label: "记忆", title: "记忆", accept: ".json" },
+      database: { filename: `${base}的数据库草稿.json`, label: "数据库", title: "数据库草稿", accept: ".json" },
     };
     return map[exportTarget] || map.persona;
   }
@@ -2749,9 +3993,11 @@
     const worldbookPreview = $("#worldbookPreview");
     const presetPreview = $("#presetPreview");
     const memoryPreview = $("#memoryPreview");
+    const databasePreview = $("#databasePreview");
     if (worldbookPreview) worldbookPreview.textContent = JSON.stringify(project.worldbook || {}, null, 2);
     if (presetPreview) presetPreview.textContent = JSON.stringify(project.preset || {}, null, 2);
     if (memoryPreview) memoryPreview.textContent = JSON.stringify(project.memory || {}, null, 2);
+    if (databasePreview) databasePreview.textContent = JSON.stringify(project.database || {}, null, 2);
   }
 
   function renderCardPreview(card) {
@@ -2871,6 +4117,7 @@
     }
   }
 
+  applyTheme(getStoredTheme());
   bindEvents();
   bindCopilotDrag();
   renderAll();
