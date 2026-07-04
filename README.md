@@ -1,214 +1,219 @@
-﻿# Fantareal PC
+# Fantareal PC HuskarUI 客户端
 
-Fantareal PC desktop client built with Qt 6, QML, C++, and HuskarUI. This source
-tree contains Fantareal application code only. HuskarUI is an external UI
-dependency and should be provided as a separate checkout or an installed CMake
-package.
+这是 Fantareal 的 PC 桌面客户端源码，基于 **Qt 6 + QML + C++ + HuskarUI** 构建。
 
-This is the active UI direction for the current plan. The older `native\`
-Direct2D experiment is retained for reference but is no longer the main UI path.
+本分支是一个独立子项目分支，根目录只包含 PC HuskarUI 客户端源码，不包含旧 Python/FastAPI 服务、运行数据、发布包、Qt SDK 或 HuskarUI 本体。
 
-## Build
+## 项目定位
 
-Required dependencies:
+`PC-HuskarUI` 是 Fantareal PC 客户端的新 UI 方向：
 
-- Qt 6.7 or newer.
-- A C++20 compiler supported by Qt.
-- CMake 3.25 or newer.
-- HuskarUI, either as a source checkout passed through `HUSKARUI_ROOT` or as an
-  installed package discoverable by `find_package(HuskarUI)`.
+- 放弃 WebView/FastAPI 运行时依赖，改为 Qt/C++ 本地客户端。
+- UI 使用 QML + HuskarUI 组件实现。
+- 通过本地 JSON 数据文件与原 Fantareal 数据结构兼容。
+- Chat 页面是最高权重页面，默认启动进入聊天主舞台。
+- 支持设置、人设卡、预设、世界书、记忆、模型路由等核心数据的安全读取与编辑。
 
-Example on Windows PowerShell:
+## 目录结构
+
+```text
+.
+├── CMakeLists.txt
+├── README.md
+├── cpp/
+│   ├── fantarealbridge.cpp
+│   ├── fantarealbridge.h
+│   └── main.cpp
+├── qml/
+│   ├── FantarealApp.qml
+│   ├── Global.qml
+│   ├── controls/
+│   └── pages/
+├── tests/
+└── tools/
+```
+
+## 依赖
+
+构建前需要准备：
+
+- Qt `6.7+`
+- 支持 C++20 的 MSVC / Clang / GCC
+- CMake `3.25+`
+- Ninja
+- HuskarUI 源码或已安装的 HuskarUI CMake 包
+
+Windows + MSVC 推荐使用 Qt `msvc2019_64` 或兼容 Kit。
+
+## 快速构建
+
+如果使用 HuskarUI 源码 checkout：
 
 ```powershell
 $env:HUSKARUI_ROOT = "C:\path\to\HuskarUI"
-.\tools\Verify-HuskarUI.ps1 -QtPrefix "C:\path\to\Qt\6.7.3\msvc2019_64" -HuskarUIRoot $env:HUSKARUI_ROOT -Build
 ```
 
-`Verify-HuskarUI.ps1` loads the VS x64 build environment automatically for MSVC
-Qt prefixes, uses Visual Studio's bundled CMake/Ninja, configures Release, and
-builds `build-verify\FantarealHuskarUI.exe`. The `-Build` path also starts the
-app once with the Qt/HuskarUI runtime paths and checks the runtime log for
-QML/C++ errors.
-
-## Scope
-
-- `HusWindow` application shell.
-- HuskarUI Gallery-style caption bar, rounded translucent hover sidebar,
-  dashboard, cards, badges, tags, segmented controls, inputs, buttons, and scroll bars.
-- Read-only legacy data scanner through `FantarealBridge`, including critical
-  JSON files, asset directories, card/material counts, and plugin manifests.
-- JSON summaries for Settings, Routes, Cards, Presets, Worldbook, Chat, and
-  Memory. API keys are exposed only as configured/unconfigured status.
-- Editable Settings page for the safe `data/settings.json` subset: model
-  endpoint/model, generation limits, custom background image path/opacity,
-  embedding/rerank connection fields, and memory summary limits, plus the local
-  chat demo toggle. Saves use a merge patch so unknown fields remain, blank API
-  key inputs preserve existing secrets, and the previous file is backed up under
-  `data\backups`. A blank or invalid background path falls back to the built-in
-  frosted gradient; valid local paths render as an image layer under the glass
-  overlay.
-- Chat page is the highest-priority workspace and is now the default launch
-  page. It uses a full-width, chat-first layout without a persistent side panel.
-  The app shell now uses one global hover sidebar: a 68px compact icon rail by
-  default, smoothly expanding into the full navigation when the mouse approaches
-  it and collapsing again when the mouse leaves. The page margins are minimized,
-  the message surface gets the largest possible area, and the composer actions
-  sit in a compact bottom bar instead of a tall tool column. It reads
-  `data/conversations.json` into a local message list, can append user messages,
-  and now has a first-pass C++/Qt ChatCompletion path that
-  posts to an OpenAI-compatible `/v1/chat/completions` endpoint without starting
-  the old FastAPI server. Base URLs may be saved as either a root domain or a
-  `/v1` path, and display-style model names such as `Grok 4.3` are normalized to
-  API IDs such as `grok-4.3` before sending. It prefers `settings.json` model config, falls back to the
-  first enabled route provider, preserves existing message objects, creates
-  `data\backups\conversations.*.json.bak`, and marks generated replies with
-  `source: "huskarui-llm"`. The page also exposes a direct local demo reply
-  action and `settings.demo_mode` fallback so the chat workspace is usable before
-  a real model endpoint is configured; demo replies are marked with
-  `source: "huskarui-demo"`. The chat composer also has a retry action backed by
-  `regenerateLastChatReply()`: it finds the last user message, replaces only the
-  trailing assistant reply after a successful new generation, preserves earlier
-  history, and backs up `conversations.json` before saving. The QML page now uses
-  async generation entry points (`startChatMessageWithReply()` and
-  `startRegenerateLastChatReply()`) plus `stopChatGeneration()` so long model
-  calls do not block the UI and stopped requests do not write partial history.
-  Async requests ask for OpenAI-compatible streaming responses and expose
-  `chatStreamingPreview`, which the Chat page renders as a temporary assistant
-  bubble while tokens arrive; ordinary JSON model responses remain supported.
-  ChatCompletion prompt construction now injects a
-  first-pass worldbook context from `data/worldbook.json`: enabled
-  `constant` entries, keyword entries matched against recent conversation text,
-  primary/secondary triggers, `any`/`all`, whole-word matching, `chance: 0`
-  exclusion, ordering, and `max_hits`. It also injects a first-pass
-  memory context from the current card runtime files: `memories.json`,
-  `merged_memories.json`, and `memory_outline.json`, excluding archived memory
-  records.
-- Planned chat post-processing is documented in
-  `docs/output-splitting-subagent-issue.md`: after the main model reply returns,
-  a dedicated output-splitting subagent should filter obvious status/system
-  panels, preserve the original prose without rewriting it, and return a JSON
-  string array where each item maps to one chat bubble. Invalid JSON must fall
-  back safely to a single raw-output bubble so normal chat is never blocked.
-- Routes page edits the safe global fields in `data/route_forwarding.json`:
-  enablement, POST hook, failover, key rotation, retry attempts, and strategy.
-  Saves preserve providers, provider keys, legacy key fields, and unknown
-  fields, create `data\backups\route_forwarding.*.json.bak`, clamp retry
-  attempts to `1-10`, and expose provider keys only as counts/status. Existing
-  providers can be added, edited, and deleted through safe metadata drafts
-  (`id`, `name`, `base_url`, `model`, `enabled`, `priority`, `weight`): edits
-  preserve keys and unknown fields, new providers start without any secret, and
-  deletes are backed up first. Provider keys can still be replaced from the
-  Routes page without echoing the old secret; blank input preserves the current
-  key, while a non-empty replacement writes a single `keys` entry and removes
-  that provider's legacy `api_key`.
-- Cards page edits the safe `data/current_role_card.json` text subset: name,
-  description, personality, scenario, first message, message examples, creator
-  notes/comment, tags, and state-journal/workshop/opening switches. Saves
-  preserve source/card identity, personas, nested workshop/state data, unknown
-  fields, create `data\backups\current_role_card.*.json.bak`, and clamp tags
-  to a deduplicated safe list. The page can also sync the current card into
-  `data/persona.json`, preserving unknown persona fields while regenerating
-  `name`, `greeting`, and `system_prompt`. It also scans local role-card
-  candidates under `cards/` and `assets/???/`, exposes safe summaries, and can
-  activate a selected JSON card after validating the relative path and backing up
-  `data/current_role_card.json`.
-- Preset page edits the active `data/preset.json` preset name, enabled flag, and
-  known module toggles. Saves preserve other presets, extra prompts, prompt
-  groups, unknown fields, and unknown module keys, create
-  `data\backups\preset.*.json.bak`, and enforce the old mutex pairs:
-  `short_paragraph/long_paragraph` and `second_person/third_person`.
-- Memory page exposes the current card runtime `memories.json` as safe editable
-  drafts. `saveMemoryEntry(entryIndex, draft)` updates one entry or appends a
-  new one with `entryIndex=-1`, backs up existing files to
-  `data\backups\memories.*.json.bak`, preserves ids, unknown fields, and other
-  entries, normalizes/deduplicates tags, supports active/archived status, and
-  rejects empty content or invalid indexes.
-- Worldbook page edits the safe `data/worldbook.json` settings subset:
-  enablement, debug mode, match defaults, default entry behavior, injection
-  defaults, and recursive scan limits. Saves preserve entries, root-level unknown
-  fields, settings-level unknown fields, create
-  `data\backups\worldbook.*.json.bak`, and clamp/normalize values to the old
-  worldbook sanitizer ranges. It now also exposes a first-pass entry editor for
-  safe `entries` fields: title, triggers, type, enabled state, matching,
-  content, group, chance, order, injection position, prompt layer, and comment.
-  Entry saves patch one entry at a time, preserve unknown entry/root/settings
-  fields, back up `worldbook.json`, reject empty content, and require triggers
-  for `keyword` entries. New entries receive generated ids.
-- First-pass pages for Chat, Settings, Routes, Cards, Presets, Memory,
-  Worldbook, Workshop, and Plugins.
-- No WebView.
-- No FastAPI runtime dependency.
-
-## Verification
-
-Completed locally:
+运行完整验证构建：
 
 ```powershell
-.\tools\Verify-HuskarUI.ps1
+.\tools\Verify-HuskarUI.ps1 `
+  -QtPrefix "C:\path\to\Qt\6.7.3\msvc2019_64" `
+  -HuskarUIRoot $env:HUSKARUI_ROOT `
+  -Build
+```
+
+验证脚本会自动完成：
+
+- 检查必需源码文件。
+- 检查 QML 语法。
+- 检查已知 HuskarUI API 误用模式。
+- 配置 Release 构建。
+- 编译 `FantarealHuskarUI.exe`。
+- 运行 CTest。
+- 启动 GUI smoke test，检查 Chat / Settings / Routes / Cards / Memory / Worldbook / Preset 页面。
+
+构建产物默认输出到：
+
+```text
+build-verify/FantarealHuskarUI.exe
+```
+
+`build-verify/` 是构建产物目录，不应提交到仓库。
+
+## 运行数据
+
+客户端默认读取 Fantareal 根目录下的本地数据文件，例如：
+
+```text
+data/settings.json
+data/conversations.json
+data/current_role_card.json
+data/preset.json
+data/worldbook.json
+data/route_forwarding.json
+data/card_runtime/cards/*/memories.json
+```
+
+也可以通过环境变量指定根目录：
+
+```powershell
+$env:FANTAREAL_ROOT = "E:\Fantareal"
+```
+
+测试用例不会写入真实 `data/`，而是使用临时目录构造 fixture。
+
+## 当前功能
+
+### Chat 聊天主舞台
+
+- 默认启动页。
+- 大面积聊天画布，弱化侧栏和工具台感。
+- Enter 发送，Shift + Enter 换行。
+- 用户消息立即写入本地对话。
+- 支持 OpenAI-compatible `/v1/chat/completions` 请求。
+- 支持流式请求，但开启输出切分时不会向 UI 泄露原始回复。
+- 支持“重新回复”：删除最后一次 AI 回复后，基于最新用户消息重新生成。
+- 支持“结束对话”：追加整理回忆状态、总结长期记忆并清空当前上下文。
+- 支持输出切分子代理：主模型回复后交给切分器处理，前端只展示切分后的气泡。
+- 子代理失败时使用本地安全切分回退，不阻塞正常聊天。
+
+### Settings 设置
+
+- 编辑模型 Base URL、模型名、温度、历史条数、超时等。
+- 编辑 Embedding / Rerank 基础配置。
+- 支持背景图片路径与透明度设置。
+- 支持输出切分开关。
+- API Key 不回显明文：空输入保留旧密钥，非空输入覆盖。
+- 保存前自动备份旧文件。
+
+### Routes 模型路由
+
+- 编辑路由开关、POST hook、重试次数、策略等安全字段。
+- Provider 支持新增、编辑、删除安全元数据。
+- Provider Key 只显示数量/状态，不回显明文。
+- 留空保存保留旧 key，输入新 key 才替换。
+- 保存前自动备份旧文件。
+
+### Cards 人设卡
+
+- 编辑当前角色卡的安全文本字段。
+- 支持导入/激活本地角色卡 JSON。
+- 支持同步到 `persona.json`。
+- 保留未知字段、Persona、Workshop、State Journal 等嵌套数据。
+
+### Preset 预设
+
+- 编辑当前预设名称、启用状态和模块开关。
+- 支持子预设/模块开关。
+- 保留其它预设、额外提示词、未知字段。
+- 保留旧互斥规则，例如短段/长段、第二人称/第三人称。
+
+### Worldbook 世界书
+
+- 编辑世界书全局设置。
+- 编辑词条标题、触发词、类型、启用状态、匹配方式、内容、注入位置等安全字段。
+- 支持新增词条。
+- 关键字词条必须有触发词。
+- 保存前自动备份，保留未知字段。
+
+### Memory 记忆
+
+- 读取当前角色运行时记忆。
+- 支持新增和编辑记忆词条。
+- 支持 active / archived 状态。
+- 标签会自动规范化和去重。
+- 保存前自动备份，保留未知字段。
+
+### First Launch 首次启动声明
+
+- 首次启动展示本地服务边界与第三方 API 责任确认弹窗。
+- 确认记录仅保存在本地。
+
+## 安全策略
+
+- 不在 UI 中回显真实 API Key。
+- 保存设置时保留未知字段，避免破坏旧数据结构。
+- 所有重要 JSON 写入前会创建本地备份。
+- 测试只写临时目录，不写真实用户数据。
+- 空白或 BOM-only 的 JSON 数组文件按空数组处理，避免启动时报 JSON 解析错误。
+- 开启输出切分时，原始 AI 回复不会先显示给玩家。
+
+## 测试
+
+当前测试覆盖：
+
+- Settings 保存与密钥保护。
+- Chat 本地发送、模型生成、异步流式生成、停止生成、重新回复。
+- 输出切分子代理与本地回退。
+- 结束对话与长期记忆总结。
+- Routes 全局设置和 Provider 安全编辑。
+- Cards 安全编辑和 Persona 同步。
+- Worldbook 设置与词条编辑。
+- Memory 新增/编辑。
+- Preset 保存与互斥规则。
+- 资源导入。
+
+运行完整验证：
+
+```powershell
 .\tools\Verify-HuskarUI.ps1 -QtPrefix "C:\path\to\Qt\6.7.3\msvc2019_64" -HuskarUIRoot "C:\path\to\HuskarUI" -Build
 ```
 
-Latest result after the configurable-background pass: required
-files exist, QML parser/format syntax check passed, known
-HuskarUI API mistake patterns are absent, CMake configure passed, Release build
-passed, `FantarealBridgeSettingsSaveTest`, `FantarealBridgeChatSendTest`,
-`FantarealBridgeChatGenerateTest`, `FantarealBridgeChatAsyncTest`,
-`FantarealBridgeRouteSaveTest`,
-`FantarealBridgeCardSaveTest`, `FantarealBridgePersonaSyncTest`,
-`FantarealBridgeWorldbookSaveTest`, `FantarealBridgeMemorySaveTest`, and
-`FantarealBridgePresetSaveTest`
-passed, and the smoke test opened the
-`Fantareal PC` main window directly on the Chat,
-Settings, Routes, Cards, Memory, Worldbook, and Preset pages.
+## 不包含的内容
 
-The Chat page is weighted as the primary product surface: it is the default
-startup page, keeps the app sidebar in a compact rail on Chat so hover does not
-steal width, renders messages on a full main canvas, and pins the composer as a
-bottom overlay instead of shrinking the conversation into a small workbench.
+本分支不包含：
 
-The app background can now be changed from Settings: `background_image_path` is
-stored in `data/settings.json`, normalized from local file URLs when needed, and
-exposed to QML as `background_image_url`. `background_image_opacity` is clamped
-to `0-1`, can be previewed live from the Settings slider, and also reduces the
-glass mask and glow layers, making custom images visibly stronger at higher
-values.
+- Qt SDK
+- HuskarUI 源码或二进制
+- 编译产物
+- 发布包
+- 用户运行数据
+- 角色卡素材库
+- 旧 Python/FastAPI 服务
+- WebView 页面
 
-`FantarealBridgeChatSendTest` also covers the no-network demo reply path:
-it appends a user message and a character-aware assistant reply locally while
-preserving old conversation metadata.
+## 开源说明
 
-`FantarealBridgeChatGenerateTest` captures the fake OpenAI-compatible request
-payload and verifies that matched worldbook notes and current-card memory notes
-are present in the system prompt while disabled/probability-zero/overflow
-worldbook notes and archived memories are excluded. The same test also verifies
-the retry flow: a second fake model response replaces the last assistant message
-without duplicating the last user message or losing existing metadata.
+本分支只作为 Fantareal PC HuskarUI 客户端源码分支。实际使用时需要自行准备 Qt、HuskarUI 和本地 Fantareal 数据目录。
 
-`FantarealBridgeChatAsyncTest` covers non-blocking generation, streaming preview,
-and cancellation: the fake model returns OpenAI SSE chunks, the bridge requests
-`stream: true`, `chatStreamingPreview` updates before finish and clears after
-save, while a stopped request emits a failed finish and leaves
-`conversations.json` unchanged.
-
-`FantarealBridgeSettingsSaveTest` also covers the background settings path:
-existing settings expose a local image URL, saved file URLs normalize to local
-paths, opacity clamps safely, unknown fields remain, and API key preservation
-still holds.
-
-`FantarealBridgeWorldbookSaveTest` covers both worldbook settings and entry
-editing: settings saves preserve entries and unknown fields, entry saves preserve
-entry identity and unknown fields, clamp/normalize editable values, append new
-constant entries with generated ids, reject invalid keyword entries, and refresh
-`worldbookEntryDrafts`.
-
-`FantarealBridgeMemorySaveTest` covers current-card memory editing and creation:
-entry saves preserve identity and unknown fields, back up existing
-`memories.json`, normalize tags, write active/archived status, append generated
-memory ids and timestamps, reject empty content/invalid indexes, and refresh
-`memoryDrafts`.
-
-`FantarealBridgeRouteSaveTest` also covers provider metadata management:
-existing provider edits preserve secrets and unknown fields, duplicate ids are
-rejected, enabled providers require endpoint/model, new providers are appended
-without keys, deletes are backed up, and invalid deletes are rejected.
+Fantareal 只提供本地部署工具与开源代码，不提供官方在线聊天服务、账号系统、API 中转或内容托管服务。第三方 LLM API、Embedding API、Rerank API 的配置和调用行为由使用者自行负责。
