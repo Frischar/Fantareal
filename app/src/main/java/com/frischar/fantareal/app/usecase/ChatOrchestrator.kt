@@ -18,6 +18,9 @@ import com.frischar.fantareal.domain.worldbook.InjectionPosition
 import com.frischar.fantareal.domain.worldbook.WorldbookEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonArray
 import java.util.UUID
 
 class ChatOrchestrator(
@@ -161,12 +164,71 @@ class ChatOrchestrator(
                     }
                     is LlmStreamEvent.Done -> {
                         val parsedContent = parseAssistantContent(currentContent)
+                        val finalVisible = parsedContent.visible.ifBlank { "[Error: Empty assistant response]" }
                         conversationRepository.updateMessage(
                             id = assistantMsgId,
-                            newContent = parsedContent.visible.ifBlank { "[Error: Empty assistant response]" },
+                            newContent = finalVisible,
                             thinking = parsedContent.thinking,
                             saveToDisk = true
                         )
+
+                        if (parsedContent.visible.isNotBlank() && settings.useSmartSplit) {
+                            try {
+                                val subagentPrompt = """
+                                    你是一个聊天输出后处理器。
+
+                                    你的任务是将输入文本整理成用于前端聊天气泡显示的内容。
+
+                                    规则：
+                                    1. 不得改写原文内容。
+                                    2. 不得新增剧情、补充描写或解释。
+                                    3. 不得润色文本。
+                                    4. 只移除明显不属于聊天正文的状态栏、系统栏、格式标签、空行和无意义分隔符。
+                                    5. 保留有效的角色动作、旁白、对白和剧情正文。
+                                    6. 按自然语义或句子进行切分。
+                                    7. 每个聊天气泡的内容之间，必须严格使用 `===` 作为唯一分隔符。
+                                    8. 只输出纯文本，绝对不要输出 JSON 或 Markdown，不要输出解释。
+
+                                    输入文本：
+                                    ${parsedContent.visible}
+                                """.trimIndent()
+                                val subagentReq = LlmRequest(
+                                    model = settings.model,
+                                    system = "You are a text formatter. Output only plain text separated by ===.",
+                                    messages = listOf(com.frischar.fantareal.domain.llm.LlmMessage(role = "user", content = subagentPrompt)),
+                                    temperature = 0.1,
+                                    stream = true
+                                )
+                                var subagentResponse = ""
+                                conversationRepository.updateMessageBubbles(assistantMsgId, listOf("子代理正在切分气泡..."), saveToDisk = false)
+
+                                provider.stream(subagentReq).collect { event ->
+                                    if (event is LlmStreamEvent.Token) {
+                                        subagentResponse += event.text
+                                        val currentVisible = parseAssistantContent(subagentResponse).visible
+                                        val streamingBubbles = currentVisible.split("===")
+                                            .map { it.trim() }
+                                            .filter { it.isNotEmpty() }
+                                        if (streamingBubbles.isNotEmpty()) {
+                                            conversationRepository.updateMessageBubbles(assistantMsgId, streamingBubbles, saveToDisk = false)
+                                        }
+                                    }
+                                }
+
+                                val finalVisibleSubagent = parseAssistantContent(subagentResponse).visible
+                                val finalBubbles = finalVisibleSubagent.split("===")
+                                    .map { it.trim() }
+                                    .filter { it.isNotEmpty() }
+
+                                if (finalBubbles.isNotEmpty()) {
+                                    conversationRepository.updateMessageBubbles(assistantMsgId, finalBubbles, saveToDisk = true)
+                                } else {
+                                    conversationRepository.updateMessageBubbles(assistantMsgId, listOf(finalVisible), saveToDisk = true)
+                                }
+                            } catch (e: Exception) {
+                                conversationRepository.updateMessageBubbles(assistantMsgId, listOf(finalVisible), saveToDisk = true)
+                            }
+                        }
                     }
                 }
             }

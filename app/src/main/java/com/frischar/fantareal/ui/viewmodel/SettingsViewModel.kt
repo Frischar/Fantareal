@@ -1,4 +1,4 @@
-﻿package com.frischar.fantareal.ui.viewmodel
+package com.frischar.fantareal.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +27,7 @@ data class SettingsUiState(
     val fontSize: Float = 16f,
     val fontColor: String = "",
     val splitRegex: String = "",
+    val useSmartSplit: Boolean = true,
     val saved: Boolean = false
 )
 
@@ -94,6 +95,10 @@ class SettingsViewModel(
     fun updateFontSize(value: Float) { _uiState.update { it.copy(fontSize = value, saved = false) } }
     fun updateFontColor(value: String) { _uiState.update { it.copy(fontColor = value, saved = false) } }
     fun updateSplitRegex(value: String) { _uiState.update { it.copy(splitRegex = value, saved = false) } }
+    fun updateUseSmartSplit(value: Boolean) {
+        _uiState.update { it.copy(useSmartSplit = value, saved = false) }
+        save()
+    }
 
     fun save() {
         val current = _uiState.value
@@ -114,7 +119,8 @@ class SettingsViewModel(
                     aiAvatarUri = current.aiAvatarUri,
                     fontSize = current.fontSize,
                     fontColor = current.fontColor,
-                    splitRegex = current.splitRegex
+                    splitRegex = current.splitRegex,
+                    useSmartSplit = current.useSmartSplit
                 )
             )
             _uiState.update { settingsRepository.settings.value.toUiState(saved = true) }
@@ -138,6 +144,7 @@ class SettingsViewModel(
             fontSize = fontSize,
             fontColor = fontColor,
             splitRegex = splitRegex,
+            useSmartSplit = useSmartSplit,
             saved = saved
         )
     }

@@ -14,5 +14,6 @@ data class ConversationMessage(
     val content: String,
     val createdAt: Long,
     val thinking: String? = null,
-    val error: Boolean = false
+    val error: Boolean = false,
+    val bubbles: List<String>? = null
 )
