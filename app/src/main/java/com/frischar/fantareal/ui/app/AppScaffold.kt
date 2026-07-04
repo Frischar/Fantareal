@@ -287,6 +287,10 @@ fun AppScaffold() {
                     onImportBytes = presetViewModel::importFromBytes,
                     onExportJson = presetViewModel::exportJson,
                     onPresetEnabledChange = presetViewModel::setEnabled,
+                    onModuleEnabledChange = presetViewModel::setModuleEnabled,
+                    onBlockEnabledChange = presetViewModel::setBlockEnabled,
+                    onGroupEnabledChange = presetViewModel::setGroupEnabled,
+                    onGroupItemEnabledChange = presetViewModel::setGroupItemEnabled,
                     onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
                 }

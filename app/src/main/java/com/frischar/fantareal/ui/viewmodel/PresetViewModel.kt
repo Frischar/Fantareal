@@ -43,6 +43,34 @@ class PresetViewModel(
         }
     }
 
+    fun setModuleEnabled(presetId: String, moduleKey: String, enabled: Boolean) {
+        viewModelScope.launch {
+            presetRepository.setModuleEnabled(presetId, moduleKey, enabled)
+            reload()
+        }
+    }
+
+    fun setBlockEnabled(presetId: String, blockId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            presetRepository.setBlockEnabled(presetId, blockId, enabled)
+            reload()
+        }
+    }
+
+    fun setGroupEnabled(presetId: String, groupId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            presetRepository.setGroupEnabled(presetId, groupId, enabled)
+            reload()
+        }
+    }
+
+    fun setGroupItemEnabled(presetId: String, groupId: String, itemId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            presetRepository.setGroupItemEnabled(presetId, groupId, itemId, enabled)
+            reload()
+        }
+    }
+
     fun importFromBytes(bytes: ByteArray) {
         viewModelScope.launch {
             try {

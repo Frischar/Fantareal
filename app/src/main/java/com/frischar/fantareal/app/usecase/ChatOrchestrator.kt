@@ -1,5 +1,7 @@
 package com.frischar.fantareal.app.usecase
 
+import com.frischar.fantareal.core.AppJson
+import com.frischar.fantareal.data.repository.AppSettings
 import com.frischar.fantareal.data.repository.ConversationRepository
 import com.frischar.fantareal.data.repository.MemoryRepository
 import com.frischar.fantareal.data.repository.PersonaRepository
@@ -11,6 +13,7 @@ import com.frischar.fantareal.domain.prompt.PromptBuildInput
 import com.frischar.fantareal.domain.prompt.PromptBuilder
 import com.frischar.fantareal.domain.chat.ConversationMessage
 import com.frischar.fantareal.domain.chat.MessageRole
+import com.frischar.fantareal.domain.llm.LlmMessage
 import com.frischar.fantareal.domain.llm.LlmRequest
 import com.frischar.fantareal.domain.llm.LlmStreamEvent
 import com.frischar.fantareal.domain.llm.OpenAiProvider
@@ -18,9 +21,10 @@ import com.frischar.fantareal.domain.worldbook.InjectionPosition
 import com.frischar.fantareal.domain.worldbook.WorldbookEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.util.UUID
 
 class ChatOrchestrator(
@@ -59,9 +63,8 @@ class ChatOrchestrator(
         val history = conversationRepository.messages.value
             .filter { it.content.isNotBlank() && it.id != "welcome" && it.id != assistantMsgId && it.id != userMsg.id }
         val memories = memoryRepository.listMemories().map { it.text }
-        val presetModules = presetRepository.listPresets()
-            .filter { it.enabled }
-            .map { it.content }
+        val presetSegments = presetRepository.listPresets()
+            .flatMap { it.enabledPromptSegments() }
         val workshopState = workshopRepository.loadState()
         val workshopPrompt = "剧情阶段 ${workshopState.stage}: ${workshopState.stageName}\n${workshopState.stagePrompt}"
         val worldbookScan = worldbookEngine.scan(
@@ -121,7 +124,8 @@ class ChatOrchestrator(
 # [权限解锁，禁词过滤器已挂载。DeepSeek 引擎已锁定世界书。开始演绎。]
                 """.trimIndent(),
                 persona = persona,
-                presetModules = presetModules + workshopPrompt,
+                presetModules = listOf(workshopPrompt),
+                presetSegments = presetSegments,
                 memories = memories,
                 worldbookBeforePersona = worldbookBeforePersona,
                 worldbookRecent = worldbookRecent,
@@ -299,7 +303,687 @@ class ChatOrchestrator(
         val thinking: String?
     )
 
+    suspend fun archiveCurrentConversationToMemory() {
+        val history = conversationRepository.messages.value.filter { it.content.isNotBlank() && it.id != "welcome" }
+        if (history.size < 2) {
+            conversationRepository.clearMessages()
+            return
+        }
+
+        val compressingMessageId = "memory_compressing_${UUID.randomUUID()}"
+        conversationRepository.addMessage(
+            ConversationMessage(
+                id = compressingMessageId,
+                role = MessageRole.Assistant,
+                content = "正在压缩记忆中...",
+                createdAt = System.currentTimeMillis()
+            )
+        )
+
+        val settings = settingsRepository.settings.value
+        val provider = OpenAiProvider(settings.apiBaseUrl, settings.apiKey)
+        try {
+            val fallback = fallbackMemoryFromConversation(history)
+            val summary = summarizeConversationToMemory(history, provider, settings, fallback)
+            val saved = memoryRepository.addMemory(
+                text = summary.content,
+                tags = summary.tags,
+                title = summary.title,
+                notes = summary.notes
+            )
+            if (saved != null) {
+                conversationRepository.clearMessages()
+            } else {
+                conversationRepository.updateMessage(
+                    id = compressingMessageId,
+                    newContent = "记忆未保存：内容可能为空、重复，或已经被删除记录拦截。当前对话已保留。",
+                    saveToDisk = true
+                )
+            }
+        } catch (e: Exception) {
+            conversationRepository.updateMessage(
+                id = compressingMessageId,
+                newContent = "记忆生成失败：${e.message ?: "未知错误"}。当前对话已保留。",
+                saveToDisk = true
+            )
+        }
+    }
+
+    private suspend fun summarizeConversationToMemory(
+        history: List<ConversationMessage>,
+        provider: OpenAiProvider,
+        settings: AppSettings,
+        fallback: MemorySummaryPayload
+    ): MemorySummaryPayload {
+        val rawSummary = runCatching {
+            requestConversationSummaryWithModel(history, provider, settings)
+        }.getOrElse {
+            return sanitizeMemorySummary(fallback, fallback)
+        }
+
+        val parsed = runCatching {
+            parseSummaryJson(rawSummary)
+        }.getOrElse {
+            val repaired = runCatching {
+                requestSummaryRepair(rawSummary, provider, settings)
+            }.getOrNull()
+            if (repaired.isNullOrBlank()) return sanitizeMemorySummary(fallback, fallback)
+            runCatching { parseSummaryJson(repaired) }
+                .getOrElse { return sanitizeMemorySummary(fallback, fallback) }
+        }
+
+        val localized = if (isMostlyEnglishSummary(parsed)) {
+            runCatching {
+                parseSummaryJson(requestSummaryRewriteToChinese(parsed, provider, settings))
+            }.getOrElse { parsed }
+        } else {
+            parsed
+        }
+
+        return sanitizeMemorySummary(localized, fallback)
+    }
+
+    private suspend fun requestConversationSummaryWithModel(
+        history: List<ConversationMessage>,
+        provider: OpenAiProvider,
+        settings: AppSettings
+    ): String {
+        return requestModelText(
+            provider = provider,
+            settings = settings,
+            temperature = 0.2,
+            system = """
+你是用于长期记忆归档的对话总结器。你必须只返回一个严格 JSON 对象，不要输出 markdown、解释、旁白、XML 或任何额外文本。
+JSON 对象只能包含四个键：title、content、tags、notes。
+总结时要记录具体事件，不要只写空泛主题。
+优先保留具体信息：请求、决定、承诺、结果、情绪变化、状态变化、后续待办。
+title 必须是简短中文标题，不超过 32 个汉字或 64 个 ASCII 字符。
+content 必须是较详细但紧凑的中文总结，通常 2 到 5 句；信息足够时不少于 80 个汉字。
+tags 必须是 2 到 6 个短标签，优先使用简体中文。
+notes 可以为空；有帮助时补充人名、地点、时间、数字、约定和未解决事项。
+输出必须以 { 开始，并以 } 结束。
+            """.trimIndent(),
+            user = """
+请把下面完整对话总结为一条长期记忆。
+不要为了简短而省略重要事件。
+重点总结：实际发生了什么、有什么变化、做了什么决定、承诺了什么、后续还有什么重要事项。
+只返回 JSON。
+
+格式示例：
+${memorySchemaHint()}
+
+对话内容：
+${buildConversationTranscript(history)}
+            """.trimIndent()
+        )
+    }
+
+    private suspend fun requestSummaryRepair(
+        rawText: String,
+        provider: OpenAiProvider,
+        settings: AppSettings
+    ): String {
+        return requestModelText(
+            provider = provider,
+            settings = settings,
+            temperature = 0.0,
+            system = """
+请把提供的内容修复为一个严格 JSON 对象。
+不要输出 markdown、解释或额外文本。
+对象只能包含四个键：title、content、tags、notes。
+除专有名词外，title、content、notes 必须使用简体中文。
+            """.trimIndent(),
+            user = """
+请将下面内容修复为严格 JSON。如果原文已经是 JSON，请只修正格式，不要扩写。
+
+格式示例：
+${memorySchemaHint()}
+
+原始内容：
+$rawText
+            """.trimIndent()
+        )
+    }
+
+    private suspend fun requestSummaryRewriteToChinese(
+        summary: MemorySummaryPayload,
+        provider: OpenAiProvider,
+        settings: AppSettings
+    ): String {
+        return requestModelText(
+            provider = provider,
+            settings = settings,
+            temperature = 0.0,
+            system = """
+你是 JSON 语言修正器。请在不改变原意的前提下，把输入中的长期记忆内容改写为简体中文。
+只返回一个严格 JSON 对象，不要输出 markdown、解释或额外文本。
+对象只能包含四个键：title、content、tags、notes。
+            """.trimIndent(),
+            user = """
+请把下面 JSON 中的长期记忆内容改写为简体中文，并保持原意。
+不要丢失事件、决定、承诺、结果、情绪变化和未解决事项。
+只返回 JSON。
+
+原始 JSON：
+${summary.toJsonLikeString()}
+            """.trimIndent()
+        )
+    }
+
+    private suspend fun requestModelText(
+        provider: OpenAiProvider,
+        settings: AppSettings,
+        temperature: Double,
+        system: String,
+        user: String
+    ): String {
+        val request = LlmRequest(
+            model = settings.model,
+            system = system,
+            messages = listOf(LlmMessage(role = "user", content = user)),
+            temperature = temperature,
+            stream = false
+        )
+        var output = ""
+        var error: String? = null
+        provider.stream(request).collect { event ->
+            when (event) {
+                is LlmStreamEvent.Token -> output += event.text
+                is LlmStreamEvent.Error -> error = event.message
+                LlmStreamEvent.Done -> Unit
+            }
+        }
+        if (output.isBlank()) {
+            throw IllegalStateException(error ?: "Empty summary response")
+        }
+        return parseAssistantContent(output).visible.trim()
+    }
+
+    private fun fallbackMemoryFromConversation(history: List<ConversationMessage>): MemorySummaryPayload {
+        val transcript = buildConversationTranscript(history)
+        val lastUser = history.asReversed().firstOrNull { it.role == MessageRole.User }?.content.orEmpty()
+        val highlightedTurns = history.takeLast(8).mapNotNull { message ->
+            val content = compactText(message.content, 110)
+            if (content.isBlank()) return@mapNotNull null
+            val speaker = if (message.role == MessageRole.User) "用户" else "AI"
+            "$speaker：$content"
+        }
+        val recentExchange = highlightedTurns.joinToString(" | ")
+        val notes = buildList {
+            if (lastUser.isNotBlank()) add("用户最后一次请求：${compactText(lastUser, 140)}")
+            if (recentExchange.isNotBlank()) add("最近关键轮次：$recentExchange")
+        }.joinToString("\n")
+        return MemorySummaryPayload(
+            title = compactText(lastUser.ifBlank { transcript }.ifBlank { "对话记忆" }, 32).ifBlank { "对话记忆" },
+            content = recentExchange.ifBlank { compactText(transcript, 420) }.ifBlank { "系统已为本轮对话生成一条长期记忆摘要。" },
+            tags = listOf("自动记忆", "对话总结"),
+            notes = notes
+        )
+    }
+
+    private fun sanitizeMemorySummary(payload: MemorySummaryPayload, fallback: MemorySummaryPayload): MemorySummaryPayload {
+        val title = compactText(payload.title.trim().ifBlank { fallback.title }, 60).ifBlank { "对话记忆" }
+        val normalizedContent = payload.content.replace(Regex("\\s+"), " ").trim()
+        val fallbackContent = fallback.content.trim()
+        val content = (if (normalizedContent.length < 80 && fallbackContent.length > normalizedContent.length) {
+            fallbackContent
+        } else {
+            normalizedContent
+        }).ifBlank { fallbackContent }.take(520)
+        val notes = payload.notes.trim().ifBlank { fallback.notes }.take(800)
+        val tags = sanitizeTags(payload.tags).ifEmpty { listOf("自动记忆", "对话总结") }.take(8)
+        return MemorySummaryPayload(title, content, tags, notes)
+    }
+
+    private fun parseSummaryJson(candidate: String): MemorySummaryPayload {
+        var cleaned = candidate.trim()
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned
+                .replace(Regex("^```(?:json)?\\s*", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("\\s*```$"), "")
+                .trim()
+        }
+        if (!cleaned.startsWith("{")) {
+            val start = cleaned.indexOf('{')
+            val end = cleaned.lastIndexOf('}')
+            if (start == -1 || end <= start) throw IllegalArgumentException("summary is not json")
+            cleaned = cleaned.substring(start, end + 1)
+        }
+        val obj = AppJson.parseToJsonElement(cleaned) as? JsonObject
+            ?: throw IllegalArgumentException("summary json must be an object")
+        val title = obj.stringField("title")
+        val content = obj.stringField("content")
+        val tags = obj.tagsField("tags")
+        val notes = obj.stringField("notes")
+        if (title.isBlank() || content.isBlank()) {
+            throw IllegalArgumentException("summary json missing required content")
+        }
+        return MemorySummaryPayload(title, content, tags, notes)
+    }
+
+    private fun isMostlyEnglishSummary(payload: MemorySummaryPayload): Boolean {
+        val combined = listOf(payload.title, payload.content, payload.notes, payload.tags.joinToString(" ")).joinToString(" ")
+        if (combined.isBlank()) return false
+        val englishCount = Regex("[A-Za-z]").findAll(combined).count()
+        val chineseCount = Regex("[\\u4e00-\\u9fff]").findAll(combined).count()
+        return englishCount >= maxOf(40, chineseCount * 2) && chineseCount < 40
+    }
+
+    private fun buildConversationTranscript(history: List<ConversationMessage>): String {
+        return history.joinToString("\n") { message ->
+            val speaker = when (message.role) {
+                MessageRole.User -> "User"
+                MessageRole.Assistant -> "AI"
+                MessageRole.System -> "System"
+            }
+            "$speaker: ${message.content}"
+        }
+    }
+
+    private fun memorySchemaHint(): String {
+        return """
+{
+  "title": "简短中文标题",
+  "content": "一段较详细的中文长期记忆总结，覆盖重要事件、决定、结果、情绪变化和未解决事项。",
+  "tags": ["标签1", "标签2", "标签3"],
+  "notes": "可选补充细节，例如人名、地点、约定、数字、时间点和待办事项。"
+}
+        """.trimIndent()
+    }
+
+    private fun sanitizeTags(tags: List<String>): List<String> {
+        return tags.map { it.trim() }.filter { it.isNotBlank() }.distinct().take(8)
+    }
+
+    private fun compactText(value: String, limit: Int): String {
+        val text = value.replace(Regex("\\s+"), " ").trim()
+        return if (text.length <= limit) text else text.take((limit - 3).coerceAtLeast(0)).trimEnd() + "..."
+    }
+
+    private fun JsonObject.stringField(key: String): String {
+        return (this[key] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+    }
+
+    private fun JsonObject.tagsField(key: String): List<String> {
+        return when (val value = this[key]) {
+            is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { tag -> tag.isNotBlank() } }
+            is JsonPrimitive -> value.contentOrNull
+                ?.split(",", "，", "、", "|")
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                .orEmpty()
+            else -> emptyList()
+        }
+    }
+
+    private data class MemorySummaryPayload(
+        val title: String,
+        val content: String,
+        val tags: List<String>,
+        val notes: String
+    )
+
+    private fun MemorySummaryPayload.toJsonLikeString(): String {
+        val escapedTags = tags.joinToString(", ") { "\"${it.escapeJsonText()}\"" }
+        return """
+{
+  "title": "${title.escapeJsonText()}",
+  "content": "${content.escapeJsonText()}",
+  "tags": [$escapedTags],
+  "notes": "${notes.escapeJsonText()}"
+}
+        """.trimIndent()
+    }
+
+    private fun String.escapeJsonText(): String {
+        return replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\r", "\\r")
+            .replace("\n", "\\n")
+    }
+
+    /*
+    suspend fun archiveCurrentConversationToMemory() {
+        val history = conversationRepository.messages.value.filter { it.content.isNotBlank() && it.id != "welcome" }
+        if (history.size < 2) {
+            conversationRepository.clearMessages()
+            return
+        }
+
+        val compressingMessageId = "memory_compressing_${UUID.randomUUID()}"
+        conversationRepository.addMessage(
+            ConversationMessage(
+                id = compressingMessageId,
+                role = MessageRole.Assistant,
+                content = "正在压缩记忆中...",
+                createdAt = System.currentTimeMillis()
+            )
+        )
+
+        val settings = settingsRepository.settings.value
+        val provider = OpenAiProvider(settings.apiBaseUrl, settings.apiKey)
+        try {
+            val fallback = fallbackMemoryFromConversation(history)
+            val summary = summarizeConversationToMemory(history, provider, settings, fallback)
+            val saved = memoryRepository.addMemory(
+                text = summary.content,
+                tags = summary.tags,
+                title = summary.title,
+                notes = summary.notes
+            )
+            if (saved != null) {
+                conversationRepository.clearMessages()
+            } else {
+                conversationRepository.updateMessage(
+                    id = compressingMessageId,
+                    newContent = "记忆未保存：内容可能为空、重复，或已被删除记录拦截。当前对话已保留。",
+                    saveToDisk = true
+                )
+            }
+        } catch (e: Exception) {
+            conversationRepository.updateMessage(
+                id = compressingMessageId,
+                newContent = "记忆生成失败：${e.message ?: "未知错误"}。当前对话已保留。",
+                saveToDisk = true
+            )
+        }
+    }
+
+    private suspend fun summarizeConversationToMemory(
+        history: List<ConversationMessage>,
+        provider: OpenAiProvider,
+        settings: AppSettings,
+        fallback: MemorySummaryPayload
+    ): MemorySummaryPayload {
+        val rawSummary = runCatching {
+            requestConversationSummaryWithModel(history, provider, settings)
+        }.getOrElse {
+            return sanitizeMemorySummary(fallback, fallback)
+        }
+
+        val parsed = runCatching {
+            parseSummaryJson(rawSummary)
+        }.getOrElse {
+            val repaired = requestSummaryRepair(rawSummary, provider, settings)
+            parseSummaryJson(repaired)
+        }
+
+        val localized = if (isMostlyEnglishSummary(parsed)) {
+            runCatching {
+                parseSummaryJson(requestSummaryRewriteToChinese(parsed, provider, settings))
+            }.getOrElse { parsed }
+        } else {
+            parsed
+        }
+
+        return sanitizeMemorySummary(localized, fallback)
+    }
+
+    private suspend fun requestConversationSummaryWithModel(
+        history: List<ConversationMessage>,
+        provider: OpenAiProvider,
+        settings: AppSettings
+    ): String {
+        return requestModelText(
+            provider = provider,
+            settings = settings,
+            temperature = 0.2,
+            system = """
+你是用于长期记忆归档的对话总结器。
+你必须只返回一个严格 JSON 对象，不要输出 markdown、解释、旁白、XML 或任何额外文本。
+JSON 对象只能包含四个键：title、content、tags、notes。
+总结时要记录具体事件，不要只写空泛主题。
+优先保留具体信息：请求、决定、承诺、结果、情绪转折、状态变化、后续待办。
+title 必须是简短中文标题，不超过 32 个汉字或 64 个 ASCII 字符。
+content 必须是较详细但紧凑的中文总结，通常 2 到 5 句；信息足够时不少于 80 个汉字。
+tags 必须是 2 到 6 个短标签，优先使用简体中文。
+notes 可以为空；有帮助时补充人名、地点、时间、数字、约定和未解决事项。
+输出必须以 { 开始，并以 } 结束。
+            """.trimIndent(),
+            user = """
+请把下面完整对话总结为一条长期记忆。
+不要为了简短而省略重要事件。
+重点总结：实际发生了什么、有什么变化、做了什么决定、承诺了什么、后续还有什么重要事项。
+只返回 JSON。
+
+格式示例：
+${memorySchemaHint()}
+
+对话内容：
+${buildConversationTranscript(history)}
+            """.trimIndent()
+        )
+    }
+
+    private suspend fun requestSummaryRepair(
+        rawText: String,
+        provider: OpenAiProvider,
+        settings: AppSettings
+    ): String {
+        return requestModelText(
+            provider = provider,
+            settings = settings,
+            temperature = 0.0,
+            system = """
+请把提供的内容修复为一个严格 JSON 对象。
+不要输出 markdown、解释或额外文本。
+对象只能包含四个键：title、content、tags、notes。
+除专有名词外，title、content、notes 必须使用简体中文。
+            """.trimIndent(),
+            user = """
+请将下面内容修复为严格 JSON。
+如果原文已经是 JSON，请只修正格式，不要扩写。
+
+格式示例：
+${memorySchemaHint()}
+
+原始内容：
+$rawText
+            """.trimIndent()
+        )
+    }
+
+    private suspend fun requestSummaryRewriteToChinese(
+        summary: MemorySummaryPayload,
+        provider: OpenAiProvider,
+        settings: AppSettings
+    ): String {
+        return requestModelText(
+            provider = provider,
+            settings = settings,
+            temperature = 0.0,
+            system = """
+你是 JSON 语言修正器。
+请在不改变原意的前提下，把输入中的长期记忆内容改写为简体中文。
+只返回一个严格 JSON 对象，不要输出 markdown、解释或额外文本。
+对象只能包含四个键：title、content、tags、notes。
+            """.trimIndent(),
+            user = """
+请把下面 JSON 中的长期记忆内容改写为简体中文，并保持原意。
+不要丢失事件、决定、承诺、结果、情绪变化和未解决事项。
+只返回 JSON。
+
+原始 JSON：
+${summary.toJsonLikeString()}
+            """.trimIndent()
+        )
+    }
+
+    private suspend fun requestModelText(
+        provider: OpenAiProvider,
+        settings: AppSettings,
+        temperature: Double,
+        system: String,
+        user: String
+    ): String {
+        val request = LlmRequest(
+            model = settings.model,
+            system = system,
+            messages = listOf(LlmMessage(role = "user", content = user)),
+            temperature = temperature,
+            stream = false
+        )
+        var output = ""
+        var error: String? = null
+        provider.stream(request).collect { event ->
+            when (event) {
+                is LlmStreamEvent.Token -> output += event.text
+                is LlmStreamEvent.Error -> error = event.message
+                LlmStreamEvent.Done -> Unit
+            }
+        }
+        if (output.isBlank()) {
+            throw IllegalStateException(error ?: "Empty summary response")
+        }
+        return parseAssistantContent(output).visible.trim()
+    }
+
+    private fun fallbackMemoryFromConversation(history: List<ConversationMessage>): MemorySummaryPayload {
+        val transcript = buildConversationTranscript(history)
+        val lastUser = history.asReversed().firstOrNull { it.role == MessageRole.User }?.content.orEmpty()
+        val highlightedTurns = history.takeLast(8).mapNotNull { message ->
+            val content = compactText(message.content, 110)
+            if (content.isBlank()) return@mapNotNull null
+            val speaker = if (message.role == MessageRole.User) "用户" else "AI"
+            "$speaker：$content"
+        }
+        val recentExchange = highlightedTurns.joinToString(" | ")
+        val notes = buildList {
+            if (lastUser.isNotBlank()) add("用户最后一次请求：${compactText(lastUser, 140)}")
+            if (recentExchange.isNotBlank()) add("最近关键轮次：$recentExchange")
+        }.joinToString("\n")
+        return MemorySummaryPayload(
+            title = compactText(lastUser.ifBlank { transcript }.ifBlank { "对话记忆" }, 32).ifBlank { "对话记忆" },
+            content = recentExchange.ifBlank { compactText(transcript, 420) }.ifBlank { "系统已为本轮对话生成一条长期记忆摘要。" },
+            tags = listOf("自动记忆", "对话总结"),
+            notes = notes
+        )
+    }
+
+    private fun sanitizeMemorySummary(payload: MemorySummaryPayload, fallback: MemorySummaryPayload): MemorySummaryPayload {
+        val title = payload.title.trim().ifBlank { fallback.title }.take(60)
+        val normalizedContent = payload.content.replace(Regex("\\s+"), " ").trim()
+        val fallbackContent = fallback.content.trim()
+        val content = (if (normalizedContent.length < 80 && fallbackContent.length > normalizedContent.length) {
+            fallbackContent
+        } else {
+            normalizedContent
+        }).ifBlank { fallbackContent }.take(520)
+        val notes = payload.notes.trim().ifBlank { fallback.notes }.take(800)
+        val tags = sanitizeTags(payload.tags).ifEmpty { listOf("自动记忆", "对话总结") }.take(8)
+        return MemorySummaryPayload(title.ifBlank { "对话记忆" }, content, tags, notes)
+    }
+
+    private fun parseSummaryJson(candidate: String): MemorySummaryPayload {
+        var cleaned = candidate.trim()
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned
+                .replace(Regex("^```(?:json)?\\s*", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("\\s*```$"), "")
+                .trim()
+        }
+        if (!cleaned.startsWith("{")) {
+            val start = cleaned.indexOf('{')
+            val end = cleaned.lastIndexOf('}')
+            if (start == -1 || end <= start) throw IllegalArgumentException("summary is not json")
+            cleaned = cleaned.substring(start, end + 1)
+        }
+        val obj = AppJson.parseToJsonElement(cleaned) as? JsonObject
+            ?: throw IllegalArgumentException("summary json must be an object")
+        val title = obj.stringField("title")
+        val content = obj.stringField("content")
+        val tags = obj.tagsField("tags")
+        val notes = obj.stringField("notes")
+        if (title.isBlank() || content.isBlank()) {
+            throw IllegalArgumentException("summary json missing required content")
+        }
+        return MemorySummaryPayload(title, content, tags, notes)
+    }
+
+    private fun isMostlyEnglishSummary(payload: MemorySummaryPayload): Boolean {
+        val combined = listOf(payload.title, payload.content, payload.notes, payload.tags.joinToString(" ")).joinToString(" ")
+        if (combined.isBlank()) return false
+        val englishCount = Regex("[A-Za-z]").findAll(combined).count()
+        val chineseCount = Regex("[\\u4e00-\\u9fff]").findAll(combined).count()
+        return englishCount >= maxOf(40, chineseCount * 2) && chineseCount < 40
+    }
+
+    private fun buildConversationTranscript(history: List<ConversationMessage>): String {
+        return history.joinToString("\n") { message ->
+            val speaker = when (message.role) {
+                MessageRole.User -> "User"
+                MessageRole.Assistant -> "AI"
+                MessageRole.System -> "System"
+            }
+            "$speaker: ${message.content}"
+        }
+    }
+
+    private fun memorySchemaHint(): String {
+        return """
+{
+  "title": "简短中文标题",
+  "content": "一段较详细的中文长期记忆总结，覆盖重要事件、决定、结果、情绪变化和未解决事项",
+  "tags": ["标签1", "标签2", "标签3"],
+  "notes": "可选补充细节，例如人名、地点、约定、数字、时间点和待办事项"
+}
+        """.trimIndent()
+    }
+
+    private fun sanitizeTags(tags: List<String>): List<String> {
+        return tags.map { it.trim() }.filter { it.isNotBlank() }.distinct().take(8)
+    }
+
+    private fun compactText(value: String, limit: Int): String {
+        val text = value.replace(Regex("\\s+"), " ").trim()
+        return if (text.length <= limit) text else text.take((limit - 3).coerceAtLeast(0)).trimEnd() + "..."
+    }
+
+    private fun JsonObject.stringField(key: String): String {
+        return (this[key] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+    }
+
+    private fun JsonObject.tagsField(key: String): List<String> {
+        return when (val value = this[key]) {
+            is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf(String::isNotBlank) }
+            is JsonPrimitive -> value.contentOrNull
+                ?.split(",", "，", "、", "|")
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                .orEmpty()
+            else -> emptyList()
+        }
+    }
+
+    private data class MemorySummaryPayload(
+        val title: String,
+        val content: String,
+        val tags: List<String>,
+        val notes: String
+    ) {
+        fun toJsonLikeString(): String {
+            val escapedTags = tags.joinToString(", ") { "\"${it.escapeJsonText()}\"" }
+            return """
+{
+  "title": "${title.escapeJsonText()}",
+  "content": "${content.escapeJsonText()}",
+  "tags": [$escapedTags],
+  "notes": "${notes.escapeJsonText()}"
+}
+            """.trimIndent()
+        }
+    }
+
+    private fun String.escapeJsonText(): String {
+        return replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+    }
+
+    */
+
     suspend fun endChatAndSummarize() {
+        archiveCurrentConversationToMemory()
+        /*
+
         val history = conversationRepository.messages.value.filter { it.content.isNotBlank() && it.id != "welcome" }
         if (history.size < 2) {
             conversationRepository.clearMessages()
@@ -343,5 +1027,6 @@ class ChatOrchestrator(
         } finally {
             conversationRepository.clearMessages()
         }
+        */
     }
 }

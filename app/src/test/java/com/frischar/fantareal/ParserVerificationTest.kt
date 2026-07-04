@@ -5,12 +5,22 @@ import com.frischar.fantareal.data.preset.PresetService
 import com.frischar.fantareal.data.memory.MemoryService
 import com.frischar.fantareal.data.rolecard.RoleCardService
 import com.frischar.fantareal.data.worldbook.WorldbookService
+import com.frischar.fantareal.domain.chat.ConversationMessage
+import com.frischar.fantareal.domain.chat.MessageRole
 import com.frischar.fantareal.domain.llm.LlmMessage
 import com.frischar.fantareal.domain.llm.LlmRequest
 import com.frischar.fantareal.domain.llm.LlmStreamEvent
 import com.frischar.fantareal.domain.llm.OpenAiProvider
 import com.frischar.fantareal.domain.memory.LongTermMemory
+import com.frischar.fantareal.domain.prompt.PromptBuildInput
+import com.frischar.fantareal.domain.prompt.PromptBuilder
+import com.frischar.fantareal.domain.prompt.PromptSegment
+import com.frischar.fantareal.domain.preset.PresetBlock
+import com.frischar.fantareal.domain.preset.PresetGroup
+import com.frischar.fantareal.domain.preset.PresetGroupItem
+import com.frischar.fantareal.domain.preset.PresetModule
 import com.frischar.fantareal.domain.preset.PromptPreset
+import com.frischar.fantareal.domain.rolecard.PersonaRuntime
 import com.frischar.fantareal.domain.rolecard.RoleCard
 import com.frischar.fantareal.domain.worldbook.InjectionPosition
 import com.frischar.fantareal.domain.worldbook.TriggerLogic
@@ -129,6 +139,49 @@ class ParserVerificationTest {
     }
 
     @Test
+    fun memoryParserPreservesStructuredFieldsAcrossExport() {
+        val service = MemoryService()
+        val json = """
+            {
+              "items": [
+                {
+                  "id": "memory_structured",
+                  "title": "阶段总结",
+                  "content": "用户确认要把 PE 的结束对话记忆改成结构化提取，并要求保存成功后再清空对话。",
+                  "notes": "需要保留 title、content、tags、notes 四个字段。",
+                  "tags": ["记忆", "PE", "结构化"]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val parsed = service.parseMemories(json).single()
+        assertEquals("memory_structured", parsed.id)
+        assertEquals("阶段总结", parsed.title)
+        assertEquals("用户确认要把 PE 的结束对话记忆改成结构化提取，并要求保存成功后再清空对话。", parsed.text)
+        assertEquals("需要保留 title、content、tags、notes 四个字段。", parsed.notes)
+        assertEquals(listOf("记忆", "PE", "结构化"), parsed.tags)
+
+        val reparsed = service.parseMemories(service.exportToJson(listOf(parsed))).single()
+        assertEquals(parsed.title, reparsed.title)
+        assertEquals(parsed.text, reparsed.text)
+        assertEquals(parsed.notes, reparsed.notes)
+        assertEquals(parsed.tags, reparsed.tags)
+    }
+
+    @Test
+    fun memoryParserKeepsLegacyTextMemoriesCompatible() {
+        val json = """[{"id":"legacy_memory","text":"Legacy saved memory.","tags":"summary，legacy"}]"""
+
+        val parsed = MemoryService().parseMemories(json).single()
+
+        assertEquals("legacy_memory", parsed.id)
+        assertEquals("", parsed.title)
+        assertEquals("Legacy saved memory.", parsed.text)
+        assertEquals(listOf("summary", "legacy"), parsed.tags)
+    }
+
+    @Test
     fun presetParserExpandsEnabledModules() {
         val json = """
             {
@@ -156,11 +209,240 @@ class ParserVerificationTest {
 
         assertEquals("preset_1", preset.id)
         assertEquals("Story Preset", preset.title)
+        assertTrue(preset.hasStructuredContent())
+        assertTrue(preset.modules.any { it.key == "emotion_detail" })
+        assertTrue(preset.modules.first { it.key == "anti_repeat" }.enabled)
+        assertTrue(preset.modules.first { it.key == "short_paragraph" }.enabled)
+        assertTrue(!preset.modules.first { it.key == "long_paragraph" }.enabled)
         assertTrue(preset.content.contains("Base rule."))
         assertTrue(preset.content.contains("Avoid repeating"))
         assertTrue(preset.content.contains("Keep natural paragraphs short"))
         assertTrue(preset.content.contains("Extra rule."))
         assertTrue(!preset.content.contains("Disabled rule."))
+    }
+
+    @Test
+    fun presetParserKeepsPromptGroupsAndSelectedItems() {
+        val json = """
+            {
+              "id": "preset_grouped",
+              "name": "Grouped Preset",
+              "enabled": true,
+              "base_system_prompt": "Base rule.",
+              "modules": {
+                "v4f_output_guard": true,
+                "emotion_detail": true
+              },
+              "prompt_groups": [
+                {
+                  "id": "tone_group",
+                  "name": "Tone",
+                  "enabled": true,
+                  "selection_mode": "multiple",
+                  "selected_ids": ["soft"],
+                  "items": [
+                    {"id": "soft", "name": "Soft", "content": "Selected group rule."},
+                    {"id": "sharp", "name": "Sharp", "content": "Unselected group rule."}
+                  ]
+                }
+              ],
+              "extra_prompts": [
+                {"id": "extra_1", "name": "Extra", "enabled": true, "content": "Extra rule."}
+              ]
+            }
+        """.trimIndent()
+
+        val preset = PresetService().parsePresets(json).single()
+        val runtime = preset.enabledPromptSections().joinToString("\n\n")
+
+        assertEquals("preset_grouped", preset.id)
+        assertEquals("Grouped Preset", preset.title)
+        assertEquals(listOf("soft"), preset.promptGroups.single().selectedIds)
+        assertTrue(preset.modules.first { it.key == "v4f_output_guard" }.enabled)
+        assertTrue(runtime.contains("Selected group rule."))
+        assertTrue(!runtime.contains("Unselected group rule."))
+        assertTrue(runtime.contains("Extra rule."))
+    }
+
+    @Test
+    fun presetParserPreservesAdvancedSegmentFieldsAcrossExport() {
+        val json = """
+            {
+              "presets": [
+                {
+                  "id": "preset_advanced",
+                  "name": "Advanced Preset",
+                  "enabled": true,
+                  "extra_prompts": [
+                    {
+                      "id": "depth_block",
+                      "name": "Depth Block",
+                      "enabled": true,
+                      "content": "Depth rule.",
+                      "order": 42,
+                      "placement": "at_depth",
+                      "role": "assistant",
+                      "depth": 7,
+                      "kind": "tone",
+                      "strength": "hard",
+                      "required": true,
+                      "tokenBudget": 321,
+                      "activation_tags": ["night", "rain"]
+                    }
+                  ],
+                  "prompt_groups": [
+                    {
+                      "id": "group_advanced",
+                      "name": "Advanced Group",
+                      "enabled": true,
+                      "selection_mode": "single",
+                      "selected_ids": ["near_item"],
+                      "items": [
+                        {
+                          "id": "near_item",
+                          "name": "Near Item",
+                          "enabled": true,
+                          "content": "Near latest rule.",
+                          "placement": "near_latest_user",
+                          "role": "system",
+                          "depth": 0,
+                          "kind": "plot",
+                          "strength": "soft",
+                          "required": false,
+                          "tokenBudget": 123,
+                          "activation_tags": ["turn"]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val service = PresetService()
+        val preset = service.parsePresets(json).single()
+        val exportedPreset = service.parsePresets(service.exportToJson(listOf(preset))).single()
+        val block = exportedPreset.extraPrompts.single()
+        val item = exportedPreset.promptGroups.single().items.single()
+        val segments = exportedPreset.enabledPromptSegments()
+
+        assertEquals("at_depth", block.placement)
+        assertEquals("assistant", block.role)
+        assertEquals(7, block.depth)
+        assertEquals("tone", block.kind)
+        assertEquals("hard", block.strength)
+        assertEquals(true, block.required)
+        assertEquals(321, block.tokenBudget)
+        assertEquals(listOf("night", "rain"), block.activationTags)
+        assertEquals("near_latest_user", item.placement)
+        assertEquals("plot", item.kind)
+        assertTrue(segments.any { it.placement == "at_depth" && it.depth == 7 && it.role == "assistant" })
+        assertTrue(segments.any { it.placement == "near_latest_user" && it.content.contains("Near latest rule.") })
+    }
+
+    @Test
+    fun promptBuilderInjectsPresetSegmentsByPlacementAndDepth() {
+        val result = PromptBuilder().build(
+            PromptBuildInput(
+                systemRules = "System rules.",
+                persona = PersonaRuntime(name = "Alice", systemPrompt = "Persona prompt."),
+                history = listOf(
+                    ConversationMessage("u1", MessageRole.User, "Older user.", 1L),
+                    ConversationMessage("a1", MessageRole.Assistant, "Latest assistant.", 2L)
+                ),
+                latestUserInput = "Current user.",
+                presetSegments = listOf(
+                    PromptSegment(
+                        id = "core",
+                        content = "Core preset.",
+                        placement = "system_core",
+                        order = 1
+                    ),
+                    PromptSegment(
+                        id = "depth1",
+                        content = "Depth one preset.",
+                        placement = "at_depth",
+                        role = "system",
+                        depth = 1,
+                        order = 1
+                    ),
+                    PromptSegment(
+                        id = "depth0",
+                        content = "Depth zero preset.",
+                        placement = "at_depth",
+                        role = "system",
+                        depth = 0,
+                        order = 1
+                    ),
+                    PromptSegment(
+                        id = "guard",
+                        content = "Output guard preset.",
+                        placement = "output_guard",
+                        role = "system",
+                        order = 1
+                    ),
+                    PromptSegment(
+                        id = "near",
+                        content = "Near latest preset.",
+                        placement = "near_latest_user",
+                        role = "system",
+                        order = 1
+                    )
+                )
+            )
+        )
+
+        assertTrue(result.system.orEmpty().contains("Core preset."))
+        assertEquals("Older user.", result.messages[0].content)
+        assertEquals("Depth one preset.", result.messages[1].content)
+        assertEquals("Latest assistant.", result.messages[2].content)
+        assertEquals("Depth zero preset.", result.messages[3].content)
+        assertEquals("Output guard preset.", result.messages[4].content)
+        assertEquals("Near latest preset.", result.messages[5].content)
+        assertEquals("Current user.", result.messages[6].content)
+    }
+
+    @Test
+    fun promptPresetRuntimeSectionsRespectNestedSwitches() {
+        val preset = PromptPreset(
+            id = "preset_nested",
+            title = "Nested",
+            enabled = true,
+            baseSystemPrompt = "Base rule.",
+            modules = listOf(
+                PresetModule(key = "m1", title = "Module 1", content = "Enabled module.", enabled = true),
+                PresetModule(key = "m2", title = "Module 2", content = "Disabled module.", enabled = false)
+            ),
+            extraPrompts = listOf(
+                PresetBlock(id = "b1", title = "Block 1", content = "Enabled block.", enabled = true),
+                PresetBlock(id = "b2", title = "Block 2", content = "Disabled block.", enabled = false)
+            ),
+            promptGroups = listOf(
+                PresetGroup(
+                    id = "g1",
+                    title = "Group 1",
+                    enabled = true,
+                    selectionMode = "single",
+                    selectedIds = listOf("i1"),
+                    items = listOf(
+                        PresetGroupItem(id = "i1", title = "Item 1", content = "Selected item."),
+                        PresetGroupItem(id = "i2", title = "Item 2", content = "Unselected item.")
+                    )
+                )
+            )
+        )
+
+        val runtime = preset.enabledPromptSections().joinToString("\n\n")
+
+        assertTrue(runtime.contains("Base rule."))
+        assertTrue(runtime.contains("Enabled module."))
+        assertTrue(!runtime.contains("Disabled module."))
+        assertTrue(runtime.contains("Enabled block."))
+        assertTrue(!runtime.contains("Disabled block."))
+        assertTrue(runtime.contains("Selected item."))
+        assertTrue(!runtime.contains("Unselected item."))
+        assertTrue(preset.copy(enabled = false).enabledPromptSections().isEmpty())
     }
 
     @Test
@@ -182,7 +464,9 @@ class ParserVerificationTest {
             listOf(
                 LongTermMemory(
                     id = "memory_1",
+                    title = "Saved title",
                     text = "A saved memory.",
+                    notes = "Saved note.",
                     tags = listOf("summary"),
                     createdAt = 123L
                 )
@@ -190,7 +474,9 @@ class ParserVerificationTest {
         )
         val memory = memoryService.parseMemories(memoryJson).single()
         assertEquals("memory_1", memory.id)
+        assertEquals("Saved title", memory.title)
         assertEquals("A saved memory.", memory.text)
+        assertEquals("Saved note.", memory.notes)
 
         val worldbookService = WorldbookService()
         val worldbookJson = worldbookService.exportToJson(
