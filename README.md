@@ -4,16 +4,6 @@
 
 本分支是一个独立子项目分支，根目录只包含 PC HuskarUI 客户端源码，不包含旧 Python/FastAPI 服务、运行数据、发布包、Qt SDK 或 HuskarUI 本体。
 
-## 项目定位
-
-`PC-HuskarUI` 是 Fantareal PC 客户端的新 UI 方向：
-
-- 放弃 WebView/FastAPI 运行时依赖，改为 Qt/C++ 本地客户端。
-- UI 使用 QML + HuskarUI 组件实现。
-- 通过本地 JSON 数据文件与原 Fantareal 数据结构兼容。
-- Chat 页面是最高权重页面，默认启动进入聊天主舞台。
-- 支持设置、人设卡、预设、世界书、记忆、模型路由等核心数据的安全读取与编辑。
-
 ## 目录结构
 
 ```text
@@ -177,40 +167,6 @@ $env:FANTAREAL_ROOT = "E:\Fantareal"
 - 测试只写临时目录，不写真实用户数据。
 - 空白或 BOM-only 的 JSON 数组文件按空数组处理，避免启动时报 JSON 解析错误。
 - 开启输出切分时，原始 AI 回复不会先显示给玩家。
-
-## 测试
-
-当前测试覆盖：
-
-- Settings 保存与密钥保护。
-- Chat 本地发送、模型生成、异步流式生成、停止生成、重新回复。
-- 输出切分子代理与本地回退。
-- 结束对话与长期记忆总结。
-- Routes 全局设置和 Provider 安全编辑。
-- Cards 安全编辑和 Persona 同步。
-- Worldbook 设置与词条编辑。
-- Memory 新增/编辑。
-- Preset 保存与互斥规则。
-- 资源导入。
-
-运行完整验证：
-
-```powershell
-.\tools\Verify-HuskarUI.ps1 -QtPrefix "C:\path\to\Qt\6.7.3\msvc2019_64" -HuskarUIRoot "C:\path\to\HuskarUI" -Build
-```
-
-## 不包含的内容
-
-本分支不包含：
-
-- Qt SDK
-- HuskarUI 源码或二进制
-- 编译产物
-- 发布包
-- 用户运行数据
-- 角色卡素材库
-- 旧 Python/FastAPI 服务
-- WebView 页面
 
 ## 开源说明
 
