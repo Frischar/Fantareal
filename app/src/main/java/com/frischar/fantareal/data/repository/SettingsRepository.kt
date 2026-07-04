@@ -1,4 +1,4 @@
-﻿package com.frischar.fantareal.data.repository
+package com.frischar.fantareal.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -24,7 +24,8 @@ data class AppSettings(
     val aiAvatarUri: String? = null,
     val fontSize: Float = 16f,
     val fontColor: String = "",
-    val splitRegex: String = ""
+    val splitRegex: String = "",
+    val useSmartSplit: Boolean = true
 )
 
 @Serializable
@@ -42,7 +43,8 @@ private data class StoredSettings(
     val aiAvatarUri: String? = null,
     val fontSize: Float = 16f,
     val fontColor: String = "",
-    val splitRegex: String = ""
+    val splitRegex: String = "",
+    val useSmartSplit: Boolean = true
 )
 
 class SettingsRepository(
@@ -80,7 +82,8 @@ class SettingsRepository(
             aiAvatarUri = storedSettings.aiAvatarUri,
             fontSize = storedSettings.fontSize,
             fontColor = storedSettings.fontColor,
-            splitRegex = storedSettings.splitRegex
+            splitRegex = storedSettings.splitRegex,
+            useSmartSplit = storedSettings.useSmartSplit
         )
     }
 
@@ -103,7 +106,8 @@ class SettingsRepository(
                     aiAvatarUri = newSettings.aiAvatarUri,
                     fontSize = newSettings.fontSize,
                     fontColor = newSettings.fontColor,
-                    splitRegex = newSettings.splitRegex
+                    splitRegex = newSettings.splitRegex,
+                    useSmartSplit = newSettings.useSmartSplit
                 )
             )
         }
@@ -122,6 +126,7 @@ class SettingsRepository(
             .putFloat("fontSize", newSettings.fontSize)
             .putString("fontColor", newSettings.fontColor)
             .putString("splitRegex", newSettings.splitRegex)
+            .putBoolean("useSmartSplit", newSettings.useSmartSplit)
             .remove("apiKey")
             .apply()
         secretStore.saveApiKey(newSettings.apiKey)
@@ -160,7 +165,8 @@ class SettingsRepository(
             aiAvatarUri = prefs.getString("aiAvatarUri", null),
             fontSize = prefs.getFloat("fontSize", 16f),
             fontColor = prefs.getString("fontColor", "") ?: "",
-            splitRegex = prefs.getString("splitRegex", "") ?: ""
+            splitRegex = prefs.getString("splitRegex", "") ?: "",
+            useSmartSplit = prefs.getBoolean("useSmartSplit", true)
         )
     }
 }

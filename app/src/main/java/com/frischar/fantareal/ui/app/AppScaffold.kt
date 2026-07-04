@@ -169,6 +169,7 @@ fun AppScaffold() {
                         createdAtText = "",
                         thinkingText = it.thinking,
                         error = it.error,
+                        bubbles = it.bubbles,
                         isStreaming = uiState.isSending && it.id == lastMsgId && it.role == com.frischar.fantareal.domain.chat.MessageRole.Assistant
                     )
                 }
@@ -211,6 +212,7 @@ fun AppScaffold() {
                     onFontSizeChange = settingsViewModel::updateFontSize,
                     onFontColorChange = settingsViewModel::updateFontColor,
                     onSplitRegexChange = settingsViewModel::updateSplitRegex,
+                    onUseSmartSplitChange = settingsViewModel::updateUseSmartSplit,
                     onBackgroundImageUriChange = settingsViewModel::updateBackgroundImageUri,
                     onUserAvatarUriChange = settingsViewModel::updateUserAvatarUri,
                     onAiAvatarUriChange = settingsViewModel::updateAiAvatarUri,

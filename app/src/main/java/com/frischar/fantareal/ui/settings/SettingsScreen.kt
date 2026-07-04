@@ -1,4 +1,4 @@
-﻿package com.frischar.fantareal.ui.settings
+package com.frischar.fantareal.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,6 +51,7 @@ fun SettingsScreen(
     onFontSizeChange: (Float) -> Unit,
     onFontColorChange: (String) -> Unit,
     onSplitRegexChange: (String) -> Unit,
+    onUseSmartSplitChange: (Boolean) -> Unit,
     onBackgroundImageUriChange: (String?) -> Unit,
     onUserAvatarUriChange: (String?) -> Unit,
     onAiAvatarUriChange: (String?) -> Unit,
@@ -80,9 +81,11 @@ fun SettingsScreen(
                     fontSize = uiState.fontSize,
                     fontColor = uiState.fontColor,
                     splitRegex = uiState.splitRegex,
+                    useSmartSplit = uiState.useSmartSplit,
                     onFontSizeChange = onFontSizeChange,
                     onFontColorChange = onFontColorChange,
                     onSplitRegexChange = onSplitRegexChange,
+                    onUseSmartSplitChange = onUseSmartSplitChange,
                     onBackgroundImageUriChange = onBackgroundImageUriChange,
                     onUserAvatarUriChange = onUserAvatarUriChange,
                     onAiAvatarUriChange = onAiAvatarUriChange
@@ -120,6 +123,8 @@ fun AppearanceCard(
     onFontSizeChange: (Float) -> Unit,
     onFontColorChange: (String) -> Unit,
     onSplitRegexChange: (String) -> Unit,
+    useSmartSplit: Boolean,
+    onUseSmartSplitChange: (Boolean) -> Unit,
     darkMode: Boolean,
     showAvatar: Boolean,
     backgroundOpacity: Float,
@@ -232,13 +237,19 @@ fun AppearanceCard(
                     }
                 }
             }
-            OutlinedTextField(
-                value = splitRegex,
-                onValueChange = onSplitRegexChange,
-                label = { Text("AI输出分段正则切割 (留空则不切割)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("子代理切分消息")
+                Switch(checked = useSmartSplit, onCheckedChange = onUseSmartSplitChange)
+            }
+            if (!useSmartSplit) {
+                OutlinedTextField(
+                    value = splitRegex,
+                    onValueChange = onSplitRegexChange,
+                    label = { Text("AI输出分段正则切割 (留空则不切割)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
         }
     }
 }

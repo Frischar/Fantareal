@@ -77,7 +77,8 @@ data class ChatMessageUiModel(
     val isStreaming: Boolean,
     val spriteTag: String? = null,
     val thinkingText: String? = null,
-    val error: Boolean = false
+    val error: Boolean = false,
+    val bubbles: List<String>? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,7 +169,13 @@ fun ChatScreen(personaName: String = "Fantareal",
                     } else {
                         Column {
                             val splitRegex = settings.splitRegex
-                            val contents = if (splitRegex.isNotBlank()) {
+                            val contents = if (settings.useSmartSplit) {
+                                if (msg.bubbles.isNullOrEmpty()) {
+                                    if (msg.isStreaming) listOf("思考剧情中...") else listOf(msg.content)
+                                } else {
+                                    msg.bubbles
+                                }
+                            } else if (splitRegex.isNotBlank()) {
                                 try {
                                     val parts = msg.content.split(Regex(splitRegex)).filter { it.isNotBlank() }
                                     val mergedParts = mutableListOf<String>()

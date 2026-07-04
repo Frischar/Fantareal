@@ -64,6 +64,21 @@ class ConversationRepository(
         }
     }
 
+    suspend fun updateMessageBubbles(id: String, bubbles: List<String>, saveToDisk: Boolean = true) {
+        initialLoad.join()
+        if (saveToDisk) {
+            mutateMessages { current ->
+                current.map {
+                    if (it.id == id) it.copy(bubbles = bubbles) else it
+                }
+            }
+        } else {
+            _messages.value = _messages.value.map {
+                if (it.id == id) it.copy(bubbles = bubbles) else it
+            }
+        }
+    }
+
     suspend fun clearMessages() {
         initialLoad.join()
         mutateMessages { emptyList() }
