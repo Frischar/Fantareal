@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>缃笺</title>
+    <script>
+      try {
+        const theme = localStorage.getItem("cardWriterTheme:v1") === "dark" ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
     <link rel="stylesheet" href="{{ static_stylesheet_url or '/static/card-writer.css' }}" />
   </head>
   <body>
@@ -24,6 +32,7 @@
             <button class="nav-chip" type="button" data-view="worldbook">世界书</button>
             <button class="nav-chip" type="button" data-view="preset">预设</button>
             <button class="nav-chip" type="button" data-view="memory">记忆</button>
+            <button class="nav-chip" type="button" data-view="database">数据库</button>
             <button class="nav-chip" type="button" data-view="preview">预览</button>
           </div>
 
@@ -45,6 +54,19 @@
             <button id="btnSave" class="primary-button" type="button">保存</button>
             <button id="btnSaveAs" class="ghost-button" type="button">另存为</button>
             <button id="btnImport" class="ghost-button" type="button">导入 JSON</button>
+            <button id="btnThemeToggle" class="ghost-button" type="button" aria-pressed="false">暗色</button>
+          </div>
+
+          <div class="sidebar-card fa-sync-card">
+            <div>
+              <strong>Fa 联动</strong>
+              <p class="field-tip" id="faBindingSummary">尚未读取当前 Fa 内容。</p>
+            </div>
+            <div id="faBindingMeta" class="fa-binding-meta"></div>
+            <div class="export-actions">
+              <button id="btnLoadFaContext" class="ghost-button compact" type="button">读取当前 Fa</button>
+              <button id="btnOpenFaApply" class="primary-button compact" type="button">应用到 Fa</button>
+            </div>
           </div>
 
           <div class="sidebar-card export-card">
@@ -115,6 +137,20 @@
             <div id="memoryEditor"></div>
           </section>
 
+          <section class="view-pane" id="view-database">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Database</p>
+                <h2>数据库</h2>
+                <p class="muted">设计变量、阶段和 tag，用于未来触发世界书或演出工坊；这里只保存草稿，不写运行时数据库。</p>
+              </div>
+              <div class="inline-actions">
+                <button class="ghost-button compact" type="button" data-export-target="database">导出数据库</button>
+              </div>
+            </div>
+            <div id="databaseEditor"></div>
+          </section>
+
           <section class="view-pane" id="view-preview">
             <div class="section-head">
               <div>
@@ -155,6 +191,10 @@
                 <div class="editor-card span-two">
                   <h3>记忆 JSON</h3>
                   <pre class="json-preview" id="memoryPreview"></pre>
+                </div>
+                <div class="editor-card span-two">
+                  <h3>数据库 JSON</h3>
+                  <pre class="json-preview" id="databasePreview"></pre>
                 </div>
               </div>
             </div>
@@ -247,10 +287,35 @@
               <label for="copilotMemoryPrompt">记忆提示词</label>
               <textarea id="copilotMemoryPrompt" rows="6"></textarea>
             </div>
+            <div class="field-block span-two">
+              <label for="copilotDatabasePrompt">数据库提示词</label>
+              <textarea id="copilotDatabasePrompt" rows="6"></textarea>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
           <button id="btnCopilotSettingsSave" class="primary-button" type="button">保存 AI 设置</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="faApplyDialog">
+      <div class="modal-content fa-apply-modal">
+        <div class="modal-header">
+          <div>
+            <h3>应用到 Fa</h3>
+            <p class="muted">先看增量预览，再把选中的模块写回当前角色卡、世界书、预设和标准记忆。</p>
+          </div>
+          <button class="modal-close" id="btnFaApplyClose" type="button">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="faApplyPreviewPanel" class="fa-apply-preview">
+            <p class="muted">点击“应用到 Fa”后会在这里显示预览。</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnFaApplyRefresh" class="ghost-button" type="button">刷新预览</button>
+          <button id="btnFaApplyConfirm" class="primary-button" type="button">确认应用选中项</button>
         </div>
       </div>
     </dialog>

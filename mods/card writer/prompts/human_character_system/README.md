@@ -2,7 +2,17 @@
 
 This folder is the self-contained prompt pack used by Card Writer copilot/wheelchair mode.
 
-It is a distilled Fa-specific runtime version of the broader human-character-system notes. The original generic skill and long tutorial/reference material are intentionally not required at runtime, so the mod can work without `design_docs`.
+It is the Fa-specific runtime adapter for the author's public skill:
+
+`virtual-character-realism-design-zh`
+
+Upstream skill repository:
+
+`https://github.com/cOkieeman/virtual-character-realism-design-zh`
+
+The public skill is the broader author-maintained design system. This folder is the bundled Fa adapter: it keeps the same goal and method, but compresses them into prompt files that Card Writer can load, reason with, and turn into reviewable JSON candidates.
+
+The mod must work offline and must not require `design_docs` or the external skill repository at runtime. When the public skill evolves, update this prompt pack intentionally instead of adding a live dependency.
 
 ## Fast Mode
 
@@ -36,4 +46,4 @@ High-order preset generation is intentionally out of scope for this prompt pack.
 - Keep this folder focused on Fa Card Writer behavior.
 - Do not reference local `design_docs` files from runtime code.
 - Do not include project-specific story material such as the Aihong redemption timeline.
-- The generic human-character-system skill can live in a separate GitHub repository later.
+- Treat `virtual-character-realism-design-zh` as the upstream author skill and this folder as the Fa runtime adaptation layer.
