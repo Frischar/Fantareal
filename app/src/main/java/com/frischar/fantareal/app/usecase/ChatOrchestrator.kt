@@ -355,11 +355,10 @@ class ChatOrchestrator(
         settings: AppSettings,
         fallback: MemorySummaryPayload
     ): MemorySummaryPayload {
-        val rawSummary = runCatching {
-            requestConversationSummaryWithModel(history, provider, settings)
-        }.getOrElse {
-            return sanitizeMemorySummary(fallback, fallback)
-        }
+        // API 不可用（无网、HTTP 错误、空响应）时直接向上抛出，
+        // 由 archiveCurrentConversationToMemory 的 catch 提示失败并保留对话；
+        // 不再静默写入 fallback 伪摘要，否则会把对话原文拼接冒充 AI 摘要并清空原对话。
+        val rawSummary = requestConversationSummaryWithModel(history, provider, settings)
 
         val parsed = runCatching {
             parseSummaryJson(rawSummary)
