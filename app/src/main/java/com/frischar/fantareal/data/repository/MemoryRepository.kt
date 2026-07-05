@@ -32,7 +32,13 @@ class MemoryRepository(
         )
     }
 
-    suspend fun addMemory(text: String, tags: List<String> = emptyList(), similarityThreshold: Double = 0.86): LongTermMemory? {
+    suspend fun addMemory(
+        text: String,
+        tags: List<String> = emptyList(),
+        similarityThreshold: Double = 0.86,
+        title: String = "",
+        notes: String = ""
+    ): LongTermMemory? {
         val normalizedText = text.trim()
         if (normalizedText.isBlank()) return null
         if (isBlockedByTombstone(normalizedText, similarityThreshold)) return null
@@ -45,7 +51,9 @@ class MemoryRepository(
             val now = System.currentTimeMillis()
             val memory = LongTermMemory(
                 id = UUID.randomUUID().toString(),
+                title = title.trim(),
                 text = normalizedText,
+                notes = notes.trim(),
                 tags = tags,
                 createdAt = now
             )

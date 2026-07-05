@@ -56,7 +56,7 @@ class ChatViewModel(
         viewModelScope.launch {
             isSending.value = true
             try {
-                orchestrator.endChatAndSummarize()
+                orchestrator.archiveCurrentConversationToMemory()
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
