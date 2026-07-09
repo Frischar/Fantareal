@@ -40,7 +40,7 @@ bool makeRequiredFiles(const QDir& root) {
     const QStringList dirs = {
         QStringLiteral("data"),
         QStringLiteral("data/auto_saga"),
-        QStringLiteral("data/mods/state_journal"),
+        QStringLiteral("data/database"),
         QStringLiteral("data/logs"),
         QStringLiteral("cards"),
     };
@@ -75,7 +75,7 @@ bool makeRequiredFiles(const QDir& root) {
         }
     }
 
-    QFile(root.absoluteFilePath(QStringLiteral("data/mods/state_journal/state_journal.db"))).open(QIODevice::WriteOnly);
+    QFile(root.absoluteFilePath(QStringLiteral("data/database/database.db"))).open(QIODevice::WriteOnly);
     QFile(root.absoluteFilePath(QStringLiteral("data/logs/fantareal.log"))).open(QIODevice::WriteOnly);
     return true;
 }
@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
     draft.insert(QStringLiteral("creator_notes"), QStringLiteral("new notes"));
     draft.insert(QStringLiteral("creator_comment"), QStringLiteral("new comment"));
     draft.insert(QStringLiteral("tagsText"), tagParts.join(QStringLiteral(";\n")));
-    draft.insert(QStringLiteral("stateJournalEnabled"), true);
+    draft.insert(QStringLiteral("databaseEnabled"), true);
     draft.insert(QStringLiteral("creativeWorkshopEnabled"), false);
     draft.insert(QStringLiteral("openingEnabled"), true);
 
@@ -255,7 +255,7 @@ int main(int argc, char* argv[]) {
     const QVariantMap refreshedDraft = bridge.cardDraft();
     if (refreshedDraft.value(QStringLiteral("name")).toString() != QStringLiteral("New Name")
         || refreshedDraft.value(QStringLiteral("tagCount")).toInt() != 24
-        || !refreshedDraft.value(QStringLiteral("stateJournalEnabled")).toBool()
+        || !refreshedDraft.value(QStringLiteral("databaseEnabled")).toBool()
         || refreshedDraft.value(QStringLiteral("creativeWorkshopEnabled")).toBool()
         || !refreshedDraft.value(QStringLiteral("openingEnabled")).toBool()) {
         return fail(QStringLiteral("cardDraft should refresh after save")) ? 0 : 1;

@@ -21,7 +21,7 @@ Item {
     property string messageExampleText: ""
     property string creatorNotesText: ""
     property string creatorCommentText: ""
-    property bool stateJournalEnabled: true
+    property bool databaseEnabled: true
     property bool creativeWorkshopEnabled: true
     property bool openingEnabled: false
     property int personaCount: 0
@@ -53,7 +53,7 @@ Item {
         messageExampleText = draft.mes_example || "";
         creatorNotesText = draft.creator_notes || "";
         creatorCommentText = draft.creator_comment || "";
-        stateJournalEnabled = draft.stateJournalEnabled === undefined ? true : Boolean(draft.stateJournalEnabled);
+        databaseEnabled = draft.databaseEnabled === undefined ? true : Boolean(draft.databaseEnabled);
         creativeWorkshopEnabled = draft.creativeWorkshopEnabled === undefined ? true : Boolean(draft.creativeWorkshopEnabled);
         openingEnabled = Boolean(draft.openingEnabled);
         personaCount = Number(draft.personaCount || 0);
@@ -73,7 +73,7 @@ Item {
             "mes_example": messageExampleText,
             "creator_notes": creatorNotesText,
             "creator_comment": creatorCommentText,
-            "stateJournalEnabled": stateJournalEnabled,
+            "databaseEnabled": databaseEnabled,
             "creativeWorkshopEnabled": creativeWorkshopEnabled,
             "openingEnabled": openingEnabled
         });
@@ -276,14 +276,14 @@ Item {
                         rowSpacing: 18
 
                         SettingField {
-                            title: "状态日志"
+                            title: "数据库"
 
                             HusSwitch {
-                                checked: root.stateJournalEnabled
+                                checked: root.databaseEnabled
                                 checkedText: "开启"
                                 uncheckedText: "关闭"
                                 onToggled: {
-                                    root.stateJournalEnabled = checked;
+                                    root.databaseEnabled = checked;
                                     root.markDirty();
                                 }
                             }
@@ -352,7 +352,7 @@ Item {
 
                     SettingField {
                         Layout.fillWidth: true
-                        title: "Personality"
+                        title: "性格（personality）"
 
                         HusTextArea {
                             id: personalityInput

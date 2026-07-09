@@ -48,7 +48,7 @@ bool makeRequiredFiles(const QDir& root) {
     const QStringList dirs = {
         QStringLiteral("data"),
         QStringLiteral("data/auto_saga"),
-        QStringLiteral("data/mods/state_journal"),
+        QStringLiteral("data/database"),
         QStringLiteral("data/logs"),
         QStringLiteral("cards"),
     };
@@ -83,7 +83,7 @@ bool makeRequiredFiles(const QDir& root) {
         }
     }
 
-    QFile(root.absoluteFilePath(QStringLiteral("data/mods/state_journal/state_journal.db"))).open(QIODevice::WriteOnly);
+    QFile(root.absoluteFilePath(QStringLiteral("data/database/database.db"))).open(QIODevice::WriteOnly);
     QFile(root.absoluteFilePath(QStringLiteral("data/logs/fantareal.log"))).open(QIODevice::WriteOnly);
     return true;
 }
