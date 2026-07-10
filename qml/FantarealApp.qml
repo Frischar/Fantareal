@@ -325,6 +325,10 @@ HusWindow {
                         return routesPage;
                     case "cards":
                         return cardsPage;
+                    case "cardAuthoring":
+                        return cardAuthoringPage;
+                    case "database":
+                        return databasePage;
                     case "preset":
                         return presetPage;
                     case "memory":
@@ -366,6 +370,16 @@ HusWindow {
     Component {
         id: cardsPage
         CardsPage {}
+    }
+    Component {
+        id: cardAuthoringPage
+        CardAuthoringPage {}
+    }
+    Component {
+        id: databasePage
+        DatabasePage {
+            onOpenPage: page => root.openPage(page)
+        }
     }
     Component {
         id: presetPage

@@ -39,7 +39,7 @@ Item {
                     RowLayout {
                         StatPill { text: "COMPAT"; accentColor: Global.accentCyan }
                         HusTag { text: "mods/*/mod.json"; presetColor: "cyan" }
-                        HusTag { text: "mobile-chat / auto-saga / state-journal"; presetColor: "blue" }
+                        HusTag { text: "mobile-chat / auto-saga / database"; presetColor: "blue" }
                     }
 
                     HusText {

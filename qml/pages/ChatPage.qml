@@ -586,7 +586,7 @@ Item {
                         height: root.generating && !root.memoryOrganizing ? Math.max(streamingAvatar.size, streamingStack.implicitHeight) + 20 : 0
                         visible: root.generating && !root.memoryOrganizing
 
-                        property string streamingContent: root.outputSplittingEnabled ? root.loadingBubbleText : (FantarealBridge.chatStreamingPreview.trim().length > 0 ? FantarealBridge.chatStreamingPreview : "...")
+                        property string streamingContent: FantarealBridge.chatStreamingPreview.trim().length > 0 ? FantarealBridge.chatStreamingPreview : root.loadingBubbleText
                         property real streamingMaxWidth: Math.min(width * 0.58, 780)
                         property real streamingWidth: Math.min(streamingMaxWidth, Math.max(96, streamingMeasure.implicitWidth + 30))
 

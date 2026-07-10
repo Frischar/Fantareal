@@ -44,7 +44,7 @@ bool makeRequiredFiles(const QDir& root) {
     const QStringList dirs = {
         QStringLiteral("data"),
         QStringLiteral("data/auto_saga"),
-        QStringLiteral("data/mods/state_journal"),
+        QStringLiteral("data/database"),
         QStringLiteral("data/logs"),
         QStringLiteral("cards"),
     };
@@ -79,7 +79,7 @@ bool makeRequiredFiles(const QDir& root) {
         }
     }
 
-    QFile(root.absoluteFilePath(QStringLiteral("data/mods/state_journal/state_journal.db"))).open(QIODevice::WriteOnly);
+    QFile(root.absoluteFilePath(QStringLiteral("data/database/database.db"))).open(QIODevice::WriteOnly);
     QFile(root.absoluteFilePath(QStringLiteral("data/logs/fantareal.log"))).open(QIODevice::WriteOnly);
     return true;
 }
@@ -291,9 +291,8 @@ int main(int argc, char* argv[]) {
     if (!waitForCondition([&]() { return mainRequestCount == 1; })) {
         return fail(QStringLiteral("async chat generation should reach the streaming response")) ? 0 : 1;
     }
-    spinEvents(80);
-    if (!bridge.chatStreamingPreview().isEmpty()) {
-        return fail(QStringLiteral("streaming preview should stay hidden while output splitting is enabled")) ? 0 : 1;
+    if (!waitForPreview(&bridge, QStringLiteral("async "))) {
+        return fail(QStringLiteral("streaming preview should show partial text while output splitting is enabled")) ? 0 : 1;
     }
     if (!QString::fromUtf8(firstRequestBody).contains(QStringLiteral("\"stream\":true"))) {
         return fail(QStringLiteral("async chat generation should request streaming responses")) ? 0 : 1;

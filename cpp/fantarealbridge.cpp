@@ -1,5 +1,11 @@
 #include "fantarealbridge.h"
 
+#include "card_authoring/cardauthoringservice.h"
+#include "card_authoring/cardauthoringprojectstore.h"
+#include "database/databasepaths.h"
+#include "database/databaseservice.h"
+#include "database/legacystatejournaladapter.h"
+
 #include <algorithm>
 #include <utility>
 
@@ -114,6 +120,18 @@ QString rowText(const QString& label, int value) {
 
 QString rowText(const QString& label, double value) {
     return rowText(label, QString::number(value, 'f', 2));
+}
+
+QString fileSizeText(qint64 bytes) {
+    if (bytes < 1024) {
+        return QStringLiteral("%1 B").arg(bytes);
+    }
+    const double kib = static_cast<double>(bytes) / 1024.0;
+    if (kib < 1024.0) {
+        return QStringLiteral("%1 KiB").arg(kib, 0, 'f', 1);
+    }
+    const double mib = kib / 1024.0;
+    return QStringLiteral("%1 MiB").arg(mib, 0, 'f', 1);
 }
 
 QJsonObject readJsonObject(const QDir& root, const QString& relativePath, QString* status) {
@@ -1074,6 +1092,137 @@ QVariantMap resultMap(bool ok, const QString& message, const QString& backupPath
     return result;
 }
 
+QStringList stringListFromVariantList(const QVariantList& values) {
+    QStringList result;
+    for (const QVariant& value : values) {
+        const QString text = value.toString().trimmed();
+        if (!text.isEmpty() && !result.contains(text)) {
+            result.append(text);
+        }
+    }
+    return result;
+}
+
+QVariantList variantListFromStringList(const QStringList& values) {
+    QVariantList result;
+    for (const QString& value : values) {
+        result.append(value);
+    }
+    return result;
+}
+
+QStringList cardAuthoringRowsFromProject(const QJsonObject& project) {
+    const QJsonObject persona = project.value(QStringLiteral("persona_card")).toObject();
+    const QJsonObject database = project.value(QStringLiteral("database")).toObject();
+    const QJsonArray tags = persona.value(QStringLiteral("tags")).toArray();
+    const QJsonArray variables = database.value(QStringLiteral("variables")).toArray();
+    const QJsonArray stages = database.value(QStringLiteral("stages")).toArray();
+    const QJsonArray databaseTags = database.value(QStringLiteral("tags")).toArray();
+
+    QStringList rows;
+    rows.append(rowText(QStringLiteral("项目标题"), displayText(project.value(QStringLiteral("title")).toString())));
+    rows.append(rowText(QStringLiteral("角色名"), displayText(persona.value(QStringLiteral("name")).toString())));
+    rows.append(rowText(QStringLiteral("角色标签"), static_cast<int>(tags.size())));
+    rows.append(rowText(QStringLiteral("数据库"), enabledText(database.value(QStringLiteral("enabled")).toBool(true))));
+    rows.append(rowText(QStringLiteral("数据库变量"), static_cast<int>(variables.size())));
+    rows.append(rowText(QStringLiteral("状态快照"), static_cast<int>(stages.size())));
+    rows.append(rowText(QStringLiteral("数据库标签"), static_cast<int>(databaseTags.size())));
+    return rows;
+}
+
+QVariantMap compiledRoleCardSummary(const QJsonObject& card) {
+    const QJsonObject raw = card.value(QStringLiteral("raw")).toObject();
+    const QJsonObject stateJournal = raw.value(QStringLiteral("stateJournal")).toObject();
+    const QJsonObject databaseDraft = stateJournal.value(QStringLiteral("databaseDraft")).toObject();
+    QVariantMap summary;
+    summary.insert(QStringLiteral("name"), raw.value(QStringLiteral("name")).toString());
+    summary.insert(QStringLiteral("source_name"), card.value(QStringLiteral("source_name")).toString());
+    summary.insert(QStringLiteral("tag_count"), raw.value(QStringLiteral("tags")).toArray().size());
+    summary.insert(QStringLiteral("database_enabled"), stateJournal.value(QStringLiteral("enabled")).toBool(true));
+    summary.insert(QStringLiteral("variable_count"), databaseDraft.value(QStringLiteral("variables")).toArray().size());
+    summary.insert(QStringLiteral("stage_count"), databaseDraft.value(QStringLiteral("stages")).toArray().size());
+    summary.insert(QStringLiteral("database_tag_count"), databaseDraft.value(QStringLiteral("tags")).toArray().size());
+    return summary;
+}
+
+QVariantMap cardAuthoringResultMap(const QJsonObject& object, const QString& defaultMessage) {
+    QVariantMap result = object.toVariantMap();
+    const bool ok = object.value(QStringLiteral("ok")).toBool(false);
+    result.insert(QStringLiteral("ok"), ok);
+    if (!result.contains(QStringLiteral("message")) || result.value(QStringLiteral("message")).toString().trimmed().isEmpty()) {
+        result.insert(QStringLiteral("message"), defaultMessage);
+    }
+
+    const QJsonArray backups = object.value(QStringLiteral("backups")).toArray();
+    if (!backups.isEmpty()) {
+        result.insert(QStringLiteral("backupPath"), backups.at(0).toString());
+    } else if (!result.contains(QStringLiteral("backupPath"))) {
+        result.insert(QStringLiteral("backupPath"), QString());
+    }
+    return result;
+}
+
+QString databaseTableLabel(const QString& tableName) {
+    if (tableName == QStringLiteral("database_meta")) {
+        return QStringLiteral("Schema 元数据");
+    }
+    if (tableName == QStringLiteral("database_state_snapshots")) {
+        return QStringLiteral("状态快照");
+    }
+    if (tableName == QStringLiteral("database_stage_state")) {
+        return QStringLiteral("阶段状态");
+    }
+    if (tableName == QStringLiteral("database_plot_ledger")) {
+        return QStringLiteral("剧情账本");
+    }
+    return tableName;
+}
+
+QVariantMap databaseOverviewToVariant(const DatabaseOverview& overview) {
+    QVariantMap result;
+    result.insert(QStringLiteral("ok"), overview.status.ok);
+    result.insert(QStringLiteral("message"), overview.status.message);
+    result.insert(QStringLiteral("databasePath"), overview.status.databasePath);
+    result.insert(QStringLiteral("relativePath"), overview.relativePath);
+    result.insert(QStringLiteral("directoryPath"), overview.directoryPath);
+    result.insert(QStringLiteral("rootPath"), overview.rootPath);
+    result.insert(QStringLiteral("schemaVersion"), overview.status.schemaVersion);
+    result.insert(QStringLiteral("fileExists"), overview.fileExists);
+    result.insert(QStringLiteral("fileSizeBytes"), overview.fileSizeBytes);
+    result.insert(QStringLiteral("fileSizeText"), fileSizeText(overview.fileSizeBytes));
+
+    QVariantList tableItems;
+    QVariantMap tableCounts;
+    for (const QString& tableName : overview.tableNames) {
+        const int rowCount = overview.tableCounts.value(tableName);
+        QVariantMap item;
+        item.insert(QStringLiteral("name"), tableName);
+        item.insert(QStringLiteral("label"), databaseTableLabel(tableName));
+        item.insert(QStringLiteral("rowCount"), rowCount);
+        tableItems.append(item);
+        tableCounts.insert(tableName, rowCount);
+    }
+    result.insert(QStringLiteral("tables"), tableItems);
+    result.insert(QStringLiteral("tableCounts"), tableCounts);
+    return result;
+}
+
+QStringList databaseRowsFromOverview(const DatabaseOverview& overview) {
+    QStringList rows;
+    rows.append(rowText(QStringLiteral("运行状态"), overview.status.ok ? QStringLiteral("就绪") : QStringLiteral("异常")));
+    rows.append(rowText(QStringLiteral("运行路径"), displayText(overview.relativePath)));
+    rows.append(rowText(QStringLiteral("Schema 版本"), overview.status.schemaVersion));
+    rows.append(rowText(QStringLiteral("数据库文件"), overview.fileExists ? QStringLiteral("已创建") : QStringLiteral("未创建")));
+    rows.append(rowText(QStringLiteral("文件大小"), fileSizeText(overview.fileSizeBytes)));
+    for (const QString& tableName : overview.tableNames) {
+        rows.append(rowText(databaseTableLabel(tableName), overview.tableCounts.value(tableName)));
+    }
+    if (!overview.status.ok) {
+        rows.append(rowText(QStringLiteral("错误"), displayText(overview.status.message)));
+    }
+    return rows;
+}
+
 QString normalizedOutputPart(QString text) {
     text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
     text = text.trimmed();
@@ -2004,6 +2153,52 @@ QString localFilePathFromInput(QString sourcePath) {
     return QDir::fromNativeSeparators(sourcePath);
 }
 
+QString safeJsonExportFileName(QString fileName, const QString& fallbackBaseName) {
+    fileName = QFileInfo(fileName).fileName().trimmed();
+    if (fileName.isEmpty()) {
+        fileName = fallbackBaseName.trimmed();
+    }
+    if (fileName.isEmpty()) {
+        fileName = QStringLiteral("compiled-role-card");
+    }
+    fileName.replace(QLatin1Char('\\'), QLatin1Char('_'));
+    fileName.replace(QLatin1Char('/'), QLatin1Char('_'));
+    fileName.replace(QRegularExpression(QStringLiteral("[<>:\"|?*]+")), QStringLiteral("_"));
+    if (!fileName.endsWith(QStringLiteral(".json"), Qt::CaseInsensitive)) {
+        fileName += QStringLiteral(".json");
+    }
+    return fileName;
+}
+
+QString compiledRoleCardExportPath(const QString& targetPath, const QJsonObject& compiledCard, QString* errorMessage) {
+    const QString cleaned = localFilePathFromInput(targetPath);
+    if (cleaned.isEmpty()) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("编译角色卡导出路径为空");
+        }
+        return {};
+    }
+
+    QFileInfo targetInfo(cleaned);
+    QDir targetDir = targetInfo.exists() && targetInfo.isDir()
+        ? QDir(targetInfo.absoluteFilePath())
+        : targetInfo.absoluteDir();
+    if (!targetDir.exists()) {
+        if (errorMessage) {
+            *errorMessage = QStringLiteral("编译角色卡导出目录不存在");
+        }
+        return {};
+    }
+
+    const QJsonObject raw = compiledCard.value(QStringLiteral("raw")).toObject();
+    const QString fallback = raw.value(QStringLiteral("name")).toString(
+        compiledCard.value(QStringLiteral("source_name")).toString(QStringLiteral("compiled-role-card")));
+    const QString fileName = safeJsonExportFileName(
+        targetInfo.exists() && targetInfo.isDir() ? QString() : targetInfo.fileName(),
+        fallback);
+    return QDir::fromNativeSeparators(targetDir.absoluteFilePath(fileName));
+}
+
 QString safeImportFileName(QString fileName, const QString& fallbackBaseName) {
     fileName = QFileInfo(fileName).fileName().trimmed();
     if (fileName.isEmpty()) {
@@ -2036,6 +2231,56 @@ QString uniqueFilePathInDir(const QDir& dir, const QString& fileName) {
     }
     return dir.absoluteFilePath(QStringLiteral("%1-%2.%3")
         .arg(baseName, QUuid::createUuid().toString(QUuid::WithoutBraces), suffix));
+}
+
+QString cardAuthoringDefaultBaseName(const QJsonObject& project) {
+    QString baseName = project.value(QStringLiteral("title")).toString().trimmed();
+    if (baseName.isEmpty()) {
+        baseName = project.value(QStringLiteral("persona_card")).toObject().value(QStringLiteral("name")).toString().trimmed();
+    }
+    return baseName.isEmpty() ? QStringLiteral("card-authoring-project") : baseName;
+}
+
+QString uniqueCardAuthoringProjectExportPath(const QString& rootPath, const QJsonObject& project, QString* errorMessage) {
+    CardAuthoringPaths paths(rootPath);
+    if (!paths.ensureRuntimeDirectories(errorMessage)) {
+        return {};
+    }
+
+    const QString extension = CardAuthoringPaths::projectFileExtension();
+    QString safe = CardAuthoringProjectStore::safeProjectFilename(cardAuthoringDefaultBaseName(project));
+    if (safe.endsWith(extension, Qt::CaseInsensitive)) {
+        safe.chop(extension.size());
+    }
+    if (safe.trimmed().isEmpty()) {
+        safe = QStringLiteral("card-authoring-project");
+    }
+
+    const QDir exportsDir(paths.exportsPath());
+    QString candidate = exportsDir.absoluteFilePath(safe + extension);
+    if (!QFileInfo::exists(candidate)) {
+        return candidate;
+    }
+    for (int attempt = 1; attempt <= 100; ++attempt) {
+        candidate = exportsDir.absoluteFilePath(QStringLiteral("%1-%2%3").arg(safe).arg(attempt).arg(extension));
+        if (!QFileInfo::exists(candidate)) {
+            return candidate;
+        }
+    }
+    return exportsDir.absoluteFilePath(QStringLiteral("%1-%2%3")
+        .arg(safe, QUuid::createUuid().toString(QUuid::WithoutBraces), extension));
+}
+
+QString uniqueCompiledRoleCardDefaultExportPath(const QString& rootPath, const QJsonObject& compiledCard, QString* errorMessage) {
+    CardAuthoringPaths paths(rootPath);
+    if (!paths.ensureRuntimeDirectories(errorMessage)) {
+        return {};
+    }
+
+    const QJsonObject raw = compiledCard.value(QStringLiteral("raw")).toObject();
+    const QString fallback = raw.value(QStringLiteral("name")).toString(
+        compiledCard.value(QStringLiteral("source_name")).toString(QStringLiteral("compiled-role-card")));
+    return uniqueFilePathInDir(QDir(paths.exportsPath()), safeJsonExportFileName({}, fallback));
 }
 
 bool writeJsonDocument(const QString& path, const QJsonDocument& document, QString* errorMessage = nullptr) {
@@ -2970,6 +3215,51 @@ QString requestAssistantReply(
     return content;
 }
 
+QJsonObject parseCardAuthoringReviewFromModelText(const QString& rawText, QString* errorMessage) {
+    const QString stripped = stripJsonCodeFence(rawText);
+    QStringList candidates{ stripped };
+
+    const int objectStart = stripped.indexOf(QLatin1Char('{'));
+    const int objectEnd = stripped.lastIndexOf(QLatin1Char('}'));
+    if (objectStart >= 0 && objectEnd > objectStart) {
+        const QString extracted = stripped.mid(objectStart, objectEnd - objectStart + 1).trimmed();
+        if (extracted != stripped) {
+            candidates.append(extracted);
+        }
+    }
+
+    const int arrayStart = stripped.indexOf(QLatin1Char('['));
+    const int arrayEnd = stripped.lastIndexOf(QLatin1Char(']'));
+    if (arrayStart >= 0 && arrayEnd > arrayStart) {
+        const QString extracted = stripped.mid(arrayStart, arrayEnd - arrayStart + 1).trimmed();
+        if (extracted != stripped) {
+            candidates.append(extracted);
+        }
+    }
+
+    QString lastError;
+    for (const QString& candidate : candidates) {
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(candidate.toUtf8(), &parseError);
+        if (parseError.error != QJsonParseError::NoError) {
+            lastError = parseError.errorString();
+            continue;
+        }
+        if (document.isObject()) {
+            return document.object();
+        }
+        if (document.isArray()) {
+            return QJsonObject{ { QStringLiteral("candidates"), document.array() } };
+        }
+        lastError = QStringLiteral("JSON 不是对象或数组");
+    }
+
+    if (errorMessage) {
+        *errorMessage = QStringLiteral("模型候选 JSON 无法解析：%1").arg(lastError.isEmpty() ? QStringLiteral("没有找到 JSON 对象") : lastError);
+    }
+    return {};
+}
+
 QString conversationMemoryRoleLabel(const QString& role) {
     if (role == QStringLiteral("user")) {
         return QStringLiteral("用户");
@@ -3173,7 +3463,7 @@ bool hasUsableRoleCardContent(const QJsonObject& raw) {
         }
     }
     return !raw.value(QStringLiteral("personas")).toObject().isEmpty()
-        || !raw.value(QStringLiteral("stateJournal")).toObject().isEmpty();
+        || LegacyStateJournalAdapter::hasStateJournal(raw);
 }
 
 QString normalizedLibraryRelativePath(QString relativePath) {
@@ -3438,6 +3728,7 @@ FantarealBridge::FantarealBridge(QObject* parent)
     if (legacyRoot_.isEmpty()) {
         legacyRoot_ = QDir::fromNativeSeparators(QStringLiteral(FANTAREAL_DEFAULT_ROOT));
     }
+    DatabaseService(legacyRoot_).ensureInitialized();
     refreshLegacyScan();
 }
 
@@ -3509,6 +3800,22 @@ QVariantMap FantarealBridge::cardDraft() const {
     return cardDraft_;
 }
 
+QVariantMap FantarealBridge::cardAuthoringDraft() const {
+    return cardAuthoringDraft_;
+}
+
+QVariantMap FantarealBridge::cardAuthoringPreview() const {
+    return cardAuthoringPreview_;
+}
+
+QVariantList FantarealBridge::cardAuthoringProjectItems() const {
+    return cardAuthoringProjectItems_;
+}
+
+QVariantMap FantarealBridge::databaseStatus() const {
+    return databaseStatus_;
+}
+
 QVariantMap FantarealBridge::presetDraft() const {
     return presetDraft_;
 }
@@ -3535,6 +3842,14 @@ QStringList FantarealBridge::routeRows() const {
 
 QStringList FantarealBridge::cardRows() const {
     return cardRows_;
+}
+
+QStringList FantarealBridge::cardAuthoringRows() const {
+    return cardAuthoringRows_;
+}
+
+QStringList FantarealBridge::databaseRows() const {
+    return databaseRows_;
 }
 
 QStringList FantarealBridge::presetRows() const {
@@ -3567,6 +3882,10 @@ QString FantarealBridge::routeStatus() const {
 
 QString FantarealBridge::cardStatus() const {
     return cardStatus_;
+}
+
+QString FantarealBridge::cardAuthoringStatus() const {
+    return cardAuthoringStatus_;
 }
 
 QString FantarealBridge::presetStatus() const {
@@ -4022,12 +4341,14 @@ QVariantMap FantarealBridge::saveCardDraft(const QVariantMap& draft) {
         draftString(draft, QStringLiteral("creator_comment"), raw.value(QStringLiteral("creator_comment")).toString(), 12000));
     raw.insert(QStringLiteral("tags"), cardTagsFromDraft(draft, raw.value(QStringLiteral("tags")).toArray()));
 
-    QJsonObject stateJournal = raw.value(QStringLiteral("stateJournal")).toObject();
-    if (draft.contains(QStringLiteral("stateJournalEnabled"))) {
-        stateJournal.insert(QStringLiteral("enabled"), draft.value(QStringLiteral("stateJournalEnabled")).toBool());
-    }
-    if (!stateJournal.isEmpty()) {
-        raw.insert(QStringLiteral("stateJournal"), stateJournal);
+    if (draft.contains(QStringLiteral("databaseEnabled"))) {
+        raw = LegacyStateJournalAdapter::applyDatabaseEnabled(
+            raw,
+            draft.value(QStringLiteral("databaseEnabled")).toBool());
+    } else if (draft.contains(QStringLiteral("stateJournalEnabled"))) {
+        raw = LegacyStateJournalAdapter::applyDatabaseEnabled(
+            raw,
+            draft.value(QStringLiteral("stateJournalEnabled")).toBool());
     }
 
     QJsonObject workshop = raw.value(QStringLiteral("creativeWorkshop")).toObject();
@@ -4183,6 +4504,527 @@ QVariantMap FantarealBridge::importRoleCardFile(const QString& sourcePath) {
     return result;
 }
 
+QVariantMap FantarealBridge::loadCardAuthoringWorkspace() {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    const QJsonObject project = service.loadWorkspace(&errorMessage);
+    if (project.isEmpty() && !errorMessage.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器工作区无法读取：%1").arg(errorMessage));
+    }
+
+    cardAuthoringDraft_ = project.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+    cardAuthoringProjectItems_ = service.listProjects().toVariantList();
+    cardAuthoringStatus_ = QFileInfo::exists(service.paths().workspacePath())
+        ? QStringLiteral("workspace.cardwork.json 已读取")
+        : QStringLiteral("未找到工作区，已准备空白草稿");
+    cardAuthoringPreview_.clear();
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器工作区已载入"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("workspacePath"), service.paths().workspacePath());
+    return result;
+}
+
+QVariantMap FantarealBridge::refreshCardAuthoringProjects() {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    const QJsonArray projects = service.listProjects(&errorMessage);
+    if (!errorMessage.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目列表刷新失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringProjectItems_ = projects.toVariantList();
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器项目列表已刷新"));
+    result.insert(QStringLiteral("items"), cardAuthoringProjectItems_);
+    result.insert(QStringLiteral("count"), cardAuthoringProjectItems_.size());
+    return result;
+}
+
+QVariantMap FantarealBridge::loadCardAuthoringProject(const QString& filename) {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    const QJsonObject project = service.loadProject(filename, &errorMessage);
+    if (project.isEmpty() && !errorMessage.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目读取失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringDraft_ = project.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+    cardAuthoringProjectItems_ = service.listProjects().toVariantList();
+    cardAuthoringStatus_ = QStringLiteral("项目已载入：%1").arg(CardAuthoringProjectStore::safeProjectFilename(filename));
+    cardAuthoringPreview_.clear();
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器项目已载入"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("filename"), CardAuthoringProjectStore::safeProjectFilename(filename));
+    return result;
+}
+
+QVariantMap FantarealBridge::saveCardAuthoringWorkspace(const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    QString savedPath;
+    const QJsonObject project = service.saveWorkspace(QJsonObject::fromVariantMap(draft), &savedPath, &errorMessage);
+    if (project.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器工作区保存失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringDraft_ = project.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+    cardAuthoringProjectItems_ = service.listProjects().toVariantList();
+    cardAuthoringStatus_ = QStringLiteral("workspace.cardwork.json 已保存");
+    cardAuthoringPreview_.clear();
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器工作区已保存"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("savedPath"), savedPath);
+    return result;
+}
+
+QVariantMap FantarealBridge::saveCardAuthoringProject(const QString& filename, const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    QString savedPath;
+    const QJsonObject project = service.saveProject(filename, QJsonObject::fromVariantMap(draft), &savedPath, &errorMessage);
+    if (project.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目保存失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringDraft_ = project.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+    cardAuthoringProjectItems_ = service.listProjects().toVariantList();
+    cardAuthoringStatus_ = QStringLiteral("项目已另存");
+    cardAuthoringPreview_.clear();
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器项目已保存"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("savedPath"), savedPath);
+    return result;
+}
+
+QVariantMap FantarealBridge::deleteCardAuthoringProject(const QString& filename) {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    QString archivedPath;
+    const QJsonObject project = service.deleteProject(filename, &archivedPath, &errorMessage);
+    if (project.isEmpty() && !errorMessage.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目归档失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringProjectItems_ = service.listProjects().toVariantList();
+    cardAuthoringStatus_ = QStringLiteral("项目已归档：%1").arg(CardAuthoringProjectStore::safeProjectFilename(filename));
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器项目已归档"));
+    result.insert(QStringLiteral("archivedPath"), archivedPath);
+    result.insert(QStringLiteral("project"), project.toVariantMap());
+    return result;
+}
+
+QVariantMap FantarealBridge::importCardAuthoringProjectFile(const QString& sourcePath) {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    QString importedPath;
+    const QJsonObject project = service.importProjectFile(localFilePathFromInput(sourcePath), &importedPath, &errorMessage);
+    if (project.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目导入失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringDraft_ = project.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+    cardAuthoringProjectItems_ = service.listProjects().toVariantList();
+    cardAuthoringStatus_ = QStringLiteral("项目已导入");
+    cardAuthoringPreview_.clear();
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器项目已导入"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("importedPath"), importedPath);
+    return result;
+}
+
+QVariantMap FantarealBridge::exportCardAuthoringProjectFile(const QString& targetPath, const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    QString exportedPath;
+    const QJsonObject project = service.exportProjectFile(
+        localFilePathFromInput(targetPath),
+        QJsonObject::fromVariantMap(draft),
+        &exportedPath,
+        &errorMessage);
+    if (project.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目导出失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringDraft_ = project.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+    cardAuthoringStatus_ = QStringLiteral("项目已导出");
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器项目已导出"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("exportedPath"), exportedPath);
+    return result;
+}
+
+QVariantMap FantarealBridge::exportCardAuthoringProjectToDefaultDir(const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    QString errorMessage;
+    const QJsonObject sourceProject = QJsonObject::fromVariantMap(draft);
+    const QString targetPath = uniqueCardAuthoringProjectExportPath(legacyRoot_, sourceProject, &errorMessage);
+    if (targetPath.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目默认导出失败：%1").arg(errorMessage));
+    }
+
+    QString exportedPath;
+    const QJsonObject project = service.exportProjectFile(targetPath, sourceProject, &exportedPath, &errorMessage);
+    if (project.isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器项目默认导出失败：%1").arg(errorMessage));
+    }
+
+    cardAuthoringDraft_ = project.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+    cardAuthoringStatus_ = QStringLiteral("项目已导出到默认目录");
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("写卡器项目已导出到默认目录"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("exportedPath"), exportedPath);
+    return result;
+}
+
+QVariantMap FantarealBridge::loadCurrentRuntimeCardAuthoringDraft() {
+    const QDir root(legacyRoot_);
+    CardAuthoringService service(legacyRoot_);
+
+    QString cardStatus;
+    const QJsonObject currentCard = readJsonObject(root, QStringLiteral("data/current_role_card.json"), &cardStatus);
+    QJsonObject rawCard = currentCard.value(QStringLiteral("raw")).toObject();
+    if (rawCard.isEmpty()
+        && (currentCard.contains(QStringLiteral("name")) || currentCard.contains(QStringLiteral("description")))) {
+        rawCard = currentCard;
+    }
+    if (rawCard.isEmpty()) {
+        return resultMap(false, QStringLiteral("无法从当前运行时载入写卡器草稿：%1").arg(cardStatus));
+    }
+
+    QJsonObject project = service.createEmptyProject();
+    const QJsonObject personaProject = service.normalizeProject(rawCard);
+    project.insert(QStringLiteral("title"), rawCard.value(QStringLiteral("name")).toString(QStringLiteral("当前运行时写卡草稿")));
+    project.insert(QStringLiteral("persona_card"), personaProject.value(QStringLiteral("persona_card")).toObject());
+    project.insert(QStringLiteral("database"), personaProject.value(QStringLiteral("database")).toObject());
+    project.insert(QStringLiteral("updated_at"), QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+
+    QString worldbookStatus;
+    const QJsonObject worldbookStore = readJsonObject(root, QStringLiteral("data/worldbook.json"), &worldbookStatus);
+    if (!worldbookStore.isEmpty()) {
+        project.insert(QStringLiteral("worldbook"), service.normalizeProject(worldbookStore).value(QStringLiteral("worldbook")).toObject());
+    }
+
+    QString presetStatus;
+    const QJsonObject presetStore = readJsonObject(root, QStringLiteral("data/preset.json"), &presetStatus);
+    if (!presetStore.isEmpty()) {
+        project.insert(QStringLiteral("preset"), service.normalizeProject(presetStore).value(QStringLiteral("preset")).toObject());
+    }
+
+    QString memoryRelativePath;
+    QString memoryStatus;
+    QJsonArray memories;
+    if (currentMemoryRelativePath(root, &memoryRelativePath, &memoryStatus)
+        && QFileInfo::exists(root.absoluteFilePath(memoryRelativePath))) {
+        memories = readJsonArray(root, memoryRelativePath, &memoryStatus);
+    } else if (QFileInfo::exists(root.absoluteFilePath(QStringLiteral("data/memories.json")))) {
+        memoryRelativePath = QStringLiteral("data/memories.json");
+        memories = readJsonArray(root, memoryRelativePath, &memoryStatus);
+    }
+    project.insert(QStringLiteral("memory"), service.normalizeProject(QJsonObject{
+        { QStringLiteral("items"), memories },
+    }).value(QStringLiteral("memory")).toObject());
+
+    const QJsonObject normalizedProject = service.normalizeProject(project);
+    cardAuthoringDraft_ = normalizedProject.toVariantMap();
+    cardAuthoringRows_ = cardAuthoringRowsFromProject(normalizedProject);
+    cardAuthoringStatus_ = QStringLiteral("已从当前运行时载入写卡器草稿");
+    emit scanChanged();
+
+    QVariantMap result = resultMap(true, QStringLiteral("已从当前运行时载入写卡器草稿"));
+    result.insert(QStringLiteral("project"), cardAuthoringDraft_);
+    result.insert(QStringLiteral("binding"), QVariantMap{
+        { QStringLiteral("card"), QVariantMap{
+            { QStringLiteral("path"), QStringLiteral("data/current_role_card.json") },
+            { QStringLiteral("status"), cardStatus },
+            { QStringLiteral("source_name"), currentCard.value(QStringLiteral("source_name")).toString() },
+            { QStringLiteral("card_uid"), currentCard.value(QStringLiteral("card_uid")).toString() },
+            { QStringLiteral("name"), rawCard.value(QStringLiteral("name")).toString() },
+        } },
+        { QStringLiteral("worldbook"), QVariantMap{
+            { QStringLiteral("path"), QStringLiteral("data/worldbook.json") },
+            { QStringLiteral("status"), worldbookStatus },
+            { QStringLiteral("entry_count"), normalizedProject.value(QStringLiteral("worldbook")).toObject().value(QStringLiteral("entries")).toArray().size() },
+        } },
+        { QStringLiteral("preset"), QVariantMap{
+            { QStringLiteral("path"), QStringLiteral("data/preset.json") },
+            { QStringLiteral("status"), presetStatus },
+            { QStringLiteral("preset_count"), normalizedProject.value(QStringLiteral("preset")).toObject().value(QStringLiteral("presets")).toArray().size() },
+        } },
+        { QStringLiteral("memory"), QVariantMap{
+            { QStringLiteral("path"), memoryRelativePath },
+            { QStringLiteral("status"), memoryStatus },
+            { QStringLiteral("item_count"), normalizedProject.value(QStringLiteral("memory")).toObject().value(QStringLiteral("items")).toArray().size() },
+        } },
+    });
+    return result;
+}
+
+QVariantMap FantarealBridge::validateCardAuthoringDraft(const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject project = QJsonObject::fromVariantMap(draft);
+    const QStringList warnings = service.validateProject(project);
+
+    QVariantMap result = resultMap(true, warnings.isEmpty()
+            ? QStringLiteral("写卡器草稿校验通过")
+            : QStringLiteral("写卡器草稿校验完成：%1 条提示").arg(warnings.size()));
+    result.insert(QStringLiteral("warnings"), variantListFromStringList(warnings));
+    result.insert(QStringLiteral("warning_count"), warnings.size());
+    return result;
+}
+
+QVariantMap FantarealBridge::compileCardAuthoringDraft(const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject project = QJsonObject::fromVariantMap(draft);
+    const QJsonObject compiledCard = service.compileRoleCard(project);
+    const QStringList warnings = service.validateProject(project);
+
+    QVariantMap result = resultMap(true, warnings.isEmpty()
+            ? QStringLiteral("写卡器角色卡已编译")
+            : QStringLiteral("写卡器角色卡已编译：%1 条提示").arg(warnings.size()));
+    result.insert(QStringLiteral("card"), compiledCard.toVariantMap());
+    result.insert(QStringLiteral("raw"), compiledCard.value(QStringLiteral("raw")).toObject().toVariantMap());
+    result.insert(QStringLiteral("summary"), compiledRoleCardSummary(compiledCard));
+    result.insert(QStringLiteral("warnings"), variantListFromStringList(warnings));
+    result.insert(QStringLiteral("warning_count"), warnings.size());
+    return result;
+}
+
+QVariantMap FantarealBridge::exportCompiledCardAuthoringRoleCardFile(const QString& targetPath, const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject project = QJsonObject::fromVariantMap(draft);
+    const QJsonObject compiledCard = service.compileRoleCard(project);
+    const QStringList warnings = service.validateProject(project);
+
+    QString errorMessage;
+    const QString exportPath = compiledRoleCardExportPath(targetPath, compiledCard, &errorMessage);
+    if (exportPath.isEmpty()) {
+        return resultMap(false, QStringLiteral("编译角色卡导出失败：%1").arg(errorMessage));
+    }
+
+    QSaveFile file(exportPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return resultMap(false, QStringLiteral("编译角色卡无法写入：%1").arg(file.errorString()));
+    }
+    const QByteArray payload = QJsonDocument(compiledCard).toJson(QJsonDocument::Indented);
+    if (file.write(payload) != payload.size()) {
+        return resultMap(false, QStringLiteral("编译角色卡写入失败：%1").arg(file.errorString()));
+    }
+    if (!file.commit()) {
+        return resultMap(false, QStringLiteral("编译角色卡提交失败：%1").arg(file.errorString()));
+    }
+
+    QVariantMap result = resultMap(true, warnings.isEmpty()
+            ? QStringLiteral("编译角色卡已导出")
+            : QStringLiteral("编译角色卡已导出：%1 条提示").arg(warnings.size()));
+    result.insert(QStringLiteral("card"), compiledCard.toVariantMap());
+    result.insert(QStringLiteral("raw"), compiledCard.value(QStringLiteral("raw")).toObject().toVariantMap());
+    result.insert(QStringLiteral("summary"), compiledRoleCardSummary(compiledCard));
+    result.insert(QStringLiteral("warnings"), variantListFromStringList(warnings));
+    result.insert(QStringLiteral("warning_count"), warnings.size());
+    result.insert(QStringLiteral("exportedPath"), exportPath);
+    return result;
+}
+
+QVariantMap FantarealBridge::exportCompiledCardAuthoringRoleCardToDefaultDir(const QVariantMap& draft) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject project = QJsonObject::fromVariantMap(draft);
+    const QJsonObject compiledCard = service.compileRoleCard(project);
+    const QStringList warnings = service.validateProject(project);
+
+    QString errorMessage;
+    const QString exportPath = uniqueCompiledRoleCardDefaultExportPath(legacyRoot_, compiledCard, &errorMessage);
+    if (exportPath.isEmpty()) {
+        return resultMap(false, QStringLiteral("编译角色卡默认导出失败：%1").arg(errorMessage));
+    }
+
+    QSaveFile file(exportPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return resultMap(false, QStringLiteral("编译角色卡无法写入：%1").arg(file.errorString()));
+    }
+    const QByteArray payload = QJsonDocument(compiledCard).toJson(QJsonDocument::Indented);
+    if (file.write(payload) != payload.size()) {
+        return resultMap(false, QStringLiteral("编译角色卡写入失败：%1").arg(file.errorString()));
+    }
+    if (!file.commit()) {
+        return resultMap(false, QStringLiteral("编译角色卡提交失败：%1").arg(file.errorString()));
+    }
+
+    QVariantMap result = resultMap(true, warnings.isEmpty()
+            ? QStringLiteral("编译角色卡已导出到默认目录")
+            : QStringLiteral("编译角色卡已导出到默认目录：%1 条提示").arg(warnings.size()));
+    result.insert(QStringLiteral("card"), compiledCard.toVariantMap());
+    result.insert(QStringLiteral("raw"), compiledCard.value(QStringLiteral("raw")).toObject().toVariantMap());
+    result.insert(QStringLiteral("summary"), compiledRoleCardSummary(compiledCard));
+    result.insert(QStringLiteral("warnings"), variantListFromStringList(warnings));
+    result.insert(QStringLiteral("warning_count"), warnings.size());
+    result.insert(QStringLiteral("exportedPath"), exportPath);
+    return result;
+}
+
+QVariantMap FantarealBridge::buildCardAuthoringPromptPack(const QString& thinkingMode) {
+    return CardAuthoringService(legacyRoot_).buildCandidatePromptPack(thinkingMode).toVariantMap();
+}
+
+QVariantMap FantarealBridge::generateCardAuthoringCandidates(
+    const QVariantMap& draft,
+    const QString& prompt,
+    const QString& currentView,
+    const QString& thinkingMode) {
+    const QString userPrompt = sanitizedChatMessage(prompt);
+    if (userPrompt.isEmpty()) {
+        return resultMap(false, QStringLiteral("请先填写写卡器 AI 需求"));
+    }
+
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject project = service.normalizeProject(QJsonObject::fromVariantMap(draft));
+    const QJsonObject promptPack = service.buildCandidatePromptPack(thinkingMode);
+    if (!promptPack.value(QStringLiteral("ok")).toBool(false)) {
+        return resultMap(false, QStringLiteral("写卡器 prompt pack 加载失败"));
+    }
+
+    const QDir root(legacyRoot_);
+    const ChatRuntimeConfig config = chatRuntimeConfig(root);
+    if (config.baseUrl.trimmed().isEmpty() || config.model.trimmed().isEmpty()) {
+        return resultMap(false, QStringLiteral("写卡器 AI 生成需要先配置 LLM Base URL 和 Model"));
+    }
+
+    const QString view = currentView.trimmed().isEmpty() ? QStringLiteral("persona") : currentView.trimmed().toLower();
+    const QString projectJson = QString::fromUtf8(QJsonDocument(project).toJson(QJsonDocument::Compact));
+    const QString schemaJson = QString::fromUtf8(
+        QJsonDocument(promptPack.value(QStringLiteral("candidate_schema")).toObject()).toJson(QJsonDocument::Compact));
+
+    QStringList userLines;
+    userLines.append(QStringLiteral("用户需求：\n%1").arg(userPrompt));
+    userLines.append(QStringLiteral("当前视图：%1").arg(view));
+    userLines.append(QStringLiteral("候选 schema：\n%1").arg(schemaJson));
+    userLines.append(QStringLiteral("当前写卡器 project JSON：\n%1").arg(projectJson));
+    userLines.append(QStringLiteral("只输出合法 JSON 对象，不输出 Markdown，不输出解释。JSON 根对象应包含 summary、plan、candidate_groups、candidates。"));
+
+    QJsonArray messages;
+    messages.append(modelMessage(QStringLiteral("system"), promptPack.value(QStringLiteral("system_prompt")).toString()));
+    messages.append(modelMessage(QStringLiteral("user"), userLines.join(QStringLiteral("\n\n"))));
+
+    QString requestError;
+    const QString rawResponse = requestAssistantReply(config, messages, &requestError);
+    if (rawResponse.trimmed().isEmpty()) {
+        return resultMap(false, requestError.isEmpty() ? QStringLiteral("写卡器 AI 返回空内容") : requestError);
+    }
+
+    QString parseError;
+    const QJsonObject review = parseCardAuthoringReviewFromModelText(rawResponse, &parseError);
+    if (review.isEmpty()) {
+        QVariantMap result = resultMap(false, parseError);
+        result.insert(QStringLiteral("raw_response"), rawResponse);
+        return result;
+    }
+
+    const QJsonObject normalized = service.normalizeCandidateReview(project, review);
+    QVariantMap result = normalized.toVariantMap();
+    result.insert(QStringLiteral("ok"), normalized.value(QStringLiteral("ok")).toBool(true));
+    result.insert(QStringLiteral("message"), QStringLiteral("轮椅模式已整理出建议"));
+    result.insert(QStringLiteral("generated"), true);
+    result.insert(QStringLiteral("raw_response"), rawResponse);
+    result.insert(QStringLiteral("thinking_mode"), promptPack.value(QStringLiteral("thinking_mode")).toString());
+    result.insert(QStringLiteral("current_view"), view);
+    cardAuthoringStatus_ = QStringLiteral("轮椅模式已整理出建议");
+    emit scanChanged();
+    return result;
+}
+
+QVariantMap FantarealBridge::normalizeCardAuthoringCandidates(const QVariantMap& draft, const QVariantMap& review) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject normalized = service.normalizeCandidateReview(
+        QJsonObject::fromVariantMap(draft),
+        QJsonObject::fromVariantMap(review));
+    QVariantMap result = normalized.toVariantMap();
+    result.insert(QStringLiteral("ok"), normalized.value(QStringLiteral("ok")).toBool(true));
+    result.insert(QStringLiteral("message"), QStringLiteral("写卡器候选已规范化"));
+    return result;
+}
+
+QVariantMap FantarealBridge::applyCardAuthoringCandidates(const QVariantMap& draft, const QVariantMap& review, const QVariantList& selectedCandidateIds) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject applied = service.applyCandidateReview(
+        QJsonObject::fromVariantMap(draft),
+        QJsonObject::fromVariantMap(review),
+        stringListFromVariantList(selectedCandidateIds));
+    QVariantMap result = applied.toVariantMap();
+    result.insert(QStringLiteral("ok"), applied.value(QStringLiteral("ok")).toBool(true));
+    result.insert(QStringLiteral("message"), QStringLiteral("写卡器候选已应用到草稿"));
+    if (applied.value(QStringLiteral("ok")).toBool(true)) {
+        const QJsonObject project = applied.value(QStringLiteral("project")).toObject();
+        cardAuthoringDraft_ = project.toVariantMap();
+        cardAuthoringRows_ = cardAuthoringRowsFromProject(project);
+        emit scanChanged();
+    }
+    return result;
+}
+
+QVariantMap FantarealBridge::previewCardAuthoringApply(const QVariantMap& draft, const QVariantList& modules) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject preview = service.buildApplyPreview(
+        QJsonObject::fromVariantMap(draft),
+        stringListFromVariantList(modules));
+    QVariantMap result = cardAuthoringResultMap(preview, preview.value(QStringLiteral("ok")).toBool()
+            ? QStringLiteral("写卡器应用预览已生成")
+            : QStringLiteral("写卡器应用预览失败"));
+    cardAuthoringPreview_ = result;
+    emit scanChanged();
+    return result;
+}
+
+QVariantMap FantarealBridge::applyCardAuthoringDraft(const QVariantMap& draft, const QVariantList& selectedGroupIds) {
+    CardAuthoringService service(legacyRoot_);
+    const QJsonObject applyResult = service.applySelected(
+        QJsonObject::fromVariantMap(draft),
+        stringListFromVariantList(selectedGroupIds));
+    QVariantMap result = cardAuthoringResultMap(applyResult, applyResult.value(QStringLiteral("ok")).toBool()
+            ? QStringLiteral("写卡器内容已应用")
+            : QStringLiteral("写卡器内容应用失败"));
+    if (!applyResult.value(QStringLiteral("ok")).toBool()) {
+        cardAuthoringPreview_ = result;
+        emit scanChanged();
+        return result;
+    }
+
+    refreshLegacyScan();
+    cardAuthoringPreview_ = applyResult.value(QStringLiteral("preview")).toObject().toVariantMap();
+    emit scanChanged();
+    return result;
+}
+
+QVariantMap FantarealBridge::refreshDatabaseStatus() {
+    const DatabaseOverview overview = DatabaseService(legacyRoot_).overview();
+    databaseStatus_ = databaseOverviewToVariant(overview);
+    databaseRows_ = databaseRowsFromOverview(overview);
+    emit scanChanged();
+    return databaseStatus_;
+}
+
 QVariantMap FantarealBridge::syncCurrentCardToPersona() {
     const QDir root(legacyRoot_);
     const QString cardRelativePath = QStringLiteral("data/current_role_card.json");
@@ -4190,7 +5032,7 @@ QVariantMap FantarealBridge::syncCurrentCardToPersona() {
 
     QFile cardFile(cardPath);
     if (!cardFile.exists()) {
-        return resultMap(false, QStringLiteral("current_role_card.json 不存在，无法同步 Persona"));
+        return resultMap(false, QStringLiteral("current_role_card.json 不存在，无法同步角色资料"));
     }
     if (!cardFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return resultMap(false, QStringLiteral("current_role_card.json 无法读取：%1").arg(cardFile.errorString()));
@@ -4226,7 +5068,7 @@ QVariantMap FantarealBridge::syncCurrentCardToPersona() {
     const QString personaPath = root.absoluteFilePath(personaRelativePath);
     QFile personaFile(personaPath);
     if (!personaFile.exists()) {
-        return resultMap(false, QStringLiteral("persona.json 不存在，无法同步 Persona"));
+        return resultMap(false, QStringLiteral("persona.json 不存在，无法同步角色资料"));
     }
     if (!personaFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return resultMap(false, QStringLiteral("persona.json 无法读取：%1").arg(personaFile.errorString()));
@@ -4264,7 +5106,7 @@ QVariantMap FantarealBridge::syncCurrentCardToPersona() {
     }
 
     refreshLegacyScan();
-    return resultMap(true, QStringLiteral("角色卡已同步到 Persona，旧 persona 已备份"), backupPath);
+    return resultMap(true, QStringLiteral("角色卡已同步到角色资料，旧 persona.json 已备份"), backupPath);
 }
 
 QVariantMap FantarealBridge::savePresetDraft(const QVariantMap& draft) {
@@ -4967,10 +5809,6 @@ QVariantMap FantarealBridge::startPendingChatRequest(
             return;
         }
         pendingChatResponseBuffer_.append(reply->readAll());
-        if (chatRuntimeConfig(QDir(legacyRoot_)).outputSplittingEnabled) {
-            setChatStreamingPreview({});
-            return;
-        }
         bool sawStream = false;
         const QString preview = extractStreamingAssistantReply(pendingChatResponseBuffer_, &sawStream);
         if (sawStream) {
@@ -5407,7 +6245,7 @@ void FantarealBridge::refreshLegacyScan() {
         "data/persona.json",
         "data/user_profile.json",
         "data/auto_saga/state.json",
-        "data/mods/state_journal/state_journal.db",
+        DatabasePaths::databaseRelativePath(),
         "data/logs/fantareal.log",
         "cards/template_single_role_card.json",
         "cards/template_multi_role_card.json",
@@ -5516,6 +6354,10 @@ void FantarealBridge::refreshLegacyScan() {
         .arg(assetFileCount_)
         .arg(pluginManifestCount_);
 
+    const DatabaseOverview databaseOverview = DatabaseService(legacyRoot_).overview();
+    databaseStatus_ = databaseOverviewToVariant(databaseOverview);
+    databaseRows_ = databaseRowsFromOverview(databaseOverview);
+
     const QJsonObject settings = readJsonObject(root, QStringLiteral("data/settings.json"), &settingsStatus_);
     settingsDraft_.clear();
     settingsRows_.clear();
@@ -5607,11 +6449,10 @@ void FantarealBridge::refreshLegacyScan() {
     } else {
         const QJsonObject raw = card.value("raw").toObject();
         const QJsonArray tags = raw.value("tags").toArray();
-        const QJsonObject stateJournal = raw.value("stateJournal").toObject();
         const QJsonObject workshop = raw.value("creativeWorkshop").toObject();
         const QJsonObject opening = workshop.value("opening").toObject();
         const QJsonObject personas = raw.value("personas").toObject();
-        const bool stateJournalEnabled = stateJournal.value("enabled").toBool(true);
+        const bool databaseEnabled = LegacyStateJournalAdapter::databaseEnabled(raw, true);
         const bool workshopEnabled = workshop.value("enabled").toBool(true);
         const bool openingEnabled = opening.value("enabled").toBool(false);
         const QString currentSourcePath = card.value(QStringLiteral("source_path")).toString();
@@ -5631,7 +6472,7 @@ void FantarealBridge::refreshLegacyScan() {
         cardDraft_.insert(QStringLiteral("tagCount"), static_cast<int>(tags.size()));
         cardDraft_.insert(QStringLiteral("personaCount"), static_cast<int>(personas.size()));
         cardDraft_.insert(QStringLiteral("dynamicSceneCount"), static_cast<int>(workshop.value("dynamicScenes").toArray().size()));
-        cardDraft_.insert(QStringLiteral("stateJournalEnabled"), stateJournalEnabled);
+        cardDraft_.insert(QStringLiteral("databaseEnabled"), databaseEnabled);
         cardDraft_.insert(QStringLiteral("creativeWorkshopEnabled"), workshopEnabled);
         cardDraft_.insert(QStringLiteral("openingEnabled"), openingEnabled);
 
@@ -5640,12 +6481,31 @@ void FantarealBridge::refreshLegacyScan() {
         cardRows_.append(rowText(QStringLiteral("Card UID"), displayText(card.value("card_uid").toString())));
         cardRows_.append(rowText(QStringLiteral("角色名"), displayText(raw.value("name").toString())));
         cardRows_.append(rowText(QStringLiteral("标签数量"), static_cast<int>(tags.size())));
-        cardRows_.append(rowText(QStringLiteral("Persona 数量"), static_cast<int>(personas.size())));
-        cardRows_.append(rowText(QStringLiteral("状态日志"), enabledText(stateJournalEnabled)));
+        cardRows_.append(rowText(QStringLiteral("多角色数量"), static_cast<int>(personas.size())));
+        cardRows_.append(rowText(QStringLiteral("数据库"), enabledText(databaseEnabled)));
         cardRows_.append(rowText(QStringLiteral("演出工坊"), enabledText(workshopEnabled)));
         cardRows_.append(rowText(QStringLiteral("开场演出"), enabledText(openingEnabled)));
         cardRows_.append(rowText(QStringLiteral("动态场景"), static_cast<int>(workshop.value("dynamicScenes").toArray().size())));
     }
+
+    CardAuthoringService cardAuthoringService(legacyRoot_);
+    QString cardAuthoringError;
+    const QJsonObject cardAuthoringProject = cardAuthoringService.loadWorkspace(&cardAuthoringError);
+    cardAuthoringDraft_.clear();
+    cardAuthoringRows_.clear();
+    cardAuthoringProjectItems_.clear();
+    if (cardAuthoringProject.isEmpty() && !cardAuthoringError.isEmpty()) {
+        cardAuthoringStatus_ = QStringLiteral("写卡器工作区读取失败：%1").arg(cardAuthoringError);
+        cardAuthoringRows_.append(cardAuthoringStatus_);
+    } else {
+        cardAuthoringDraft_ = cardAuthoringProject.toVariantMap();
+        cardAuthoringRows_ = cardAuthoringRowsFromProject(cardAuthoringProject);
+        cardAuthoringProjectItems_ = cardAuthoringService.listProjects().toVariantList();
+        cardAuthoringStatus_ = QFileInfo::exists(cardAuthoringService.paths().workspacePath())
+            ? QStringLiteral("workspace.cardwork.json 已读取")
+            : QStringLiteral("未找到工作区，已准备空白草稿");
+    }
+
     const QJsonObject presetStore = readJsonObject(root, QStringLiteral("data/preset.json"), &presetStatus_);
     presetDraft_.clear();
     presetRows_.clear();
@@ -5782,8 +6642,8 @@ void FantarealBridge::refreshLegacyScan() {
     const QJsonObject persona = readJsonObject(root, QStringLiteral("data/persona.json"), nullptr);
     const QJsonObject userProfile = readJsonObject(root, QStringLiteral("data/user_profile.json"), nullptr);
     chatRows_.append(rowText(QStringLiteral("消息数量"), static_cast<int>(chatMessages_.size())));
-    chatRows_.append(rowText(QStringLiteral("Persona"), displayText(persona.value("name").toString())));
-    chatRows_.append(rowText(QStringLiteral("Persona 问候"), clippedText(persona.value("greeting").toString())));
+    chatRows_.append(rowText(QStringLiteral("角色资料"), displayText(persona.value("name").toString())));
+    chatRows_.append(rowText(QStringLiteral("角色问候"), clippedText(persona.value("greeting").toString())));
     chatRows_.append(rowText(QStringLiteral("用户昵称"), displayText(userProfile.value("nickname").toString())));
     chatRows_.append(rowText(QStringLiteral("用户档案"), clippedText(userProfile.value("profile_text").toString())));
     if (!chatMessages_.isEmpty()) {

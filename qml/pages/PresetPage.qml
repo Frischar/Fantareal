@@ -233,7 +233,7 @@ Item {
                         rowSpacing: 18
 
                         SettingField {
-                            title: "Preset Name"
+                            title: "预设名称"
 
                             HusInput {
                                 width: parent.width
