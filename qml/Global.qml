@@ -120,7 +120,7 @@ QtObject {
         {
             key: "database",
             title: "数据库",
-            desc: "查看运行库、状态快照、阶段状态与剧情账本。",
+            desc: "查看运行库、数据表快照、阶段状态与剧情账本。",
             color: accentGreen,
             tag: "P1",
             iconSource: HusIcon.DatabaseOutlined

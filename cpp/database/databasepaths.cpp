@@ -16,6 +16,10 @@ QString DatabasePaths::databaseRelativePath() {
     return QStringLiteral("data/database/database.db");
 }
 
+QString DatabasePaths::workerSettingsRelativePath() {
+    return QStringLiteral("data/database/worker_settings.json");
+}
+
 QString DatabasePaths::rootPath() const {
     return rootPath_;
 }
@@ -26,6 +30,10 @@ QString DatabasePaths::directoryPath() const {
 
 QString DatabasePaths::databasePath() const {
     return QDir(rootPath_).absoluteFilePath(databaseRelativePath());
+}
+
+QString DatabasePaths::workerSettingsPath() const {
+    return QDir(rootPath_).absoluteFilePath(workerSettingsRelativePath());
 }
 
 bool DatabasePaths::ensureRuntimeDirectory(QString* errorMessage) const {

@@ -52,6 +52,7 @@ QJsonObject projectListItem(const QFileInfo& info, const QJsonObject& project, c
     item.insert(QStringLiteral("file_size"), static_cast<double>(info.size()));
     item.insert(QStringLiteral("variable_count"), database.value(QStringLiteral("variables")).toArray().size());
     item.insert(QStringLiteral("stage_count"), database.value(QStringLiteral("stages")).toArray().size());
+    item.insert(QStringLiteral("snapshot_field_count"), database.value(QStringLiteral("snapshotFields")).toArray().size());
     item.insert(QStringLiteral("tag_count"), database.value(QStringLiteral("tags")).toArray().size());
     item.insert(QStringLiteral("worldbook_entry_count"), worldbook.value(QStringLiteral("entries")).toArray().size());
     item.insert(QStringLiteral("memory_item_count"), memory.value(QStringLiteral("items")).toArray().size());

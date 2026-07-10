@@ -137,7 +137,7 @@ QString warningText(const QString& warning) {
         return QStringLiteral("角色名为空；应用“主卡”会把当前角色名写成空值。");
     }
     if (warning == QStringLiteral("database draft is empty")) {
-        return QStringLiteral("数据库草稿为空；应用数据库模块不会带入变量、状态快照或标签。");
+        return QStringLiteral("数据库草稿为空；应用数据库模块不会带入变量、阶段规则、状态快照字段或标签。");
     }
     return warning;
 }
@@ -381,7 +381,7 @@ QJsonArray databaseGeneratedWorldbookEntries(const QJsonObject& project) {
                 textValue(stage, QStringLiteral("title"), textValue(stage, QStringLiteral("stage_key"), trigger)),
                 trigger,
                 content,
-                QStringLiteral("写卡器状态快照生成"));
+                QStringLiteral("写卡器阶段规则生成"));
         }
     }
     return entries;

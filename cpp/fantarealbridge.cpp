@@ -1,9 +1,11 @@
 #include "fantarealbridge.h"
 
+#include "card_authoring/cardauthoringmodels.h"
 #include "card_authoring/cardauthoringservice.h"
 #include "card_authoring/cardauthoringprojectstore.h"
 #include "database/databasepaths.h"
 #include "database/databaseservice.h"
+#include "database/databaseworker.h"
 #include "database/legacystatejournaladapter.h"
 
 #include <algorithm>
@@ -30,6 +32,7 @@
 #include <QPair>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QSet>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
@@ -325,6 +328,908 @@ QJsonArray cardTagsFromDraft(const QVariantMap& draft, const QJsonArray& current
     QJsonArray result;
     for (const QString& tag : uniqueTags) {
         result.append(tag);
+    }
+    return result;
+}
+
+constexpr int kMaxCardPersonas = 32;
+constexpr int kMaxDatabaseRoles = 32;
+constexpr int kMaxDatabaseVariables = 128;
+constexpr int kMaxDatabaseStages = 64;
+constexpr int kMaxDatabaseSnapshotFields = 64;
+constexpr int kMaxDatabaseConditions = 16;
+
+QString limitedJsonText(const QJsonValue& value, const QString& fallback, int maxLength) {
+    QString text = value.isUndefined() ? fallback : value.toVariant().toString();
+    text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+    text = text.trimmed();
+    if (text.size() > maxLength) {
+        text = text.left(maxLength);
+    }
+    return text;
+}
+
+QJsonValue objectValue(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    const QString& key,
+    const QJsonValue& fallback = {}) {
+    if (incoming.contains(key)) {
+        return incoming.value(key);
+    }
+    if (current.contains(key)) {
+        return current.value(key);
+    }
+    return fallback;
+}
+
+QString objectText(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    const QString& key,
+    const QString& fallback,
+    int maxLength) {
+    return limitedJsonText(objectValue(incoming, current, key), fallback, maxLength);
+}
+
+QString objectTextByKeys(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    const QStringList& keys,
+    const QString& fallback,
+    int maxLength) {
+    for (const QString& key : keys) {
+        if (incoming.contains(key)) {
+            return limitedJsonText(incoming.value(key), fallback, maxLength);
+        }
+    }
+    for (const QString& key : keys) {
+        if (current.contains(key)) {
+            return limitedJsonText(current.value(key), fallback, maxLength);
+        }
+    }
+    return limitedJsonText({}, fallback, maxLength);
+}
+
+bool objectBool(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    const QString& key,
+    bool fallback) {
+    const QJsonValue value = objectValue(incoming, current, key);
+    if (value.isBool()) {
+        return value.toBool();
+    }
+    if (value.isDouble()) {
+        return value.toDouble() != 0.0;
+    }
+    const QString text = value.toVariant().toString().trimmed().toLower();
+    if (text == QStringLiteral("true") || text == QStringLiteral("yes") || text == QStringLiteral("on") || text == QStringLiteral("1")) {
+        return true;
+    }
+    if (text == QStringLiteral("false") || text == QStringLiteral("no") || text == QStringLiteral("off") || text == QStringLiteral("0")) {
+        return false;
+    }
+    return fallback;
+}
+
+double limitedJsonNumber(const QJsonValue& value, double fallback, double minimum, double maximum) {
+    bool ok = false;
+    double number = value.toVariant().toDouble(&ok);
+    if (!ok || !qIsFinite(number)) {
+        number = fallback;
+    }
+    return qBound(minimum, number, maximum);
+}
+
+double objectNumber(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    const QString& key,
+    double fallback,
+    double minimum,
+    double maximum) {
+    return limitedJsonNumber(objectValue(incoming, current, key), fallback, minimum, maximum);
+}
+
+int objectInt(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    const QString& key,
+    int fallback,
+    int minimum,
+    int maximum) {
+    return static_cast<int>(qRound(objectNumber(incoming, current, key, fallback, minimum, maximum)));
+}
+
+QString normalizedStateKey(QString value, const QString& fallback, int maxLength = 160) {
+    value = value.trimmed().toLower();
+    value.replace(QRegularExpression(QStringLiteral("\\s+")), QStringLiteral("_"));
+    value.replace(QRegularExpression(QStringLiteral("[^a-z0-9_\\-]+")), QString());
+    value.replace(QRegularExpression(QStringLiteral("[_\\-]{2,}")), QStringLiteral("_"));
+    while (value.startsWith(QLatin1Char('_')) || value.startsWith(QLatin1Char('-'))) {
+        value.remove(0, 1);
+    }
+    while (value.endsWith(QLatin1Char('_')) || value.endsWith(QLatin1Char('-'))) {
+        value.chop(1);
+    }
+    if (value.size() > maxLength) {
+        value = value.left(maxLength);
+    }
+    return value.isEmpty() ? fallback : value;
+}
+
+QString normalizedPersonaKey(QString value, const QString& fallback) {
+    value = value.trimmed();
+    value.remove(QRegularExpression(QStringLiteral("[\\x00-\\x1f\\x7f]+")));
+    if (value.size() > 80) {
+        value = value.left(80);
+    }
+    return value.isEmpty() ? fallback : value;
+}
+
+QJsonArray controlledTextArray(
+    const QJsonValue& value,
+    int maxItems,
+    int maxLength,
+    bool splitText = true) {
+    QStringList candidates;
+    if (value.isArray()) {
+        for (const QJsonValue& item : value.toArray()) {
+            candidates.append(item.toVariant().toString());
+        }
+    } else if (splitText) {
+        candidates = value.toVariant().toString().split(
+            QRegularExpression(QStringLiteral("[,，;；\\r\\n]+")),
+            Qt::SkipEmptyParts);
+    }
+
+    QStringList unique;
+    for (QString item : candidates) {
+        item = item.simplified();
+        if (item.size() > maxLength) {
+            item = item.left(maxLength).trimmed();
+        }
+        if (!item.isEmpty() && !unique.contains(item)) {
+            unique.append(item);
+        }
+        if (unique.size() >= maxItems) {
+            break;
+        }
+    }
+
+    QJsonArray result;
+    for (const QString& item : unique) {
+        result.append(item);
+    }
+    return result;
+}
+
+QString objectIdentity(const QJsonObject& object, const QStringList& keys) {
+    for (const QString& key : keys) {
+        const QString value = object.value(key).toVariant().toString().trimmed().toLower();
+        if (!value.isEmpty()) {
+            return value;
+        }
+    }
+    return {};
+}
+
+QJsonObject matchingArrayObject(
+    const QJsonArray& current,
+    const QJsonObject& incoming,
+    const QStringList& primaryKeys,
+    const QStringList& secondaryKeys = {}) {
+    const QString primary = objectIdentity(incoming, primaryKeys);
+    const QString secondary = objectIdentity(incoming, secondaryKeys);
+    for (const QJsonValue& value : current) {
+        const QJsonObject candidate = value.toObject();
+        if (!primary.isEmpty() && objectIdentity(candidate, primaryKeys) == primary) {
+            return candidate;
+        }
+    }
+    for (const QJsonValue& value : current) {
+        const QJsonObject candidate = value.toObject();
+        if (!secondary.isEmpty() && objectIdentity(candidate, secondaryKeys) == secondary) {
+            return candidate;
+        }
+    }
+    return {};
+}
+
+QVariantList controlledPersonasDraft(const QJsonObject& personas) {
+    QStringList keys = personas.keys();
+    std::sort(keys.begin(), keys.end(), [](const QString& left, const QString& right) {
+        bool leftNumeric = false;
+        bool rightNumeric = false;
+        const int leftNumber = left.toInt(&leftNumeric);
+        const int rightNumber = right.toInt(&rightNumeric);
+        if (leftNumeric && rightNumeric) {
+            return leftNumber < rightNumber;
+        }
+        return left.localeAwareCompare(right) < 0;
+    });
+
+    QVariantList result;
+    for (const QString& key : keys) {
+        if (result.size() >= kMaxCardPersonas) {
+            break;
+        }
+        const QJsonObject persona = personas.value(key).toObject();
+        if (persona.isEmpty() && !personas.value(key).isObject()) {
+            continue;
+        }
+        QVariantMap item;
+        item.insert(QStringLiteral("key"), normalizedPersonaKey(key, QString::number(result.size() + 1)));
+        item.insert(QStringLiteral("name"), limitedJsonText(persona.value(QStringLiteral("name")), {}, 160));
+        item.insert(QStringLiteral("role_id"), limitedJsonText(
+            persona.value(QStringLiteral("role_id")).isUndefined()
+                ? persona.value(QStringLiteral("id"))
+                : persona.value(QStringLiteral("role_id")),
+            {},
+            160));
+        item.insert(QStringLiteral("aliases"), controlledTextArray(persona.value(QStringLiteral("aliases")), 32, 120).toVariantList());
+        item.insert(QStringLiteral("description"), limitedJsonText(persona.value(QStringLiteral("description")), {}, 12000));
+        item.insert(QStringLiteral("personality"), limitedJsonText(persona.value(QStringLiteral("personality")), {}, 12000));
+        item.insert(QStringLiteral("scenario"), limitedJsonText(persona.value(QStringLiteral("scenario")), {}, 12000));
+        item.insert(QStringLiteral("creator_notes"), limitedJsonText(persona.value(QStringLiteral("creator_notes")), {}, 12000));
+        item.insert(QStringLiteral("tags"), controlledTextArray(persona.value(QStringLiteral("tags")), 24, 80).toVariantList());
+        result.append(item);
+    }
+    return result;
+}
+
+QJsonObject personasFromDraft(const QJsonValue& value, const QJsonObject& currentPersonas) {
+    QJsonObject result;
+    const QJsonArray incomingPersonas = value.toArray();
+    QStringList usedKeys;
+    for (int index = 0; index < incomingPersonas.size() && result.size() < kMaxCardPersonas; ++index) {
+        const QJsonObject incoming = incomingPersonas.at(index).toObject();
+        if (incoming.isEmpty() && !incomingPersonas.at(index).isObject()) {
+            continue;
+        }
+        QString key = normalizedPersonaKey(
+            limitedJsonText(incoming.value(QStringLiteral("key")), {}, 80),
+            QString::number(index + 1));
+        if (usedKeys.contains(key)) {
+            const QString baseKey = key;
+            int suffix = 2;
+            do {
+                key = normalizedPersonaKey(
+                    QStringLiteral("%1_%2").arg(baseKey).arg(suffix),
+                    QString::number(index + 1));
+                ++suffix;
+            } while (usedKeys.contains(key));
+        }
+
+        QJsonObject current = currentPersonas.value(key).toObject();
+        if (current.isEmpty()) {
+            const QString incomingRoleId = objectIdentity(incoming, { QStringLiteral("role_id"), QStringLiteral("id") });
+            const QString incomingName = objectIdentity(incoming, { QStringLiteral("name") });
+            for (auto it = currentPersonas.constBegin(); it != currentPersonas.constEnd(); ++it) {
+                if (usedKeys.contains(it.key()) || !it.value().isObject()) {
+                    continue;
+                }
+                const QJsonObject candidate = it.value().toObject();
+                if ((!incomingRoleId.isEmpty()
+                        && objectIdentity(candidate, { QStringLiteral("role_id"), QStringLiteral("id") }) == incomingRoleId)
+                    || (!incomingName.isEmpty()
+                        && objectIdentity(candidate, { QStringLiteral("name") }) == incomingName)) {
+                    current = candidate;
+                    break;
+                }
+            }
+        }
+
+        QJsonObject persona = current;
+        persona.insert(QStringLiteral("name"), objectText(incoming, current, QStringLiteral("name"), {}, 160));
+        persona.insert(QStringLiteral("role_id"), objectTextByKeys(
+            incoming,
+            current,
+            { QStringLiteral("role_id"), QStringLiteral("id") },
+            {},
+            160));
+        persona.insert(QStringLiteral("aliases"), controlledTextArray(
+            objectValue(incoming, current, QStringLiteral("aliases")),
+            32,
+            120));
+        for (const QString& field : {
+                QStringLiteral("description"),
+                QStringLiteral("personality"),
+                QStringLiteral("scenario"),
+                QStringLiteral("creator_notes"),
+            }) {
+            persona.insert(field, objectText(incoming, current, field, {}, 12000));
+        }
+        persona.insert(QStringLiteral("tags"), controlledTextArray(
+            objectValue(incoming, current, QStringLiteral("tags")),
+            24,
+            80));
+        result.insert(key, persona);
+        usedKeys.append(key);
+    }
+    return result;
+}
+
+QString normalizedRoleMode(QString value, bool enabled, bool hasVariables, bool hasStages, bool hasSnapshot) {
+    value = value.trimmed().toLower();
+    value.replace(QLatin1Char('-'), QLatin1Char('_'));
+    if (value == QStringLiteral("snapshot") || value == QStringLiteral("snapshotfields")
+        || value == QStringLiteral("snapshot_fields") || value == QStringLiteral("note_only")) {
+        value = QStringLiteral("snapshot_only");
+    } else if (value == QStringLiteral("variable")) {
+        value = QStringLiteral("variables");
+    } else if (value == QStringLiteral("stage")) {
+        value = QStringLiteral("stages");
+    } else if (value == QStringLiteral("full_stage")) {
+        value = QStringLiteral("full");
+    } else if (value == QStringLiteral("off") || value == QStringLiteral("none")
+        || value == QStringLiteral("disable")) {
+        value = QStringLiteral("disabled");
+    }
+    if (value == QStringLiteral("default") || value == QStringLiteral("snapshot_only")
+        || value == QStringLiteral("variables") || value == QStringLiteral("stages")
+        || value == QStringLiteral("full") || value == QStringLiteral("disabled")) {
+        return value;
+    }
+    if (!enabled) {
+        return QStringLiteral("disabled");
+    }
+    if (hasVariables && hasStages) {
+        return QStringLiteral("full");
+    }
+    if (hasVariables) {
+        return QStringLiteral("variables");
+    }
+    if (hasStages) {
+        return QStringLiteral("stages");
+    }
+    if (hasSnapshot) {
+        return QStringLiteral("snapshot_only");
+    }
+    return QStringLiteral("default");
+}
+
+QJsonObject controlledDatabaseCondition(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    bool preserveUnknown) {
+    QJsonObject condition = preserveUnknown ? current : QJsonObject{};
+    QString source = objectText(incoming, current, QStringLiteral("source"), {}, 32).toLower();
+    if (source != QStringLiteral("story_time")) {
+        source = QStringLiteral("variable");
+    }
+    QString op = objectText(incoming, current, QStringLiteral("op"), QStringLiteral(">="), 4);
+    if (!QStringList{
+            QStringLiteral(">"),
+            QStringLiteral(">="),
+            QStringLiteral("<"),
+            QStringLiteral("<="),
+            QStringLiteral("="),
+            QStringLiteral("!="),
+        }.contains(op)) {
+        op = QStringLiteral(">=");
+    }
+    condition.insert(QStringLiteral("source"), source);
+    condition.insert(QStringLiteral("op"), op);
+    if (source == QStringLiteral("story_time")) {
+        condition.remove(QStringLiteral("var"));
+        condition.insert(QStringLiteral("field"), normalizedStateKey(
+            objectTextByKeys(incoming, current, { QStringLiteral("field"), QStringLiteral("var") }, {}, 80),
+            {}));
+        const QJsonValue rawValue = objectValue(incoming, current, QStringLiteral("value"), 0);
+        if (rawValue.isString()) {
+            condition.insert(QStringLiteral("value"), limitedJsonText(rawValue, {}, 160));
+        } else {
+            condition.insert(QStringLiteral("value"), limitedJsonNumber(rawValue, 0.0, -1000000000.0, 1000000000.0));
+        }
+    } else {
+        condition.remove(QStringLiteral("field"));
+        condition.insert(QStringLiteral("var"), normalizedStateKey(
+            objectTextByKeys(incoming, current, { QStringLiteral("var"), QStringLiteral("field") }, {}, 80),
+            {}));
+        condition.insert(QStringLiteral("value"), objectNumber(
+            incoming,
+            current,
+            QStringLiteral("value"),
+            0.0,
+            -1000000000.0,
+            1000000000.0));
+    }
+    return condition;
+}
+
+QJsonArray controlledDatabaseConditions(
+    const QJsonValue& incomingValue,
+    const QJsonArray& current,
+    bool preserveUnknown) {
+    const QJsonArray incoming = incomingValue.isArray() ? incomingValue.toArray() : current;
+    QJsonArray result;
+    for (int index = 0; index < incoming.size() && result.size() < kMaxDatabaseConditions; ++index) {
+        const QJsonObject item = incoming.at(index).toObject();
+        if (item.isEmpty() && !incoming.at(index).isObject()) {
+            continue;
+        }
+        result.append(controlledDatabaseCondition(
+            item,
+            index < current.size() ? current.at(index).toObject() : QJsonObject{},
+            preserveUnknown));
+    }
+    return result;
+}
+
+QJsonObject controlledDatabaseVariable(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    int index,
+    bool preserveUnknown) {
+    QJsonObject variable = preserveUnknown ? current : QJsonObject{};
+    const QString fallbackKey = QStringLiteral("var_%1").arg(index + 1);
+    const QString varKey = normalizedStateKey(
+        objectTextByKeys(incoming, current, { QStringLiteral("var_key"), QStringLiteral("key") }, fallbackKey, 80),
+        fallbackKey,
+        80);
+    const QString varName = objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("var_name"), QStringLiteral("label") },
+        varKey,
+        160);
+    double minimum = objectNumber(incoming, current, QStringLiteral("min_value"), 0.0, -1000000000.0, 1000000000.0);
+    double maximum = objectNumber(incoming, current, QStringLiteral("max_value"), 100.0, -1000000000.0, 1000000000.0);
+    if (maximum <= minimum) {
+        maximum = qMin(1000000000.0, minimum + 100.0);
+    }
+    double deltaMinimum = objectNumber(incoming, current, QStringLiteral("delta_min"), -5.0, -1000000000.0, 1000000000.0);
+    double deltaMaximum = objectNumber(incoming, current, QStringLiteral("delta_max"), 5.0, -1000000000.0, 1000000000.0);
+    if (deltaMaximum < deltaMinimum) {
+        std::swap(deltaMinimum, deltaMaximum);
+    }
+
+    variable.insert(QStringLiteral("var_key"), varKey);
+    variable.insert(QStringLiteral("var_name"), varName);
+    variable.insert(QStringLiteral("enabled"), objectBool(incoming, current, QStringLiteral("enabled"), true));
+    variable.insert(QStringLiteral("default_value"), qBound(
+        minimum,
+        objectNumber(incoming, current, QStringLiteral("default_value"), minimum, -1000000000.0, 1000000000.0),
+        maximum));
+    variable.insert(QStringLiteral("min_value"), minimum);
+    variable.insert(QStringLiteral("max_value"), maximum);
+    variable.insert(QStringLiteral("delta_min"), deltaMinimum);
+    variable.insert(QStringLiteral("delta_max"), deltaMaximum);
+    variable.insert(QStringLiteral("display"), objectBool(incoming, current, QStringLiteral("display"), true));
+    variable.insert(QStringLiteral("stage_relevant"), objectBool(incoming, current, QStringLiteral("stage_relevant"), true));
+    variable.insert(QStringLiteral("instruction"), objectText(incoming, current, QStringLiteral("instruction"), {}, 4000));
+    return variable;
+}
+
+QJsonArray controlledDatabaseVariables(
+    const QJsonValue& incomingValue,
+    const QJsonArray& current,
+    bool preserveUnknown) {
+    const QJsonArray incoming = incomingValue.isArray() ? incomingValue.toArray() : current;
+    QJsonArray result;
+    QStringList keys;
+    for (int index = 0; index < incoming.size() && result.size() < kMaxDatabaseVariables; ++index) {
+        const QJsonObject item = incoming.at(index).toObject();
+        if (item.isEmpty() && !incoming.at(index).isObject()) {
+            continue;
+        }
+        const QJsonObject base = matchingArrayObject(
+            current,
+            item,
+            { QStringLiteral("var_key"), QStringLiteral("key"), QStringLiteral("id") },
+            { QStringLiteral("var_name"), QStringLiteral("label") });
+        const QJsonObject variable = controlledDatabaseVariable(item, base, index, preserveUnknown);
+        const QString key = variable.value(QStringLiteral("var_key")).toString();
+        if (keys.contains(key)) {
+            continue;
+        }
+        keys.append(key);
+        result.append(variable);
+    }
+    return result;
+}
+
+QJsonObject controlledDatabaseStage(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    const QString& roleId,
+    int index,
+    bool preserveUnknown) {
+    QJsonObject stage = preserveUnknown ? current : QJsonObject{};
+    const QString fallbackKey = QStringLiteral("stage_%1").arg(index + 1);
+    const QString stageKey = normalizedStateKey(
+        objectTextByKeys(incoming, current, { QStringLiteral("stage_key"), QStringLiteral("key") }, fallbackKey, 80),
+        fallbackKey,
+        80);
+    const QString stageName = objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("stage_name"), QStringLiteral("name"), QStringLiteral("title") },
+        stageKey,
+        160);
+    QString conditionMode = objectText(incoming, current, QStringLiteral("condition_mode"), QStringLiteral("all"), 16).toLower();
+    if (conditionMode != QStringLiteral("any")) {
+        conditionMode = QStringLiteral("all");
+    }
+    stage.insert(QStringLiteral("stage_key"), stageKey);
+    stage.insert(QStringLiteral("stage_name"), stageName);
+    stage.insert(QStringLiteral("enabled"), objectBool(incoming, current, QStringLiteral("enabled"), true));
+    stage.insert(QStringLiteral("priority"), objectInt(incoming, current, QStringLiteral("priority"), (index + 1) * 10, -100000, 100000));
+    stage.insert(QStringLiteral("condition_mode"), conditionMode);
+    stage.insert(QStringLiteral("conditions"), controlledDatabaseConditions(
+        objectValue(incoming, current, QStringLiteral("conditions")),
+        current.value(QStringLiteral("conditions")).toArray(),
+        preserveUnknown));
+    stage.insert(QStringLiteral("allow_regression"), objectBool(incoming, current, QStringLiteral("allow_regression"), false));
+    stage.insert(QStringLiteral("confirm_turns"), objectInt(incoming, current, QStringLiteral("confirm_turns"), 1, 1, 10000));
+    stage.insert(QStringLiteral("cooldown_turns"), objectInt(incoming, current, QStringLiteral("cooldown_turns"), 0, 0, 10000));
+    const QString fallbackTag = roleId.isEmpty()
+        ? QString()
+        : QStringLiteral("database.stage.%1.%2").arg(roleId, stageKey);
+    QString activationTag = objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("activation_tag"), QStringLiteral("active_tag") },
+        fallbackTag,
+        240);
+    const QString legacyPrefix = QStringLiteral("state_journal.stage.");
+    if (activationTag.startsWith(legacyPrefix)) {
+        activationTag = QStringLiteral("database.stage.%1").arg(activationTag.mid(legacyPrefix.size()));
+    }
+    stage.insert(QStringLiteral("activation_tag"), activationTag);
+    if (incoming.contains(QStringLiteral("emits_tags")) || current.contains(QStringLiteral("emits_tags"))) {
+        QJsonArray emittedTags = controlledTextArray(
+            objectValue(incoming, current, QStringLiteral("emits_tags")),
+            24,
+            160);
+        for (int tagIndex = 0; tagIndex < emittedTags.size(); ++tagIndex) {
+            QString tag = emittedTags.at(tagIndex).toString();
+            if (tag.startsWith(legacyPrefix)) {
+                tag = QStringLiteral("database.stage.%1").arg(tag.mid(legacyPrefix.size()));
+                emittedTags.replace(tagIndex, tag);
+            }
+        }
+        stage.insert(QStringLiteral("emits_tags"), emittedTags);
+    }
+    for (const QString& field : { QStringLiteral("description"), QStringLiteral("notes") }) {
+        if (incoming.contains(field) || current.contains(field)) {
+            stage.insert(field, objectText(incoming, current, field, {}, 4000));
+        }
+    }
+    return stage;
+}
+
+QJsonArray controlledDatabaseStages(
+    const QJsonValue& incomingValue,
+    const QJsonArray& current,
+    const QString& roleId,
+    bool preserveUnknown) {
+    const QJsonArray incoming = incomingValue.isArray() ? incomingValue.toArray() : current;
+    QJsonArray result;
+    QStringList keys;
+    for (int index = 0; index < incoming.size() && result.size() < kMaxDatabaseStages; ++index) {
+        const QJsonObject item = incoming.at(index).toObject();
+        if (item.isEmpty() && !incoming.at(index).isObject()) {
+            continue;
+        }
+        const QJsonObject base = matchingArrayObject(
+            current,
+            item,
+            { QStringLiteral("stage_key"), QStringLiteral("key"), QStringLiteral("id") },
+            { QStringLiteral("stage_name"), QStringLiteral("name"), QStringLiteral("title") });
+        const QJsonObject stage = controlledDatabaseStage(item, base, roleId, index, preserveUnknown);
+        const QString key = stage.value(QStringLiteral("stage_key")).toString();
+        if (keys.contains(key)) {
+            continue;
+        }
+        keys.append(key);
+        result.append(stage);
+    }
+    return result;
+}
+
+QJsonObject controlledDatabaseSnapshotField(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    int index,
+    bool preserveUnknown) {
+    QJsonObject field = preserveUnknown ? current : QJsonObject{};
+    const QString fallbackKey = QStringLiteral("snapshot_%1").arg(index + 1);
+    const QString key = normalizedStateKey(
+        objectTextByKeys(incoming, current, { QStringLiteral("key"), QStringLiteral("field_key") }, fallbackKey, 80),
+        fallbackKey,
+        80);
+    field.insert(QStringLiteral("key"), key);
+    field.insert(QStringLiteral("label"), objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("label"), QStringLiteral("name") },
+        key,
+        160));
+    field.insert(QStringLiteral("enabled"), objectBool(incoming, current, QStringLiteral("enabled"), true));
+    field.insert(QStringLiteral("display"), objectBool(incoming, current, QStringLiteral("display"), true));
+    field.insert(QStringLiteral("instruction"), objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("instruction"), QStringLiteral("note") },
+        QStringLiteral("根据本轮上下文生成该状态快照字段。"),
+        4000));
+    return field;
+}
+
+QJsonArray controlledDatabaseSnapshotFields(
+    const QJsonValue& incomingValue,
+    const QJsonArray& current,
+    bool preserveUnknown) {
+    const QJsonArray incoming = incomingValue.isArray() ? incomingValue.toArray() : current;
+    QJsonArray result;
+    QStringList keys;
+    for (int index = 0; index < incoming.size() && result.size() < kMaxDatabaseSnapshotFields; ++index) {
+        const QJsonObject item = incoming.at(index).toObject();
+        if (item.isEmpty() && !incoming.at(index).isObject()) {
+            continue;
+        }
+        const QJsonObject base = matchingArrayObject(
+            current,
+            item,
+            { QStringLiteral("key"), QStringLiteral("field_key"), QStringLiteral("id") },
+            { QStringLiteral("label"), QStringLiteral("name") });
+        const QJsonObject field = controlledDatabaseSnapshotField(item, base, index, preserveUnknown);
+        const QString key = field.value(QStringLiteral("key")).toString();
+        if (keys.contains(key)) {
+            continue;
+        }
+        keys.append(key);
+        result.append(field);
+    }
+    return result;
+}
+
+QJsonObject controlledDatabaseRole(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    int index,
+    bool preserveUnknown) {
+    QJsonObject role = preserveUnknown ? current : QJsonObject{};
+    const QString fallbackId = QStringLiteral("role_%1").arg(index + 1);
+    const QString roleId = normalizedStateKey(
+        objectTextByKeys(incoming, current, { QStringLiteral("role_id"), QStringLiteral("id") }, fallbackId, 160),
+        fallbackId);
+    const QString roleName = objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("role_name"), QStringLiteral("name") },
+        roleId,
+        160);
+    const QJsonArray variables = controlledDatabaseVariables(
+        objectValue(incoming, current, QStringLiteral("variables")),
+        current.value(QStringLiteral("variables")).toArray(),
+        preserveUnknown);
+    const QJsonArray stages = controlledDatabaseStages(
+        objectValue(incoming, current, QStringLiteral("stages")),
+        current.value(QStringLiteral("stages")).toArray(),
+        roleId,
+        preserveUnknown);
+    const QJsonValue incomingSnapshotFields = incoming.contains(QStringLiteral("snapshotFields"))
+        ? incoming.value(QStringLiteral("snapshotFields"))
+        : incoming.value(QStringLiteral("snapshot_fields"));
+    const QJsonArray currentSnapshotFields = current.value(QStringLiteral("snapshotFields")).toArray(
+        current.value(QStringLiteral("snapshot_fields")).toArray());
+    const QJsonArray snapshotFields = controlledDatabaseSnapshotFields(
+        incomingSnapshotFields.isUndefined() ? QJsonValue(currentSnapshotFields) : incomingSnapshotFields,
+        currentSnapshotFields,
+        preserveUnknown);
+    const bool enabled = objectBool(incoming, current, QStringLiteral("enabled"), true);
+    const QString requestedMode = objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("mode"), QStringLiteral("stateJournalMode") },
+        {},
+        32);
+    const QString mode = normalizedRoleMode(
+        requestedMode,
+        enabled,
+        !variables.isEmpty(),
+        !stages.isEmpty(),
+        !snapshotFields.isEmpty());
+
+    role.insert(QStringLiteral("role_id"), roleId);
+    role.insert(QStringLiteral("role_name"), roleName);
+    role.insert(QStringLiteral("aliases"), controlledTextArray(
+        objectValue(incoming, current, QStringLiteral("aliases")),
+        32,
+        120));
+    role.insert(QStringLiteral("enabled"), mode == QStringLiteral("disabled") ? false : enabled);
+    role.insert(QStringLiteral("mode"), mode);
+    role.insert(QStringLiteral("stateJournalMode"), mode);
+    role.insert(QStringLiteral("use_default_variables"), objectBool(
+        incoming,
+        current,
+        QStringLiteral("use_default_variables"),
+        false));
+    role.insert(QStringLiteral("initial_stage"), normalizedStateKey(
+        objectText(incoming, current, QStringLiteral("initial_stage"), stages.isEmpty()
+                ? QStringLiteral("stage_a")
+                : stages.first().toObject().value(QStringLiteral("stage_key")).toString(), 80),
+        QStringLiteral("stage_a"),
+        80));
+    role.insert(QStringLiteral("variables"), variables);
+    role.insert(QStringLiteral("stages"), stages);
+    role.insert(QStringLiteral("snapshotFields"), snapshotFields);
+
+    for (const QString& field : {
+            QStringLiteral("source"),
+            QStringLiteral("source_type"),
+            QStringLiteral("display_policy"),
+        }) {
+        if (incoming.contains(field) || current.contains(field)) {
+            role.insert(field, objectText(incoming, current, field, {}, 120));
+        }
+    }
+    for (const QString& field : {
+            QStringLiteral("has_state_journal_config"),
+            QStringLiteral("is_empty_slot"),
+        }) {
+        if (incoming.contains(field) || current.contains(field)) {
+            role.insert(field, objectBool(incoming, current, field, false));
+        }
+    }
+
+    const QJsonObject incomingSettings = incoming.value(QStringLiteral("settings")).toObject();
+    const QJsonObject currentSettings = current.value(QStringLiteral("settings")).toObject();
+    QJsonObject settings = preserveUnknown ? currentSettings : QJsonObject{};
+    settings.insert(QStringLiteral("allow_regression"), objectBool(
+        incomingSettings,
+        currentSettings,
+        QStringLiteral("allow_regression"),
+        false));
+    settings.insert(QStringLiteral("confirm_turns"), objectInt(
+        incomingSettings,
+        currentSettings,
+        QStringLiteral("confirm_turns"),
+        1,
+        1,
+        10000));
+    settings.insert(QStringLiteral("cooldown_turns"), objectInt(
+        incomingSettings,
+        currentSettings,
+        QStringLiteral("cooldown_turns"),
+        2,
+        0,
+        10000));
+    role.insert(QStringLiteral("settings"), settings);
+    return role;
+}
+
+QJsonObject controlledDatabaseConfig(
+    const QJsonObject& incoming,
+    const QJsonObject& current,
+    bool preserveUnknown) {
+    QJsonObject config = preserveUnknown ? current : QJsonObject{};
+    config.insert(QStringLiteral("version"), objectInt(incoming, current, QStringLiteral("version"), 1, 1, 100));
+    config.insert(QStringLiteral("enabled"), objectBool(incoming, current, QStringLiteral("enabled"), true));
+    QString roleSourceMode = objectTextByKeys(
+        incoming,
+        current,
+        { QStringLiteral("role_source_mode"), QStringLiteral("roleSourceMode") },
+        QStringLiteral("auto"),
+        32).toLower();
+    roleSourceMode.replace(QLatin1Char('-'), QLatin1Char('_'));
+    if (roleSourceMode == QStringLiteral("main") || roleSourceMode == QStringLiteral("single")
+        || roleSourceMode == QStringLiteral("single_role") || roleSourceMode == QStringLiteral("card")) {
+        roleSourceMode = QStringLiteral("main_card");
+    } else if (roleSourceMode == QStringLiteral("persona") || roleSourceMode == QStringLiteral("personas")
+        || roleSourceMode == QStringLiteral("multi") || roleSourceMode == QStringLiteral("multi_role")
+        || roleSourceMode == QStringLiteral("narrator")) {
+        roleSourceMode = QStringLiteral("personas_only");
+    }
+    if (roleSourceMode != QStringLiteral("main_card") && roleSourceMode != QStringLiteral("personas_only")) {
+        roleSourceMode = QStringLiteral("auto");
+    }
+    config.insert(QStringLiteral("role_source_mode"), roleSourceMode);
+
+    const QJsonArray incomingRoles = incoming.value(QStringLiteral("roles")).isArray()
+        ? incoming.value(QStringLiteral("roles")).toArray()
+        : current.value(QStringLiteral("roles")).toArray();
+    const QJsonArray currentRoles = current.value(QStringLiteral("roles")).toArray();
+    QJsonArray roles;
+    QStringList roleIds;
+    for (int index = 0; index < incomingRoles.size() && roles.size() < kMaxDatabaseRoles; ++index) {
+        const QJsonObject item = incomingRoles.at(index).toObject();
+        if (item.isEmpty() && !incomingRoles.at(index).isObject()) {
+            continue;
+        }
+        const QJsonObject base = matchingArrayObject(
+            currentRoles,
+            item,
+            { QStringLiteral("role_id"), QStringLiteral("id") },
+            { QStringLiteral("role_name"), QStringLiteral("name") });
+        const QJsonObject role = controlledDatabaseRole(item, base, index, preserveUnknown);
+        const QString roleId = role.value(QStringLiteral("role_id")).toString();
+        if (roleIds.contains(roleId)) {
+            continue;
+        }
+        roleIds.append(roleId);
+        roles.append(role);
+    }
+    config.insert(QStringLiteral("roles"), roles);
+    return config;
+}
+
+QString databaseDraftItemIdentity(const QString& arrayKey, const QJsonObject& item) {
+    if (arrayKey == QStringLiteral("roles")) {
+        return objectIdentity(item, { QStringLiteral("role_id"), QStringLiteral("id") });
+    }
+    if (arrayKey == QStringLiteral("variables")) {
+        return QStringLiteral("%1:%2").arg(
+            objectIdentity(item, { QStringLiteral("role_id"), QStringLiteral("scope") }),
+            objectIdentity(item, { QStringLiteral("var_key"), QStringLiteral("key"), QStringLiteral("id") }));
+    }
+    if (arrayKey == QStringLiteral("stages")) {
+        return QStringLiteral("%1:%2").arg(
+            objectIdentity(item, { QStringLiteral("role_id") }),
+            objectIdentity(item, { QStringLiteral("stage_key"), QStringLiteral("key"), QStringLiteral("id") }));
+    }
+    if (arrayKey == QStringLiteral("snapshotFields")) {
+        return QStringLiteral("%1:%2").arg(
+            objectIdentity(item, { QStringLiteral("role_id") }),
+            objectIdentity(item, { QStringLiteral("key"), QStringLiteral("field_key"), QStringLiteral("id") }));
+    }
+    return objectIdentity(item, { QStringLiteral("id"), QStringLiteral("tag"), QStringLiteral("key") });
+}
+
+QJsonArray mergeDatabaseDraftArray(
+    const QString& arrayKey,
+    const QJsonArray& current,
+    const QJsonArray& incoming) {
+    QJsonArray result;
+    for (const QJsonValue& value : incoming) {
+        const QJsonObject item = value.toObject();
+        const QString identity = databaseDraftItemIdentity(arrayKey, item);
+        QJsonObject merged;
+        for (const QJsonValue& currentValue : current) {
+            const QJsonObject candidate = currentValue.toObject();
+            if (!identity.isEmpty() && databaseDraftItemIdentity(arrayKey, candidate) == identity) {
+                merged = candidate;
+                break;
+            }
+        }
+        for (auto it = item.constBegin(); it != item.constEnd(); ++it) {
+            merged.insert(it.key(), it.value());
+        }
+        result.append(merged);
+    }
+    return result;
+}
+
+QJsonObject synchronizedDatabaseDraft(const QJsonObject& stateJournal) {
+    QJsonObject payload{
+        { QStringLiteral("version"), stateJournal.value(QStringLiteral("version")) },
+        { QStringLiteral("enabled"), stateJournal.value(QStringLiteral("enabled")) },
+        { QStringLiteral("role_source_mode"), stateJournal.value(QStringLiteral("role_source_mode")) },
+        { QStringLiteral("roles"), stateJournal.value(QStringLiteral("roles")) },
+    };
+    const QJsonObject normalized = CardAuthoring::normalizeDatabase(payload);
+    const QJsonObject current = stateJournal.value(QStringLiteral("databaseDraft")).toObject();
+    QJsonObject result = current;
+    for (auto it = normalized.constBegin(); it != normalized.constEnd(); ++it) {
+        if (it.key() == QStringLiteral("notes") && it.value().toString().isEmpty() && current.contains(it.key())) {
+            continue;
+        }
+        if (it.key() == QStringLiteral("tags") && it.value().toArray().isEmpty() && current.contains(it.key())) {
+            continue;
+        }
+        if (it.value().isArray()) {
+            result.insert(it.key(), mergeDatabaseDraftArray(
+                it.key(),
+                current.value(it.key()).toArray(),
+                it.value().toArray()));
+        } else {
+            result.insert(it.key(), it.value());
+        }
     }
     return result;
 }
@@ -1125,7 +2030,7 @@ QStringList cardAuthoringRowsFromProject(const QJsonObject& project) {
     rows.append(rowText(QStringLiteral("角色标签"), static_cast<int>(tags.size())));
     rows.append(rowText(QStringLiteral("数据库"), enabledText(database.value(QStringLiteral("enabled")).toBool(true))));
     rows.append(rowText(QStringLiteral("数据库变量"), static_cast<int>(variables.size())));
-    rows.append(rowText(QStringLiteral("状态快照"), static_cast<int>(stages.size())));
+    rows.append(rowText(QStringLiteral("阶段规则"), static_cast<int>(stages.size())));
     rows.append(rowText(QStringLiteral("数据库标签"), static_cast<int>(databaseTags.size())));
     return rows;
 }
@@ -1141,6 +2046,7 @@ QVariantMap compiledRoleCardSummary(const QJsonObject& card) {
     summary.insert(QStringLiteral("database_enabled"), stateJournal.value(QStringLiteral("enabled")).toBool(true));
     summary.insert(QStringLiteral("variable_count"), databaseDraft.value(QStringLiteral("variables")).toArray().size());
     summary.insert(QStringLiteral("stage_count"), databaseDraft.value(QStringLiteral("stages")).toArray().size());
+    summary.insert(QStringLiteral("snapshot_field_count"), databaseDraft.value(QStringLiteral("snapshotFields")).toArray().size());
     summary.insert(QStringLiteral("database_tag_count"), databaseDraft.value(QStringLiteral("tags")).toArray().size());
     return summary;
 }
@@ -1167,13 +2073,46 @@ QString databaseTableLabel(const QString& tableName) {
         return QStringLiteral("Schema 元数据");
     }
     if (tableName == QStringLiteral("database_state_snapshots")) {
-        return QStringLiteral("状态快照");
+        return QStringLiteral("数据表快照");
+    }
+    if (tableName == QStringLiteral("database_runtime_values")) {
+        return QStringLiteral("运行变量");
+    }
+    if (tableName == QStringLiteral("database_metric_history")) {
+        return QStringLiteral("数值历史");
+    }
+    if (tableName == QStringLiteral("database_relationship_state")) {
+        return QStringLiteral("关系状态");
+    }
+    if (tableName == QStringLiteral("database_relationship_history")) {
+        return QStringLiteral("关系历史");
     }
     if (tableName == QStringLiteral("database_stage_state")) {
         return QStringLiteral("阶段状态");
     }
+    if (tableName == QStringLiteral("database_stage_history")) {
+        return QStringLiteral("阶段历史");
+    }
+    if (tableName == QStringLiteral("database_story_time_state")) {
+        return QStringLiteral("剧情时间");
+    }
+    if (tableName == QStringLiteral("database_story_time_history")) {
+        return QStringLiteral("时间历史");
+    }
+    if (tableName == QStringLiteral("database_active_tags")) {
+        return QStringLiteral("活动标签");
+    }
     if (tableName == QStringLiteral("database_plot_ledger")) {
         return QStringLiteral("剧情账本");
+    }
+    if (tableName == QStringLiteral("database_turn_records")) {
+        return QStringLiteral("状态记录回合");
+    }
+    if (tableName == QStringLiteral("database_turn_displays")) {
+        return QStringLiteral("状态记录卡片");
+    }
+    if (tableName == QStringLiteral("database_turn_effects")) {
+        return QStringLiteral("回合变更记录");
     }
     return tableName;
 }
@@ -1221,6 +2160,138 @@ QStringList databaseRowsFromOverview(const DatabaseOverview& overview) {
         rows.append(rowText(QStringLiteral("错误"), displayText(overview.status.message)));
     }
     return rows;
+}
+
+QVariantMap databaseOperationToVariant(const DatabaseOperationResult& result) {
+    QVariantMap map;
+    map.insert(QStringLiteral("ok"), result.ok);
+    map.insert(QStringLiteral("code"), result.code);
+    map.insert(QStringLiteral("message"), result.message);
+    map.insert(QStringLiteral("turnId"), result.turnId);
+    map.insert(QStringLiteral("affectedRows"), result.affectedRows);
+    return map;
+}
+
+bool isRetryableDatabaseError(const QString& code) {
+    return code == QStringLiteral("config_missing")
+        || code == QStringLiteral("provider_auth")
+        || code == QStringLiteral("provider_timeout")
+        || code == QStringLiteral("provider_network")
+        || code == QStringLiteral("provider_response")
+        || code == QStringLiteral("invalid_json")
+        || code == QStringLiteral("apply_error")
+        || code == QStringLiteral("display_save_error");
+}
+
+QVariantMap databaseTurnViewToVariant(const DatabaseTurnView& view) {
+    QVariantMap map;
+    map.insert(QStringLiteral("status"), databaseTurnStatusToString(view.turn.status));
+    map.insert(QStringLiteral("turnId"), view.turn.turnId);
+    map.insert(QStringLiteral("cardUid"), view.turn.cardUid);
+    map.insert(QStringLiteral("conversationId"), view.turn.conversationId);
+    map.insert(QStringLiteral("messageId"), view.turn.messageId);
+    map.insert(QStringLiteral("turnIndex"), view.turn.turnIndex);
+    map.insert(QStringLiteral("workerModel"), view.turn.workerModel);
+    map.insert(QStringLiteral("attemptCount"), view.turn.attemptCount);
+    map.insert(QStringLiteral("warningsJson"), view.turn.warningsJson);
+    map.insert(QStringLiteral("createdAt"), view.turn.createdAt);
+    map.insert(QStringLiteral("updatedAt"), view.turn.updatedAt);
+    map.insert(QStringLiteral("completedAt"), view.turn.completedAt);
+    map.insert(QStringLiteral("hasDisplay"), view.hasDisplay);
+    if (view.hasDisplay) {
+        map.insert(QStringLiteral("titleCard"), view.display.title.toVariantMap());
+        map.insert(QStringLiteral("recordCard"), view.display.record.toVariantMap());
+    }
+    QVariantMap error;
+    error.insert(QStringLiteral("code"), view.turn.errorCode);
+    error.insert(QStringLiteral("message"), view.turn.errorMessage);
+    error.insert(QStringLiteral("retryable"), isRetryableDatabaseError(view.turn.errorCode));
+    map.insert(QStringLiteral("error"), error);
+    map.insert(QStringLiteral("canRetry"), view.turn.status == DatabaseTurnStatus::Error
+            && isRetryableDatabaseError(view.turn.errorCode));
+    return map;
+}
+
+QVariantList databaseRuntimeItemsToVariant(const QList<QJsonObject>& items) {
+    QVariantList result;
+    result.reserve(items.size());
+    for (const QJsonObject& item : items) {
+        result.append(item.toVariantMap());
+    }
+    return result;
+}
+
+QVariantMap databaseRuntimeViewToVariant(const DatabaseRuntimeView& view) {
+    QVariantMap result;
+    result.insert(QStringLiteral("cardUid"), view.cardUid);
+    result.insert(QStringLiteral("snapshots"), databaseRuntimeItemsToVariant(view.snapshots));
+    result.insert(QStringLiteral("characters"), databaseRuntimeItemsToVariant(view.characters));
+    result.insert(QStringLiteral("variables"), databaseRuntimeItemsToVariant(view.variables));
+    result.insert(QStringLiteral("metricHistory"), databaseRuntimeItemsToVariant(view.metricHistory));
+    result.insert(QStringLiteral("relationships"), databaseRuntimeItemsToVariant(view.relationships));
+    result.insert(QStringLiteral("relationshipHistory"), databaseRuntimeItemsToVariant(view.relationshipHistory));
+    result.insert(QStringLiteral("stages"), databaseRuntimeItemsToVariant(view.stages));
+    result.insert(QStringLiteral("ledger"), databaseRuntimeItemsToVariant(view.ledger));
+    result.insert(QStringLiteral("storyTime"), view.storyTime.toVariantMap());
+    result.insert(QStringLiteral("storyTimeHistory"), databaseRuntimeItemsToVariant(view.storyTimeHistory));
+    result.insert(QStringLiteral("stageHistory"), databaseRuntimeItemsToVariant(view.stageHistory));
+    result.insert(QStringLiteral("activeTags"), databaseRuntimeItemsToVariant(view.activeTags));
+    return result;
+}
+
+QVariantMap databaseDebugTableToVariant(const DatabaseDebugTableView& view) {
+    QVariantMap result;
+    result.insert(QStringLiteral("ok"), view.ok);
+    result.insert(QStringLiteral("message"), view.message);
+    result.insert(QStringLiteral("tableName"), view.tableName);
+    result.insert(QStringLiteral("label"), databaseTableLabel(view.tableName));
+    result.insert(QStringLiteral("columns"), view.columns);
+    result.insert(QStringLiteral("rows"), databaseRuntimeItemsToVariant(view.rows));
+    result.insert(QStringLiteral("totalRows"), view.totalRows);
+    result.insert(QStringLiteral("offset"), view.offset);
+    result.insert(QStringLiteral("limit"), view.limit);
+    return result;
+}
+
+QJsonArray databaseWorkerRecentHistory(const QJsonArray& conversations, const QString& conversationId,
+    const QString& assistantMessageId, int inputTurnCount) {
+    QJsonArray filtered;
+    const QString targetConversationId = conversationId.trimmed();
+    const QString targetAssistantMessageId = assistantMessageId.trimmed();
+    for (const QJsonValue& value : conversations) {
+        const QJsonObject message = value.toObject();
+        if (!targetConversationId.isEmpty()
+            && message.value(QStringLiteral("conversation_id")).toString().trimmed() != targetConversationId) {
+            continue;
+        }
+        if (!targetAssistantMessageId.isEmpty()
+            && message.value(QStringLiteral("message_id")).toString().trimmed() == targetAssistantMessageId) {
+            break;
+        }
+        const QString role = message.value(QStringLiteral("role")).toString().trimmed();
+        const QString content = message.value(QStringLiteral("content")).toString().trimmed();
+        if ((role != QStringLiteral("user") && role != QStringLiteral("assistant")) || content.isEmpty()) {
+            continue;
+        }
+        filtered.append(QJsonObject{
+            { QStringLiteral("role"), role },
+            { QStringLiteral("content"), content.left(4000) },
+        });
+    }
+
+    const int messageLimit = qBound(2, inputTurnCount, 20) * 2;
+    if (filtered.size() <= messageLimit) {
+        return filtered;
+    }
+    QJsonArray result;
+    for (int index = filtered.size() - messageLimit; index < filtered.size(); ++index) {
+        result.append(filtered.at(index));
+    }
+    return result;
+}
+
+QString cardUidFromRuntimeCard(const QJsonObject& card) {
+    return card.value(QStringLiteral("card_uid")).toString().trimmed();
 }
 
 QString normalizedOutputPart(QString text) {
@@ -1525,6 +2596,7 @@ QVariantMap chatMessageToVariant(const QJsonObject& message, int index, bool out
     item.insert(QStringLiteral("created_at"), message.value("created_at").toString());
     item.insert(QStringLiteral("timestamp"), message.value("timestamp").toString());
     item.insert(QStringLiteral("message_id"), message.value("message_id").toString());
+    item.insert(QStringLiteral("conversation_id"), message.value("conversation_id").toString());
     item.insert(QStringLiteral("source"), message.value("source").toString());
     item.insert(QStringLiteral("isUser"), role == QStringLiteral("user"));
     item.insert(QStringLiteral("isAssistant"), role == QStringLiteral("assistant"));
@@ -1555,6 +2627,7 @@ struct ChatRuntimeConfig {
     int requestTimeout{};
     bool demoMode{};
     bool outputSplittingEnabled{ true };
+    ReplyDisplayMode replyDisplayMode{ ReplyDisplayMode::SplitBubbles };
     QString source;
 };
 
@@ -1680,7 +2753,15 @@ ChatRuntimeConfig chatRuntimeConfig(const QDir& root) {
     config.historyLimit = qBound(1, settings.value(QStringLiteral("history_limit")).toInt(20), 100);
     config.requestTimeout = qBound(10, settings.value(QStringLiteral("request_timeout")).toInt(120), 600);
     config.demoMode = settings.value(QStringLiteral("demo_mode")).toBool(false);
-    config.outputSplittingEnabled = settings.value(QStringLiteral("output_splitting_enabled")).toBool(true);
+    bool recognizedReplyMode = false;
+    config.replyDisplayMode = replyDisplayModeFromString(
+        settings.value(QStringLiteral("reply_display_mode")).toString(), &recognizedReplyMode);
+    if (!recognizedReplyMode) {
+        config.replyDisplayMode = settings.value(QStringLiteral("output_splitting_enabled")).toBool(true)
+            ? ReplyDisplayMode::SplitBubbles
+            : ReplyDisplayMode::StateRecord;
+    }
+    config.outputSplittingEnabled = config.replyDisplayMode == ReplyDisplayMode::SplitBubbles;
     config.source = settingsBaseUrl.isEmpty() && !routeBaseUrl.isEmpty() ? QStringLiteral("route_forwarding") : QStringLiteral("settings");
     return config;
 }
@@ -1689,18 +2770,32 @@ QJsonObject chatHistoryMessage(
     const QString& role,
     const QString& content,
     const QString& source,
-    const QJsonArray& displayParts = {}) {
+    const QJsonArray& displayParts = {},
+    const QString& conversationId = {}) {
     QJsonObject message;
     message.insert(QStringLiteral("role"), role);
     message.insert(QStringLiteral("content"), content);
     message.insert(QStringLiteral("created_at"), QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
     message.insert(QStringLiteral("message_id"), QUuid::createUuid().toString(QUuid::WithoutBraces));
     message.insert(QStringLiteral("source"), source);
+    if (!conversationId.trimmed().isEmpty()) {
+        message.insert(QStringLiteral("conversation_id"), conversationId.trimmed());
+    }
     if (role == QStringLiteral("assistant") && !displayParts.isEmpty()) {
         message.insert(QStringLiteral("display_parts"), displayParts);
         message.insert(QStringLiteral("display_processor"), QStringLiteral("output-splitting-subagent"));
     }
     return message;
+}
+
+QString conversationIdForNextMessage(const QJsonArray& conversations) {
+    for (int index = conversations.size() - 1; index >= 0; --index) {
+        const QString candidate = conversations.at(index).toObject().value(QStringLiteral("conversation_id")).toString().trimmed();
+        if (!candidate.isEmpty()) {
+            return candidate;
+        }
+    }
+    return QUuid::createUuid().toString(QUuid::WithoutBraces);
 }
 
 QString promptField(const QJsonObject& object, const QString& key, int maxLength = 2400) {
@@ -1909,7 +3004,8 @@ QString worldbookQueryText(const QJsonArray& conversations, const ChatRuntimeCon
     return parts.join(QStringLiteral("\n"));
 }
 
-QList<WorldbookHit> matchWorldbookHits(const QDir& root, const QJsonArray& conversations, const ChatRuntimeConfig& config) {
+QList<WorldbookHit> matchWorldbookHits(const QDir& root, const QJsonArray& conversations,
+    const ChatRuntimeConfig& config, const QStringList& activeTags) {
     const QJsonObject store = readJsonObject(root, QStringLiteral("data/worldbook.json"), nullptr);
     const QJsonObject settings = store.value(QStringLiteral("settings")).toObject();
     if (!settings.value(QStringLiteral("enabled")).toBool(true)) {
@@ -1917,9 +3013,10 @@ QList<WorldbookHit> matchWorldbookHits(const QDir& root, const QJsonArray& conve
     }
 
     const QString queryText = worldbookQueryText(conversations, config);
-    if (queryText.trimmed().isEmpty()) {
+    if (queryText.trimmed().isEmpty() && activeTags.isEmpty()) {
         return {};
     }
+    const QSet<QString> activeTagSet(activeTags.cbegin(), activeTags.cend());
 
     const QJsonArray entries = store.value(QStringLiteral("entries")).toArray();
     const int maxHits = qBound(1, settings.value(QStringLiteral("max_hits")).toInt(3), 20);
@@ -1949,13 +3046,36 @@ QList<WorldbookHit> matchWorldbookHits(const QDir& root, const QJsonArray& conve
         }
 
         QString entryType = entry.value(QStringLiteral("entry_type")).toString(defaultEntryType).trimmed().toLower();
-        if (entryType != QStringLiteral("constant") && entryType != QStringLiteral("keyword")) {
+        if (entryType != QStringLiteral("constant") && entryType != QStringLiteral("keyword")
+            && entryType != QStringLiteral("external_tag")) {
             continue;
         }
 
         QString matchedText;
         QString source = entryType;
-        if (entryType == QStringLiteral("keyword")) {
+        if (entryType == QStringLiteral("external_tag")) {
+            QStringList activationTags;
+            for (const QJsonValue& value : entry.value(QStringLiteral("activation_tags")).toArray()) {
+                const QString tag = value.toString().trimmed();
+                if (!tag.isEmpty() && !activationTags.contains(tag)) {
+                    activationTags.append(tag);
+                }
+            }
+            if (activationTags.isEmpty()) {
+                activationTags = splitWorldbookAliases(worldbookString(entry, QStringLiteral("trigger"), 1200));
+            }
+            QStringList matchedTags;
+            for (const QString& tag : activationTags) {
+                if (activeTagSet.contains(tag)) {
+                    matchedTags.append(tag);
+                }
+            }
+            if (matchedTags.isEmpty()) {
+                continue;
+            }
+            matchedText = matchedTags.join(QStringLiteral(" / "));
+            source = QStringLiteral("external_tag");
+        } else if (entryType == QStringLiteral("keyword")) {
             const QString trigger = worldbookString(entry, QStringLiteral("trigger"), 1200);
             if (trigger.isEmpty()) {
                 continue;
@@ -2016,8 +3136,10 @@ QList<WorldbookHit> matchWorldbookHits(const QDir& root, const QJsonArray& conve
         if (left.order != right.order) {
             return left.order < right.order;
         }
-        const int leftSourceRank = left.source == QStringLiteral("constant") ? 0 : 3;
-        const int rightSourceRank = right.source == QStringLiteral("constant") ? 0 : 3;
+        const int leftSourceRank = left.source == QStringLiteral("constant") ? 0
+            : (left.source == QStringLiteral("external_tag") ? 1 : 3);
+        const int rightSourceRank = right.source == QStringLiteral("constant") ? 0
+            : (right.source == QStringLiteral("external_tag") ? 1 : 3);
         if (leftSourceRank != rightSourceRank) {
             return leftSourceRank < rightSourceRank;
         }
@@ -2873,7 +3995,18 @@ QJsonArray buildChatCompletionMessages(const QDir& root, const QJsonArray& conve
         systemLines.append(QStringLiteral("[Preset]"));
         systemLines.append(presetPrompt);
     }
-    const QString worldbookPrompt = buildWorldbookPrompt(matchWorldbookHits(root, conversations, config));
+    QStringList databaseActiveTags;
+    const QString cardUid = cardUidFromRuntimeCard(card);
+    if (!cardUid.isEmpty()) {
+        for (const QJsonObject& item : DatabaseService(root.absolutePath()).runtimeView(cardUid).activeTags) {
+            const QString tag = item.value(QStringLiteral("tag")).toString().trimmed();
+            if (!tag.isEmpty() && !databaseActiveTags.contains(tag)) {
+                databaseActiveTags.append(tag);
+            }
+        }
+    }
+    const QString worldbookPrompt = buildWorldbookPrompt(
+        matchWorldbookHits(root, conversations, config, databaseActiveTags));
     if (!worldbookPrompt.isEmpty()) {
         systemLines.append(QString());
         systemLines.append(QStringLiteral("[Worldbook]"));
@@ -3729,6 +4862,23 @@ FantarealBridge::FantarealBridge(QObject* parent)
         legacyRoot_ = QDir::fromNativeSeparators(QStringLiteral(FANTAREAL_DEFAULT_ROOT));
     }
     DatabaseService(legacyRoot_).ensureInitialized();
+    databaseWorker_ = new DatabaseWorker(legacyRoot_, this);
+    QObject::connect(databaseWorker_, &DatabaseWorker::turnFinished, this,
+        [this](const QString&, const DatabaseOperationResult& result) {
+            databaseWorkerStatus_ = databaseOperationToVariant(result);
+            refreshLegacyScan();
+        });
+    QObject::connect(databaseWorker_, &DatabaseWorker::modelsFetched, this,
+        [this](const QStringList& models, const DatabaseOperationResult& result) {
+            databaseWorkerModels_ = models;
+            databaseWorkerStatus_ = databaseOperationToVariant(result);
+            emit scanChanged();
+        });
+    QObject::connect(databaseWorker_, &DatabaseWorker::connectionTested, this,
+        [this](const DatabaseOperationResult& result) {
+            databaseWorkerStatus_ = databaseOperationToVariant(result);
+            emit scanChanged();
+        });
     refreshLegacyScan();
 }
 
@@ -3814,6 +4964,26 @@ QVariantList FantarealBridge::cardAuthoringProjectItems() const {
 
 QVariantMap FantarealBridge::databaseStatus() const {
     return databaseStatus_;
+}
+
+QVariantMap FantarealBridge::databaseWorkerDraft() const {
+    return databaseWorkerDraft_;
+}
+
+QVariantList FantarealBridge::databaseRecentTurns() const {
+    return databaseRecentTurns_;
+}
+
+QVariantMap FantarealBridge::databaseRuntime() const {
+    return databaseRuntime_;
+}
+
+QVariantMap FantarealBridge::databaseWorkerStatus() const {
+    return databaseWorkerStatus_;
+}
+
+QStringList FantarealBridge::databaseWorkerModels() const {
+    return databaseWorkerModels_;
 }
 
 QVariantMap FantarealBridge::presetDraft() const {
@@ -4025,8 +5195,17 @@ QVariantMap FantarealBridge::saveSettingsDraft(const QVariantMap& draft) {
         draftInt(draft, QStringLiteral("request_timeout"), settings.value("request_timeout").toInt(120), 10, 600));
     settings.insert(QStringLiteral("demo_mode"),
         draft.value(QStringLiteral("demo_mode"), settings.value("demo_mode").toBool(false)).toBool());
-    settings.insert(QStringLiteral("output_splitting_enabled"),
-        draft.value(QStringLiteral("output_splitting_enabled"), settings.value("output_splitting_enabled").toBool(true)).toBool());
+    bool recognizedReplyMode = false;
+    ReplyDisplayMode replyDisplayMode = replyDisplayModeFromString(
+        draft.value(QStringLiteral("reply_display_mode")).toString(), &recognizedReplyMode);
+    if (!recognizedReplyMode) {
+        const bool fallback = draft.value(
+            QStringLiteral("output_splitting_enabled"),
+            settings.value(QStringLiteral("output_splitting_enabled")).toBool(true)).toBool();
+        replyDisplayMode = fallback ? ReplyDisplayMode::SplitBubbles : ReplyDisplayMode::StateRecord;
+    }
+    settings.insert(QStringLiteral("reply_display_mode"), replyDisplayModeToString(replyDisplayMode));
+    settings.insert(QStringLiteral("output_splitting_enabled"), replyDisplayMode == ReplyDisplayMode::SplitBubbles);
     settings.insert(QStringLiteral("embedding_base_url"),
         draftString(draft, QStringLiteral("embedding_base_url"), settings.value("embedding_base_url").toString(), 2048));
     settings.insert(QStringLiteral("embedding_model"),
@@ -4341,14 +5520,43 @@ QVariantMap FantarealBridge::saveCardDraft(const QVariantMap& draft) {
         draftString(draft, QStringLiteral("creator_comment"), raw.value(QStringLiteral("creator_comment")).toString(), 12000));
     raw.insert(QStringLiteral("tags"), cardTagsFromDraft(draft, raw.value(QStringLiteral("tags")).toArray()));
 
-    if (draft.contains(QStringLiteral("databaseEnabled"))) {
+    if (draft.contains(QStringLiteral("personas"))) {
+        const QJsonValue personasValue = QJsonValue::fromVariant(draft.value(QStringLiteral("personas")));
+        if (personasValue.isArray()) {
+            raw.insert(
+                QStringLiteral("personas"),
+                personasFromDraft(personasValue, raw.value(QStringLiteral("personas")).toObject()));
+        }
+    }
+
+    bool databaseTouched = false;
+    if (draft.contains(QStringLiteral("databaseConfig"))) {
+        const QJsonValue databaseValue = QJsonValue::fromVariant(draft.value(QStringLiteral("databaseConfig")));
+        if (databaseValue.isObject()) {
+            QJsonObject stateJournal = controlledDatabaseConfig(
+                databaseValue.toObject(),
+                raw.value(QStringLiteral("stateJournal")).toObject(),
+                true);
+            stateJournal.insert(QStringLiteral("databaseDraft"), synchronizedDatabaseDraft(stateJournal));
+            raw.insert(QStringLiteral("stateJournal"), stateJournal);
+            databaseTouched = true;
+        }
+    }
+    if (!databaseTouched && draft.contains(QStringLiteral("databaseEnabled"))) {
         raw = LegacyStateJournalAdapter::applyDatabaseEnabled(
             raw,
             draft.value(QStringLiteral("databaseEnabled")).toBool());
-    } else if (draft.contains(QStringLiteral("stateJournalEnabled"))) {
+        databaseTouched = true;
+    } else if (!databaseTouched && draft.contains(QStringLiteral("stateJournalEnabled"))) {
         raw = LegacyStateJournalAdapter::applyDatabaseEnabled(
             raw,
             draft.value(QStringLiteral("stateJournalEnabled")).toBool());
+        databaseTouched = true;
+    }
+    if (databaseTouched && raw.value(QStringLiteral("stateJournal")).isObject()) {
+        QJsonObject stateJournal = raw.value(QStringLiteral("stateJournal")).toObject();
+        stateJournal.insert(QStringLiteral("databaseDraft"), synchronizedDatabaseDraft(stateJournal));
+        raw.insert(QStringLiteral("stateJournal"), stateJournal);
     }
 
     QJsonObject workshop = raw.value(QStringLiteral("creativeWorkshop")).toObject();
@@ -5021,8 +6229,403 @@ QVariantMap FantarealBridge::refreshDatabaseStatus() {
     const DatabaseOverview overview = DatabaseService(legacyRoot_).overview();
     databaseStatus_ = databaseOverviewToVariant(overview);
     databaseRows_ = databaseRowsFromOverview(overview);
+    refreshDatabaseRuntime();
     emit scanChanged();
     return databaseStatus_;
+}
+
+QVariantMap FantarealBridge::saveDatabaseWorkerDraft(const QVariantMap& draft) {
+    const DatabaseOperationResult result = DatabaseService(legacyRoot_).saveWorkerConfig(draft);
+    databaseWorkerStatus_ = databaseOperationToVariant(result);
+    refreshDatabaseRuntime();
+    emit scanChanged();
+    return databaseWorkerStatus_;
+}
+
+QVariantMap FantarealBridge::clearDatabaseWorkerApiKey() {
+    const DatabaseOperationResult result = DatabaseService(legacyRoot_).saveWorkerConfig({}, true);
+    databaseWorkerStatus_ = databaseOperationToVariant(result);
+    refreshDatabaseRuntime();
+    emit scanChanged();
+    return databaseWorkerStatus_;
+}
+
+QVariantMap FantarealBridge::copyMainModelToDatabaseWorker() {
+    const QJsonObject settings = readJsonObject(QDir(legacyRoot_), QStringLiteral("data/settings.json"), nullptr);
+    const DatabaseOperationResult result = DatabaseService(legacyRoot_).copyMainModelConfig(settings);
+    databaseWorkerStatus_ = databaseOperationToVariant(result);
+    refreshDatabaseRuntime();
+    emit scanChanged();
+    return databaseWorkerStatus_;
+}
+
+QVariantMap FantarealBridge::fetchDatabaseWorkerModels() {
+    if (!databaseWorker_) {
+        return resultMap(false, QStringLiteral("DatabaseWorker 尚未初始化"));
+    }
+    databaseWorkerStatus_ = resultMap(true, QStringLiteral("正在获取 DatabaseWorker 模型列表"));
+    databaseWorker_->fetchModels();
+    emit scanChanged();
+    QVariantMap result = databaseWorkerStatus_;
+    result.insert(QStringLiteral("started"), true);
+    return result;
+}
+
+QVariantMap FantarealBridge::testDatabaseWorkerConnection() {
+    if (!databaseWorker_) {
+        return resultMap(false, QStringLiteral("DatabaseWorker 尚未初始化"));
+    }
+    databaseWorkerStatus_ = resultMap(true, QStringLiteral("正在测试 DatabaseWorker 连接"));
+    databaseWorker_->testConnection();
+    emit scanChanged();
+    QVariantMap result = databaseWorkerStatus_;
+    result.insert(QStringLiteral("started"), true);
+    return result;
+}
+
+QVariantMap FantarealBridge::initializeDatabaseRuntime() {
+    const QDir root(legacyRoot_);
+    const QJsonObject card = readJsonObject(root, QStringLiteral("data/current_role_card.json"), nullptr);
+    const QJsonObject raw = card.value(QStringLiteral("raw")).toObject();
+    const QString cardUid = cardUidFromRuntimeCard(card);
+    if (cardUid.isEmpty()) {
+        return resultMap(false, QStringLiteral("当前角色卡缺少唯一标识，无法初始化运行态"));
+    }
+    if (!LegacyStateJournalAdapter::databaseEnabled(raw, true)) {
+        return resultMap(false, QStringLiteral("当前角色卡未启用数据库，无法初始化运行态"));
+    }
+
+    const QJsonObject databaseConfig = CardAuthoring::normalizeProject(card)
+                                           .value(QStringLiteral("database")).toObject();
+    const DatabaseOperationResult operation = DatabaseService(legacyRoot_).initializeRuntime(cardUid, databaseConfig);
+    databaseWorkerStatus_ = databaseOperationToVariant(operation);
+    refreshLegacyScan();
+    return databaseWorkerStatus_;
+}
+
+QVariantMap FantarealBridge::saveDatabaseStoryTimeDraft(const QVariantMap& draft) {
+    const QJsonObject card = readJsonObject(
+        QDir(legacyRoot_), QStringLiteral("data/current_role_card.json"), nullptr);
+    const QString cardUid = cardUidFromRuntimeCard(card);
+    if (cardUid.isEmpty()) {
+        return resultMap(false, QStringLiteral("当前角色卡缺少唯一标识，无法保存剧情时间"));
+    }
+    const DatabaseOperationResult operation = DatabaseService(legacyRoot_).configureStoryTime(
+        cardUid, QJsonObject::fromVariantMap(draft));
+    databaseWorkerStatus_ = databaseOperationToVariant(operation);
+    refreshLegacyScan();
+    return databaseWorkerStatus_;
+}
+
+QVariantMap FantarealBridge::generateLatestDatabaseTurn() {
+    const QDir root(legacyRoot_);
+    QJsonArray conversations;
+    QString readError;
+    if (!readJsonArrayFileStrict(root.absoluteFilePath(QStringLiteral("data/conversations.json")), &conversations, &readError)) {
+        return resultMap(false, QStringLiteral("conversations.json %1").arg(readError));
+    }
+    const QString conversationId = conversationIdForNextMessage(conversations);
+    if (conversationId.isEmpty()) {
+        return resultMap(false, QStringLiteral("当前会话没有可用于生成状态记录的对话标识"));
+    }
+    for (int index = conversations.size() - 1; index >= 0; --index) {
+        const QJsonObject assistant = conversations.at(index).toObject();
+        if (assistant.value(QStringLiteral("role")).toString() != QStringLiteral("assistant")
+            || assistant.value(QStringLiteral("conversation_id")).toString().trimmed() != conversationId) {
+            continue;
+        }
+        const QString content = assistant.value(QStringLiteral("content")).toString();
+        if (content.trimmed().isEmpty()) {
+            return resultMap(false, QStringLiteral("最近一条助手回复没有可用于生成状态记录的正文"));
+        }
+        databaseWorkerStatus_ = startDatabaseWorkerForAssistant(assistant, content, conversations, true);
+        refreshLegacyScan();
+        return databaseWorkerStatus_;
+    }
+    return resultMap(false, QStringLiteral("当前会话还没有助手回复，无法生成状态记录"));
+}
+
+QVariantMap FantarealBridge::retryDatabaseTurn(const QString& messageId) {
+    const QDir root(legacyRoot_);
+    const QJsonObject card = readJsonObject(root, QStringLiteral("data/current_role_card.json"), nullptr);
+    const QString cardUid = cardUidFromRuntimeCard(card);
+    const QString id = messageId.trimmed();
+    if (cardUid.isEmpty() || id.isEmpty()) {
+        return resultMap(false, QStringLiteral("当前角色卡或状态记录标识无效"));
+    }
+    DatabaseService service(legacyRoot_);
+    const DatabaseWorkerConfig config = service.loadWorkerConfig();
+    const std::optional<DatabaseTurnView> view = service.turnByMessageId(cardUid, id);
+    if (!view) {
+        return resultMap(false, QStringLiteral("未找到对应的状态记录"));
+    }
+
+    QJsonArray conversations;
+    QString readError;
+    if (!readJsonArrayFileStrict(root.absoluteFilePath(QStringLiteral("data/conversations.json")), &conversations, &readError)) {
+        return resultMap(false, QStringLiteral("conversations.json %1").arg(readError));
+    }
+    QJsonObject assistant;
+    for (const QJsonValue& value : conversations) {
+        const QJsonObject candidate = value.toObject();
+        if (candidate.value(QStringLiteral("message_id")).toString() == id
+            && candidate.value(QStringLiteral("role")).toString() == QStringLiteral("assistant")) {
+            assistant = candidate;
+            break;
+        }
+    }
+    const QString assistantContent = assistant.value(QStringLiteral("content")).toString();
+    const QString contentHash = QString::fromLatin1(QCryptographicHash::hash(
+        assistantContent.toUtf8(), QCryptographicHash::Sha256).toHex());
+    if (assistantContent.isEmpty() || contentHash != view->turn.contentHash) {
+        service.markTurnError(view->turn.turnId, QStringLiteral("content_stale"), QStringLiteral("当前助手正文已变化，不能覆盖旧状态记录"));
+        refreshLegacyScan();
+        return resultMap(false, QStringLiteral("助手正文已变化，请重新生成回复"));
+    }
+    const DatabaseOperationResult retry = service.retryTurn(view->turn.turnId);
+    if (!retry.ok) {
+        databaseWorkerStatus_ = databaseOperationToVariant(retry);
+        refreshLegacyScan();
+        return databaseWorkerStatus_;
+    }
+
+    DatabaseWorkerRequest request;
+    request.turn = view->turn;
+    request.turn.status = DatabaseTurnStatus::Pending;
+    request.assistantContent = assistantContent;
+    request.roleName = card.value(QStringLiteral("raw")).toObject().value(QStringLiteral("name")).toString();
+    request.databaseConfig = CardAuthoring::normalizeProject(card).value(QStringLiteral("database")).toObject();
+    request.recentHistory = databaseWorkerRecentHistory(
+        conversations, view->turn.conversationId, view->turn.messageId, config.inputTurnCount);
+    databaseWorkerStatus_ = databaseOperationToVariant(retry);
+    if (databaseWorker_) {
+        QTimer::singleShot(0, this, [this, request]() {
+            if (databaseWorker_) {
+                databaseWorker_->start(request);
+            }
+        });
+    }
+    refreshLegacyScan();
+    return databaseWorkerStatus_;
+}
+
+QVariantMap FantarealBridge::refreshDatabaseRecentTurns() {
+    refreshDatabaseRuntime();
+    emit scanChanged();
+    QVariantMap result = resultMap(true, QStringLiteral("状态记录已刷新"));
+    result.insert(QStringLiteral("turns"), databaseRecentTurns_);
+    return result;
+}
+
+QVariantMap FantarealBridge::loadDatabaseDebugTable(const QString& tableName, int offset, int limit) {
+    const QJsonObject card = readJsonObject(
+        QDir(legacyRoot_), QStringLiteral("data/current_role_card.json"), nullptr);
+    const DatabaseDebugTableView view = DatabaseService(legacyRoot_).debugTable(
+        tableName, cardUidFromRuntimeCard(card), offset, limit);
+    return databaseDebugTableToVariant(view);
+}
+
+void FantarealBridge::refreshDatabaseRuntime() {
+    const QDir root(legacyRoot_);
+    DatabaseService service(legacyRoot_);
+    QString configError;
+    databaseWorkerDraft_ = service.workerConfigDraft(&configError);
+    if (!configError.isEmpty()) {
+        databaseWorkerStatus_ = resultMap(false, configError);
+    }
+
+    const QJsonObject card = readJsonObject(root, QStringLiteral("data/current_role_card.json"), nullptr);
+    const QString cardUid = cardUidFromRuntimeCard(card);
+    databaseRecentTurns_.clear();
+    databaseRuntime_ = databaseRuntimeViewToVariant({});
+    if (!cardUid.isEmpty()) {
+        for (const DatabaseTurnView& view : service.recentTurns(cardUid, 50)) {
+            databaseRecentTurns_.append(databaseTurnViewToVariant(view));
+        }
+        databaseRuntime_ = databaseRuntimeViewToVariant(service.runtimeView(cardUid));
+    }
+    databaseWorkerStatus_.insert(QStringLiteral("recentTurnCount"), databaseRecentTurns_.size());
+    databaseWorkerStatus_.insert(QStringLiteral("runtimeVariableCount"), databaseRuntime_.value(QStringLiteral("variables")).toList().size());
+    databaseWorkerStatus_.insert(QStringLiteral("active"), false);
+}
+
+DatabaseOperationResult FantarealBridge::supersedeDatabaseTurnsForRemovedAssistantMessages(
+    const QJsonArray& conversations, int firstRemovedIndex) {
+    if (firstRemovedIndex < 0 || firstRemovedIndex >= conversations.size()) {
+        return {true, {}, QStringLiteral("没有需要回滚的状态记录")};
+    }
+
+    const QDir root(legacyRoot_);
+    const QJsonObject card = readJsonObject(root, QStringLiteral("data/current_role_card.json"), nullptr);
+    const QString cardUid = cardUidFromRuntimeCard(card);
+    if (cardUid.isEmpty()) {
+        return {true, {}, QStringLiteral("当前角色卡没有数据库运行态需要回滚")};
+    }
+
+    DatabaseService service(legacyRoot_);
+    QStringList messageIds;
+    QStringList turnIds;
+    for (int i = firstRemovedIndex; i < conversations.size(); ++i) {
+        const QJsonObject message = conversations.at(i).toObject();
+        if (message.value(QStringLiteral("role")).toString() != QStringLiteral("assistant")) {
+            continue;
+        }
+        const QString messageId = message.value(QStringLiteral("message_id")).toString().trimmed();
+        if (messageId.isEmpty()) {
+            continue;
+        }
+        const std::optional<DatabaseTurnView> turn = service.turnByMessageId(cardUid, messageId);
+        if (!turn || turn->turn.status == DatabaseTurnStatus::Superseded) {
+            continue;
+        }
+        messageIds.append(messageId);
+        turnIds.append(turn->turn.turnId);
+    }
+    if (messageIds.isEmpty()) {
+        return {true, {}, QStringLiteral("没有活动状态记录需要回滚")};
+    }
+    const DatabaseOperationResult operation = service.markMessagesSuperseded(cardUid, messageIds);
+    if (!operation.ok) {
+        return operation;
+    }
+    if (databaseWorker_) {
+        for (const QString& turnId : turnIds) {
+            databaseWorker_->cancel(turnId);
+        }
+    }
+    return operation;
+}
+
+void FantarealBridge::scheduleDatabaseWorkerForAssistant(
+    const QJsonObject& assistantMessage,
+    const QString& assistantContent,
+    const QJsonArray& conversations) {
+    const QVariantMap result = startDatabaseWorkerForAssistant(
+        assistantMessage, assistantContent, conversations, false);
+    if (!result.value(QStringLiteral("skipped")).toBool()) {
+        databaseWorkerStatus_ = result;
+    }
+}
+
+QVariantMap FantarealBridge::startDatabaseWorkerForAssistant(
+    const QJsonObject& assistantMessage,
+    const QString& assistantContent,
+    const QJsonArray& conversations,
+    bool manual) {
+    const QDir root(legacyRoot_);
+    const QJsonObject card = readJsonObject(root, QStringLiteral("data/current_role_card.json"), nullptr);
+    const QJsonObject raw = card.value(QStringLiteral("raw")).toObject();
+    const QString cardUid = cardUidFromRuntimeCard(card);
+    if (cardUid.isEmpty() || !LegacyStateJournalAdapter::databaseEnabled(raw, true)) {
+        return resultMap(false, QStringLiteral("当前角色卡未启用数据库，无法生成状态记录"));
+    }
+
+    DatabaseService service(legacyRoot_);
+    const DatabaseWorkerConfig config = service.loadWorkerConfig();
+    if (!config.enabled) {
+        return resultMap(false, QStringLiteral("DatabaseWorker 已关闭，无法生成状态记录"));
+    }
+    if (!manual && !config.autoUpdate) {
+        QVariantMap skipped = resultMap(true, QStringLiteral("DatabaseWorker 自动生成已关闭"));
+        skipped.insert(QStringLiteral("skipped"), true);
+        return skipped;
+    }
+    if (!databaseWorker_) {
+        return resultMap(false, QStringLiteral("DatabaseWorker 尚未初始化"));
+    }
+    if (manual
+        && (config.apiBaseUrl.trimmed().isEmpty() || !config.apiKeyConfigured() || config.model.trimmed().isEmpty())) {
+        return resultMap(false, QStringLiteral("请先完整配置 DatabaseWorker 的 API 地址、密钥和模型"));
+    }
+    const QString messageId = assistantMessage.value(QStringLiteral("message_id")).toString().trimmed();
+    const QString conversationId = assistantMessage.value(QStringLiteral("conversation_id")).toString().trimmed();
+    if (messageId.isEmpty() || conversationId.isEmpty() || assistantContent.trimmed().isEmpty()) {
+        return resultMap(false, QStringLiteral("助手回复缺少会话标识、消息标识或正文，无法生成状态记录"));
+    }
+
+    const QString contentHash = QString::fromLatin1(QCryptographicHash::hash(
+        assistantContent.toUtf8(), QCryptographicHash::Sha256).toHex());
+    DatabaseWorkerRequest request;
+    const std::optional<DatabaseTurnView> existing = service.turnByMessageId(cardUid, messageId);
+    if (existing) {
+        if (existing->turn.contentHash != contentHash) {
+            return resultMap(false, QStringLiteral("助手正文已变化，请重新生成回复后再生成状态记录"));
+        }
+        if (existing->turn.status == DatabaseTurnStatus::Pending) {
+            QVariantMap pending = databaseTurnViewToVariant(*existing);
+            pending.insert(QStringLiteral("ok"), true);
+            pending.insert(QStringLiteral("message"), QStringLiteral("最近一条回复的状态记录正在生成"));
+            pending.insert(QStringLiteral("started"), false);
+            return pending;
+        }
+        if (existing->turn.status == DatabaseTurnStatus::Ready) {
+            QVariantMap ready = databaseTurnViewToVariant(*existing);
+            ready.insert(QStringLiteral("ok"), true);
+            ready.insert(QStringLiteral("message"), QStringLiteral("最近一条回复已有状态记录"));
+            ready.insert(QStringLiteral("started"), false);
+            return ready;
+        }
+        if (existing->turn.status == DatabaseTurnStatus::Superseded) {
+            return resultMap(false, QStringLiteral("最近一条回复已被替换，无法为其生成状态记录"));
+        }
+        const DatabaseOperationResult retried = service.retryTurn(existing->turn.turnId);
+        if (!retried.ok) {
+            return databaseOperationToVariant(retried);
+        }
+        request.turn = existing->turn;
+        request.turn.status = DatabaseTurnStatus::Pending;
+    }
+
+    DatabaseOperationResult operation;
+    if (!existing) {
+        int turnIndex = 0;
+        for (const QJsonValue& value : conversations) {
+            const QJsonObject message = value.toObject();
+            if (message.value(QStringLiteral("role")).toString() == QStringLiteral("assistant")
+                && message.value(QStringLiteral("conversation_id")).toString() == conversationId) {
+                ++turnIndex;
+            }
+        }
+
+        DatabaseTurnRecord record;
+        record.turnId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        record.cardUid = cardUid;
+        record.conversationId = conversationId;
+        record.messageId = messageId;
+        record.turnIndex = qMax(1, turnIndex);
+        record.contentHash = contentHash;
+        record.triggerSource = manual ? QStringLiteral("manual") : QStringLiteral("chat_complete");
+        record.workerModel = config.model;
+        operation = service.createPendingTurn(record);
+        if (!operation.ok) {
+            return databaseOperationToVariant(operation);
+        }
+        request.turn = record;
+    } else {
+        operation = DatabaseOperationResult{
+            true,
+            {},
+            QStringLiteral("正在重新生成最近一条回复的状态记录"),
+            request.turn.turnId,
+            1,
+        };
+    }
+
+    request.assistantContent = assistantContent;
+    request.roleName = raw.value(QStringLiteral("name")).toString();
+    request.databaseConfig = CardAuthoring::normalizeProject(card).value(QStringLiteral("database")).toObject();
+    request.recentHistory = databaseWorkerRecentHistory(
+        conversations, conversationId, messageId, config.inputTurnCount);
+    refreshDatabaseRuntime();
+    QTimer::singleShot(0, this, [this, request]() {
+        if (databaseWorker_) {
+            databaseWorker_->start(request);
+        }
+    });
+    QVariantMap result = databaseOperationToVariant(operation);
+    result.insert(QStringLiteral("started"), true);
+    result.insert(QStringLiteral("manual"), manual);
+    return result;
 }
 
 QVariantMap FantarealBridge::syncCurrentCardToPersona() {
@@ -5621,13 +7224,16 @@ QVariantMap FantarealBridge::sendChatMessageDemoReply(const QString& message) {
         return resultMap(false, QStringLiteral("conversations.json %1").arg(readError));
     }
 
-    conversations.append(chatHistoryMessage(QStringLiteral("user"), content, QStringLiteral("huskarui")));
+    const QString conversationId = conversationIdForNextMessage(conversations);
+    conversations.append(chatHistoryMessage(
+        QStringLiteral("user"), content, QStringLiteral("huskarui"), {}, conversationId));
     const QString assistantContent = demoAssistantReply(root, content);
     conversations.append(chatHistoryMessage(
         QStringLiteral("assistant"),
         assistantContent,
         QStringLiteral("huskarui-demo"),
-        outputPartsToJsonArray(fallbackOutputParts(assistantContent))));
+        outputPartsToJsonArray(fallbackOutputParts(assistantContent)),
+        conversationId));
 
     QString backupError;
     const QString backupPath = backupJsonFile(root, relativePath, QStringLiteral("conversations"), &backupError);
@@ -5700,8 +7306,15 @@ void FantarealBridge::finishPendingChatRequest(bool ok, const QString& message, 
 void FantarealBridge::completePendingChatRequest(const QString& assistantContent) {
     QJsonArray conversations = pendingChatConversations_;
     const QDir root(legacyRoot_);
-    const QJsonArray displayParts = assistantDisplayParts(chatRuntimeConfig(root), assistantContent);
-    conversations.append(chatHistoryMessage(QStringLiteral("assistant"), assistantContent, pendingChatAssistantSource_, displayParts));
+    const ChatRuntimeConfig config = chatRuntimeConfig(root);
+    const QJsonArray displayParts = assistantDisplayParts(config, assistantContent);
+    const QJsonObject assistantMessage = chatHistoryMessage(
+        QStringLiteral("assistant"),
+        assistantContent,
+        pendingChatAssistantSource_,
+        displayParts,
+        conversationIdForNextMessage(conversations));
+    conversations.append(assistantMessage);
 
     QString backupError;
     const QString backupPath = backupJsonFile(root, pendingChatRelativePath_, QStringLiteral("conversations"), &backupError);
@@ -5725,6 +7338,7 @@ void FantarealBridge::completePendingChatRequest(const QString& assistantContent
         return;
     }
 
+    scheduleDatabaseWorkerForAssistant(assistantMessage, assistantContent, conversations);
     const QString successMessage = pendingChatSuccessMessage_;
     refreshLegacyScan();
     finishPendingChatRequest(true, successMessage, backupPath);
@@ -5851,7 +7465,8 @@ QVariantMap FantarealBridge::startChatMessageWithReply(const QString& message) {
         return resultMap(false, QStringLiteral("conversations.json %1").arg(readError));
     }
 
-    conversations.append(chatHistoryMessage(QStringLiteral("user"), content, QStringLiteral("huskarui")));
+    conversations.append(chatHistoryMessage(
+        QStringLiteral("user"), content, QStringLiteral("huskarui"), {}, conversationIdForNextMessage(conversations)));
 
     const ChatRuntimeConfig config = chatRuntimeConfig(root);
     if (config.baseUrl.trimmed().isEmpty() || config.model.trimmed().isEmpty()) {
@@ -5926,11 +7541,21 @@ QVariantMap FantarealBridge::startRegenerateLastChatReply() {
     }
 
     const QString url = buildApiUrl(config.baseUrl, QStringLiteral("chat/completions"));
-    const QJsonArray messages = buildChatCompletionMessages(root, retryConversations, config);
     QString saveError;
-    if (saveChatConversationsWithBackup(root, relativePath, retryConversations, &saveError).isEmpty()) {
+    const QString backupPath = saveChatConversationsWithBackup(
+        root, relativePath, retryConversations, &saveError);
+    if (backupPath.isEmpty()) {
         return resultMap(false, saveError);
     }
+    const DatabaseOperationResult superseded = supersedeDatabaseTurnsForRemovedAssistantMessages(
+        conversations, lastUserIndex + 1);
+    if (!superseded.ok) {
+        return resultMap(
+            false,
+            QStringLiteral("旧状态记录回滚失败：%1").arg(superseded.message),
+            backupPath);
+    }
+    const QJsonArray messages = buildChatCompletionMessages(root, retryConversations, config);
     refreshLegacyScan();
 
     return startPendingChatRequest(
@@ -6102,7 +7727,8 @@ QVariantMap FantarealBridge::sendChatMessageWithReply(const QString& message) {
         return resultMap(false, QStringLiteral("conversations.json %1").arg(readError));
     }
 
-    conversations.append(chatHistoryMessage(QStringLiteral("user"), content, QStringLiteral("huskarui")));
+    const QString conversationId = conversationIdForNextMessage(conversations);
+    conversations.append(chatHistoryMessage(QStringLiteral("user"), content, QStringLiteral("huskarui"), {}, conversationId));
 
     const ChatRuntimeConfig config = chatRuntimeConfig(root);
     QString assistantContent;
@@ -6124,7 +7750,9 @@ QVariantMap FantarealBridge::sendChatMessageWithReply(const QString& message) {
     const QJsonArray displayParts = assistantSource == QStringLiteral("huskarui-demo")
         ? outputPartsToJsonArray(fallbackOutputParts(assistantContent))
         : assistantDisplayParts(config, assistantContent);
-    conversations.append(chatHistoryMessage(QStringLiteral("assistant"), assistantContent, assistantSource, displayParts));
+    const QJsonObject assistantMessage = chatHistoryMessage(
+        QStringLiteral("assistant"), assistantContent, assistantSource, displayParts, conversationId);
+    conversations.append(assistantMessage);
 
     QString backupError;
     const QString backupPath = backupJsonFile(root, relativePath, QStringLiteral("conversations"), &backupError);
@@ -6144,6 +7772,7 @@ QVariantMap FantarealBridge::sendChatMessageWithReply(const QString& message) {
         return resultMap(false, QStringLiteral("conversations.json 提交失败：%1").arg(saveFile.errorString()), backupPath);
     }
 
+    scheduleDatabaseWorkerForAssistant(assistantMessage, assistantContent, conversations);
     refreshLegacyScan();
     return resultMap(true, QStringLiteral("消息已发送，助手回复已写入本地聊天历史"), backupPath);
 }
@@ -6188,32 +7817,50 @@ QVariantMap FantarealBridge::regenerateLastChatReply() {
     }
 
     const ChatRuntimeConfig config = chatRuntimeConfig(root);
-    QString assistantContent;
-    QString assistantSource = QStringLiteral("huskarui-llm");
     if (config.baseUrl.trimmed().isEmpty() || config.model.trimmed().isEmpty()) {
         if (!config.demoMode) {
             return resultMap(false, QStringLiteral("聊天模型未配置：请在设置页填写 LLM Base URL 和模型名，或启用 demo_mode"));
         }
+    }
+
+    QString saveError;
+    const QString backupPath = saveChatConversationsWithBackup(
+        root, relativePath, retryConversations, &saveError);
+    if (backupPath.isEmpty()) {
+        return resultMap(false, saveError);
+    }
+    const DatabaseOperationResult superseded = supersedeDatabaseTurnsForRemovedAssistantMessages(
+        conversations, lastUserIndex + 1);
+    if (!superseded.ok) {
+        return resultMap(
+            false,
+            QStringLiteral("旧状态记录回滚失败：%1").arg(superseded.message),
+            backupPath);
+    }
+
+    QString assistantContent;
+    QString assistantSource = QStringLiteral("huskarui-llm");
+    if (config.baseUrl.trimmed().isEmpty() || config.model.trimmed().isEmpty()) {
         assistantContent = demoAssistantReply(root, lastUserContent);
         assistantSource = QStringLiteral("huskarui-demo");
     } else {
         QString requestError;
         assistantContent = requestAssistantReply(config, buildChatCompletionMessages(root, retryConversations, config), &requestError);
         if (assistantContent.trimmed().isEmpty()) {
-            return resultMap(false, requestError.isEmpty() ? QStringLiteral("模型返回空回复") : requestError);
+            return resultMap(
+                false,
+                requestError.isEmpty() ? QStringLiteral("模型返回空回复") : requestError,
+                backupPath);
         }
     }
 
     const QJsonArray displayParts = assistantSource == QStringLiteral("huskarui-demo")
         ? outputPartsToJsonArray(fallbackOutputParts(assistantContent))
         : assistantDisplayParts(config, assistantContent);
-    retryConversations.append(chatHistoryMessage(QStringLiteral("assistant"), assistantContent, assistantSource, displayParts));
-
-    QString backupError;
-    const QString backupPath = backupJsonFile(root, relativePath, QStringLiteral("conversations"), &backupError);
-    if (backupPath.isEmpty()) {
-        return resultMap(false, backupError);
-    }
+    const QJsonObject assistantMessage = chatHistoryMessage(
+        QStringLiteral("assistant"), assistantContent, assistantSource, displayParts,
+        conversationIdForNextMessage(retryConversations));
+    retryConversations.append(assistantMessage);
 
     QSaveFile saveFile(conversationPath);
     if (!saveFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -6227,6 +7874,7 @@ QVariantMap FantarealBridge::regenerateLastChatReply() {
         return resultMap(false, QStringLiteral("conversations.json 提交失败：%1").arg(saveFile.errorString()), backupPath);
     }
 
+    scheduleDatabaseWorkerForAssistant(assistantMessage, assistantContent, retryConversations);
     refreshLegacyScan();
     return resultMap(true, QStringLiteral("已重试生成最近一条助手回复，旧聊天已备份"), backupPath);
 }
@@ -6357,6 +8005,7 @@ void FantarealBridge::refreshLegacyScan() {
     const DatabaseOverview databaseOverview = DatabaseService(legacyRoot_).overview();
     databaseStatus_ = databaseOverviewToVariant(databaseOverview);
     databaseRows_ = databaseRowsFromOverview(databaseOverview);
+    refreshDatabaseRuntime();
 
     const QJsonObject settings = readJsonObject(root, QStringLiteral("data/settings.json"), &settingsStatus_);
     settingsDraft_.clear();
@@ -6377,7 +8026,16 @@ void FantarealBridge::refreshLegacyScan() {
         settingsDraft_.insert(QStringLiteral("history_limit"), settings.value("history_limit").toInt());
         settingsDraft_.insert(QStringLiteral("request_timeout"), settings.value("request_timeout").toInt());
         settingsDraft_.insert(QStringLiteral("demo_mode"), settings.value("demo_mode").toBool(false));
-        settingsDraft_.insert(QStringLiteral("output_splitting_enabled"), settings.value("output_splitting_enabled").toBool(true));
+        bool recognizedReplyMode = false;
+        ReplyDisplayMode replyDisplayMode = replyDisplayModeFromString(
+            settings.value(QStringLiteral("reply_display_mode")).toString(), &recognizedReplyMode);
+        if (!recognizedReplyMode) {
+            replyDisplayMode = settings.value(QStringLiteral("output_splitting_enabled")).toBool(true)
+                ? ReplyDisplayMode::SplitBubbles
+                : ReplyDisplayMode::StateRecord;
+        }
+        settingsDraft_.insert(QStringLiteral("reply_display_mode"), replyDisplayModeToString(replyDisplayMode));
+        settingsDraft_.insert(QStringLiteral("output_splitting_enabled"), replyDisplayMode == ReplyDisplayMode::SplitBubbles);
         settingsDraft_.insert(QStringLiteral("embedding_base_url"), settings.value("embedding_base_url").toString());
         settingsDraft_.insert(QStringLiteral("embedding_api_key_configured"), !settings.value("embedding_api_key").toString().trimmed().isEmpty());
         settingsDraft_.insert(QStringLiteral("embedding_model"), settings.value("embedding_model").toString());
@@ -6403,7 +8061,9 @@ void FantarealBridge::refreshLegacyScan() {
         settingsRows_.append(rowText(QStringLiteral("历史轮数"), settings.value("history_limit").toInt()));
         settingsRows_.append(rowText(QStringLiteral("请求超时"), QStringLiteral("%1 秒").arg(settings.value("request_timeout").toInt())));
         settingsRows_.append(rowText(QStringLiteral("本地演示模式"), enabledText(settings.value("demo_mode").toBool(false))));
-        settingsRows_.append(rowText(QStringLiteral("输出气泡切分"), enabledText(settings.value("output_splitting_enabled").toBool(true))));
+        settingsRows_.append(rowText(QStringLiteral("回复展示方式"), replyDisplayMode == ReplyDisplayMode::SplitBubbles
+                ? QStringLiteral("分泡模式")
+                : QStringLiteral("状态记录模式")));
         settingsRows_.append(rowText(QStringLiteral("Embedding Model"), displayText(settings.value("embedding_model").toString())));
         settingsRows_.append(rowText(QStringLiteral("Embedding API Key"), secretStatus(settings.value("embedding_api_key").toString())));
         settingsRows_.append(rowText(QStringLiteral("Rerank"), enabledText(settings.value("rerank_enabled").toBool())));
@@ -6452,6 +8112,7 @@ void FantarealBridge::refreshLegacyScan() {
         const QJsonObject workshop = raw.value("creativeWorkshop").toObject();
         const QJsonObject opening = workshop.value("opening").toObject();
         const QJsonObject personas = raw.value("personas").toObject();
+        const QJsonObject stateJournal = raw.value(QStringLiteral("stateJournal")).toObject();
         const bool databaseEnabled = LegacyStateJournalAdapter::databaseEnabled(raw, true);
         const bool workshopEnabled = workshop.value("enabled").toBool(true);
         const bool openingEnabled = opening.value("enabled").toBool(false);
@@ -6471,8 +8132,12 @@ void FantarealBridge::refreshLegacyScan() {
         cardDraft_.insert(QStringLiteral("tagsText"), tagsTextFromArray(tags));
         cardDraft_.insert(QStringLiteral("tagCount"), static_cast<int>(tags.size()));
         cardDraft_.insert(QStringLiteral("personaCount"), static_cast<int>(personas.size()));
+        cardDraft_.insert(QStringLiteral("personas"), controlledPersonasDraft(personas));
         cardDraft_.insert(QStringLiteral("dynamicSceneCount"), static_cast<int>(workshop.value("dynamicScenes").toArray().size()));
         cardDraft_.insert(QStringLiteral("databaseEnabled"), databaseEnabled);
+        cardDraft_.insert(
+            QStringLiteral("databaseConfig"),
+            controlledDatabaseConfig(stateJournal, {}, false).toVariantMap());
         cardDraft_.insert(QStringLiteral("creativeWorkshopEnabled"), workshopEnabled);
         cardDraft_.insert(QStringLiteral("openingEnabled"), openingEnabled);
 
@@ -6626,7 +8291,10 @@ void FantarealBridge::refreshLegacyScan() {
     }
 
     const QJsonArray conversations = readJsonArray(root, QStringLiteral("data/conversations.json"), &chatStatus_);
-    const bool outputSplittingEnabled = settings.value("output_splitting_enabled").toBool(true);
+    const ChatRuntimeConfig chatConfig = chatRuntimeConfig(root);
+    const bool outputSplittingEnabled = chatConfig.outputSplittingEnabled;
+    const QString activeCardUid = cardUidFromRuntimeCard(card);
+    DatabaseService chatDatabaseService(legacyRoot_);
     chatMessages_.clear();
     for (int i = 0; i < conversations.size(); ++i) {
         const QJsonObject message = conversations.at(i).toObject();
@@ -6634,7 +8302,16 @@ void FantarealBridge::refreshLegacyScan() {
         const QString content = message.value("content").toString().trimmed();
         if ((role == QStringLiteral("user") || role == QStringLiteral("assistant") || role == QStringLiteral("system"))
             && !content.isEmpty()) {
-            chatMessages_.append(chatMessageToVariant(message, i, outputSplittingEnabled));
+            QVariantMap item = chatMessageToVariant(message, i, outputSplittingEnabled);
+            if (chatConfig.replyDisplayMode == ReplyDisplayMode::StateRecord
+                && role == QStringLiteral("assistant") && !activeCardUid.isEmpty()) {
+                const std::optional<DatabaseTurnView> turn = chatDatabaseService.turnByMessageId(
+                    activeCardUid, message.value(QStringLiteral("message_id")).toString());
+                if (turn && turn->turn.status != DatabaseTurnStatus::Superseded) {
+                    item.insert(QStringLiteral("stateRecord"), databaseTurnViewToVariant(*turn));
+                }
+            }
+            chatMessages_.append(item);
         }
     }
 

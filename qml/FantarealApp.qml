@@ -329,6 +329,8 @@ HusWindow {
                         return cardAuthoringPage;
                     case "database":
                         return databasePage;
+                    case "databaseDebug":
+                        return databaseDebugPage;
                     case "preset":
                         return presetPage;
                     case "memory":
@@ -378,6 +380,12 @@ HusWindow {
     Component {
         id: databasePage
         DatabasePage {
+            onOpenPage: page => root.openPage(page)
+        }
+    }
+    Component {
+        id: databaseDebugPage
+        DatabaseDebugPage {
             onOpenPage: page => root.openPage(page)
         }
     }
