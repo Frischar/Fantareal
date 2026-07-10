@@ -24,6 +24,7 @@ QJsonObject normalizePresetItem(const QJsonObject& payload, int index);
 QJsonObject normalizeDatabase(const QJsonObject& payload);
 QJsonObject normalizeDatabaseVariable(const QJsonObject& payload, int index);
 QJsonObject normalizeDatabaseStage(const QJsonObject& payload, int index);
+QJsonObject normalizeDatabaseSnapshotField(const QJsonObject& payload, int index);
 QJsonObject normalizeDatabaseTag(const QJsonObject& payload, int index);
 
 QString normalizedText(const QJsonValue& value);

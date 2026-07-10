@@ -139,6 +139,7 @@ QJsonObject normalizeWorkshopItem(const QJsonObject& payload, int index) {
 
 QJsonObject normalizeCreativeWorkshop(const QJsonValue& value) {
     const QJsonObject raw = value.toObject();
+    QJsonObject workshop = raw;
     QJsonArray items;
     const QJsonArray rawItems = raw.value(QStringLiteral("items")).toArray();
     for (int i = 0; i < rawItems.size(); ++i) {
@@ -146,10 +147,9 @@ QJsonObject normalizeCreativeWorkshop(const QJsonValue& value) {
             items.append(normalizeWorkshopItem(rawItems.at(i).toObject(), i));
         }
     }
-    return QJsonObject{
-        { QStringLiteral("enabled"), boolValue(raw.value(QStringLiteral("enabled")), true) },
-        { QStringLiteral("items"), items },
-    };
+    workshop.insert(QStringLiteral("enabled"), boolValue(raw.value(QStringLiteral("enabled")), true));
+    workshop.insert(QStringLiteral("items"), items);
+    return workshop;
 }
 
 QJsonObject normalizePersonaCard(const QJsonObject& payload) {
@@ -282,30 +282,162 @@ QJsonObject normalizePreset(const QJsonObject& payload) {
 }
 
 QJsonObject normalizeDatabaseVariable(const QJsonObject& payload, int index) {
-    QJsonObject variable;
+    QJsonObject variable = payload;
+    const QString fallbackKey = QStringLiteral("var_%1").arg(index + 1);
+    const QString key = normalizedText(payload.value(QStringLiteral("var_key"))).isEmpty()
+        ? idOrDefault(payload, QStringLiteral("key"), fallbackKey)
+        : normalizedText(payload.value(QStringLiteral("var_key")));
+    const QString label = normalizedText(payload.value(QStringLiteral("var_name"))).isEmpty()
+        ? idOrDefault(payload, QStringLiteral("label"), key)
+        : normalizedText(payload.value(QStringLiteral("var_name")));
+    const QString roleId = normalizedText(payload.value(QStringLiteral("role_id"))).isEmpty()
+        ? idOrDefault(payload, QStringLiteral("scope"), QStringLiteral("role"))
+        : normalizedText(payload.value(QStringLiteral("role_id")));
+    double minimum = doubleValue(payload.value(QStringLiteral("min_value")), 0.0);
+    double maximum = doubleValue(payload.value(QStringLiteral("max_value")), 100.0);
+    if (maximum <= minimum) {
+        maximum = minimum + 100.0;
+    }
+    double deltaMinimum = doubleValue(payload.value(QStringLiteral("delta_min")), -5.0);
+    double deltaMaximum = doubleValue(payload.value(QStringLiteral("delta_max")), 5.0);
+    if (deltaMaximum < deltaMinimum) {
+        const double swap = deltaMinimum;
+        deltaMinimum = deltaMaximum;
+        deltaMaximum = swap;
+    }
+    const double defaultValue = qBound(
+        minimum,
+        payload.contains(QStringLiteral("default_value"))
+            ? doubleValue(payload.value(QStringLiteral("default_value")), minimum)
+            : doubleValue(payload.value(QStringLiteral("initial_value")), minimum),
+        maximum);
+    QString instruction = normalizedText(payload.value(QStringLiteral("instruction")));
+    if (instruction.isEmpty()) {
+        instruction = normalizedText(payload.value(QStringLiteral("description")));
+    }
+
     variable.insert(QStringLiteral("id"), idOrDefault(payload, QStringLiteral("id"), QStringLiteral("db_var_%1").arg(index + 1, 3, 10, QLatin1Char('0'))));
-    variable.insert(QStringLiteral("key"), normalizedText(payload.value(QStringLiteral("key"))));
-    variable.insert(QStringLiteral("label"), normalizedText(payload.value(QStringLiteral("label"))));
+    variable.insert(QStringLiteral("role_id"), roleId);
+    variable.insert(QStringLiteral("scope"), roleId);
+    variable.insert(QStringLiteral("key"), key);
+    variable.insert(QStringLiteral("var_key"), key);
+    variable.insert(QStringLiteral("label"), label);
+    variable.insert(QStringLiteral("var_name"), label);
     variable.insert(QStringLiteral("value_type"), idOrDefault(payload, QStringLiteral("value_type"), QStringLiteral("text")));
-    variable.insert(QStringLiteral("initial_value"), normalizedText(payload.value(QStringLiteral("initial_value"))));
-    variable.insert(QStringLiteral("scope"), idOrDefault(payload, QStringLiteral("scope"), QStringLiteral("role")));
+    variable.insert(QStringLiteral("initial_value"), payload.contains(QStringLiteral("initial_value"))
+            ? normalizedText(payload.value(QStringLiteral("initial_value")))
+            : QString::number(defaultValue, 'g', 12));
+    variable.insert(QStringLiteral("enabled"), boolValue(payload.value(QStringLiteral("enabled")), true));
+    variable.insert(QStringLiteral("default_value"), defaultValue);
+    variable.insert(QStringLiteral("min_value"), minimum);
+    variable.insert(QStringLiteral("max_value"), maximum);
+    variable.insert(QStringLiteral("delta_min"), deltaMinimum);
+    variable.insert(QStringLiteral("delta_max"), deltaMaximum);
+    variable.insert(QStringLiteral("display"), boolValue(payload.value(QStringLiteral("display")), true));
+    variable.insert(QStringLiteral("stage_relevant"), boolValue(payload.value(QStringLiteral("stage_relevant")), true));
+    variable.insert(QStringLiteral("instruction"), instruction);
     variable.insert(QStringLiteral("description"), normalizedText(payload.value(QStringLiteral("description"))));
     variable.insert(QStringLiteral("write_policy"), normalizedText(payload.value(QStringLiteral("write_policy"))));
     variable.insert(QStringLiteral("notes"), normalizedText(payload.value(QStringLiteral("notes"))));
     return variable;
 }
 
+QJsonArray normalizeDatabaseConditions(const QJsonValue& value) {
+    QJsonArray conditions;
+    const QJsonArray rawConditions = value.toArray();
+    for (const QJsonValue& conditionValue : rawConditions) {
+        if (!conditionValue.isObject()) {
+            continue;
+        }
+        QJsonObject condition = conditionValue.toObject();
+        QString source = normalizedText(condition.value(QStringLiteral("source"))).toLower();
+        if (source != QStringLiteral("story_time")) {
+            source = QStringLiteral("variable");
+        }
+        QString op = idOrDefault(condition, QStringLiteral("op"), QStringLiteral(">="));
+        if (!QStringList{
+                QStringLiteral(">"),
+                QStringLiteral(">="),
+                QStringLiteral("<"),
+                QStringLiteral("<="),
+                QStringLiteral("="),
+                QStringLiteral("!="),
+            }.contains(op)) {
+            op = QStringLiteral(">=");
+        }
+        condition.insert(QStringLiteral("source"), source);
+        condition.insert(QStringLiteral("op"), op);
+        if (source == QStringLiteral("story_time")) {
+            condition.remove(QStringLiteral("var"));
+            condition.insert(QStringLiteral("field"), normalizedText(condition.value(QStringLiteral("field"))).isEmpty()
+                    ? normalizedText(conditionValue.toObject().value(QStringLiteral("var")))
+                    : normalizedText(condition.value(QStringLiteral("field"))));
+        } else {
+            condition.remove(QStringLiteral("field"));
+            condition.insert(QStringLiteral("var"), normalizedText(condition.value(QStringLiteral("var"))).isEmpty()
+                    ? normalizedText(conditionValue.toObject().value(QStringLiteral("field")))
+                    : normalizedText(condition.value(QStringLiteral("var"))));
+            condition.insert(QStringLiteral("value"), doubleValue(condition.value(QStringLiteral("value")), 0.0));
+        }
+        conditions.append(condition);
+    }
+    return conditions;
+}
+
+QString databaseConditionSummary(const QJsonArray& conditions) {
+    QStringList parts;
+    for (const QJsonValue& conditionValue : conditions) {
+        const QJsonObject condition = conditionValue.toObject();
+        const QString source = normalizedText(condition.value(QStringLiteral("source")));
+        const QString key = source == QStringLiteral("story_time")
+            ? normalizedText(condition.value(QStringLiteral("field")))
+            : normalizedText(condition.value(QStringLiteral("var")));
+        if (key.isEmpty()) {
+            continue;
+        }
+        parts.append(QStringLiteral("%1 %2 %3").arg(
+            key,
+            idOrDefault(condition, QStringLiteral("op"), QStringLiteral(">=")),
+            normalizedText(condition.value(QStringLiteral("value")))));
+    }
+    return parts.join(QStringLiteral("；"));
+}
+
 QJsonObject normalizeDatabaseStage(const QJsonObject& payload, int index) {
-    QJsonObject stage;
+    QJsonObject stage = payload;
     const QString roleId = idOrDefault(payload, QStringLiteral("role_id"), QStringLiteral("role"));
     const QString stageKey = idOrDefault(payload, QStringLiteral("stage_key"), QStringLiteral("stage_%1").arg(index + 1));
     const QString defaultTag = QStringLiteral("database.stage.%1.%2").arg(roleId, stageKey);
-    const QString activeTag = importedDatabaseTag(idOrDefault(payload, QStringLiteral("active_tag"), defaultTag));
+    const QString stageName = normalizedText(payload.value(QStringLiteral("stage_name"))).isEmpty()
+        ? idOrDefault(payload, QStringLiteral("title"), idOrDefault(payload, QStringLiteral("name"), stageKey))
+        : normalizedText(payload.value(QStringLiteral("stage_name")));
+    const QString activeTag = importedDatabaseTag(
+        normalizedText(payload.value(QStringLiteral("activation_tag"))).isEmpty()
+            ? idOrDefault(payload, QStringLiteral("active_tag"), defaultTag)
+            : normalizedText(payload.value(QStringLiteral("activation_tag"))));
+    QString conditionMode = idOrDefault(payload, QStringLiteral("condition_mode"), QStringLiteral("all")).toLower();
+    if (conditionMode != QStringLiteral("any")) {
+        conditionMode = QStringLiteral("all");
+    }
+    const QJsonArray conditions = normalizeDatabaseConditions(payload.value(QStringLiteral("conditions")));
+    QString conditionText = normalizedText(payload.value(QStringLiteral("condition")));
+    if (conditionText.isEmpty()) {
+        conditionText = databaseConditionSummary(conditions);
+    }
     stage.insert(QStringLiteral("id"), idOrDefault(payload, QStringLiteral("id"), QStringLiteral("db_stage_%1").arg(index + 1, 3, 10, QLatin1Char('0'))));
     stage.insert(QStringLiteral("role_id"), roleId);
     stage.insert(QStringLiteral("stage_key"), stageKey);
-    stage.insert(QStringLiteral("title"), normalizedText(payload.value(QStringLiteral("title"))));
-    stage.insert(QStringLiteral("condition"), normalizedText(payload.value(QStringLiteral("condition"))));
+    stage.insert(QStringLiteral("stage_name"), stageName);
+    stage.insert(QStringLiteral("title"), stageName);
+    stage.insert(QStringLiteral("enabled"), boolValue(payload.value(QStringLiteral("enabled")), true));
+    stage.insert(QStringLiteral("priority"), intValue(payload.value(QStringLiteral("priority")), (index + 1) * 10));
+    stage.insert(QStringLiteral("condition_mode"), conditionMode);
+    stage.insert(QStringLiteral("conditions"), conditions);
+    stage.insert(QStringLiteral("condition"), conditionText);
+    stage.insert(QStringLiteral("allow_regression"), boolValue(payload.value(QStringLiteral("allow_regression")), false));
+    stage.insert(QStringLiteral("confirm_turns"), qMax(1, intValue(payload.value(QStringLiteral("confirm_turns")), 1)));
+    stage.insert(QStringLiteral("cooldown_turns"), qMax(0, intValue(payload.value(QStringLiteral("cooldown_turns")), 0)));
+    stage.insert(QStringLiteral("activation_tag"), activeTag);
     stage.insert(QStringLiteral("active_tag"), activeTag);
     QStringList emitsTags;
     for (const QString& tag : splitTags(payload.value(QStringLiteral("emits_tags")))) {
@@ -318,6 +450,19 @@ QJsonObject normalizeDatabaseStage(const QJsonObject& payload, int index) {
     stage.insert(QStringLiteral("description"), normalizedText(payload.value(QStringLiteral("description"))));
     stage.insert(QStringLiteral("notes"), normalizedText(payload.value(QStringLiteral("notes"))));
     return stage;
+}
+
+QJsonObject normalizeDatabaseSnapshotField(const QJsonObject& payload, int index) {
+    QJsonObject field = payload;
+    field.insert(QStringLiteral("id"), idOrDefault(payload, QStringLiteral("id"), QStringLiteral("db_snapshot_%1").arg(index + 1, 3, 10, QLatin1Char('0'))));
+    field.insert(QStringLiteral("role_id"), idOrDefault(payload, QStringLiteral("role_id"), QStringLiteral("role")));
+    field.insert(QStringLiteral("key"), idOrDefault(payload, QStringLiteral("key"), QStringLiteral("snapshot_%1").arg(index + 1)));
+    field.insert(QStringLiteral("label"), idOrDefault(payload, QStringLiteral("label"), field.value(QStringLiteral("key")).toString()));
+    field.insert(QStringLiteral("enabled"), boolValue(payload.value(QStringLiteral("enabled")), true));
+    field.insert(QStringLiteral("display"), boolValue(payload.value(QStringLiteral("display")), true));
+    field.insert(QStringLiteral("instruction"), idOrDefault(payload, QStringLiteral("instruction"), QStringLiteral("根据本轮上下文生成该状态快照字段。")));
+    field.insert(QStringLiteral("notes"), normalizedText(payload.value(QStringLiteral("notes"))));
+    return field;
 }
 
 QJsonObject normalizeDatabaseTag(const QJsonObject& payload, int index) {
@@ -333,23 +478,104 @@ QJsonObject normalizeDatabaseTag(const QJsonObject& payload, int index) {
 }
 
 QJsonObject normalizeDatabase(const QJsonObject& payload) {
-    QJsonObject database;
+    QJsonObject database = payload;
+    database.remove(QStringLiteral("databaseDraft"));
+    database.insert(QStringLiteral("version"), qMax(1, intValue(payload.value(QStringLiteral("version")), 1)));
     database.insert(QStringLiteral("enabled"), boolValue(payload.value(QStringLiteral("enabled")), true));
+    QString roleSourceMode = idOrDefault(payload, QStringLiteral("role_source_mode"), QStringLiteral("auto")).toLower();
+    if (roleSourceMode != QStringLiteral("main_card") && roleSourceMode != QStringLiteral("personas_only")) {
+        roleSourceMode = QStringLiteral("auto");
+    }
+    database.insert(QStringLiteral("role_source_mode"), roleSourceMode);
     database.insert(QStringLiteral("notes"), normalizedText(payload.value(QStringLiteral("notes"))));
 
+    const QJsonArray roles = payload.value(QStringLiteral("roles")).toArray();
+    database.insert(QStringLiteral("roles"), roles);
+
     QJsonArray variables;
-    const QJsonArray rawVariables = payload.value(QStringLiteral("variables")).toArray();
+    QJsonArray rawVariables = payload.value(QStringLiteral("variables")).toArray();
+    if (rawVariables.isEmpty() && !roles.isEmpty()) {
+        rawVariables = {};
+        for (const QJsonValue& roleValue : roles) {
+            const QJsonObject role = roleValue.toObject();
+            const QString roleId = normalizedText(role.value(QStringLiteral("role_id"))).isEmpty()
+                ? idOrDefault(role, QStringLiteral("id"), QStringLiteral("role"))
+                : normalizedText(role.value(QStringLiteral("role_id")));
+            for (const QJsonValue& variableValue : role.value(QStringLiteral("variables")).toArray()) {
+                QJsonObject variable = variableValue.toObject();
+                const QString varKey = normalizedText(variable.value(QStringLiteral("var_key"))).isEmpty()
+                    ? normalizedText(variable.value(QStringLiteral("key")))
+                    : normalizedText(variable.value(QStringLiteral("var_key")));
+                if (normalizedText(variable.value(QStringLiteral("id"))).isEmpty() && !varKey.isEmpty()) {
+                    variable.insert(QStringLiteral("id"), QStringLiteral("db_var_%1_%2").arg(roleId, varKey));
+                }
+                variable.insert(QStringLiteral("role_id"), roleId);
+                variable.insert(QStringLiteral("scope"), roleId);
+                rawVariables.append(variable);
+            }
+        }
+    }
     for (int i = 0; i < rawVariables.size(); ++i) {
         variables.append(normalizeDatabaseVariable(rawVariables.at(i).toObject(), i));
     }
     database.insert(QStringLiteral("variables"), variables);
 
     QJsonArray stages;
-    const QJsonArray rawStages = payload.value(QStringLiteral("stages")).toArray();
+    QJsonArray rawStages = payload.value(QStringLiteral("stages")).toArray();
+    if (rawStages.isEmpty() && !roles.isEmpty()) {
+        rawStages = {};
+        for (const QJsonValue& roleValue : roles) {
+            const QJsonObject role = roleValue.toObject();
+            const QString roleId = normalizedText(role.value(QStringLiteral("role_id"))).isEmpty()
+                ? idOrDefault(role, QStringLiteral("id"), QStringLiteral("role"))
+                : normalizedText(role.value(QStringLiteral("role_id")));
+            for (const QJsonValue& stageValue : role.value(QStringLiteral("stages")).toArray()) {
+                QJsonObject stage = stageValue.toObject();
+                const QString stageKey = normalizedText(stage.value(QStringLiteral("stage_key"))).isEmpty()
+                    ? normalizedText(stage.value(QStringLiteral("key")))
+                    : normalizedText(stage.value(QStringLiteral("stage_key")));
+                if (normalizedText(stage.value(QStringLiteral("id"))).isEmpty() && !stageKey.isEmpty()) {
+                    stage.insert(QStringLiteral("id"), QStringLiteral("db_stage_%1_%2").arg(roleId, stageKey));
+                }
+                stage.insert(QStringLiteral("role_id"), roleId);
+                rawStages.append(stage);
+            }
+        }
+    }
     for (int i = 0; i < rawStages.size(); ++i) {
         stages.append(normalizeDatabaseStage(rawStages.at(i).toObject(), i));
     }
     database.insert(QStringLiteral("stages"), stages);
+
+    QJsonArray snapshotFields;
+    QJsonArray rawSnapshotFields = payload.value(QStringLiteral("snapshotFields")).toArray(
+        payload.value(QStringLiteral("snapshot_fields")).toArray());
+    if (rawSnapshotFields.isEmpty() && !roles.isEmpty()) {
+        rawSnapshotFields = {};
+        for (const QJsonValue& roleValue : roles) {
+            const QJsonObject role = roleValue.toObject();
+            const QString roleId = normalizedText(role.value(QStringLiteral("role_id"))).isEmpty()
+                ? idOrDefault(role, QStringLiteral("id"), QStringLiteral("role"))
+                : normalizedText(role.value(QStringLiteral("role_id")));
+            const QJsonArray roleSnapshotFields = role.value(QStringLiteral("snapshotFields")).toArray(
+                role.value(QStringLiteral("snapshot_fields")).toArray());
+            for (const QJsonValue& fieldValue : roleSnapshotFields) {
+                QJsonObject field = fieldValue.toObject();
+                const QString fieldKey = normalizedText(field.value(QStringLiteral("key"))).isEmpty()
+                    ? normalizedText(field.value(QStringLiteral("field_key")))
+                    : normalizedText(field.value(QStringLiteral("key")));
+                if (normalizedText(field.value(QStringLiteral("id"))).isEmpty() && !fieldKey.isEmpty()) {
+                    field.insert(QStringLiteral("id"), QStringLiteral("db_snapshot_%1_%2").arg(roleId, fieldKey));
+                }
+                field.insert(QStringLiteral("role_id"), roleId);
+                rawSnapshotFields.append(field);
+            }
+        }
+    }
+    for (int i = 0; i < rawSnapshotFields.size(); ++i) {
+        snapshotFields.append(normalizeDatabaseSnapshotField(rawSnapshotFields.at(i).toObject(), i));
+    }
+    database.insert(QStringLiteral("snapshotFields"), snapshotFields);
 
     QJsonArray tags;
     const QJsonArray rawTags = payload.value(QStringLiteral("tags")).toArray();
@@ -393,12 +619,16 @@ QString summarizeStateJournalConditions(const QJsonValue& value) {
 }
 
 QJsonObject databaseFromStateJournal(const QJsonObject& stateJournal) {
-    QJsonArray variables;
-    QJsonArray stages;
-    QJsonArray tags;
-    QSet<QString> seenTags;
-
+    QJsonObject database = stateJournal.value(QStringLiteral("databaseDraft")).toObject();
     const QJsonArray roles = stateJournal.value(QStringLiteral("roles")).toArray();
+    QJsonArray tags = database.value(QStringLiteral("tags")).toArray();
+    QSet<QString> seenTags;
+    for (const QJsonValue& value : tags) {
+        const QString tag = normalizedText(value.toObject().value(QStringLiteral("tag")));
+        if (!tag.isEmpty()) {
+            seenTags.insert(tag);
+        }
+    }
     for (const QJsonValue& roleValue : roles) {
         const QJsonObject role = roleValue.toObject();
         const QString roleId = normalizedText(role.value(QStringLiteral("role_id"))).isEmpty()
@@ -407,30 +637,6 @@ QJsonObject databaseFromStateJournal(const QJsonObject& stateJournal) {
         const QString roleName = normalizedText(role.value(QStringLiteral("role_name"))).isEmpty()
             ? idOrDefault(role, QStringLiteral("name"), roleId)
             : normalizedText(role.value(QStringLiteral("role_name")));
-
-        const QJsonArray roleVariables = role.value(QStringLiteral("variables")).toArray();
-        for (int i = 0; i < roleVariables.size(); ++i) {
-            const QJsonObject variable = roleVariables.at(i).toObject();
-            const QString varKey = normalizedText(variable.value(QStringLiteral("var_key"))).isEmpty()
-                ? normalizedText(variable.value(QStringLiteral("key")))
-                : normalizedText(variable.value(QStringLiteral("var_key")));
-            if (varKey.isEmpty()) {
-                continue;
-            }
-            variables.append(normalizeDatabaseVariable(QJsonObject{
-                    { QStringLiteral("id"), roleId.isEmpty()
-                            ? QStringLiteral("db_var_%1").arg(i + 1, 3, 10, QLatin1Char('0'))
-                            : QStringLiteral("db_var_%1_%2").arg(roleId, varKey) },
-                    { QStringLiteral("key"), varKey },
-                    { QStringLiteral("label"), idOrDefault(variable, QStringLiteral("var_name"), idOrDefault(variable, QStringLiteral("label"), varKey)) },
-                    { QStringLiteral("value_type"), QStringLiteral("number") },
-                    { QStringLiteral("initial_value"), normalizedText(variable.value(QStringLiteral("default_value"))) },
-                    { QStringLiteral("scope"), roleId.isEmpty() ? idOrDefault(role, QStringLiteral("role_name"), QStringLiteral("role")) : roleId },
-                    { QStringLiteral("description"), normalizedText(variable.value(QStringLiteral("instruction"))) },
-                    { QStringLiteral("notes"), QStringLiteral("来自 Fa 角色：%1").arg(roleName) },
-                },
-                variables.size()));
-        }
 
         const QJsonArray roleStages = role.value(QStringLiteral("stages")).toArray();
         for (int i = 0; i < roleStages.size(); ++i) {
@@ -453,19 +659,6 @@ QJsonObject databaseFromStateJournal(const QJsonObject& stateJournal) {
             if (emitsTags.isEmpty() && !activeTag.isEmpty()) {
                 emitsTags.append(activeTag);
             }
-            stages.append(normalizeDatabaseStage(QJsonObject{
-                    { QStringLiteral("id"), roleId.isEmpty()
-                            ? QStringLiteral("db_stage_%1").arg(i + 1, 3, 10, QLatin1Char('0'))
-                            : QStringLiteral("db_stage_%1_%2").arg(roleId, stageKey) },
-                    { QStringLiteral("role_id"), roleId },
-                    { QStringLiteral("stage_key"), stageKey },
-                    { QStringLiteral("title"), idOrDefault(stage, QStringLiteral("stage_name"), idOrDefault(stage, QStringLiteral("name"), stageKey)) },
-                    { QStringLiteral("condition"), summarizeStateJournalConditions(stage.value(QStringLiteral("conditions"))) },
-                    { QStringLiteral("active_tag"), activeTag },
-                    { QStringLiteral("emits_tags"), tagsArray(emitsTags) },
-                    { QStringLiteral("notes"), QStringLiteral("来自 Fa 角色：%1").arg(roleName) },
-                },
-                stages.size()));
             for (const QString& tag : emitsTags) {
                 if (tag.isEmpty() || seenTags.contains(tag)) {
                     continue;
@@ -481,22 +674,28 @@ QJsonObject databaseFromStateJournal(const QJsonObject& stateJournal) {
                         { QStringLiteral("target"), QStringLiteral("worldbook") },
                         { QStringLiteral("notes"), QStringLiteral("来自 Fa 阶段：%1 / %2").arg(roleName, stageKey) },
                     },
-                    tags.size()));
+                tags.size()));
             }
         }
     }
 
-    return normalizeDatabase(QJsonObject{
-        { QStringLiteral("enabled"), stateJournal.value(QStringLiteral("enabled")).isBool() ? stateJournal.value(QStringLiteral("enabled")).toBool() : true },
-        { QStringLiteral("variables"), variables },
-        { QStringLiteral("stages"), stages },
-        { QStringLiteral("tags"), tags },
-    });
+    database.insert(QStringLiteral("version"), qMax(1, intValue(stateJournal.value(QStringLiteral("version")), 1)));
+    database.insert(QStringLiteral("enabled"), stateJournal.value(QStringLiteral("enabled")).isBool()
+            ? stateJournal.value(QStringLiteral("enabled")).toBool()
+            : true);
+    database.insert(QStringLiteral("role_source_mode"), idOrDefault(
+        stateJournal,
+        QStringLiteral("role_source_mode"),
+        QStringLiteral("auto")));
+    database.insert(QStringLiteral("roles"), roles);
+    database.insert(QStringLiteral("tags"), tags);
+    return normalizeDatabase(database);
 }
 
 bool hasDatabaseDraftContent(const QJsonObject& database) {
     return !database.value(QStringLiteral("variables")).toArray().isEmpty()
         || !database.value(QStringLiteral("stages")).toArray().isEmpty()
+        || !database.value(QStringLiteral("snapshotFields")).toArray().isEmpty()
         || !database.value(QStringLiteral("tags")).toArray().isEmpty()
         || !database.value(QStringLiteral("notes")).toString().trimmed().isEmpty();
 }

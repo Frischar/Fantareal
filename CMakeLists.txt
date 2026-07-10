@@ -74,12 +74,19 @@ add_library(FantarealCore STATIC
     cpp/card_authoring/cardauthoringservice.h
     cpp/card_authoring/cardauthoringservice.cpp
     cpp/database/databasemodels.h
+    cpp/database/databasemodels.cpp
+    cpp/database/databaserules.h
+    cpp/database/databaserules.cpp
     cpp/database/databasepaths.h
     cpp/database/databasepaths.cpp
     cpp/database/databaserepository.h
     cpp/database/databaserepository.cpp
     cpp/database/databaseservice.h
     cpp/database/databaseservice.cpp
+    cpp/database/databaseworkerconfigstore.h
+    cpp/database/databaseworkerconfigstore.cpp
+    cpp/database/databaseworker.h
+    cpp/database/databaseworker.cpp
     cpp/database/legacystatejournaladapter.h
     cpp/database/legacystatejournaladapter.cpp
 )
@@ -138,6 +145,8 @@ qt_add_qml_module(FantarealHuskarUI
         qml/pages/CardsPage.qml
         qml/pages/CardAuthoringPage.qml
         qml/pages/DatabasePage.qml
+        qml/pages/DatabaseDebugPage.qml
+        qml/database/DatabaseRuntimePage.qml
         qml/pages/PresetPage.qml
         qml/pages/MemoryPage.qml
         qml/pages/WorldbookPage.qml
@@ -199,6 +208,10 @@ fantareal_add_core_test(FantarealBridgeMemorySaveTest tests/memory_save_test.cpp
 fantareal_add_core_test(FantarealBridgePresetSaveTest tests/preset_save_test.cpp)
 fantareal_add_core_test(FantarealBridgeImportAssetsTest tests/import_assets_test.cpp)
 fantareal_add_core_test(FantarealDatabaseServiceTest tests/database_service_test.cpp)
+fantareal_add_core_test(FantarealDatabaseTurnRepositoryTest tests/database_turn_repository_test.cpp)
+fantareal_add_core_test(FantarealDatabaseRulesTest tests/database_rules_test.cpp)
+fantareal_add_core_test(FantarealDatabaseWorkerConfigTest tests/database_worker_config_test.cpp)
+fantareal_add_core_test(FantarealDatabaseWorkerChatTest tests/database_worker_chat_test.cpp)
 fantareal_add_core_test(FantarealBridgeDatabaseTest tests/database_bridge_test.cpp)
 fantareal_add_core_test(FantarealCardAuthoringServiceTest tests/card_authoring_service_test.cpp)
 fantareal_add_core_test(FantarealBridgeCardAuthoringTest tests/card_authoring_bridge_test.cpp)

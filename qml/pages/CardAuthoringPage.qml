@@ -47,6 +47,7 @@ Item {
     property string personaCreatorNotesText: ""
     property string personaTagsText: ""
     property bool creativeWorkshopPresent: false
+    property var creativeWorkshopDraft: ({})
     property bool creativeWorkshopEnabled: true
     property var workshopItems: []
     property int selectedWorkshopIndex: -1
@@ -71,9 +72,11 @@ Item {
     property string databaseNotesText: ""
     property var databaseVariables: []
     property var databaseStages: []
+    property var databaseSnapshotFields: []
     property var databaseTags: []
     property int selectedVariableIndex: -1
     property int selectedStageIndex: -1
+    property int selectedSnapshotFieldIndex: -1
     property int selectedTagIndex: -1
     property string variableKeyText: ""
     property string variableLabelText: ""
@@ -91,6 +94,13 @@ Item {
     property string stageEmitsTagsText: ""
     property string stageDescriptionText: ""
     property string stageNotesText: ""
+    property string snapshotRoleText: "role"
+    property string snapshotKeyText: ""
+    property string snapshotLabelText: ""
+    property bool snapshotEnabled: true
+    property bool snapshotDisplay: true
+    property string snapshotInstructionText: ""
+    property string snapshotNotesText: ""
     property string databaseTagText: ""
     property string databaseTagTitleText: ""
     property string databaseTagTriggerText: ""
@@ -302,6 +312,19 @@ Item {
         };
     }
 
+    function defaultSnapshotField(index) {
+        return {
+            "id": `db_snapshot_${paddedIndex(index)}`,
+            "role_id": "role",
+            "key": `snapshot_${index + 1}`,
+            "label": "",
+            "enabled": true,
+            "display": true,
+            "instruction": "根据本轮上下文生成该状态快照字段。",
+            "notes": ""
+        };
+    }
+
     function defaultDatabaseTag(index) {
         return {
             "id": `db_tag_${paddedIndex(index)}`,
@@ -482,9 +505,10 @@ Item {
     function projectMetaText(item) {
         const variables = Number(item.variable_count || 0);
         const stages = Number(item.stage_count || 0);
+        const snapshots = Number(item.snapshot_field_count || 0);
         const entries = Number(item.worldbook_entry_count || 0);
         const memories = Number(item.memory_item_count || 0);
-        return `${variables} 变量 · ${stages} 状态快照 · ${entries} 世界书 · ${memories} 记忆`;
+        return `${variables} 变量 · ${stages} 阶段规则 · ${snapshots} 快照字段 · ${entries} 世界书 · ${memories} 记忆`;
     }
 
     function variableTitle(item, index) {
@@ -492,7 +516,11 @@ Item {
     }
 
     function stageTitle(item, index) {
-        return item.title || item.stage_key || `状态快照 ${index + 1}`;
+        return item.title || item.stage_key || `阶段规则 ${index + 1}`;
+    }
+
+    function snapshotFieldTitle(item, index) {
+        return item.label || item.key || `状态快照字段 ${index + 1}`;
     }
 
     function databaseTagTitle(item, index) {
@@ -753,6 +781,17 @@ Item {
         stageNotesText = item.notes || "";
     }
 
+    function applySnapshotFieldFields(item) {
+        item = item || {};
+        snapshotRoleText = item.role_id || "role";
+        snapshotKeyText = item.key || "";
+        snapshotLabelText = item.label || "";
+        snapshotEnabled = item.enabled === undefined ? true : Boolean(item.enabled);
+        snapshotDisplay = item.display === undefined ? true : Boolean(item.display);
+        snapshotInstructionText = item.instruction || "";
+        snapshotNotesText = item.notes || "";
+    }
+
     function applyDatabaseTagFields(item) {
         item = item || {};
         databaseTagText = item.tag || "";
@@ -858,6 +897,11 @@ Item {
         applyStageFields(selectedStageIndex >= 0 ? databaseStages[selectedStageIndex] : {});
     }
 
+    function selectSnapshotField(index) {
+        selectedSnapshotFieldIndex = index >= 0 && index < databaseSnapshotFields.length ? index : -1;
+        applySnapshotFieldFields(selectedSnapshotFieldIndex >= 0 ? databaseSnapshotFields[selectedSnapshotFieldIndex] : {});
+    }
+
     function selectDatabaseTag(index) {
         selectedTagIndex = index >= 0 && index < databaseTags.length ? index : -1;
         applyDatabaseTagFields(selectedTagIndex >= 0 ? databaseTags[selectedTagIndex] : {});
@@ -942,6 +986,17 @@ Item {
         items[selectedStageIndex] = items[selectedStageIndex] || defaultStage(selectedStageIndex);
         items[selectedStageIndex][field] = value;
         databaseStages = items;
+        markDirty();
+    }
+
+    function updateSnapshotField(field, value) {
+        if (selectedSnapshotFieldIndex < 0 || selectedSnapshotFieldIndex >= databaseSnapshotFields.length) {
+            return;
+        }
+        const items = clone(databaseSnapshotFields);
+        items[selectedSnapshotFieldIndex] = items[selectedSnapshotFieldIndex] || defaultSnapshotField(selectedSnapshotFieldIndex);
+        items[selectedSnapshotFieldIndex][field] = value;
+        databaseSnapshotFields = items;
         markDirty();
     }
 
@@ -1119,6 +1174,14 @@ Item {
         markDirty();
     }
 
+    function addSnapshotField() {
+        const items = clone(databaseSnapshotFields);
+        items.push(defaultSnapshotField(items.length));
+        databaseSnapshotFields = items;
+        selectSnapshotField(items.length - 1);
+        markDirty();
+    }
+
     function addDatabaseTag() {
         const items = clone(databaseTags);
         items.push(defaultDatabaseTag(items.length));
@@ -1204,6 +1267,17 @@ Item {
         items.splice(selectedStageIndex, 1);
         databaseStages = items;
         selectStage(Math.min(selectedStageIndex, items.length - 1));
+        markDirty();
+    }
+
+    function removeSnapshotField() {
+        if (selectedSnapshotFieldIndex < 0 || selectedSnapshotFieldIndex >= databaseSnapshotFields.length) {
+            return;
+        }
+        const items = clone(databaseSnapshotFields);
+        items.splice(selectedSnapshotFieldIndex, 1);
+        databaseSnapshotFields = items;
+        selectSnapshotField(Math.min(selectedSnapshotFieldIndex, items.length - 1));
         markDirty();
     }
 
@@ -1357,12 +1431,14 @@ Item {
         personaItems = personaMapToItems(persona.personas || {});
         creativeWorkshopPresent = Object.prototype.hasOwnProperty.call(persona, "creativeWorkshop");
         const creativeWorkshop = persona.creativeWorkshop || {};
+        creativeWorkshopDraft = clone(creativeWorkshop);
         creativeWorkshopEnabled = creativeWorkshop.enabled === undefined ? true : Boolean(creativeWorkshop.enabled);
         workshopItems = clone(creativeWorkshop.items || []);
         databaseEnabled = database.enabled === undefined ? true : Boolean(database.enabled);
         databaseNotesText = database.notes || "";
         databaseVariables = clone(database.variables || []);
         databaseStages = clone(database.stages || []);
+        databaseSnapshotFields = clone(database.snapshotFields || database.snapshot_fields || []);
         databaseTags = clone(database.tags || []);
         worldbookSettings = clone(worldbook.settings || {});
         worldbookEntries = clone(worldbook.entries || worldbook.items || []);
@@ -1380,6 +1456,7 @@ Item {
         memoryItems = clone(memory.items || memory.entries || memory.memories || []);
         selectVariable(databaseVariables.length > 0 ? 0 : -1);
         selectStage(databaseStages.length > 0 ? 0 : -1);
+        selectSnapshotField(databaseSnapshotFields.length > 0 ? 0 : -1);
         selectDatabaseTag(databaseTags.length > 0 ? 0 : -1);
         selectWorldbookEntry(worldbookEntries.length > 0 ? 0 : -1);
         selectPresetItem(presetExtraPrompts.length > 0 ? 0 : -1);
@@ -1418,10 +1495,10 @@ Item {
         project.persona_card.creator_notes = creatorNotesText;
         project.persona_card.personas = personaItemsToMap(personaItems);
         if (creativeWorkshopPresent || workshopItems.length > 0 || !creativeWorkshopEnabled) {
-            project.persona_card.creativeWorkshop = {
-                "enabled": creativeWorkshopEnabled,
-                "items": clone(workshopItems)
-            };
+            const creativeWorkshop = clone(creativeWorkshopDraft || {});
+            creativeWorkshop.enabled = creativeWorkshopEnabled;
+            creativeWorkshop.items = clone(workshopItems);
+            project.persona_card.creativeWorkshop = creativeWorkshop;
         } else {
             delete project.persona_card.creativeWorkshop;
         }
@@ -1430,6 +1507,7 @@ Item {
         project.database.notes = databaseNotesText;
         project.database.variables = clone(databaseVariables);
         project.database.stages = clone(databaseStages);
+        project.database.snapshotFields = clone(databaseSnapshotFields);
         project.database.tags = clone(databaseTags);
         project.worldbook = project.worldbook || {};
         project.worldbook.settings = clone(worldbookSettings || {});
@@ -2422,7 +2500,7 @@ Item {
                         }
 
                         SettingField {
-                            title: "触发状态快照"
+                            title: "触发阶段规则"
 
                             HusInput {
                                 width: parent.width
@@ -3517,7 +3595,7 @@ Item {
 
                         HusText {
                             Layout.fillWidth: true
-                            text: "状态快照"
+                            text: "阶段规则"
                             font.pixelSize: 18
                             font.weight: Font.DemiBold
                             color: HusTheme.Primary.colorTextPrimary
@@ -3529,7 +3607,7 @@ Item {
                         }
 
                         HusButton {
-                            text: "新增状态快照"
+                            text: "新增阶段规则"
                             type: HusButton.Type_Primary
                             onClicked: root.addStage()
                         }
@@ -3569,7 +3647,7 @@ Item {
 
                         HusText {
                             anchors.centerIn: parent
-                            text: "还没有状态快照"
+                            text: "还没有阶段规则"
                             font.pixelSize: 13
                             color: HusTheme.Primary.colorTextSecondary
                         }
@@ -3600,7 +3678,7 @@ Item {
                         }
 
                         SettingField {
-                            title: "状态快照键（key）"
+                            title: "阶段键（key）"
 
                             HusInput {
                                 width: parent.width
@@ -3693,7 +3771,7 @@ Item {
                         rowSpacing: 18
 
                         SettingField {
-                            title: "状态快照说明"
+                            title: "阶段说明"
 
                             HusTextArea {
                                 id: stageDescriptionInput
@@ -3704,7 +3782,7 @@ Item {
                                 autoSize: true
                                 resizable: true
                                 text: root.stageDescriptionText
-                                placeholderText: "这个状态快照代表什么阶段"
+                                placeholderText: "这个阶段规则代表什么阶段"
                                 onTextChanged: {
                                     if (root.stageDescriptionText !== text) {
                                         root.stageDescriptionText = text;
@@ -3715,7 +3793,7 @@ Item {
                         }
 
                         SettingField {
-                            title: "状态快照备注（notes）"
+                            title: "阶段备注（notes）"
 
                             HusTextArea {
                                 id: stageNotesInput
@@ -3731,6 +3809,211 @@ Item {
                                     if (root.stageNotesText !== text) {
                                         root.stageNotesText = text;
                                         root.updateStageField("notes", text);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        HusText {
+                            Layout.fillWidth: true
+                            text: "状态快照字段"
+                            font.pixelSize: 18
+                            font.weight: Font.DemiBold
+                            color: HusTheme.Primary.colorTextPrimary
+                        }
+
+                        HusTag {
+                            text: `${root.databaseSnapshotFields.length} 项`
+                            tagState: root.databaseSnapshotFields.length > 0 ? HusTag.State_Success : HusTag.State_Default
+                        }
+
+                        HusButton {
+                            text: "新增快照字段"
+                            type: HusButton.Type_Primary
+                            onClicked: root.addSnapshotField()
+                        }
+
+                        HusButton {
+                            text: "移除当前"
+                            type: HusButton.Type_Outlined
+                            enabled: root.selectedSnapshotFieldIndex >= 0
+                            onClicked: root.removeSnapshotField()
+                        }
+                    }
+
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        visible: root.databaseSnapshotFields.length > 0
+
+                        Repeater {
+                            model: root.databaseSnapshotFields
+
+                            delegate: HusButton {
+                                text: root.snapshotFieldTitle(modelData, index)
+                                type: index === root.selectedSnapshotFieldIndex ? HusButton.Type_Primary : HusButton.Type_Outlined
+                                onClicked: root.selectSnapshotField(index)
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 52
+                        radius: 8
+                        visible: root.databaseSnapshotFields.length === 0
+                        color: HusThemeFunctions.alpha(HusTheme.Primary.colorBgBase, HusTheme.isDark ? 0.12 : 0.36)
+                        border.width: 1
+                        border.color: HusThemeFunctions.alpha(HusTheme.Primary.colorBorder, 0.24)
+
+                        HusText {
+                            anchors.centerIn: parent
+                            text: "还没有状态快照字段"
+                            font.pixelSize: 13
+                            color: HusTheme.Primary.colorTextSecondary
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        visible: root.selectedSnapshotFieldIndex >= 0
+                        columns: pageColumn.width < 880 ? 1 : 2
+                        columnSpacing: 18
+                        rowSpacing: 18
+
+                        SettingField {
+                            title: "角色"
+
+                            HusInput {
+                                width: parent.width
+                                text: root.snapshotRoleText
+                                placeholderText: "role"
+                                clearEnabled: "active"
+                                iconSource: HusIcon.IdcardOutlined
+                                iconPosition: HusInput.Position_Left
+                                onTextEdited: {
+                                    root.snapshotRoleText = text;
+                                    root.updateSnapshotField("role_id", text);
+                                }
+                            }
+                        }
+
+                        SettingField {
+                            title: "字段键（key）"
+
+                            HusInput {
+                                width: parent.width
+                                text: root.snapshotKeyText
+                                placeholderText: "mood"
+                                clearEnabled: "active"
+                                iconSource: HusIcon.KeyOutlined
+                                iconPosition: HusInput.Position_Left
+                                onTextEdited: {
+                                    root.snapshotKeyText = text;
+                                    root.updateSnapshotField("key", text);
+                                }
+                            }
+                        }
+
+                        SettingField {
+                            title: "字段名称"
+
+                            HusInput {
+                                width: parent.width
+                                text: root.snapshotLabelText
+                                placeholderText: "当前情绪"
+                                clearEnabled: "active"
+                                iconSource: HusIcon.ProjectOutlined
+                                iconPosition: HusInput.Position_Left
+                                onTextEdited: {
+                                    root.snapshotLabelText = text;
+                                    root.updateSnapshotField("label", text);
+                                }
+                            }
+                        }
+
+                        SettingField {
+                            title: "启用与显示"
+
+                            RowLayout {
+                                width: parent.width
+                                spacing: 12
+
+                                HusSwitch {
+                                    checked: root.snapshotEnabled
+                                    checkedText: "启用"
+                                    uncheckedText: "关闭"
+                                    onToggled: {
+                                        root.snapshotEnabled = checked;
+                                        root.updateSnapshotField("enabled", checked);
+                                    }
+                                }
+
+                                HusSwitch {
+                                    checked: root.snapshotDisplay
+                                    checkedText: "显示"
+                                    uncheckedText: "隐藏"
+                                    onToggled: {
+                                        root.snapshotDisplay = checked;
+                                        root.updateSnapshotField("display", checked);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        visible: root.selectedSnapshotFieldIndex >= 0
+                        columns: pageColumn.width < 880 ? 1 : 2
+                        columnSpacing: 18
+                        rowSpacing: 18
+
+                        SettingField {
+                            title: "生成说明"
+                            description: "告诉 DatabaseWorker 如何从本轮回复里提取这个字段。"
+
+                            HusTextArea {
+                                id: snapshotInstructionInput
+                                width: parent.width
+                                minRows: 2
+                                maxRows: 5
+                                maxLength: 4000
+                                autoSize: true
+                                resizable: true
+                                text: root.snapshotInstructionText
+                                placeholderText: "根据本轮上下文生成该状态快照字段。"
+                                onTextChanged: {
+                                    if (root.snapshotInstructionText !== text) {
+                                        root.snapshotInstructionText = text;
+                                        root.updateSnapshotField("instruction", text);
+                                    }
+                                }
+                            }
+                        }
+
+                        SettingField {
+                            title: "字段备注（notes）"
+
+                            HusTextArea {
+                                id: snapshotNotesInput
+                                width: parent.width
+                                minRows: 2
+                                maxRows: 5
+                                maxLength: 4000
+                                autoSize: true
+                                resizable: true
+                                text: root.snapshotNotesText
+                                placeholderText: "内部备注、迁移来源或候选生成提示"
+                                onTextChanged: {
+                                    if (root.snapshotNotesText !== text) {
+                                        root.snapshotNotesText = text;
+                                        root.updateSnapshotField("notes", text);
                                     }
                                 }
                             }
@@ -4440,7 +4723,7 @@ Item {
                         }
 
                         HusButton {
-                            text: root.worldbookStateAdvancedVisible ? "收起状态快照联动" : "状态快照联动"
+                            text: root.worldbookStateAdvancedVisible ? "收起数据库联动" : "数据库联动"
                             type: root.worldbookStateAdvancedVisible ? HusButton.Type_Primary : HusButton.Type_Outlined
                             onClicked: root.worldbookStateAdvancedVisible = !root.worldbookStateAdvancedVisible
                         }
@@ -4823,7 +5106,7 @@ Item {
                             autoSize: true
                             resizable: true
                             text: root.presetBaseSystemPromptText
-                            placeholderText: "描述模型如何读取主卡、世界书、记忆和状态快照"
+                            placeholderText: "描述模型如何读取主卡、世界书、记忆和数据库状态"
                             onTextChanged: {
                                 if (root.presetBaseSystemPromptText !== text) {
                                     root.presetBaseSystemPromptText = text;
@@ -6203,7 +6486,12 @@ Item {
                                 }
 
                                 HusTag {
-                                    text: `状态快照 ${Number(((root.compiledResult || {}).summary || {}).stage_count || 0)}`
+                                    text: `阶段规则 ${Number(((root.compiledResult || {}).summary || {}).stage_count || 0)}`
+                                    tagState: HusTag.State_Default
+                                }
+
+                                HusTag {
+                                    text: `快照字段 ${Number(((root.compiledResult || {}).summary || {}).snapshot_field_count || 0)}`
                                     tagState: HusTag.State_Default
                                 }
 

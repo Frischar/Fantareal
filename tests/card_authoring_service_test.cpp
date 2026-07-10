@@ -197,6 +197,15 @@ QJsonObject manualFullSample() {
         "description": "Visible when trust reaches the threshold."
       }
     ],
+    "snapshotFields": [
+      {
+        "id": "snapshot_mood",
+        "role_id": "role-main",
+        "key": "mood",
+        "label": "Mood",
+        "instruction": "Summarize the visible mood for the state record."
+      }
+    ],
     "tags": [
       {
         "id": "tag_trust_lore",
@@ -306,6 +315,13 @@ QJsonObject legacyStateJournalSample() {
             ],
             "activation_tag": "state_journal.stage.role-main.trust",
             "emits_tags": ["state_journal.stage.role-main.trust"]
+          }
+        ],
+        "snapshotFields": [
+          {
+            "key": "mood",
+            "label": "Mood",
+            "instruction": "Summarize the visible mood from legacy stateJournal."
           }
         ]
       }
@@ -426,6 +442,7 @@ bool verifyManualSamples() {
         || fullPersona.value(QStringLiteral("creativeWorkshop")).toObject().value(QStringLiteral("items")).toArray().isEmpty()
         || fullDatabase.value(QStringLiteral("variables")).toArray().isEmpty()
         || fullDatabase.value(QStringLiteral("stages")).toArray().isEmpty()
+        || fullDatabase.value(QStringLiteral("snapshotFields")).toArray().isEmpty()
         || fullDatabase.value(QStringLiteral("tags")).toArray().isEmpty()
         || normalizedFull.value(QStringLiteral("worldbook")).toObject().value(QStringLiteral("entries")).toArray().isEmpty()
         || normalizedFull.value(QStringLiteral("preset")).toObject().value(QStringLiteral("presets")).toArray().isEmpty()
@@ -437,7 +454,8 @@ bool verifyManualSamples() {
     const QJsonObject compiledRaw = compiledFull.value(QStringLiteral("raw")).toObject();
     if (compiledRaw.value(QStringLiteral("name")).toString() != QStringLiteral("Manual Acceptance Role")
         || compiledRaw.value(QStringLiteral("creativeWorkshop")).toObject().value(QStringLiteral("items")).toArray().isEmpty()
-        || compiledRaw.value(QStringLiteral("stateJournal")).toObject().value(QStringLiteral("databaseDraft")).toObject().value(QStringLiteral("stages")).toArray().isEmpty()) {
+        || compiledRaw.value(QStringLiteral("stateJournal")).toObject().value(QStringLiteral("databaseDraft")).toObject().value(QStringLiteral("stages")).toArray().isEmpty()
+        || compiledRaw.value(QStringLiteral("stateJournal")).toObject().value(QStringLiteral("databaseDraft")).toObject().value(QStringLiteral("snapshotFields")).toArray().isEmpty()) {
         return fail(QStringLiteral("manual full cardwork sample should compile into role card raw and compatible stateJournal draft"));
     }
 
@@ -450,10 +468,12 @@ bool verifyManualSamples() {
     const QJsonObject importedLegacy = service.importProjectFile(legacySamplePath, &importedPath, &errorMessage);
     const QJsonObject importedLegacyDatabase = importedLegacy.value(QStringLiteral("database")).toObject();
     const QJsonObject importedLegacyStage = importedLegacyDatabase.value(QStringLiteral("stages")).toArray().first().toObject();
+    const QJsonObject importedLegacySnapshot = importedLegacyDatabase.value(QStringLiteral("snapshotFields")).toArray().first().toObject();
     if (importedLegacy.value(QStringLiteral("persona_card")).toObject().value(QStringLiteral("name")).toString() != QStringLiteral("Legacy StateJournal Role")
         || importedPath.isEmpty()
         || importedLegacyDatabase.value(QStringLiteral("variables")).toArray().isEmpty()
         || importedLegacyStage.value(QStringLiteral("active_tag")).toString() != QStringLiteral("database.stage.role-main.trust")
+        || importedLegacySnapshot.value(QStringLiteral("label")).toString() != QStringLiteral("Mood")
         || importedLegacyDatabase.value(QStringLiteral("tags")).toArray().first().toObject().value(QStringLiteral("tag")).toString() != QStringLiteral("database.stage.role-main.trust")) {
         return fail(QStringLiteral("manual legacy stateJournal sample should import into database draft with normalized stage tags: %1").arg(errorMessage));
     }
@@ -602,6 +622,57 @@ int main(int argc, char* argv[]) {
     }
 
     CardAuthoringService service(tempDir.path());
+    const QJsonObject preservationProject{
+        { QStringLiteral("type"), QStringLiteral("fantareal_card_authoring_project") },
+        { QStringLiteral("version"), 1 },
+        { QStringLiteral("persona_card"), QJsonObject{
+            { QStringLiteral("name"), QStringLiteral("Preservation Role") },
+            { QStringLiteral("creativeWorkshop"), QJsonObject{
+                { QStringLiteral("enabled"), true },
+                { QStringLiteral("opening"), QJsonObject{ { QStringLiteral("title"), QStringLiteral("Opening stays") } } },
+                { QStringLiteral("ambience"), QJsonObject{ { QStringLiteral("musicUrl"), QStringLiteral("ambience.mp3") } } },
+                { QStringLiteral("dynamicScenes"), QJsonArray{ QJsonObject{ { QStringLiteral("id"), QStringLiteral("scene-1") } } } },
+                { QStringLiteral("items"), QJsonArray{} },
+            } },
+        } },
+        { QStringLiteral("database"), QJsonObject{
+            { QStringLiteral("roles"), QJsonArray{ QJsonObject{
+                { QStringLiteral("role_id"), QStringLiteral("role-main") },
+                { QStringLiteral("variables"), QJsonArray{ QJsonObject{
+                    { QStringLiteral("var_key"), QStringLiteral("trust") },
+                    { QStringLiteral("var_name"), QStringLiteral("旧信任") },
+                } } },
+                { QStringLiteral("stages"), QJsonArray{} },
+                { QStringLiteral("snapshotFields"), QJsonArray{} },
+            } } },
+            { QStringLiteral("variables"), QJsonArray{ QJsonObject{
+                { QStringLiteral("role_id"), QStringLiteral("role-main") },
+                { QStringLiteral("var_key"), QStringLiteral("trust") },
+                { QStringLiteral("var_name"), QStringLiteral("编辑后的信任") },
+            } } },
+            { QStringLiteral("stages"), QJsonArray{} },
+            { QStringLiteral("snapshotFields"), QJsonArray{} },
+        } },
+    };
+    const QJsonObject preservedProject = service.normalizeProject(preservationProject);
+    const QJsonObject preservedWorkshop = preservedProject.value(QStringLiteral("persona_card")).toObject()
+        .value(QStringLiteral("creativeWorkshop")).toObject();
+    const QJsonObject preservedVariable = findByKey(
+        preservedProject.value(QStringLiteral("database")).toObject().value(QStringLiteral("variables")).toArray(),
+        QStringLiteral("var_key"), QStringLiteral("trust"));
+    const QJsonObject preservedCompiledRole = findById(
+        service.compileRoleCard(preservationProject).value(QStringLiteral("raw")).toObject()
+            .value(QStringLiteral("stateJournal")).toObject().value(QStringLiteral("roles")).toArray(),
+        QStringLiteral("role-main"));
+    if (preservedWorkshop.value(QStringLiteral("opening")).toObject().value(QStringLiteral("title")).toString() != QStringLiteral("Opening stays")
+        || preservedWorkshop.value(QStringLiteral("ambience")).toObject().value(QStringLiteral("musicUrl")).toString() != QStringLiteral("ambience.mp3")
+        || preservedWorkshop.value(QStringLiteral("dynamicScenes")).toArray().size() != 1
+        || preservedVariable.value(QStringLiteral("var_name")).toString() != QStringLiteral("编辑后的信任")
+        || findByKey(preservedCompiledRole.value(QStringLiteral("variables")).toArray(), QStringLiteral("var_key"), QStringLiteral("trust"))
+                .value(QStringLiteral("var_name")).toString()
+            != QStringLiteral("编辑后的信任")) {
+        return fail(QStringLiteral("card authoring normalize/compile must preserve workshop fields and prefer explicit flat database edits")) ? 0 : 1;
+    }
     QJsonObject project = service.createEmptyProject();
     const QJsonObject emptyProjectPersonas = project.value(QStringLiteral("persona_card")).toObject().value(QStringLiteral("personas")).toObject();
     if (!emptyProjectPersonas.contains(QStringLiteral("1"))

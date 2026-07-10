@@ -31,8 +31,28 @@ double numberValue(const QJsonValue& value, double fallback = 0.0) {
     return ok ? parsed : fallback;
 }
 
+bool boolValue(const QJsonValue& value, bool fallback) {
+    if (value.isBool()) {
+        return value.toBool();
+    }
+    const QString text = CardAuthoring::normalizedText(value).toLower();
+    if (text == QStringLiteral("true") || text == QStringLiteral("yes") || text == QStringLiteral("on") || text == QStringLiteral("1")) {
+        return true;
+    }
+    if (text == QStringLiteral("false") || text == QStringLiteral("no") || text == QStringLiteral("off") || text == QStringLiteral("0")) {
+        return false;
+    }
+    return fallback;
+}
+
+int intValue(const QJsonValue& value, int fallback, int minimum = -100000, int maximum = 100000) {
+    return qBound(minimum, static_cast<int>(qRound(numberValue(value, fallback))), maximum);
+}
+
 QJsonObject ensureRole(QJsonObject role, const QString& roleId) {
-    role.insert(QStringLiteral("id"), roleId);
+    if (role.value(QStringLiteral("id")).toString().trimmed().isEmpty()) {
+        role.insert(QStringLiteral("id"), roleId);
+    }
     role.insert(QStringLiteral("role_id"), roleId);
     if (role.value(QStringLiteral("role_name")).toString().trimmed().isEmpty()) {
         role.insert(QStringLiteral("role_name"), roleId);
@@ -40,7 +60,9 @@ QJsonObject ensureRole(QJsonObject role, const QString& roleId) {
     if (!role.value(QStringLiteral("aliases")).isArray()) {
         role.insert(QStringLiteral("aliases"), QJsonArray{ roleId });
     }
-    role.insert(QStringLiteral("enabled"), true);
+    if (!role.value(QStringLiteral("enabled")).isBool()) {
+        role.insert(QStringLiteral("enabled"), true);
+    }
     if (!role.value(QStringLiteral("variables")).isArray()) {
         role.insert(QStringLiteral("variables"), QJsonArray{});
     }
@@ -53,13 +75,17 @@ QJsonObject ensureRole(QJsonObject role, const QString& roleId) {
     if (role.value(QStringLiteral("use_default_variables")).isUndefined()) {
         role.insert(QStringLiteral("use_default_variables"), false);
     }
-    if (!role.value(QStringLiteral("settings")).isObject()) {
-        role.insert(QStringLiteral("settings"), QJsonObject{
-            { QStringLiteral("allow_regression"), false },
-            { QStringLiteral("confirm_turns"), 1 },
-            { QStringLiteral("cooldown_turns"), 0 },
-        });
+    QJsonObject settings = role.value(QStringLiteral("settings")).toObject();
+    if (!settings.value(QStringLiteral("allow_regression")).isBool()) {
+        settings.insert(QStringLiteral("allow_regression"), false);
     }
+    if (!settings.value(QStringLiteral("confirm_turns")).isDouble()) {
+        settings.insert(QStringLiteral("confirm_turns"), 1);
+    }
+    if (!settings.value(QStringLiteral("cooldown_turns")).isDouble()) {
+        settings.insert(QStringLiteral("cooldown_turns"), 0);
+    }
+    role.insert(QStringLiteral("settings"), settings);
     if (role.value(QStringLiteral("initial_stage")).toString().trimmed().isEmpty()) {
         role.insert(QStringLiteral("initial_stage"), QStringLiteral("stage_a"));
     }
@@ -95,20 +121,41 @@ QJsonObject databaseVariableToState(const QJsonObject& variable, int index) {
             instructionParts.append(part);
         }
     }
+    double minimum = numberValue(variable.value(QStringLiteral("min_value")), 0.0);
+    double maximum = numberValue(variable.value(QStringLiteral("max_value")), 100.0);
+    if (maximum <= minimum) {
+        maximum = minimum + 100.0;
+    }
+    double deltaMinimum = numberValue(variable.value(QStringLiteral("delta_min")), -5.0);
+    double deltaMaximum = numberValue(variable.value(QStringLiteral("delta_max")), 5.0);
+    if (deltaMaximum < deltaMinimum) {
+        const double swap = deltaMinimum;
+        deltaMinimum = deltaMaximum;
+        deltaMaximum = swap;
+    }
+    QString instruction = CardAuthoring::normalizedText(variable.value(QStringLiteral("instruction")));
+    if (instruction.isEmpty()) {
+        instruction = instructionParts.join(QLatin1Char('\n'));
+    }
+    const QJsonValue defaultSource = variable.contains(QStringLiteral("default_value"))
+        ? variable.value(QStringLiteral("default_value"))
+        : variable.value(QStringLiteral("initial_value"));
     return QJsonObject{
         { QStringLiteral("var_key"), key },
-        { QStringLiteral("var_name"), CardAuthoring::normalizedText(variable.value(QStringLiteral("label"))).isEmpty()
-                ? key
-                : CardAuthoring::normalizedText(variable.value(QStringLiteral("label"))) },
-        { QStringLiteral("enabled"), true },
-        { QStringLiteral("default_value"), numberValue(variable.value(QStringLiteral("initial_value")), 0.0) },
-        { QStringLiteral("min_value"), 0 },
-        { QStringLiteral("max_value"), 100 },
-        { QStringLiteral("delta_min"), -5 },
-        { QStringLiteral("delta_max"), 5 },
-        { QStringLiteral("display"), true },
-        { QStringLiteral("stage_relevant"), true },
-        { QStringLiteral("instruction"), instructionParts.join(QLatin1Char('\n')) },
+        { QStringLiteral("var_name"), CardAuthoring::normalizedText(variable.value(QStringLiteral("var_name"))).isEmpty()
+                ? (CardAuthoring::normalizedText(variable.value(QStringLiteral("label"))).isEmpty()
+                        ? key
+                        : CardAuthoring::normalizedText(variable.value(QStringLiteral("label"))))
+                : CardAuthoring::normalizedText(variable.value(QStringLiteral("var_name"))) },
+        { QStringLiteral("enabled"), boolValue(variable.value(QStringLiteral("enabled")), true) },
+        { QStringLiteral("default_value"), qBound(minimum, numberValue(defaultSource, minimum), maximum) },
+        { QStringLiteral("min_value"), minimum },
+        { QStringLiteral("max_value"), maximum },
+        { QStringLiteral("delta_min"), deltaMinimum },
+        { QStringLiteral("delta_max"), deltaMaximum },
+        { QStringLiteral("display"), boolValue(variable.value(QStringLiteral("display")), true) },
+        { QStringLiteral("stage_relevant"), boolValue(variable.value(QStringLiteral("stage_relevant")), true) },
+        { QStringLiteral("instruction"), instruction },
     };
 }
 
@@ -161,26 +208,36 @@ QJsonObject databaseStageToState(const QJsonObject& stage, int index, const QSet
             ? CardAuthoring::normalizedText(stage.value(QStringLiteral("id")))
             : CardAuthoring::normalizedText(stage.value(QStringLiteral("stage_key"))),
         QStringLiteral("stage_%1").arg(index));
-    const QString activeTag = CardAuthoring::normalizedText(stage.value(QStringLiteral("active_tag"))).isEmpty()
+    const QString configuredActiveTag = CardAuthoring::normalizedText(stage.value(QStringLiteral("activation_tag"))).isEmpty()
+        ? CardAuthoring::normalizedText(stage.value(QStringLiteral("active_tag")))
+        : CardAuthoring::normalizedText(stage.value(QStringLiteral("activation_tag")));
+    const QString activeTag = configuredActiveTag.isEmpty()
         ? (roleId.isEmpty() ? QString() : QStringLiteral("database.stage.%1.%2").arg(roleId, stageKey))
-        : CardAuthoring::normalizedText(stage.value(QStringLiteral("active_tag")));
+        : configuredActiveTag;
     bool parsed = true;
     const QString conditionText = CardAuthoring::normalizedText(stage.value(QStringLiteral("condition")));
-    const QJsonArray conditions = parseDatabaseStageConditions(conditionText, variableKeys, &parsed);
+    QJsonArray conditions = stage.value(QStringLiteral("conditions")).toArray();
+    if (conditions.isEmpty() && !conditionText.isEmpty()) {
+        conditions = parseDatabaseStageConditions(conditionText, variableKeys, &parsed);
+    }
 
     QJsonObject stateStage{
         { QStringLiteral("stage_key"), stageKey },
-        { QStringLiteral("stage_name"), CardAuthoring::normalizedText(stage.value(QStringLiteral("title"))).isEmpty()
-                ? stageKey
-                : CardAuthoring::normalizedText(stage.value(QStringLiteral("title"))) },
-        { QStringLiteral("enabled"), true },
-        { QStringLiteral("priority"), index * 10 },
-        { QStringLiteral("condition_mode"), QStringLiteral("all") },
+        { QStringLiteral("stage_name"), CardAuthoring::normalizedText(stage.value(QStringLiteral("stage_name"))).isEmpty()
+                ? (CardAuthoring::normalizedText(stage.value(QStringLiteral("title"))).isEmpty()
+                        ? stageKey
+                        : CardAuthoring::normalizedText(stage.value(QStringLiteral("title"))))
+                : CardAuthoring::normalizedText(stage.value(QStringLiteral("stage_name"))) },
+        { QStringLiteral("enabled"), boolValue(stage.value(QStringLiteral("enabled")), true) },
+        { QStringLiteral("priority"), intValue(stage.value(QStringLiteral("priority")), index * 10) },
+        { QStringLiteral("condition_mode"), CardAuthoring::normalizedText(stage.value(QStringLiteral("condition_mode"))).toLower() == QStringLiteral("any")
+                ? QStringLiteral("any")
+                : QStringLiteral("all") },
         { QStringLiteral("conditions"), conditions },
         { QStringLiteral("condition_text"), conditionText },
-        { QStringLiteral("allow_regression"), false },
-        { QStringLiteral("confirm_turns"), 1 },
-        { QStringLiteral("cooldown_turns"), 0 },
+        { QStringLiteral("allow_regression"), boolValue(stage.value(QStringLiteral("allow_regression")), false) },
+        { QStringLiteral("confirm_turns"), intValue(stage.value(QStringLiteral("confirm_turns")), 1, 1, 10000) },
+        { QStringLiteral("cooldown_turns"), intValue(stage.value(QStringLiteral("cooldown_turns")), 0, 0, 10000) },
         { QStringLiteral("activation_tag"), activeTag },
         { QStringLiteral("emits_tags"), stage.value(QStringLiteral("emits_tags")).toArray() },
     };
@@ -198,12 +255,42 @@ QJsonObject databaseStageToState(const QJsonObject& stage, int index, const QSet
     return stateStage;
 }
 
+QJsonObject databaseSnapshotFieldToState(const QJsonObject& field, int index) {
+    const QString key = normalizeFaKey(
+        CardAuthoring::normalizedText(field.value(QStringLiteral("key"))).isEmpty()
+            ? CardAuthoring::normalizedText(field.value(QStringLiteral("id")))
+            : CardAuthoring::normalizedText(field.value(QStringLiteral("key"))),
+        QStringLiteral("snapshot_%1").arg(index));
+    const QString label = CardAuthoring::normalizedText(field.value(QStringLiteral("label"))).isEmpty()
+        ? key
+        : CardAuthoring::normalizedText(field.value(QStringLiteral("label")));
+    QString instruction = CardAuthoring::normalizedText(field.value(QStringLiteral("instruction")));
+    const QString notes = CardAuthoring::normalizedText(field.value(QStringLiteral("notes")));
+    if (!notes.isEmpty()) {
+        instruction = instruction.isEmpty() ? notes : QStringLiteral("%1\n%2").arg(instruction, notes);
+    }
+    return QJsonObject{
+        { QStringLiteral("key"), key },
+        { QStringLiteral("label"), label },
+        { QStringLiteral("enabled"), boolValue(field.value(QStringLiteral("enabled")), true) },
+        { QStringLiteral("display"), boolValue(field.value(QStringLiteral("display")), true) },
+        { QStringLiteral("instruction"), instruction.isEmpty() ? QStringLiteral("根据本轮上下文生成该状态快照字段。") : instruction },
+    };
+}
+
 QJsonObject updateRoleStateMode(QJsonObject role) {
     const bool hasVariables = !role.value(QStringLiteral("variables")).toArray().isEmpty();
     const bool hasStages = !role.value(QStringLiteral("stages")).toArray().isEmpty();
     const bool hasSnapshot = !role.value(QStringLiteral("snapshotFields")).toArray().isEmpty();
-    QString mode;
-    if (hasVariables && hasStages) {
+    QString mode = role.value(QStringLiteral("mode")).toString(
+        role.value(QStringLiteral("stateJournalMode")).toString()).trimmed().toLower();
+    if (mode == QStringLiteral("disabled") || role.value(QStringLiteral("enabled")).toBool(true) == false) {
+        mode = QStringLiteral("disabled");
+    } else if (mode == QStringLiteral("snapshot_only")) {
+        mode = QStringLiteral("snapshot_only");
+    } else if (mode == QStringLiteral("full") || mode == QStringLiteral("variables")
+        || mode == QStringLiteral("stages")) {
+    } else if (hasVariables && hasStages) {
         mode = QStringLiteral("full");
     } else if (hasVariables) {
         mode = QStringLiteral("variables");
@@ -267,6 +354,7 @@ QStringList CardAuthoringCompiler::validateProject(const QJsonObject& project) c
     const QJsonObject database = normalized.value(QStringLiteral("database")).toObject();
     if (database.value(QStringLiteral("variables")).toArray().isEmpty()
         && database.value(QStringLiteral("stages")).toArray().isEmpty()
+        && database.value(QStringLiteral("snapshotFields")).toArray().isEmpty()
         && database.value(QStringLiteral("tags")).toArray().isEmpty()
         && database.value(QStringLiteral("notes")).toString().trimmed().isEmpty()) {
         warnings.append(QStringLiteral("database draft is empty"));
@@ -279,17 +367,33 @@ QJsonObject CardAuthoringCompiler::databaseToStateJournal(const QJsonObject& dat
 
     QJsonObject stateJournal;
     stateJournal.insert(QStringLiteral("enabled"), normalized.value(QStringLiteral("enabled")).toBool(true));
-    stateJournal.insert(QStringLiteral("version"), 1);
-    stateJournal.insert(QStringLiteral("role_source_mode"), QStringLiteral("auto"));
+    stateJournal.insert(QStringLiteral("version"), qMax(1, normalized.value(QStringLiteral("version")).toInt(1)));
+    stateJournal.insert(QStringLiteral("role_source_mode"), normalized.value(QStringLiteral("role_source_mode")).toString(QStringLiteral("auto")));
 
     QJsonArray roles;
     QJsonObject roleById;
+    const QJsonArray roleDrafts = normalized.value(QStringLiteral("roles")).toArray();
+    for (const QJsonValue& roleValue : roleDrafts) {
+        QJsonObject role = roleValue.toObject();
+        const QString roleId = normalizeFaKey(
+            CardAuthoring::normalizedText(role.value(QStringLiteral("role_id"))).isEmpty()
+                ? CardAuthoring::normalizedText(role.value(QStringLiteral("id")))
+                : CardAuthoring::normalizedText(role.value(QStringLiteral("role_id"))),
+            QStringLiteral("role"));
+        role.insert(QStringLiteral("variables"), QJsonArray{});
+        role.insert(QStringLiteral("stages"), QJsonArray{});
+        role.insert(QStringLiteral("snapshotFields"), QJsonArray{});
+        roleById.insert(roleId, ensureRole(role, roleId));
+    }
 
     const QJsonArray variables = normalized.value(QStringLiteral("variables")).toArray();
     for (int i = 0; i < variables.size(); ++i) {
         const QJsonValue value = variables.at(i);
         const QJsonObject variable = value.toObject();
-        const QString roleId = normalizeFaKey(variable.value(QStringLiteral("scope")).toString(QStringLiteral("role")), QStringLiteral("role"));
+        const QString roleId = normalizeFaKey(
+            variable.value(QStringLiteral("role_id")).toString(
+                variable.value(QStringLiteral("scope")).toString(QStringLiteral("role"))),
+            QStringLiteral("role"));
         QJsonObject role = ensureRole(roleById.value(roleId).toObject(), roleId);
         QJsonArray roleVariables = role.value(QStringLiteral("variables")).toArray();
         roleVariables.append(databaseVariableToState(variable, i + 1));
@@ -319,6 +423,17 @@ QJsonObject CardAuthoringCompiler::databaseToStateJournal(const QJsonObject& dat
             || role.value(QStringLiteral("initial_stage")).toString() == QStringLiteral("stage_a")) {
             role.insert(QStringLiteral("initial_stage"), stateStage.value(QStringLiteral("stage_key")).toString());
         }
+        roleById.insert(roleId, role);
+    }
+
+    const QJsonArray snapshotFields = normalized.value(QStringLiteral("snapshotFields")).toArray();
+    for (int i = 0; i < snapshotFields.size(); ++i) {
+        const QJsonObject field = snapshotFields.at(i).toObject();
+        const QString roleId = normalizeFaKey(field.value(QStringLiteral("role_id")).toString(QStringLiteral("role")), QStringLiteral("role"));
+        QJsonObject role = ensureRole(roleById.value(roleId).toObject(), roleId);
+        QJsonArray roleSnapshotFields = role.value(QStringLiteral("snapshotFields")).toArray();
+        roleSnapshotFields.append(databaseSnapshotFieldToState(field, i + 1));
+        role.insert(QStringLiteral("snapshotFields"), roleSnapshotFields);
         roleById.insert(roleId, role);
     }
 

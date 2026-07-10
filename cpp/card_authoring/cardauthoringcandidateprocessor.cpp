@@ -57,6 +57,11 @@ QString normalizeDatabaseKind(const QJsonValue& value) {
     if (kind == QStringLiteral("stage") || kind == QStringLiteral("stages")) {
         return QStringLiteral("stages");
     }
+    if (kind == QStringLiteral("snapshot") || kind == QStringLiteral("snapshots")
+        || kind == QStringLiteral("snapshotfield") || kind == QStringLiteral("snapshotfields")
+        || kind == QStringLiteral("snapshot_field") || kind == QStringLiteral("snapshot_fields")) {
+        return QStringLiteral("snapshotFields");
+    }
     if (kind == QStringLiteral("tag") || kind == QStringLiteral("tags")) {
         return QStringLiteral("tags");
     }
@@ -285,12 +290,46 @@ QJsonValue normalizeAfterValue(const QJsonObject& project, const QString& path, 
     if (parts.first() == QStringLiteral("database")) {
         const int index = candidateArrayIndex(project, path);
         if (parts.size() >= 2 && rawAfter.isObject()) {
-            const QJsonObject object = mergedObjectForPath(project, path, rawAfter.toObject());
+            const QJsonObject incoming = rawAfter.toObject();
+            QJsonObject object = mergedObjectForPath(project, path, incoming);
             if (parts.at(1) == QStringLiteral("variables")) {
+                if (incoming.contains(QStringLiteral("label")) && !incoming.contains(QStringLiteral("var_name"))) {
+                    object.insert(QStringLiteral("var_name"), incoming.value(QStringLiteral("label")));
+                } else if (incoming.contains(QStringLiteral("var_name")) && !incoming.contains(QStringLiteral("label"))) {
+                    object.insert(QStringLiteral("label"), incoming.value(QStringLiteral("var_name")));
+                }
+                if (incoming.contains(QStringLiteral("key")) && !incoming.contains(QStringLiteral("var_key"))) {
+                    object.insert(QStringLiteral("var_key"), incoming.value(QStringLiteral("key")));
+                } else if (incoming.contains(QStringLiteral("var_key")) && !incoming.contains(QStringLiteral("key"))) {
+                    object.insert(QStringLiteral("key"), incoming.value(QStringLiteral("var_key")));
+                }
+                if (incoming.contains(QStringLiteral("scope")) && !incoming.contains(QStringLiteral("role_id"))) {
+                    object.insert(QStringLiteral("role_id"), incoming.value(QStringLiteral("scope")));
+                } else if (incoming.contains(QStringLiteral("role_id")) && !incoming.contains(QStringLiteral("scope"))) {
+                    object.insert(QStringLiteral("scope"), incoming.value(QStringLiteral("role_id")));
+                }
+                if (incoming.contains(QStringLiteral("initial_value")) && !incoming.contains(QStringLiteral("default_value"))) {
+                    object.insert(QStringLiteral("default_value"), incoming.value(QStringLiteral("initial_value")));
+                } else if (incoming.contains(QStringLiteral("default_value")) && !incoming.contains(QStringLiteral("initial_value"))) {
+                    object.insert(QStringLiteral("initial_value"), incoming.value(QStringLiteral("default_value")));
+                }
                 return CardAuthoring::normalizeDatabaseVariable(object, index);
             }
             if (parts.at(1) == QStringLiteral("stages")) {
+                if (incoming.contains(QStringLiteral("title")) && !incoming.contains(QStringLiteral("stage_name"))) {
+                    object.insert(QStringLiteral("stage_name"), incoming.value(QStringLiteral("title")));
+                } else if (incoming.contains(QStringLiteral("stage_name")) && !incoming.contains(QStringLiteral("title"))) {
+                    object.insert(QStringLiteral("title"), incoming.value(QStringLiteral("stage_name")));
+                }
+                if (incoming.contains(QStringLiteral("active_tag")) && !incoming.contains(QStringLiteral("activation_tag"))) {
+                    object.insert(QStringLiteral("activation_tag"), incoming.value(QStringLiteral("active_tag")));
+                } else if (incoming.contains(QStringLiteral("activation_tag")) && !incoming.contains(QStringLiteral("active_tag"))) {
+                    object.insert(QStringLiteral("active_tag"), incoming.value(QStringLiteral("activation_tag")));
+                }
                 return CardAuthoring::normalizeDatabaseStage(object, index);
+            }
+            if (parts.at(1) == QStringLiteral("snapshotFields") || parts.at(1) == QStringLiteral("snapshot_fields")) {
+                return CardAuthoring::normalizeDatabaseSnapshotField(object, index);
             }
             if (parts.at(1) == QStringLiteral("tags")) {
                 return CardAuthoring::normalizeDatabaseTag(object, index);

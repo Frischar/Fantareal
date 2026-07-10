@@ -15,6 +15,8 @@
 #include <QTemporaryDir>
 #include <QVariantMap>
 
+#include "database/databaseservice.h"
+
 #include <iostream>
 
 namespace {
@@ -219,7 +221,7 @@ int main(int argc, char* argv[]) {
 
     QJsonObject worldbookSettings;
     worldbookSettings.insert(QStringLiteral("enabled"), true);
-    worldbookSettings.insert(QStringLiteral("max_hits"), 2);
+    worldbookSettings.insert(QStringLiteral("max_hits"), 3);
     worldbookSettings.insert(QStringLiteral("default_match_mode"), QStringLiteral("any"));
     worldbookSettings.insert(QStringLiteral("default_secondary_mode"), QStringLiteral("all"));
     worldbookSettings.insert(QStringLiteral("default_group_operator"), QStringLiteral("and"));
@@ -255,9 +257,21 @@ int main(int argc, char* argv[]) {
     overflowEntry.insert(QStringLiteral("content"), QStringLiteral("MAX_HITS_EXCLUDED"));
     overflowEntry.insert(QStringLiteral("order"), 99);
 
+    QJsonObject externalTagEntry;
+    externalTagEntry.insert(QStringLiteral("id"), QStringLiteral("wb-database-stage"));
+    externalTagEntry.insert(QStringLiteral("title"), QStringLiteral("Trusted Navigator"));
+    externalTagEntry.insert(QStringLiteral("entry_type"), QStringLiteral("external_tag"));
+    externalTagEntry.insert(QStringLiteral("activation_tags"), QJsonArray{
+        QStringLiteral("database.stage.main.trusted"),
+    });
+    externalTagEntry.insert(QStringLiteral("content"), QStringLiteral("Astra now trusts the pilot with restricted navigation details."));
+    externalTagEntry.insert(QStringLiteral("order"), 2);
+
     QJsonObject worldbook;
     worldbook.insert(QStringLiteral("settings"), worldbookSettings);
-    worldbook.insert(QStringLiteral("entries"), QJsonArray{ constantEntry, matchedEntry, skippedEntry, overflowEntry });
+    worldbook.insert(QStringLiteral("entries"), QJsonArray{
+        constantEntry, externalTagEntry, matchedEntry, skippedEntry, overflowEntry,
+    });
     if (!writeJson(root.absoluteFilePath(QStringLiteral("data/worldbook.json")), QJsonDocument(worldbook))) {
         return fail(QStringLiteral("failed to write worldbook fixture")) ? 0 : 1;
     }
@@ -313,6 +327,28 @@ int main(int argc, char* argv[]) {
         return fail(QStringLiteral("failed to write conversation fixture")) ? 0 : 1;
     }
 
+    const QJsonObject trustedStage{
+        { QStringLiteral("role_id"), QStringLiteral("main") },
+        { QStringLiteral("stage_key"), QStringLiteral("trusted") },
+        { QStringLiteral("stage_name"), QStringLiteral("信赖") },
+        { QStringLiteral("enabled"), true },
+        { QStringLiteral("activation_tag"), QStringLiteral("database.stage.main.trusted") },
+        { QStringLiteral("emits_tags"), QJsonArray{ QStringLiteral("database.stage.main.trusted") } },
+    };
+    const QJsonObject databaseConfig{
+        { QStringLiteral("enabled"), true },
+        { QStringLiteral("roles"), QJsonArray{ QJsonObject{
+              { QStringLiteral("role_id"), QStringLiteral("main") },
+              { QStringLiteral("enabled"), true },
+              { QStringLiteral("mode"), QStringLiteral("full") },
+              { QStringLiteral("initial_stage"), QStringLiteral("trusted") },
+          } } },
+        { QStringLiteral("stages"), QJsonArray{ trustedStage } },
+    };
+    if (!DatabaseService(root.absolutePath()).initializeRuntime(QStringLiteral("card-astra"), databaseConfig).ok) {
+        return fail(QStringLiteral("failed to seed database active tag fixture")) ? 0 : 1;
+    }
+
     qunsetenv("LLM_BASE_URL");
     qunsetenv("LLM_API_KEY");
     qunsetenv("LLM_MODEL");
@@ -343,6 +379,7 @@ int main(int argc, char* argv[]) {
     }
     if (!systemPrompt.contains(QStringLiteral("[Worldbook]"))
         || !systemPrompt.contains(QStringLiteral("Astra never ignores jump safety."))
+        || !systemPrompt.contains(QStringLiteral("Astra now trusts the pilot with restricted navigation details."))
         || !systemPrompt.contains(QStringLiteral("The Aster Gate requires silent orbit alignment."))
         || systemPrompt.contains(QStringLiteral("SHOULD_NOT_APPEAR"))
         || systemPrompt.contains(QStringLiteral("MAX_HITS_EXCLUDED"))) {

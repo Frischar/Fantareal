@@ -333,6 +333,16 @@ QVariantMap buildProject(const QVariantMap& baseDraft) {
     stage.insert(QStringLiteral("description"), QStringLiteral("trust stage description"));
     stage.insert(QStringLiteral("notes"), QStringLiteral("trust stage note"));
 
+    QVariantMap snapshotField;
+    snapshotField.insert(QStringLiteral("id"), QStringLiteral("db_snapshot_mood"));
+    snapshotField.insert(QStringLiteral("role_id"), QStringLiteral("role-1"));
+    snapshotField.insert(QStringLiteral("key"), QStringLiteral("mood"));
+    snapshotField.insert(QStringLiteral("label"), QStringLiteral("Mood"));
+    snapshotField.insert(QStringLiteral("enabled"), true);
+    snapshotField.insert(QStringLiteral("display"), true);
+    snapshotField.insert(QStringLiteral("instruction"), QStringLiteral("Summarize the visible mood for the state record."));
+    snapshotField.insert(QStringLiteral("notes"), QStringLiteral("mood snapshot note"));
+
     QVariantMap databaseTag;
     databaseTag.insert(QStringLiteral("id"), QStringLiteral("db_tag_lore"));
     databaseTag.insert(QStringLiteral("tag"), QStringLiteral("database.tag.bridge-lore"));
@@ -347,6 +357,7 @@ QVariantMap buildProject(const QVariantMap& baseDraft) {
     database.insert(QStringLiteral("notes"), QStringLiteral("bridge test database draft"));
     database.insert(QStringLiteral("variables"), QVariantList{ variable });
     database.insert(QStringLiteral("stages"), QVariantList{ stage });
+    database.insert(QStringLiteral("snapshotFields"), QVariantList{ snapshotField });
     database.insert(QStringLiteral("tags"), QVariantList{ databaseTag });
     project.insert(QStringLiteral("database"), database);
     QVariantMap worldbookEntry;
@@ -478,6 +489,10 @@ int main(int argc, char* argv[]) {
         compiledDatabaseDraft.value(QStringLiteral("stages")).toList(),
         QStringLiteral("id"),
         QStringLiteral("db_stage_trust"));
+    const QVariantMap compiledDatabaseSnapshot = findVariantMapByValue(
+        compiledDatabaseDraft.value(QStringLiteral("snapshotFields")).toList(),
+        QStringLiteral("id"),
+        QStringLiteral("db_snapshot_mood"));
     const QVariantMap compiledDatabaseTag = findVariantMapByValue(
         compiledDatabaseDraft.value(QStringLiteral("tags")).toList(),
         QStringLiteral("id"),
@@ -500,6 +515,9 @@ int main(int argc, char* argv[]) {
     const QJsonObject exportedDatabaseStage = findById(
         exportedDatabaseDraft.value(QStringLiteral("stages")).toArray(),
         QStringLiteral("db_stage_trust"));
+    const QJsonObject exportedDatabaseSnapshot = findById(
+        exportedDatabaseDraft.value(QStringLiteral("snapshotFields")).toArray(),
+        QStringLiteral("db_snapshot_mood"));
     const QJsonObject exportedDatabaseTag = findById(
         exportedDatabaseDraft.value(QStringLiteral("tags")).toArray(),
         QStringLiteral("db_tag_lore"));
@@ -511,6 +529,7 @@ int main(int argc, char* argv[]) {
         || compiledSummary.value(QStringLiteral("name")).toString() != QStringLiteral("New Name")
         || compiledSummary.value(QStringLiteral("variable_count")).toInt() != 1
         || compiledSummary.value(QStringLiteral("stage_count")).toInt() != 1
+        || compiledSummary.value(QStringLiteral("snapshot_field_count")).toInt() != 1
         || compiledSummary.value(QStringLiteral("database_tag_count")).toInt() != 1
         || compiledRaw.value(QStringLiteral("name")).toString() != QStringLiteral("New Name")
         || compiledRaw.value(QStringLiteral("mes_example")).toString() != QStringLiteral("new example dialogue")
@@ -529,6 +548,8 @@ int main(int argc, char* argv[]) {
         || compiledDatabaseStage.value(QStringLiteral("active_tag")).toString() != QStringLiteral("database.stage.role-1.trust")
         || !compiledDatabaseStage.value(QStringLiteral("emits_tags")).toList().contains(QStringLiteral("database.tag.bridge-signal"))
         || compiledDatabaseStage.value(QStringLiteral("notes")).toString() != QStringLiteral("trust stage note")
+        || compiledDatabaseSnapshot.value(QStringLiteral("label")).toString() != QStringLiteral("Mood")
+        || compiledDatabaseSnapshot.value(QStringLiteral("instruction")).toString() != QStringLiteral("Summarize the visible mood for the state record.")
         || compiledDatabaseTag.value(QStringLiteral("trigger")).toString() != QStringLiteral("bridge lore trigger")
         || compiledDatabaseTag.value(QStringLiteral("notes")).toString() != QStringLiteral("bridge lore tag note")
         || !compiledExport.value(QStringLiteral("ok")).toBool()
@@ -546,6 +567,7 @@ int main(int argc, char* argv[]) {
         || exportedDatabaseVariable.value(QStringLiteral("value_type")).toString() != QStringLiteral("number")
         || exportedDatabaseStage.value(QStringLiteral("active_tag")).toString() != QStringLiteral("database.stage.role-1.trust")
         || !jsonArrayContainsString(exportedDatabaseStage.value(QStringLiteral("emits_tags")).toArray(), QStringLiteral("database.tag.bridge-signal"))
+        || exportedDatabaseSnapshot.value(QStringLiteral("label")).toString() != QStringLiteral("Mood")
         || exportedDatabaseTag.value(QStringLiteral("description")).toString() != QStringLiteral("bridge lore tag description")
         || beforeCompileCard != readFileBytes(cardPath)) {
         return fail(QStringLiteral("compile/export/validate bridge APIs should expose compiled role card JSON without writing runtime files")) ? 0 : 1;
@@ -918,6 +940,9 @@ int main(int argc, char* argv[]) {
     const QJsonObject afterApplyDatabaseStage = findById(
         afterApplyDatabaseDraft.value(QStringLiteral("stages")).toArray(),
         QStringLiteral("db_stage_trust"));
+    const QJsonObject afterApplyDatabaseSnapshot = findById(
+        afterApplyDatabaseDraft.value(QStringLiteral("snapshotFields")).toArray(),
+        QStringLiteral("db_snapshot_mood"));
     const QJsonObject afterApplyDatabaseTag = findById(
         afterApplyDatabaseDraft.value(QStringLiteral("tags")).toArray(),
         QStringLiteral("db_tag_lore"));
@@ -930,6 +955,7 @@ int main(int argc, char* argv[]) {
         || afterApplyDatabaseStage.value(QStringLiteral("active_tag")).toString() != QStringLiteral("database.stage.role-1.trust")
         || !jsonArrayContainsString(afterApplyDatabaseStage.value(QStringLiteral("emits_tags")).toArray(), QStringLiteral("database.tag.bridge-signal"))
         || afterApplyDatabaseStage.value(QStringLiteral("description")).toString() != QStringLiteral("trust stage description")
+        || afterApplyDatabaseSnapshot.value(QStringLiteral("notes")).toString() != QStringLiteral("mood snapshot note")
         || afterApplyDatabaseTag.value(QStringLiteral("target")).toString() != QStringLiteral("worldbook")
         || afterApplyDatabaseTag.value(QStringLiteral("notes")).toString() != QStringLiteral("bridge lore tag note")) {
         return fail(QStringLiteral("database apply should preserve persona/raw fields and merge compatible database payload")) ? 0 : 1;

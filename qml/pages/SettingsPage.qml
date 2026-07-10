@@ -18,7 +18,7 @@ Item {
     property int historyLimit: 20
     property int requestTimeout: 120
     property bool demoMode: false
-    property bool outputSplittingEnabled: true
+    property string replyDisplayMode: "split_bubbles"
     property string backgroundImagePath: ""
     property real backgroundImageOpacity: 0.42
     property string embeddingBaseUrl: ""
@@ -49,7 +49,7 @@ Item {
         historyLimit = Number(draft.history_limit || 20);
         requestTimeout = Number(draft.request_timeout || 120);
         demoMode = Boolean(draft.demo_mode);
-        outputSplittingEnabled = draft.output_splitting_enabled === undefined ? true : Boolean(draft.output_splitting_enabled);
+        replyDisplayMode = draft.reply_display_mode === "state_record" ? "state_record" : "split_bubbles";
         backgroundImagePath = draft.background_image_path || "";
         backgroundImageOpacity = draft.background_image_opacity === undefined ? 0.42 : Number(draft.background_image_opacity);
         embeddingBaseUrl = draft.embedding_base_url || "";
@@ -77,7 +77,7 @@ Item {
             "history_limit": historyLimit,
             "request_timeout": requestTimeout,
             "demo_mode": demoMode,
-            "output_splitting_enabled": outputSplittingEnabled,
+            "reply_display_mode": replyDisplayMode,
             "background_image_path": backgroundImagePath,
             "background_image_opacity": backgroundImageOpacity,
             "embedding_base_url": embeddingBaseUrl,
@@ -494,26 +494,34 @@ Item {
                         }
 
                         SettingField {
-                            title: "输出气泡切分"
-                            description: "开启后，模型回复会先交给后处理子代理拆成多个聊天气泡；关闭则按原文单气泡显示。"
+                            title: "回复展示方式"
+                            description: "分泡模式将正文拆成多条气泡；状态记录模式保留完整正文，并在同一条回复上下显示数据库状态卡片。"
 
                             RowLayout {
                                 width: parent.width
                                 spacing: 10
 
-                                HusSwitch {
-                                    checked: root.outputSplittingEnabled
-                                    checkedText: "开启"
-                                    uncheckedText: "关闭"
-                                    onToggled: {
-                                        root.outputSplittingEnabled = checked;
-                                        root.markDirty();
+                                HusSegmented {
+                                    Layout.preferredWidth: 252
+                                    options: [
+                                        { label: "分泡模式", value: "split_bubbles" },
+                                        { label: "状态记录模式", value: "state_record" }
+                                    ]
+                                    currentIndex: root.replyDisplayMode === "state_record" ? 1 : 0
+                                    onCurrentIndexChanged: {
+                                        const nextMode = currentIndex === 1 ? "state_record" : "split_bubbles";
+                                        if (root.replyDisplayMode !== nextMode) {
+                                            root.replyDisplayMode = nextMode;
+                                            root.markDirty();
+                                        }
                                     }
                                 }
 
                                 HusText {
                                     Layout.fillWidth: true
-                                    text: root.outputSplittingEnabled ? "多段回复会分泡展示" : "关闭子代理，仅显示原文"
+                                    text: root.replyDisplayMode === "state_record"
+                                        ? "正文保持一个气泡，数据库记录以固定卡片显示。"
+                                        : "多段回复会拆成独立气泡，状态记录仍会写入数据库但不在聊天页显示。"
                                     color: HusTheme.Primary.colorTextSecondary
                                     wrapMode: Text.Wrap
                                 }
