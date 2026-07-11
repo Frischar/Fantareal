@@ -100,7 +100,7 @@ Item {
 
                         HusText {
                             Layout.fillWidth: true
-                            text: "聊天页先承载消息列表、当前角色、Persona、活动预设和生成状态。旧 WebUI 不再作为新 UI 的隐藏依赖。"
+                            text: "聊天页先承载消息列表、当前角色、角色资料、活动预设和生成状态。旧 WebUI 不再作为新 UI 的隐藏依赖。"
                             wrapMode: Text.Wrap
                             color: HusTheme.Primary.colorTextSecondary
                         }

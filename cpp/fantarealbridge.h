@@ -12,6 +12,8 @@
 class QNetworkAccessManager;
 class QNetworkReply;
 class QTimer;
+class DatabaseWorker;
+struct DatabaseOperationResult;
 
 class FantarealBridge final : public QObject {
     Q_OBJECT
@@ -32,6 +34,15 @@ class FantarealBridge final : public QObject {
     Q_PROPERTY(double backgroundImagePreviewOpacity READ backgroundImagePreviewOpacity NOTIFY scanChanged)
     Q_PROPERTY(QVariantMap routeDraft READ routeDraft NOTIFY scanChanged)
     Q_PROPERTY(QVariantMap cardDraft READ cardDraft NOTIFY scanChanged)
+    Q_PROPERTY(QVariantMap cardAuthoringDraft READ cardAuthoringDraft NOTIFY scanChanged)
+    Q_PROPERTY(QVariantMap cardAuthoringPreview READ cardAuthoringPreview NOTIFY scanChanged)
+    Q_PROPERTY(QVariantList cardAuthoringProjectItems READ cardAuthoringProjectItems NOTIFY scanChanged)
+    Q_PROPERTY(QVariantMap databaseStatus READ databaseStatus NOTIFY scanChanged)
+    Q_PROPERTY(QVariantMap databaseWorkerDraft READ databaseWorkerDraft NOTIFY scanChanged)
+    Q_PROPERTY(QVariantList databaseRecentTurns READ databaseRecentTurns NOTIFY scanChanged)
+    Q_PROPERTY(QVariantMap databaseRuntime READ databaseRuntime NOTIFY scanChanged)
+    Q_PROPERTY(QVariantMap databaseWorkerStatus READ databaseWorkerStatus NOTIFY scanChanged)
+    Q_PROPERTY(QStringList databaseWorkerModels READ databaseWorkerModels NOTIFY scanChanged)
     Q_PROPERTY(QVariantMap presetDraft READ presetDraft NOTIFY scanChanged)
     Q_PROPERTY(QVariantMap worldbookDraft READ worldbookDraft NOTIFY scanChanged)
     Q_PROPERTY(QVariantList worldbookEntryDrafts READ worldbookEntryDrafts NOTIFY scanChanged)
@@ -39,6 +50,8 @@ class FantarealBridge final : public QObject {
     Q_PROPERTY(QStringList settingsRows READ settingsRows NOTIFY scanChanged)
     Q_PROPERTY(QStringList routeRows READ routeRows NOTIFY scanChanged)
     Q_PROPERTY(QStringList cardRows READ cardRows NOTIFY scanChanged)
+    Q_PROPERTY(QStringList cardAuthoringRows READ cardAuthoringRows NOTIFY scanChanged)
+    Q_PROPERTY(QStringList databaseRows READ databaseRows NOTIFY scanChanged)
     Q_PROPERTY(QStringList presetRows READ presetRows NOTIFY scanChanged)
     Q_PROPERTY(QStringList worldbookRows READ worldbookRows NOTIFY scanChanged)
     Q_PROPERTY(QVariantList chatMessages READ chatMessages NOTIFY scanChanged)
@@ -47,6 +60,7 @@ class FantarealBridge final : public QObject {
     Q_PROPERTY(QString settingsStatus READ settingsStatus NOTIFY scanChanged)
     Q_PROPERTY(QString routeStatus READ routeStatus NOTIFY scanChanged)
     Q_PROPERTY(QString cardStatus READ cardStatus NOTIFY scanChanged)
+    Q_PROPERTY(QString cardAuthoringStatus READ cardAuthoringStatus NOTIFY scanChanged)
     Q_PROPERTY(QString presetStatus READ presetStatus NOTIFY scanChanged)
     Q_PROPERTY(QString worldbookStatus READ worldbookStatus NOTIFY scanChanged)
     Q_PROPERTY(QString chatStatus READ chatStatus NOTIFY scanChanged)
@@ -79,6 +93,15 @@ public:
     double backgroundImagePreviewOpacity() const;
     QVariantMap routeDraft() const;
     QVariantMap cardDraft() const;
+    QVariantMap cardAuthoringDraft() const;
+    QVariantMap cardAuthoringPreview() const;
+    QVariantList cardAuthoringProjectItems() const;
+    QVariantMap databaseStatus() const;
+    QVariantMap databaseWorkerDraft() const;
+    QVariantList databaseRecentTurns() const;
+    QVariantMap databaseRuntime() const;
+    QVariantMap databaseWorkerStatus() const;
+    QStringList databaseWorkerModels() const;
     QVariantMap presetDraft() const;
     QVariantMap worldbookDraft() const;
     QVariantList worldbookEntryDrafts() const;
@@ -86,6 +109,8 @@ public:
     QStringList settingsRows() const;
     QStringList routeRows() const;
     QStringList cardRows() const;
+    QStringList cardAuthoringRows() const;
+    QStringList databaseRows() const;
     QStringList presetRows() const;
     QStringList worldbookRows() const;
     QVariantList chatMessages() const;
@@ -94,6 +119,7 @@ public:
     QString settingsStatus() const;
     QString routeStatus() const;
     QString cardStatus() const;
+    QString cardAuthoringStatus() const;
     QString presetStatus() const;
     QString worldbookStatus() const;
     QString chatStatus() const;
@@ -116,6 +142,38 @@ public:
     Q_INVOKABLE QVariantMap saveCardDraft(const QVariantMap& draft);
     Q_INVOKABLE QVariantMap activateRoleCard(const QString& relativePath);
     Q_INVOKABLE QVariantMap importRoleCardFile(const QString& sourcePath);
+    Q_INVOKABLE QVariantMap loadCardAuthoringWorkspace();
+    Q_INVOKABLE QVariantMap refreshCardAuthoringProjects();
+    Q_INVOKABLE QVariantMap loadCardAuthoringProject(const QString& filename);
+    Q_INVOKABLE QVariantMap saveCardAuthoringWorkspace(const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap saveCardAuthoringProject(const QString& filename, const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap deleteCardAuthoringProject(const QString& filename);
+    Q_INVOKABLE QVariantMap importCardAuthoringProjectFile(const QString& sourcePath);
+    Q_INVOKABLE QVariantMap exportCardAuthoringProjectFile(const QString& targetPath, const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap exportCardAuthoringProjectToDefaultDir(const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap loadCurrentRuntimeCardAuthoringDraft();
+    Q_INVOKABLE QVariantMap validateCardAuthoringDraft(const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap compileCardAuthoringDraft(const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap exportCompiledCardAuthoringRoleCardFile(const QString& targetPath, const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap exportCompiledCardAuthoringRoleCardToDefaultDir(const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap buildCardAuthoringPromptPack(const QString& thinkingMode);
+    Q_INVOKABLE QVariantMap generateCardAuthoringCandidates(const QVariantMap& draft, const QString& prompt, const QString& currentView, const QString& thinkingMode);
+    Q_INVOKABLE QVariantMap normalizeCardAuthoringCandidates(const QVariantMap& draft, const QVariantMap& review);
+    Q_INVOKABLE QVariantMap applyCardAuthoringCandidates(const QVariantMap& draft, const QVariantMap& review, const QVariantList& selectedCandidateIds);
+    Q_INVOKABLE QVariantMap previewCardAuthoringApply(const QVariantMap& draft, const QVariantList& modules);
+    Q_INVOKABLE QVariantMap applyCardAuthoringDraft(const QVariantMap& draft, const QVariantList& selectedGroupIds);
+    Q_INVOKABLE QVariantMap refreshDatabaseStatus();
+    Q_INVOKABLE QVariantMap saveDatabaseWorkerDraft(const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap clearDatabaseWorkerApiKey();
+    Q_INVOKABLE QVariantMap copyMainModelToDatabaseWorker();
+    Q_INVOKABLE QVariantMap fetchDatabaseWorkerModels();
+    Q_INVOKABLE QVariantMap testDatabaseWorkerConnection();
+    Q_INVOKABLE QVariantMap initializeDatabaseRuntime();
+    Q_INVOKABLE QVariantMap saveDatabaseStoryTimeDraft(const QVariantMap& draft);
+    Q_INVOKABLE QVariantMap generateLatestDatabaseTurn();
+    Q_INVOKABLE QVariantMap retryDatabaseTurn(const QString& messageId);
+    Q_INVOKABLE QVariantMap refreshDatabaseRecentTurns();
+    Q_INVOKABLE QVariantMap loadDatabaseDebugTable(const QString& tableName, int offset = 0, int limit = 50);
     Q_INVOKABLE QVariantMap savePresetDraft(const QVariantMap& draft);
     Q_INVOKABLE QVariantMap importPresetFile(const QString& sourcePath);
     Q_INVOKABLE QVariantMap saveWorldbookDraft(const QVariantMap& draft);
@@ -153,6 +211,13 @@ private:
     void clearPendingChatRequest();
     void setChatGenerationState(bool generating, const QString& status);
     void setChatStreamingPreview(const QString& preview);
+    void refreshDatabaseRuntime();
+    QVariantMap startDatabaseWorkerForAssistant(
+        const QJsonObject& assistantMessage, const QString& assistantContent,
+        const QJsonArray& conversations, bool manual);
+    void scheduleDatabaseWorkerForAssistant(const QJsonObject& assistantMessage, const QString& assistantContent, const QJsonArray& conversations);
+    DatabaseOperationResult supersedeDatabaseTurnsForRemovedAssistantMessages(
+        const QJsonArray& conversations, int firstRemovedIndex);
 
     QString legacyRoot_;
     int criticalFileCount_{};
@@ -171,6 +236,15 @@ private:
     double backgroundImagePreviewOpacity_ = 0.42;
     QVariantMap routeDraft_;
     QVariantMap cardDraft_;
+    QVariantMap cardAuthoringDraft_;
+    QVariantMap cardAuthoringPreview_;
+    QVariantList cardAuthoringProjectItems_;
+    QVariantMap databaseStatus_;
+    QVariantMap databaseWorkerDraft_;
+    QVariantList databaseRecentTurns_;
+    QVariantMap databaseRuntime_;
+    QVariantMap databaseWorkerStatus_;
+    QStringList databaseWorkerModels_;
     QVariantMap presetDraft_;
     QVariantMap worldbookDraft_;
     QVariantList worldbookEntryDrafts_;
@@ -178,6 +252,8 @@ private:
     QStringList settingsRows_;
     QStringList routeRows_;
     QStringList cardRows_;
+    QStringList cardAuthoringRows_;
+    QStringList databaseRows_;
     QStringList presetRows_;
     QStringList worldbookRows_;
     QVariantList chatMessages_;
@@ -186,6 +262,7 @@ private:
     QString settingsStatus_;
     QString routeStatus_;
     QString cardStatus_;
+    QString cardAuthoringStatus_;
     QString presetStatus_;
     QString worldbookStatus_;
     QString chatStatus_;
@@ -196,6 +273,7 @@ private:
     QNetworkAccessManager* chatNetwork_{};
     QNetworkReply* chatReply_{};
     QTimer* chatTimer_{};
+    DatabaseWorker* databaseWorker_{};
     QByteArray pendingChatResponseBuffer_;
     QJsonArray pendingChatConversations_;
     QString pendingChatConversationPath_;

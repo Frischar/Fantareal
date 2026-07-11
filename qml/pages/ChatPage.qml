@@ -248,6 +248,135 @@ Item {
         return name.length > 0 ? name.charAt(0) : "F";
     }
 
+    function stateRecordStatusText(record) {
+        const status = String((record || {}).status || "");
+        if (status === "ready") {
+            return "已生成";
+        }
+        if (status === "pending") {
+            return "生成中";
+        }
+        if (status === "error") {
+            return "失败";
+        }
+        return "已跳过";
+    }
+
+    function stateRecordStatusState(record) {
+        const status = String((record || {}).status || "");
+        if (status === "ready") {
+            return HusTag.State_Success;
+        }
+        if (status === "error") {
+            return HusTag.State_Error;
+        }
+        if (status === "pending") {
+            return HusTag.State_Processing;
+        }
+        return HusTag.State_Default;
+    }
+
+    function displayValue(value) {
+        if (value === undefined || value === null) {
+            return "";
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => root.displayValue(item)).filter(item => item.length > 0).join("、");
+        }
+        if (typeof value === "object") {
+            return JSON.stringify(value);
+        }
+        return String(value).trim();
+    }
+
+    function sceneItems(scene) {
+        scene = scene || {};
+        const labels = {
+            "time": "时间",
+            "timeSlot": "时段",
+            "season": "季节",
+            "location": "地点",
+            "weather": "天气",
+            "atmosphere": "氛围",
+            "characters": "在场",
+            "timeDelta": "时间推进"
+        };
+        const keys = ["time", "timeSlot", "season", "location", "weather", "atmosphere", "characters", "timeDelta"];
+        const items = [];
+        for (let i = 0; i < keys.length; ++i) {
+            const key = keys[i];
+            const value = root.displayValue(scene[key]);
+            if (value.length > 0) {
+                items.push({
+                    "key": key,
+                    "label": labels[key],
+                    "value": value
+                });
+            }
+        }
+        return items;
+    }
+
+    function metricDeltaText(metric) {
+        metric = metric || {};
+        if (metric.delta === undefined || metric.delta === null || String(metric.delta).trim().length === 0) {
+            return "";
+        }
+        const delta = Number(metric.delta);
+        if (Number.isFinite(delta)) {
+            return delta >= 0 ? `+${delta}` : String(delta);
+        }
+        const text = String(metric.delta).trim();
+        return text.charAt(0) === "+" || text.charAt(0) === "-" ? text : `+${text}`;
+    }
+
+    function metricText(metric) {
+        metric = metric || {};
+        const value = root.displayValue(metric.value);
+        const maximum = root.displayValue(metric.maximum);
+        const delta = root.metricDeltaText(metric);
+        let result = value;
+        if (maximum.length > 0) {
+            result += `/${maximum}`;
+        }
+        if (delta.length > 0) {
+            result += `（${delta}）`;
+        }
+        return result;
+    }
+
+    function characterMetricGroups(characters) {
+        const groups = [];
+        const source = characters || [];
+        for (let i = 0; i < source.length; ++i) {
+            const metrics = source[i].metrics || [];
+            if (metrics.length > 0) {
+                groups.push({
+                    "name": source[i].name || "角色",
+                    "metrics": metrics
+                });
+            }
+        }
+        return groups;
+    }
+
+    function stateRecordHasDetails(recordCard) {
+        recordCard = recordCard || {};
+        return String(recordCard.summary || "").trim().length > 0
+            || (recordCard.characters || []).length > 0
+            || (recordCard.metrics || []).length > 0
+            || (recordCard.relationships || []).length > 0;
+    }
+
+    function retryStateRecord(messageId) {
+        const result = FantarealBridge.retryDatabaseTurn(messageId || "");
+        if (result.ok) {
+            message.success(result.message || "状态记录已重新排队");
+        } else {
+            message.error(result.message || "状态记录重试失败", 5000);
+        }
+    }
+
     HusMessage {
         id: message
         z: 999
@@ -407,6 +536,10 @@ Item {
                         property bool revealingMessage: modelData.message_id === root.revealingAssistantMessageId
                         property real bubbleMaxWidth: Math.min(width * 0.58, 780)
                         property real bubbleMinWidth: 52
+                        property var stateRecord: modelData.stateRecord || ({})
+                        property var stateTitleCard: stateRecord.titleCard || ({})
+                        property var stateRecordCard: stateRecord.recordCard || ({})
+                        property bool showStateRecord: !userMessage && !systemMessage && Boolean(modelData.stateRecord)
 
                         Behavior on height {
                             NumberAnimation {
@@ -474,6 +607,105 @@ Item {
                                 color: HusTheme.Primary.colorTextTertiary
                                 font.pixelSize: 12
                                 elide: Text.ElideRight
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                visible: messageDelegate.showStateRecord
+                                implicitHeight: stateTitleLayout.implicitHeight + 18
+                                radius: 10
+                                color: HusThemeFunctions.alpha(Global.accentBlue, HusTheme.isDark ? 0.18 : 0.10)
+                                border.width: 1
+                                border.color: HusThemeFunctions.alpha(Global.accentBlue, 0.24)
+
+                                ColumnLayout {
+                                    id: stateTitleLayout
+                                    anchors.fill: parent
+                                    anchors.margins: 9
+                                    spacing: 5
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        HusText {
+                                            Layout.fillWidth: true
+                                            text: messageDelegate.stateTitleCard.title || "本轮状态"
+                                            color: HusTheme.Primary.colorTextPrimary
+                                            font.pixelSize: 14
+                                            font.weight: Font.DemiBold
+                                            elide: Text.ElideRight
+                                        }
+
+                                        HusTag {
+                                            text: root.stateRecordStatusText(messageDelegate.stateRecord)
+                                            tagState: root.stateRecordStatusState(messageDelegate.stateRecord)
+                                        }
+                                    }
+
+                                    HusText {
+                                        Layout.fillWidth: true
+                                        visible: String(messageDelegate.stateTitleCard.subtitle || "").trim().length > 0
+                                        text: messageDelegate.stateTitleCard.subtitle || ""
+                                        wrapMode: Text.Wrap
+                                        color: HusTheme.Primary.colorTextSecondary
+                                        font.pixelSize: 12
+                                    }
+
+                                    GridLayout {
+                                        Layout.fillWidth: true
+                                        visible: root.sceneItems(messageDelegate.stateTitleCard.scene || {}).length > 0
+                                        columns: width >= 520 ? 2 : 1
+                                        columnSpacing: 6
+                                        rowSpacing: 6
+
+                                        Repeater {
+                                            model: root.sceneItems(messageDelegate.stateTitleCard.scene || {})
+
+                                            delegate: Rectangle {
+                                                Layout.fillWidth: true
+                                                implicitHeight: sceneItemRow.implicitHeight + 10
+                                                radius: 6
+                                                color: HusThemeFunctions.alpha(HusTheme.Primary.colorBgBase, HusTheme.isDark ? 0.18 : 0.48)
+                                                border.width: 1
+                                                border.color: HusThemeFunctions.alpha(Global.accentBlue, 0.14)
+
+                                                RowLayout {
+                                                    id: sceneItemRow
+                                                    anchors.fill: parent
+                                                    anchors.margins: 5
+                                                    spacing: 7
+
+                                                    HusText {
+                                                        Layout.preferredWidth: 54
+                                                        text: modelData.label
+                                                        color: Global.accentBlue
+                                                        font.pixelSize: 11
+                                                        font.weight: Font.DemiBold
+                                                    }
+
+                                                    HusText {
+                                                        Layout.fillWidth: true
+                                                        text: modelData.value
+                                                        wrapMode: Text.Wrap
+                                                        color: HusTheme.Primary.colorTextSecondary
+                                                        font.pixelSize: 12
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    HusText {
+                                        Layout.fillWidth: true
+                                        visible: String((messageDelegate.stateTitleCard.scene || {}).eventSummary || "").trim().length > 0
+                                        text: (messageDelegate.stateTitleCard.scene || {}).eventSummary || ""
+                                        wrapMode: Text.Wrap
+                                        color: HusTheme.Primary.colorTextSecondary
+                                        font.pixelSize: 12
+                                        lineHeight: 1.18
+                                    }
+                                }
                             }
 
                             Repeater {
@@ -575,6 +807,317 @@ Item {
                                     }
                                 }
                             }
+
+                            Rectangle {
+                                width: parent.width
+                                visible: messageDelegate.showStateRecord
+                                implicitHeight: stateRecordLayout.implicitHeight + 18
+                                radius: 10
+                                color: HusThemeFunctions.alpha(HusTheme.Primary.colorBgBase, HusTheme.isDark ? 0.22 : 0.58)
+                                border.width: 1
+                                border.color: HusThemeFunctions.alpha(Global.accentViolet, 0.22)
+
+                                ColumnLayout {
+                                    id: stateRecordLayout
+                                    anchors.fill: parent
+                                    anchors.margins: 9
+                                    spacing: 7
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        HusText {
+                                            Layout.fillWidth: true
+                                            text: "状态记录"
+                                            color: HusTheme.Primary.colorTextPrimary
+                                            font.pixelSize: 14
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        HusButton {
+                                            text: "重试"
+                                            type: HusButton.Type_Outlined
+                                            visible: Boolean(messageDelegate.stateRecord.canRetry)
+                                            onClicked: root.retryStateRecord(modelData.message_id)
+                                        }
+                                    }
+
+                                    HusText {
+                                        Layout.fillWidth: true
+                                        visible: String(messageDelegate.stateRecordCard.summary || "").trim().length > 0
+                                        text: messageDelegate.stateRecordCard.summary
+                                        wrapMode: Text.Wrap
+                                        color: HusTheme.Primary.colorTextSecondary
+                                        font.pixelSize: 13
+                                        lineHeight: 1.18
+                                    }
+
+                                    HusText {
+                                        Layout.fillWidth: true
+                                        visible: !root.stateRecordHasDetails(messageDelegate.stateRecordCard)
+                                        text: ((messageDelegate.stateRecord.error || {}).message)
+                                            || (messageDelegate.stateRecord.status === "pending" ? "DatabaseWorker 正在生成状态记录。" : "暂无状态记录内容。")
+                                        wrapMode: Text.Wrap
+                                        color: messageDelegate.stateRecord.status === "error"
+                                            ? HusTheme.Primary.colorError
+                                            : HusTheme.Primary.colorTextTertiary
+                                        font.pixelSize: 12
+                                    }
+
+                                    Repeater {
+                                        model: messageDelegate.stateRecordCard.characters || []
+
+                                        delegate: Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: characterColumn.implicitHeight + 12
+                                            radius: 8
+                                            color: HusThemeFunctions.alpha(Global.accentViolet, HusTheme.isDark ? 0.11 : 0.08)
+                                            border.width: 1
+                                            border.color: HusThemeFunctions.alpha(Global.accentViolet, 0.16)
+
+                                            ColumnLayout {
+                                                id: characterColumn
+                                                anchors.fill: parent
+                                                anchors.margins: 6
+                                                spacing: 4
+
+                                                HusText {
+                                                    Layout.fillWidth: true
+                                                    text: modelData.name || "角色"
+                                                    color: HusTheme.Primary.colorTextPrimary
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.DemiBold
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                Repeater {
+                                                    model: modelData.fields || []
+
+                                                    delegate: Rectangle {
+                                                        Layout.fillWidth: true
+                                                        implicitHeight: characterFieldRow.implicitHeight + 10
+                                                        radius: 6
+                                                        color: HusThemeFunctions.alpha(HusTheme.Primary.colorBgBase, HusTheme.isDark ? 0.14 : 0.44)
+                                                        border.width: 1
+                                                        border.color: HusThemeFunctions.alpha(HusTheme.Primary.colorBorder, 0.16)
+
+                                                        RowLayout {
+                                                            id: characterFieldRow
+                                                            anchors.fill: parent
+                                                            anchors.margins: 5
+                                                            spacing: 8
+
+                                                            HusText {
+                                                                Layout.preferredWidth: 78
+                                                                text: modelData.label || modelData.key || "字段"
+                                                                wrapMode: Text.Wrap
+                                                                color: Global.accentBlue
+                                                                font.pixelSize: 11
+                                                                font.weight: Font.DemiBold
+                                                            }
+
+                                                            HusText {
+                                                                Layout.fillWidth: true
+                                                                text: root.displayValue(modelData.value)
+                                                                wrapMode: Text.Wrap
+                                                                color: HusTheme.Primary.colorTextSecondary
+                                                                font.pixelSize: 12
+                                                                lineHeight: 1.18
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        visible: root.characterMetricGroups(messageDelegate.stateRecordCard.characters || []).length > 0
+                                            || (messageDelegate.stateRecordCard.metrics || []).length > 0
+                                        spacing: 6
+
+                                        HusText {
+                                            Layout.fillWidth: true
+                                            text: "本轮数值变化"
+                                            color: HusTheme.Primary.colorTextPrimary
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Repeater {
+                                            model: root.characterMetricGroups(messageDelegate.stateRecordCard.characters || [])
+
+                                            delegate: Rectangle {
+                                                Layout.fillWidth: true
+                                                implicitHeight: characterMetricColumn.implicitHeight + 12
+                                                radius: 8
+                                                color: HusThemeFunctions.alpha(Global.accentBlue, HusTheme.isDark ? 0.08 : 0.06)
+                                                border.width: 1
+                                                border.color: HusThemeFunctions.alpha(Global.accentBlue, 0.14)
+
+                                                ColumnLayout {
+                                                    id: characterMetricColumn
+                                                    anchors.fill: parent
+                                                    anchors.margins: 6
+                                                    spacing: 4
+
+                                                    HusText {
+                                                        Layout.fillWidth: true
+                                                        text: modelData.name || "角色"
+                                                        color: HusTheme.Primary.colorTextPrimary
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.DemiBold
+                                                    }
+
+                                                    Repeater {
+                                                        model: modelData.metrics || []
+
+                                                        delegate: ColumnLayout {
+                                                            Layout.fillWidth: true
+                                                            spacing: 1
+
+                                                            RowLayout {
+                                                                Layout.fillWidth: true
+                                                                spacing: 8
+
+                                                                HusText {
+                                                                    Layout.fillWidth: true
+                                                                    text: modelData.label || modelData.key || "数值"
+                                                                    color: HusTheme.Primary.colorTextSecondary
+                                                                    font.pixelSize: 12
+                                                                }
+
+                                                                HusText {
+                                                                    text: root.metricText(modelData)
+                                                                    color: root.metricDeltaText(modelData).charAt(0) === "-"
+                                                                        ? HusTheme.Primary.colorError
+                                                                        : Global.accentBlue
+                                                                    font.pixelSize: 12
+                                                                    font.weight: Font.DemiBold
+                                                                }
+                                                            }
+
+                                                            HusText {
+                                                                Layout.fillWidth: true
+                                                                visible: String(modelData.reason || "").trim().length > 0
+                                                                text: modelData.reason || ""
+                                                                wrapMode: Text.Wrap
+                                                                color: HusTheme.Primary.colorTextTertiary
+                                                                font.pixelSize: 11
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Repeater {
+                                            model: messageDelegate.stateRecordCard.metrics || []
+
+                                            delegate: ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+
+                                                RowLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 8
+
+                                                    HusText {
+                                                        Layout.fillWidth: true
+                                                        text: modelData.label || modelData.key || "数值"
+                                                        color: HusTheme.Primary.colorTextSecondary
+                                                        font.pixelSize: 12
+                                                    }
+
+                                                    HusText {
+                                                        text: root.metricText(modelData)
+                                                        color: root.metricDeltaText(modelData).charAt(0) === "-"
+                                                            ? HusTheme.Primary.colorError
+                                                            : Global.accentBlue
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.DemiBold
+                                                    }
+                                                }
+
+                                                HusText {
+                                                    Layout.fillWidth: true
+                                                    visible: String(modelData.reason || "").trim().length > 0
+                                                    text: modelData.reason || ""
+                                                    wrapMode: Text.Wrap
+                                                    color: HusTheme.Primary.colorTextTertiary
+                                                    font.pixelSize: 11
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        visible: (messageDelegate.stateRecordCard.relationships || []).length > 0
+                                        spacing: 6
+
+                                        HusText {
+                                            Layout.fillWidth: true
+                                            text: "关系与阶段变化"
+                                            color: HusTheme.Primary.colorTextPrimary
+                                            font.pixelSize: 13
+                                            font.weight: Font.DemiBold
+                                        }
+
+                                        Repeater {
+                                            model: messageDelegate.stateRecordCard.relationships || []
+
+                                            delegate: Rectangle {
+                                                Layout.fillWidth: true
+                                                implicitHeight: relationshipColumn.implicitHeight + 12
+                                                radius: 8
+                                                color: HusThemeFunctions.alpha(HusTheme.Primary.colorBgBase, HusTheme.isDark ? 0.14 : 0.44)
+                                                border.width: 1
+                                                border.color: HusThemeFunctions.alpha(HusTheme.Primary.colorBorder, 0.16)
+
+                                                ColumnLayout {
+                                                    id: relationshipColumn
+                                                    anchors.fill: parent
+                                                    anchors.margins: 6
+                                                    spacing: 3
+
+                                                    RowLayout {
+                                                        Layout.fillWidth: true
+                                                        spacing: 8
+
+                                                        HusText {
+                                                            Layout.fillWidth: true
+                                                            text: modelData.pair || "关系"
+                                                            color: HusTheme.Primary.colorTextPrimary
+                                                            font.pixelSize: 12
+                                                            font.weight: Font.DemiBold
+                                                            wrapMode: Text.Wrap
+                                                        }
+
+                                                        HusTag {
+                                                            visible: String(modelData.stage || "").trim().length > 0
+                                                            text: modelData.stage || ""
+                                                            tagState: HusTag.State_Processing
+                                                        }
+                                                    }
+
+                                                    HusText {
+                                                        Layout.fillWidth: true
+                                                        visible: String(modelData.change || "").trim().length > 0
+                                                        text: modelData.change || ""
+                                                        wrapMode: Text.Wrap
+                                                        color: HusTheme.Primary.colorTextSecondary
+                                                        font.pixelSize: 12
+                                                        lineHeight: 1.18
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -586,7 +1129,7 @@ Item {
                         height: root.generating && !root.memoryOrganizing ? Math.max(streamingAvatar.size, streamingStack.implicitHeight) + 20 : 0
                         visible: root.generating && !root.memoryOrganizing
 
-                        property string streamingContent: root.outputSplittingEnabled ? root.loadingBubbleText : (FantarealBridge.chatStreamingPreview.trim().length > 0 ? FantarealBridge.chatStreamingPreview : "...")
+                        property string streamingContent: FantarealBridge.chatStreamingPreview.trim().length > 0 ? FantarealBridge.chatStreamingPreview : root.loadingBubbleText
                         property real streamingMaxWidth: Math.min(width * 0.58, 780)
                         property real streamingWidth: Math.min(streamingMaxWidth, Math.max(96, streamingMeasure.implicitWidth + 30))
 
