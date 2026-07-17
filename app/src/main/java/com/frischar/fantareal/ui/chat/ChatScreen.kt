@@ -375,7 +375,7 @@ fun MessageBubble(
                     if (displayText.isNotBlank()) {
                         val parsedContent = parseMarkdown(displayText, MaterialTheme.colorScheme.surfaceVariant)
                         
-                        val defaultColor = MaterialTheme.colorScheme.onSurface
+                        val defaultColor = defaultChatTextColor(settings.darkMode)
                         val userColor = try {
                             if (settings.fontColor.isNotBlank()) {
                                 androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(settings.fontColor))
@@ -450,6 +450,9 @@ fun MessageBubble(
         }
     }
 }
+
+internal fun defaultChatTextColor(darkMode: Boolean): androidx.compose.ui.graphics.Color =
+    if (darkMode) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black
 
 
 

@@ -30,10 +30,21 @@ class PresetService {
             return emptyList()
         }
 
-        return collectPresetObjects(root)
+        val presets = collectPresetObjects(root)
             .mapNotNull(::parsePresetObject)
             .distinctBy { it.id }
             .filter { it.runtimeContent().isNotBlank() || it.hasStructuredContent() }
+        val activePresetId = (root as? JsonObject)
+            ?.get("active_preset_id")
+            ?.let { it as? JsonPrimitive }
+            ?.contentOrNull
+            ?.trim()
+            .orEmpty()
+        return if (activePresetId.isNotBlank() && presets.any { it.id == activePresetId }) {
+            presets.map { it.copy(enabled = it.id == activePresetId) }
+        } else {
+            presets
+        }
     }
 
     fun exportToJson(presets: List<PromptPreset>): String {

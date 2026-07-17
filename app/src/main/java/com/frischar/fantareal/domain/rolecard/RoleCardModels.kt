@@ -19,6 +19,7 @@ data class RoleCard(
     val tags: List<String> = emptyList(),
     val plotStages: JsonElement? = null,
     val personas: JsonElement? = null,
+    val stateJournal: JsonElement? = null,
     val creativeWorkshop: JsonElement? = null
 )
 

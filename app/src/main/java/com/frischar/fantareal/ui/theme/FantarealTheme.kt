@@ -10,12 +10,13 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
+internal fun darkAppColorScheme() = darkColorScheme(
     primary = NightHighlight,
     secondary = NightEmotional,
     tertiary = NightFantasy,
@@ -23,16 +24,16 @@ private val DarkColorScheme = darkColorScheme(
     surface = NightMainPanel,
     surfaceVariant = NightSecondaryPanel,
     error = NightError,
-    onPrimary = NightTextMain,
-    onSecondary = NightTextMain,
-    onTertiary = NightTextMain,
-    onBackground = NightTextMain,
-    onSurface = NightTextMain,
-    onSurfaceVariant = NightTextSecondary,
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White,
+    onSurfaceVariant = Color.White,
     outline = NightStroke
 )
 
-private val LightColorScheme = lightColorScheme(
+internal fun lightAppColorScheme() = lightColorScheme(
     primary = DayHighlight,
     secondary = DayEmotional,
     tertiary = DayFantasy,
@@ -40,14 +41,17 @@ private val LightColorScheme = lightColorScheme(
     surface = DayMainPanel,
     surfaceVariant = DaySecondaryPanel,
     error = DayError,
-    onPrimary = DayBackground,
-    onSecondary = DayBackground,
-    onTertiary = DayBackground,
-    onBackground = DayTextMain,
-    onSurface = DayTextMain,
-    onSurfaceVariant = DayTextSecondary,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
+    onTertiary = Color.Black,
+    onBackground = Color.Black,
+    onSurface = Color.Black,
+    onSurfaceVariant = Color.Black,
     outline = DayStroke
 )
+
+private val DarkColorScheme = darkAppColorScheme()
+private val LightColorScheme = lightAppColorScheme()
 
 @Composable
 fun FantarealTheme(

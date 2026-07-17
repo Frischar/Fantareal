@@ -4,8 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.frischar.fantareal.data.repository.PersonaRepository
 import com.frischar.fantareal.data.rolecard.RoleCardService
+import com.frischar.fantareal.data.statejournal.StateJournalRepository
 import com.frischar.fantareal.domain.rolecard.PersonaRuntime
 import com.frischar.fantareal.domain.rolecard.RoleCard
+import com.frischar.fantareal.domain.statejournal.StateJournalConfig
+import com.frischar.fantareal.domain.statejournal.StateJournalRuntime
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +20,8 @@ import com.frischar.fantareal.data.repository.ConversationRepository
 data class RoleCardUiState(
     val roleCard: RoleCard? = null,
     val persona: PersonaRuntime = PersonaRuntime(),
+    val stateJournalConfig: StateJournalConfig = StateJournalConfig(),
+    val stateJournalRuntime: StateJournalRuntime? = null,
     val statusMessage: String? = null,
     val error: String? = null
 )
@@ -24,12 +29,18 @@ data class RoleCardUiState(
 class RoleCardViewModel(
     private val roleCardService: RoleCardService,
     private val personaRepository: PersonaRepository,
-    private val conversationRepository: ConversationRepository
+    private val conversationRepository: ConversationRepository,
+    private val stateJournalRepository: StateJournalRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(RoleCardUiState())
     val uiState: StateFlow<RoleCardUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            stateJournalRepository.runtime.collect { runtime ->
+                _uiState.update { it.copy(stateJournalRuntime = runtime) }
+            }
+        }
         reload()
     }
 
@@ -37,7 +48,14 @@ class RoleCardViewModel(
         viewModelScope.launch {
             val persona = personaRepository.loadCurrent()
             val card = roleCardService.loadCurrentRoleCard()
-            _uiState.value = RoleCardUiState(roleCard = card, persona = persona)
+            val config = stateJournalRepository.parseConfig(card?.stateJournal)
+            val runtime = stateJournalRepository.loadOrInitialize(card?.stateJournal)
+            _uiState.value = RoleCardUiState(
+                roleCard = card,
+                persona = persona,
+                stateJournalConfig = config,
+                stateJournalRuntime = runtime
+            )
         }
     }
 
@@ -51,6 +69,8 @@ class RoleCardViewModel(
                 _uiState.value = RoleCardUiState(
                     roleCard = result.roleCard,
                     persona = result.persona,
+                    stateJournalConfig = stateJournalRepository.parseConfig(result.roleCard.stateJournal),
+                    stateJournalRuntime = stateJournalRepository.runtime.value,
                     statusMessage = "角色卡已导入并覆盖当前存档"
                 )
             }.onFailure { error ->
@@ -69,6 +89,8 @@ class RoleCardViewModel(
                 _uiState.value = RoleCardUiState(
                     roleCard = result.roleCard,
                     persona = result.persona,
+                    stateJournalConfig = stateJournalRepository.parseConfig(result.roleCard.stateJournal),
+                    stateJournalRuntime = stateJournalRepository.runtime.value,
                     statusMessage = "角色卡已导入并覆盖当前存档"
                 )
             }.onFailure { error ->

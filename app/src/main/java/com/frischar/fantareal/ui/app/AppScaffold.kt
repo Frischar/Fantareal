@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -151,7 +152,9 @@ fun AppScaffold() {
                                 memoryRepository = repositories.memoryRepository,
                                 worldbookRepository = repositories.worldbookRepository,
                                 presetRepository = repositories.presetRepository,
-                                workshopRepository = repositories.workshopRepository
+                                workshopRepository = repositories.workshopRepository,
+                                stateJournalRepository = repositories.stateJournalRepository,
+                                roleCardService = repositories.roleCardService
                             )
                             return ChatViewModel(orchestrator, repositories.conversationRepository, repositories.personaRepository) as T
                         }
@@ -225,7 +228,12 @@ fun AppScaffold() {
                     factory = object : androidx.lifecycle.ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                            return RoleCardViewModel(repositories.roleCardService, repositories.personaRepository, repositories.conversationRepository) as T
+                            return RoleCardViewModel(
+                                repositories.roleCardService,
+                                repositories.personaRepository,
+                                repositories.conversationRepository,
+                                repositories.stateJournalRepository
+                            ) as T
                         }
                     }
                 )
@@ -246,6 +254,9 @@ fun AppScaffold() {
                         }
                     }
                 )
+                LaunchedEffect(memoryViewModel) {
+                    memoryViewModel.reload()
+                }
                 val uiState by memoryViewModel.uiState.collectAsState()
                 com.frischar.fantareal.ui.memory.MemoryScreen(
                     uiState = uiState,

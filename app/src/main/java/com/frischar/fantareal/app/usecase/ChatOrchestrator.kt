@@ -9,6 +9,8 @@ import com.frischar.fantareal.data.repository.PresetRepository
 import com.frischar.fantareal.data.repository.SettingsRepository
 import com.frischar.fantareal.data.repository.WorkshopRepository
 import com.frischar.fantareal.data.repository.WorldbookRepository
+import com.frischar.fantareal.data.rolecard.RoleCardService
+import com.frischar.fantareal.data.statejournal.StateJournalRepository
 import com.frischar.fantareal.domain.prompt.PromptBuildInput
 import com.frischar.fantareal.domain.prompt.PromptBuilder
 import com.frischar.fantareal.domain.chat.ConversationMessage
@@ -17,6 +19,7 @@ import com.frischar.fantareal.domain.llm.LlmMessage
 import com.frischar.fantareal.domain.llm.LlmRequest
 import com.frischar.fantareal.domain.llm.LlmStreamEvent
 import com.frischar.fantareal.domain.llm.OpenAiProvider
+import com.frischar.fantareal.domain.statejournal.StateJournalEngine
 import com.frischar.fantareal.domain.worldbook.InjectionPosition
 import com.frischar.fantareal.domain.worldbook.WorldbookEngine
 import kotlinx.coroutines.flow.Flow
@@ -36,7 +39,12 @@ class ChatOrchestrator(
     private val worldbookRepository: WorldbookRepository = WorldbookRepository(conversationRepository.slotRepository),
     private val presetRepository: PresetRepository = PresetRepository(conversationRepository.slotRepository),
     private val workshopRepository: WorkshopRepository = WorkshopRepository(conversationRepository.slotRepository),
-    private val worldbookEngine: WorldbookEngine = WorldbookEngine()
+    private val worldbookEngine: WorldbookEngine = WorldbookEngine(),
+    private val stateJournalRepository: StateJournalRepository = StateJournalRepository(conversationRepository.slotRepository),
+    private val roleCardService: RoleCardService = RoleCardService(
+        conversationRepository.slotRepository,
+        stateJournalRepository = stateJournalRepository
+    )
 ) {
     fun sendMessage(input: String): Flow<Unit> = flow {
         val userMsg = ConversationMessage(
@@ -61,16 +69,26 @@ class ChatOrchestrator(
 
         val persona = personaRepository.loadCurrent()
         val history = conversationRepository.messages.value
-            .filter { it.content.isNotBlank() && it.id != "welcome" && it.id != assistantMsgId && it.id != userMsg.id }
+            .filter {
+                it.content.isNotBlank() &&
+                    it.id != "welcome" &&
+                    it.id != assistantMsgId &&
+                    it.id != userMsg.id &&
+                    it.role != MessageRole.System
+            }
         val memories = memoryRepository.listMemories().map { it.text }
         val presetSegments = presetRepository.listPresets()
             .flatMap { it.enabledPromptSegments() }
         val workshopState = workshopRepository.loadState()
         val workshopPrompt = "剧情阶段 ${workshopState.stage}: ${workshopState.stageName}\n${workshopState.stagePrompt}"
+        val roleCard = roleCardService.loadCurrentRoleCard()
+        val stateJournalPrompt = roleCard?.let { stateJournalRepository.runtimePrompt(it.stateJournal) }.orEmpty()
+        val activeStageTags = roleCard?.let { stateJournalRepository.activeStageTags(it.stateJournal) }.orEmpty()
         val worldbookScan = worldbookEngine.scan(
             entries = worldbookRepository.listEntries(),
             userInput = input,
-            recentHistory = history.takeLast(8).map { it.content }
+            recentHistory = history.takeLast(8).map { it.content },
+            activeTags = activeStageTags
         )
         val worldbookBeforePersona = worldbookScan.matches
             .filter { it.position == InjectionPosition.BeforePersona }
@@ -124,7 +142,7 @@ class ChatOrchestrator(
 # [权限解锁，禁词过滤器已挂载。DeepSeek 引擎已锁定世界书。开始演绎。]
                 """.trimIndent(),
                 persona = persona,
-                presetModules = listOf(workshopPrompt),
+                presetModules = listOf(workshopPrompt, stateJournalPrompt).filter { it.isNotBlank() },
                 presetSegments = presetSegments,
                 memories = memories,
                 worldbookBeforePersona = worldbookBeforePersona,
@@ -176,6 +194,35 @@ class ChatOrchestrator(
                             saveToDisk = true
                         )
 
+                        if (finalVisible.isNotBlank() && roleCard?.stateJournal != null) {
+                            runCatching {
+                                val statePrompt = stateJournalRepository.analysisPrompt(
+                                    roleCard.stateJournal,
+                                    finalVisible
+                                )
+                                if (statePrompt.isNotBlank()) {
+                                    val stateRequest = LlmRequest(
+                                        model = settings.model,
+                                        system = StateJournalEngine.ANALYSIS_SYSTEM_PROMPT,
+                                        messages = listOf(LlmMessage(role = "user", content = statePrompt)),
+                                        temperature = 0.1,
+                                        stream = false
+                                    )
+                                    var stateResponse = ""
+                                    var stateError: String? = null
+                                    provider.stream(stateRequest).collect { stateEvent ->
+                                        when (stateEvent) {
+                                            is LlmStreamEvent.Token -> stateResponse += stateEvent.text
+                                            is LlmStreamEvent.Error -> stateError = stateEvent.message
+                                            is LlmStreamEvent.Done -> Unit
+                                        }
+                                    }
+                                    stateError?.let { throw IllegalStateException(it) }
+                                    stateJournalRepository.applyAnalysis(roleCard.stateJournal, stateResponse)
+                                }
+                            }
+                        }
+
                         if (parsedContent.visible.isNotBlank() && settings.useSmartSplit) {
                             try {
                                 val subagentPrompt = """
@@ -206,9 +253,9 @@ class ChatOrchestrator(
                                 var subagentResponse = ""
                                 conversationRepository.updateMessageBubbles(assistantMsgId, listOf("子代理正在切分气泡..."), saveToDisk = false)
 
-                                provider.stream(subagentReq).collect { event ->
-                                    if (event is LlmStreamEvent.Token) {
-                                        subagentResponse += event.text
+                                provider.stream(subagentReq).collect { splitEvent ->
+                                    if (splitEvent is LlmStreamEvent.Token) {
+                                        subagentResponse += splitEvent.text
                                         val currentVisible = parseAssistantContent(subagentResponse).visible
                                         val streamingBubbles = currentVisible.split("===")
                                             .map { it.trim() }
@@ -985,14 +1032,14 @@ ${summary.toJsonLikeString()}
 
         val history = conversationRepository.messages.value.filter { it.content.isNotBlank() && it.id != "welcome" }
         if (history.size < 2) {
-            conversationRepository.clearMessages()
             return
         }
 
+        val progressMessageId = "memory_compressing_${UUID.randomUUID()}"
         conversationRepository.addMessage(
             ConversationMessage(
-                id = "memory_compressing_${UUID.randomUUID()}",
-                role = MessageRole.Assistant,
+                id = progressMessageId,
+                role = MessageRole.System,
                 content = "正在压缩记忆中....",
                 createdAt = System.currentTimeMillis()
             )
@@ -1012,19 +1059,33 @@ ${summary.toJsonLikeString()}
 
         try {
             var summary = ""
+            var streamError: String? = null
             provider.stream(request).collect { event ->
-                if (event is LlmStreamEvent.Token) {
-                    summary += event.text
+                when (event) {
+                    is LlmStreamEvent.Token -> summary += event.text
+                    is LlmStreamEvent.Error -> streamError = event.message
+                    is LlmStreamEvent.Done -> Unit
                 }
             }
-            if (summary.isNotBlank()) {
-                val parsed = parseAssistantContent(summary).visible
-                memoryRepository.addMemory(text = parsed, tags = listOf("对话总结"))
+            streamError?.let { throw IllegalStateException(it) }
+
+            val parsed = parseAssistantContent(summary).visible.trim()
+            if (parsed.isBlank()) {
+                throw IllegalStateException("模型没有返回可保存的总结")
             }
+
+            memoryRepository.addConversationSummary(parsed)
+                ?: throw IllegalStateException("总结内容为空，未写入记忆")
+            conversationRepository.resetConversation(
+                "记忆压缩完成，已保存到记忆库。可以开始新一轮对话。"
+            )
         } catch (e: Exception) {
-            // Ignore error or log it
-        } finally {
-            conversationRepository.clearMessages()
+            val reason = e.message?.takeIf { it.isNotBlank() } ?: "未知错误"
+            conversationRepository.updateMessage(
+                id = progressMessageId,
+                newContent = "记忆压缩失败：$reason\n原对话已保留，可以稍后重试。",
+                saveToDisk = true
+            )
         }
         */
     }

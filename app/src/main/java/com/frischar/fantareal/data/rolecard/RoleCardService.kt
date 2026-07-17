@@ -3,6 +3,7 @@ package com.frischar.fantareal.data.rolecard
 import com.frischar.fantareal.core.AppJson
 import com.frischar.fantareal.data.repository.SlotRepository
 import com.frischar.fantareal.data.storage.JsonStore
+import com.frischar.fantareal.data.statejournal.StateJournalRepository
 import com.frischar.fantareal.domain.memory.LongTermMemory
 import com.frischar.fantareal.domain.memory.MemoryTombstone
 import com.frischar.fantareal.domain.rolecard.PersonaRuntime
@@ -14,13 +15,15 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class RoleCardService(
     private val slotRepository: SlotRepository,
-    private val jsonStore: JsonStore = JsonStore()
+    private val jsonStore: JsonStore = JsonStore(),
+    private val stateJournalRepository: StateJournalRepository = StateJournalRepository(slotRepository)
 ) {
     suspend fun loadCurrentRoleCard(): RoleCard? {
         val file = slotRepository.paths.currentRoleCardFile(slotRepository.currentSlotId.value)
@@ -90,6 +93,7 @@ class RoleCardService(
         jsonStore.write(slotRepository.paths.currentRoleCardFile(slotId), RoleCard.serializer(), card)
         jsonStore.write(slotRepository.paths.personaFile(slotId), PersonaRuntime.serializer(), persona)
         slotRepository.paths.rawRoleCardFile(slotId).writeText(rawJson, Charsets.UTF_8)
+        stateJournalRepository.reset(card.stateJournal)
 
         if (clearMemories) {
             jsonStore.write(slotRepository.paths.memoriesFile(slotId), ListSerializer(LongTermMemory.serializer()), emptyList())
@@ -148,6 +152,7 @@ class RoleCardService(
             tags.isNotEmpty() ||
             plotStages != null ||
             personas != null ||
+            stateJournal != null ||
             creativeWorkshop != null
     }
 
@@ -181,8 +186,33 @@ class RoleCardService(
                 tags = data["tags"]?.asStringList().orEmpty(),
                 plotStages = data["plotStages"],
                 personas = data["personas"],
+                stateJournal = data["stateJournal"] ?: data["state_journal"],
                 creativeWorkshop = data["creativeWorkshop"]
             )
+        }
+
+        fun activeStageTags(card: RoleCard): Set<String> {
+            val root = card.stateJournal as? JsonObject ?: return emptySet()
+            if ((root["enabled"] as? JsonPrimitive)?.booleanOrNull == false) return emptySet()
+
+            val explicitTags = root["active_stage_tags"]?.asStringList().orEmpty()
+            val roles = root["roles"] as? JsonArray
+            val roleTags = roles.orEmpty().mapNotNull { roleElement ->
+                val role = roleElement as? JsonObject ?: return@mapNotNull null
+                if ((role["enabled"] as? JsonPrimitive)?.booleanOrNull == false) return@mapNotNull null
+                val stageKey = role.stringValue("active_stage", "current_stage", "initial_stage")
+                if (stageKey.isBlank()) return@mapNotNull null
+                val stages = role["stages"] as? JsonArray
+                val activeStage = stages
+                    ?.mapNotNull { it as? JsonObject }
+                    ?.firstOrNull { it.stringValue("stage_key", "stageKey", "key") == stageKey }
+                activeStage?.stringValue("activation_tag", "activationTag")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: role.stringValue("role_id", "roleId")
+                        .takeIf { it.isNotBlank() }
+                        ?.let { roleId -> "state_journal.stage.$roleId.$stageKey" }
+            }
+            return (explicitTags + roleTags).filter { it.isNotBlank() }.toSet()
         }
 
         private fun JsonObject.stringValue(vararg keys: String): String {

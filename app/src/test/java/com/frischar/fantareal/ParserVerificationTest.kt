@@ -26,6 +26,7 @@ import com.frischar.fantareal.domain.worldbook.InjectionPosition
 import com.frischar.fantareal.domain.worldbook.TriggerLogic
 import com.frischar.fantareal.domain.worldbook.TriggerMode
 import com.frischar.fantareal.domain.worldbook.WorldbookEntry
+import com.frischar.fantareal.domain.worldbook.WorldbookEngine
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
@@ -131,6 +132,69 @@ class ParserVerificationTest {
         assertEquals(listOf("Castle"), entry.primaryTriggers)
         assertEquals("Castle lore.", entry.content)
         assertEquals(1.0, entry.chance, 0.001)
+    }
+
+    @Test
+    fun stateJournalInitialStagesActivateExternalTagWorldbookEntries() {
+        val roleCardJson = """
+            {
+              "name": "Stage Test",
+              "stateJournal": {
+                "version": 1,
+                "enabled": true,
+                "roles": [
+                  {
+                    "role_id": "shen_qixue",
+                    "role_name": "沈栖雪",
+                    "initial_stage": "stage_a",
+                    "stages": [
+                      {
+                        "stage_key": "stage_a",
+                        "stage_name": "A阶段",
+                        "activation_tag": "state_journal.stage.shen_qixue.stage_a"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+        val worldbookJson = """
+            {
+              "entries": [
+                {
+                  "id": "stage_a_entry",
+                  "title": "沈栖雪 · A阶段",
+                  "entry_type": "external_tag",
+                  "activation_tags": ["state_journal.stage.shen_qixue.stage_a"],
+                  "content": "A阶段约束",
+                  "chance": 100
+                },
+                {
+                  "id": "stage_b_entry",
+                  "title": "沈栖雪 · B阶段",
+                  "entry_type": "external_tag",
+                  "activation_tags": ["state_journal.stage.shen_qixue.stage_b"],
+                  "content": "B阶段约束",
+                  "chance": 100
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val roleCard = RoleCardService.parseRoleCardJson(roleCardJson)
+        val activeTags = RoleCardService.activeStageTags(roleCard)
+        val entries = WorldbookService().parseTavernWorldbook(worldbookJson)
+        val matches = WorldbookEngine().scan(
+            entries = entries,
+            userInput = "继续整理卷宗",
+            recentHistory = emptyList(),
+            activeTags = activeTags
+        ).matches
+
+        assertEquals(setOf("state_journal.stage.shen_qixue.stage_a"), activeTags)
+        assertEquals(2, entries.size)
+        assertEquals(listOf("stage_a_entry"), matches.map { it.entry.id })
     }
 
     @Test
@@ -443,6 +507,49 @@ class ParserVerificationTest {
         assertTrue(runtime.contains("Selected item."))
         assertTrue(!runtime.contains("Unselected item."))
         assertTrue(preset.copy(enabled = false).enabledPromptSections().isEmpty())
+    }
+
+    @Test
+    fun presetParserUsesActivePresetAndSelectedPromptGroupItems() {
+        val json = """
+            {
+              "active_preset_id": "active_preset",
+              "presets": [
+                {
+                  "id": "default_preset",
+                  "name": "Default",
+                  "enabled": true,
+                  "content": "Default rule."
+                },
+                {
+                  "id": "active_preset",
+                  "name": "Active",
+                  "enabled": true,
+                  "base_system_prompt": "Base rule.",
+                  "prompt_groups": [
+                    {
+                      "id": "style",
+                      "enabled": true,
+                      "selection_mode": "single",
+                      "selected_ids": ["selected"],
+                      "items": [
+                        {"id": "selected", "enabled": true, "content": "Selected rule."},
+                        {"id": "unselected", "enabled": true, "content": "Unselected rule."}
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val presets = PresetService().parsePresets(json)
+        val active = presets.single { it.id == "active_preset" }
+
+        assertTrue(!presets.single { it.id == "default_preset" }.enabled)
+        assertTrue(active.enabled)
+        assertTrue(active.content.contains("Selected rule."))
+        assertTrue(!active.content.contains("Unselected rule."))
     }
 
     @Test
