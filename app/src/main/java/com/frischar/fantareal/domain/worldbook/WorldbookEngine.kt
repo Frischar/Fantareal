@@ -12,7 +12,8 @@ class WorldbookEngine(
     fun scan(
         entries: List<WorldbookEntry>,
         userInput: String,
-        recentHistory: List<String>
+        recentHistory: List<String>,
+        activeTags: Set<String> = emptySet()
     ): WorldbookScanResult {
         decrementTurnState()
         val sourceText = (recentHistory + userInput).joinToString("\n")
@@ -23,7 +24,7 @@ class WorldbookEngine(
             val roundMatches = entries
                 .filter { it.enabled }
                 .filter { it.id !in matched.map(WorldbookEntry::id) }
-                .filter { shouldInclude(it, scanText) }
+                .filter { shouldInclude(it, scanText, activeTags) }
 
             if (roundMatches.isEmpty()) return@repeat
             matched += roundMatches
@@ -41,9 +42,12 @@ class WorldbookEngine(
         )
     }
 
-    private fun shouldInclude(entry: WorldbookEntry, sourceText: String): Boolean {
+    private fun shouldInclude(entry: WorldbookEntry, sourceText: String, activeTags: Set<String>): Boolean {
         if (stickyRemaining.getOrDefault(entry.id, 0) > 0) return true
         if (cooldownRemaining.getOrDefault(entry.id, 0) > 0) return false
+        if (entry.activationTags.isNotEmpty()) {
+            return entry.activationTags.any(activeTags::contains) && passesChance(entry)
+        }
         if (entry.constant) return passesChance(entry)
         if (entry.primaryTriggers.isEmpty()) return false
         val primaryPasses = when (entry.primaryLogic) {

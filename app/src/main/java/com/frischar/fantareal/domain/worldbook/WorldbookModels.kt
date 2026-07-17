@@ -28,6 +28,7 @@ data class WorldbookEntry(
     val content: String,
     val enabled: Boolean = true,
     val constant: Boolean = false,
+    val activationTags: List<String> = emptyList(),
     val primaryTriggers: List<String> = emptyList(),
     val primaryLogic: TriggerLogic = TriggerLogic.Any,
     val secondaryTriggers: List<String> = emptyList(),

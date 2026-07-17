@@ -20,8 +20,8 @@ android {
         applicationId = "com.frischar.fantareal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 15
-        versionName = "1.6.4"
+        versionCode = 17
+        versionName = "1.6.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

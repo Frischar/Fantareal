@@ -32,7 +32,7 @@ class MemoryViewModel(
 
     fun reload() {
         viewModelScope.launch {
-            _uiState.value = MemoryUiState(memoryRepository.listMemories())
+            _uiState.value = MemoryUiState(loadMemoriesNewestFirst())
         }
     }
 
@@ -59,7 +59,7 @@ class MemoryViewModel(
                     memoryRepository.saveMemories(memories)
                     conversationRepository.resetConversation(personaRepository.persona.value.greeting)
                     _uiState.value = MemoryUiState(
-                        memories = memoryRepository.listMemories(),
+                        memories = loadMemoriesNewestFirst(),
                         statusMessage = "记忆卡已导入并覆盖当前存档"
                     )
                 } else {
@@ -78,5 +78,9 @@ class MemoryViewModel(
             val jsonText = service.exportToJson(memories)
             onExportReady(jsonText)
         }
+    }
+
+    private suspend fun loadMemoriesNewestFirst(): List<LongTermMemory> {
+        return memoryRepository.listMemories().sortedByDescending { it.createdAt }
     }
 }

@@ -43,7 +43,10 @@ class WorldbookService {
             }
         }
 
-        return parsedEntries.filter { it.content.isNotBlank() && (it.constant || it.primaryTriggers.isNotEmpty()) }
+        return parsedEntries.filter {
+            it.content.isNotBlank() &&
+                (it.constant || it.primaryTriggers.isNotEmpty() || it.activationTags.isNotEmpty())
+        }
     }
 
     private fun parseEntry(obj: JsonObject): WorldbookEntry {
@@ -51,7 +54,7 @@ class WorldbookService {
             .takeIf { it.isNotBlank() }
             ?: UUID.randomUUID().toString()
             
-        val comment = obj.stringValue("comment", "title")
+        val comment = obj.stringValue("title", "comment")
             
         val content = obj.stringValue("content")
         
@@ -60,6 +63,7 @@ class WorldbookService {
             ?: entryType.equals("constant", ignoreCase = true)
         
         val primaryTriggers = triggerList(obj["key"] ?: obj["keys"] ?: obj["trigger"] ?: obj["primaryTriggers"] ?: obj["primary_triggers"])
+        val activationTags = triggerList(obj["activation_tags"] ?: obj["activationTags"])
         val secondaryTriggers = triggerList(
             obj["keysecondary"] ?: obj["secondary_keys"] ?: obj["secondary_trigger"] ?: obj["secondaryTriggers"] ?: obj["secondary_triggers"]
         )
@@ -96,6 +100,7 @@ class WorldbookService {
             content = content,
             enabled = enabled,
             constant = constant,
+            activationTags = activationTags,
             primaryTriggers = primaryTriggers,
             primaryLogic = primaryLogic,
             secondaryTriggers = secondaryTriggers,
@@ -121,6 +126,10 @@ class WorldbookService {
                     put("comment", entry.title)
                     put("content", entry.content)
                     put("constant", entry.constant)
+                    if (entry.activationTags.isNotEmpty()) {
+                        put("entry_type", "external_tag")
+                        put("activation_tags", buildJsonArray { entry.activationTags.forEach { add(it) } })
+                    }
                     put("chance", entry.chance)
                     put("sticky_turns", entry.stickyTurns)
                     put("cooldown_turns", entry.cooldownTurns)

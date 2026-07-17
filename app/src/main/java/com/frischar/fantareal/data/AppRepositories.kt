@@ -11,6 +11,7 @@ import com.frischar.fantareal.data.repository.WorkshopRepository
 import com.frischar.fantareal.data.repository.WorldbookRepository
 import com.frischar.fantareal.data.rolecard.RoleCardService
 import com.frischar.fantareal.data.storage.StoragePaths
+import com.frischar.fantareal.data.statejournal.StateJournalRepository
 
 class AppRepositories(context: Context) {
     private val appContext = context.applicationContext
@@ -23,5 +24,6 @@ class AppRepositories(context: Context) {
     val worldbookRepository = WorldbookRepository(slotRepository)
     val presetRepository = PresetRepository(slotRepository)
     val workshopRepository = WorkshopRepository(slotRepository)
-    val roleCardService = RoleCardService(slotRepository)
+    val stateJournalRepository = StateJournalRepository(slotRepository)
+    val roleCardService = RoleCardService(slotRepository, stateJournalRepository = stateJournalRepository)
 }

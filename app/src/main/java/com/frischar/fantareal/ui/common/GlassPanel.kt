@@ -26,6 +26,7 @@ fun GlassPanel(
         modifier = modifier,
         shape = shape,
         color = actualColor,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(borderWidth, actualBorder),
         content = content
     )

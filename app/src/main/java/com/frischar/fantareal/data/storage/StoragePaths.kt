@@ -42,6 +42,8 @@ class StoragePaths(context: Context) {
 
     fun worldbookFile(slotId: String): File = File(slotDir(slotId), "worldbook.json")
 
+    fun stateJournalRuntimeFile(slotId: String): File = File(slotDir(slotId), "state_journal_runtime.json")
+
     private fun sanitizeSlotId(slotId: String): String {
         val normalized = slotId.trim()
         require(normalized.matches(SLOT_ID_PATTERN)) {
