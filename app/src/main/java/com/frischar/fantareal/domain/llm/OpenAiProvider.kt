@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonArray
@@ -13,9 +14,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -67,6 +65,40 @@ class OpenAiProvider(
         .connectTimeout(60, TimeUnit.SECONDS)
         .build()
 
+    suspend fun fetchAvailableModels(): List<String> = withContext(Dispatchers.IO) {
+        val httpReq = Request.Builder()
+            .url(normalizeEndpoint(baseUrl, "models"))
+            .apply {
+                if (apiKey.isNotBlank()) {
+                    addHeader("Authorization", "Bearer $apiKey")
+                }
+            }
+            .get()
+            .build()
+
+        client.newCall(httpReq).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw IllegalStateException("拉取模型失败：HTTP ${response.code}")
+            }
+
+            val responseText = response.body?.string().orEmpty()
+            val root = runCatching { AppJson.parseToJsonElement(responseText) as? JsonObject }
+                .getOrNull()
+                ?: throw IllegalStateException("模型列表接口没有返回有效 JSON")
+            val rows = root["data"] as? JsonArray
+                ?: throw IllegalStateException("模型列表格式无效：缺少 data 数组")
+
+            rows.mapNotNull { item ->
+                (item as? JsonObject)
+                    ?.get("id")
+                    ?.let { it as? JsonPrimitive }
+                    ?.contentOrNull
+                    ?.trim()
+                    ?.takeIf(String::isNotBlank)
+            }.distinct()
+        }
+    }
+
     fun stream(request: LlmRequest): Flow<LlmStreamEvent> = flow {
         val messages = mutableListOf<OpenAiMessage>()
         if (request.system != null) {
@@ -84,7 +116,7 @@ class OpenAiProvider(
         try {
             val jsonBody = AppJson.encodeToString(openAiReq)
             val httpReq = Request.Builder()
-                .url(normalizeEndpoint(baseUrl))
+                .url(normalizeEndpoint(baseUrl, "chat/completions"))
                 .apply {
                     if (apiKey.isNotBlank()) {
                         addHeader("Authorization", "Bearer $apiKey")
@@ -168,18 +200,24 @@ class OpenAiProvider(
         }
     }.flowOn(Dispatchers.IO)
 
-    private fun normalizeEndpoint(value: String): String {
+    private fun normalizeEndpoint(value: String, endpoint: String): String {
         val trimmed = value.trim().trimEnd('/')
         require(trimmed.isNotBlank()) { "API base URL is empty" }
         require(trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
             "API base URL must start with http:// or https://"
         }
-        return if (trimmed.endsWith("/chat/completions")) {
-            trimmed
-        } else if (!trimmed.substringAfter("://", "").contains("/")) {
-            "$trimmed/v1/chat/completions"
+
+        val cleanEndpoint = endpoint.trim('/')
+        val endpointBase = when {
+            trimmed.endsWith("/chat/completions") -> trimmed.removeSuffix("/chat/completions")
+            trimmed.endsWith("/models") -> trimmed.removeSuffix("/models")
+            else -> trimmed
+        }.trimEnd('/')
+
+        return if (!endpointBase.substringAfter("://", "").contains("/")) {
+            "$endpointBase/v1/$cleanEndpoint"
         } else {
-            "$trimmed/chat/completions"
+            "$endpointBase/$cleanEndpoint"
         }
     }
 
