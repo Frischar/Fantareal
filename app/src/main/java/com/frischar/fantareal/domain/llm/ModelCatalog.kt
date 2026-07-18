@@ -82,6 +82,26 @@ internal fun choosePreferredChatModel(
     return chatCandidates.singleOrNull().orEmpty()
 }
 
+internal fun shouldClearApiKeyForProviderSwitch(
+    currentBaseUrl: String,
+    nextBaseUrl: String,
+    apiKey: String
+): Boolean {
+    if (apiKey.isBlank()) return false
+
+    val currentProvider = normalizeProviderBaseUrl(currentBaseUrl)
+    val nextProvider = normalizeProviderBaseUrl(nextBaseUrl)
+    return nextProvider.isNotBlank() && currentProvider != nextProvider
+}
+
+private fun normalizeProviderBaseUrl(value: String): String = value
+    .trim()
+    .trimEnd('/')
+    .removeSuffix("/chat/completions")
+    .removeSuffix("/models")
+    .trimEnd('/')
+    .lowercase()
+
 private fun isClearlyNonChatModel(model: String): Boolean {
     val normalized = model.lowercase()
     return listOf(

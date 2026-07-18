@@ -7,6 +7,7 @@ import com.frischar.fantareal.data.repository.SettingsRepository
 import com.frischar.fantareal.domain.llm.ModelProviderPresets
 import com.frischar.fantareal.domain.llm.OpenAiProvider
 import com.frischar.fantareal.domain.llm.choosePreferredChatModel
+import com.frischar.fantareal.domain.llm.shouldClearApiKeyForProviderSwitch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -95,20 +96,32 @@ class SettingsViewModel(
     fun applyProviderPresetAndFetch() {
         val current = _uiState.value
         val preset = ModelProviderPresets.find(current.selectedProviderId)
+        val nextBaseUrl = preset.baseUrl.ifBlank { current.apiBaseUrl }
+        val clearApiKey = shouldClearApiKeyForProviderSwitch(
+            currentBaseUrl = current.apiBaseUrl,
+            nextBaseUrl = nextBaseUrl,
+            apiKey = current.apiKey
+        )
         _uiState.update {
             it.copy(
-                apiBaseUrl = preset.baseUrl.ifBlank { it.apiBaseUrl },
+                apiBaseUrl = nextBaseUrl,
+                apiKey = if (clearApiKey) "" else it.apiKey,
                 model = when {
                     preset.id == "custom" -> it.model
                     preset.recommendedModel.isNotBlank() -> preset.recommendedModel
                     else -> ""
                 },
                 availableModels = emptyList(),
-                modelStatus = "已填入 ${preset.label} 预设。",
+                modelStatus = if (clearApiKey) {
+                    "已切换至 ${preset.label}；为保护旧服务商密钥，API Key 已清空，请填写新密钥后再获取模型。"
+                } else {
+                    "已填入 ${preset.label} 预设。"
+                },
                 modelStatusIsError = false,
                 saved = false
             )
         }
+        if (clearApiKey) return
         fetchModels(preset.recommendedModel)
     }
 

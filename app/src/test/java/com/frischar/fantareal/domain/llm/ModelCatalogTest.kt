@@ -69,4 +69,32 @@ class ModelCatalogTest {
             )
         )
     }
+
+    @Test
+    fun providerSwitchClearsOnlyCredentialsThatWouldCrossServiceBoundaries() {
+        assertEquals(
+            true,
+            shouldClearApiKeyForProviderSwitch(
+                currentBaseUrl = "https://api.openai.com/v1",
+                nextBaseUrl = "https://api.deepseek.com/v1",
+                apiKey = "openai-key"
+            )
+        )
+        assertEquals(
+            false,
+            shouldClearApiKeyForProviderSwitch(
+                currentBaseUrl = "https://api.openai.com/v1/chat/completions",
+                nextBaseUrl = "https://api.openai.com/v1/",
+                apiKey = "openai-key"
+            )
+        )
+        assertEquals(
+            false,
+            shouldClearApiKeyForProviderSwitch(
+                currentBaseUrl = "https://api.openai.com/v1",
+                nextBaseUrl = "https://api.deepseek.com/v1",
+                apiKey = ""
+            )
+        )
+    }
 }
