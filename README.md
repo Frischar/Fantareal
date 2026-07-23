@@ -1,7 +1,14 @@
 # Fantareal Android
 
 > Fantareal 的原生 Android 客户端。
-> Web 版（Python/FastAPI）位于 [`main`](https://github.com/Frischar/Fantareal/tree/main) 分支；本分支（`android`）是原生 Android 客户端
+> Web 版（Python/FastAPI）位于 [`main`](https://github.com/TeabyteDev/Fantareal/tree/main) 分支；本分支（`android`）是原生 Android 客户端
+
+## 当前版本
+
+- 应用版本：v1.6.6（versionCode 17）
+- 包名：`com.frischar.fantareal`
+- 最低要求：Android 8.0（API 26）
+- 正式版下载：[Android v1.6.6](https://github.com/TeabyteDev/Fantareal/releases/tag/v1.6.6)
 
 ## 功能
 
